@@ -54,7 +54,7 @@ import { MotionProvider } from "./shared/components/motion";
 import { ProtectedRoute } from "./shared/components/ProtectedRoute";
 import { RouteTransition } from "./shared/components/RouteTransition";
 import { ScrollToTop } from "./shared/components/ScrollToTop";
-import { ToastContainer } from "./shared/components/ToastContainer";
+import { Toaster } from "./shared/components/ui/sonner";
 import { ThemeProvider } from "./shared/contexts/ThemeContext";
 import { ToastProvider } from "./shared/contexts/ToastContext";
 import { Header } from "./shared/ui/Header";
@@ -540,7 +540,7 @@ const App: React.FC = () => {
                   <AppContent />
                   <FeedbackModal />
                 </FeedbackProvider>
-                <ToastContainer />
+                <Toaster position="bottom-right" />
               </ToastProvider>
             </AuthProvider>
           </MotionProvider>

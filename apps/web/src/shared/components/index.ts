@@ -21,4 +21,3 @@ export { ProgressBar } from "./ProgressBar";
 
 // Re-export ProtectedRoute for convenience
 export { ProtectedRoute } from "./ProtectedRoute";
-export { ToastContainer } from "./ToastContainer";
