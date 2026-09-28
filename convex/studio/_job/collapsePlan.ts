@@ -1,6 +1,6 @@
 /**
- * Grouping plan for the spreadsheet collapse phase (pure; no LLM calls).
- * @see ./spreadsheetJobPhases.ts `recursiveCollapse`
+ * Grouping plan for Studio collapse phases (pure; no LLM calls).
+ * @see ../spreadsheets/spreadsheetJobPhases.ts `recursiveCollapse`
  */
 
 type EstimateTokens = (text: string) => number;
@@ -21,10 +21,15 @@ export function shouldStopCollapsing(
 /**
  * Packs outputs into groups of roughly `targetTokens` each, preserving order.
  *
- * Every group holds at least two outputs (when there are two or more), so each
- * collapse round at least halves the output count even if the LLM does not
- * shrink the text at all. Without that guarantee, outputs each larger than half
- * the target end up in singleton groups and the collapse never converges.
+ * Every group except possibly the last holds at least two outputs, so each
+ * collapse round turns n outputs into at most ceil(n / 2) even if the LLM does
+ * not shrink the text at all. Without that guarantee, outputs each larger than
+ * half the target end up in singleton groups and the collapse never converges.
+ *
+ * A group only exceeds `targetTokens` when it holds exactly two outputs, so no
+ * group is larger than max(targetTokens, two largest outputs). A trailing
+ * singleton is left as its own group (callers pass it through unchanged) rather
+ * than merged into an already-full group.
  */
 export function planCollapseGroups(
   outputs: string[],
@@ -48,9 +53,7 @@ export function planCollapseGroups(
     }
   }
 
-  if (currentGroup.length === 1 && groups.length > 0) {
-    groups[groups.length - 1].push(currentGroup[0]);
-  } else if (currentGroup.length > 0) {
+  if (currentGroup.length > 0) {
     groups.push(currentGroup);
   }
 

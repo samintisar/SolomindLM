@@ -34,9 +34,10 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
+import { planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
 import { type InvokeStudioLlmOptions, invokeStudioLlm } from "../_job/invokeStudioLlm";
 import { createJobDeadline, type JobDeadline } from "../_job/jobDeadline";
-import { planCollapseGroups, shouldStopCollapsing } from "./collapsePlan";
 
 // ============================================================
 // CONFIGURATION
@@ -51,10 +52,13 @@ const CONFIG = {
   // Finalization must end (saved or marked failed) before Convex's 600s action
   // limit, which kills the action without running its catch block.
   FINALIZE_BUDGET_MS: 540_000,
-  REDUCE_RESERVE_MS: 150_000, // held back from collapse rounds for the reduce call
-  MIN_COLLAPSE_CALL_MS: 60_000, // skip further collapse rounds below this per-call budget
+  REDUCE_RESERVE_MS: 270_000, // held back from collapse rounds: up to 240s of reduce + save
+  MIN_COLLAPSE_CALL_MS: 60_000, // skip collapse calls below this per-call budget
   SAVE_RESERVE_MS: 30_000, // held back from reduce for title generation + saving
   TITLE_TIMEOUT_MS: 20_000,
+  // Largest combined collapse output sent to the reduce call; beyond this the
+  // prompt cannot fit the model context alongside a 32k-token response.
+  REDUCE_MAX_INPUT_TOKENS: 100_000,
 } as const;
 
 export type SpreadsheetGenerationPhaseArgs = {
@@ -621,32 +625,20 @@ export async function runFinalizeSpreadsheetPhase(
       },
     });
 
-    // Stage 1: Collapse (if needed)
-    let collapsedOutputs: string[];
+    // Stage 1: Collapse (recursiveCollapse returns the outputs as-is when not needed)
     let reduceUsage: TokenUsage | undefined;
 
-    const totalTokens = allOutputs.reduce((sum, s) => sum + estimateTokens(s), 0);
-
-    if (shouldStopCollapsing(allOutputs, CONFIG.REDUCE_CHUNK_SIZE_TOKENS, estimateTokens)) {
-      console.log(
-        `[SpreadsheetJob] Skipping collapse (${totalTokens} tokens, ${allOutputs.length} outputs)`
-      );
-      collapsedOutputs = allOutputs;
-    } else {
-      console.log(
-        `[SpreadsheetJob] Collapsing ${allOutputs.length} outputs (${totalTokens} tokens)`
-      );
-      collapsedOutputs = await recursiveCollapse(
-        allOutputs,
-        spreadsheetType,
-        customPrompt,
-        deadline,
-        language,
-        (usage) => {
-          reduceUsage = addTokenUsage(reduceUsage, usage);
-        }
-      );
-    }
+    console.log(`[SpreadsheetJob] Collapse input: ${allOutputs.length} outputs`);
+    const collapsedOutputs = await recursiveCollapse(
+      allOutputs,
+      spreadsheetType,
+      customPrompt,
+      deadline,
+      language,
+      (usage) => {
+        reduceUsage = addTokenUsage(reduceUsage, usage);
+      }
+    );
 
     // Update status for reduce
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
@@ -661,6 +653,12 @@ export async function runFinalizeSpreadsheetPhase(
 
     // Stage 2: Reduce (Generate CSV)
     const combined = collapsedOutputs.join("\n\n---\n\n");
+    const combinedTokens = countTokens(combined);
+    if (combinedTokens > CONFIG.REDUCE_MAX_INPUT_TOKENS) {
+      throw new Error(
+        `Sources too large to consolidate in time: ${combinedTokens} estimated tokens remain after collapsing (limit ${CONFIG.REDUCE_MAX_INPUT_TOKENS}). Try fewer sources.`
+      );
+    }
 
     // Get the reduce prompt based on spreadsheet type
     const reducePromptTemplate =
@@ -723,10 +721,7 @@ export async function runFinalizeSpreadsheetPhase(
     if (allOutputs.length > 0) {
       try {
         title = await invokeWithTimeout(
-          () =>
-            ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-              chunk: allOutputs[0],
-            }),
+          () => generateTitleFromChunk(allOutputs[0]),
           deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
           "SpreadsheetTitle"
         );
@@ -803,7 +798,7 @@ export async function runFinalizeSpreadsheetPhase(
 // HELPER: Recursive Collapse
 // ============================================================
 
-async function recursiveCollapse(
+export async function recursiveCollapse(
   textOutputs: string[],
   spreadsheetType: string,
   customPrompt: string,
@@ -811,7 +806,7 @@ async function recursiveCollapse(
   language?: string,
   onUsage?: (usage: TokenUsage) => void
 ): Promise<string[]> {
-  if (shouldStopCollapsing(textOutputs, CONFIG.REDUCE_CHUNK_SIZE_TOKENS, estimateTokens)) {
+  if (shouldStopCollapsing(textOutputs, CONFIG.REDUCE_CHUNK_SIZE_TOKENS, countTokens)) {
     return textOutputs;
   }
 
@@ -825,7 +820,7 @@ async function recursiveCollapse(
     return textOutputs;
   }
 
-  const groups = planCollapseGroups(textOutputs, CONFIG.REDUCE_CHUNK_SIZE_TOKENS, estimateTokens);
+  const groups = planCollapseGroups(textOutputs, CONFIG.REDUCE_CHUNK_SIZE_TOKENS, countTokens);
 
   console.log(`[SpreadsheetJob] Collapsing ${groups.length} token-aware groups`);
 
@@ -833,6 +828,16 @@ async function recursiveCollapse(
     groups.map((group, idx) => {
       return async () => {
         const combined = group.join("\n\n---\n\n");
+        if (group.length === 1) {
+          return combined; // Trailing singleton: nothing to merge
+        }
+        // Groups queued behind earlier waves start later, so re-check the budget
+        // here instead of firing a call that would be abandoned almost at once.
+        const timeoutMs = collapseCallBudgetMs();
+        if (timeoutMs < CONFIG.MIN_COLLAPSE_CALL_MS) {
+          console.log(`[SpreadsheetJob] Collapse group ${idx} skipped: out of time budget`);
+          return combined;
+        }
         const collapsePromptTemplate =
           customPrompt && customPrompt.trim()
             ? COLLAPSE_PROMPTS["custom"]
@@ -854,7 +859,7 @@ async function recursiveCollapse(
                 reasoningEnabled: true,
                 onUsage,
               }),
-            timeoutMs: collapseCallBudgetMs(),
+            timeoutMs,
             phaseLabel: "CollapseGroup",
           });
         } catch (error) {
@@ -869,15 +874,26 @@ async function recursiveCollapse(
   return recursiveCollapse(collapsed, spreadsheetType, customPrompt, deadline, language, onUsage);
 }
 
-/** Rough token estimate used for collapse grouping (~3 chars per token). */
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3);
-}
-
 /**
  * Runs a studio LLM call with `timeoutMs` bounding all retry attempts together,
  * not just each attempt, so a flaky provider cannot push past the job deadline.
+ *
+ * Each attempt only gets what is left of the shared budget, and no attempt starts
+ * once it is spent (the timeout error is non-retryable), so the retry loop ends
+ * with the budget instead of carrying on in the background.
  */
-function invokeWithinBudget<T>(options: InvokeStudioLlmOptions<T>): Promise<T> {
-  return invokeWithTimeout(() => invokeStudioLlm(options), options.timeoutMs, options.phaseLabel);
+export function invokeWithinBudget<T>(options: InvokeStudioLlmOptions<T>): Promise<T> {
+  const budget = createJobDeadline(options.timeoutMs);
+  return invokeStudioLlm({
+    ...options,
+    invoke: () => {
+      const remainingMs = budget.remainingMs();
+      if (remainingMs <= 0) {
+        return Promise.reject(
+          new Error(`${options.phaseLabel} timeout after ${options.timeoutMs}ms`)
+        );
+      }
+      return invokeWithTimeout(options.invoke, remainingMs, options.phaseLabel);
+    },
+  });
 }

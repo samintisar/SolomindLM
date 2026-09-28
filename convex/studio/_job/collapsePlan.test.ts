@@ -35,18 +35,31 @@ describe("planCollapseGroups", () => {
     const groups = planCollapseGroups(outputs, 10, estimate);
 
     expect(groups.length).toBeLessThan(outputs.length);
-    for (const group of groups) {
+    for (const group of groups.slice(0, -1)) {
       expect(group.length).toBeGreaterThanOrEqual(2);
     }
     expect(groups.flat()).toEqual(outputs);
   });
 
-  it("merges an oversized leading output into the following group", () => {
+  it("pairs an oversized leading output with the next one and leaves a trailing singleton alone", () => {
     const [big, s1, s2] = [out(12, "a"), out(3, "b"), out(3, "c")];
-    expect(planCollapseGroups([big, s1, s2], 10, estimate)).toEqual([[big, s1, s2]]);
+    expect(planCollapseGroups([big, s1, s2], 10, estimate)).toEqual([[big, s1], [s2]]);
   });
 
-  it("at least halves the output count every round, even when collapsing never shrinks text", () => {
+  it("never puts more than two outputs in a group that exceeds the target", () => {
+    const outputs = [out(30, "a"), out(30, "b"), out(30, "c"), out(30, "d"), out(30, "e")];
+    const groups = planCollapseGroups(outputs, 10, estimate);
+
+    for (const group of groups) {
+      const tokens = group.reduce((sum, text) => sum + estimate(text), 0);
+      if (tokens > 10) {
+        expect(group.length).toBeLessThanOrEqual(2);
+      }
+    }
+    expect(groups.flat()).toEqual(outputs);
+  });
+
+  it("roughly halves the output count every round, even when collapsing never shrinks text", () => {
     // Worst case: the LLM returns something as large as its input. Each round
     // must still reduce the count so the loop terminates.
     let outputs = Array.from({ length: 71 }, (_, i) => out(9, String.fromCharCode(65 + (i % 26))));
@@ -54,7 +67,7 @@ describe("planCollapseGroups", () => {
 
     while (!shouldStopCollapsing(outputs, 10, estimate)) {
       const groups = planCollapseGroups(outputs, 10, estimate);
-      expect(groups.length).toBeLessThanOrEqual(Math.floor(outputs.length / 2));
+      expect(groups.length).toBeLessThanOrEqual(Math.ceil(outputs.length / 2));
       outputs = groups.map((group) => group.join(""));
       rounds++;
       expect(rounds).toBeLessThan(10);
