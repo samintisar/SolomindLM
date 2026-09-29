@@ -2,10 +2,10 @@ import { X } from "lucide-react";
 import { useToast } from "../contexts/useToast";
 
 const toastStyles = {
-  success: "bg-vintage-green-50 border-vintage-green-200 text-vintage-green-700",
-  error: "bg-vintage-red-50 border-vintage-red-200 text-vintage-red-700",
-  info: "bg-vintage-blue-50 border-vintage-blue-200 text-vintage-blue-700",
-  loading: "bg-vintage-amber-50 border-vintage-amber-200 text-vintage-amber-800",
+  success: "bg-success-muted border-success-border text-success-muted-foreground",
+  error: "bg-destructive-muted border-destructive-border text-destructive-muted-foreground",
+  info: "bg-info-muted border-info-border text-info-muted-foreground",
+  loading: "bg-warning-muted border-warning-border text-warning-muted-foreground",
 };
 
 export function ToastContainer() {

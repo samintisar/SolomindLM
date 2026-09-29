@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
+import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import type { ChatSettings } from "@/shared/types";
 
 // ============================================================
@@ -42,7 +43,7 @@ export function useCreateNotebook() {
           year: "numeric",
         }),
         sourceCount: 0,
-        coverColor: args.coverColor || "bg-vintage-brown-300",
+        coverColor: args.coverColor || DEFAULT_COVER_COLOR,
         icon: args.icon || "Folder",
         isFeatured: args.isFeatured || false,
         isSharedNotebook: false,
