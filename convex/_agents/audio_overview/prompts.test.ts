@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getMapPrompt, getReducePrompt } from "./prompts";
+import { getContinuationPrompt, getMapPrompt, getReducePrompt } from "./prompts";
 
 const baseParams = {
   content: "BEATS",
@@ -34,5 +34,22 @@ describe("getMapPrompt", () => {
     const chunk = "Let $x$ be real; then $&x$ and $'y$ hold.";
 
     expect(getMapPrompt("deep_dive", chunk)).toContain(chunk);
+  });
+});
+
+describe("getContinuationPrompt", () => {
+  it("includes the beats, the script so far and the turn budget with no unfilled placeholders", () => {
+    const prompt = getContinuationPrompt({
+      content: "BEATS",
+      scriptSoFar: [{ speaker: "host_a", text: "Last line so far." }],
+      turns: 42,
+      audioType: "deep_dive",
+      focus: "general overview",
+    });
+
+    expect(prompt).toContain("BEATS");
+    expect(prompt).toContain("Last line so far.");
+    expect(prompt).toMatch(/\b42\b/);
+    expect(prompt).not.toMatch(/\{(content|scriptSoFar|turns|audioType|focus)\}/);
   });
 });

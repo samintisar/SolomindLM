@@ -8,6 +8,7 @@
  */
 
 import { fillTemplate } from "../_shared/promptTemplate";
+import type { DialogueLine } from "./state";
 
 // ============================================================
 // System Prompts
@@ -85,8 +86,8 @@ uneven, lifelike dialogue:
 - AHA:         A connection between two ideas the source doesn't draw explicitly.
 - RECAP:       A short summary the hosts can use to round out a stretch.
 - NAMED_ITEM:  Use ONLY when the chunk introduces a discrete named-list item
-               (e.g. "Pattern: prompt chaining — break a task into ordered
-               steps."). Use the exact name verbatim. The reducer relies on
+               (a stage, principle, rule, step, type, or law the source names
+               and enumerates). Use the exact name verbatim. The reducer relies on
                these to guarantee complete coverage of the source's named list.
                Emit ONE NAMED_ITEM per named item appearing in this chunk; do
                not collapse them.
@@ -98,12 +99,12 @@ count against the 8–12 target — emit them in addition.
 
 Format: each beat on its own line, prefixed with the type and a colon.
 
-Illustrative example (do not copy the wording):
-CLAIM: The author benchmarks routing at 85% F1 across a 5k-intent test set.
-PUSHBACK: 85% F1 looks fine on paper, but he doesn't break it out by category — the long-tail intents could be much worse.
-FOLLOWUP: What does the system do when the router's softmax sits right at the threshold?
-HESITATION: He's loose on what "threshold" means here — at one point it's 0.7, later he writes 0.65 without flagging the change.
-NAMED_ITEM: Pattern: routing — a small classifier dispatches incoming work to a downstream agent or tool.
+Illustrative example (unrelated topic — do not copy the wording):
+CLAIM: The study followed 1,200 households for six years and found savings rates fell 4 points after the tax change.
+PUSHBACK: Six years sounds solid, but they only surveyed urban households — rural savers could look completely different.
+FOLLOWUP: What happens to the result if the tax change and the recession overlapped in the same year?
+HESITATION: The source is loose on "household" — early on it counts roommates, later it doesn't, without flagging the switch.
+NAMED_ITEM: Stage 2: consolidation — the new habit is repeated until it no longer needs a reminder.
 
 TEXT TO ANALYZE:
 {chunk}`,
@@ -211,14 +212,14 @@ ANTI-REPETITION:
 HOST VOICES:
 
 host_a is the domain expert. Passionate but a bit scattered. Often self-corrects mid-thought. Drops in specific numbers and proper nouns casually.
-Sample:
-  "Look, prompt chaining is basically—you don't ask the model to do five things at once. You break it into steps. Output of step one goes to step two. The reason it works is... well, if step three fails, it fails loudly in isolation. You actually know what broke."
-  "Right, but routing is completely different. That's just a classifier sitting at the front door deciding which agent gets the ticket. It's cheap, but if you don't tune the threshold, it's wrong half the time."
+Sample (unrelated topic — match the voice, not the content):
+  "Look, the whole trick with compound interest is—you're not earning on what you put in, you're earning on what you earned. Year one it's boring. Year twenty it's most of the balance. That's why the first ten years matter more than people think."
+  "Right, but inflation is a completely different animal. It doesn't care about your balance, it eats the purchasing power of every dollar. Three percent a year sounds tiny until you realize prices double in about twenty-four years."
 
 host_b is the skeptical audience surrogate. Doesn't just ask questions—challenges assumptions and tries to translate expert jargon into normal terms.
 Sample:
-  "Wait, 'fails loudly' sounds great in theory, but doesn't the user just end up staring at a wall of broken JSON when step three crashes?"
-  "So routing is just a traffic cop. But what happens when a request is weird and doesn't fit any of your predefined buckets? Does it just guess?"
+  "Wait, 'the first ten years matter more' sounds great in theory, but who actually has spare money to invest at twenty-two?"
+  "So inflation is basically a slow leak. But if everything costs more, don't wages go up too? Or is that the catch?"
 
 DO NOT include the host names "Asteria" or "Orion" in the dialogue text. Just write
 their lines. The speaker labels are JSON metadata.
@@ -231,10 +232,10 @@ Start mid-thought, with something specific to this material — a number, a cont
 a half-finished question. Never a stock podcast opener. Never "So, today we're talking
 about..." or "Welcome back."
 
-NAMED-LIST RECAP (only when applicable):
-If the source enumerates a discrete named list and you couldn't cover them all, give ONE of the hosts a casual, hand-wavy recap turn. Do not sound like a robot reading a checklist. Group them or speed-run them naturally.
-Example shape (do NOT copy wording literally):
-  host_a: "There's like ten others in the book—stuff like multi-agent collaboration, memory management, goal setting... we'd be here all day if we went through them. But they mostly fall into that same bucket of keeping the LLM on rails."
+NAMED LISTS (only when applicable):
+If the beats include NAMED_ITEM entries and the hosts can't dig into all of them, give ONE of the hosts a quick, casual run-through turn for the rest. Group them or speed-run them naturally — not a robot reading a checklist.
+Example shape (unrelated topic — do NOT copy wording):
+  host_a: "The other three stages go fast—storming, norming, then performing. Honestly the model gets criticized for implying teams move through them in order, which the source admits they usually don't."
 
 ENDING:
 Only after generating close to {targetLines} turns, give host_b one brief closing
@@ -250,6 +251,35 @@ SOURCE MATERIAL (dialogue beats):
 {content}
 
 Generate the dialogue script as a JSON array. Output ONLY the JSON, no markdown formatting:`;
+
+/** Continues a dialogue script that ended early or was cut off. */
+export const CONTINUATION_PROMPT = `You are continuing a two-host podcast script that stopped before it was finished. Write the NEXT dialogue turns so the conversation picks up seamlessly from the last line of the script so far.
+
+Output ONLY a valid JSON array of the NEW dialogue lines (do not repeat the script so far):
+[
+  {"speaker": "host_a", "text": "..."},
+  {"speaker": "host_b", "text": "..."}
+]
+
+RULES:
+- Write approximately {turns} new turns.
+- The first new turn must respond naturally to the last line of the script so far.
+- Prioritize beats from the source material that the script so far has not covered, or covered only in passing. Go deeper on them: consequences, edge cases, disagreements, concrete numbers and names from the beats.
+- Do NOT restate points, examples, or analogies already used in the script so far. Do NOT restart the episode or re-introduce the topic.
+- Keep the same voices: host_a is the scattered but specific domain expert; host_b is the skeptical audience surrogate who challenges and translates.
+- Do not use "..." as a stylistic pause. Do not include host names in the text.
+- End with host_b giving one brief closing turn (1–2 sentences), then close the JSON array.
+
+AUDIO TYPE: {audioType}
+FOCUS AREA: {focus}
+
+SOURCE MATERIAL (dialogue beats):
+{content}
+
+SCRIPT SO FAR (JSON):
+{scriptSoFar}
+
+Write the next ~{turns} turns as a JSON array. Output ONLY the JSON, no markdown formatting:`;
 
 // ============================================================
 // Helper Functions
@@ -283,6 +313,25 @@ export function getReducePrompt(params: {
     audioType: params.audioType,
     targetLines: params.targetLines.toString(),
     estimatedWords: estimatedWords.toString(),
+    focus: params.focus || "general overview",
+  });
+}
+
+/**
+ * Gets the continuation prompt for extending a script that ended early or was cut off.
+ */
+export function getContinuationPrompt(params: {
+  content: string;
+  scriptSoFar: DialogueLine[];
+  turns: number;
+  audioType: AudioType;
+  focus: string;
+}): string {
+  return fillTemplate(CONTINUATION_PROMPT, {
+    content: params.content,
+    scriptSoFar: JSON.stringify(params.scriptSoFar),
+    turns: params.turns.toString(),
+    audioType: params.audioType,
     focus: params.focus || "general overview",
   });
 }
