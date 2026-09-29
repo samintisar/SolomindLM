@@ -94,7 +94,7 @@ function SubmitButton(props: {
 }) {
   return (
     <Button type="submit" size="lg" className="w-full" disabled={props.disabled}>
-      {props.loading ? <Spinner data-icon="inline-start" /> : null}
+      {props.loading ? <Spinner aria-hidden /> : null}
       {props.loading ? props.loadingLabel : props.label}
     </Button>
   );
@@ -247,11 +247,7 @@ function AuthFormPanelContent({
             onClick={handleGoogleSignIn}
             disabled={disableAll}
           >
-            {googleLoading ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <GoogleIcon className="size-5" />
-            )}
+            {googleLoading ? <Spinner aria-hidden /> : <GoogleIcon className="size-5" />}
             {googleLoading ? "Connecting…" : "Continue with Google"}
           </Button>
 
