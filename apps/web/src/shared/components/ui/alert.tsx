@@ -10,7 +10,7 @@ const alertVariants = cva(
         default: "bg-card text-card-foreground",
         // Semantic status tokens: tinted surface + AA-contrast text (see tokenContrast.test.ts).
         destructive:
-          "border-destructive-border bg-destructive-muted text-destructive-muted-foreground [&>svg]:text-destructive",
+          "border-destructive-border bg-destructive-muted text-destructive-muted-foreground [&>svg]:text-destructive *:data-[slot=alert-description]:text-destructive-muted-foreground",
       },
     },
     defaultVariants: {
