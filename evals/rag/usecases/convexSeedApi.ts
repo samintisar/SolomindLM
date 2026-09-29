@@ -3,6 +3,8 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { PackSeedApi } from "./seedClient";
 
+const UPLOAD_TIMEOUT_MS = 60_000;
+
 /** PackSeedApi over the gated actions in convex/eval/seedEvalAction.ts. */
 export function createConvexSeedApi(convexUrl: string, evalSecret: string): PackSeedApi {
   const client = new ConvexHttpClient(convexUrl);
@@ -19,12 +21,18 @@ export function createConvexSeedApi(convexUrl: string, evalSecret: string): Pack
         method: "POST",
         headers: { "Content-Type": file.contentType },
         body: new Blob([new Uint8Array(file.bytes)], { type: file.contentType }),
+        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
       });
       if (!response.ok) {
-        throw new Error(`Upload of ${file.fileName} failed: HTTP ${response.status}`);
+        throw new Error(
+          `Upload of ${file.fileName} failed: HTTP ${response.status} ${await response.text()}`
+        );
       }
-      const { storageId } = (await response.json()) as { storageId: string };
-      return storageId;
+      const body = (await response.json()) as { storageId?: unknown };
+      if (typeof body.storageId !== "string" || body.storageId === "") {
+        throw new Error(`Upload of ${file.fileName} returned no storageId`);
+      }
+      return body.storageId;
     },
     add: ({ notebookId, storageId, file }) =>
       client.action(api.eval.seedEvalAction.addPackDocument, {

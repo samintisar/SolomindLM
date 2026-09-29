@@ -11,21 +11,11 @@
 import { getPack, USE_CASE_PACKS } from "./usecases";
 import { createConvexSeedApi } from "./usecases/convexSeedApi";
 import { assertNotProdConvexUrl } from "./usecases/prodGuard";
+import { parseSeedArgs } from "./usecases/seedArgs";
 import { seedPack } from "./usecases/seedClient";
 import { readPackSources } from "./usecases/sources";
 import type { RegisteredPack } from "./usecases/types";
 import { validatePack } from "./usecases/validate";
-
-function selectedPackIds(args: string[]): string[] {
-  const index = args.indexOf("--use-case");
-  if (index === -1) return USE_CASE_PACKS.map((p) => p.pack.id);
-  const value = args[index + 1] ?? "";
-  if (value === "all") return USE_CASE_PACKS.map((p) => p.pack.id);
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 function fatal(message: string): never {
   console.error(`FATAL: ${message}`);
@@ -45,9 +35,12 @@ async function main(): Promise<void> {
   }
 
   // Resolve every requested pack up front so a typo fails before anything is seeded.
-  const packIds = selectedPackIds(process.argv.slice(2));
   const packs: RegisteredPack[] = [];
   try {
+    const packIds = parseSeedArgs(
+      process.argv.slice(2),
+      USE_CASE_PACKS.map((p) => p.pack.id)
+    );
     for (const id of packIds) packs.push(getPack(id));
   } catch (err) {
     fatal(err instanceof Error ? err.message : String(err));
