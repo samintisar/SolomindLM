@@ -212,6 +212,7 @@ export const TourTooltip: React.FC = () => {
         <PopoverContent
           side={step.side}
           sideOffset={12}
+          collisionPadding={8}
           updatePositionStrategy="always"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
@@ -223,7 +224,8 @@ export const TourTooltip: React.FC = () => {
             <span>
               {stepNumber} of {TOTAL_STEPS}
             </span>
-            <Button variant="link" size="sm" onClick={handleSkip}>
+            {/* -mr-4 cancels size sm's px-4 so the label lines up with the popover's padding edge. */}
+            <Button variant="link" size="sm" className="-mr-4" onClick={handleSkip}>
               Skip tour
             </Button>
           </div>
