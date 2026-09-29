@@ -152,6 +152,52 @@ export const storeAudioOverviewMapResult = internalMutation({
   },
 });
 
+const tokenUsageValidator = v.object({
+  prompt: v.number(),
+  completion: v.number(),
+  total: v.number(),
+});
+
+/**
+ * Hands the finished script to the synthesis phase, which runs as its own action so TTS gets a
+ * full action time budget. Returns false if the row was deleted.
+ */
+export const storeAudioOverviewScript = internalMutation({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    script: v.array(
+      v.object({
+        speaker: v.union(v.literal("host_a"), v.literal("host_b")),
+        text: v.string(),
+      })
+    ),
+    title: v.string(),
+    reduce: v.object({
+      latencyMs: v.number(),
+      tokenUsage: v.optional(tokenUsageValidator),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    if (!audioOverview) return false;
+
+    await ctx.db.patch(args.audioOverviewId, {
+      status: "generating",
+      updatedAt: Date.now(),
+      metadata: {
+        ...audioOverview.metadata,
+        phase: "synthesizing",
+        progress: 70,
+        currentStep: "Synthesizing audio...",
+        dialogueScript: args.script,
+        pendingTitle: args.title,
+        reduceTelemetry: args.reduce,
+      },
+    });
+    return true;
+  },
+});
+
 export const clearAudioOverviewMapData = internalMutation({
   args: {
     audioOverviewId: v.id("audioOverviews"),
@@ -160,7 +206,13 @@ export const clearAudioOverviewMapData = internalMutation({
     const audioOverview = await ctx.db.get(args.audioOverviewId);
     if (!audioOverview) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } = audioOverview.metadata || {};
+    const {
+      mapResults: _mapResults,
+      dialogueScript: _dialogueScript,
+      pendingTitle: _pendingTitle,
+      reduceTelemetry: _reduceTelemetry,
+      ...restMetadata
+    } = audioOverview.metadata || {};
     await ctx.db.patch(args.audioOverviewId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

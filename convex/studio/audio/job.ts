@@ -11,6 +11,7 @@ import {
   runAudioOverviewGenerationPhase,
   runFinalizeAudioOverviewPhase,
   runProcessAudioMapChunkPhase,
+  runSynthesizeAudioOverviewPhase,
 } from "./audioJobPhases";
 
 export const audioOverviewGeneration = internalAction({
@@ -50,5 +51,17 @@ export const finalizeAudioOverviewPhase = internalAction({
   handler: async (ctx, args) => {
     "use node";
     await runFinalizeAudioOverviewPhase(ctx, args);
+  },
+});
+
+export const synthesizeAudioOverviewPhase = internalAction({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    userId: v.string(),
+    notebookId: v.id("notebooks"),
+  },
+  handler: async (ctx, args) => {
+    "use node";
+    await runSynthesizeAudioOverviewPhase(ctx, args);
   },
 });
