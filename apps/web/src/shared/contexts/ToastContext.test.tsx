@@ -101,14 +101,21 @@ describe("ToastProvider (sonner adapter)", () => {
     expect(sonner.success).toHaveBeenCalledWith("Saved", expect.anything());
   });
 
-  it("passes id and action through", () => {
+  it("passes id and action through, keeping the toast open on action click", () => {
     const { result } = renderToastHook();
     const onClick = vi.fn();
     result.current.info("Undo?", { id: "undo-1", action: { label: "Undo", onClick } });
     expect(sonner.info).toHaveBeenCalledWith(
       "Undo?",
-      expect.objectContaining({ id: "undo-1", action: { label: "Undo", onClick } })
+      expect.objectContaining({ id: "undo-1", action: expect.objectContaining({ label: "Undo" }) })
     );
+    const passedAction = vi.mocked(sonner.info).mock.calls[0][1]?.action as unknown as {
+      onClick: (event: { preventDefault: () => void }) => void;
+    };
+    const preventDefault = vi.fn();
+    passedAction.onClick({ preventDefault });
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(preventDefault).toHaveBeenCalledOnce();
   });
 
   it("dismiss forwards to sonner", () => {

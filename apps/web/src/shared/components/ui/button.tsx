@@ -16,9 +16,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:-translate-y-px hover:bg-primary/88 hover:shadow-lg hover:shadow-primary/35 active:translate-y-0 active:scale-98 active:shadow-md",
+          "rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 dark:shadow-primary/30 hover:-translate-y-px hover:bg-primary/88 hover:shadow-lg hover:shadow-primary/35 dark:hover:shadow-primary/40 active:translate-y-0 active:scale-98 active:bg-primary/95 active:shadow-md",
         destructive:
-          "rounded-xl bg-destructive text-destructive-foreground shadow-md shadow-destructive/25 hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35 active:translate-y-0 active:scale-98",
+          "rounded-xl bg-destructive text-destructive-foreground shadow-md shadow-destructive/25 dark:shadow-destructive/35 hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35 active:translate-y-0 active:scale-98",
         outline:
           "rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:bg-accent/60 hover:text-accent-foreground active:scale-98",
         secondary:

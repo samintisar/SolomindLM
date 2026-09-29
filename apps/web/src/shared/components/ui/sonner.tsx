@@ -7,13 +7,14 @@ import {
 } from "lucide-react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { useTheme } from "@/shared/contexts/useTheme";
+import { cn } from "@/shared/utils/cn";
 
-function Toaster(props: ToasterProps) {
+function Toaster({ className, ...props }: ToasterProps) {
   const { theme } = useTheme();
   return (
     <Sonner
       theme={theme}
-      className="toaster group"
+      className={cn("toaster group", className)}
       closeButton
       mobileOffset={{ bottom: "calc(16px + env(safe-area-inset-bottom))" }}
       icons={{

@@ -17,9 +17,17 @@ let counter = 0;
 function show(message: string, options: Partial<Toast> = {}): string {
   const type = options.type ?? "info";
   const id = options.id ?? `toast-${++counter}`;
+  const { action } = options;
   const external = {
     id,
-    action: options.action,
+    // sonner closes the toast after an action click; preventDefault keeps it open like before.
+    action: action && {
+      label: action.label,
+      onClick: (event: { preventDefault: () => void }) => {
+        event.preventDefault();
+        action.onClick();
+      },
+    },
     duration: durationFor(type, options.duration),
   };
   sonner[type](message, external);

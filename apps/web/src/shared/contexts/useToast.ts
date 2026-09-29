@@ -19,7 +19,7 @@ export interface ToastContextValue {
   error: (message: string, options?: Partial<Toast>) => string;
   info: (message: string, options?: Partial<Toast>) => string;
   loading: (message: string, options?: Partial<Toast>) => string;
-  dismiss: (id?: string) => void;
+  dismiss: (id: string) => void;
 }
 
 export const ToastContext = createContext<ToastContextValue | undefined>(undefined);
