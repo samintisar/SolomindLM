@@ -81,6 +81,8 @@ Documents in the notebook that don't match a manifest file are left untouched.
 - `addPackDocument({ evalSecret, notebookId, storageId, fileName, contentType, sha256 })`: inserts a `file` document through an internal mutation (no plan source limit) and schedules `internal.documents.embeddingJob.docEmbedding`, the same ingestion path as user uploads
 - `removePackDocument({ evalSecret, documentId })`: deletes chunks, stored file, and document through a new internal mutation. It reuses `deleteAllChunksForDocument` and mirrors the cleanup in the public `documents.remove` (which requires user auth). It refuses documents outside a notebook owned by the eval owner.
 
+- `getPackSourceText({ evalSecret, documentIds })` → `[{ fileName, text }]`: extracted text for rubric judges (section 4), limited to the eval owner's documents
+
 The owner is resolved on the server from `RAG_EVAL_OWNER_EMAIL`. Callers never pass a user id.
 
 **Flow per pack:** resolve the notebook (create it if missing) → plan → upload file bytes straight to the storage URL → add, replace, or skip each document → poll every 5 s until every planned document is `completed`, with a 10-minute timeout per pack → print notebook id, doc count, and chunk count.
@@ -118,6 +120,8 @@ interface RubricCheck {
 ```
 
 **Scoring:** `scoreRubricMetrics(fixture, artifact, pack)` in `evals/rag/metrics/rubric.ts` runs each check that applies to `artifact.runner`. It uses the existing binary-judge invoker (`createTogetherJudgeInvoker`) and one generic prompt template: check question, formatted output, and source excerpts when `evidence: "sources"`. It emits one `MetricResult` per check, named `rubric:<pack-id>:<check-id>`, scored pass/fail with the judge's reason.
+
+**Source evidence for studio runners:** studio artifacts carry no retrieved chunks (`selectedChunks: []`). When a check needs sources and the artifact has no chunks, the judge gets the pack's extracted source text instead. A gated action `getPackSourceText({ evalSecret, documentIds })` returns each document's `extractedMarkdown`, capped at 50k chars per document. The CLI fetches it once per pack after resolution, and the prompt splits its source budget (12k chars) evenly across documents. On long sources the judge only sees the start of each document. That limitation is accepted here; exhaustive answer-key grounding is piece 2.
 
 **Rubric wording rule:** a check describes the quality a user in that audience expects from any output, for example "Does every figure match the source?". It never refers to specific fixture contents or expected items.
 
