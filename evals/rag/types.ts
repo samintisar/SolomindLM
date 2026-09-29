@@ -304,6 +304,7 @@ export interface CompareCaseResult {
   /** A wins | B wins | tie */
   winner: "a" | "b" | "tie";
   reason: string;
+  useCase?: string;
 }
 
 export interface CompareReport {
@@ -319,6 +320,8 @@ export interface CompareReport {
   /** Win rate for B vs A (ties count half toward each) */
   winRateB: number;
   byRunner: Record<string, { winsA: number; winsB: number; ties: number; winRateB: number }>;
+  /** Same tally grouped by use-case pack (pack fixtures only) */
+  byUseCase: Record<string, { winsA: number; winsB: number; ties: number; winRateB: number }>;
   cases: CompareCaseResult[];
 }
 

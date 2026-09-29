@@ -94,6 +94,29 @@ async function judgePair(
   return "tie";
 }
 
+type WinTally = { winsA: number; winsB: number; ties: number; winRateB: number };
+
+/** Win counts per key (cases whose key is undefined are skipped); ties count half. */
+export function tallyWins(
+  cases: CompareCaseResult[],
+  keyOf: (c: CompareCaseResult) => string | undefined
+): Record<string, WinTally> {
+  const tally: Record<string, WinTally> = {};
+  for (const c of cases) {
+    const key = keyOf(c);
+    if (key === undefined) continue;
+    const row = (tally[key] ??= { winsA: 0, winsB: 0, ties: 0, winRateB: 0 });
+    if (c.winner === "a") row.winsA++;
+    else if (c.winner === "b") row.winsB++;
+    else row.ties++;
+  }
+  for (const row of Object.values(tally)) {
+    const total = row.winsA + row.winsB + row.ties;
+    row.winRateB = total > 0 ? (row.winsB + row.ties / 2) / total : 0;
+  }
+  return tally;
+}
+
 /**
  * Compare overlapping cases between two artifact directories.
  */
@@ -119,7 +142,6 @@ export async function compareArtifactDirs(
   let winsA = 0;
   let winsB = 0;
   let ties = 0;
-  const byRunner: CompareReport["byRunner"] = {};
 
   for (const [key, artA] of mapA) {
     const artB = mapB.get(key);
@@ -138,25 +160,13 @@ export async function compareArtifactDirs(
       runner: artA.runner as ConcreteRunnerKind,
       winner,
       reason: `Position-bias swap: ${winner}`,
+      useCase: artA.useCase,
     };
     cases.push(caseResult);
 
     if (winner === "a") winsA++;
     else if (winner === "b") winsB++;
     else ties++;
-
-    const r = artA.runner;
-    if (!byRunner[r]) {
-      byRunner[r] = { winsA: 0, winsB: 0, ties: 0, winRateB: 0 };
-    }
-    if (winner === "a") byRunner[r].winsA++;
-    else if (winner === "b") byRunner[r].winsB++;
-    else byRunner[r].ties++;
-  }
-
-  for (const stats of Object.values(byRunner)) {
-    const total = stats.winsA + stats.winsB + stats.ties;
-    stats.winRateB = total > 0 ? (stats.winsB + stats.ties / 2) / total : 0;
   }
 
   const total = winsA + winsB + ties;
@@ -173,7 +183,8 @@ export async function compareArtifactDirs(
     winsB,
     ties,
     winRateB,
-    byRunner,
+    byRunner: tallyWins(cases, (c) => c.runner),
+    byUseCase: tallyWins(cases, (c) => c.useCase),
     cases,
   };
 }
