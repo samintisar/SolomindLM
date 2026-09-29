@@ -125,6 +125,11 @@ export interface EvalFixture {
   sourcePolicy?: SourcePolicyConfig;
   /** Dataset split; when omitted, resolved by evals/rag/splits.ts */
   split?: EvalSplit;
+  /**
+   * Use-case pack id (evals/rag/usecases/<id>). Pack fixtures leave
+   * notebookId/documentIds unset; the CLI fills them from the seeded notebook.
+   */
+  useCase?: string;
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -216,6 +221,8 @@ export interface EvalRunArtifact {
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: TokenUsageSource;
   stageSpans?: AgentStageSpan[];
+  /** Use-case pack id copied from the fixture (for scorecards and compare) */
+  useCase?: string;
   /** Timestamp */
   timestamp: string;
 }
