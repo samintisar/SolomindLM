@@ -36,4 +36,14 @@ describe("parseSeedArgs", () => {
       "Unknown option --usecase. Usage: bun run eval:seed [-- --use-case <ids|all>]"
     );
   });
+
+  it("rejects stray positional arguments", () => {
+    const usage = "Usage: bun run eval:seed [-- --use-case <ids|all>]";
+    expect(() => parseSeedArgs(["language-learners"], known)).toThrow(
+      `Unexpected argument language-learners. ${usage}`
+    );
+    expect(() => parseSeedArgs(["--use-case", "a", "b"], known)).toThrow(
+      `Unexpected argument b. ${usage}`
+    );
+  });
 });

@@ -64,13 +64,13 @@ export async function seedPack(
     if (!file) throw new Error(`${pack.id}: planned ${action.fileName} but it was not read`);
     // Upload first so a failed upload never deletes the existing document.
     const storageId = await api.upload(file);
-    if (action.kind === "replace") {
-      log(`  replace ${action.fileName} (${action.reason})`);
-      await api.remove(action.documentId);
-    } else {
-      log(`  upload ${action.fileName}`);
-    }
     try {
+      if (action.kind === "replace") {
+        log(`  replace ${action.fileName} (${action.reason})`);
+        await api.remove(action.documentId);
+      } else {
+        log(`  upload ${action.fileName}`);
+      }
       await api.add({ notebookId, storageId, file });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

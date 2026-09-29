@@ -20,6 +20,8 @@ class FakeSeedApi implements PackSeedApi {
   resolveCount = 0;
   /** Number of upcoming upload() calls that throw */
   failUploads = 0;
+  /** Number of upcoming remove() calls that throw */
+  failRemoves = 0;
   /** Number of upcoming add() calls that throw */
   failAdds = 0;
   /** Runs at the start of every resolve(); use it to simulate another process */
@@ -95,6 +97,10 @@ class FakeSeedApi implements PackSeedApi {
   }
   async remove(documentId: string): Promise<void> {
     this.calls.push(`remove:${documentId}`);
+    if (this.failRemoves > 0) {
+      this.failRemoves--;
+      throw new Error("remove boom");
+    }
     if (this.notebook) {
       this.notebook.docs = this.notebook.docs.filter((d) => d.documentId !== documentId);
     }
@@ -180,6 +186,19 @@ describe("seedPack", () => {
     await expect(seedPack(pack, [file("a.md", "1")], api, fast)).rejects.toThrow(
       "add boom (uploaded storage st-a.md is now orphaned)"
     );
+  });
+
+  it("names the orphaned storage id when remove fails after a successful upload", async () => {
+    const api = new FakeSeedApi({
+      notebookId: "nb",
+      docs: [{ documentId: "d1", fileName: "a.md", status: "completed", sha256: "old" }],
+    });
+    api.failRemoves = 1;
+    const error = await seedPack(pack, [file("a.md", "new")], api, fast).catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe("remove boom (uploaded storage st-a.md is now orphaned)");
+    expect(error.cause).toBeInstanceOf(Error);
+    expect(api.calls).toEqual(["resolve", "upload:a.md", "remove:d1"]);
   });
 
   it("waits through processing until the document completes", async () => {

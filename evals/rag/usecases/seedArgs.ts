@@ -19,6 +19,8 @@ export function parseSeedArgs(argv: string[], knownIds: string[]): string[] {
       value = arg.slice("--use-case=".length);
     } else if (arg.startsWith("--")) {
       throw new Error(`Unknown option ${arg}. Usage: ${USAGE}`);
+    } else {
+      throw new Error(`Unexpected argument ${arg}. Usage: ${USAGE}`);
     }
   }
   if (!sawUseCase) return [...knownIds];
