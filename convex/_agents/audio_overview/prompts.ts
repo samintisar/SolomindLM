@@ -259,7 +259,7 @@ Generate the dialogue script as a JSON array. Output ONLY the JSON, no markdown 
 export function getMapPrompt(audioType: AudioType, chunk: string, focus?: string): string {
   const promptTemplate = MAP_PROMPTS[audioType] || MAP_PROMPTS.deep_dive;
   const focusLine = focus ? `\n\nFOCUS AREA: Prioritize content related to: "${focus}"` : "";
-  return promptTemplate.replace("{chunk}", chunk) + focusLine;
+  return fillTemplate(promptTemplate, { chunk }) + focusLine;
 }
 
 /**
@@ -275,12 +275,25 @@ export function getReducePrompt(params: {
 }): string {
   const estimatedWords = params.targetLines * ESTIMATED_WORDS_PER_LINE;
 
-  return REDUCE_PROMPT.replace("{coveredTopicsPrompt}", params.coveredTopicsPrompt || "")
-    .replace("{content}", params.content)
-    .replace("{audioType}", params.audioType)
-    .replace("{targetLines}", params.targetLines.toString())
-    .replace("{estimatedWords}", estimatedWords.toString())
-    .replace("{focus}", params.focus || "general overview");
+  return fillTemplate(REDUCE_PROMPT, {
+    coveredTopicsPrompt: params.coveredTopicsPrompt || "",
+    content: params.content,
+    audioType: params.audioType,
+    targetLines: params.targetLines.toString(),
+    estimatedWords: estimatedWords.toString(),
+    focus: params.focus || "general overview",
+  });
+}
+
+/**
+ * Replaces every `{key}` placeholder in one pass. Values are inserted verbatim: a function
+ * replacer keeps `$&`-style patterns in source text literal, and placeholder-like text inside
+ * inserted values is never re-substituted.
+ */
+function fillTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    Object.hasOwn(values, key) ? values[key] : match
+  );
 }
 
 /**

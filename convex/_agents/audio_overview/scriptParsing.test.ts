@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { EmptyLlmResponseError } from "../_shared/llmErrors";
 import { generateValidatedDialogueScript, parseDialogueScriptResponse } from "./scriptParsing";
 
 const line = (speaker: "host_a" | "host_b", text: string) => JSON.stringify({ speaker, text });
@@ -157,5 +158,36 @@ describe("generateValidatedDialogueScript", () => {
       generateValidatedDialogueScript({ generate, minimumLines: 2, maxAttempts: 2 })
     ).rejects.toThrow("provider down");
     expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries after an empty model response (e.g. output budget spent on reasoning)", async () => {
+    const generate = vi
+      .fn()
+      .mockRejectedValueOnce(new EmptyLlmResponseError({ model: "m", finishReason: "length" }))
+      .mockResolvedValueOnce(validResponse);
+    const onAttemptFailed = vi.fn();
+
+    const result = await generateValidatedDialogueScript({
+      generate,
+      minimumLines: 2,
+      maxAttempts: 2,
+      onAttemptFailed,
+    });
+
+    expect(result.attempt).toBe(2);
+    expect(onAttemptFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ attempt: 1, reason: expect.stringMatching(/empty.*length/i) })
+    );
+  });
+
+  it("fails with the empty-response reason when every attempt comes back empty", async () => {
+    const generate = vi
+      .fn()
+      .mockRejectedValue(new EmptyLlmResponseError({ model: "m", finishReason: "length" }));
+
+    await expect(
+      generateValidatedDialogueScript({ generate, minimumLines: 2, maxAttempts: 2 })
+    ).rejects.toThrow(/failed after 2 attempt\(s\).*empty/i);
+    expect(generate).toHaveBeenCalledTimes(2);
   });
 });

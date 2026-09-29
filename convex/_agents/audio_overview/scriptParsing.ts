@@ -1,3 +1,4 @@
+import { EmptyLlmResponseError } from "../_shared/llmErrors";
 import type { DialogueLine } from "./state";
 
 export type DialogueScriptParseResult =
@@ -139,7 +140,10 @@ export function parseDialogueScriptResponse(
 }
 
 export type GenerateValidatedDialogueScriptOptions = {
-  /** Produces the raw model response for a 1-based attempt number. Errors propagate unchanged. */
+  /**
+   * Produces the raw model response for a 1-based attempt number. An `EmptyLlmResponseError`
+   * counts as a failed attempt; any other error propagates unchanged.
+   */
   generate: (attempt: number) => Promise<string>;
   minimumLines: number;
   maxAttempts: number;
@@ -161,7 +165,17 @@ export async function generateValidatedDialogueScript(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     attemptsMade = attempt;
-    const responseText = await generate(attempt);
+    let responseText: string;
+    try {
+      responseText = await generate(attempt);
+    } catch (error) {
+      // An empty completion is a bad sample, not an outage: retry like a parse failure.
+      if (!(error instanceof EmptyLlmResponseError)) throw error;
+      lastReason = `The model returned an empty response (finish_reason=${error.finishReason ?? "unknown"}).`;
+      onAttemptFailed?.({ attempt, reason: lastReason, responseText: "" });
+      if (canRetry && !canRetry()) break;
+      continue;
+    }
     const parseResult = parseDialogueScriptResponse(responseText, minimumLines);
 
     if (parseResult.ok) return { script: parseResult.script, attempt };

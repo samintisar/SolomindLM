@@ -55,6 +55,12 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk
   REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
   REDUCE_MAX_OUTPUT_TOKENS: 16_384,
+  /**
+   * Script writing runs with reasoning off. The smart model thinks by default and its reasoning
+   * shares `max_tokens` with the answer; on a ~220-line script it often spent the whole budget
+   * thinking and returned no script (finish_reason=length, #198).
+   */
+  REDUCE_REASONING_ENABLED: false,
   TTS_TIMEOUT_MS: 300_000, // 5 minutes
 } as const;
 
@@ -544,7 +550,7 @@ export async function runFinalizeAudioOverviewPhase(
     const minimumDialogueLines = getMinimumDialogueLines(targetLines);
 
     console.log(
-      `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`
+      `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, reasoning=${CONFIG.REDUCE_REASONING_ENABLED}`
     );
 
     const reducePrompt = getReducePrompt({
@@ -588,7 +594,7 @@ export async function runFinalizeAudioOverviewPhase(
                 model: env.AUDIO_LLM,
                 maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
                 temperature: attempt === 1 ? 0.6 : 0.3,
-                reasoningEnabled: true,
+                reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
                 onUsage: (usage) => {
                   reduceUsage = addTokenUsage(reduceUsage, usage);
                 },
