@@ -61,6 +61,19 @@ describe("computeAnchoredPosition", () => {
 
   test("stays on the preferred side when the other side is no roomier", () => {
     const pos = computeAnchoredPosition({
+      anchor: rect(100, 200, 30, 30),
+      panel: { width: 144, height: 400 },
+      viewport: { width: 390, height: 300 },
+      side: "top",
+      align: "start",
+    });
+    // 184px above vs 54px below: neither fits, so keep the preferred side and cap height.
+    expect(pos.side).toBe("top");
+    expect(pos.maxHeight).toBe(200 - 8 - 8);
+  });
+
+  test("flips to the roomier side when neither side fits", () => {
+    const pos = computeAnchoredPosition({
       anchor: rect(100, 60, 30, 30),
       panel: { width: 144, height: 400 },
       viewport: { width: 390, height: 300 },
@@ -82,5 +95,17 @@ describe("computeAnchoredPosition", () => {
     });
     expect(pos.left).toBe(8);
     expect(pos.maxWidth).toBe(304);
+  });
+
+  test("never widens past the panel's own CSS max-width", () => {
+    const pos = computeAnchoredPosition({
+      anchor: rect(1300, 700, 30, 30),
+      panel: { width: 288, height: 200, maxWidth: 288 },
+      viewport: { width: 1440, height: 900 },
+      side: "top",
+      align: "end",
+    });
+    expect(pos.maxWidth).toBe(288);
+    expect(pos.left).toBe(1330 - 288);
   });
 });

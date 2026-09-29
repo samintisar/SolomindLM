@@ -16,7 +16,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const menuStyle = useAnchoredPosition(containerRef, menuRef, isOpen, {
+  const { style: menuStyle, side: menuSide } = useAnchoredPosition(containerRef, menuRef, isOpen, {
     side: "bottom",
     align: align === "left" ? "start" : "end",
   });
@@ -88,7 +88,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
       ref={menuRef}
       role="menu"
       style={menuStyle}
-      className="fixed z-200 min-w-[200px] max-h-(--anchored-max-height) overflow-y-auto bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
+      data-side={menuSide}
+      className="fixed z-200 min-w-[200px] max-h-(--anchored-max-height) overflow-y-auto bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 duration-200"
       onClick={(e) => {
         const menuItem = (e.target as HTMLElement).closest<HTMLElement>('[role="menuitem"]');
         const opensSubmenu =

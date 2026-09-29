@@ -47,7 +47,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // Portaled so the sidebar's overflow-y-auto doesn't clip it; flips upward for bottom rows.
-  const menuStyle = useAnchoredPosition(menuButtonRef, menuRef, isMenuOpen, {
+  const { style: menuStyle } = useAnchoredPosition(menuButtonRef, menuRef, isMenuOpen, {
     side: "bottom",
     align: "end",
   });

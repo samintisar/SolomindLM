@@ -36,18 +36,23 @@ export function ConversationList({
   pinnedIds,
   onTogglePin,
 }: ConversationListProps) {
-  /** Submenu is portaled to body; position stored so it is not clipped by parent overflow. */
+  /** Submenu is portaled to body so parent overflow can't clip it; `useAnchoredPosition` places it next to `threadMenuAnchorRef`. */
   const [threadMenu, setThreadMenu] = useState<{ convId: string } | null>(null);
   const threadMenuAnchorRef = useRef<HTMLElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
   const threadMenuBoxRef = useRef<HTMLDivElement>(null);
-  const threadMenuStyle = useAnchoredPosition(threadMenuAnchorRef, threadMenuBoxRef, !!threadMenu, {
-    side: "bottom",
-    align: "end",
-    repositionKey: threadMenu?.convId,
-  });
+  const { style: threadMenuStyle } = useAnchoredPosition(
+    threadMenuAnchorRef,
+    threadMenuBoxRef,
+    !!threadMenu,
+    {
+      side: "bottom",
+      align: "end",
+      repositionKey: threadMenu?.convId,
+    }
+  );
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const toast = useToast();
 
@@ -80,7 +85,11 @@ export function ConversationList({
 
   useEffect(() => {
     if (!threadMenu) return;
-    const onScroll = () => setThreadMenu(null);
+    const onScroll = (e: Event) => {
+      // Scrolling the (height-capped) menu itself must not close it.
+      if (threadMenuBoxRef.current?.contains(e.target as Node)) return;
+      setThreadMenu(null);
+    };
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onScroll);
     return () => {

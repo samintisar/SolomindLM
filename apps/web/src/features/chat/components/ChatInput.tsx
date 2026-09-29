@@ -136,7 +136,7 @@ function ComposerDropUp({
   children,
   ...rest
 }: ComposerDropUpProps) {
-  const style = useAnchoredPosition(anchorRef, panelRef, open, {
+  const { style, side } = useAnchoredPosition(anchorRef, panelRef, open, {
     side: "top",
     align: align === "left" ? "start" : "end",
   });
@@ -144,8 +144,12 @@ function ComposerDropUp({
   return createPortal(
     <div
       ref={panelRef}
-      className={cn("overflow-x-hidden overflow-y-auto", className)}
+      className={cn(
+        "overflow-x-hidden overflow-y-auto data-[side=bottom]:slide-in-from-top-2",
+        className
+      )}
       style={{ ...style, zIndex: 200 }}
+      data-side={side}
       {...rest}
     >
       {children}
@@ -540,7 +544,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   anchorRef={filtersAnchorRef}
                   open={openMenu === "filters"}
                   panelRef={filtersPanelRef}
-                  className="max-h-[min(65vh,480px,var(--anchored-max-height))] w-76 overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  className="max-h-[min(65vh,480px,var(--anchored-max-height))] w-76 rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
                 >
                   <AcademicDiscoveryFiltersSection
                     academic={academicDiscoveryFilters ?? {}}
@@ -572,7 +576,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   anchorRef={filtersAnchorRef}
                   open={openMenu === "filters"}
                   panelRef={filtersPanelRef}
-                  className="max-h-[min(65vh,480px,var(--anchored-max-height))] w-76 overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  className="max-h-[min(65vh,480px,var(--anchored-max-height))] w-76 rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
                 >
                   <p className="text-xs font-semibold text-foreground">Source channels</p>
                   <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
@@ -659,7 +663,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     open={openMenu === "model"}
                     align="right"
                     panelRef={modelPanelRef}
-                    className="min-w-54 max-w-72 max-h-[min(70vh,22rem,var(--anchored-max-height))] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
+                    className="min-w-54 max-w-72 max-h-[min(70vh,22rem,var(--anchored-max-height))] rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
                     role="listbox"
                     aria-label="Choose model"
                   >
