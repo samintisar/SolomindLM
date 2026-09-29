@@ -13,10 +13,7 @@ test.describe("Auth — Sign-out flow", () => {
     await page.waitForURL("/home", { timeout: 10_000 });
 
     // Open avatar dropdown and sign out
-    const avatarButton = page
-      .locator("header [class*='rounded-xl']")
-      .filter({ has: page.locator("svg") })
-      .first();
+    const avatarButton = page.getByRole("button", { name: "Account menu" });
     await expect(avatarButton).toBeVisible();
     await avatarButton.click();
 
@@ -43,10 +40,7 @@ test.describe("Auth — Sign-out flow", () => {
     await page.waitForURL("/home", { timeout: 10_000 });
 
     // Sign out
-    const avatarButton = page
-      .locator("header [class*='rounded-xl']")
-      .filter({ has: page.locator("svg") })
-      .first();
+    const avatarButton = page.getByRole("button", { name: "Account menu" });
     await expect(avatarButton).toBeVisible();
     await avatarButton.click();
     await page.getByRole("menuitem", { name: "Logout" }).click();

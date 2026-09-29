@@ -1,5 +1,4 @@
 import { render } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { Header } from "./Header";
 
@@ -45,12 +44,6 @@ vi.mock("../../features/auth/useAuth", () => ({
 
 vi.mock("../contexts/useTheme", () => ({
   useTheme: () => ({ theme: "light", toggleTheme: vi.fn() }),
-}));
-
-vi.mock("./DropdownMenu", () => ({
-  DropdownMenu: ({ children }: { children: ReactNode }) => (
-    <div data-testid="dropdown">{children}</div>
-  ),
 }));
 
 vi.mock("../../features/auth/components/AvatarDropdown", () => ({
