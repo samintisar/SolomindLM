@@ -69,15 +69,34 @@ async function findNotebookInFolder(
     .query("notebooks")
     .withIndex("by_folder", (q) => q.eq("folderId", folderId))
     .collect();
-  return notebooks.find((n) => n.userId === userId && n.title === title) ?? null;
+  const wanted = title.trim(); // createNotebook trims titles
+  return notebooks.find((n) => n.userId === userId && n.title === wanted) ?? null;
 }
 
-function readSourceSha(metadata: unknown): string | undefined {
-  if (metadata && typeof metadata === "object" && "evalSourceSha256" in metadata) {
-    const value = (metadata as { evalSourceSha256: unknown }).evalSourceSha256;
+/**
+ * Reads a string field from a document's untyped `metadata`. Ingestion failure
+ * and `prepareDocumentReembed` overwrite or clear `metadata`, so a lost
+ * `evalSourceSha256` just means the seeder replaces the document.
+ */
+function readMetadataString(metadata: unknown, key: string): string | undefined {
+  if (metadata && typeof metadata === "object" && key in metadata) {
+    const value = (metadata as Record<string, unknown>)[key];
     return typeof value === "string" ? value : undefined;
   }
   return undefined;
+}
+
+/** The notebook must belong to the eval owner and live in their Test folder. */
+async function assertPackNotebook(
+  db: DbReader,
+  userId: Id<"users">,
+  notebookId: Id<"notebooks">
+): Promise<void> {
+  const notebook = await db.get(notebookId);
+  const folder = await findEvalFolder(db, userId);
+  if (!notebook || notebook.userId !== userId || !folder || notebook.folderId !== folder._id) {
+    throw new Error("Notebook is not an eval pack notebook in the Test folder.");
+  }
 }
 
 export const findPackNotebook = internalQuery({
@@ -99,8 +118,8 @@ export const findPackNotebook = internalQuery({
         documentId: d._id,
         fileName: d.fileName,
         status: d.status,
-        sha256: readSourceSha(d.metadata),
-        error: d.error,
+        sha256: readMetadataString(d.metadata, "evalSourceSha256"),
+        error: d.error ?? readMetadataString(d.metadata, "error"),
         totalChunks: d.totalChunks,
       })),
     };
@@ -146,9 +165,13 @@ export const insertPackDocument = internalMutation({
   returns: v.id("documents"),
   handler: async (ctx, args) => {
     const userId = await ownerIdByEmail(ctx.db, args.ownerEmail);
-    const notebook = await ctx.db.get(args.notebookId);
-    if (!notebook || notebook.userId !== userId) {
-      throw new Error("Pack notebook not found for the eval owner.");
+    await assertPackNotebook(ctx.db, userId, args.notebookId);
+    const attached = await ctx.db
+      .query("documents")
+      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (attached) {
+      throw new Error("storageId is already attached to a document.");
     }
     const now = Date.now();
     const documentId = await ctx.db.insert("documents", {
@@ -183,6 +206,12 @@ export const deletePackDocument = internalMutation({
     if (document.userId !== userId) {
       throw new Error("Refusing to delete a document the eval owner does not own.");
     }
+    await assertPackNotebook(ctx.db, userId, document.notebookId);
+    if (document.status === "pending" || document.status === "processing") {
+      throw new Error(
+        `Document ${document.fileName} is still ingesting; wait for it to finish before replacing it.`
+      );
+    }
     await deleteAllChunksForDocument(ctx, args.documentId);
     if (document.storageId) {
       await ctx.storage.delete(document.storageId as Id<"_storage">);
@@ -203,6 +232,7 @@ export const packSourceText = internalQuery({
       if (!document || document.userId !== userId) {
         throw new Error(`Document ${documentId} is not an eval pack document.`);
       }
+      await assertPackNotebook(ctx.db, userId, document.notebookId);
       texts.push({
         fileName: document.fileName,
         text: (document.extractedMarkdown ?? "").slice(0, SOURCE_TEXT_MAX_CHARS),
