@@ -1,8 +1,9 @@
 import type { EvalFixture } from "../types";
+import { getPack } from "./index";
 import type { PackSeedApi } from "./seedClient";
-import type { SourceDigest } from "./sources";
+import { readPackSources, type SourceDigest } from "./sources";
 import { checkPackReady, type PackReadiness } from "./sync";
-import type { UseCasePack } from "./types";
+import type { SourceText, UseCasePack } from "./types";
 
 export class PackNotReadyError extends Error {
   constructor(readonly packs: PackReadiness[]) {
@@ -64,4 +65,33 @@ export function formatPlannedJobs(fixtures: EvalFixture[]): string {
         `  ${pack}: ${[...runners].map(([runner, n]) => `${runner}×${n}`).join(" ")}`
     )
     .join("\n");
+}
+
+type LoadedPack = { pack: UseCasePack; local: SourceDigest[] };
+
+const loadRegisteredPack = (id: string): LoadedPack => {
+  const registered = getPack(id);
+  return { pack: registered.pack, local: readPackSources(registered) };
+};
+
+/**
+ * Resolve every pack the fixtures use, pin the fixtures to their notebooks, and
+ * fetch each pack's source text (judge evidence). Throws PackNotReadyError
+ * before any source text is fetched or any job runs.
+ */
+export async function prepareUseCaseRun(
+  fixtures: EvalFixture[],
+  api: Pick<PackSeedApi, "resolve" | "sourceText">,
+  loadPack: (id: string) => LoadedPack = loadRegisteredPack
+): Promise<{ fixtures: EvalFixture[]; sourceTexts: Map<string, SourceText[]> }> {
+  const sourceTexts = new Map<string, SourceText[]>();
+  const packIds = [...new Set(fixtures.flatMap((f) => (f.useCase ? [f.useCase] : [])))];
+  if (packIds.length === 0) return { fixtures, sourceTexts };
+
+  const readiness = await resolvePackReadiness(packIds.map(loadPack), api);
+  const pinned = applyPackResolution(fixtures, readiness);
+  for (const [id, resolved] of readiness) {
+    sourceTexts.set(id, await api.sourceText(resolved.documentIds));
+  }
+  return { fixtures: pinned, sourceTexts };
 }

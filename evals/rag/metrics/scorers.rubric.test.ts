@@ -38,8 +38,9 @@ const artifact = {
   timestamp: "2026-01-01T00:00:00.000Z",
 } as EvalRunArtifact;
 
+const saved = [...USE_CASE_PACKS];
 afterEach(() => {
-  USE_CASE_PACKS.length = 0;
+  USE_CASE_PACKS.splice(0, USE_CASE_PACKS.length, ...saved);
 });
 
 describe("scoreAllMetrics rubric wiring", () => {

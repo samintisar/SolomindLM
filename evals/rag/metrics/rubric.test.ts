@@ -87,6 +87,31 @@ describe("rubric prompts", () => {
 
     const outputOnly = buildRubricPrompt(pack, pack.rubric[1], fixture, artifact(), sources);
     expect(outputOnly).not.toContain("Source excerpts:");
+    expect(outputOnly).not.toContain("(Excerpts may be truncated.)");
+    expect(withSources).toContain("(Excerpts may be truncated.)");
+  });
+
+  it("marks an output that was cut for judging as truncated", () => {
+    const long = buildRubricPrompt(
+      pack,
+      pack.rubric[1],
+      fixture,
+      artifact({ answer: "z".repeat(10_001) }),
+      []
+    );
+    expect(long).toContain(
+      `${"z".repeat(10_000)}\n[… output truncated at 10000 chars for judging]`
+    );
+    expect(long).not.toContain("z".repeat(10_001));
+
+    const short = buildRubricPrompt(
+      pack,
+      pack.rubric[1],
+      fixture,
+      artifact({ answer: "z".repeat(10_000) }),
+      []
+    );
+    expect(short).not.toContain("output truncated");
   });
 });
 

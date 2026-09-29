@@ -48,6 +48,7 @@ function fixture(overrides: Partial<EvalFixture> = {}): EvalFixture {
     runner: "flashcards",
     tags: ["use-case"],
     useCase: "language-learners",
+    split: "smoke",
     ...overrides,
   };
 }
@@ -121,6 +122,18 @@ describe("validatePack", () => {
       "language-learners/y: pack fixtures must not set notebookId or documentIds"
     );
     expect(problems).toContain('language-learners/z: runner "report" is not in pack features');
+  });
+
+  it("requires pack fixtures to set split explicitly", () => {
+    const problems = validatePack(
+      registered(pack(), [
+        fixture({ id: "language-learners/no-split", split: undefined }),
+        fixture({ id: "language-learners/bad-split", split: "dev" as never }),
+      ])
+    );
+    const message = "pack fixtures must set split (smoke, train or holdout)";
+    expect(problems).toContain(`language-learners/no-split: ${message}`);
+    expect(problems).toContain(`language-learners/bad-split: ${message}`);
   });
 
   it("flags duplicate fixture ids and rubric checks that apply to no feature", () => {

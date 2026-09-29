@@ -4,6 +4,7 @@ import {
   applyPackResolution,
   formatPlannedJobs,
   PackNotReadyError,
+  prepareUseCaseRun,
   resolvePackReadiness,
 } from "./resolve";
 import type { PackReadiness } from "./sync";
@@ -101,5 +102,69 @@ describe("formatPlannedJobs", () => {
         fixture("ml-x", undefined, "chat"),
       ])
     ).toBe("  language-learners: flashcards×2 quiz×1");
+  });
+});
+
+describe("prepareUseCaseRun", () => {
+  const pack = { id: "language-learners", notebookTitle: "Language Learners" } as UseCasePack;
+  const loadPack = () => ({ pack, local: [{ fileName: "a.md", sha256: "1" }] });
+  const readyNotebook = {
+    notebookId: "nb",
+    docs: [{ documentId: "d1", fileName: "a.md", status: "completed", sha256: "1" }],
+  };
+
+  it("pins pack fixtures and loads source text for ready packs", async () => {
+    const asked: string[][] = [];
+    const result = await prepareUseCaseRun(
+      [
+        fixture("language-learners/a", "language-learners", "flashcards"),
+        fixture("language-learners/b", "language-learners", "quiz"),
+        fixture("ml-x", undefined, "chat"),
+      ],
+      {
+        resolve: async () => readyNotebook,
+        sourceText: async (ids) => {
+          asked.push(ids);
+          return [{ fileName: "a.md", text: "hello" }];
+        },
+      },
+      loadPack
+    );
+    expect(result.fixtures.map((f) => f.notebookId)).toEqual(["nb", "nb", "legacy-nb"]);
+    expect(result.sourceTexts.get("language-learners")).toEqual([
+      { fileName: "a.md", text: "hello" },
+    ]);
+    expect(asked).toEqual([["d1"]]);
+  });
+
+  it("throws PackNotReadyError before fetching any source text", async () => {
+    let fetched = false;
+    await expect(
+      prepareUseCaseRun(
+        [fixture("language-learners/a", "language-learners", "flashcards")],
+        {
+          resolve: async () => null,
+          sourceText: async () => {
+            fetched = true;
+            return [];
+          },
+        },
+        loadPack
+      )
+    ).rejects.toThrow(PackNotReadyError);
+    expect(fetched).toBe(false);
+  });
+
+  it("does nothing when no fixture belongs to a pack", async () => {
+    const fixtures = [fixture("ml-x", undefined, "chat")];
+    const api = {
+      resolve: async () => {
+        throw new Error("should not resolve");
+      },
+      sourceText: async () => [],
+    };
+    const result = await prepareUseCaseRun(fixtures, api, loadPack);
+    expect(result.fixtures).toBe(fixtures);
+    expect(result.sourceTexts.size).toBe(0);
   });
 });

@@ -87,6 +87,34 @@ describe("buildScorecard", () => {
   });
 });
 
+describe("judge-error-only cells", () => {
+  it("has a null pass rate and prints n/a (0/0)", () => {
+    const scorecard = buildScorecard(
+      [
+        m({
+          caseId: "language-learners/a",
+          metric: "rubric:language-learners:one-item",
+          status: "fail",
+          breakdown: { judgeError: true },
+        }),
+      ],
+      useCaseByCase
+    );
+    expect(scorecard.cells).toEqual([
+      {
+        useCase: "language-learners",
+        runner: "flashcards",
+        pass: 0,
+        fail: 0,
+        judgeErrors: 1,
+        passRate: null,
+        failedChecks: [],
+      },
+    ]);
+    expect(formatScorecard(scorecard)).toContain("      flashcards  n/a (0/0)  judge errors: 1");
+  });
+});
+
 describe("scorecard in reports", () => {
   it("formats cells and is attached and printed by the report", () => {
     const scorecard = buildScorecard(metrics, useCaseByCase);

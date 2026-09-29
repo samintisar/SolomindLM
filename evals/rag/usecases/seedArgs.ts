@@ -1,3 +1,5 @@
+import { resolveUseCaseIds } from "./ids";
+
 const USAGE = "bun run eval:seed [-- --use-case <ids|all>]";
 
 /**
@@ -25,12 +27,5 @@ export function parseSeedArgs(argv: string[], knownIds: string[]): string[] {
   }
   if (!sawUseCase) return [...knownIds];
 
-  const ids = (value ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (value === undefined || value.startsWith("--") || ids.length === 0) {
-    throw new Error("--use-case needs a value: <ids,comma-separated> or all");
-  }
-  return ids.length === 1 && ids[0] === "all" ? [...knownIds] : ids;
+  return resolveUseCaseIds(value, knownIds);
 }

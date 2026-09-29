@@ -43,16 +43,11 @@ import type {
   SourcePolicyConfig,
   StudioRunnerKind,
 } from "./types";
-import { getPack, USE_CASE_PACKS } from "./usecases";
+import { USE_CASE_PACKS } from "./usecases";
 import { createConvexSeedApi } from "./usecases/convexSeedApi";
-import {
-  applyPackResolution,
-  formatPlannedJobs,
-  PackNotReadyError,
-  resolvePackReadiness,
-} from "./usecases/resolve";
+import { resolveUseCaseIds } from "./usecases/ids";
+import { formatPlannedJobs, PackNotReadyError, prepareUseCaseRun } from "./usecases/resolve";
 import type { PackSeedApi } from "./usecases/seedClient";
-import { readPackSources } from "./usecases/sources";
 import type { SourceText } from "./usecases/types";
 
 // ─── CLI Options ─────────────────────────────────────────────
@@ -122,13 +117,9 @@ function parseRunners(value: string): RunnerKind[] {
   return parts as RunnerKind[];
 }
 
-function parseUseCases(value: string): string[] {
+function parseUseCases(value: string | undefined): string[] {
   const known = USE_CASE_PACKS.map((p) => p.pack.id);
-  if (value.trim() === "all") return known;
-  const ids = value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const ids = resolveUseCaseIds(value, known);
   for (const id of ids) {
     if (!known.includes(id)) {
       throw new Error(`Unknown use case "${id}". Registered: ${known.join(", ") || "(none)"}`);
@@ -390,6 +381,22 @@ async function main(): Promise<void> {
       });
     }
   }
+  if (opts.useCases && !opts.caseId) {
+    if (USE_CASE_PACKS.length === 0) {
+      console.log("No use-case packs registered (evals/rag/usecases/index.ts).");
+      process.exit(0);
+    }
+    if (fixtureIds.length === 0) {
+      const filters = [
+        `use cases: ${opts.useCases.join(", ") || "(none)"}`,
+        opts.split && `split: ${opts.split}`,
+        opts.runners?.length && `runner: ${opts.runners.join(", ")}`,
+        opts.idPrefix && `prefix: ${opts.idPrefix}`,
+      ].filter(Boolean);
+      console.error(`No fixtures matched the filters (${filters.join("; ")}).`);
+      process.exit(2);
+    }
+  }
   if (opts.caseId && opts.idPrefix) {
     console.warn("Warning: --prefix is ignored when --case is set.");
   }
@@ -466,31 +473,21 @@ async function main(): Promise<void> {
   // Use-case packs: resolve seeded notebooks before any job runs, so an
   // unseeded pack costs nothing (spec §3).
   let fixturesToRun = expandedFixtures;
-  const packSourceTexts = new Map<string, SourceText[]>();
-  const packIds = [...new Set(expandedFixtures.flatMap((f) => (f.useCase ? [f.useCase] : [])))];
-  if (packIds.length > 0) {
-    console.log(`Planned use-case jobs:
-${formatPlannedJobs(expandedFixtures)}
-`);
+  let packSourceTexts = new Map<string, SourceText[]>();
+  if (expandedFixtures.some((f) => f.useCase)) {
+    console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
     if (seedApi) {
-      const readiness = await resolvePackReadiness(
-        packIds.map((id) => {
-          const registered = getPack(id);
-          return { pack: registered.pack, local: readPackSources(registered) };
-        }),
-        seedApi
-      );
       try {
-        fixturesToRun = applyPackResolution(expandedFixtures, readiness);
+        ({ fixtures: fixturesToRun, sourceTexts: packSourceTexts } = await prepareUseCaseRun(
+          expandedFixtures,
+          seedApi
+        ));
       } catch (err) {
         if (err instanceof PackNotReadyError) {
           console.error(err.message);
           process.exit(2);
         }
         throw err;
-      }
-      for (const [id, resolved] of readiness) {
-        packSourceTexts.set(id, await seedApi.sourceText(resolved.documentIds));
       }
     }
   }
@@ -624,7 +621,7 @@ ${formatPlannedJobs(expandedFixtures)}
         console.log("Ready for human labeling — fill humanAgree on each item.");
       } else {
         console.log(
-          `Need ${20 - queue.length} more binary-judge rows before a 20-verdict calibration.`
+          `Need ${20 - queue.length} more judge verdicts before a 20-verdict calibration.`
         );
       }
     }

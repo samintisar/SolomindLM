@@ -56,4 +56,24 @@ describe("buildJudgeCalibrationQueue", () => {
       "binary_judge_studio_grounding",
     ]);
   });
+
+  it("excludes judge errors, which carry no verdict to calibrate", () => {
+    const queue = buildJudgeCalibrationQueue(
+      [
+        metric({
+          metric: "binary_judge_chat_grounding",
+          status: "fail",
+          breakdown: { error: "JSON Parse error" },
+        }),
+        metric({
+          metric: "rubric:professionals:figures-match",
+          status: "fail",
+          breakdown: { judgeError: true, error: "truncated" },
+        }),
+        metric({ metric: "rubric:professionals:figures-match", status: "pass", caseId: "c2" }),
+      ],
+      { limit: 20 }
+    );
+    expect(queue.map((row) => [row.caseId, row.modelStatus])).toEqual([["c2", "pass"]]);
+  });
 });

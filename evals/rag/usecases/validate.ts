@@ -49,6 +49,9 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
     if (seenIds.has(f.id)) problems.push(`${f.id}: duplicate fixture id`);
     seenIds.add(f.id);
     if (f.useCase !== pack.id) problems.push(`${f.id}: useCase must be "${pack.id}"`);
+    if (f.split !== "smoke" && f.split !== "train" && f.split !== "holdout") {
+      problems.push(`${f.id}: pack fixtures must set split (smoke, train or holdout)`);
+    }
     if (f.notebookId || f.documentIds) {
       problems.push(`${f.id}: pack fixtures must not set notebookId or documentIds`);
     }

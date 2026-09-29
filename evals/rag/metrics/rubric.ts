@@ -28,6 +28,11 @@ export function formatSourceTexts(texts: SourceText[], limit: number): string {
   return texts.map((t) => `[${t.fileName}]\n${t.text.slice(0, perDoc)}`).join("\n\n---\n\n");
 }
 
+function truncateOutput(output: string): string {
+  if (output.length <= OUTPUT_LIMIT) return output;
+  return `${output.slice(0, OUTPUT_LIMIT)}\n[… output truncated at ${OUTPUT_LIMIT} chars for judging]`;
+}
+
 function sourceEvidence(artifact: EvalRunArtifact, sourceTexts: SourceText[]): string {
   if (artifact.selectedChunks.length > 0) {
     return artifact.selectedChunks
@@ -56,13 +61,14 @@ export function buildRubricPrompt(
   if (check.evidence === "sources") {
     lines.push(
       "Source excerpts:",
+      "(Excerpts may be truncated.)",
       sourceEvidence(artifact, sourceTexts) || "(no source excerpts recorded)",
       ""
     );
   }
   lines.push(
     "Output:",
-    artifact.answer.slice(0, OUTPUT_LIMIT),
+    truncateOutput(artifact.answer),
     "",
     "Answer the check for the output as a whole. Pass only if the answer is yes.",
     'Respond JSON only: {"pass": boolean, "reason": string}'
