@@ -33,9 +33,11 @@ describe("invokeTogetherText", () => {
       usage: { promptTokens: 10, completionTokens: 16384, totalTokens: 16394 },
     });
 
-    const error = await invokeTogetherText({ systemPrompt: "s", userPrompt: "u", model: "m" }).catch(
-      (e: unknown) => e
-    );
+    const error = await invokeTogetherText({
+      systemPrompt: "s",
+      userPrompt: "u",
+      model: "m",
+    }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(EmptyLlmResponseError);
     expect(error).toMatchObject({ model: "m", finishReason: "length", completionTokens: 16384 });

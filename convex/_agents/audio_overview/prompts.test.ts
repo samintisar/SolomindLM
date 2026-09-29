@@ -13,7 +13,9 @@ describe("getReducePrompt", () => {
   it("substitutes every placeholder occurrence, not just the first", () => {
     const prompt = getReducePrompt(baseParams);
 
-    expect(prompt).not.toMatch(/\{(targetLines|estimatedWords|content|audioType|focus|coveredTopicsPrompt)\}/);
+    expect(prompt).not.toMatch(
+      /\{(targetLines|estimatedWords|content|audioType|focus|coveredTopicsPrompt)\}/
+    );
     // targetLines is referenced throughout the length instructions.
     expect(prompt.match(/\b220\b/g)?.length ?? 0).toBeGreaterThan(3);
   });
