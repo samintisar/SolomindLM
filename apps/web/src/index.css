@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 @import "katex/dist/katex.min.css";
 
 /* Streamdown (Tailwind v4): scan hoisted package classes — deps live under apps/web/node_modules */
@@ -268,6 +269,22 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: "Lora", serif;
+  }
+}
+
+/* Motion tokens. Durations use Tailwind's numeric utilities: duration-120 (micro), duration-200
+   (base), duration-320 (panels/routes), duration-500 (hero). Keep JS mirrors in
+   src/shared/components/motion/tokens.ts in sync. */
+@theme {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --animate-route-in: route-in 320ms var(--ease-out);
+
+  @keyframes route-in {
+    from {
+      opacity: 0;
+    }
   }
 }
 
@@ -943,4 +960,21 @@
     transparent
   );
   animation: studio-generating-bar-sweep 1.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Spinners are the only sign that work is in progress; a frozen frame reads as stalled. */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
