@@ -258,6 +258,19 @@
     --destructive-muted: oklch(0.95 0.025 30);
     --destructive-muted-foreground: oklch(0.36 0.09 30);
     --destructive-border: oklch(0.85 0.045 30);
+    --popover: oklch(0.9914 0.0098 87.4695);
+    --popover-foreground: oklch(0.21 0.01 0);
+    --secondary: oklch(0.8846 0.02 85.5655);
+    --secondary-foreground: oklch(0.4313 0.03 64.9288);
+    --input: oklch(0.8606 0.0321 84.5881);
+    --shadow-2xs: 0 1px 1px 0 hsl(28 20% 20% / 0.04);
+    --shadow-xs: 0 1px 2px 0 hsl(28 20% 20% / 0.06);
+    --shadow-sm: 0 1px 2px 0 hsl(28 20% 20% / 0.06), 0 1px 3px 0 hsl(28 20% 20% / 0.08);
+    --shadow: 0 1px 2px 0 hsl(28 20% 20% / 0.06), 0 1px 3px 0 hsl(28 20% 20% / 0.08);
+    --shadow-md: 0 2px 4px -1px hsl(28 20% 20% / 0.06), 0 4px 8px -2px hsl(28 20% 20% / 0.08);
+    --shadow-lg: 0 4px 6px -2px hsl(28 20% 20% / 0.05), 0 12px 24px -4px hsl(28 20% 20% / 0.1);
+    --shadow-xl: 0 8px 12px -4px hsl(28 20% 20% / 0.06), 0 24px 48px -8px hsl(28 20% 20% / 0.14);
+    --shadow-2xl: 0 32px 64px -12px hsl(28 20% 20% / 0.22);
   }
 
   html {
@@ -278,6 +291,7 @@
 @theme {
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
 
   --animate-route-in: route-in 320ms var(--ease-out);
 
@@ -384,6 +398,21 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+}
+
+/* Soft brand glow behind the sign-in page (decorative; token-derived). */
+@utility bg-auth-glow {
+  background-image:
+    radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      color-mix(in oklch, var(--primary) 12%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 100% 50%,
+      color-mix(in oklch, var(--success) 8%, transparent),
+      transparent
+    );
 }
 
 /* Sonner reads these; the :root prefix outranks its [data-sonner-toaster][data-sonner-theme] rules. */
