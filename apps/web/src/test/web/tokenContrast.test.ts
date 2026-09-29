@@ -32,6 +32,10 @@ const PAIRS: Array<[string, string, number]> = [
   ["card-foreground", "card", 4.5],
   ["primary-foreground", "primary", 4.5],
   ["destructive-foreground", "destructive", 4.5],
+  // text-destructive for errors, delete menu items and destructive-muted callouts.
+  ["destructive", "background", 4.5],
+  ["destructive", "card", 4.5],
+  ["destructive", "muted", 4.5],
   ["success-foreground", "success", 4.5],
   ["warning-foreground", "warning", 4.5],
   ["info-foreground", "info", 4.5],
