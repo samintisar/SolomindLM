@@ -494,7 +494,7 @@ export function AuthPage() {
               : "max-w-7xl -translate-y-4 gap-12 sm:-translate-y-6 lg:-translate-y-10 lg:flex-row lg:items-stretch lg:gap-10 xl:gap-14 2xl:max-w-360"
           )}
         >
-          <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:w-lg lg:shrink-0 lg:justify-end">
+          <div className="flex w-full justify-center lg:min-h-0 lg:w-lg lg:shrink-0 lg:justify-end">
             <div className="flex w-full max-w-lg flex-col lg:h-full lg:min-h-0">
               <div className="flex w-full flex-col items-center lg:h-full lg:min-h-0 lg:justify-center">
                 <div className="w-full">
