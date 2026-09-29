@@ -21,7 +21,12 @@ function AuthProviderContent({ children, signInGoogle, signOutUser }: AuthProvid
   const [authError, setAuthError] = useState<string | null>(null);
 
   const user: User | null = currentUser
-    ? { id: currentUser.id, email: currentUser.email, name: currentUser.name }
+    ? {
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        image: currentUser.image,
+      }
     : null;
 
   const signInWithGoogle = async (): Promise<void> => {

@@ -154,6 +154,8 @@ const currentUserValidator = v.object({
   id: v.string(),
   email: v.optional(v.string()),
   name: v.optional(v.string()),
+  /** Profile photo URL (Google `picture`, stored by Convex Auth as `users.image`). */
+  image: v.optional(v.string()),
 });
 
 export const getCurrentUser = query({
@@ -175,6 +177,7 @@ export const getCurrentUser = query({
         id: user._id.toString(),
         email: user.email ?? undefined,
         name: user.name ?? undefined,
+        image: user.image ?? undefined,
       };
     } catch (e) {
       console.error("getCurrentUser", e);
