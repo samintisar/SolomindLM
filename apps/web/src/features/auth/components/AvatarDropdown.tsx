@@ -64,7 +64,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Account menu">
+        <Button variant="ghost" size="avatar" aria-label="Account menu">
           <Avatar>
             {isAuthenticated && user?.image ? (
               // Google photo URLs can 403 when a referrer is sent.
