@@ -64,3 +64,30 @@ describe("runStudioEval tokenUsageSource", () => {
     ]);
   });
 });
+
+describe("runStudioEval quiz serialization", () => {
+  it("shows the judge the correct option text, not the bare answer index", async () => {
+    const invoker: StudioInvoker = {
+      kind: "quiz",
+      invoke: async () => ({
+        raw: {
+          questions: [
+            { question: "Which is prime?", options: ["4", "6", "7", "9"], answer: 2 },
+            { question: "Legacy shape", options: ["x", "y"], correctAnswer: "y" },
+          ],
+        },
+        latencyMs: 5,
+      }),
+    };
+
+    const { artifact } = await runStudioEval(
+      { fixture: { ...fixture, runner: "quiz" }, config: snapshotRetrievalConfig(), kind: "quiz" },
+      invoker
+    );
+
+    expect(artifact.answer).toContain("Q1: Which is prime?");
+    expect(artifact.answer).toContain("A: 7");
+    expect(artifact.answer).not.toMatch(/A: 2\b/);
+    expect(artifact.answer).toContain("A: y");
+  });
+});
