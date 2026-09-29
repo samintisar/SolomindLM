@@ -50,6 +50,20 @@ describe("planPackSync duplicates", () => {
   });
 });
 
+describe("planPackSync in-flight replace", () => {
+  it.each(["pending", "processing"])(
+    "throws before planning when a changed document is still %s",
+    (status) => {
+      const inFlight: RemotePackDoc[] = [
+        { documentId: "d1", fileName: "a.pdf", status, sha256: "old" },
+      ];
+      expect(() => planPackSync([local[1], local[0]], inFlight)).toThrow(
+        '"a.pdf" is still ingesting an older version; wait for it to finish, then re-run eval:seed (if it is stuck, delete it in the app).'
+      );
+    }
+  );
+});
+
 describe("checkPackReady", () => {
   it("reports a missing notebook", () => {
     expect(checkPackReady(pack, local, null)).toEqual({

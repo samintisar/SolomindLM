@@ -30,6 +30,16 @@ export function planPackSync(local: SourceDigest[], remote: RemotePackDoc[]): Sy
         `Pack notebook has ${count} documents named "${file.fileName}"; delete the extras in the app, then re-seed.`
       );
     }
+    const doc = remote.find((d) => d.fileName === file.fileName);
+    if (
+      doc &&
+      (doc.status === "pending" || doc.status === "processing") &&
+      doc.sha256 !== file.sha256
+    ) {
+      throw new Error(
+        `"${file.fileName}" is still ingesting an older version; wait for it to finish, then re-run eval:seed (if it is stuck, delete it in the app).`
+      );
+    }
   }
   return local.map((file): SyncAction => {
     const doc = remote.find((d) => d.fileName === file.fileName);
