@@ -74,7 +74,8 @@ interface QuizQuestion {
   q?: string;
   options?: string[];
   choices?: string[];
-  answer?: string;
+  /** Zero-based option index (current quiz schema) or answer text (legacy). */
+  answer?: string | number;
   correctAnswer?: string;
 }
 
@@ -83,8 +84,13 @@ function serializeQuiz(raw: unknown): string {
   return qs
     .map((q, i) => {
       const question = q.question ?? q.prompt ?? q.q ?? "";
-      const options = (q.options ?? q.choices ?? []).join("\n  - ");
-      const answer = q.answer ?? q.correctAnswer ?? "";
+      const choices = q.options ?? q.choices ?? [];
+      const options = choices.join("\n  - ");
+      // Resolve an index to its option text so the judge can check correctness.
+      const answer =
+        typeof q.answer === "number"
+          ? (choices[q.answer] ?? `invalid index ${q.answer}`)
+          : (q.answer ?? q.correctAnswer ?? "");
       return `Q${i + 1}: ${question}${options ? `\n  - ${options}` : ""}\nA: ${answer}`;
     })
     .join("\n\n");

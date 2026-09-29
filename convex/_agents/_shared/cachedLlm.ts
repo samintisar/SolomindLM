@@ -54,6 +54,8 @@ export interface LLMResponse {
   content: string;
   /** Populated for `json_schema` / `json_object` calls when a JSON object is found in content or reasoning. */
   structuredJson?: string;
+  /** Provider `finish_reason` for the first choice (e.g. `"stop"`, `"length"`). */
+  finishReason?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -345,6 +347,7 @@ async function executeTogetherLlmRequest(
       return {
         content,
         structuredJson,
+        finishReason: choice?.finish_reason,
         usage,
       };
     } catch (e) {
