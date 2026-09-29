@@ -163,3 +163,34 @@ describe("flashcard_card_validity", () => {
     expect(m.status).toBe("pass");
   });
 });
+
+describe("flashcard_answer_leak", () => {
+  it("flags cards that give the answer away or break the blank", async () => {
+    const m = await metric(
+      artifact("flashcards", {
+        cards: [
+          { front: "Il cherche ___ (ses) clés.", back: "ses" },
+          { front: "Je ___ habite à Paris.", back: "j'" },
+          { front: "What is the capital of France?", back: "Paris" },
+          { front: "Tu ___ à Paris.", back: "habites" },
+        ],
+      }),
+      "flashcard_answer_leak"
+    );
+    expect(m.status).toBe("fail");
+    expect(m.score).toBeCloseTo(2 / 4);
+  });
+
+  it("passes clean cards", async () => {
+    const m = await metric(
+      artifact("flashcards", {
+        cards: [
+          { front: "What is the capital of France?", back: "Paris" },
+          { question: "Il ___ (chercher) ses clés.", answer: "cherche" },
+        ],
+      }),
+      "flashcard_answer_leak"
+    );
+    expect(m.status).toBe("pass");
+  });
+});

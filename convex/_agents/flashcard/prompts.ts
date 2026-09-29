@@ -68,6 +68,17 @@ export const PROBLEMATIC_PHRASES = [
   "this figure",
 ] as const;
 
+/**
+ * The front is what the learner sees before recalling the back, so it must not
+ * already contain the back. Shared by map, collapse and refine so merged or
+ * rewritten cards keep the rule; `flashcardDefects.ts` enforces it afterwards.
+ */
+export const ANSWER_NOT_ON_FRONT_RULES = `**NEVER PUT THE ANSWER ON THE FRONT:**
+- The front must not contain the answer from the back: not in parentheses, not in quotes, and not elsewhere in the sentence.
+- A fill-in-the-blank hint may give a base or dictionary form, a category, or a choice list, but never the exact word or phrase that fills the blank.
+- Explanations belong on the back. Never append "(True)", "(False - ...)" or the definition to the front.
+- Read the front with the answer put into the blank: it must be a complete, correct sentence. The blank covers the whole answer and nothing more, so no word is left doubled or half-written beside it.`;
+
 // ============================================================
 // PROMPT TEMPLATES
 // ============================================================
@@ -103,15 +114,20 @@ ${topic ? `**Topic Focus:** ${topic}` : ""}
 **CARD VARIETY REQUIREMENT:**
 You MUST generate a DIVERSE mix of flashcard types. Distribute evenly across these 5 types:
 1. **WH-Question** (what, where, when, why, how) - Test factual recall
-   Example: "What is the primary function of mitochondria?"
+   Front: "What is the primary function of mitochondria?"
+   Back: "Producing most of the cell's ATP."
 2. **Fill-in-the-Blank** - Test precise knowledge recall
-   Example: "The _____ is the control center of the cell and contains DNA."
+   Front: "The _____ is the control center of the cell and contains DNA."
+   Back: "nucleus"
 3. **True/False** - Test understanding of misconceptions
-   Example: "True or False: Mitochondria are found only in animal cells. (False - also in plants)"
+   Front: "True or False: Mitochondria are found only in animal cells."
+   Back: "False - plant cells have mitochondria too."
 4. **Definition** - Test concept understanding
-   Example: "Define: Mitochondria (The powerhouse of the cell that generates ATP)"
+   Front: "Define: mitochondria"
+   Back: "The organelle that generates most of the cell's ATP."
 5. **Scenario/Application** - Test knowledge transfer
-   Example: "If a cell lacks mitochondria, what cellular process would be most impaired? (ATP production/energy metabolism)"
+   Front: "If a cell lacks mitochondria, which cellular process would be most impaired?"
+   Back: "ATP production (energy metabolism)."
 
 **Card Type Distribution:** Aim for ~20% of each type. Mix them evenly!
 
@@ -122,6 +138,8 @@ You MUST generate a DIVERSE mix of flashcard types. Distribute evenly across the
 - Avoid overly trivial or obvious questions
 - For true/false: include explanation in answer to clarify why it's true or false
 - For fill-in-the-blank: ensure the blank is the key concept being tested
+
+${ANSWER_NOT_ON_FRONT_RULES}
 
 **SELF-CONTAINED FLASHCARDS REQUIREMENT:**
 CRITICAL: Each flashcard question MUST BE COMPLETELY SELF-CONTAINED. The user will ONLY see the question and answer.
