@@ -293,6 +293,12 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
 
+  /* Sign-in page: hero preview height scales with the viewport, capped on tall screens
+     (min-h-auth-hero); desktop headline size (text-display). */
+  --spacing-auth-hero: min(93svh, 65rem);
+  --text-display: 2.75rem;
+  --text-display--line-height: 1.25;
+
   --animate-route-in: route-in 320ms var(--ease-out);
 
   @keyframes route-in {

@@ -62,8 +62,9 @@ function PasswordField(props: {
       <FieldLabel htmlFor={props.id} className="sr-only">
         {props.label}
       </FieldLabel>
-      <InputGroup>
+      <InputGroup size="lg">
         <InputGroupInput
+          size="lg"
           id={props.id}
           name={props.name}
           type={props.shown ? "text" : "password"}
@@ -93,7 +94,7 @@ function SubmitButton(props: {
   label: string;
 }) {
   return (
-    <Button type="submit" size="lg" className="w-full" disabled={props.disabled}>
+    <Button type="submit" className="w-full" disabled={props.disabled}>
       {props.loading ? <Spinner aria-hidden /> : null}
       {props.loading ? props.loadingLabel : props.label}
     </Button>
@@ -242,7 +243,6 @@ function AuthFormPanelContent({
           <Button
             type="button"
             variant="outline"
-            size="lg"
             className="w-full"
             onClick={handleGoogleSignIn}
             disabled={disableAll}
@@ -265,6 +265,7 @@ function AuthFormPanelContent({
                 Email
               </FieldLabel>
               <Input
+                size="lg"
                 id={`${id}-email`}
                 name="email"
                 type="email"
@@ -293,13 +294,12 @@ function AuthFormPanelContent({
             />
           </form>
 
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex flex-wrap items-center justify-center gap-x-4">
             {step === "signIn" ? (
               <>
                 <Button
                   type="button"
                   variant="link"
-                  size="sm"
                   onClick={() => {
                     setError("");
                     setStep("signUp");
@@ -310,7 +310,6 @@ function AuthFormPanelContent({
                 <Button
                   type="button"
                   variant="link"
-                  size="sm"
                   onClick={() => {
                     setError("");
                     setStep("forgot");
@@ -323,7 +322,6 @@ function AuthFormPanelContent({
               <Button
                 type="button"
                 variant="link"
-                size="sm"
                 onClick={() => {
                   setError("");
                   setStep("signIn");
@@ -351,6 +349,7 @@ function AuthFormPanelContent({
                 Verification code
               </FieldLabel>
               <Input
+                size="lg"
                 id={`${id}-code`}
                 name="code"
                 type="text"
@@ -370,7 +369,6 @@ function AuthFormPanelContent({
           <Button
             type="button"
             variant="link"
-            size="sm"
             className="self-center"
             onClick={() => {
               setError("");
@@ -393,6 +391,7 @@ function AuthFormPanelContent({
                 Email
               </FieldLabel>
               <Input
+                size="lg"
                 id={`${id}-reset-email`}
                 name="email"
                 type="email"
@@ -412,7 +411,6 @@ function AuthFormPanelContent({
           <Button
             type="button"
             variant="link"
-            size="sm"
             className="self-center"
             onClick={() => {
               setError("");
@@ -439,6 +437,7 @@ function AuthFormPanelContent({
                 Reset code
               </FieldLabel>
               <Input
+                size="lg"
                 id={`${id}-reset-code`}
                 name="code"
                 type="text"
@@ -468,7 +467,6 @@ function AuthFormPanelContent({
           <Button
             type="button"
             variant="link"
-            size="sm"
             className="self-center"
             onClick={() => {
               setError("");

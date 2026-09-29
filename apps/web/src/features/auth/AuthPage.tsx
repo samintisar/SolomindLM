@@ -107,7 +107,7 @@ function AuthHeroMockup() {
     <div
       role="region"
       aria-label="Product preview"
-      className="relative hidden h-full min-h-200 w-full flex-col overflow-hidden rounded-3xl border border-border bg-background/90 text-left text-foreground shadow-2xl backdrop-blur-md lg:flex"
+      className="relative hidden h-full min-h-auth-hero w-full flex-col overflow-hidden rounded-3xl border border-border bg-background/90 text-left text-foreground shadow-2xl backdrop-blur-md lg:flex"
     >
       <div className="pointer-events-none absolute inset-0 chat-panel-graph-grid bg-background/88" />
 
@@ -500,7 +500,7 @@ export function AuthPage() {
                 <div className="w-full">
                   {!nativeShell && (
                     <Reveal className="relative z-10 px-2 text-center sm:px-0 lg:pointer-events-none">
-                      <h1 className="mx-auto text-balance font-serif text-4xl font-normal leading-tight tracking-tight text-foreground sm:text-5xl">
+                      <h1 className="mx-auto text-balance font-serif text-4xl font-normal leading-tight tracking-tight text-foreground sm:text-5xl lg:text-display">
                         Think deeper,
                         <br />
                         learn faster.
@@ -528,7 +528,7 @@ export function AuthPage() {
           {!nativeShell && (
             <Reveal
               delay={0.16}
-              className="flex h-full min-h-0 w-full justify-center lg:min-h-200 lg:min-w-0 lg:flex-1 lg:justify-start"
+              className="flex h-full min-h-0 w-full justify-center lg:min-h-auth-hero lg:min-w-0 lg:flex-1 lg:justify-start"
             >
               <AuthHeroMockup />
             </Reveal>
