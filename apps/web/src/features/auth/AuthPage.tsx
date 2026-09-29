@@ -22,7 +22,6 @@ import { CustomizeReportModal } from "@/features/studio/components/CustomizeRepo
 import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
-import { Reveal } from "@/shared/components/motion";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { STUDIO_TOOLS } from "@/shared/constants";
@@ -499,7 +498,7 @@ export function AuthPage() {
               <div className="flex w-full flex-col items-center lg:h-full lg:min-h-0 lg:justify-center">
                 <div className="w-full">
                   {!nativeShell && (
-                    <Reveal className="relative z-10 px-2 text-center sm:px-0 lg:pointer-events-none">
+                    <div className="relative z-10 px-2 text-center animate-in fade-in slide-in-from-bottom-2 duration-320 ease-out sm:px-0 lg:pointer-events-none">
                       <h1 className="mx-auto text-balance font-serif text-4xl font-normal leading-tight tracking-tight text-foreground sm:text-5xl lg:text-display">
                         Think deeper,
                         <br />
@@ -508,30 +507,29 @@ export function AuthPage() {
                       <p className="mx-auto mt-3 max-w-md font-sans text-base text-muted-foreground sm:mt-4 sm:text-lg">
                         Ground your research in real sources.
                       </p>
-                    </Reveal>
+                    </div>
                   )}
-                  <Reveal
-                    delay={0.08}
-                    className={nativeShell ? "relative z-0 mt-2" : "relative z-0 mt-10 lg:mt-8"}
+                  <div
+                    className={cn(
+                      "relative z-0 animate-in fade-in slide-in-from-bottom-2 duration-320 ease-out delay-80 fill-mode-backwards",
+                      nativeShell ? "mt-2" : "mt-10 lg:mt-8"
+                    )}
                   >
                     <AuthFormPanel
                       authError={bannerMessage}
                       onAuthenticated={handleAuthenticated}
                       initialMode={initialMode}
                     />
-                  </Reveal>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {!nativeShell && (
-            <Reveal
-              delay={0.16}
-              className="flex h-full min-h-0 w-full justify-center lg:min-h-auth-hero lg:min-w-0 lg:flex-1 lg:justify-start"
-            >
+            <div className="flex h-full min-h-0 w-full justify-center animate-in fade-in slide-in-from-bottom-2 duration-320 ease-out delay-160 fill-mode-backwards lg:min-h-auth-hero lg:min-w-0 lg:flex-1 lg:justify-start">
               <AuthHeroMockup />
-            </Reveal>
+            </div>
           )}
         </div>
       </main>
