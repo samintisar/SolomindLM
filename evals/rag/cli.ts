@@ -43,6 +43,17 @@ import type {
   SourcePolicyConfig,
   StudioRunnerKind,
 } from "./types";
+import { getPack, USE_CASE_PACKS } from "./usecases";
+import { createConvexSeedApi } from "./usecases/convexSeedApi";
+import {
+  applyPackResolution,
+  formatPlannedJobs,
+  PackNotReadyError,
+  resolvePackReadiness,
+} from "./usecases/resolve";
+import type { PackSeedApi } from "./usecases/seedClient";
+import { readPackSources } from "./usecases/sources";
+import type { SourceText } from "./usecases/types";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -54,6 +65,8 @@ interface CliOptions {
   runners?: RunnerKind[];
   /** Dataset split filter (default smoke for live runs) */
   split?: EvalSplit;
+  /** Restrict to use-case pack fixtures (ids from evals/rag/usecases) */
+  useCases?: string[];
   dryRun: boolean;
   full: boolean;
   verbose: boolean;
@@ -109,6 +122,21 @@ function parseRunners(value: string): RunnerKind[] {
   return parts as RunnerKind[];
 }
 
+function parseUseCases(value: string): string[] {
+  const known = USE_CASE_PACKS.map((p) => p.pack.id);
+  if (value.trim() === "all") return known;
+  const ids = value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const id of ids) {
+    if (!known.includes(id)) {
+      throw new Error(`Unknown use case "${id}". Registered: ${known.join(", ") || "(none)"}`);
+    }
+  }
+  return ids;
+}
+
 function parseArgs(args: string[]): CliOptions {
   const opts: CliOptions = {
     dryRun: false,
@@ -137,6 +165,9 @@ function parseArgs(args: string[]): CliOptions {
         opts.split = split;
         break;
       }
+      case "--use-case":
+        opts.useCases = parseUseCases(args[++i]);
+        break;
       case "--dry-run":
         opts.dryRun = true;
         break;
@@ -201,6 +232,7 @@ Options:
   --prefix <str>           Run fixtures whose id starts with prefix (e.g. ml-)
   --runner <kinds>         Comma-separated runner filter (chat,research,literatureReview,…)
   --split <smoke|train|holdout>  Filter fixtures by dataset split (live default: smoke)
+  --use-case <ids|all>     Use-case pack fixtures only (seed first: bun run eval:seed)
   --dry-run                Validate fixtures without running agents
   --full                   Run all fixtures with verbose output
   --verbose, -v            Show detailed metric output
@@ -350,12 +382,22 @@ async function main(): Promise<void> {
     if (opts.split) {
       fixtureIds = filterFixtureIdsBySplit(fixtureIds, opts.split);
     }
+    if (opts.useCases) {
+      const allowed = new Set(opts.useCases);
+      fixtureIds = fixtureIds.filter((id) => {
+        const useCase = getFixture(id).useCase;
+        return useCase !== undefined && allowed.has(useCase);
+      });
+    }
   }
   if (opts.caseId && opts.idPrefix) {
     console.warn("Warning: --prefix is ignored when --case is set.");
   }
   if (opts.caseId && opts.runners) {
     console.warn("Warning: --runner is ignored when --case is set.");
+  }
+  if (opts.caseId && opts.useCases) {
+    console.warn("Warning: --use-case is ignored when --case is set.");
   }
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}\n`
@@ -366,6 +408,7 @@ async function main(): Promise<void> {
   let researchInvoker: ResearchAgentInvoker | undefined;
   let literatureReviewInvoker: LiteratureReviewInvoker | undefined;
   let studioInvokers: Partial<Record<StudioRunnerKind, StudioInvoker>> | undefined;
+  let seedApi: PackSeedApi | undefined;
   if (!opts.dryRun) {
     const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
     const evalSecret = process.env.RAG_EVAL_SECRET?.trim();
@@ -391,6 +434,7 @@ async function main(): Promise<void> {
     researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
     literatureReviewInvoker = createConvexLiteratureReviewInvoker(convexUrl, { evalSecret });
     studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
+    seedApi = createConvexSeedApi(convexUrl, evalSecret);
   }
 
   const allMetrics: MetricResult[] = [];
@@ -419,7 +463,39 @@ async function main(): Promise<void> {
     }
   }
 
-  for (const fixture of expandedFixtures) {
+  // Use-case packs: resolve seeded notebooks before any job runs, so an
+  // unseeded pack costs nothing (spec §3).
+  let fixturesToRun = expandedFixtures;
+  const packSourceTexts = new Map<string, SourceText[]>();
+  const packIds = [...new Set(expandedFixtures.flatMap((f) => (f.useCase ? [f.useCase] : [])))];
+  if (packIds.length > 0) {
+    console.log(`Planned use-case jobs:
+${formatPlannedJobs(expandedFixtures)}
+`);
+    if (seedApi) {
+      const readiness = await resolvePackReadiness(
+        packIds.map((id) => {
+          const registered = getPack(id);
+          return { pack: registered.pack, local: readPackSources(registered) };
+        }),
+        seedApi
+      );
+      try {
+        fixturesToRun = applyPackResolution(expandedFixtures, readiness);
+      } catch (err) {
+        if (err instanceof PackNotReadyError) {
+          console.error(err.message);
+          process.exit(2);
+        }
+        throw err;
+      }
+      for (const [id, resolved] of readiness) {
+        packSourceTexts.set(id, await seedApi.sourceText(resolved.documentIds));
+      }
+    }
+  }
+
+  for (const fixture of fixturesToRun) {
     fixtureMeta.set(fixture.id, {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
@@ -444,6 +520,7 @@ async function main(): Promise<void> {
     }
 
     for (const { artifact, errors } of results) {
+      artifact.useCase = fixture.useCase;
       if (errors.length > 0) {
         console.log(`  Errors: ${errors.join("; ")}`);
         runtimeErrorCount += errors.length;
@@ -485,6 +562,7 @@ async function main(): Promise<void> {
         likertJudges: opts.likertJudges,
         dryRun: opts.dryRun,
         judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+        packSourceTexts: fixture.useCase ? packSourceTexts.get(fixture.useCase) : undefined,
       });
       allMetrics.push(...metrics);
 
@@ -510,6 +588,9 @@ async function main(): Promise<void> {
     includeWarnings: true,
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
+    useCaseByCase: new Map(
+      fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
+    ),
   });
 
   console.log(formatReport(report));

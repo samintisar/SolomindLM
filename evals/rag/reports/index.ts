@@ -9,3 +9,4 @@ export {
   type PromotionRegression,
 } from "./promotion";
 export { formatReport, type GenerateReportOptions, generateReport } from "./reportGenerator";
+export { buildScorecard, formatScorecard, isJudgeError, type Scorecard } from "./scorecard";

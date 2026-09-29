@@ -6,6 +6,7 @@
  */
 
 import type { SourceChannel } from "../../convex/_agents/research/types";
+import type { Scorecard } from "./reports/scorecard";
 
 // ─── Fixtures ────────────────────────────────────────────────
 
@@ -292,6 +293,8 @@ export interface EvalReport {
   metrics: MetricResult[];
   /** Grouped failures for coding agent consumption */
   failureGroups: FailureGroup[];
+  /** Per use-case pack × runner pass rates (only when pack fixtures ran) */
+  scorecard?: Scorecard;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
