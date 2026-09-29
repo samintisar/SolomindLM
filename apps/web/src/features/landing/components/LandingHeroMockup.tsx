@@ -347,9 +347,9 @@ export function LandingHeroMockup({
                             className="flex items-center gap-2 font-sans text-[10px] text-muted-foreground sm:text-xs"
                           >
                             {step.done ? (
-                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-vintage-green-600/15 sm:h-[18px] sm:w-[18px]">
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-success-muted sm:h-[18px] sm:w-[18px]">
                                 <Check
-                                  className="h-2.5 w-2.5 text-vintage-green-600 sm:h-3 sm:w-3"
+                                  className="h-2.5 w-2.5 text-success sm:h-3 sm:w-3"
                                   aria-hidden
                                 />
                               </span>

@@ -465,7 +465,7 @@ export interface FolderItem {
   id: string;
   name: string;
   description?: string;
-  color?: string; // e.g. 'bg-vintage-brown-300'
+  color?: string; // one of COVER_COLORS in shared/notebook/coverColor.ts
   icon?: string;
   notebookCount: number;
   created_at: string | number;

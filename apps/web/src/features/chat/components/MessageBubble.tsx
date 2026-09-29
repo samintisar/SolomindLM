@@ -138,9 +138,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
           icon: ThumbsUp,
           onClick: () => onSetFeedback(message.id, message.feedback === "up" ? null : "up"),
           className:
-            message.feedback === "up"
-              ? "text-vintage-green-700 dark:text-vintage-green-600 fill-vintage-green-600/30 dark:fill-vintage-green-500/25"
-              : "",
+            message.feedback === "up" ? "text-success-muted-foreground fill-success/30" : "",
         },
         {
           id: "thumbs-down",
@@ -149,7 +147,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
           onClick: () => onSetFeedback(message.id, message.feedback === "down" ? null : "down"),
           className:
             message.feedback === "down"
-              ? "text-vintage-red-700 dark:text-vintage-red-600 fill-vintage-red-600/30 dark:fill-vintage-red-500/25"
+              ? "text-destructive-muted-foreground fill-destructive/30"
               : "",
         }
       );

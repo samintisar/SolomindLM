@@ -28,7 +28,7 @@ test.describe("Auth — Forgot password flow", () => {
     await expect(
       page
         .getByRole("heading", { name: "Enter reset code" })
-        .or(page.locator("[class*='bg-vintage-red-50']"))
+        .or(page.locator(".auth-form-light").getByRole("alert"))
     ).toBeVisible({ timeout: 8_000 });
   });
 
@@ -55,7 +55,7 @@ test.describe("Auth — Forgot password flow", () => {
 
     // Wait for either success or error
     const resetHeading = page.getByRole("heading", { name: "Enter reset code" });
-    const errorBox = page.locator("[class*='bg-vintage-red-50']");
+    const errorBox = page.locator(".auth-form-light").getByRole("alert");
 
     await expect(resetHeading.or(errorBox)).toBeVisible({ timeout: 8_000 });
 
@@ -74,7 +74,7 @@ test.describe("Auth — Forgot password flow", () => {
     await page.getByRole("button", { name: "Send code" }).click();
 
     const resetHeading = page.getByRole("heading", { name: "Enter reset code" });
-    const errorBox = page.locator("[class*='bg-vintage-red-50']");
+    const errorBox = page.locator(".auth-form-light").getByRole("alert");
     await expect(resetHeading.or(errorBox)).toBeVisible({ timeout: 8_000 });
 
     if (await resetHeading.isVisible().catch(() => false)) {

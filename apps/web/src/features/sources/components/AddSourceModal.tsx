@@ -314,11 +314,13 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
 
           {/* Warnings */}
           {showAuthWarning && (
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
-              <X className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+            <div className="bg-warning-muted border border-warning-border rounded-lg p-4 flex items-start gap-3">
+              <X className="w-5 h-5 text-warning-muted-foreground shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-warning">Authentication required</p>
-                <p className="text-xs text-warning/80 mt-1">
+                <p className="text-sm font-medium text-warning-muted-foreground">
+                  Authentication required
+                </p>
+                <p className="text-xs text-warning-muted-foreground mt-1">
                   Please log in and select a notebook to upload sources.
                 </p>
               </div>

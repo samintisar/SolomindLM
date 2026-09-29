@@ -243,17 +243,11 @@ function AuthHeroMockup() {
                       {activityOpen ? (
                         <ul className="space-y-1.5 border-l-2 border-primary/20 py-1 pl-3 font-sans text-xs text-muted-foreground">
                           <li className="flex items-center gap-2">
-                            <Check
-                              className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
-                              aria-hidden
-                            />
+                            <Check className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
                             HyDE + embeddings
                           </li>
                           <li className="flex items-center gap-2">
-                            <Check
-                              className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
-                              aria-hidden
-                            />
+                            <Check className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
                             Ranked relevant passages
                           </li>
                           <li className="flex items-start gap-2 pt-0.5">

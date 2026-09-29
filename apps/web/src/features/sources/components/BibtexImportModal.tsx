@@ -263,11 +263,11 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
 
           {/* Warnings */}
           {warnings.length > 0 && (
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+            <div className="bg-warning-muted border border-warning-border rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-warning-muted-foreground shrink-0 mt-0.5" />
               <div className="space-y-1">
                 {warnings.map((w, i) => (
-                  <p key={i} className="text-sm text-warning">
+                  <p key={i} className="text-sm text-warning-muted-foreground">
                     {w}
                   </p>
                 ))}
@@ -292,9 +292,9 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
 
           {/* Warning for papers without DOI */}
           {withoutDoiCount > 0 && (
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-              <p className="text-sm text-warning">
+            <div className="bg-warning-muted border border-warning-border rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-warning-muted-foreground shrink-0 mt-0.5" />
+              <p className="text-sm text-warning-muted-foreground">
                 {withoutDoiCount} paper{withoutDoiCount !== 1 ? "s" : ""} missing DOI. These may
                 have limited metadata.
               </p>
@@ -345,7 +345,9 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
                           {paper.authors.join(", ")}
                         </p>
                       )}
-                      {!paper.doi && <span className="text-xs text-warning">No DOI</span>}
+                      {!paper.doi && (
+                        <span className="text-xs text-warning-muted-foreground">No DOI</span>
+                      )}
                     </div>
                   </div>
                 ))}

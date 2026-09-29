@@ -38,7 +38,7 @@ test.describe("Auth — Sign-up flow", () => {
     await expect(
       page
         .getByRole("heading", { name: "Check your email" })
-        .or(page.locator("[class*='bg-vintage-red-50']"))
+        .or(page.locator(".auth-form-light").getByRole("alert"))
     ).toBeVisible({ timeout: 8_000 });
   });
 
@@ -51,7 +51,9 @@ test.describe("Auth — Sign-up flow", () => {
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Should show some kind of error (exact message depends on backend)
-    await expect(page.locator("[class*='bg-vintage-red-50']")).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator(".auth-form-light").getByRole("alert")).toBeVisible({
+      timeout: 8_000,
+    });
   });
 
   test("can toggle back to sign-in from sign-up", async ({ page }) => {
