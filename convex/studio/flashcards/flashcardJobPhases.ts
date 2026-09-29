@@ -27,7 +27,7 @@ import { FLASHCARD_CONFIG } from "../../_agents/flashcard/config";
 import {
   groupFlashcardsByTopic,
   heuristicDedupeFlashcards,
-  validateSelfContained,
+  isUsableFlashcard,
 } from "../../_agents/flashcard/flashcardHeuristics";
 import { formatFlashcardsAsText } from "../../_agents/flashcard/formatFlashcards";
 import {
@@ -599,9 +599,7 @@ export async function runFinalizeFlashcardPhase(
       language
     );
 
-    const collapsedFlashcards = collapsedOutputs
-      .flat()
-      .filter((card) => card.front && card.back && validateSelfContained(card));
+    const collapsedFlashcards = collapsedOutputs.flat().filter(isUsableFlashcard);
 
     if (collapsedFlashcards.length === 0) {
       throw new Error("No valid flashcards remained after collapse");

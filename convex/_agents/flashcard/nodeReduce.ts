@@ -6,7 +6,7 @@ import { createAgentGraphLogger, type JobLogger } from "../_shared/logging.js";
 import {
   groupFlashcardsByTopic,
   heuristicDedupeFlashcards,
-  validateSelfContained,
+  isUsableFlashcard,
 } from "./flashcardHeuristics.js";
 import { callStatusUpdate } from "./nodeSplit.js";
 import type { Flashcard, OverallStateType } from "./state.js";
@@ -26,7 +26,7 @@ function flattenCollapsedOutputs(outputs: Flashcard[][], logger: JobLogger): Fla
 
   for (const flashcards of outputs) {
     for (const card of flashcards) {
-      if (card.front && card.back && validateSelfContained(card)) {
+      if (isUsableFlashcard(card)) {
         allCards.push(card);
       } else {
         failedValidationCount++;
