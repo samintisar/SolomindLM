@@ -2,11 +2,6 @@
   "features/audio": {
     "shadcn/no-inline-styles": 2
   },
-  "features/auth": {
-    "shadcn/no-arbitrary-values": 18,
-    "shadcn/no-inline-styles": 8,
-    "shadcn/no-raw-colors": 12
-  },
   "features/billing": {
     "shadcn/no-raw-colors": 1
   },
@@ -34,11 +29,6 @@
     "shadcn/no-raw-colors": 10,
     "shadcn/no-restyle": 14,
     "shadcn/no-unknown-classes": 5
-  },
-  "features/onboarding": {
-    "shadcn/no-arbitrary-values": 1,
-    "shadcn/no-inline-styles": 3,
-    "shadcn/no-raw-colors": 3
   },
   "features/sources": {
     "shadcn/no-arbitrary-values": 57,

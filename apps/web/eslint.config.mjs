@@ -4,7 +4,12 @@ import tsParser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 
 /** Migrated to the design system: violations are errors. Add a feature dir when its PR lands. */
-const MIGRATED = ["src/shared/components/ui/**/*.tsx", "src/shared/components/motion/**/*.tsx"];
+const MIGRATED = [
+  "src/shared/components/ui/**/*.tsx",
+  "src/shared/components/motion/**/*.tsx",
+  "src/features/auth/**/*.tsx",
+  "src/features/onboarding/**/*.tsx",
+];
 
 const UPSTREAM_ARBITRARY = [
   "alert-dialog",
