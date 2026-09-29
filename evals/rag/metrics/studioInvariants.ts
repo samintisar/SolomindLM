@@ -6,6 +6,7 @@
  * fine one question at a time. They need no API calls, so they run on every
  * studio eval. `studio.ts` wraps each check into a `MetricResult`.
  */
+import { findFlashcardDefect } from "../../../convex/_agents/flashcard/flashcardDefects";
 import type { MetricStatus } from "../types";
 
 export interface InvariantCheck {
@@ -221,6 +222,39 @@ export function flashcardCardValidity(cards: FlashcardLike[]): InvariantCheck {
             .map((i) => `#${i.index + 1} (${i.reasons.join(", ")})`)
             .join("; ")}`,
     breakdown: { invalid, total },
+  };
+}
+
+// ─── Flashcards: answer leak ─────────────────────────────────
+
+/** Cards whose front gives the answer away, or whose blank breaks the sentence. */
+export function flashcardAnswerLeak(cards: FlashcardLike[]): InvariantCheck {
+  const metric = "flashcard_answer_leak";
+  const flagged: Array<{ index: number; defect: string }> = [];
+  let total = 0;
+
+  cards.forEach((card, index) => {
+    const front = card.front ?? card.question;
+    const back = card.back ?? card.answer;
+    if (isBlank(front) || isBlank(back)) return;
+    total++;
+    const defect = findFlashcardDefect({ front: front as string, back: back as string });
+    if (defect) flagged.push({ index, defect });
+  });
+
+  const score = total === 0 ? 1 : (total - flagged.length) / total;
+  return {
+    metric,
+    status: total === 0 ? "info" : validityStatus(score),
+    score,
+    detail:
+      flagged.length === 0
+        ? `None of ${total} cards give the answer away on the front.`
+        : `${flagged.length}/${total} cards give the answer away or break their blank: ${flagged
+            .slice(0, 5)
+            .map((i) => `#${i.index + 1} (${i.defect})`)
+            .join("; ")}`,
+    breakdown: { flagged, total },
   };
 }
 
