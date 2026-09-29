@@ -1,11 +1,26 @@
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { requestNativePasswordSignIn } from "@/features/auth/nativeShellAuth";
 import { useAuth } from "@/features/auth/useAuth";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+import { Button } from "@/shared/components/ui/button";
+import { Card, CardContent } from "@/shared/components/ui/card";
+import { Field, FieldLabel } from "@/shared/components/ui/field";
+import { Input } from "@/shared/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/shared/components/ui/input-group";
+import { Separator } from "@/shared/components/ui/separator";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { cn } from "@/shared/utils/cn";
 import { isNativeShell } from "@/utils/platformDetection";
+import { GoogleIcon } from "./GoogleIcon";
 
 export type AuthFormInitialMode = "signIn" | "signUp";
 
@@ -16,15 +31,14 @@ type AuthStep =
   | "forgot"
   | { kind: "resetVerification"; email: string };
 
-const inputClass =
-  "w-full px-3 py-2.5 rounded-lg text-sm text-foreground placeholder:text-muted-foreground bg-muted border border-border/70 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 font-sans shadow-none";
-
 interface AuthFormPanelProps {
   authError?: string;
   onAuthenticated: () => void;
   initialMode?: AuthFormInitialMode;
-  /** Merged onto the card root (e.g. extra top padding when a headline overlaps). */
+  /** Merged onto the root wrapper around the card (layout only, e.g. margin or width). */
   className?: string;
+  /** `"none"` renders without the card when a parent (e.g. the auth dialog) provides the surface. */
+  chrome?: "card" | "none";
 }
 
 type AuthFormPanelContentProps = AuthFormPanelProps & {
@@ -32,13 +46,69 @@ type AuthFormPanelContentProps = AuthFormPanelProps & {
   signInPassword: (formData: FormData) => Promise<boolean>;
 };
 
+function PasswordField(props: {
+  id: string;
+  name: string;
+  label: string;
+  placeholder: string;
+  autoComplete: string;
+  shown: boolean;
+  onToggle: () => void;
+  showLabel: string;
+  hideLabel: string;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor={props.id} className="sr-only">
+        {props.label}
+      </FieldLabel>
+      <InputGroup>
+        <InputGroupInput
+          id={props.id}
+          name={props.name}
+          type={props.shown ? "text" : "password"}
+          autoComplete={props.autoComplete}
+          required
+          placeholder={props.placeholder}
+        />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            onClick={props.onToggle}
+            aria-label={props.shown ? props.hideLabel : props.showLabel}
+          >
+            {props.shown ? <EyeOff /> : <Eye />}
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </Field>
+  );
+}
+
+/** Spinner shows only for the password action; `disabled` also covers an in-flight Google sign-in. */
+function SubmitButton(props: {
+  loading: boolean;
+  disabled: boolean;
+  loadingLabel: string;
+  label: string;
+}) {
+  return (
+    <Button type="submit" size="lg" className="w-full" disabled={props.disabled}>
+      {props.loading ? <Spinner data-icon="inline-start" /> : null}
+      {props.loading ? props.loadingLabel : props.label}
+    </Button>
+  );
+}
+
 function AuthFormPanelContent({
   authError,
   onAuthenticated,
   initialMode = "signIn",
   className,
+  chrome = "card",
   signInPassword,
 }: AuthFormPanelContentProps) {
+  const id = useId();
   const { signInWithGoogle } = useAuth();
   const [step, setStep] = useState<AuthStep>(initialMode);
   const [error, setError] = useState("");
@@ -154,333 +224,298 @@ function AuthFormPanelContent({
 
   const disableAll = googleLoading || passwordLoading;
 
-  const btnPrimary =
-    "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition hover:opacity-95 disabled:pointer-events-none disabled:opacity-50";
+  const content = (
+    <div className="flex flex-col gap-6">
+      <h2 className="text-center font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+        {modalTitle}
+      </h2>
 
-  const btnOutline =
-    "inline-flex w-full items-center justify-center gap-3 rounded-xl border-2 border-border bg-muted px-4 py-3 text-sm font-medium text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-50";
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
-  return (
-    <div
-      className={`auth-form-light rounded-2xl border border-border/90 bg-card/90 p-6 shadow-lg shadow-primary/5 backdrop-blur-sm sm:p-8${className ? ` ${className}` : ""}`}
-    >
-      <div className="mb-6 text-center">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          {modalTitle}
-        </h2>
-      </div>
+      {step === "signIn" || step === "signUp" ? (
+        <div className="flex flex-col gap-5">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={handleGoogleSignIn}
+            disabled={disableAll}
+          >
+            {googleLoading ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <GoogleIcon className="size-5" />
+            )}
+            {googleLoading ? "Connecting…" : "Continue with Google"}
+          </Button>
 
-      {error && (
-        <div
-          role="alert"
-          className="mb-5 rounded-lg border border-destructive-border bg-destructive-muted p-3"
-        >
-          <p className="text-sm text-destructive-muted-foreground font-sans">{error}</p>
-        </div>
-      )}
+          <div className="flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="font-sans text-sm font-medium tracking-wide text-muted-foreground">
+              Or continue with email
+            </span>
+            <Separator className="flex-1" />
+          </div>
 
-      <div className="space-y-5">
-        {step === "signIn" || step === "signUp" ? (
-          <>
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={disableAll}
-              className={btnOutline}
-            >
-              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden>
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              {googleLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Connecting…
-                </>
-              ) : (
-                "Continue with Google"
-              )}
-            </button>
-
-            <div className="relative py-0.5">
-              <div className="absolute inset-0 flex items-center" aria-hidden>
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-card px-3 font-sans text-sm font-medium tracking-wide text-muted-foreground">
-                  Or continue with email
-                </span>
-              </div>
-            </div>
-
-            <form className="space-y-3" onSubmit={handleEmailPasswordSubmit}>
-              <input
+          <form className="flex flex-col gap-3" onSubmit={handleEmailPasswordSubmit}>
+            <Field>
+              <FieldLabel htmlFor={`${id}-email`} className="sr-only">
+                Email
+              </FieldLabel>
+              <Input
+                id={`${id}-email`}
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
                 placeholder="Enter your email"
-                className={inputClass}
               />
-              <div className="relative">
-                <input
-                  name="password"
-                  type={showAuthPassword ? "text" : "password"}
-                  autoComplete={step === "signUp" ? "new-password" : "current-password"}
-                  required
-                  placeholder="Password"
-                  className={`${inputClass} pr-11`}
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                  onClick={() => setShowAuthPassword((v) => !v)}
-                  aria-label={showAuthPassword ? "Hide password" : "Show password"}
-                >
-                  {showAuthPassword ? (
-                    <EyeOff className="h-4 w-4" aria-hidden />
-                  ) : (
-                    <Eye className="h-4 w-4" aria-hidden />
-                  )}
-                </button>
-              </div>
-              <input name="flow" type="hidden" value={step === "signUp" ? "signUp" : "signIn"} />
-              <button type="submit" disabled={disableAll} className={btnPrimary}>
-                {passwordLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Please wait…
-                  </>
-                ) : step === "signUp" ? (
-                  "Create account"
-                ) : (
-                  "Continue with email"
-                )}
-              </button>
-            </form>
+            </Field>
+            <PasswordField
+              id={`${id}-password`}
+              name="password"
+              label="Password"
+              placeholder="Password"
+              autoComplete={step === "signUp" ? "new-password" : "current-password"}
+              shown={showAuthPassword}
+              onToggle={() => setShowAuthPassword((v) => !v)}
+              showLabel="Show password"
+              hideLabel="Hide password"
+            />
+            <input name="flow" type="hidden" value={step === "signUp" ? "signUp" : "signIn"} />
+            <SubmitButton
+              loading={passwordLoading}
+              disabled={disableAll}
+              loadingLabel="Please wait…"
+              label={step === "signUp" ? "Create account" : "Continue with email"}
+            />
+          </form>
 
-            <div className="flex flex-col gap-2 text-center text-sm font-sans">
-              {step === "signIn" ? (
-                <>
-                  <button
-                    type="button"
-                    className="text-primary underline-offset-2 hover:underline"
-                    onClick={() => {
-                      setError("");
-                      setStep("signUp");
-                    }}
-                  >
-                    Create an account
-                  </button>
-                  <button
-                    type="button"
-                    className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                    onClick={() => {
-                      setError("");
-                      setStep("forgot");
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </>
-              ) : (
-                <button
+          <div className="flex flex-col items-center gap-1">
+            {step === "signIn" ? (
+              <>
+                <Button
                   type="button"
-                  className="text-primary underline-offset-2 hover:underline"
+                  variant="link"
+                  size="sm"
                   onClick={() => {
                     setError("");
-                    setStep("signIn");
+                    setStep("signUp");
                   }}
                 >
-                  Already have an account? Sign in
-                </button>
-              )}
-            </div>
-          </>
-        ) : null}
+                  Create an account
+                </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => {
+                    setError("");
+                    setStep("forgot");
+                  }}
+                >
+                  Forgot password?
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                onClick={() => {
+                  setError("");
+                  setStep("signIn");
+                }}
+              >
+                Already have an account? Sign in
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : null}
 
-        {typeof step === "object" && step.kind === "emailVerification" ? (
-          <>
-            <p className="text-sm leading-relaxed text-muted-foreground font-sans">
-              We sent an 8-digit code to{" "}
-              <span className="font-medium text-foreground">{step.email}</span>. Enter it below to
-              continue.
-            </p>
-            <form className="space-y-3" onSubmit={handleEmailVerificationSubmit}>
-              <input name="email" type="hidden" value={step.email} />
-              <input name="flow" type="hidden" value="email-verification" />
-              <input
+      {typeof step === "object" && step.kind === "emailVerification" ? (
+        <div className="flex flex-col gap-5">
+          <p className="font-sans text-sm leading-relaxed text-muted-foreground">
+            We sent an 8-digit code to{" "}
+            <span className="font-medium text-foreground">{step.email}</span>. Enter it below to
+            continue.
+          </p>
+          <form className="flex flex-col gap-3" onSubmit={handleEmailVerificationSubmit}>
+            <input name="email" type="hidden" value={step.email} />
+            <input name="flow" type="hidden" value="email-verification" />
+            <Field>
+              <FieldLabel htmlFor={`${id}-code`} className="sr-only">
+                Verification code
+              </FieldLabel>
+              <Input
+                id={`${id}-code`}
                 name="code"
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 required
                 placeholder="Verification code"
-                className={inputClass}
               />
-              <button type="submit" disabled={disableAll} className={btnPrimary}>
-                {passwordLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Verifying…
-                  </>
-                ) : (
-                  "Verify and continue"
-                )}
-              </button>
-            </form>
-            <button
-              type="button"
-              className="mx-auto block text-sm text-primary font-sans underline-offset-2 hover:underline"
-              onClick={() => {
-                setError("");
-                setStep("signIn");
-              }}
-            >
-              Back to sign in
-            </button>
-          </>
-        ) : null}
+            </Field>
+            <SubmitButton
+              loading={passwordLoading}
+              disabled={disableAll}
+              loadingLabel="Verifying…"
+              label="Verify and continue"
+            />
+          </form>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="self-center"
+            onClick={() => {
+              setError("");
+              setStep("signIn");
+            }}
+          >
+            Back to sign in
+          </Button>
+        </div>
+      ) : null}
 
-        {step === "forgot" ? (
-          <>
-            <p className="text-sm leading-relaxed text-muted-foreground font-sans">
-              Enter your email and we will send you a code to reset your password.
-            </p>
-            <form className="space-y-3" onSubmit={handleForgotSubmit}>
-              <input
+      {step === "forgot" ? (
+        <div className="flex flex-col gap-5">
+          <p className="font-sans text-sm leading-relaxed text-muted-foreground">
+            Enter your email and we will send you a code to reset your password.
+          </p>
+          <form className="flex flex-col gap-3" onSubmit={handleForgotSubmit}>
+            <Field>
+              <FieldLabel htmlFor={`${id}-reset-email`} className="sr-only">
+                Email
+              </FieldLabel>
+              <Input
+                id={`${id}-reset-email`}
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
                 placeholder="Email"
-                className={inputClass}
               />
-              <input name="flow" type="hidden" value="reset" />
-              <button type="submit" disabled={disableAll} className={btnPrimary}>
-                {passwordLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Sending…
-                  </>
-                ) : (
-                  "Send code"
-                )}
-              </button>
-            </form>
-            <button
-              type="button"
-              className="mx-auto block text-sm text-primary font-sans underline-offset-2 hover:underline"
-              onClick={() => {
-                setError("");
-                setStep("signIn");
-              }}
-            >
-              Back to sign in
-            </button>
-          </>
-        ) : null}
+            </Field>
+            <input name="flow" type="hidden" value="reset" />
+            <SubmitButton
+              loading={passwordLoading}
+              disabled={disableAll}
+              loadingLabel="Sending…"
+              label="Send code"
+            />
+          </form>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="self-center"
+            onClick={() => {
+              setError("");
+              setStep("signIn");
+            }}
+          >
+            Back to sign in
+          </Button>
+        </div>
+      ) : null}
 
-        {typeof step === "object" && step.kind === "resetVerification" ? (
-          <>
-            <p className="text-sm leading-relaxed text-muted-foreground font-sans">
-              Enter the code we sent to{" "}
-              <span className="font-medium text-foreground">{step.email}</span> and choose a new
-              password.
-            </p>
-            <form className="space-y-3" onSubmit={handleResetVerificationSubmit}>
-              <input name="email" type="hidden" value={step.email} />
-              <input name="flow" type="hidden" value="reset-verification" />
-              <input
+      {typeof step === "object" && step.kind === "resetVerification" ? (
+        <div className="flex flex-col gap-5">
+          <p className="font-sans text-sm leading-relaxed text-muted-foreground">
+            Enter the code we sent to{" "}
+            <span className="font-medium text-foreground">{step.email}</span> and choose a new
+            password.
+          </p>
+          <form className="flex flex-col gap-3" onSubmit={handleResetVerificationSubmit}>
+            <input name="email" type="hidden" value={step.email} />
+            <input name="flow" type="hidden" value="reset-verification" />
+            <Field>
+              <FieldLabel htmlFor={`${id}-reset-code`} className="sr-only">
+                Reset code
+              </FieldLabel>
+              <Input
+                id={`${id}-reset-code`}
                 name="code"
                 type="text"
                 inputMode="numeric"
                 required
                 placeholder="Reset code"
-                className={inputClass}
               />
-              <div className="relative">
-                <input
-                  name="newPassword"
-                  type={showNewPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  required
-                  placeholder="New password"
-                  className={`${inputClass} pr-11`}
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                  onClick={() => setShowNewPassword((v) => !v)}
-                  aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                >
-                  {showNewPassword ? (
-                    <EyeOff className="h-4 w-4" aria-hidden />
-                  ) : (
-                    <Eye className="h-4 w-4" aria-hidden />
-                  )}
-                </button>
-              </div>
-              <button type="submit" disabled={disableAll} className={btnPrimary}>
-                {passwordLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Updating…
-                  </>
-                ) : (
-                  "Update password"
-                )}
-              </button>
-            </form>
-            <button
-              type="button"
-              className="mx-auto block text-sm text-primary font-sans underline-offset-2 hover:underline"
-              onClick={() => {
-                setError("");
-                setStep("forgot");
-              }}
-            >
-              Resend code
-            </button>
-          </>
-        ) : null}
+            </Field>
+            <PasswordField
+              id={`${id}-new-password`}
+              name="newPassword"
+              label="New password"
+              placeholder="New password"
+              autoComplete="new-password"
+              shown={showNewPassword}
+              onToggle={() => setShowNewPassword((v) => !v)}
+              showLabel="Show new password"
+              hideLabel="Hide new password"
+            />
+            <SubmitButton
+              loading={passwordLoading}
+              disabled={disableAll}
+              loadingLabel="Updating…"
+              label="Update password"
+            />
+          </form>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="self-center"
+            onClick={() => {
+              setError("");
+              setStep("forgot");
+            }}
+          >
+            Resend code
+          </Button>
+        </div>
+      ) : null}
 
-        {step === "signIn" || step === "signUp" ? (
-          <div className="border-t border-border pt-5 text-center">
-            <p className="text-sm text-muted-foreground font-sans">
-              By continuing, you agree to our{" "}
-              <Link
-                to="/terms"
-                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                to="/privacy"
-                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                Privacy Policy
-              </Link>
-              .
-            </p>
-          </div>
-        ) : null}
-      </div>
+      {step === "signIn" || step === "signUp" ? (
+        <>
+          <Separator />
+          <p className="text-center font-sans text-sm text-muted-foreground">
+            By continuing, you agree to our{" "}
+            <Link to="/terms" className="underline-offset-2 hover:text-foreground hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              to="/privacy"
+              className="underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+
+  // The light pin lives on a wrapper: the Card inherits its tokens without a restyle class.
+  return (
+    <div className={cn("auth-form-light", className)}>
+      {chrome === "none" ? (
+        content
+      ) : (
+        <Card variant="elevated">
+          <CardContent>{content}</CardContent>
+        </Card>
+      )}
     </div>
   );
 }
