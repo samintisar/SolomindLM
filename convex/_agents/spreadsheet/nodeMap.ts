@@ -4,6 +4,7 @@ import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { getMessageContent } from "./csvHelpers.js";
@@ -49,9 +50,10 @@ export async function mapProcess(
     customPrompt && customPrompt.trim()
       ? MAP_PROMPTS["custom"]
       : MAP_PROMPTS[spreadsheetType] || MAP_PROMPTS["custom"];
-  const prompt = promptTemplate
-    .replace("{chunk}", chunk)
-    .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+  const prompt = fillTemplate(promptTemplate, {
+    chunk,
+    customPrompt: sanitizeUserInput(customPrompt || ""),
+  });
 
   console.log(`[SpreadsheetGraph] ${chunkId} Sending prompt to LLM (${prompt.length} chars)...`);
 

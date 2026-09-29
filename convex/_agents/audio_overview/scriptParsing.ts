@@ -139,15 +139,19 @@ export function parseDialogueScriptResponse(
   return strict;
 }
 
+/** Why the previous attempt failed, so a retry can tailor its instructions. */
+export type DialogueScriptFailureKind = "empty_response" | "invalid_script";
+
 export type GenerateValidatedDialogueScriptOptions = {
   /**
-   * Produces the raw model response for a 1-based attempt number. An `EmptyLlmResponseError`
-   * counts as a failed attempt; any other error propagates unchanged.
+   * Produces the raw model response for a 1-based attempt number; `previousFailure` is set on
+   * retries. An `EmptyLlmResponseError` counts as a failed attempt; any other error propagates
+   * unchanged.
    */
-  generate: (attempt: number) => Promise<string>;
+  generate: (attempt: number, previousFailure?: DialogueScriptFailureKind) => Promise<string>;
   minimumLines: number;
   maxAttempts: number;
-  /** Return false to stop retrying after a parse failure (e.g. time budget exhausted). */
+  /** Return false to stop retrying after a failed attempt (e.g. time budget exhausted). */
   canRetry?: () => boolean;
   onAttemptFailed?: (info: { attempt: number; reason: string; responseText: string }) => void;
 };
@@ -161,28 +165,26 @@ export async function generateValidatedDialogueScript(
 ): Promise<{ script: DialogueLine[]; attempt: number }> {
   const { generate, minimumLines, maxAttempts, canRetry, onAttemptFailed } = options;
   let lastReason = "no usable script was produced";
+  let lastFailure: DialogueScriptFailureKind | undefined;
   let attemptsMade = 0;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     attemptsMade = attempt;
-    let responseText: string;
+    let responseText = "";
     try {
-      responseText = await generate(attempt);
+      responseText = await generate(attempt, lastFailure);
+      const parseResult = parseDialogueScriptResponse(responseText, minimumLines);
+      if (parseResult.ok) return { script: parseResult.script, attempt };
+      lastFailure = "invalid_script";
+      lastReason = describeDialogueScriptParseFailure(parseResult);
     } catch (error) {
       // An empty completion is a bad sample, not an outage: retry like a parse failure.
       if (!(error instanceof EmptyLlmResponseError)) throw error;
+      lastFailure = "empty_response";
       lastReason = `The model returned an empty response (finish_reason=${error.finishReason ?? "unknown"}).`;
-      onAttemptFailed?.({ attempt, reason: lastReason, responseText: "" });
-      if (canRetry && !canRetry()) break;
-      continue;
     }
-    const parseResult = parseDialogueScriptResponse(responseText, minimumLines);
 
-    if (parseResult.ok) return { script: parseResult.script, attempt };
-
-    lastReason = describeDialogueScriptParseFailure(parseResult);
     onAttemptFailed?.({ attempt, reason: lastReason, responseText });
-
     if (canRetry && !canRetry()) break;
   }
 

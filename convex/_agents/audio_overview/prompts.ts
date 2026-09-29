@@ -7,6 +7,8 @@
  * of audio overview generation.
  */
 
+import { fillTemplate } from "../_shared/promptTemplate";
+
 // ============================================================
 // System Prompts
 // ============================================================
@@ -283,17 +285,6 @@ export function getReducePrompt(params: {
     estimatedWords: estimatedWords.toString(),
     focus: params.focus || "general overview",
   });
-}
-
-/**
- * Replaces every `{key}` placeholder in one pass. Values are inserted verbatim: a function
- * replacer keeps `$&`-style patterns in source text literal, and placeholder-like text inside
- * inserted values is never re-substituted.
- */
-function fillTemplate(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    Object.hasOwn(values, key) ? values[key] : match
-  );
 }
 
 /**

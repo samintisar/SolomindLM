@@ -13,13 +13,11 @@ export class EmptyLlmResponseError extends Error {
   readonly completionTokens?: number;
 
   constructor(details: { model: string; finishReason?: string; completionTokens?: number }) {
-    const parts = [
-      details.finishReason ? `finish_reason=${details.finishReason}` : undefined,
-      details.completionTokens !== undefined
-        ? `completion_tokens=${details.completionTokens}`
-        : undefined,
-    ].filter(Boolean);
-    super(`LLM returned empty text response${parts.length ? ` (${parts.join(", ")})` : ""}`);
+    // Keep numbers out of the message: `isRetryableError` substring-matches status codes like
+    // "500" / "429", so a token count there would change retry behaviour. Counts live on fields.
+    super(
+      `LLM returned empty text response${details.finishReason ? ` (finish_reason=${details.finishReason})` : ""}`
+    );
     this.name = "EmptyLlmResponseError";
     this.model = details.model;
     this.finishReason = details.finishReason;
