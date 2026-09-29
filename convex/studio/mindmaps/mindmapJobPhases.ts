@@ -9,6 +9,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { validateWithPreset } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { fillTemplate } from "../../_agents/_shared/promptTemplate";
 import { invokeStructuredOutput } from "../../_agents/_shared/structuredLlm";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
 import {
@@ -333,7 +334,7 @@ export async function runProcessMindMapMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    const prompt = MAP_PROMPT.replace("{content}", chunk);
+    const prompt = fillTemplate(MAP_PROMPT, { content: chunk });
 
     console.log(`[MindMapJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
@@ -579,7 +580,7 @@ export async function runFinalizeMindMapPhase(
         invoke: () =>
           invokeTogetherText({
             systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-            userPrompt: REDUCE_PROMPT.replace("{extractions}", safeInput),
+            userPrompt: fillTemplate(REDUCE_PROMPT, { extractions: safeInput }),
             model: env.MINDMAP_LLM,
             maxTokens: 16_000,
             temperature: 0.3,

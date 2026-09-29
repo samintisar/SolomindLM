@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { ExternalServiceError } from "../../_lib/errors";
+import { EmptyLlmResponseError } from "./llmErrors";
 import {
   createRetryWrapper,
   invokeWithHttpRetry,
   invokeWithRetry,
   isHttpAwareRetryableError,
+  isRetryableError,
   RetryPolicies,
 } from "./retry";
 
@@ -30,6 +32,20 @@ describe("isHttpAwareRetryableError", () => {
     expect(isHttpAwareRetryableError(new Error("ECONNRESET"))).toBe(true);
     expect(isHttpAwareRetryableError(new Error("validation failed"))).toBe(false);
     expect(isHttpAwareRetryableError(new Error("not found"))).toBe(false);
+  });
+});
+
+describe("isRetryableError", () => {
+  it("retries an empty completion by type, not by message digits", () => {
+    const error = new EmptyLlmResponseError({
+      model: "m",
+      finishReason: "stop",
+      completionTokens: 1500,
+    });
+
+    expect(isRetryableError(error)).toBe(true);
+    expect(error.message).not.toMatch(/\d/);
+    expect(error.completionTokens).toBe(1500);
   });
 });
 
