@@ -54,7 +54,7 @@ evals/rag/usecases/
 
 **Fixtures:** `EvalFixture` gains optional `useCase?: string`. Pack fixtures set `useCase` and leave `notebookId`/`documentIds` unset; section 3 fills them at run time. Fixture ids are namespaced: `<pack-id>/<slug>`. Splits per pack: 1–2 `smoke`, about 6–8 `train`, 2 `holdout`. Holdout fixtures are never used while tuning.
 
-**Validation (`usecases.test.ts`, also run by `eval:rag:dry` in CI):** every listed source exists and has an entry in `LICENSES.md`; fixture ids are unique and prefixed with the pack id; every fixture runner is in `features`; every rubric check applies to at least one listed feature.
+**Validation (`validatePack`):** every listed source is a plain file name that exists (exact case) and has an entry in `LICENSES.md`; fixture ids are unique and prefixed with the pack id; every fixture sets `split`; every fixture runner is in `features`; every rubric check applies to at least one listed feature. It runs in `registry.test.ts` (part of `test:convex` in CI), in `eval:seed`, and in dry runs that select pack fixtures (`eval:usecases:dry`). Plain `eval:rag:dry` skips pack fixtures, so adding `eval:usecases:dry` to CI belongs in the first pack PR.
 
 ## 2. Seeding
 
