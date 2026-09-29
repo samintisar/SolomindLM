@@ -1,5 +1,4 @@
-"use node";
-
+// Pure helpers (no "use node"): also imported by the V8 saveQuizResults mutation.
 import type { QuizQuestion } from "./prompts.js";
 
 /**
