@@ -69,4 +69,88 @@ describe("updateAudioOverviewStatus", () => {
     const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
     expect(row?.metadata).toMatchObject({ phase: "writing_script", progress: 55, length: "short" });
   });
+
+  test("does nothing when the audio overview was deleted mid-job", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await seedAudioOverview(t);
+    await t.run((ctx) => ctx.db.delete(audioOverviewId));
+
+    await expect(
+      t.mutation(internal.studio.jobMutations.audio.updateAudioOverviewStatus, {
+        audioOverviewId,
+        status: "generating",
+        metadata: { phase: "writing_script", progress: 55 },
+      })
+    ).resolves.toBeNull();
+    await expect(
+      t.mutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
+        audioOverviewId,
+        error: "boom",
+      })
+    ).resolves.toBeNull();
+  });
+});
+
+describe("audio job mutation sequence", () => {
+  const settings = { audioType: "debate", length: "short", focus: "exam prep" };
+
+  async function runMapPhase(t: ReturnType<typeof convexTest>) {
+    const audioOverviewId = await seedAudioOverview(t);
+    const audio = internal.studio.jobMutations.audio;
+    await t.mutation(audio.updateAudioOverviewStatus, {
+      audioOverviewId,
+      status: "generating",
+      metadata: { phase: "initializing", progress: 5 },
+    });
+    await t.mutation(audio.initAudioOverviewMapPhase, { audioOverviewId, totalMapTasks: 1 });
+    await t.mutation(audio.storeAudioOverviewMapResult, {
+      audioOverviewId,
+      chunkIndex: 0,
+      result: JSON.stringify({ beats: "beat" }),
+    });
+    await t.mutation(audio.clearAudioOverviewMapData, { audioOverviewId });
+    await t.mutation(audio.updateAudioOverviewStatus, {
+      audioOverviewId,
+      status: "generating",
+      metadata: { phase: "writing_script", progress: 55 },
+    });
+    return audioOverviewId;
+  }
+
+  test("completed row keeps the user's settings", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await runMapPhase(t);
+
+    await t.mutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
+      audioOverviewId,
+      audioUrl: "https://example.com/audio.mp3",
+      transcript: "Hello",
+      metadata: { title: "Title", phase: "completed", progress: 100 },
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.status).toBe("completed");
+    expect(row?.metadata).toMatchObject({ ...settings, phase: "completed", progress: 100 });
+    expect(row?.metadata.mapResults).toBeUndefined();
+  });
+
+  test("failed row keeps the user's settings and drops map output", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await seedAudioOverview(t);
+    await t.mutation(internal.studio.jobMutations.audio.initAudioOverviewMapPhase, {
+      audioOverviewId,
+      totalMapTasks: 2,
+    });
+
+    await t.mutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
+      audioOverviewId,
+      error: "All map tasks failed",
+      metadata: { phase: "failed", errorPhase: "map_processing", errorType: "llm_failure" },
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.status).toBe("failed");
+    expect(row?.metadata).toMatchObject({ ...settings, phase: "failed" });
+    expect(row?.metadata.mapResults).toBeUndefined();
+  });
 });

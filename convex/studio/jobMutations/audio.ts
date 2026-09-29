@@ -25,6 +25,7 @@ export const saveAudioOverviewResults = internalMutation({
       updatedAt: Date.now(),
       title,
       metadata: {
+        ...audioOverview.metadata,
         ...args.metadata,
         completedAt: Date.now(),
       },
@@ -59,6 +60,9 @@ export const updateAudioOverviewStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    if (!audioOverview) return null;
+
     const updates: { status: string; updatedAt: number; metadata?: Record<string, unknown> } = {
       status: args.status,
       updatedAt: Date.now(),
@@ -66,8 +70,7 @@ export const updateAudioOverviewStatus = internalMutation({
     if (args.metadata) {
       // Merge: the row's metadata also holds the user's settings (audioType, length, focus),
       // which later job phases read back.
-      const audioOverview = await ctx.db.get(args.audioOverviewId);
-      updates.metadata = { ...audioOverview?.metadata, ...args.metadata };
+      updates.metadata = { ...audioOverview.metadata, ...args.metadata };
     }
     await ctx.db.patch(args.audioOverviewId, updates);
   },
@@ -80,15 +83,21 @@ export const markAudioOverviewFailed = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    if (!audioOverview) return null;
+
     const errorMetadata = buildErrorMetadata(
       args.error,
       args.metadata?.phase || "unknown",
       args.metadata
     );
+    // Keep the user's settings; drop intermediate map output, which a failed job no longer needs.
+    const { mapResults: _mapResults, ...existingMetadata } = audioOverview.metadata || {};
     await ctx.db.patch(args.audioOverviewId, {
       status: "failed",
       updatedAt: Date.now(),
       metadata: {
+        ...existingMetadata,
         ...args.metadata,
         ...errorMetadata,
       },
