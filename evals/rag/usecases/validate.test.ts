@@ -69,11 +69,41 @@ describe("validatePack", () => {
 
   it("flags an unsupported source extension", () => {
     writeFileSync(join(dir, "sources", "clip.mp4"), "x");
-    writeFileSync(join(dir, "sources", "LICENSES.md"), "- unit-1.md\n- clip.mp4");
+    writeFileSync(join(dir, "sources", "LICENSES.md"), "- unit-1.md: x\n- clip.mp4: x");
     const problems = validatePack(registered(pack({ sources: ["clip.mp4"] })));
     expect(problems).toContain(
       'language-learners: source "clip.mp4" has unsupported extension ".mp4"'
     );
+  });
+
+  it("does not accept a licence entry for a different file whose name contains the source name", () => {
+    writeFileSync(
+      join(dir, "sources", "LICENSES.md"),
+      "- unit-10.md: CC BY 4.0, Example Author\n- old-unit-1.md: x"
+    );
+    const problems = validatePack(registered(pack()));
+    expect(problems).toContain('language-learners: source "unit-1.md" has no entry in LICENSES.md');
+  });
+
+  it("rejects source names that are not plain file names", () => {
+    const problems = validatePack(registered(pack({ sources: ["../secret.md", "sub/unit-1.md"] })));
+    expect(problems).toContain(
+      'language-learners: source "../secret.md" must be a plain file name'
+    );
+    expect(problems).toContain(
+      'language-learners: source "sub/unit-1.md" must be a plain file name'
+    );
+  });
+
+  it("matches source file names case-sensitively against the sources folder", () => {
+    writeFileSync(join(dir, "sources", "LICENSES.md"), "- Unit-1.md: x");
+    const problems = validatePack(registered(pack({ sources: ["Unit-1.md"] })));
+    expect(problems).toContain('language-learners: source "Unit-1.md" not found in sources/');
+  });
+
+  it("flags source names that differ only by case as duplicates", () => {
+    const problems = validatePack(registered(pack({ sources: ["unit-1.md", "Unit-1.md"] })));
+    expect(problems).toContain("language-learners: duplicate source file names");
   });
 
   it("flags fixture id prefix, useCase, pinned notebook and runner problems", () => {

@@ -23,6 +23,14 @@ export type SyncAction =
 
 /** Decide what the seeder does for each committed source. Unrelated notebook docs are left alone. */
 export function planPackSync(local: SourceDigest[], remote: RemotePackDoc[]): SyncAction[] {
+  for (const file of local) {
+    const count = remote.filter((d) => d.fileName === file.fileName).length;
+    if (count > 1) {
+      throw new Error(
+        `Pack notebook has ${count} documents named "${file.fileName}"; delete the extras in the app, then re-seed.`
+      );
+    }
+  }
   return local.map((file): SyncAction => {
     const doc = remote.find((d) => d.fileName === file.fileName);
     if (!doc) return { kind: "upload", fileName: file.fileName };
@@ -74,16 +82,23 @@ export function checkPackReady(
   const problems: string[] = [];
   const documentIds: string[] = [];
   for (const file of local) {
-    const doc = remote.docs.find((d) => d.fileName === file.fileName);
-    if (!doc) {
+    const matches = remote.docs.filter((d) => d.fileName === file.fileName);
+    if (matches.length === 0) {
       problems.push(`${file.fileName}: not uploaded`);
       continue;
     }
+    if (matches.length > 1) {
+      problems.push(`${file.fileName}: ${matches.length} documents with this name`);
+      continue;
+    }
+    const doc = matches[0];
     documentIds.push(doc.documentId);
-    if (doc.sha256 !== file.sha256) {
+    if (doc.status === "failed") {
+      problems.push(`${file.fileName}: failed${doc.error ? ` (${doc.error})` : ""}`);
+    } else if (doc.sha256 !== file.sha256) {
       problems.push(`${file.fileName}: out of date`);
     } else if (doc.status !== "completed") {
-      problems.push(`${file.fileName}: ${doc.status}${doc.error ? ` (${doc.error})` : ""}`);
+      problems.push(`${file.fileName}: ${doc.status}`);
     }
   }
   return { useCase: pack.id, notebookId: remote.notebookId, documentIds, problems };

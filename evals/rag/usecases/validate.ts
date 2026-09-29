@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { ConcreteRunnerKind } from "../types";
 import { SOURCE_CONTENT_TYPES, sourceExtension } from "./sources";
 import type { RegisteredPack } from "./types";
@@ -10,18 +10,29 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
   const sourcesDir = join(dir, "sources");
   const licensesPath = join(sourcesDir, "LICENSES.md");
   const licenses = existsSync(licensesPath) ? readFileSync(licensesPath, "utf-8") : null;
+  // LICENSES.md format: one list entry per source, "- <fileName>: <licence, attribution, origin>"
+  const licensed = new Set<string>();
+  for (const line of (licenses ?? "").split(/\r?\n/)) {
+    const match = /^\s*[-*]\s+([^:\s]+)\s*:/.exec(line);
+    if (match) licensed.add(match[1]);
+  }
+  const onDisk = existsSync(sourcesDir) ? new Set(readdirSync(sourcesDir)) : null;
 
   if (licenses === null) problems.push(`${pack.id}: missing sources/LICENSES.md`);
   if (pack.sources.length === 0) problems.push(`${pack.id}: no sources listed`);
-  if (new Set(pack.sources).size !== pack.sources.length) {
+  if (new Set(pack.sources.map((f) => f.toLowerCase())).size !== pack.sources.length) {
     problems.push(`${pack.id}: duplicate source file names`);
   }
 
   for (const file of pack.sources) {
-    if (!existsSync(join(sourcesDir, file))) {
+    if (basename(file) !== file || file.includes("..")) {
+      problems.push(`${pack.id}: source "${file}" must be a plain file name`);
+      continue;
+    }
+    if (!onDisk?.has(file)) {
       problems.push(`${pack.id}: source "${file}" not found in sources/`);
     }
-    if (licenses !== null && !licenses.includes(file)) {
+    if (licenses !== null && !licensed.has(file)) {
       problems.push(`${pack.id}: source "${file}" has no entry in LICENSES.md`);
     }
     const ext = sourceExtension(file);

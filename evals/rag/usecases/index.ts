@@ -11,6 +11,9 @@ export function registerPack(pack: UseCasePack, fixtures: EvalFixture[]): Regist
 }
 
 /**
+ * Pack modules must not import values from `evals/rag/fixtures`: fixtures/index.ts
+ * imports this registry at load time, so that would be a circular import (TDZ).
+ *
  * Registered use-case packs. Each pack PR adds one entry, e.g.
  *   registerPack(languageLearnersPack, languageLearnersFixtures),
  */

@@ -28,4 +28,10 @@ describe("assertNotProdConvexUrl", () => {
       assertNotProdConvexUrl("https://calm-fox-456.convex.cloud", undefined)
     ).not.toThrow();
   });
+
+  it("reports an invalid eval URL clearly", () => {
+    expect(() => assertNotProdConvexUrl("not a url", "prod:happy-otter-123")).toThrow(
+      "RAG_EVAL_CONVEX_URL is not a valid URL: not a url"
+    );
+  });
 });

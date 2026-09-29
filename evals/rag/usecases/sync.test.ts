@@ -38,6 +38,18 @@ describe("planPackSync", () => {
   });
 });
 
+describe("planPackSync duplicates", () => {
+  it("throws before planning when a source name matches several remote documents", () => {
+    const dupes: RemotePackDoc[] = [
+      { documentId: "d1", fileName: "a.pdf", status: "completed", sha256: "aaa" },
+      { documentId: "d2", fileName: "a.pdf", status: "completed", sha256: "aaa" },
+    ];
+    expect(() => planPackSync([local[0]], dupes)).toThrow(
+      'Pack notebook has 2 documents named "a.pdf"; delete the extras in the app, then re-seed.'
+    );
+  });
+});
+
 describe("checkPackReady", () => {
   it("reports a missing notebook", () => {
     expect(checkPackReady(pack, local, null)).toEqual({
@@ -67,5 +79,25 @@ describe("checkPackReady", () => {
       sha256: f.sha256,
     }));
     expect(checkPackReady(pack, local, { notebookId: "nb", docs }).problems).toEqual([]);
+  });
+
+  it("reports a failed document even when its hash is stale", () => {
+    const docs = [
+      { documentId: "d1", fileName: "a.pdf", status: "failed", sha256: "old", error: "boom" },
+    ];
+    expect(checkPackReady(pack, [local[0]], { notebookId: "nb", docs }).problems).toEqual([
+      "a.pdf: failed (boom)",
+    ]);
+  });
+
+  it("reports duplicate remote names and excludes their ids", () => {
+    const docs = [
+      { documentId: "d1", fileName: "a.pdf", status: "completed", sha256: "aaa" },
+      { documentId: "d2", fileName: "a.pdf", status: "completed", sha256: "aaa" },
+      { documentId: "d3", fileName: "b.md", status: "completed", sha256: "bbb" },
+    ];
+    const result = checkPackReady(pack, local.slice(0, 2), { notebookId: "nb", docs });
+    expect(result.problems).toEqual(["a.pdf: 2 documents with this name"]);
+    expect(result.documentIds).toEqual(["d3"]);
   });
 });
