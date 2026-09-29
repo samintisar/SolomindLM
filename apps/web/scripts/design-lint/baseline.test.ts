@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { areaOf, compareCounts, countViolations, type LintResult, sortCounts } from "./baseline";
+import {
+  areaOf,
+  compareCounts,
+  countViolations,
+  isDegradedRun,
+  type LintResult,
+  sortCounts,
+} from "./baseline";
 
 const msg = (ruleId: string | null, severity = 1) => ({ ruleId, severity, message: "m", line: 1 });
 
@@ -78,5 +85,22 @@ describe("sortCounts", () => {
       c: { "r/x": 0 },
     });
     expect(JSON.stringify(sorted)).toBe('{"a":{"r/a":1,"r/b":2},"b":{"r/z":1}}');
+  });
+});
+
+describe("isDegradedRun", () => {
+  it("returns the plugin's warnings, which mean counts may differ from the baseline", () => {
+    const stderr = [
+      "some unrelated ESLint noise",
+      "[@shadcn/lint] The Tailwind worker failed twice (timeout); no-unknown-classes is using the grammar bundled with @shadcn/lint for the rest of this run.",
+    ].join("\n");
+    expect(isDegradedRun(stderr)).toEqual([
+      "[@shadcn/lint] The Tailwind worker failed twice (timeout); no-unknown-classes is using the grammar bundled with @shadcn/lint for the rest of this run.",
+    ]);
+  });
+
+  it("returns nothing for a clean run", () => {
+    expect(isDegradedRun("")).toEqual([]);
+    expect(isDegradedRun("DeprecationWarning: something else\n")).toEqual([]);
   });
 });

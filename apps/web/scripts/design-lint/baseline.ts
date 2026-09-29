@@ -82,3 +82,14 @@ export function sortCounts(counts: Counts): Counts {
   }
   return sorted;
 }
+
+const PLUGIN_WARNING = /^\[@shadcn\/lint\] .*$/gm;
+
+/**
+ * @shadcn/lint reports every fallback or misconfiguration (e.g. its Tailwind worker timing out,
+ * after which no-unknown-classes uses a bundled grammar) as a `[@shadcn/lint] …` warning on
+ * stderr. Counts from such a run can't be compared with the baseline, so callers must bail.
+ */
+export function isDegradedRun(stderr: string): string[] {
+  return stderr.match(PLUGIN_WARNING) ?? [];
+}
