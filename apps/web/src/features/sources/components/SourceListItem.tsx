@@ -122,7 +122,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
             )}
             {/* Status badge */}
             {status === "processing" && (
-              <div className="flex items-center gap-1 text-xs font-medium text-warning font-sans shrink-0">
+              <div className="flex items-center gap-1 text-xs font-medium text-warning-muted-foreground font-sans shrink-0">
                 <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                 <span>Processing</span>
               </div>

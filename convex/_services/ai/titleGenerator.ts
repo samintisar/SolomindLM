@@ -13,65 +13,67 @@ export const generateTitle = internalAction({
     chunk: v.string(),
     model: v.optional(v.string()),
   },
-  handler: async (_ctx, args) => {
-    const apiKey = process.env.TOGETHER_AI_API_KEY;
-    if (!apiKey) {
-      throw new Error("TOGETHER_AI_API_KEY environment variable is not set");
-    }
+  handler: async (_ctx, args) => generateTitleFromChunk(args.chunk),
+});
 
-    const truncatedContent =
-      args.chunk.length > 500 ? args.chunk.substring(0, 500) + "..." : args.chunk;
+/**
+ * Same as `generateTitle`, but callable inline from an action that is already running,
+ * so a caller-side timeout does not leave a detached child action running.
+ */
+export async function generateTitleFromChunk(chunk: string): Promise<string> {
+  const apiKey = process.env.TOGETHER_AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("TOGETHER_AI_API_KEY environment variable is not set");
+  }
 
-    const prompt = `Generate a single, concise title (max 10 words) for the following content. Output ONLY the title with no preamble, no list, no introduction, and no quotation marks.
+  const truncatedContent = chunk.length > 500 ? chunk.substring(0, 500) + "..." : chunk;
+
+  const prompt = `Generate a single, concise title (max 10 words) for the following content. Output ONLY the title with no preamble, no list, no introduction, and no quotation marks.
 
 Content:
 ${truncatedContent}
 
 Title:`;
 
-    /** Strip quotes; first line only; cap at 10 words (prompt contract). */
-    function finalizeTitle(raw: string): string {
-      const t = raw.trim().replace(/^["']|["']$/g, "");
-      const line = t.split(/\n/)[0]?.trim() ?? "";
-      const words = line.split(/\s+/).filter(Boolean);
-      if (words.length > 10) return words.slice(0, 10).join(" ");
-      return line;
-    }
+  /** Strip quotes; first line only; cap at 10 words (prompt contract). */
+  function finalizeTitle(raw: string): string {
+    const t = raw.trim().replace(/^["']|["']$/g, "");
+    const line = t.split(/\n/)[0]?.trim() ?? "";
+    const words = line.split(/\s+/).filter(Boolean);
+    if (words.length > 10) return words.slice(0, 10).join(" ");
+    return line;
+  }
 
-    async function titleFromModel(model: string): Promise<string> {
-      const response = await uncachedLlmCall({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        // Reasoning models (e.g. GPT-OSS on Together) may consume part of the completion budget
-        // for traces; 50 was too small and could cut titles mid-phrase (e.g. after "100×").
-        maxTokens: 128,
-        reasoningEnabled: false,
-        toolChoice: "none",
-      });
-      return finalizeTitle(response.content);
-    }
+  async function titleFromModel(model: string): Promise<string> {
+    const response = await uncachedLlmCall({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      // Reasoning models (e.g. GPT-OSS on Together) may consume part of the completion budget
+      // for traces; 50 was too small and could cut titles mid-phrase (e.g. after "100×").
+      maxTokens: 128,
+      reasoningEnabled: false,
+      toolChoice: "none",
+    });
+    return finalizeTitle(response.content);
+  }
 
+  try {
+    let title: string;
     try {
-      let title: string;
-      try {
-        title = await titleFromModel(env.FAST_LLM);
-      } catch (firstError) {
-        if (env.SMART_LLM !== env.FAST_LLM) {
-          console.warn(
-            "[TitleGenerator] fast model failed, retrying with smart model:",
-            firstError
-          );
-          title = await titleFromModel(env.SMART_LLM);
-        } else {
-          throw firstError;
-        }
+      title = await titleFromModel(env.FAST_LLM);
+    } catch (firstError) {
+      if (env.SMART_LLM !== env.FAST_LLM) {
+        console.warn("[TitleGenerator] fast model failed, retrying with smart model:", firstError);
+        title = await titleFromModel(env.SMART_LLM);
+      } else {
+        throw firstError;
       }
-      console.log("[TitleGenerator] Generated title:", title);
-      return title;
-    } catch (error) {
-      console.error("[TitleGenerator] Error:", error);
-      throw new Error("Failed to generate title", { cause: error });
     }
-  },
-});
+    console.log("[TitleGenerator] Generated title:", title);
+    return title;
+  } catch (error) {
+    console.error("[TitleGenerator] Error:", error);
+    throw new Error("Failed to generate title", { cause: error });
+  }
+}

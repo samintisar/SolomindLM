@@ -195,9 +195,11 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
                   <span className="font-medium">{papers.length}</span> found
                 </div>
                 {skippedCount > 0 && (
-                  <div className="px-3 py-1 bg-warning/10 rounded-lg">
-                    <span className="font-medium text-warning">{skippedCount}</span> already in
-                    notebook
+                  <div className="px-3 py-1 bg-warning-muted rounded-lg">
+                    <span className="font-medium text-warning-muted-foreground">
+                      {skippedCount}
+                    </span>{" "}
+                    already in notebook
                   </div>
                 )}
                 <div className="px-3 py-1 bg-primary/10 rounded-lg">

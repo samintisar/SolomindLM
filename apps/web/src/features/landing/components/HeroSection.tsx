@@ -107,14 +107,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
               Understanding
             </span>
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground font-display font-light leading-relaxed max-w-2xl mx-auto animate-in fade-in duration-700 delay-200">
+          <p className="text-xl md:text-2xl text-muted-foreground font-display font-light leading-relaxed max-w-2xl mx-auto animate-in fade-in fill-mode-backwards duration-700 delay-200">
             AI that enhances learning, not replaces thinking.
           </p>
         </div>
 
         {/* CTA Search Bar - Redesigned */}
         <div
-          className="group/bar relative w-full max-w-3xl mx-auto min-h-[136px] sm:min-h-[144px] animate-in fade-in delay-300 transition-[transform] duration-300 ease-out hover:scale-[1.02]"
+          className="group/bar relative w-full max-w-3xl mx-auto min-h-[136px] sm:min-h-[144px] animate-in fade-in fill-mode-backwards delay-300 transition-[transform] duration-300 ease-out hover:scale-[1.02]"
           onClick={onGetStarted}
           onMouseEnter={() => setIsFocused(true)}
           onMouseLeave={() => setIsFocused(false)}
@@ -215,7 +215,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
         </div>
 
         {/* Product Preview / Visual Proof Area */}
-        <div className="pt-20 sm:pt-24 animate-in fade-in duration-1000 delay-500">
+        <div className="pt-20 sm:pt-24 animate-in fade-in fill-mode-backwards duration-1000 delay-500">
           <div className="relative max-w-[1500px] w-full mx-auto">
             {/* Glow Effect */}
             <div className="absolute -inset-4 bg-gradient-to-r from-orange-500/20 via-amber-500/20 to-rose-500/20 rounded-3xl blur-2xl"></div>
