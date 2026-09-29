@@ -37,6 +37,11 @@ export interface FlashcardViewProps {
 
 type ViewMode = "browse" | "study" | "edit";
 
+// Flip visibility swap for the card faces: lands when the card is edge-on (90°), which the default
+// easing reaches ~245ms into the 700ms rotation. Instant under reduced motion, where the rotation
+// itself is instant.
+const FACE_SWAP = "transition-[visibility] duration-0 delay-245 motion-reduce:delay-0";
+
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
   // State
   const [mode, setMode] = useState<ViewMode>("browse");
@@ -479,8 +484,14 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                   isFlipped ? "rotate-y-180" : ""
                 } ${mode === "edit" ? "ring-2 ring-primary ring-offset-2" : ""}`}
               >
-                {/* Front */}
-                <div className="absolute inset-0 backface-hidden bg-card rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border">
+                {/* Front. backface-visibility alone is unreliable (composited descendants such
+                    as the scroll area can ignore it and bleed through mirrored), so the inactive
+                    face is also hidden. The swap waits for the edge-on midpoint of the flip. */}
+                <div
+                  className={`absolute inset-0 backface-hidden ${FACE_SWAP} ${
+                    isFlipped ? "invisible" : "visible"
+                  } bg-card rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border`}
+                >
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
                     Question
                   </span>
@@ -500,7 +511,11 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                 </div>
 
                 {/* Back */}
-                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-muted/30 rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border">
+                <div
+                  className={`absolute inset-0 backface-hidden rotate-y-180 ${FACE_SWAP} ${
+                    isFlipped ? "visible" : "invisible"
+                  } bg-muted/30 rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border`}
+                >
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
                     Answer
                   </span>

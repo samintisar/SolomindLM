@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": false,
@@ -44,7 +44,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": false,
+      "preset": "none",
       "complexity": {
         "noAdjacentSpacesInRegex": "error",
         "noBannedTypes": "error",
@@ -87,7 +87,7 @@
         "useValidTypeof": "error",
         "useYield": "error"
       },
-      "nursery": { "noDuplicateEnumValues": "error", "useErrorCause": "off" },
+      "nursery": {},
       "style": {
         "noCommonJs": "error",
         "noNamespace": "error",
@@ -95,7 +95,8 @@
         "useArrayLiterals": "error",
         "useAsConstAssertion": "error",
         "useBlockStatements": "off",
-        "useComponentExportOnlyModules": "warn"
+        "useComponentExportOnlyModules": "warn",
+        "useErrorCause": "off"
       },
       "suspicious": {
         "noAssignInExpressions": "off",
@@ -134,7 +135,8 @@
         "noUselessRegexBackrefs": "error",
         "noWith": "error",
         "useGetterReturn": "error",
-        "useNamespaceKeyword": "error"
+        "useNamespaceKeyword": "error",
+        "noDuplicateEnumValues": "error"
       }
     },
     "includes": [
@@ -189,8 +191,8 @@
             "noUnreachable": "off",
             "noUnreachableSuper": "off"
           },
-          "nursery": { "useSpread": "error" },
-          "style": { "useConst": "error" },
+          "nursery": {},
+          "style": { "useConst": "error", "useSpreadOverApply": "error" },
           "suspicious": {
             "noClassAssign": "off",
             "noDuplicateClassMembers": "off",

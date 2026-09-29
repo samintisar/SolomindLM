@@ -1,63 +1,63 @@
-import React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { Slot } from "radix-ui";
+import type * as React from "react";
 import { cn } from "@/shared/utils/cn";
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "outline" | "ghost" | "destructive";
-  size?: "default" | "sm" | "lg" | "icon";
-}
+const buttonVariants = cva(
+  [
+    "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-sans text-sm font-semibold tracking-wide",
+    "transition-all duration-200 ease-out outline-none",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    "disabled:pointer-events-none disabled:opacity-50",
+    "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
+    "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  ],
+  {
+    variants: {
+      variant: {
+        default:
+          "rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 dark:shadow-primary/30 hover:-translate-y-px hover:bg-primary/88 hover:shadow-lg hover:shadow-primary/35 dark:hover:shadow-primary/40 active:translate-y-0 active:scale-98 active:bg-primary/95 active:shadow-md",
+        destructive:
+          "rounded-xl bg-destructive text-destructive-foreground shadow-md shadow-destructive/25 dark:shadow-destructive/35 hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35 active:translate-y-0 active:scale-98",
+        outline:
+          "rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:bg-accent/60 hover:text-accent-foreground active:scale-98",
+        secondary:
+          "rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-98",
+        ghost: "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-11 px-6",
+        sm: "h-9 px-4 text-xs",
+        lg: "h-12 px-8 text-base",
+        icon: "size-10 rounded-xl",
+        "icon-sm": "size-8 rounded-lg",
+        "icon-lg": "size-12 rounded-xl",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
 
-const variantStyles = {
-  default: [
-    "rounded-xl bg-primary text-primary-foreground",
-    "shadow-md shadow-primary/25 dark:shadow-primary/30",
-    "hover:-translate-y-px hover:bg-primary/88 hover:shadow-lg hover:shadow-primary/35 dark:hover:shadow-primary/40",
-    "active:translate-y-0 active:bg-primary/95 active:shadow-md",
-  ].join(" "),
-  outline: [
-    "rounded-xl border-2 border-input bg-background",
-    "hover:border-primary/40 hover:bg-accent/60 hover:text-accent-foreground",
-    "active:translate-y-px",
-  ].join(" "),
-  ghost: ["rounded-lg", "hover:bg-accent hover:text-accent-foreground", "active:bg-accent/80"].join(
-    " "
-  ),
-  destructive: [
-    "rounded-xl bg-destructive text-destructive-foreground",
-    "shadow-md shadow-destructive/25 dark:shadow-destructive/35",
-    "hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35",
-    "active:translate-y-0 active:shadow-md",
-  ].join(" "),
-};
+type ButtonProps = React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+  };
 
-const sizeStyles = {
-  default: "h-11 min-h-11 px-6 py-2",
-  sm: "h-9 px-4 text-xs",
-  lg: "h-12 px-8 text-base",
-  icon: "h-10 w-10 shrink-0 rounded-xl p-0",
-};
-
-export function Button({
-  className,
-  variant = "default",
-  size = "default",
-  children,
-  ref,
-  ...props
-}: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
+function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+  const Comp = asChild ? Slot.Root : "button";
   return (
-    <button
-      ref={ref}
-      className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap text-sm font-semibold tracking-wide",
-        "ring-offset-background transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2",
-        "focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-        variantStyles[variant],
-        sizeStyles[size],
-        className
-      )}
+    <Comp
+      data-slot="button"
+      data-variant={variant ?? "default"}
+      data-size={size ?? "default"}
+      className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    >
-      {children}
-    </button>
+    />
   );
 }
+
+export { Button, type ButtonProps, buttonVariants };

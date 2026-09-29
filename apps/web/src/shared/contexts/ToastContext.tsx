@@ -1,72 +1,51 @@
-import { ReactNode, useCallback, useState } from "react";
-import { Toast, ToastContext } from "./useToast";
+import type { ReactNode } from "react";
+import { toast as sonner } from "sonner";
+import { type Toast, ToastContext, type ToastContextValue, type ToastType } from "./useToast";
 
 const DEFAULT_DURATION = 4000;
+const ERROR_DURATION = 6000;
+
+function durationFor(type: ToastType, requested?: number): number {
+  if (type === "loading") return Infinity;
+  if (type === "error") return requested ?? ERROR_DURATION;
+  return requested ?? DEFAULT_DURATION;
+}
+
+// sonner generates numeric ids and matches them with ===, so we own the ids and keep them strings.
+let counter = 0;
+
+function show(message: string, options: Partial<Toast> = {}): string {
+  const type = options.type ?? "info";
+  const id = options.id ?? `toast-${++counter}`;
+  const { action } = options;
+  const external = {
+    id,
+    // sonner closes the toast after an action click; preventDefault keeps it open like before.
+    action: action && {
+      label: action.label,
+      onClick: (event: { preventDefault: () => void }) => {
+        event.preventDefault();
+        action.onClick();
+      },
+    },
+    duration: durationFor(type, options.duration),
+  };
+  sonner[type](message, external);
+  return id;
+}
+
+// Stateless: sonner owns the toast queue, so the context value never changes.
+const value: ToastContextValue = {
+  toast: show,
+  success: (message, options) => show(message, { ...options, type: "success" }),
+  error: (message, options) => show(message, { ...options, type: "error" }),
+  info: (message, options) => show(message, { ...options, type: "info" }),
+  loading: (message, options) => show(message, { ...options, type: "loading" }),
+  dismiss: (id) => {
+    sonner.dismiss(id);
+  },
+};
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const toast = useCallback((message: string, options: Partial<Toast> = {}) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    const newToast: Toast = {
-      id,
-      message,
-      type: options.type || "info",
-      duration: options.duration ?? DEFAULT_DURATION,
-      action: options.action,
-    };
-
-    setToasts((prev) => [...prev, newToast]);
-
-    if (newToast.type !== "loading" && newToast.duration) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, newToast.duration);
-    }
-
-    return id;
-  }, []);
-
-  const success = useCallback(
-    (message: string, options?: Partial<Toast>) => {
-      return toast(message, { ...options, type: "success" });
-    },
-    [toast]
-  );
-
-  const error = useCallback(
-    (message: string, options?: Partial<Toast>) => {
-      const { duration: durationOverride, ...rest } = options ?? {};
-      return toast(message, {
-        ...rest,
-        type: "error",
-        duration: durationOverride ?? 6000,
-      });
-    },
-    [toast]
-  );
-
-  const info = useCallback(
-    (message: string, options?: Partial<Toast>) => {
-      return toast(message, { ...options, type: "info" });
-    },
-    [toast]
-  );
-
-  const loading = useCallback(
-    (message: string, options?: Partial<Toast>) => {
-      return toast(message, { ...options, type: "loading", duration: Infinity });
-    },
-    [toast]
-  );
-
-  const dismiss = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  return (
-    <ToastContext.Provider value={{ toasts, toast, success, error, info, loading, dismiss }}>
-      {children}
-    </ToastContext.Provider>
-  );
+  return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>;
 }

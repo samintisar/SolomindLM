@@ -4,6 +4,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { z } from "zod";
 import { env } from "../../_lib/env";
 import { invokeWithTimeout } from "../_shared/index.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 import { invokeStructuredOutput } from "../_shared/structuredLlm.js";
 import { GRAPH_CONFIG } from "./config.js";
 import { MAP_PROMPT, MAP_SYSTEM_PROMPT } from "./prompts.js";
@@ -26,7 +27,7 @@ export async function extractConcepts(
     () =>
       invokeStructuredOutput({
         systemPrompt: MAP_SYSTEM_PROMPT,
-        userPrompt: MAP_PROMPT.replace("{content}", content),
+        userPrompt: fillTemplate(MAP_PROMPT, { content }),
         schema: ConceptExtractionSchema,
         schemaName: "concept_extraction",
         model: options?.model ?? env.FAST_LLM,

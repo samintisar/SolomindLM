@@ -10,6 +10,7 @@ import {
   invokeWithTimeout,
   withoutMapOutputs,
 } from "../_shared/index.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { getMessageContent } from "./csvHelpers.js";
@@ -36,9 +37,10 @@ async function collapseGroup(
       ? COLLAPSE_PROMPTS["custom"]
       : COLLAPSE_PROMPTS[spreadsheetType] || COLLAPSE_PROMPTS["custom"];
 
-  const prompt = collapsePrompt
-    .replace("{content}", combined)
-    .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+  const prompt = fillTemplate(collapsePrompt, {
+    content: combined,
+    customPrompt: sanitizeUserInput(customPrompt || ""),
+  });
 
   const response = await invokeWithRetry(
     () =>

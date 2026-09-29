@@ -31,7 +31,7 @@ export function getStatusIcon(status?: string): React.ReactNode {
     case "ranking":
       return <ListOrdered className="w-3.5 h-3.5" />;
     case "completed":
-      return <Check className="w-3.5 h-3.5 text-vintage-green-700 dark:text-vintage-green-600" />;
+      return <Check className="w-3.5 h-3.5 text-success-muted-foreground" />;
     default:
       return status ? <Brain className="w-3.5 h-3.5" /> : null;
   }

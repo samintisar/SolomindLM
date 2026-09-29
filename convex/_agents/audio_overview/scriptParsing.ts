@@ -1,3 +1,4 @@
+import { EmptyLlmResponseError } from "../_shared/llmErrors";
 import type { DialogueLine } from "./state";
 
 export type DialogueScriptParseResult =
@@ -23,11 +24,57 @@ export function getMinimumDialogueLines(targetLines: number): number {
   return Math.min(12, Math.max(8, Math.ceil(targetLines * 0.25)));
 }
 
-export function parseDialogueScriptResponse(
+/**
+ * Walks the response from `startIndex` and collects every complete top-level `{...}` object that
+ * is a valid dialogue line. Tolerates truncated output (an unfinished trailing object is
+ * dropped) and isolated malformed entries, which a strict `JSON.parse` would reject wholesale.
+ */
+function salvageDialogueLines(responseText: string, startIndex: number): DialogueLine[] {
+  const lines: DialogueLine[] = [];
+  let depth = 0;
+  let objectStart = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = startIndex; index < responseText.length; index += 1) {
+    const char = responseText[index];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      if (depth === 0) objectStart = index;
+      depth += 1;
+    } else if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && objectStart !== -1) {
+        try {
+          const candidate: unknown = JSON.parse(responseText.substring(objectStart, index + 1));
+          if (isDialogueLine(candidate)) {
+            lines.push({ speaker: candidate.speaker, text: candidate.text.trim() });
+          }
+        } catch {
+          // Skip the malformed object and keep scanning.
+        }
+        objectStart = -1;
+      }
+    }
+  }
+
+  return lines;
+}
+
+function parseStrictDialogueScript(
   responseText: string,
+  jsonStart: number,
   minimumLines: number
 ): DialogueScriptParseResult {
-  const jsonStart = responseText.indexOf("[");
   const jsonEnd = responseText.lastIndexOf("]");
 
   if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) {
@@ -73,49 +120,77 @@ export function parseDialogueScriptResponse(
   };
 }
 
-function cleanBeatLine(line: string): string | null {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed === "---") return null;
+export function parseDialogueScriptResponse(
+  responseText: string,
+  minimumLines: number
+): DialogueScriptParseResult {
+  const jsonStart = responseText.indexOf("[");
+  const strict = parseStrictDialogueScript(responseText, jsonStart, minimumLines);
 
-  const withoutBullet = trimmed.replace(/^[-•*]\s*/, "");
-  const withoutType = withoutBullet.replace(
-    /^(CLAIM|PUSHBACK|FOLLOWUP|HESITATION|AHA|RECAP|NAMED_ITEM|MAIN IDEAS?|QUICK FACTS?|KEY TAKEAWAYS?|STRENGTHS?|WEAKNESSES?|TECHNIQUES?|SUGGESTIONS?|POSITION A|POSITION B|GRAY AREAS?|KEY EVIDENCE):\s*/i,
-    ""
-  );
-  const cleaned = withoutType.replace(/\s+/g, " ").trim();
+  if (strict.ok || jsonStart === -1) return strict;
+  if (strict.reason === "not_array" || strict.reason === "too_short") return strict;
 
-  if (cleaned.length < 20) return null;
-  return cleaned;
-}
-
-export function buildFallbackDialogueScriptFromBeats(
-  beatsText: string,
-  targetLines: number
-): DialogueLine[] | null {
-  const beats = beatsText
-    .split(/\r?\n/)
-    .map(cleanBeatLine)
-    .filter((beat): beat is string => beat !== null);
-
-  if (beats.length === 0) return null;
-
-  const lineCount = Math.max(2, targetLines);
-  const script: DialogueLine[] = [];
-
-  for (let index = 0; index < lineCount; index += 1) {
-    const beat = beats[index % beats.length];
-    const speaker = index % 2 === 0 ? "host_a" : "host_b";
-    const text =
-      speaker === "host_a"
-        ? beat
-        : index === lineCount - 1
-          ? `The useful takeaway is that this is not just background detail: ${beat}`
-          : `So the pressure point is this: ${beat}`;
-
-    script.push({ speaker, text });
+  // Truncated output or a few malformed entries: keep the valid lines if there are enough.
+  const salvaged = salvageDialogueLines(responseText, jsonStart);
+  if (salvaged.length >= minimumLines) {
+    return { ok: true, script: salvaged };
   }
 
-  return script;
+  return strict;
+}
+
+/** Why the previous attempt failed, so a retry can tailor its instructions. */
+export type DialogueScriptFailureKind = "empty_response" | "invalid_script";
+
+export type GenerateValidatedDialogueScriptOptions = {
+  /**
+   * Produces the raw model response for a 1-based attempt number; `previousFailure` is set on
+   * retries. An `EmptyLlmResponseError` counts as a failed attempt; any other error propagates
+   * unchanged.
+   */
+  generate: (attempt: number, previousFailure?: DialogueScriptFailureKind) => Promise<string>;
+  minimumLines: number;
+  maxAttempts: number;
+  /** Return false to stop retrying after a failed attempt (e.g. time budget exhausted). */
+  canRetry?: () => boolean;
+  onAttemptFailed?: (info: { attempt: number; reason: string; responseText: string }) => void;
+};
+
+/**
+ * Calls `generate` until its response parses into a valid dialogue script. Throws (rather than
+ * returning placeholder content) when no attempt produces one.
+ */
+export async function generateValidatedDialogueScript(
+  options: GenerateValidatedDialogueScriptOptions
+): Promise<{ script: DialogueLine[]; attempt: number }> {
+  const { generate, minimumLines, maxAttempts, canRetry, onAttemptFailed } = options;
+  let lastReason = "no usable script was produced";
+  let lastFailure: DialogueScriptFailureKind | undefined;
+  let attemptsMade = 0;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    attemptsMade = attempt;
+    let responseText = "";
+    try {
+      responseText = await generate(attempt, lastFailure);
+      const parseResult = parseDialogueScriptResponse(responseText, minimumLines);
+      if (parseResult.ok) return { script: parseResult.script, attempt };
+      lastFailure = "invalid_script";
+      lastReason = describeDialogueScriptParseFailure(parseResult);
+    } catch (error) {
+      // An empty completion is a bad sample, not an outage: retry like a parse failure.
+      if (!(error instanceof EmptyLlmResponseError)) throw error;
+      lastFailure = "empty_response";
+      lastReason = `The model returned an empty response (finish_reason=${error.finishReason ?? "unknown"}).`;
+    }
+
+    onAttemptFailed?.({ attempt, reason: lastReason, responseText });
+    if (canRetry && !canRetry()) break;
+  }
+
+  throw new Error(
+    `Dialogue script generation failed after ${attemptsMade} attempt(s): ${lastReason}`
+  );
 }
 
 export function describeDialogueScriptParseFailure(

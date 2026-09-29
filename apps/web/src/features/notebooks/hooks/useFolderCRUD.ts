@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import { FolderItem } from "@/shared/types/index";
 import { useCreateFolder, useDeleteFolder, useUpdateFolder } from "../services/foldersApi";
 import { useUpdateNotebook } from "../services/notebooksApi";
@@ -29,7 +30,7 @@ export function useFolderCRUD({ isAuthenticated, user, onRequireAuth }: UseFolde
     try {
       await createFolder({
         name: "New Folder",
-        color: "bg-vintage-brown-300",
+        color: DEFAULT_COVER_COLOR,
         icon: "Folder",
       });
     } catch (error) {
