@@ -3,6 +3,8 @@
  * MetricResult[] for a single fixture/artifact pair.
  */
 import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
+import { getPack } from "../usecases";
+import type { SourceText } from "../usecases/types";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
 import {
   abstentionCorrectness,
@@ -18,6 +20,7 @@ import {
   scoreLiteratureReviewMetrics,
 } from "./literatureReview";
 import { type LlmJudgeOptions, scoreAllLlmJudgeMetrics } from "./llmJudge";
+import { scoreRubricMetrics } from "./rubric";
 import {
   externalSourceUtilization,
   researchSourceBreadth,
@@ -37,6 +40,8 @@ export interface ScoreAllMetricsOptions {
   judgeModel?: string;
   /** Custom judge invoker (tests). */
   judgeInvoke?: LlmJudgeOptions["invoke"];
+  /** Extracted pack source text for rubric judges (use-case pack fixtures) */
+  packSourceTexts?: SourceText[];
 }
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
@@ -112,6 +117,16 @@ export async function scoreAllMetrics(
   };
   const binaryResults = await scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions);
   results.push(...binaryResults);
+
+  if (fixture.useCase && binaryOptions.enabled && invoke) {
+    results.push(
+      ...(await scoreRubricMetrics(fixture, artifact, getPack(fixture.useCase).pack, {
+        invoke,
+        model: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+        sourceTexts: options.packSourceTexts,
+      }))
+    );
+  }
 
   if (options.likertJudges && !options.dryRun && invoke) {
     const likertModel = options.judgeModel ?? "openai/gpt-oss-120b";

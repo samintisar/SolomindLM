@@ -42,4 +42,18 @@ describe("buildJudgeCalibrationQueue", () => {
     expect(queue.some((row) => row.modelStatus === "fail")).toBe(true);
     expect(queue.every((row) => row.humanAgree === null)).toBe(true);
   });
+
+  it("includes rubric verdicts alongside binary judges", () => {
+    const queue = buildJudgeCalibrationQueue(
+      [
+        metric({ metric: "rubric:professionals:figures-match", status: "fail" }),
+        metric({ metric: "binary_judge_studio_grounding", status: "pass", runner: "report" }),
+      ],
+      { limit: 20 }
+    );
+    expect(queue.map((row) => row.metric)).toEqual([
+      "rubric:professionals:figures-match",
+      "binary_judge_studio_grounding",
+    ]);
+  });
 });

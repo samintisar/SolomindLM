@@ -17,7 +17,9 @@ export function buildJudgeCalibrationQueue(
   options?: { limit?: number }
 ): JudgeCalibrationItem[] {
   const limit = options?.limit ?? 20;
-  const judges = metrics.filter((row) => row.metric.startsWith("binary_judge_"));
+  const judges = metrics.filter(
+    (row) => row.metric.startsWith("binary_judge_") || row.metric.startsWith("rubric:")
+  );
   const fails = judges.filter((row) => row.status === "fail" || row.status === "warn");
   const passes = judges.filter((row) => row.status === "pass");
 
