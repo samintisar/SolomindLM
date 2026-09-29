@@ -46,6 +46,7 @@ import {
 import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import type { AudioSynthesisInput } from "../jobMutations/audio";
 
 // ============================================================
 // CONFIGURATION
@@ -652,11 +653,18 @@ export async function runFinalizeAudioOverviewPhase(
       internal.studio.jobMutations.audio.storeAudioOverviewScript,
       {
         audioOverviewId,
-        script: fullDialogueScript,
-        title,
-        reduce: {
-          latencyMs: reduceLatencyMs,
-          ...(reduceUsage !== undefined ? { tokenUsage: reduceUsage } : {}),
+        synthesisInput: {
+          script: fullDialogueScript,
+          title,
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+          telemetry: aggregateStudioJobTelemetry({
+            mapResults: Object.values(mapResults),
+            reduce: {
+              latencyMs: reduceLatencyMs,
+              ...(reduceUsage !== undefined ? { tokenUsage: reduceUsage } : {}),
+            },
+          }),
         },
       }
     );
@@ -725,28 +733,19 @@ export async function runSynthesizeAudioOverviewPhase(
       return;
     }
 
-    const storedMetadata = (audioOverview.metadata ?? {}) as {
-      dialogueScript?: DialogueLine[];
-      pendingTitle?: string;
-      reduceTelemetry?: { latencyMs: number; tokenUsage?: TokenUsage };
-      mapResults?: Record<string, string>;
-    };
-    const fullDialogueScript = storedMetadata.dialogueScript;
-    if (!fullDialogueScript || fullDialogueScript.length === 0) {
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    if (!synthesisInput || synthesisInput.script.length === 0) {
       throw new Error("No dialogue script stored for synthesis");
     }
-    const title = storedMetadata.pendingTitle || "Audio Overview";
-    const reduceTelemetry = storedMetadata.reduceTelemetry;
-    const mapResults = storedMetadata.mapResults || {};
-    const failedCount = {
-      count: Object.values(mapResults).filter((result) => {
-        try {
-          return Boolean(JSON.parse(result)._error);
-        } catch {
-          return true;
-        }
-      }).length,
-    };
+    const {
+      script: fullDialogueScript,
+      title,
+      mapSuccessCount,
+      mapFailedCount,
+      telemetry,
+    } = synthesisInput;
 
     const ttsStartTime = Date.now();
     const ttsClient = createTogetherTtsClient();
@@ -846,15 +845,17 @@ export async function runSynthesizeAudioOverviewPhase(
           phase: "completed",
           progress: 100,
           completedAt: Date.now(),
-          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-          mapFailedCount: failedCount.count,
+          mapSuccessCount,
+          mapFailedCount,
           dialogueLines: successCount,
         },
-        aggregateStudioJobTelemetry({
-          mapResults: Object.values(mapResults),
-          reduce: reduceTelemetry,
-          extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
-        })
+        {
+          ...telemetry,
+          stageSpans: [
+            ...(telemetry.stageSpans ?? []),
+            { stage: "tts", latencyMs: Date.now() - ttsStartTime },
+          ],
+        }
       ),
     });
 
@@ -862,8 +863,8 @@ export async function runSynthesizeAudioOverviewPhase(
       title,
       audioUrl,
       transcriptLength: transcript.length,
-      mapSuccess: Object.keys(mapResults).length - failedCount.count,
-      mapFailed: failedCount.count,
+      mapSuccess: mapSuccessCount,
+      mapFailed: mapFailedCount,
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "synthesis");

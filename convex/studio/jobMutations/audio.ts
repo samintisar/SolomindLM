@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
@@ -17,6 +17,8 @@ export const saveAudioOverviewResults = internalMutation({
 
     const normalizedTranscript = normalizeMathMarkdown(args.transcript);
     const title = args.metadata?.title ?? "Audio Overview";
+    // The script handed to synthesis is now in `transcript`.
+    const { synthesisInput: _synthesisInput, ...existingMetadata } = audioOverview.metadata || {};
 
     await ctx.db.patch(args.audioOverviewId, {
       transcript: normalizedTranscript,
@@ -25,7 +27,7 @@ export const saveAudioOverviewResults = internalMutation({
       updatedAt: Date.now(),
       title,
       metadata: {
-        ...audioOverview.metadata,
+        ...existingMetadata,
         ...args.metadata,
         completedAt: Date.now(),
       },
@@ -91,8 +93,13 @@ export const markAudioOverviewFailed = internalMutation({
       args.metadata?.phase || "unknown",
       args.metadata
     );
-    // Keep the user's settings; drop intermediate map output, which a failed job no longer needs.
-    const { mapResults: _mapResults, ...existingMetadata } = audioOverview.metadata || {};
+    // Keep the user's settings; drop intermediate map output and the synthesis script, which a
+    // failed job no longer needs.
+    const {
+      mapResults: _mapResults,
+      synthesisInput: _synthesisInput,
+      ...existingMetadata
+    } = audioOverview.metadata || {};
     await ctx.db.patch(args.audioOverviewId, {
       status: "failed",
       updatedAt: Date.now(),
@@ -170,24 +177,52 @@ const tokenUsageValidator = v.object({
   total: v.number(),
 });
 
+const synthesisInputValidator = v.object({
+  script: v.array(
+    v.object({
+      speaker: v.union(v.literal("host_a"), v.literal("host_b")),
+      text: v.string(),
+    })
+  ),
+  title: v.string(),
+  // Finalize clears mapResults from the row before writing the script, so the map stats and
+  // map/reduce telemetry are computed there and carried over.
+  mapSuccessCount: v.number(),
+  mapFailedCount: v.number(),
+  telemetry: v.object({
+    tokenUsage: v.optional(tokenUsageValidator),
+    tokenUsageSource: v.optional(v.union(v.literal("provider"), v.literal("estimated"))),
+    stageSpans: v.optional(
+      v.array(
+        v.object({
+          stage: v.union(
+            v.literal("retrieve"),
+            v.literal("rerank"),
+            v.literal("select"),
+            v.literal("map"),
+            v.literal("reduce"),
+            v.literal("parse"),
+            v.literal("tts")
+          ),
+          latencyMs: v.number(),
+          tokenUsage: v.optional(tokenUsageValidator),
+        })
+      )
+    ),
+  }),
+});
+
+export type AudioSynthesisInput = Infer<typeof synthesisInputValidator>;
+
 /**
  * Hands the finished script to the synthesis phase, which runs as its own action so TTS gets a
- * full action time budget. Returns false if the row was deleted.
+ * full action time budget. Stored as `metadata.synthesisInput`, which the save and failure
+ * mutations drop. Returns false if the row was deleted.
  */
 export const storeAudioOverviewScript = internalMutation({
   args: {
     audioOverviewId: v.id("audioOverviews"),
-    script: v.array(
-      v.object({
-        speaker: v.union(v.literal("host_a"), v.literal("host_b")),
-        text: v.string(),
-      })
-    ),
-    title: v.string(),
-    reduce: v.object({
-      latencyMs: v.number(),
-      tokenUsage: v.optional(tokenUsageValidator),
-    }),
+    synthesisInput: synthesisInputValidator,
   },
   handler: async (ctx, args) => {
     const audioOverview = await ctx.db.get(args.audioOverviewId);
@@ -201,9 +236,7 @@ export const storeAudioOverviewScript = internalMutation({
         phase: "synthesizing",
         progress: 70,
         currentStep: "Synthesizing audio...",
-        dialogueScript: args.script,
-        pendingTitle: args.title,
-        reduceTelemetry: args.reduce,
+        synthesisInput: args.synthesisInput,
       },
     });
     return true;
@@ -218,13 +251,7 @@ export const clearAudioOverviewMapData = internalMutation({
     const audioOverview = await ctx.db.get(args.audioOverviewId);
     if (!audioOverview) return null;
 
-    const {
-      mapResults: _mapResults,
-      dialogueScript: _dialogueScript,
-      pendingTitle: _pendingTitle,
-      reduceTelemetry: _reduceTelemetry,
-      ...restMetadata
-    } = audioOverview.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = audioOverview.metadata || {};
     await ctx.db.patch(args.audioOverviewId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
