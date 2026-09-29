@@ -287,6 +287,7 @@ import type * as eval_chatEvalTelemetry from "../eval/chatEvalTelemetry.js";
 import type * as eval_literatureReviewEvalAction from "../eval/literatureReviewEvalAction.js";
 import type * as eval_researchEvalAction from "../eval/researchEvalAction.js";
 import type * as eval_retrieveClock from "../eval/retrieveClock.js";
+import type * as eval_seedEvalAction from "../eval/seedEvalAction.js";
 import type * as eval_studioEvalAction from "../eval/studioEvalAction.js";
 import type * as eval_studioEvalTelemetry from "../eval/studioEvalTelemetry.js";
 import type * as feedback_github from "../feedback/github.js";
@@ -665,6 +666,7 @@ declare const fullApi: ApiFromModules<{
   "eval/literatureReviewEvalAction": typeof eval_literatureReviewEvalAction;
   "eval/researchEvalAction": typeof eval_researchEvalAction;
   "eval/retrieveClock": typeof eval_retrieveClock;
+  "eval/seedEvalAction": typeof eval_seedEvalAction;
   "eval/studioEvalAction": typeof eval_studioEvalAction;
   "eval/studioEvalTelemetry": typeof eval_studioEvalTelemetry;
   "feedback/github": typeof feedback_github;
