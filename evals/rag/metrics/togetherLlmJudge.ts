@@ -61,6 +61,36 @@ export function createTogetherClient(config: TogetherJudgeConfig = {}): Together
 // ============================================================
 
 /**
+ * Returns `text` if it is a JSON object, else the last parseable top-level `{...}` object inside
+ * it (a verdict that follows reasoning prose), else null.
+ */
+function extractJsonVerdict(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    if (typeof JSON.parse(trimmed) === "object") return trimmed;
+  } catch {
+    // Not bare JSON; scan for an embedded object below.
+  }
+  for (let end = trimmed.lastIndexOf("}"); end > 0; end = trimmed.lastIndexOf("}", end - 1)) {
+    for (
+      let start = trimmed.lastIndexOf("{", end);
+      start >= 0;
+      start = trimmed.lastIndexOf("{", start - 1)
+    ) {
+      const candidate = trimmed.slice(start, end + 1);
+      try {
+        if (typeof JSON.parse(candidate) === "object") return candidate;
+      } catch {
+        // Keep widening the candidate.
+      }
+      if (start === 0) break;
+    }
+  }
+  return null;
+}
+
+/**
  * Create an LLM judge invoker function for use with eval metrics.
  *
  * @example
@@ -79,7 +109,9 @@ export function createTogetherJudgeInvoker(
 ): LlmJudgeOptions["invoke"] {
   const client = createTogetherClient(config);
   const model = config.model ?? DEFAULT_JUDGE_MODEL;
-  const maxTokens = config.maxTokens ?? 1024;
+  // Reasoning judges (the default) spend most of the budget thinking; 1024 truncated long judge
+  // prompts before the verdict.
+  const maxTokens = config.maxTokens ?? 8192;
   const temperature = config.temperature ?? 0.1;
 
   return async (prompt: string): Promise<string> => {
@@ -103,15 +135,19 @@ export function createTogetherJudgeInvoker(
         temperature,
       });
 
-      const content = response.choices[0]?.message?.content;
-      const reasoning = (response.choices[0]?.message as { reasoning?: string } | undefined)
-        ?.reasoning;
-      const payload = content?.trim() ? content : reasoning;
-      if (!payload) {
-        throw new Error("Empty response from LLM judge");
+      const choice = response.choices[0];
+      const message = choice?.message as
+        | { content?: string | null; reasoning?: string; reasoning_content?: string }
+        | undefined;
+      // Reasoning judges can put their scratch work in `content` (json_object mode) or in a
+      // reasoning field, so take the JSON verdict from whichever field carries one.
+      for (const field of [message?.content, message?.reasoning, message?.reasoning_content]) {
+        const verdict = field ? extractJsonVerdict(field) : null;
+        if (verdict) return verdict;
       }
-
-      return payload;
+      throw new Error(
+        `LLM judge returned no JSON verdict (finish_reason=${choice?.finish_reason ?? "unknown"})`
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Together AI judge failed: ${message}`, { cause: err });
