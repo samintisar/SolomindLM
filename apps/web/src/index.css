@@ -988,4 +988,11 @@
     animation-duration: 1s !important;
     animation-iteration-count: infinite !important;
   }
+
+  /* Landing features marquee (react-fast-marquee) keeps scrolling by product decision: frozen, it shows
+     clipped and duplicated cards. It stays slow and pauses on hover. */
+  .rfm-marquee {
+    animation-duration: var(--duration) !important;
+    animation-iteration-count: var(--iteration-count) !important;
+  }
 }
