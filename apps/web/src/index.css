@@ -386,6 +386,17 @@
   --shadow-2xl: var(--shadow-2xl);
 }
 
+/* Sonner reads these; the :root prefix outranks its [data-sonner-toaster][data-sonner-theme] rules. */
+:root [data-sonner-toaster].toaster {
+  --normal-bg: var(--popover);
+  --normal-text: var(--popover-foreground);
+  --normal-border: var(--border);
+  --border-radius: var(--radius);
+  --normal-bg-hover: var(--accent);
+  --normal-border-hover: var(--border);
+  font-family: var(--font-sans);
+}
+
 /* Markdown/Prose Styling */
 .prose {
   color: var(--foreground);
