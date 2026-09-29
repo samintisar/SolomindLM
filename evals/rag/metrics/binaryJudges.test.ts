@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { EvalRunArtifact } from "../types";
-import { formatResearchEvidence, parseBinaryResponse } from "./binaryJudges";
+import {
+  formatResearchEvidence,
+  parseBinaryResponse,
+  scoreBinaryJudgeMetrics,
+} from "./binaryJudges";
 
 function stubResearchArtifact(overrides: Partial<EvalRunArtifact>): EvalRunArtifact {
   return {
@@ -76,5 +80,43 @@ describe("formatResearchEvidence", () => {
     );
     expect(text).toContain("Evidence paper");
     expect(text).not.toContain("Ignored chunk");
+  });
+});
+
+describe("judge excerpts", () => {
+  const fixture = {
+    schemaVersion: 1,
+    id: "studio-audio-script-only-long",
+    question: "Generate a long audio script.",
+    runner: "audioScriptOnly",
+    notebookId: "nb",
+    expectedItems: [],
+    expectedBehavior: "Long two-host dialogue script.",
+  } as unknown as Parameters<typeof scoreBinaryJudgeMetrics>[0];
+
+  it("tells the judge when a long output was cut for judging, and leaves short ones unmarked", async () => {
+    const prompts: string[] = [];
+    const invoke = vi.fn(async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"pass": true, "reason": "ok"}';
+    });
+
+    await scoreBinaryJudgeMetrics(
+      fixture,
+      stubResearchArtifact({ runner: "audioScriptOnly", answer: "word ".repeat(5000) }),
+      undefined,
+      { invoke }
+    );
+    await scoreBinaryJudgeMetrics(
+      fixture,
+      stubResearchArtifact({ runner: "audioScriptOnly", answer: "A short complete script." }),
+      undefined,
+      { invoke }
+    );
+
+    const [longPrompts, shortPrompts] = [prompts.slice(0, 2), prompts.slice(2)];
+    expect(longPrompts).toHaveLength(2);
+    for (const prompt of longPrompts) expect(prompt).toMatch(/cut off here for judging/i);
+    for (const prompt of shortPrompts) expect(prompt).not.toMatch(/cut off here for judging/i);
   });
 });
