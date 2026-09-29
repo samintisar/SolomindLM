@@ -48,6 +48,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@shadcn/lint": "^0.2.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
@@ -58,10 +59,12 @@
     "@types/node": "^25.9.8",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "@typescript-eslint/parser": "^8.71.0",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.6.1",
     "culori": "^4.0.2",
+    "eslint": "^10.11.0",
     "jsdom": "^29.1.1",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
