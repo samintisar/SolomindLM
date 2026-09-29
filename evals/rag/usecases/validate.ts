@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { ConcreteRunnerKind } from "../types";
+import type { ConcreteRunnerKind, EvalFixture } from "../types";
 import { SOURCE_CONTENT_TYPES, sourceExtension } from "./sources";
 import type { RegisteredPack } from "./types";
 
@@ -55,6 +55,9 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
     if (f.notebookId || f.documentIds) {
       problems.push(`${f.id}: pack fixtures must not set notebookId or documentIds`);
     }
+    if (f.runner === "research" && !f.sourcePolicy?.channels?.length) {
+      problems.push(`${f.id}: research fixtures must set sourcePolicy.channels`);
+    }
     if (f.runner === "both" || !pack.features.includes(f.runner as ConcreteRunnerKind)) {
       problems.push(`${f.id}: runner "${f.runner}" is not in pack features`);
     }
@@ -70,4 +73,25 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
   }
 
   return problems;
+}
+
+/** Packs `eval:rag:dry` should validate: all registered ones for `--use-case`, else those with a selected fixture. */
+export function packsToValidate(
+  registered: RegisteredPack[],
+  selected: EvalFixture[],
+  useCaseFlag: boolean
+): RegisteredPack[] {
+  if (useCaseFlag) return registered;
+  const used = new Set(selected.flatMap((f) => (f.useCase ? [f.useCase] : [])));
+  return registered.filter((p) => used.has(p.pack.id));
+}
+
+/** "INVALID PACK <id>:" blocks for every invalid pack (empty when all are valid). */
+export function formatPackProblems(packs: RegisteredPack[]): string[] {
+  return packs.flatMap((registered) => {
+    const problems = validatePack(registered);
+    return problems.length === 0
+      ? []
+      : [`INVALID PACK ${registered.pack.id}:`, ...problems.map((p) => `  - ${p}`)];
+  });
 }

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EvalFixture } from "../types";
 import { readPackSources } from "./sources";
 import type { RegisteredPack, UseCasePack } from "./types";
-import { validatePack } from "./validate";
+import { formatPackProblems, packsToValidate, validatePack } from "./validate";
 
 let dir: string;
 
@@ -136,6 +136,29 @@ describe("validatePack", () => {
     expect(problems).toContain(`language-learners/bad-split: ${message}`);
   });
 
+  it("requires research fixtures to set sourcePolicy.channels", () => {
+    const researchPack = pack({ features: ["research"] });
+    const problems = validatePack(
+      registered(researchPack, [
+        fixture({ id: "language-learners/r-none", runner: "research" }),
+        fixture({
+          id: "language-learners/r-empty",
+          runner: "research",
+          sourcePolicy: { channels: [] },
+        }),
+        fixture({
+          id: "language-learners/r-ok",
+          runner: "research",
+          sourcePolicy: { channels: ["notebook"] },
+        }),
+      ])
+    );
+    const message = "research fixtures must set sourcePolicy.channels";
+    expect(problems).toContain(`language-learners/r-none: ${message}`);
+    expect(problems).toContain(`language-learners/r-empty: ${message}`);
+    expect(problems.filter((p) => p.includes("r-ok"))).toEqual([]);
+  });
+
   it("flags duplicate fixture ids and rubric checks that apply to no feature", () => {
     const problems = validatePack(
       registered(
@@ -161,5 +184,37 @@ describe("readPackSources", () => {
     expect(file.contentType).toBe("text/markdown");
     expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(new TextDecoder().decode(file.bytes)).toContain("Bonjour");
+  });
+});
+
+describe("packsToValidate / formatPackProblems", () => {
+  // Built per test: `dir` is only set by the top-level beforeEach.
+  const twoPacks = () => ({
+    a: registered(pack()),
+    b: registered(pack({ id: "medical-students" }), [
+      fixture({ id: "medical-students/x", useCase: "medical-students" }),
+    ]),
+  });
+
+  it("validates every registered pack when --use-case is set", () => {
+    const { a, b } = twoPacks();
+    expect(packsToValidate([a, b], [], true)).toEqual([a, b]);
+  });
+
+  it("validates only packs that have a selected fixture otherwise", () => {
+    const { a, b } = twoPacks();
+    const selected = [fixture({ id: "medical-students/x", useCase: "medical-students" })];
+    expect(packsToValidate([a, b], selected, false)).toEqual([b]);
+    expect(packsToValidate([a, b], [fixture({ useCase: undefined })], false)).toEqual([]);
+  });
+
+  it("formats problems as INVALID PACK blocks and nothing for valid packs", () => {
+    const { a } = twoPacks();
+    expect(formatPackProblems([a])).toEqual([]);
+    const bad = registered(pack({ sources: [] }));
+    expect(formatPackProblems([a, bad])).toEqual([
+      "INVALID PACK language-learners:",
+      "  - language-learners: no sources listed",
+    ]);
   });
 });

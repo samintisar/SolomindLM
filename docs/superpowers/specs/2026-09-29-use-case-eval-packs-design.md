@@ -93,7 +93,7 @@ The owner is resolved on the server from `RAG_EVAL_OWNER_EMAIL`. Callers never p
 
 **Resolution before any job runs:** after fixture filtering, the CLI collects the selected `useCase` values and calls `resolvePackNotebook` once per pack. A pack is ready when every manifest source is present, `completed`, and matches its hash. If any pack isn't ready, the run **aborts before starting any job** and lists the packs to seed (`bun run eval:seed --use-case <id>`).
 
-**Filling in fixtures:** each pack fixture gets `notebookId` plus `documentIds` restricted to the pack's source documents. Documents added to the notebook by hand never reach eval runs. The invokers already accept both fields, so their code doesn't change.
+**Filling in fixtures:** each pack fixture gets `notebookId` plus `documentIds` restricted to the pack's source documents. Documents added to the notebook by hand never reach eval runs, except for `literatureReview` fixtures: that runner accepts only `notebookId`, so it uses the whole pack notebook. Don't hand-add documents to a pack notebook that has `literatureReview` fixtures. The other invokers already accept both fields, so their code doesn't change.
 
 **Flags and scripts:**
 

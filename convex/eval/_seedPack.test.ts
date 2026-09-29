@@ -218,6 +218,59 @@ describe("insertPackDocument / deletePackDocument", () => {
     ).rejects.toThrow("storageId is already attached to a document.");
   });
 
+  test("rejects a storageId that does not exist", async () => {
+    const { t } = await setup();
+    const notebookId = await createPack(t);
+    const storageId = await storeFile(t, "gone");
+    await t.run((ctx) => ctx.storage.delete(storageId));
+    await expect(
+      t.mutation(internal.eval._seedPack.insertPackDocument, {
+        ownerEmail: OWNER,
+        notebookId,
+        storageId,
+        fileName: "gone.md",
+        contentType: "text/markdown",
+        fileSize: 4,
+        sha256: "gone",
+      })
+    ).rejects.toThrow("storageId must be a fresh upload from getEvalUploadUrl.");
+  });
+
+  test("rejects a storageId uploaded more than an hour ago", async () => {
+    const { t } = await setup();
+    const notebookId = await createPack(t);
+    const storageId = await storeFile(t, "old");
+    vi.setSystemTime(Date.now() + 60 * 60 * 1000 + 1000);
+    await expect(
+      t.mutation(internal.eval._seedPack.insertPackDocument, {
+        ownerEmail: OWNER,
+        notebookId,
+        storageId,
+        fileName: "old.md",
+        contentType: "text/markdown",
+        fileSize: 3,
+        sha256: "old",
+      })
+    ).rejects.toThrow("storageId must be a fresh upload from getEvalUploadUrl.");
+  });
+
+  test("accepts a storageId uploaded just under an hour ago", async () => {
+    const { t } = await setup();
+    const notebookId = await createPack(t);
+    const storageId = await storeFile(t, "recent");
+    vi.setSystemTime(Date.now() + 59 * 60 * 1000);
+    const documentId = await t.mutation(internal.eval._seedPack.insertPackDocument, {
+      ownerEmail: OWNER,
+      notebookId,
+      storageId,
+      fileName: "recent.md",
+      contentType: "text/markdown",
+      fileSize: 6,
+      sha256: "recent",
+    });
+    expect(documentId).toBeTruthy();
+  });
+
   test("refuses notebooks and documents owned by someone else", async () => {
     const { t } = await setup();
     const otherId = await t.run((ctx) => ctx.db.insert("users", { email: "other@example.com" }));

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { runEval } from "../runners";
 import type { EvalFixture } from "../types";
 import {
   applyPackResolution,
+  excludeUnselectedPackFixtures,
   formatPlannedJobs,
   PackNotReadyError,
+  pinForDryRun,
   prepareUseCaseRun,
   resolvePackReadiness,
 } from "./resolve";
@@ -166,5 +169,81 @@ describe("prepareUseCaseRun", () => {
     const result = await prepareUseCaseRun(fixtures, api, loadPack);
     expect(result.fixtures).toBe(fixtures);
     expect(result.sourceTexts.size).toBe(0);
+  });
+});
+
+describe("pinForDryRun", () => {
+  it("gives pack fixtures a placeholder notebook and leaves legacy fixtures alone", () => {
+    const [pack, legacy] = pinForDryRun([
+      fixture("language-learners/a", "language-learners", "flashcards"),
+      fixture("ml-x", undefined, "chat"),
+    ]);
+    expect(pack.notebookId).toBe("dry-run:language-learners");
+    expect(legacy.notebookId).toBe("legacy-nb");
+  });
+
+  it("lets studio, literature review and chat pack fixtures pass runEval in dry-run mode", async () => {
+    const fixtures = pinForDryRun(
+      (["flashcards", "quiz", "literatureReview", "chat"] as const).map((runner) => ({
+        ...fixture(`language-learners/${runner}`, "language-learners", runner),
+        expectedItems: ["item"],
+      }))
+    );
+    for (const f of fixtures) {
+      const results = await runEval(f, { dryRun: true });
+      expect(results.flatMap((r) => r.errors)).toEqual([]);
+    }
+  });
+
+  it("would fail validation without the pin", async () => {
+    const unpinned = {
+      ...fixture("language-learners/a", "language-learners", "flashcards"),
+      expectedItems: ["item"],
+    };
+    const [{ errors }] = await runEval(unpinned, { dryRun: true });
+    expect(errors).toContain("Studio fixture must specify a notebookId");
+  });
+});
+
+describe("excludeUnselectedPackFixtures", () => {
+  const all = [
+    fixture("ml-x", undefined, "chat"),
+    fixture("agentic-patterns-20", undefined, "chat"),
+    fixture("language-learners/a", "language-learners", "flashcards"),
+    fixture("medical-students/a", "medical-students", "quiz"),
+  ];
+  const byId = new Map(all.map((f) => [f.id, f]));
+  const get = (id: string) => byId.get(id) as EvalFixture;
+  const ids = all.map((f) => f.id);
+  const known = ["language-learners", "medical-students"];
+
+  it("keeps only legacy fixtures by default", () => {
+    expect(excludeUnselectedPackFixtures(ids, get, {}, known)).toEqual([
+      "ml-x",
+      "agentic-patterns-20",
+    ]);
+  });
+
+  it("keeps pack fixtures when --use-case is set", () => {
+    expect(
+      excludeUnselectedPackFixtures(ids, get, { useCases: ["language-learners"] }, known)
+    ).toEqual(ids);
+  });
+
+  it("keeps pack fixtures when the prefix selects a registered pack", () => {
+    expect(
+      excludeUnselectedPackFixtures(ids, get, { idPrefix: "language-learners/" }, known)
+    ).toEqual(ids);
+  });
+
+  it("still drops pack fixtures for a non-pack prefix", () => {
+    expect(excludeUnselectedPackFixtures(ids, get, { idPrefix: "ml-" }, known)).toEqual([
+      "ml-x",
+      "agentic-patterns-20",
+    ]);
+    // A prefix that merely starts like a pack id (no slash) is not an explicit selection.
+    expect(
+      excludeUnselectedPackFixtures(ids, get, { idPrefix: "language-learners" }, known)
+    ).toEqual(["ml-x", "agentic-patterns-20"]);
   });
 });

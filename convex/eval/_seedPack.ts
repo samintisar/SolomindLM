@@ -16,6 +16,9 @@ export const EVAL_PACK_FOLDER_NAME = "Test";
 
 const SOURCE_TEXT_MAX_CHARS = 50_000;
 
+/** A pack upload must be adopted soon after getEvalUploadUrl handed out the URL. */
+const FRESH_UPLOAD_MAX_AGE_MS = 60 * 60 * 1000;
+
 export const packDocValidator = v.object({
   documentId: v.id("documents"),
   fileName: v.string(),
@@ -174,6 +177,10 @@ export const insertPackDocument = internalMutation({
       throw new Error("storageId is already attached to a document.");
     }
     const now = Date.now();
+    const file = await ctx.db.system.get(args.storageId);
+    if (!file || now - file._creationTime > FRESH_UPLOAD_MAX_AGE_MS) {
+      throw new Error("storageId must be a fresh upload from getEvalUploadUrl.");
+    }
     const documentId = await ctx.db.insert("documents", {
       userId,
       notebookId: args.notebookId,

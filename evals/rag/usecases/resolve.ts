@@ -1,5 +1,5 @@
 import type { EvalFixture } from "../types";
-import { getPack } from "./index";
+import { getPack, USE_CASE_PACKS } from "./index";
 import type { PackSeedApi } from "./seedClient";
 import { readPackSources, type SourceDigest } from "./sources";
 import { checkPackReady, type PackReadiness } from "./sync";
@@ -94,4 +94,32 @@ export async function prepareUseCaseRun(
     sourceTexts.set(id, await api.sourceText(resolved.documentIds));
   }
   return { fixtures: pinned, sourceTexts };
+}
+
+/**
+ * Dry runs never talk to Convex, so pack fixtures have no seeded notebook.
+ * Give them a placeholder so runner fixture validation (which requires a
+ * notebookId) still exercises the rest of the fixture.
+ */
+export function pinForDryRun(fixtures: EvalFixture[]): EvalFixture[] {
+  return fixtures.map((f) => (f.useCase ? { ...f, notebookId: `dry-run:${f.useCase}` } : f));
+}
+
+/**
+ * Pack fixtures only run when explicitly selected: `--use-case`, or an id prefix
+ * naming a registered pack ("<pack>/…"). Everything else (default, `--runner`,
+ * a legacy prefix) drops them so an unseeded pack cannot abort a legacy run.
+ * (`--case <id>` bypasses fixture selection entirely.)
+ */
+export function excludeUnselectedPackFixtures(
+  ids: string[],
+  lookup: (id: string) => EvalFixture,
+  selection: { useCases?: string[]; idPrefix?: string },
+  packIds: string[] = USE_CASE_PACKS.map((p) => p.pack.id)
+): string[] {
+  const { idPrefix } = selection;
+  const explicit =
+    selection.useCases !== undefined ||
+    (idPrefix !== undefined && packIds.some((id) => idPrefix.startsWith(`${id}/`)));
+  return explicit ? ids : ids.filter((id) => lookup(id).useCase === undefined);
 }

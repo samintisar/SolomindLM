@@ -43,6 +43,10 @@ Rubric metrics (`rubric:<pack-id>:<check-id>`) feed the judge calibration queue 
 
 Pack notebooks live in the eval owner's `Test` folder. The eval owner is the account whose email is `RAG_EVAL_OWNER_EMAIL` (set on the dev deployment). `eval:seed` creates the `Test` folder and the pack notebook if they are missing, uploads changed sources and waits for ingestion.
 
+`literatureReview` fixtures take only a `notebookId` (the eval action has no `documentIds` input), so they use the whole pack notebook. Don't hand-add documents to a pack notebook that has `literatureReview` fixtures; other runners are restricted to the pack's source documents.
+
+Pack fixtures only run when selected explicitly (`--use-case`, `--prefix <pack-id>/…` or `--case <id>`). Plain `eval:rag`, `eval:studio` and `--runner` runs skip them. Dry runs pin them to a placeholder notebook and validate the packs they select.
+
 ## Running
 
 ```bash

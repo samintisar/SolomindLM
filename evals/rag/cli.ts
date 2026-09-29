@@ -46,9 +46,16 @@ import type {
 import { USE_CASE_PACKS } from "./usecases";
 import { createConvexSeedApi } from "./usecases/convexSeedApi";
 import { resolveUseCaseIds } from "./usecases/ids";
-import { formatPlannedJobs, PackNotReadyError, prepareUseCaseRun } from "./usecases/resolve";
+import {
+  excludeUnselectedPackFixtures,
+  formatPlannedJobs,
+  PackNotReadyError,
+  pinForDryRun,
+  prepareUseCaseRun,
+} from "./usecases/resolve";
 import type { PackSeedApi } from "./usecases/seedClient";
 import type { SourceText } from "./usecases/types";
+import { formatPackProblems, packsToValidate } from "./usecases/validate";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -362,7 +369,7 @@ async function main(): Promise<void> {
   if (opts.caseId) {
     fixtureIds = [opts.caseId];
   } else {
-    fixtureIds = listFixtureIds();
+    fixtureIds = excludeUnselectedPackFixtures(listFixtureIds(), getFixture, opts);
     if (opts.idPrefix) {
       fixtureIds = fixtureIds.filter((id) => id.startsWith(opts.idPrefix!));
     }
@@ -394,6 +401,15 @@ async function main(): Promise<void> {
         opts.idPrefix && `prefix: ${opts.idPrefix}`,
       ].filter(Boolean);
       console.error(`No fixtures matched the filters (${filters.join("; ")}).`);
+      process.exit(2);
+    }
+  }
+  if (opts.dryRun) {
+    const packProblems = formatPackProblems(
+      packsToValidate(USE_CASE_PACKS, fixtureIds.map(getFixture), opts.useCases !== undefined)
+    );
+    if (packProblems.length > 0) {
+      console.error(packProblems.join("\n"));
       process.exit(2);
     }
   }
@@ -472,7 +488,7 @@ async function main(): Promise<void> {
 
   // Use-case packs: resolve seeded notebooks before any job runs, so an
   // unseeded pack costs nothing (spec §3).
-  let fixturesToRun = expandedFixtures;
+  let fixturesToRun = opts.dryRun ? pinForDryRun(expandedFixtures) : expandedFixtures;
   let packSourceTexts = new Map<string, SourceText[]>();
   if (expandedFixtures.some((f) => f.useCase)) {
     console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
