@@ -478,6 +478,12 @@ export async function runFinalizeAudioOverviewPhase(
 
     const mapResults = (audioOverview.metadata?.mapResults as Record<string, string>) || {};
 
+    // Map output is held in memory from here; drop it from the row so the finalize-phase
+    // status updates don't rewrite and re-send it.
+    await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
+      audioOverviewId,
+    });
+
     // Separate successful and failed results
     const allBeats: string[] = [];
     const failedCount = { count: 0 };
@@ -751,11 +757,6 @@ export async function runFinalizeAudioOverviewPhase(
           extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
         })
       ),
-    });
-
-    // Clear intermediate data
-    await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
-      audioOverviewId,
     });
 
     logger.jobComplete({
