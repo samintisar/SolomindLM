@@ -8,7 +8,8 @@
       "!.agents/**",
       "!convex/_generated/**",
       "!apps/web/src/convex-generated-api.d.ts",
-      "!apps/web/src/convex-generated-dataModel.d.ts"
+      "!apps/web/src/convex-generated-dataModel.d.ts",
+      "!apps/web/design-lint-baseline.json"
     ]
   },
   "formatter": {
