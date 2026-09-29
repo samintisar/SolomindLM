@@ -409,9 +409,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                               {children}
                             </table>
                           ),
-                          thead: ({ children }) => (
-                            <thead className="bg-info-border/50">{children}</thead>
-                          ),
+                          thead: ({ children }) => <thead className="bg-info/15">{children}</thead>,
                           tbody: ({ children }) => <tbody>{children}</tbody>,
                           tr: ({ children }) => (
                             <tr className="border-b border-info-border">{children}</tr>
