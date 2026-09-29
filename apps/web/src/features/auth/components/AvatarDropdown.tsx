@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
@@ -30,7 +31,8 @@ interface AvatarDropdownProps {
   user: User | null;
   isAuthenticated: boolean;
   onLogin: () => void;
-  onLogout: () => void;
+  /** May be async (e.g. Convex `signOut`); a rejection is shown as an error toast. */
+  onLogout: () => Promise<void> | void;
   theme: "light" | "dark";
   toggleTheme: () => void;
   onShowChecklist?: () => void;
@@ -54,6 +56,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   showChecklistDismissed,
 }) => {
   const navigate = useNavigate();
+  const { showError } = useServiceErrorToast();
   const { open: openFeedback } = useFeedback();
   // Only the "Feedback triage" item needs this, and it's staff-only — don't open
   // the subscription for signed-out menus.
@@ -110,7 +113,16 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
           ) : null}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => (isAuthenticated ? onLogout() : onLogin())}>
+        <DropdownMenuItem
+          onSelect={() => {
+            if (!isAuthenticated) {
+              onLogin();
+              return;
+            }
+            // Promise.resolve also wraps a sync onLogout; a sync throw still propagates to Radix.
+            Promise.resolve(onLogout()).catch(showError);
+          }}
+        >
           {isAuthenticated ? <LogOut /> : <LogIn />}
           {isAuthenticated ? "Logout" : "Login"}
         </DropdownMenuItem>

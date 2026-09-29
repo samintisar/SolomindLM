@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeAll, describe, expect, test, vi } from "vitest";
+import { ToastContext, type ToastContextValue } from "@/shared/contexts/useToast";
 import { FeedbackProvider } from "../../feedback/FeedbackContext";
 import { AvatarDropdown } from "./AvatarDropdown";
 
@@ -28,7 +29,21 @@ beforeAll(() => {
   Element.prototype.releasePointerCapture ??= () => {};
 });
 
-function renderMenu(overrides: Partial<ComponentProps<typeof AvatarDropdown>> = {}) {
+function makeToast(): ToastContextValue {
+  return {
+    toast: vi.fn(() => "t"),
+    success: vi.fn(() => "t"),
+    error: vi.fn(() => "t"),
+    info: vi.fn(() => "t"),
+    loading: vi.fn(() => "t"),
+    dismiss: vi.fn(),
+  };
+}
+
+function renderMenu(
+  overrides: Partial<ComponentProps<typeof AvatarDropdown>> = {},
+  toast: ToastContextValue = makeToast()
+) {
   const props: ComponentProps<typeof AvatarDropdown> = {
     user: { id: "u1", email: "user@example.com", name: "User" },
     isAuthenticated: true,
@@ -43,12 +58,15 @@ function renderMenu(overrides: Partial<ComponentProps<typeof AvatarDropdown>> = 
   return {
     ...render(
       <MemoryRouter>
-        <FeedbackProvider>
-          <AvatarDropdown {...props} />
-        </FeedbackProvider>
+        <ToastContext.Provider value={toast}>
+          <FeedbackProvider>
+            <AvatarDropdown {...props} />
+          </FeedbackProvider>
+        </ToastContext.Provider>
       </MemoryRouter>
     ),
     props,
+    toast,
   };
 }
 
@@ -84,6 +102,20 @@ describe("AvatarDropdown menu", () => {
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Logout" }));
     expect(props.onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  test("shows an error toast when logout fails", async () => {
+    const user = userEvent.setup();
+    const { props, toast } = renderMenu({
+      onLogout: vi.fn(async () => {
+        throw new Error("Network down");
+      }),
+    });
+    await openMenu(user);
+
+    await user.click(screen.getByRole("menuitem", { name: "Logout" }));
+    expect(props.onLogout).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Network down"));
   });
 
   test("offers Login when signed out", async () => {
