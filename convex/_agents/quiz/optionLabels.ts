@@ -1,5 +1,4 @@
-"use node";
-
+// Pure helpers (no "use node"): also imported by the V8 saveQuizResults mutation.
 import type { QuizQuestion } from "./prompts.js";
 
 /**
@@ -57,10 +56,33 @@ function coerceToFourOptions(
 }
 
 /**
- * Strips list labels, then coerces to exactly four options and a valid 0–3 answer index.
+ * Fisher–Yates shuffle that carries the correct answer index along with its option.
+ * LLMs strongly favour writing the answer they were given as the first option, so the
+ * position must never be left to the model.
  */
-export function normalizeQuizQuestion(q: QuizQuestion): QuizQuestion {
+function shuffleOptions(
+  options: string[],
+  answer: number,
+  rng: () => number
+): { options: string[]; answer: number } {
+  const order = options.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
+  return { options: order.map((i) => options[i]!), answer: order.indexOf(answer) };
+}
+
+/**
+ * Strips list labels, coerces to exactly four options with a valid 0–3 answer index,
+ * then shuffles so the correct answer lands in a uniformly random position.
+ */
+export function normalizeQuizQuestion(
+  q: QuizQuestion,
+  rng: () => number = Math.random
+): QuizQuestion {
   const stripped = q.options.map((o) => stripMultipleChoiceLabel(o));
-  const { options, answer } = coerceToFourOptions(stripped, q.answer);
+  const coerced = coerceToFourOptions(stripped, q.answer);
+  const { options, answer } = shuffleOptions(coerced.options, coerced.answer, rng);
   return { ...q, options, answer };
 }
