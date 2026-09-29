@@ -725,6 +725,7 @@ export async function runSynthesizeAudioOverviewPhase(
     const ttsClient = createTogetherTtsClient();
     const results: { index: number; buffer: Buffer | null }[] = [];
     const BATCH_SIZE = 5;
+    let firstSynthesisError: string | undefined;
 
     for (let i = 0; i < fullDialogueScript.length; i += BATCH_SIZE) {
       const batchLines = fullDialogueScript.slice(i, i + BATCH_SIZE);
@@ -741,8 +742,10 @@ export async function runSynthesizeAudioOverviewPhase(
             timeoutMs: CONFIG.TTS_TIMEOUT_MS,
           });
           return { index: globalIndex, buffer };
-        } catch (_error) {
-          console.log(`[AudioJob] Failed line ${globalIndex + 1}`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          firstSynthesisError ??= message;
+          console.log(`[AudioJob] Failed line ${globalIndex + 1}: ${message}`);
           return { index: globalIndex, buffer: null };
         }
       });
@@ -759,7 +762,9 @@ export async function runSynthesizeAudioOverviewPhase(
     const successCount = sortedBuffers.length;
 
     if (successCount < fullDialogueScript.length * 0.5) {
-      throw new Error(`Too many synthesis failures: ${successCount}/${fullDialogueScript.length}`);
+      throw new Error(
+        `Too many synthesis failures: ${successCount}/${fullDialogueScript.length} lines synthesized (first error: ${firstSynthesisError ?? "unknown"})`
+      );
     }
 
     const wavBuffer = concatenateWavBuffers(sortedBuffers);
