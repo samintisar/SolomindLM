@@ -13,6 +13,11 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
+import {
+  flashcardCardValidity,
+  type InvariantCheck,
+  quizInvariantChecks,
+} from "./studioInvariants";
 import { evaluateInfographicWithVision } from "./visionJudge";
 
 function baseMetric(
@@ -34,6 +39,22 @@ function baseMetric(
     detail,
     ...(breakdown ? { breakdown } : {}),
   };
+}
+
+function fromInvariant(
+  check: InvariantCheck,
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact
+): MetricResult {
+  return baseMetric(
+    check.metric,
+    fixture,
+    artifact,
+    check.status,
+    check.score,
+    check.detail,
+    check.breakdown
+  );
 }
 
 // ─── Generic count gate ──────────────────────────────────────
@@ -289,12 +310,20 @@ export async function scoreStudioMetrics(
     case "report":
       results.push(reportSectionPresence(fixture, artifact));
       break;
-    case "flashcards":
+    case "flashcards": {
       results.push(flashcardCountMatch(fixture, artifact));
+      const cards = (artifact.studioOutput.raw as ItemArrayPayload | undefined)?.cards ?? [];
+      results.push(fromInvariant(flashcardCardValidity(cards as object[]), fixture, artifact));
       break;
-    case "quiz":
+    }
+    case "quiz": {
       results.push(quizCountMatch(fixture, artifact));
+      const qs = (artifact.studioOutput.raw as ItemArrayPayload | undefined)?.questions ?? [];
+      for (const check of quizInvariantChecks(qs as object[])) {
+        results.push(fromInvariant(check, fixture, artifact));
+      }
       break;
+    }
     case "writtenQuestions":
       results.push(writtenQuestionsCountMatch(fixture, artifact));
       break;

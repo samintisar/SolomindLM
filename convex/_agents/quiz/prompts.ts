@@ -36,7 +36,7 @@ export const QuizQuestionSchema = z.object({
   explanation: z
     .string()
     .describe(
-      "Concise explanation citing the context. Explain why the correct answer is right and why each distractor is wrong. Be precise and on-point."
+      "Concise explanation citing the context. Explain why the correct answer is right and why each distractor is wrong, naming options by their content (never by letter or position — options are shuffled). Be precise and on-point."
     ),
 });
 
@@ -102,6 +102,7 @@ export const EXPAND_QUESTION_SYSTEM_PROMPT = `You are a professional educator cr
 - Output exactly four options in the options array. Not two, not five—four.
 - Each option string must be the choice text only. Do not prefix with letters (A. B. C. D. or A) B) …) or numbers (1. 2. …) — the app shows choices in order without those labels.
 - Inline code and math in options are fine; use backticks and $…$ as needed.
+- The app shuffles the options after generation, so option order carries no meaning. In the hint and explanation, refer to options by their content — never by letter, number or position ("option B", "the first choice", "answer 2").
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}`;
 
@@ -290,7 +291,7 @@ INSTRUCTIONS:
  or
 [Image of mitosis stages]
  in the explanation. Only do this if it aids understanding.
-5. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. BE CONCISE - 1-2 sentences maximum.
+5. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. Name options by their content, not by letter or position (options are shuffled after generation). BE CONCISE - 1-2 sentences maximum.
 
 Output full JSON.`;
 };
