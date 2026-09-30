@@ -96,11 +96,6 @@ export const getYouTubeTranscript = action({
 });
 
 /**
- * Extract text from a URL using Supadata (legacy alias, cached)
- */
-export const extractFromUrl = scrapeUrl;
-
-/**
  * Extract transcript from a YouTube video using Supadata (legacy alias, cached)
  */
 export const extractFromYouTube = action({
