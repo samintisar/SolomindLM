@@ -258,5 +258,3 @@ export const MendeleyImportModal: React.FC<MendeleyImportModalProps> = ({
     </div>
   );
 };
-
-export default MendeleyImportModal;

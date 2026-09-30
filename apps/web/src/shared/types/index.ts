@@ -1,4 +1,4 @@
-export interface SourceGuide {
+interface SourceGuide {
   summary: string;
   topics: string[];
   generatedAt: number;
@@ -198,22 +198,14 @@ export interface Flashcard {
   };
 }
 
-export interface MindMapNode {
+interface MindMapNode {
   id: string;
   topic: string;
   children?: MindMapNode[];
 }
 
-export interface MindMapNodeData {
+interface MindMapNodeData {
   nodeData: MindMapNode;
-}
-
-// Infographic - single AI-generated image
-export interface Infographic {
-  imageUrl: string;
-  title: string;
-  prompt?: string;
-  metadata?: Record<string, unknown>;
 }
 
 /** Convex studio jobs persist these on artifact `metadata` while status is `generating`. */
@@ -234,7 +226,7 @@ interface BaseNote {
 }
 
 // Text note - simple content
-export interface TextNote extends BaseNote {
+interface TextNote extends BaseNote {
   type: "text";
   content: string;
 }
@@ -392,11 +384,6 @@ export type Note =
   | SpreadsheetNote
   | UserNote;
 
-// Type guard functions for checking note types at runtime
-export function isTextNote(note: Note): note is TextNote {
-  return note.type === "text";
-}
-
 export function isReportNote(note: Note): note is ReportNote {
   return note.type === "report";
 }
@@ -472,14 +459,6 @@ export interface FolderItem {
   updated_at: string | number;
 }
 
-// Union type for rendering mixed lists
-export type NotebookOrFolder = NotebookItem | FolderItem;
-
-// Type guard
-export function isFolder(item: NotebookOrFolder): item is FolderItem {
-  return "notebookCount" in item;
-}
-
 export interface Document {
   id: string;
   user_id: string;
@@ -548,34 +527,6 @@ export interface UnifiedDiscoveryResult {
 }
 
 /**
- * Response from unified discovery API
- */
-export interface DiscoveryResponse {
-  sources: UnifiedDiscoveryResult[];
-  totalCount: number;
-  sourceTypeCounts: Record<string, number>;
-}
-
-/**
- * Request options for unified discovery
- */
-export interface DiscoveryRequest {
-  query: string;
-  sourceTypes: ("web" | "news" | "academic" | "finance")[];
-  timeRange?: "day" | "week" | "month" | "year";
-  filters: {
-    academic?: {
-      publicationYear?: { from?: number; to?: number };
-      minCitations?: number;
-      openAccessOnly?: boolean;
-      hasFullText?: boolean;
-    };
-  };
-  maxResults: number;
-  sortBy?: "relevance" | "date" | "citations";
-}
-
-/**
  * Features that have daily limits
  */
 export type DailyFeature =
@@ -587,25 +538,3 @@ export type DailyFeature =
   | "writtenQuestion"
   | "spreadsheet"
   | "infographic";
-
-/**
- * Error codes for different types of limit errors
- */
-export type ErrorCode = "NOTEBOOK_LIMIT_REACHED" | "SOURCE_LIMIT_REACHED" | "DAILY_LIMIT_REACHED";
-
-/**
- * Types of limits that can be enforced
- */
-export type LimitType = "notebook" | "source" | "daily";
-
-/**
- * Structured error data that can be serialized through Convex
- */
-export interface LimitErrorData {
-  code: ErrorCode;
-  limit: number;
-  current: number;
-  limitType: LimitType;
-  feature?: DailyFeature;
-  isPro?: boolean;
-}

@@ -5,9 +5,9 @@ import {
 } from "../components/researchStepTypes";
 
 /** Steps shown in the deep research chat timeline. */
-export const VISIBLE_DEEP_RESEARCH_STEP_TYPES = new Set(["searching", "generating_report"]);
+const VISIBLE_DEEP_RESEARCH_STEP_TYPES = new Set(["searching", "generating_report"]);
 
-export const deepResearchStepConfig: Record<string, { title: string; description: string }> = {
+const deepResearchStepConfig: Record<string, { title: string; description: string }> = {
   searching: {
     title: "Gathering sources",
     description:

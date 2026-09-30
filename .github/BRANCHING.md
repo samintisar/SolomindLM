@@ -221,6 +221,7 @@ The `.github/workflows/ci.yml` runs on:
 **Advisory** (run on PRs, not merge-blocking):
 
 - **Dependency audit (baseline)** - `bun audit`, non-blocking until the baseline is clean
+- **Knip (unused code, advisory)** - [Knip](https://knip.dev) reports unused files, exports and dependencies to the job summary, non-blocking until the baseline is clean. Run locally with `bun run knip` (includes tests) and `bun run knip:production` (shipped code only — the pass that finds dead Convex code, since convex-test's `import.meta.glob` marks every Convex module as used when tests are included). Config is `knip.json`: every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name — add yours there, or Knip reports it as unused.
 - **Lint (PR title)** - conventional-commit form on the PR title (becomes the squash commit)
 - **PR labeler** - applies `area:*` labels from changed paths (`.github/labeler.yml`)
 - **CodeRabbit** - AI review comments on ready (non-draft) PRs; config in .coderabbit.yaml. Advisory only.

@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import type { UserNote } from "@/shared/types/index";
 
 /**
@@ -28,25 +28,6 @@ function mapDatabaseNoteToUserNote(dbNote: any): UserNote {
       ...dbNote.metadata,
     },
   };
-}
-
-/**
- * Get all notes for a notebook
- */
-export function useUserNotes(notebookId: string | null) {
-  const notes = useQuery(
-    api.notes.userNotes.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return notes?.map(mapDatabaseNoteToUserNote);
-}
-
-/**
- * Get a specific note by ID
- */
-export function useUserNote(noteId: string | null) {
-  const note = useQuery(api.notes.userNotes.get, noteId ? { id: noteId as Id<"notes"> } : "skip");
-  return note ? mapDatabaseNoteToUserNote(note) : null;
 }
 
 /**

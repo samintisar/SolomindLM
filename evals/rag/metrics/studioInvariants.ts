@@ -69,7 +69,7 @@ function binomialUpperTail(n: number, k: number, p: number): number {
  * compared with a uniform spread (one-sided binomial tail, Bonferroni-corrected
  * across the four positions).
  */
-export function quizAnswerPositionBalance(questions: QuizQuestionLike[]): InvariantCheck {
+function quizAnswerPositionBalance(questions: QuizQuestionLike[]): InvariantCheck {
   const metric = "quiz_answer_position_balance";
   const counts = new Array<number>(OPTION_COUNT).fill(0);
   for (const q of questions) {
@@ -109,7 +109,7 @@ export function quizAnswerPositionBalance(questions: QuizQuestionLike[]): Invari
 
 // ─── Quiz: option validity ───────────────────────────────────
 
-export function quizOptionValidity(questions: QuizQuestionLike[]): InvariantCheck {
+function quizOptionValidity(questions: QuizQuestionLike[]): InvariantCheck {
   const metric = "quiz_option_validity";
   const invalid: Array<{ index: number; reasons: string[] }> = [];
 
@@ -164,7 +164,7 @@ const POSITIONAL_REF_PATTERNS: RegExp[] = [
   /\b(?:first|second|third|fourth|last)\s+(?:option|choice|alternative)s?\b/i,
 ];
 
-export function quizPositionalReferences(questions: QuizQuestionLike[]): InvariantCheck {
+function quizPositionalReferences(questions: QuizQuestionLike[]): InvariantCheck {
   const metric = "quiz_explanation_positional_refs";
   const flagged: number[] = [];
   questions.forEach((q, index) => {
@@ -206,7 +206,7 @@ function percentile(sorted: number[], p: number): number {
  * shorter stems, so this tracks the trend across runs instead of gating on it.
  * Whitespace-delimited counting undercounts unspaced scripts (e.g. Chinese).
  */
-export function quizStemLength(questions: QuizQuestionLike[], difficulty?: string): InvariantCheck {
+function quizStemLength(questions: QuizQuestionLike[], difficulty?: string): InvariantCheck {
   const metric = "quiz_stem_length";
   const words = questions
     .filter(

@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import type { InfographicNote } from "@/shared/types/index";
 
 export interface CreateInfographicParams {
@@ -17,10 +17,6 @@ export interface CreateInfographicResponse {
   infographicId: string;
   status: string;
   infographic: InfographicNote;
-}
-
-export interface InfographicConfig {
-  customPrompt?: string;
 }
 
 /**
@@ -82,29 +78,6 @@ function mapInfographicToNote(dbInfographic: any): InfographicNote {
       error: dbInfographic.metadata?.error,
     },
   };
-}
-
-/**
- * Get all infographics for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useInfographics(notebookId: string | null) {
-  const infographics = useQuery(
-    api.studio.infographic.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return infographics?.map(mapInfographicToNote);
-}
-
-/**
- * Get a specific infographic by ID
- */
-export function useInfographic(infographicId: string | null) {
-  const infographic = useQuery(
-    api.studio.infographic.index.get,
-    infographicId ? { id: infographicId as Id<"infographics"> } : "skip"
-  );
-  return infographic ? mapInfographicToNote(infographic) : null;
 }
 
 /**

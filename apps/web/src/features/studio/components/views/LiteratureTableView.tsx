@@ -32,9 +32,7 @@ import { ColumnManager, type TableColumn } from "../ColumnManager";
 import { LiteratureTableExtractionCell } from "../LiteratureTableExtractionCell";
 import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
 
-export type { TableColumn };
-
-export interface TablePaper {
+interface TablePaper {
   citationId: string;
   rowData: Record<string, string>;
   includeReason?: string;

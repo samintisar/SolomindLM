@@ -180,5 +180,3 @@ export const DoiInputModal: React.FC<DoiInputModalProps> = ({
     </div>
   );
 };
-
-export default DoiInputModal;

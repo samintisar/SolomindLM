@@ -15,6 +15,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege for every job's GITHUB_TOKEN: jobs only check out code.
+# actions/cache and upload-artifact use the runtime token, not this one.
+# A job that needs more must declare its own `permissions:` block.
+permissions:
+  contents: read
+
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
 
@@ -133,6 +139,52 @@ jobs:
               echo "::warning::bun audit reported advisories at or above 'high' — see the job summary. Baseline is non-blocking; tighten in a follow-up."
             fi
           fi
+
+  knip:
+    name: Knip (unused code, advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory until the baseline is clean: findings go to the job summary and
+    # never fail the PR (--no-exit-code); continue-on-error keeps a Knip crash
+    # or config error from blocking either.
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      # vitest.convex.config.ts calls dotenv, which Knip loads; keep its banner
+      # out of the markdown report.
+      DOTENV_CONFIG_QUIET: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Knip loads repo config files (vitest/vite/playwright configs);
+          # nothing here needs the token after checkout.
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      # Default mode includes tests: covers devDependencies and test helpers.
+      # convex-test's import.meta.glob("/convex/**/*.ts") marks every Convex
+      # module as used here, so Convex dead code only shows in the next step.
+      - name: Knip (default mode)
+        continue-on-error: true
+        run: |
+          {
+            echo "## Knip — default mode"
+            bun run knip --no-exit-code --reporter markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Production mode skips tests (and the glob above): finds dead Convex
+      # code and code only reachable from tests.
+      - name: Knip (production mode)
+        continue-on-error: true
+        run: |
+          {
+            echo "## Knip — production mode"
+            bun run knip:production --no-exit-code --reporter markdown
+          } >> "$GITHUB_STEP_SUMMARY"
 
   test-unit:
     name: Unit Tests

@@ -21,7 +21,7 @@ export type StudioRunnerKind =
   | "audioScript"
   | "audioScriptOnly";
 
-export type LiteratureReviewRunnerKind = "literatureReview";
+type LiteratureReviewRunnerKind = "literatureReview";
 
 /** Dataset split for offline eval loops (smoke = fast gate, train = iterate, holdout = rare confirm). */
 export type EvalSplit = "smoke" | "train" | "holdout";
@@ -46,7 +46,7 @@ export type ConcreteRunnerKind =
  * underlying studio job. Field names match the args of the corresponding
  * `convex/studio/scheduling/<type>.ts` action.
  */
-export interface StudioParams {
+interface StudioParams {
   reportType?: string;
   customPrompt?: string;
   cardCount?: number;
@@ -76,7 +76,7 @@ export interface SourcePolicyConfig {
  * `minItems`: minimum count for cards/questions/nodes/rows.
  * `jsonShape`: which Zod-style validator to apply (only for structured outputs).
  */
-export interface ExpectedStructure {
+interface ExpectedStructure {
   minItems?: number;
   requiredSections?: string[];
   jsonShape?: "mindmap" | "spreadsheet";
@@ -166,7 +166,7 @@ export interface AgentStageSpan {
   tokenUsage?: { prompt: number; completion: number; total: number };
 }
 
-export type TokenUsageSource = "provider" | "estimated";
+type TokenUsageSource = "provider" | "estimated";
 
 /** Artifact captured by an eval runner for a single case */
 export interface EvalRunArtifact {
