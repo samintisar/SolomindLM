@@ -270,3 +270,146 @@ describe("synthesis state", () => {
     }
   });
 });
+
+const job = internal.studio.audio.job;
+
+async function jobArgs(t: ReturnType<typeof convexTest>, audioOverviewId: Id<"audioOverviews">) {
+  const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+  if (!row) throw new Error("row missing");
+  return { audioOverviewId, userId: row.userId, notebookId: row.notebookId };
+}
+
+async function scheduledCalls(t: ReturnType<typeof convexTest>, functionName: string) {
+  const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+  return scheduled.filter((call) => call.name.includes(functionName));
+}
+
+const scriptOf = (lines: number): AudioSynthesisInput => ({
+  ...synthesisInput,
+  script: Array.from({ length: lines }, (_, i) => ({
+    speaker: i % 2 === 0 ? ("host_a" as const) : ("host_b" as const),
+    text: `Line ${i + 1}.`,
+  })),
+});
+
+describe("synthesis phases", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Generous timeouts: the first action call loads the whole audio job module.
+  test("the planner stores the plan and schedules one action per chunk, without TTS", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await runToSynthesis(t, scriptOf(100));
+
+    await t.action(job.synthesizeAudioOverviewPhase, await jobArgs(t, audioOverviewId));
+
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.metadata.synthesis.chunks).toHaveLength(3);
+    const chunkCalls = await scheduledCalls(t, "synthesizeAudioOverviewChunk");
+    expect(chunkCalls.map((call) => call.args[0].chunkIndex)).toEqual([0, 1, 2]);
+    expect(chunkCalls.every((call) => call.args[0].attempt === 0)).toBe(true);
+  }, 30000);
+
+  test("a chunk for a job that is no longer generating does nothing", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await runToSynthesis(t);
+    await t.mutation(audio.initAudioSynthesis, { audioOverviewId, chunks: twoChunks });
+    await t.mutation(audio.markAudioOverviewFailed, {
+      audioOverviewId,
+      error: "boom",
+      metadata: { phase: "failed", errorPhase: "synthesis" },
+    });
+
+    await t.action(job.synthesizeAudioOverviewChunk, {
+      ...(await jobArgs(t, audioOverviewId)),
+      chunkIndex: 0,
+      attempt: 0,
+    });
+
+    expect(await scheduledCalls(t, "synthesizeAudioOverviewChunk")).toHaveLength(0);
+  }, 30000);
+
+  test("a failing chunk retries once, then fails the job", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    // No chunk plan stored: the chunk action throws before calling TTS.
+    const audioOverviewId = await runToSynthesis(t);
+    const args = { ...(await jobArgs(t, audioOverviewId)), chunkIndex: 0 };
+
+    await t.action(job.synthesizeAudioOverviewChunk, { ...args, attempt: 0 });
+    const retries = await scheduledCalls(t, "synthesizeAudioOverviewChunk");
+    expect(retries.map((call) => call.args[0].attempt)).toEqual([1]);
+
+    await expect(
+      t.action(job.synthesizeAudioOverviewChunk, { ...args, attempt: 1 })
+    ).rejects.toThrow("No script or plan stored for synthesis chunk 0");
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.status).toBe("failed");
+    expect(row?.metadata).toMatchObject({ errorPhase: "synthesis" });
+  }, 30000);
+
+  test("assembly joins chunk MP3s in order, saves the episode and deletes the chunks", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await runToSynthesis(t);
+    await t.mutation(audio.initAudioSynthesis, { audioOverviewId, chunks: twoChunks });
+    const first = await storeFile(t, [1, 2, 3]);
+    const second = await storeFile(t, [4, 5]);
+    await t.mutation(audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex: 1,
+      result: chunkResult(second),
+    });
+    await t.mutation(audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex: 0,
+      result: chunkResult(first),
+    });
+
+    await t.action(job.assembleAudioOverviewPhase, await jobArgs(t, audioOverviewId));
+
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.status).toBe("completed");
+    expect(row?.transcript).toBe("Opening line.\nReply line.");
+    expect(row?.metadata).toMatchObject({ phase: "completed", dialogueLines: 2 });
+    expect(row?.metadata.synthesis).toBeUndefined();
+    expect(await fileExists(t, first)).toBe(false);
+    expect(await fileExists(t, second)).toBe(false);
+    const files = await t.run((ctx) => ctx.db.system.query("_storage").collect());
+    expect(files).toHaveLength(1);
+    const bytes = await t.run(async (ctx) => {
+      const blob = await ctx.storage.get(files[0]._id);
+      return blob ? [...new Uint8Array(await blob.arrayBuffer())] : [];
+    });
+    expect(bytes).toEqual([1, 2, 3, 4, 5]);
+  }, 30000);
+
+  test("assembly fails the job when fewer than half the lines were synthesized", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await runToSynthesis(t);
+    await t.mutation(audio.initAudioSynthesis, { audioOverviewId, chunks: twoChunks });
+    const partial = await storeFile(t, [1]);
+    const failed = { synthesizedLines: 0, failedLines: 1, latencyMs: 10 };
+    await t.mutation(audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex: 0,
+      result: { ...failed, firstError: "voice unavailable" },
+    });
+    await t.mutation(audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex: 1,
+      result: { ...failed, storageId: partial },
+    });
+
+    await expect(
+      t.action(job.assembleAudioOverviewPhase, await jobArgs(t, audioOverviewId))
+    ).rejects.toThrow(
+      "Too many synthesis failures: 0/2 lines synthesized (first error: voice unavailable)"
+    );
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.status).toBe("failed");
+    expect(await fileExists(t, partial)).toBe(false);
+  }, 30000);
+});
