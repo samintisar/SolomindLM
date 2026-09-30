@@ -45,7 +45,7 @@
       ],
       "convex": false,
       "ignoreBinaries": ["conda"],
-      "ignoreDependencies": ["vite"]
+      "ignoreDependencies": ["vite", "@langchain/openai"]
     },
     "apps/web": {
       "entry": ["scripts/**/*.ts!", "src/test/mocks/**/*.ts"],
