@@ -6,7 +6,7 @@ import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from ".
 import type { LlmJudgeOptions } from "./llmJudge";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
 
-export interface BinaryJudgeResult {
+interface BinaryJudgeResult {
   pass: boolean;
   reason: string;
 }

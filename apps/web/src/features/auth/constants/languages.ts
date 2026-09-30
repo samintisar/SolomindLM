@@ -16,5 +16,3 @@ export const SUPPORTED_LANGUAGES = [
   { code: "ur", label: "Urdu" },
   { code: "vi", label: "Vietnamese" },
 ] as const;
-
-export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];

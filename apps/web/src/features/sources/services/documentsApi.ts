@@ -442,17 +442,6 @@ export async function uploadUrl(
 }
 
 /**
- * Get document content by ID (imperative, for use in event handlers / effects)
- */
-export async function getDocumentContent(documentId: string): Promise<string> {
-  const client = getConvexClient();
-  const result = await client.query(api.documents.index.getContent, {
-    id: documentId as Id<"documents">,
-  });
-  return result.content;
-}
-
-/**
  * Upload pasted text as a document
  * This is an imperative function that can be called outside of React
  */

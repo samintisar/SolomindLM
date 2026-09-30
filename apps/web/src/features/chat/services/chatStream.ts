@@ -50,27 +50,11 @@ export interface ParsedStreamData {
   isDone: boolean;
 }
 
-// API response format (with created_at as string)
-export interface ApiMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  created_at: string;
-  references?: ReferenceChunk[];
-  metadata?: Record<string, any>;
-}
-
 // ============================================================
 // API Response Types
 // ============================================================
 
-export interface ChatHistoryResponse {
-  conversationId: string;
-  title: string;
-  messages: ApiMessage[];
-}
-
-export interface ChatError {
+interface ChatError {
   message: string;
   type?: string;
 }

@@ -238,5 +238,3 @@ export const ManualPaperModal: React.FC<ManualPaperModalProps> = ({
     </div>
   );
 };
-
-export default ManualPaperModal;

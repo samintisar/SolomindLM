@@ -4,9 +4,9 @@ import {
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
 } from "../components/ChatInput";
 
-export const COMPOSER_PREFS_STORAGE_KEY_PREFIX = "solomind:chat-composer:v1:";
+const COMPOSER_PREFS_STORAGE_KEY_PREFIX = "solomind:chat-composer:v1:";
 
-export const SOURCE_CHANNEL_IDS = ["notebook", "academic", "web", "news", "finance"] as const;
+const SOURCE_CHANNEL_IDS = ["notebook", "academic", "web", "news", "finance"] as const;
 
 const COMPOSER_MODES: ChatComposerMode[] = ["chat", "deepResearch", "literatureReview"];
 const RESEARCH_DATABASES: ResearchDatabaseOption[] = ["all", "pubmed", "arxiv"];

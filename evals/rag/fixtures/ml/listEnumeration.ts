@@ -147,8 +147,3 @@ export const mlListEnumerationFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlListEnumerationFixture(id: string): EvalFixture | undefined {
-  return mlListEnumerationFixtures.find((f) => f.id === id);
-}
