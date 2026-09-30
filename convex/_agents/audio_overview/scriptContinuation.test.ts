@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   continueScriptIfNeeded,
   getContinuationMaxTokens,
+  getScriptMaxLines,
   planScriptContinuation,
 } from "./scriptContinuation";
 import type { DialogueLine } from "./state";
@@ -345,5 +346,13 @@ describe("first drafts over the line cap", () => {
     expect(generate.mock.calls[0][2]).toBe(true);
     expect(result).toHaveLength(96);
     expect(result.at(-1)?.text).toBe("Agreed. Thanks for listening, everyone.");
+  });
+});
+
+describe("getScriptMaxLines", () => {
+  it("allows some overshoot per length but never past what one TTS action can synthesize", () => {
+    expect(getScriptMaxLines(100)).toBe(120);
+    expect(getScriptMaxLines(220)).toBe(264);
+    expect(getScriptMaxLines(350)).toBe(350);
   });
 });

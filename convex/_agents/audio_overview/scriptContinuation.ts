@@ -21,6 +21,20 @@ const MAX_CONTINUATION_TURNS = 250;
 const MIN_WORDS_PER_TURN = 10;
 const MAX_WORDS_PER_TURN = 25;
 
+/** Scripts may run this far past their requested turns before being trimmed. */
+const MAX_LINES_OVER_TARGET_RATIO = 1.2;
+/**
+ * Most lines one TTS action synthesizes reliably. Synthesis time and memory scale with lines:
+ * on dev, 350 lines ran into the 10-minute action limit when TTS was slow, and 440 lines ran out
+ * of memory. Raise this once synthesis is split across actions.
+ */
+const MAX_SYNTHESIZABLE_LINES = 350;
+
+/** Line ceiling for a finished script with `targetLines` requested turns. */
+export function getScriptMaxLines(targetLines: number): number {
+  return Math.min(Math.ceil(targetLines * MAX_LINES_OVER_TARGET_RATIO), MAX_SYNTHESIZABLE_LINES);
+}
+
 function countWords(script: DialogueLine[]): number {
   return script.reduce((sum, line) => sum + countDialogueWords(line.text), 0);
 }
