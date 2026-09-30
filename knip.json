@@ -36,6 +36,7 @@
       ],
       "project": [
         "convex/**/*.ts!",
+        "!convex/_testing/**!",
         "evals/**/*.ts",
         "scripts/**/*.{js,mjs,ts}",
         "e2e/**/*.ts",

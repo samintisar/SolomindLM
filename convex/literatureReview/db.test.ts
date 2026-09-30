@@ -2,6 +2,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 import {
   RANKED_PAPER_SNAPSHOT_ABSTRACT_MAX_CHARS,
@@ -15,6 +16,7 @@ const modules = {
   "./_generated/server.js": () => import("../_generated/server.js"),
   "./_generated/api.js": () => import("../_generated/api.js"),
 };
+preloadModules(modules, ["./literatureReview/db.ts", "./studio/literature_tables/index.ts"]);
 
 async function seedUser(t: ReturnType<typeof convexTest>): Promise<Id<"users">> {
   return t.run(async (ctx) => ctx.db.insert("users", { name: "Test User" }));

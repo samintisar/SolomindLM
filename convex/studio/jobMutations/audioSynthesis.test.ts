@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
+import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema";
 import type { AudioSynthesisInput } from "./audio";
 
@@ -10,6 +11,11 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, [
+  "./studio/audio/index.ts",
+  "./studio/audio/job.ts",
+  "./studio/jobMutations/audio.ts",
+]);
 
 const settings = { audioType: "debate", length: "short" };
 

@@ -1,14 +1,15 @@
 /// <reference types="vite/client" />
-import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
+import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
 // The committed `convex/_lib/env.ts` snapshots `process.env` at module-eval
-// time, and convex-test loads that module once per test file (on the first
-// function call). Stub the admin allowlist at module scope so `env.ts` sees it
+// time, and it is loaded once per test file (by `preloadModules`' beforeAll).
+// Stub the admin allowlist at module scope so `env.ts` sees it
 // when it first evaluates. The GitHub token is read directly from `process.env`
 // by `feedback/github.ts` (NOT via the `env` snapshot), so per-test
 // `vi.stubEnv("FEEDBACK_GITHUB_TOKEN", ...)` below takes effect at call time.
@@ -18,6 +19,8 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, ["./feedback/github.ts", "./feedback/index.ts"]);
+preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 
 function makeT() {
   const t = convexTest(schema, modules);
