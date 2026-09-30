@@ -664,6 +664,9 @@ export async function runFinalizeAudioOverviewPhase(
       // Truncated at the token limit, or a repetition loop ran to the end: there is no real ending.
       cutOff: scriptTruncated || endedInRepeat,
       targetWords: targetLines * ESTIMATED_WORDS_PER_LINE,
+      // Synthesis time and memory scale with lines; past the requested turns, long scripts run
+      // out of TTS action time or memory.
+      maxLines: targetLines,
       canContinue: () => remainingReduceBudgetMs() >= CONFIG.CONTINUATION_MIN_TIMEOUT_MS,
       generate: (scriptSoFar, turns) => {
         const maxTokens = getContinuationMaxTokens(turns, CONFIG.REDUCE_MAX_OUTPUT_TOKENS);

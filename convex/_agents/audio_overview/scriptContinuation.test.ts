@@ -15,7 +15,12 @@ const lines = (count: number, wordsPerLine: number): DialogueLine[] =>
 describe("planScriptContinuation", () => {
   it("does nothing for a complete script near its word target", () => {
     expect(
-      planScriptContinuation({ script: lines(220, 19), targetWords: 4400, cutOff: false })
+      planScriptContinuation({
+        script: lines(220, 19),
+        targetWords: 4400,
+        maxLines: 10_000,
+        cutOff: false,
+      })
     ).toBeNull();
   });
 
@@ -23,6 +28,7 @@ describe("planScriptContinuation", () => {
     const plan = planScriptContinuation({
       script: lines(300, 16),
       targetWords: 7000,
+      maxLines: 10_000,
       cutOff: false,
     });
 
@@ -38,6 +44,7 @@ describe("planScriptContinuation", () => {
     const plan = planScriptContinuation({
       script: lines(220, 20),
       targetWords: 4400,
+      maxLines: 10_000,
       cutOff: true,
     });
 
@@ -50,6 +57,7 @@ describe("planScriptContinuation", () => {
     const plan = planScriptContinuation({
       script: lines(20, 16),
       targetWords: 7000,
+      maxLines: 10_000,
       cutOff: false,
     });
 
@@ -69,6 +77,7 @@ describe("continueScriptIfNeeded", () => {
       script,
       cutOff: false,
       targetWords: 4400,
+      maxLines: 10_000,
       canContinue: () => true,
       generate,
     });
@@ -85,6 +94,7 @@ describe("continueScriptIfNeeded", () => {
       script,
       cutOff: false,
       targetWords: 4400,
+      maxLines: 10_000,
       canContinue: () => true,
       generate,
     });
@@ -106,6 +116,7 @@ describe("continueScriptIfNeeded", () => {
       script,
       cutOff: true,
       targetWords: 200,
+      maxLines: 10_000,
       canContinue: () => true,
       generate,
     });
@@ -125,6 +136,7 @@ describe("continueScriptIfNeeded", () => {
         script,
         cutOff: false,
         targetWords: 4400,
+        maxLines: 10_000,
         canContinue: () => true,
         generate,
       });
@@ -140,6 +152,7 @@ describe("continueScriptIfNeeded", () => {
       script,
       cutOff: true,
       targetWords: 4400,
+      maxLines: 10_000,
       canContinue: () => false,
       generate,
     });
@@ -171,6 +184,7 @@ describe("continueScriptIfNeeded runaway guard", () => {
       script,
       cutOff: false,
       targetWords: 2400,
+      maxLines: 10_000,
       canContinue: () => true,
       generate,
     });
@@ -197,6 +211,7 @@ describe("continueScriptIfNeeded runaway guard", () => {
       script,
       cutOff: true,
       targetWords: 2000,
+      maxLines: 10_000,
       canContinue: () => true,
       generate,
     });
@@ -226,7 +241,71 @@ describe("planScriptContinuation with unspaced languages", () => {
     }));
 
     expect(
-      planScriptContinuation({ script: japanese, targetWords: 2000, cutOff: false })
+      planScriptContinuation({ script: japanese, targetWords: 2000, maxLines: 100, cutOff: false })
     ).toBeNull();
+  });
+});
+
+describe("script line cap", () => {
+  const asJson = (texts: string[]) =>
+    JSON.stringify(texts.map((text, i) => ({ speaker: i % 2 ? "host_b" : "host_a", text })));
+
+  it("never plans more turns than fit under the line cap", () => {
+    // A short-turn draft: 188 lines of 12 words against a 7000-word, 350-line target.
+    const plan = planScriptContinuation({
+      script: lines(188, 12),
+      targetWords: 7000,
+      maxLines: 350,
+      cutOff: false,
+    });
+
+    expect(plan?.keepLines).toBe(186);
+    expect(plan?.turns).toBeLessThanOrEqual(350 - 186);
+  });
+
+  it("does not extend a complete script that already fills the line cap", () => {
+    expect(
+      planScriptContinuation({
+        script: lines(349, 10),
+        targetWords: 7000,
+        maxLines: 350,
+        cutOff: false,
+      })
+    ).toBeNull();
+  });
+
+  it("trims a cut-off script over the cap to leave room for a wrap-up", () => {
+    expect(
+      planScriptContinuation({
+        script: lines(400, 20),
+        targetWords: 7000,
+        maxLines: 350,
+        cutOff: true,
+      })
+    ).toEqual({ keepLines: 346, turns: 4 });
+  });
+
+  it("keeps a continuation that overshoots within the cap, then wraps up", async () => {
+    const script = lines(188, 12);
+    const overshoot = Array.from(
+      { length: 350 },
+      (_, i) => `Overshoot turn number ${i} with enough words.`
+    );
+    const generate = vi
+      .fn()
+      .mockResolvedValueOnce(asJson(overshoot))
+      .mockResolvedValueOnce(asJson(["That ties it together.", "Thanks for listening, everyone."]));
+
+    const result = await continueScriptIfNeeded({
+      script,
+      cutOff: false,
+      targetWords: 7000,
+      maxLines: 350,
+      canContinue: () => true,
+      generate,
+    });
+
+    expect(result.length).toBeLessThanOrEqual(350);
+    expect(result.at(-1)?.text).toBe("Thanks for listening, everyone.");
   });
 });

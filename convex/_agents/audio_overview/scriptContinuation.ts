@@ -36,20 +36,29 @@ export type ScriptContinuationPlan = {
  * - Complete scripts are extended only when well short of `targetWords`.
  *
  * The turn budget uses the script's own words-per-turn, since models write shorter or longer turns
- * than the prompt's estimate.
+ * than the prompt's estimate. The script never grows past `maxLines`: synthesis time and memory
+ * scale with the number of lines, so a words-driven plan for a short-turn script would otherwise
+ * push synthesis past its action limits. A cut-off script over the cap is trimmed to leave room
+ * for its wrap-up.
  */
 export function planScriptContinuation(input: {
   script: DialogueLine[];
   targetWords: number;
+  maxLines: number;
   cutOff: boolean;
 }): ScriptContinuationPlan | null {
-  const { script, targetWords, cutOff } = input;
+  const { script, targetWords, maxLines, cutOff } = input;
   if (script.length === 0) return null;
 
   const totalWords = countWords(script);
   if (!cutOff && totalWords >= targetWords * CONTINUE_BELOW_TARGET_RATIO) return null;
 
-  const keepLines = cutOff ? script.length : Math.max(1, script.length - SIGN_OFF_LINES);
+  const keepLines = cutOff
+    ? Math.max(1, Math.min(script.length, maxLines - WRAP_UP_TURNS))
+    : Math.max(1, script.length - SIGN_OFF_LINES);
+  const room = maxLines - keepLines;
+  // A complete script already at the cap keeps its own ending.
+  if (room < WRAP_UP_TURNS) return null;
   const kept = script.slice(0, keepLines);
   const wordsPerTurn = Math.min(
     MAX_WORDS_PER_TURN,
@@ -59,7 +68,7 @@ export function planScriptContinuation(input: {
 
   return {
     keepLines,
-    turns: Math.min(MAX_CONTINUATION_TURNS, Math.max(WRAP_UP_TURNS, missingTurns)),
+    turns: Math.min(MAX_CONTINUATION_TURNS, room, Math.max(WRAP_UP_TURNS, missingTurns)),
   };
 }
 
@@ -94,17 +103,19 @@ export async function continueScriptIfNeeded(options: {
   script: DialogueLine[];
   cutOff: boolean;
   targetWords: number;
+  /** The finished script never exceeds this many lines. */
+  maxLines: number;
   /** Return false when the phase's time budget no longer allows another model call. */
   canContinue: () => boolean;
   /** Produces the raw model response continuing `scriptSoFar` with ~`turns` new turns. */
   generate: (scriptSoFar: DialogueLine[], turns: number) => Promise<string>;
 }): Promise<DialogueLine[]> {
-  const { targetWords, canContinue, generate } = options;
+  const { targetWords, maxLines, canContinue, generate } = options;
   let script = options.script;
   let cutOff = options.cutOff;
 
   for (let pass = 1; pass <= MAX_CONTINUATION_PASSES; pass += 1) {
-    const plan = planScriptContinuation({ script, targetWords, cutOff });
+    const plan = planScriptContinuation({ script, targetWords, maxLines, cutOff });
     if (!plan) return script;
     if (!canContinue()) {
       console.warn(
@@ -124,11 +135,14 @@ export async function continueScriptIfNeeded(options: {
         return script;
       }
       // Keep a runaway continuation's first turns; they follow on from the script so far.
-      const maxLines = Math.ceil(turns * CONTINUATION_OVERSHOOT_RATIO);
-      const added = parsed.script.slice(0, maxLines);
+      const maxAdded = Math.min(
+        Math.ceil(turns * CONTINUATION_OVERSHOOT_RATIO),
+        maxLines - plan.keepLines
+      );
+      const added = parsed.script.slice(0, maxAdded);
       const merged = removeRepeatedDialogueLines([...kept, ...added]);
       script = merged.script;
-      cutOff = parsed.truncated || parsed.script.length > maxLines || merged.endedInRepeat;
+      cutOff = parsed.truncated || parsed.script.length > maxAdded || merged.endedInRepeat;
       console.log(
         `[AudioScript] Continuation pass ${pass}: kept ${kept.length} lines, requested ${turns}, appended ${script.length - kept.length}, hasEnding=${!cutOff}`
       );
