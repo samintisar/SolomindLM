@@ -14,12 +14,6 @@ export const MIN_RELEVANCE_THRESHOLD = parseFloat(env.CHAT_MIN_RELEVANCE_THRESHO
 export const CONTEXT_TOKEN_BUDGET = parseInt(env.CHAT_CONTEXT_TOKEN_BUDGET, 10);
 export const MAX_CHUNKS_HARD_LIMIT = parseInt(env.CHAT_MAX_CHUNKS_HARD_LIMIT, 10);
 
-/**
- * List queries retrieve a wide candidate pool upstream; context packing stays
- * stricter so the model sees mostly on-topic passages (better precision@K + answers).
- */
-export const LIST_QUERY_RELEVANCE_THRESHOLD = MIN_RELEVANCE_THRESHOLD;
-
 /** Max chunks passed to the LLM for list/enumeration questions after global rerank. */
 export const LIST_QUERY_MAX_SELECTED_CHUNKS = 24;
 
