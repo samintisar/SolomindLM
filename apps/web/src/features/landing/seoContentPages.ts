@@ -41,7 +41,6 @@ export type SeoContentPageConfig = {
   faqs: FAQItem[];
   ctaLabel: string;
   conversionPromise: string;
-  signupIntentKey: string;
   breadcrumbParent: { name: string; path: string };
   navLabel: string;
   relatedLinks: SeoContentRelatedLink[];
@@ -272,7 +271,6 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
     ],
     ctaLabel: "Try SolomindLM free",
     conversionPromise: "Try SolomindLM free with your own PDFs, papers, and lecture materials.",
-    signupIntentKey: "sourceUpload",
     breadcrumbParent: { name: "Compare", path: "/compare/solomindlm-vs-notebooklm" },
     navLabel: "SolomindLM vs NotebookLM",
     relatedLinks: [
@@ -401,7 +399,6 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
     ctaLabel: "Create free account",
     conversionPromise:
       "Upload your first PDFs and generate study materials in minutes—no credit card required.",
-    signupIntentKey: "flashcards",
     breadcrumbParent: { name: "Guides", path: "/guides/how-to-study-from-pdfs-with-ai" },
     navLabel: "Study from PDFs with AI",
     relatedLinks: [
@@ -533,7 +530,6 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
     ctaLabel: "Start a research notebook",
     conversionPromise:
       "Import your reading list and run your first literature review synthesis in minutes.",
-    signupIntentKey: "literatureReview",
     breadcrumbParent: { name: "Guides", path: "/guides/how-to-do-an-ai-literature-review" },
     navLabel: "AI literature review guide",
     relatedLinks: [

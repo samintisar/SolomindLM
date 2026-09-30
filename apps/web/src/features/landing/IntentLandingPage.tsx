@@ -13,7 +13,6 @@ import {
   getRelatedIntentPages,
   type IntentLandingPageConfig,
 } from "./intentLandingPages";
-import { setSignupIntent } from "./landingSignup";
 
 type IntentLandingPageProps = {
   pagePath: string;
@@ -37,10 +36,7 @@ export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
     return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
   }
 
-  const openSignup = () => {
-    setSignupIntent(page.intentKey);
-    setAuthModalOpen(true);
-  };
+  const openSignup = () => setAuthModalOpen(true);
 
   return (
     <>
