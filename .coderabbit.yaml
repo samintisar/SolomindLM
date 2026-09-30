@@ -131,7 +131,11 @@ chat:
 knowledge_base:
   code_guidelines:
     enabled: true
+    # Plain-string entries only govern their own directory, so map each doc to the code it covers.
     filePatterns:
-      - ".github/BRANCHING.md"
-      - "docs/engineering/code-quality.md"
-      - "convex/_generated/ai/guidelines.md"
+      - files: ".github/BRANCHING.md"
+        applyTo: "**/*"
+      - files: "docs/engineering/code-quality.md"
+        applyTo: "**/*"
+      - files: "convex/_generated/ai/guidelines.md"
+        applyTo: "convex/**"
