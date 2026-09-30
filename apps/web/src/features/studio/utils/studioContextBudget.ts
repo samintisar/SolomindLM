@@ -4,7 +4,7 @@ import { DEFAULT_SMART_MODEL_ID, findSmartModelById } from "@/shared/constants/m
  * Model studio jobs run their reduce/synthesis phase on. The backend picks it from
  * `REPORT_LLM` / `QUIZ_LLM` / … env vars, which all default to the smart model.
  */
-export const STUDIO_GENERATION_MODEL_ID = DEFAULT_SMART_MODEL_ID;
+const STUDIO_GENERATION_MODEL_ID = DEFAULT_SMART_MODEL_ID;
 
 /**
  * Upper bound on source context that still produces focused studio output, even on

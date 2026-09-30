@@ -8,7 +8,7 @@ const PROMOTE_PREFIXES = [
   "binary_judge_lr",
 ] as const;
 
-export interface PromotionRegression {
+interface PromotionRegression {
   caseId: string;
   runner: string;
   metric: string;

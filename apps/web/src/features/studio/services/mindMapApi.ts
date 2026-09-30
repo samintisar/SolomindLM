@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import type { MindMapNote } from "@/shared/types/index";
 
 export interface CreateMindMapParams {
@@ -73,29 +73,6 @@ function mapMindMapToNote(dbMindMap: any): MindMapNote {
     metadata: dbMindMap.metadata || {},
     mindMapData,
   };
-}
-
-/**
- * Get all mind maps for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useMindMaps(notebookId: string | null) {
-  const mindMaps = useQuery(
-    api.studio.mindmaps.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return mindMaps?.map(mapMindMapToNote);
-}
-
-/**
- * Get a specific mind map by ID
- */
-export function useMindMap(mindMapId: string | null) {
-  const mindMap = useQuery(
-    api.studio.mindmaps.index.get,
-    mindMapId ? { id: mindMapId as Id<"mindmaps"> } : "skip"
-  );
-  return mindMap ? mapMindMapToNote(mindMap) : null;
 }
 
 /**

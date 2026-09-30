@@ -25,14 +25,6 @@ export interface SubmitAnswerParams {
   answer: string;
 }
 
-export interface GradedResult {
-  score: number;
-  maxScore: number;
-  feedback: string;
-  strengths: string[];
-  improvements: string[];
-}
-
 /** Map 'fewer' | 'standard' | 'more' to API question count (5, 10, 15) */
 function questionCountToNumber(count: "fewer" | "standard" | "more"): number {
   const map: Record<string, number> = { fewer: 5, standard: 10, more: 15 };
@@ -83,18 +75,6 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
       lastViewedIndex: dbWQ.metadata?.lastViewedIndex,
     },
   };
-}
-
-/**
- * Get all written questions for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useWrittenQuestions(notebookId: string | null) {
-  const writtenQuestions = useQuery(
-    api.studio.writtenQuestions.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return writtenQuestions?.map(mapWrittenQuestionsToNote);
 }
 
 /**
@@ -266,31 +246,6 @@ export function useResetWrittenAnswers() {
 }
 
 /**
- * Get graded result for a specific question
- */
-export function useGradedResult(writtenQuestionsId: string | null, questionId: string | null) {
-  const wq = useWrittenQuestionSet(writtenQuestionsId);
-
-  if (!wq || !questionId) {
-    return null;
-  }
-
-  const answer = wq.userAnswers?.[questionId];
-
-  if (!answer || !answer.graded) {
-    return null;
-  }
-
-  return {
-    score: answer.score || 0,
-    maxScore: answer.maxScore || 0,
-    feedback: answer.feedback || "",
-    strengths: answer.strengths || [],
-    improvements: answer.improvements || [],
-  };
-}
-
-/**
  * Persist written questions progress (last viewed question index)
  * Note: Does NOT use optimistic updates to avoid interfering with questions state
  */
@@ -319,41 +274,4 @@ export function useUpdateWrittenQuestionsProgress(
       }
     };
   }, [writtenQuestionsId, currentIndex, update]);
-}
-
-/**
- * Poll for graded result
- */
-export async function pollGradedResult(
-  getWQ: () => WrittenQuestionsNote | null | undefined,
-  questionId: string,
-  onUpdate?: (graded: boolean) => void,
-  maxAttempts = 60, // 2 minutes @ 2s intervals
-  interval = 2000
-): Promise<GradedResult> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getWQ();
-
-    if (!note) {
-      throw new Error("Written questions not found");
-    }
-
-    const answer = note.userAnswers?.[questionId];
-
-    if (answer?.graded) {
-      onUpdate?.(true);
-      return {
-        score: answer.score || 0,
-        maxScore: answer.maxScore || 0,
-        feedback: answer.feedback || "",
-        strengths: answer.strengths || [],
-        improvements: answer.improvements || [],
-      };
-    }
-
-    onUpdate?.(false);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error("Grading timed out");
 }

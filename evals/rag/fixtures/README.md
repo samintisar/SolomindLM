@@ -10,7 +10,7 @@ The fastest way to create fixtures is using NotebookLM:
 4. **Convert to fixtures** using the helper below
 
 ```typescript
-import { convertNotebookLM } from "./fixtures";
+import { convertNotebookLM } from "./notebookLM_converter";
 
 // Paste NotebookLM output here
 const nlmOutput = `

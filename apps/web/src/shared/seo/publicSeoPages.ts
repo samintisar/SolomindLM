@@ -97,7 +97,7 @@ const INTENT_SEO_PAGES: PublicSeoPage[] = INTENT_LANDING_PAGES.map((page) => ({
   ],
 }));
 
-export const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
+const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
   {
     path: "/",
     title: SEO_DEFAULT_TITLE,

@@ -19,12 +19,6 @@ export interface LlmJudgeOptions {
   invoke?: (prompt: string) => Promise<string>;
 }
 
-export interface JudgeResult {
-  score: number; // 0-1
-  reasoning: string;
-  status: "pass" | "warn" | "fail";
-}
-
 // ─── Prompts ───────────────────────────────────────────────────────
 
 const CORRECTNESS_PROMPT = (opts: {
@@ -348,7 +342,7 @@ export async function llmJudgeCorrectness(
  *
  * Does not require fixture.expectedAnswer — evaluates against context alone.
  */
-export async function llmJudgeFaithfulness(
+async function llmJudgeFaithfulness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   options: LlmJudgeOptions = {}
@@ -418,7 +412,7 @@ export async function llmJudgeFaithfulness(
  *
  * Uses fixture.expectedBehavior as the completeness criterion.
  */
-export async function llmJudgeCompleteness(
+async function llmJudgeCompleteness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   options: LlmJudgeOptions = {}
@@ -491,4 +485,4 @@ export async function scoreAllLlmJudgeMetrics(
 }
 
 // Re-export types
-export type { JudgeResult, LlmJudgeOptions };
+export type { LlmJudgeOptions };

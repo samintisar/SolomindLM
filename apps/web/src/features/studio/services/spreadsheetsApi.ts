@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import type { SpreadsheetNote } from "@/shared/types/index";
 
 export interface CreateSpreadsheetParams {
@@ -35,7 +35,7 @@ export function getSpreadsheetTypeLabel(spreadsheetType: string): string {
 /**
  * Get subtitle for spreadsheet based on status and type
  */
-export function getSpreadsheetSubtitle(spreadsheetType: string, status?: string): string {
+function getSpreadsheetSubtitle(spreadsheetType: string, status?: string): string {
   const typeLabel = getSpreadsheetTypeLabel(spreadsheetType);
 
   if (status === "generating") {
@@ -71,29 +71,6 @@ function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
       customPrompt: dbSpreadsheet.metadata?.customPrompt,
     },
   };
-}
-
-/**
- * Get all spreadsheets for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useSpreadsheets(notebookId: string | null) {
-  const spreadsheets = useQuery(
-    api.studio.spreadsheets.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return spreadsheets?.map(mapSpreadsheetToNote);
-}
-
-/**
- * Get a specific spreadsheet by ID
- */
-export function useSpreadsheet(spreadsheetId: string | null) {
-  const spreadsheet = useQuery(
-    api.studio.spreadsheets.index.get,
-    spreadsheetId ? { id: spreadsheetId as Id<"spreadsheets"> } : "skip"
-  );
-  return spreadsheet ? mapSpreadsheetToNote(spreadsheet) : null;
 }
 
 /**

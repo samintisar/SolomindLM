@@ -313,24 +313,6 @@ export function useNotes(notebookId: string | null, types?: string[]): Note[] {
 }
 
 /**
- * Get note counts by type for a notebook
- */
-export function useNoteCounts(notebookId: string | null) {
-  return useQuery(
-    api.notes.index.count,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-}
-
-/**
- * Get a single note by type and ID (full payload).
- */
-export function useNote(type: string, noteId: string | null) {
-  const note = useQuery(api.notes.index.get, noteId && type ? { type, id: noteId as any } : "skip");
-  return note ? mapDatabaseNoteToNote(note) : null;
-}
-
-/**
  * Load full studio note content when opening a saved item from the list.
  */
 export function useNoteDetail(type: string | null, noteId: string | null) {
@@ -340,19 +322,3 @@ export function useNoteDetail(type: string | null, noteId: string | null) {
     isLoading: note === undefined && Boolean(type && noteId),
   };
 }
-
-/**
- * Check if any notes are currently loading
- */
-export function useNotesLoading(notebookId: string | null): boolean {
-  const notes = useQuery(
-    api.notes.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-
-  // Convex returns undefined while loading, null on error, and the data when ready
-  return notes === undefined;
-}
-
-// For single-type lookups, import directly from the specific service file
-// (e.g., import { useReports } from "./reportsApi").

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { NotebookItem } from "@/shared/types/index";
 
-export type SortOption = "date" | "title";
+type SortOption = "date" | "title";
 
 export interface UseNotebookSortingReturn {
   sortOption: SortOption;
