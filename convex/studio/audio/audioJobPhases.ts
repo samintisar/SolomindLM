@@ -47,7 +47,7 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
+import { concatenateMp3Buffers, encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
 import {
   createTogetherTtsClient,
   synthesizeSpeechToBuffer,
@@ -55,7 +55,8 @@ import {
 import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
-import type { AudioSynthesisInput } from "../jobMutations/audio";
+import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
+import { planSynthesisChunks } from "./synthesisChunks";
 
 // ============================================================
 // CONFIGURATION
@@ -80,6 +81,10 @@ const CONFIG = {
   CONTINUATION_MIN_TIMEOUT_MS: 60_000,
   CONTINUATION_MS_PER_OUTPUT_TOKEN: 33,
   TTS_TIMEOUT_MS: 300_000, // 5 minutes
+  /** Lines each synthesis chunk sends to TTS at once. */
+  TTS_BATCH_SIZE: 5,
+  /** Delay before a failed synthesis chunk's one retry. */
+  SYNTHESIS_CHUNK_RETRY_DELAY_MS: 5_000,
 } as const;
 
 export type AudioOverviewGenerationPhaseArgs = {
@@ -105,6 +110,12 @@ export type FinalizeAudioOverviewPhaseArgs = {
 };
 
 export type SynthesizeAudioOverviewPhaseArgs = FinalizeAudioOverviewPhaseArgs;
+
+export type SynthesizeAudioOverviewChunkPhaseArgs = SynthesizeAudioOverviewPhaseArgs & {
+  chunkIndex: number;
+  /** 0 on the first run, 1 on the retry. */
+  attempt: number;
+};
 
 /** Kokoro (or other Together TTS) voice IDs per host */
 const VOICES = {
@@ -778,9 +789,41 @@ export async function runFinalizeAudioOverviewPhase(
 }
 
 // ============================================================
-// PHASE 4: Synthesize (TTS + Upload + Save)
+// PHASE 4: Synthesize — plan chunks and fan out
 // ============================================================
 
+/** Marks the job failed in the synthesis phase. The mutation also deletes stored chunk MP3s. */
+async function failSynthesisPhase(
+  ctx: ActionCtx,
+  logger: ReturnType<typeof createJobLogger>,
+  audioOverviewId: Id<"audioOverviews">,
+  error: unknown
+): Promise<void> {
+  const errorMeta = createErrorMetadata(error, "synthesis");
+
+  logger.jobError(error, {
+    phase: "synthesis",
+    errorType: errorMeta.type,
+    retryable: errorMeta.retryable,
+  });
+
+  await ctx.runMutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
+    audioOverviewId,
+    error: errorMeta.message,
+    metadata: {
+      phase: "failed",
+      errorPhase: "synthesis",
+      errorType: errorMeta.type,
+      retryable: errorMeta.retryable,
+      failedAt: Date.now(),
+    },
+  });
+}
+
+/**
+ * Plans the synthesis chunks and schedules one action per chunk. Each chunk runs in its own
+ * action, so TTS time and memory per action stay bounded however long the script is.
+ */
 export async function runSynthesizeAudioOverviewPhase(
   ctx: ActionCtx,
   args: SynthesizeAudioOverviewPhaseArgs
@@ -788,13 +831,7 @@ export async function runSynthesizeAudioOverviewPhase(
   "use node";
 
   const { audioOverviewId, userId, notebookId } = args;
-
-  const logger = createJobLogger({
-    jobType: "audio",
-    jobId: audioOverviewId,
-    notebookId,
-    userId,
-  });
+  const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
 
   try {
     const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
@@ -811,6 +848,193 @@ export async function runSynthesizeAudioOverviewPhase(
     if (!synthesisInput || synthesisInput.script.length === 0) {
       throw new Error("No dialogue script stored for synthesis");
     }
+
+    const chunks = planSynthesisChunks(synthesisInput.script.length);
+    const planned = await ctx.runMutation(internal.studio.jobMutations.audio.initAudioSynthesis, {
+      audioOverviewId,
+      chunks,
+    });
+    if (!planned) {
+      console.log("[AudioJob] Synthesis already planned, or the job is no longer generating");
+      return;
+    }
+
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      await ctx.scheduler.runAfter(0, internal.studio.audio.job.synthesizeAudioOverviewChunk, {
+        audioOverviewId,
+        userId,
+        notebookId,
+        chunkIndex,
+        attempt: 0,
+      });
+    }
+    logger.info("Scheduled synthesis chunks", {
+      chunks: chunks.length,
+      dialogueLines: synthesisInput.script.length,
+    });
+  } catch (error) {
+    await failSynthesisPhase(ctx, logger, audioOverviewId, error);
+    throw error;
+  }
+}
+
+/**
+ * Synthesizes dialogue lines in order, CONFIG.TTS_BATCH_SIZE at a time. A line that fails is
+ * skipped and counted. `lineOffset` is the first line's index in the script, for logs.
+ */
+async function synthesizeDialogueLines(
+  lines: DialogueLine[],
+  lineOffset: number
+): Promise<{ buffers: Buffer[]; failedLines: number; firstError?: string }> {
+  const ttsClient = createTogetherTtsClient();
+  const buffers: Buffer[] = [];
+  let failedLines = 0;
+  let firstError: string | undefined;
+
+  for (let i = 0; i < lines.length; i += CONFIG.TTS_BATCH_SIZE) {
+    const batch = await Promise.all(
+      lines.slice(i, i + CONFIG.TTS_BATCH_SIZE).map(async (line, batchIdx) => {
+        try {
+          return await synthesizeSpeechToBuffer(ttsClient, {
+            model: env.AUDIO_TTS_MODEL,
+            input: line.text,
+            voice: line.speaker === "host_a" ? VOICES.host_a : VOICES.host_b,
+            timeoutMs: CONFIG.TTS_TIMEOUT_MS,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          firstError ??= message;
+          failedLines += 1;
+          console.log(`[AudioJob] Failed line ${lineOffset + i + batchIdx + 1}: ${message}`);
+          return null;
+        }
+      })
+    );
+    for (const buffer of batch) {
+      if (buffer) buffers.push(buffer);
+    }
+  }
+
+  return { buffers, failedLines, firstError };
+}
+
+/**
+ * Synthesizes one chunk of the script, stores it as an MP3 and records it. Recording the last
+ * chunk schedules assembly. A failed chunk retries once, then fails the job.
+ */
+export async function runSynthesizeAudioOverviewChunkPhase(
+  ctx: ActionCtx,
+  args: SynthesizeAudioOverviewChunkPhaseArgs
+): Promise<void> {
+  "use node";
+
+  const { audioOverviewId, userId, notebookId, chunkIndex, attempt } = args;
+  const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
+  // Stored but not yet recorded: nothing else would delete it if this action fails.
+  let unrecordedStorageId: Id<"_storage"> | undefined;
+
+  try {
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    if (!audioOverview || audioOverview.status !== "generating") {
+      console.log(
+        `[AudioJob] Skipping synthesis chunk ${chunkIndex}: job deleted or no longer generating`
+      );
+      return;
+    }
+
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    const synthesis = audioOverview.metadata?.synthesis as AudioSynthesisState | undefined;
+    const range = synthesis?.chunks[chunkIndex];
+    if (!synthesisInput || !synthesis || !range) {
+      throw new Error(`No script or plan stored for synthesis chunk ${chunkIndex}`);
+    }
+
+    const startTime = Date.now();
+    const { buffers, failedLines, firstError } = await synthesizeDialogueLines(
+      synthesisInput.script.slice(range.start, range.end),
+      range.start
+    );
+    let storageId: Id<"_storage"> | undefined;
+    if (buffers.length > 0) {
+      const mp3 = encodePcmWavToMp3(concatenateWavBuffers(buffers));
+      storageId = await ctx.storage.store(new Blob([new Uint8Array(mp3)], { type: "audio/mpeg" }));
+      unrecordedStorageId = storageId;
+    }
+    const latencyMs = Date.now() - startTime;
+    console.log(
+      `[AudioJob] Synthesis chunk ${chunkIndex + 1}/${synthesis.chunks.length} (lines ${range.start + 1}-${range.end}): ${buffers.length} synthesized, ${failedLines} failed, ${latencyMs} ms`
+    );
+
+    // Recording the last chunk also schedules assembly, in the same transaction.
+    await ctx.runMutation(internal.studio.jobMutations.audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex,
+      result: {
+        ...(storageId ? { storageId } : {}),
+        synthesizedLines: buffers.length,
+        failedLines,
+        ...(firstError ? { firstError } : {}),
+        latencyMs,
+      },
+    });
+    unrecordedStorageId = undefined;
+  } catch (error) {
+    if (unrecordedStorageId) {
+      await ctx.storage.delete(unrecordedStorageId).catch((deleteError: unknown) => {
+        console.warn(
+          `[AudioJob] Could not delete unrecorded chunk audio ${unrecordedStorageId}: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`
+        );
+      });
+    }
+    if (attempt === 0) {
+      console.log(
+        `[AudioJob] Synthesis chunk ${chunkIndex} failed, retrying: ${error instanceof Error ? error.message : String(error)}`
+      );
+      await ctx.scheduler.runAfter(
+        CONFIG.SYNTHESIS_CHUNK_RETRY_DELAY_MS,
+        internal.studio.audio.job.synthesizeAudioOverviewChunk,
+        { ...args, attempt: 1 }
+      );
+      return;
+    }
+    await failSynthesisPhase(ctx, logger, audioOverviewId, error);
+    throw error;
+  }
+}
+
+// ============================================================
+// PHASE 5: Assemble (join chunk MP3s + Upload + Save)
+// ============================================================
+
+export async function runAssembleAudioOverviewPhase(
+  ctx: ActionCtx,
+  args: SynthesizeAudioOverviewPhaseArgs
+): Promise<void> {
+  "use node";
+
+  const { audioOverviewId, userId, notebookId } = args;
+  const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
+
+  try {
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    if (!audioOverview || audioOverview.status !== "generating") {
+      console.log("[AudioJob] Skipping assembly: job deleted or no longer generating");
+      return;
+    }
+
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    const synthesis = audioOverview.metadata?.synthesis as AudioSynthesisState | undefined;
+    if (!synthesisInput || !synthesis) {
+      throw new Error("No script or synthesis results stored for assembly");
+    }
     const {
       script: fullDialogueScript,
       title,
@@ -819,56 +1043,29 @@ export async function runSynthesizeAudioOverviewPhase(
       telemetry,
     } = synthesisInput;
 
-    const ttsStartTime = Date.now();
-    const ttsClient = createTogetherTtsClient();
-    const results: { index: number; buffer: Buffer | null }[] = [];
-    const BATCH_SIZE = 5;
-    let firstSynthesisError: string | undefined;
-
-    for (let i = 0; i < fullDialogueScript.length; i += BATCH_SIZE) {
-      const batchLines = fullDialogueScript.slice(i, i + BATCH_SIZE);
-
-      const batchPromises = batchLines.map(async (line, batchIdx) => {
-        const globalIndex = i + batchIdx;
-        const voice = line.speaker === "host_a" ? VOICES.host_a : VOICES.host_b;
-
-        try {
-          const buffer = await synthesizeSpeechToBuffer(ttsClient, {
-            model: env.AUDIO_TTS_MODEL,
-            input: line.text,
-            voice,
-            timeoutMs: CONFIG.TTS_TIMEOUT_MS,
-          });
-          return { index: globalIndex, buffer };
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          firstSynthesisError ??= message;
-          console.log(`[AudioJob] Failed line ${globalIndex + 1}: ${message}`);
-          return { index: globalIndex, buffer: null };
-        }
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-    }
-
-    const sortedBuffers = results
-      .sort((a, b) => a.index - b.index)
-      .map((r) => r.buffer)
-      .filter((b): b is Buffer => b !== null);
-
-    const successCount = sortedBuffers.length;
-
+    const results = synthesis.chunks.map((_, chunkIndex) => {
+      const result = synthesis.done[chunkIndex];
+      if (!result) throw new Error(`Synthesis chunk ${chunkIndex} has no result`);
+      return result;
+    });
+    const successCount = results.reduce((sum, result) => sum + result.synthesizedLines, 0);
     if (successCount < fullDialogueScript.length * 0.5) {
+      const firstSynthesisError = results.find((result) => result.firstError)?.firstError;
       throw new Error(
         `Too many synthesis failures: ${successCount}/${fullDialogueScript.length} lines synthesized (first error: ${firstSynthesisError ?? "unknown"})`
       );
     }
 
-    const wavBuffer = concatenateWavBuffers(sortedBuffers);
-    const audioBuffer = encodePcmWavToMp3(wavBuffer);
+    const chunkMp3s: Buffer[] = [];
+    for (const result of results) {
+      if (!result.storageId) continue;
+      const blob = await ctx.storage.get(result.storageId);
+      if (!blob) throw new Error(`Synthesis chunk audio ${result.storageId} is missing`);
+      chunkMp3s.push(Buffer.from(await blob.arrayBuffer()));
+    }
+    const audioBuffer = concatenateMp3Buffers(chunkMp3s);
     console.log(
-      `[AudioJob] Audio synthesis complete: ${successCount} lines, ${wavBuffer.length} WAV bytes, ${audioBuffer.length} MP3 bytes`
+      `[AudioJob] Audio synthesis complete: ${successCount} lines in ${results.length} chunks, ${audioBuffer.length} MP3 bytes`
     );
 
     // Update status for uploading
@@ -877,7 +1074,7 @@ export async function runSynthesizeAudioOverviewPhase(
       status: "generating",
       metadata: {
         phase: "uploading",
-        progress: 90,
+        progress: 95,
         currentStep: "Uploading audio...",
       },
     });
@@ -906,7 +1103,7 @@ export async function runSynthesizeAudioOverviewPhase(
     // Build transcript
     const transcript = fullDialogueScript.map((l) => l.text).join("\n");
 
-    // Save results
+    // Save results. This also deletes the chunk MP3s.
     await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
       audioOverviewId,
       audioUrl,
@@ -925,7 +1122,7 @@ export async function runSynthesizeAudioOverviewPhase(
           ...telemetry,
           stageSpans: [
             ...(telemetry.stageSpans ?? []),
-            { stage: "tts", latencyMs: Date.now() - ttsStartTime },
+            { stage: "tts", latencyMs: Date.now() - synthesis.startedAt },
           ],
         }
       ),
@@ -939,26 +1136,7 @@ export async function runSynthesizeAudioOverviewPhase(
       mapFailed: mapFailedCount,
     });
   } catch (error) {
-    const errorMeta = createErrorMetadata(error, "synthesis");
-
-    logger.jobError(error, {
-      phase: "synthesis",
-      errorType: errorMeta.type,
-      retryable: errorMeta.retryable,
-    });
-
-    await ctx.runMutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
-      audioOverviewId,
-      error: errorMeta.message,
-      metadata: {
-        phase: "failed",
-        errorPhase: "synthesis",
-        errorType: errorMeta.type,
-        retryable: errorMeta.retryable,
-        failedAt: Date.now(),
-      },
-    });
-
+    await failSynthesisPhase(ctx, logger, audioOverviewId, error);
     throw error;
   }
 }

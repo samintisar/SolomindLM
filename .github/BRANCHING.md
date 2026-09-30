@@ -223,6 +223,7 @@ The `.github/workflows/ci.yml` runs on:
 - **Dependency audit (baseline)** - `bun audit`, non-blocking until the baseline is clean
 - **Lint (PR title)** - conventional-commit form on the PR title (becomes the squash commit)
 - **PR labeler** - applies `area:*` labels from changed paths (`.github/labeler.yml`)
+- **CodeRabbit** - AI review comments on ready (non-draft) PRs; config in .coderabbit.yaml. Advisory only.
 
 E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it is not a required check. Phase 3 of the CI/CD deployment plan wires it to run against the Vercel preview deployment.
 
