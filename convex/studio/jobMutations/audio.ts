@@ -7,7 +7,8 @@ import { buildErrorMetadata } from "./jobErrorUtils";
 export const saveAudioOverviewResults = internalMutation({
   args: {
     audioOverviewId: v.id("audioOverviews"),
-    audioUrl: v.string(),
+    /** Omitted for script-only (`skipTts`) eval jobs. */
+    audioUrl: v.optional(v.string()),
     transcript: v.string(),
     metadata: v.any(),
   },

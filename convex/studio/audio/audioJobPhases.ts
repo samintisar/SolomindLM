@@ -746,6 +746,35 @@ export async function runSynthesizeAudioOverviewPhase(
       mapFailedCount,
       telemetry,
     } = synthesisInput;
+    const transcript = fullDialogueScript.map((l) => l.text).join("\n");
+
+    // Script-only eval jobs measure the script, so they complete here without TTS time or cost.
+    if (audioOverview.metadata?.skipTts === true) {
+      await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
+        audioOverviewId,
+        transcript,
+        metadata: withStudioTelemetryMetadata(
+          {
+            title,
+            phase: "completed",
+            progress: 100,
+            completedAt: Date.now(),
+            mapSuccessCount,
+            mapFailedCount,
+            dialogueLines: fullDialogueScript.length,
+          },
+          telemetry
+        ),
+      });
+      logger.jobComplete({
+        title,
+        skippedTts: true,
+        transcriptLength: transcript.length,
+        mapSuccess: mapSuccessCount,
+        mapFailed: mapFailedCount,
+      });
+      return;
+    }
 
     const ttsStartTime = Date.now();
     const ttsClient = createTogetherTtsClient();
@@ -830,9 +859,6 @@ export async function runSynthesizeAudioOverviewPhase(
       standardUrl,
       customUrl: `${process.env.CONVEX_DEPLOYMENT}/audio/${storageId}`,
     });
-
-    // Build transcript
-    const transcript = fullDialogueScript.map((l) => l.text).join("\n");
 
     // Save results
     await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {

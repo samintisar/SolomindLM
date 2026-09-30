@@ -30,7 +30,10 @@ const synthesisInput = {
 };
 
 /** Runs the mutations in the order the real job does, up to the synthesis handoff. */
-async function runToSynthesis(t: ReturnType<typeof convexTest>) {
+async function runToSynthesis(
+  t: ReturnType<typeof convexTest>,
+  metadata: Record<string, unknown> = settings
+) {
   const audioOverviewId = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { name: "Test" });
     const notebookId = await ctx.db.insert("notebooks", {
@@ -44,7 +47,7 @@ async function runToSynthesis(t: ReturnType<typeof convexTest>) {
       notebookId,
       title: "Audio Overview",
       status: "generating",
-      metadata: settings,
+      metadata,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -124,5 +127,28 @@ describe("synthesis handoff cleanup", () => {
     expect(row?.status).toBe("failed");
     expect(row?.metadata).toMatchObject({ ...settings, phase: "failed" });
     expect(row?.metadata.synthesisInput).toBeUndefined();
+  });
+});
+
+describe("script-only (skipTts) jobs", () => {
+  test("complete with the transcript and no audio, without calling TTS", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await runToSynthesis(t, { ...settings, skipTts: true });
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    if (!row) throw new Error("row missing");
+
+    await t.action(internal.studio.audio.job.synthesizeAudioOverviewPhase, {
+      audioOverviewId,
+      userId: row.userId,
+      notebookId: row.notebookId,
+    });
+
+    const done = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(done?.status).toBe("completed");
+    expect(done?.transcript).toBe("Opening line.\nReply line.");
+    expect(done?.audioUrl).toBeUndefined();
+    expect(done?.title).toBe("Generated Title");
+    expect(done?.metadata).toMatchObject({ phase: "completed", dialogueLines: 2 });
+    expect(done?.metadata.synthesisInput).toBeUndefined();
   });
 });
