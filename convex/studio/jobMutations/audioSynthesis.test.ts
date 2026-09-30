@@ -156,6 +156,10 @@ const chunkResult = (storageId: Id<"_storage">) => ({
 });
 
 describe("synthesis state", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("initAudioSynthesis writes the chunk plan once", async () => {
     const t = convexTest(schema, modules);
     const audioOverviewId = await runToSynthesis(t);
@@ -171,6 +175,7 @@ describe("synthesis state", () => {
   });
 
   test("recordAudioSynthesisChunk reports the last chunk exactly once, in any order", async () => {
+    vi.useFakeTimers(); // hold the assembly the last record schedules
     const t = convexTest(schema, modules);
     const audioOverviewId = await runToSynthesis(t);
     const chunks = [...twoChunks, { start: 2, end: 3 }];
@@ -190,6 +195,45 @@ describe("synthesis state", () => {
     expect(isLast).toEqual([false, false, true]);
     const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
     expect(row?.metadata.progress).toBe(95);
+  });
+
+  // Scheduling in the same transaction means a crash after the last record can't strand the job.
+  test("recording the last chunk schedules assembly exactly once", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const audioOverviewId = await runToSynthesis(t);
+      await t.mutation(audio.initAudioSynthesis, { audioOverviewId, chunks: twoChunks });
+      const assemblies = async () =>
+        (await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).filter(
+          (call) => call.name.includes("assembleAudioOverviewPhase")
+        );
+
+      await t.mutation(audio.recordAudioSynthesisChunk, {
+        audioOverviewId,
+        chunkIndex: 1,
+        result: chunkResult(await storeFile(t, [2])),
+      });
+      expect(await assemblies()).toHaveLength(0);
+
+      await t.mutation(audio.recordAudioSynthesisChunk, {
+        audioOverviewId,
+        chunkIndex: 0,
+        result: chunkResult(await storeFile(t, [1])),
+      });
+      // A retried chunk recording the same index again must not schedule a second assembly.
+      await t.mutation(audio.recordAudioSynthesisChunk, {
+        audioOverviewId,
+        chunkIndex: 0,
+        result: chunkResult(await storeFile(t, [3])),
+      });
+
+      const scheduled = await assemblies();
+      expect(scheduled).toHaveLength(1);
+      expect(scheduled[0].args[0]).toMatchObject({ audioOverviewId });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("a chunk recorded twice keeps the first result and deletes the second file", async () => {
@@ -352,6 +396,8 @@ describe("synthesis phases", () => {
   }, 30000);
 
   test("assembly joins chunk MP3s in order, saves the episode and deletes the chunks", async () => {
+    // Fake timers hold the assembly that recording the last chunk schedules; the test runs it.
+    vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const audioOverviewId = await runToSynthesis(t);
     await t.mutation(audio.initAudioSynthesis, { audioOverviewId, chunks: twoChunks });
@@ -387,6 +433,7 @@ describe("synthesis phases", () => {
   }, 30000);
 
   test("assembly fails the job when fewer than half the lines were synthesized", async () => {
+    vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const audioOverviewId = await runToSynthesis(t);
     await t.mutation(audio.initAudioSynthesis, { audioOverviewId, chunks: twoChunks });

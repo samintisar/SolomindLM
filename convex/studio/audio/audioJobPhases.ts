@@ -847,8 +847,8 @@ async function synthesizeDialogueLines(
 }
 
 /**
- * Synthesizes one chunk of the script, stores it as an MP3 and records it. The chunk that
- * completes the plan schedules assembly. A failed chunk retries once, then fails the job.
+ * Synthesizes one chunk of the script, stores it as an MP3 and records it. Recording the last
+ * chunk schedules assembly. A failed chunk retries once, then fails the job.
  */
 export async function runSynthesizeAudioOverviewChunkPhase(
   ctx: ActionCtx,
@@ -858,6 +858,8 @@ export async function runSynthesizeAudioOverviewChunkPhase(
 
   const { audioOverviewId, userId, notebookId, chunkIndex, attempt } = args;
   const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
+  // Stored but not yet recorded: nothing else would delete it if this action fails.
+  let unrecordedStorageId: Id<"_storage"> | undefined;
 
   try {
     const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
@@ -888,34 +890,34 @@ export async function runSynthesizeAudioOverviewChunkPhase(
     if (buffers.length > 0) {
       const mp3 = encodePcmWavToMp3(concatenateWavBuffers(buffers));
       storageId = await ctx.storage.store(new Blob([new Uint8Array(mp3)], { type: "audio/mpeg" }));
+      unrecordedStorageId = storageId;
     }
     const latencyMs = Date.now() - startTime;
     console.log(
       `[AudioJob] Synthesis chunk ${chunkIndex + 1}/${synthesis.chunks.length} (lines ${range.start + 1}-${range.end}): ${buffers.length} synthesized, ${failedLines} failed, ${latencyMs} ms`
     );
 
-    const { isLast } = await ctx.runMutation(
-      internal.studio.jobMutations.audio.recordAudioSynthesisChunk,
-      {
-        audioOverviewId,
-        chunkIndex,
-        result: {
-          ...(storageId ? { storageId } : {}),
-          synthesizedLines: buffers.length,
-          failedLines,
-          ...(firstError ? { firstError } : {}),
-          latencyMs,
-        },
-      }
-    );
-    if (isLast) {
-      await ctx.scheduler.runAfter(0, internal.studio.audio.job.assembleAudioOverviewPhase, {
-        audioOverviewId,
-        userId,
-        notebookId,
+    // Recording the last chunk also schedules assembly, in the same transaction.
+    await ctx.runMutation(internal.studio.jobMutations.audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex,
+      result: {
+        ...(storageId ? { storageId } : {}),
+        synthesizedLines: buffers.length,
+        failedLines,
+        ...(firstError ? { firstError } : {}),
+        latencyMs,
+      },
+    });
+    unrecordedStorageId = undefined;
+  } catch (error) {
+    if (unrecordedStorageId) {
+      await ctx.storage.delete(unrecordedStorageId).catch((deleteError: unknown) => {
+        console.warn(
+          `[AudioJob] Could not delete unrecorded chunk audio ${unrecordedStorageId}: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`
+        );
       });
     }
-  } catch (error) {
     if (attempt === 0) {
       console.log(
         `[AudioJob] Synthesis chunk ${chunkIndex} failed, retrying: ${error instanceof Error ? error.message : String(error)}`

@@ -1,4 +1,5 @@
 import { type Infer, v } from "convex/values";
+import { internal } from "../../_generated/api";
 import { internalMutation, type MutationCtx } from "../../_generated/server";
 import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
@@ -314,9 +315,10 @@ export const initAudioSynthesis = internalMutation({
 });
 
 /**
- * Stores one synthesized chunk. Returns `isLast: true` only to the call that completes the plan,
- * so exactly one chunk schedules assembly. A result the job can't use (row deleted or no longer
- * generating, or a chunk recorded twice after a retry) has its file deleted.
+ * Stores one synthesized chunk. The call that completes the plan schedules assembly in the same
+ * transaction, so exactly one assembly runs and a failure after recording can't strand the job.
+ * A result the job can't use (row deleted or no longer generating, or a chunk recorded twice
+ * after a retry) has its file deleted.
  */
 export const recordAudioSynthesisChunk = internalMutation({
   args: {
@@ -348,7 +350,15 @@ export const recordAudioSynthesisChunk = internalMutation({
         synthesis: { ...synthesis, done },
       },
     });
-    return { isLast: doneCount === total };
+    const isLast = doneCount === total;
+    if (isLast) {
+      await ctx.scheduler.runAfter(0, internal.studio.audio.job.assembleAudioOverviewPhase, {
+        audioOverviewId: args.audioOverviewId,
+        userId: audioOverview.userId,
+        notebookId: audioOverview.notebookId,
+      });
+    }
+    return { isLast };
   },
 });
 
