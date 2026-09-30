@@ -8,8 +8,6 @@ import {
   MIN_RELEVANCE_THRESHOLD,
 } from "./chatConfig.js";
 
-export { LIST_QUERY_RELEVANCE_THRESHOLD } from "./chatConfig.js";
-
 export function chunkDedupKey(c: ReferenceChunk): string {
   return `${c.sourceId}:${c.chunkIndex}`;
 }
