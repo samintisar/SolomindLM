@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodePcmWavToMp3 } from "./mp3";
+import { concatenateMp3Buffers, encodePcmWavToMp3 } from "./mp3";
 
 function makeSilentWav(seconds: number): Buffer {
   const sampleRate = 24000;
@@ -48,5 +48,29 @@ describe("encodePcmWavToMp3", () => {
 
   it("rejects buffers that are not PCM WAV audio", () => {
     expect(() => encodePcmWavToMp3(Buffer.from("not a wav"))).toThrow("Invalid WAV");
+  });
+});
+
+describe("concatenateMp3Buffers", () => {
+  it("joins chunk MP3s in order", () => {
+    const joined = concatenateMp3Buffers([Buffer.from([1, 2, 3]), Buffer.from([4, 5])]);
+
+    expect([...joined]).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("rejects an empty list", () => {
+    expect(() => concatenateMp3Buffers([])).toThrow("No MP3 audio to join");
+  });
+
+  // Byte-level joining is only valid while the encoder writes bare frames with no header block.
+  it("joins encoder output that has no ID3 tag or Xing/Info header", () => {
+    const chunk = encodePcmWavToMp3(makeSilentWav(1));
+
+    expect(chunk[0] === 0xff && (chunk[1] & 0xe0) === 0xe0).toBe(true);
+    expect(chunk.includes("Xing")).toBe(false);
+    expect(chunk.includes("Info")).toBe(false);
+    const joined = concatenateMp3Buffers([chunk, chunk]);
+    expect(joined.length).toBe(chunk.length * 2);
+    expect(joined[chunk.length] === 0xff && (joined[chunk.length + 1] & 0xe0) === 0xe0).toBe(true);
   });
 });

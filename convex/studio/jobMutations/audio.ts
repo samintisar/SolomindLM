@@ -1,5 +1,6 @@
 import { type Infer, v } from "convex/values";
-import { internalMutation } from "../../_generated/server";
+import { internal } from "../../_generated/api";
+import { internalMutation, type MutationCtx } from "../../_generated/server";
 import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
@@ -17,8 +18,13 @@ export const saveAudioOverviewResults = internalMutation({
 
     const normalizedTranscript = normalizeMathMarkdown(args.transcript);
     const title = args.metadata?.title ?? "Audio Overview";
-    // The script handed to synthesis is now in `transcript`.
-    const { synthesisInput: _synthesisInput, ...existingMetadata } = audioOverview.metadata || {};
+    // The script handed to synthesis is now in `transcript`, and the chunk MP3s are joined.
+    const {
+      synthesisInput: _synthesisInput,
+      synthesis: _synthesis,
+      ...existingMetadata
+    } = audioOverview.metadata || {};
+    await deleteSynthesisChunkFiles(ctx, audioOverview.metadata);
 
     await ctx.db.patch(args.audioOverviewId, {
       transcript: normalizedTranscript,
@@ -93,13 +99,15 @@ export const markAudioOverviewFailed = internalMutation({
       args.metadata?.phase || "unknown",
       args.metadata
     );
-    // Keep the user's settings; drop intermediate map output and the synthesis script, which a
-    // failed job no longer needs.
+    // Keep the user's settings; drop intermediate map output, the synthesis script and the chunk
+    // MP3s, which a failed job no longer needs.
     const {
       mapResults: _mapResults,
       synthesisInput: _synthesisInput,
+      synthesis: _synthesis,
       ...existingMetadata
     } = audioOverview.metadata || {};
+    await deleteSynthesisChunkFiles(ctx, audioOverview.metadata);
     await ctx.db.patch(args.audioOverviewId, {
       status: "failed",
       updatedAt: Date.now(),
@@ -214,6 +222,34 @@ const synthesisInputValidator = v.object({
 
 export type AudioSynthesisInput = Infer<typeof synthesisInputValidator>;
 
+const synthesisChunkRangeValidator = v.object({ start: v.number(), end: v.number() });
+
+const synthesisChunkResultValidator = v.object({
+  /** Absent when every line in the chunk failed to synthesize. */
+  storageId: v.optional(v.id("_storage")),
+  synthesizedLines: v.number(),
+  failedLines: v.number(),
+  firstError: v.optional(v.string()),
+  latencyMs: v.number(),
+});
+
+export type AudioSynthesisChunkResult = Infer<typeof synthesisChunkResultValidator>;
+
+/** `metadata.synthesis`: the chunk plan and each finished chunk's result, keyed by chunk index. */
+export type AudioSynthesisState = {
+  chunks: Infer<typeof synthesisChunkRangeValidator>[];
+  done: Record<string, AudioSynthesisChunkResult>;
+  startedAt: number;
+};
+
+/** Deletes the chunk MP3s a synthesis stored. A finished or failed job no longer needs them. */
+async function deleteSynthesisChunkFiles(ctx: MutationCtx, metadata: unknown): Promise<void> {
+  const synthesis = (metadata as { synthesis?: AudioSynthesisState } | undefined)?.synthesis;
+  for (const chunk of Object.values(synthesis?.done ?? {})) {
+    if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
+  }
+}
+
 /**
  * Hands the finished script to the synthesis phase, which runs as its own action so TTS gets a
  * full action time budget. Stored as `metadata.synthesisInput`, which the save and failure
@@ -240,6 +276,89 @@ export const storeAudioOverviewScript = internalMutation({
       },
     });
     return true;
+  },
+});
+
+/**
+ * Records the synthesis chunk plan (see planSynthesisChunks) before the chunk actions start.
+ * Returns false if the row was deleted, is no longer generating, or was already planned, so a
+ * repeated planner run can't orphan chunks already stored.
+ */
+export const initAudioSynthesis = internalMutation({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    chunks: v.array(synthesisChunkRangeValidator),
+  },
+  handler: async (ctx, args) => {
+    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    if (
+      !audioOverview ||
+      audioOverview.status !== "generating" ||
+      audioOverview.metadata?.synthesis
+    ) {
+      return false;
+    }
+
+    const synthesis: AudioSynthesisState = { chunks: args.chunks, done: {}, startedAt: Date.now() };
+    await ctx.db.patch(args.audioOverviewId, {
+      updatedAt: Date.now(),
+      metadata: {
+        ...audioOverview.metadata,
+        phase: "synthesizing",
+        progress: 70,
+        currentStep: "Synthesizing audio...",
+        synthesis,
+      },
+    });
+    return true;
+  },
+});
+
+/**
+ * Stores one synthesized chunk. The call that completes the plan schedules assembly in the same
+ * transaction, so exactly one assembly runs and a failure after recording can't strand the job.
+ * A result the job can't use (row deleted or no longer generating, or a chunk recorded twice
+ * after a retry) has its file deleted.
+ */
+export const recordAudioSynthesisChunk = internalMutation({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    chunkIndex: v.number(),
+    result: synthesisChunkResultValidator,
+  },
+  handler: async (ctx, args) => {
+    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    const synthesis = audioOverview?.metadata?.synthesis as AudioSynthesisState | undefined;
+    if (
+      !audioOverview ||
+      audioOverview.status !== "generating" ||
+      !synthesis ||
+      synthesis.done[args.chunkIndex] !== undefined
+    ) {
+      if (args.result.storageId) await ctx.storage.delete(args.result.storageId);
+      return { isLast: false };
+    }
+
+    const done = { ...synthesis.done, [args.chunkIndex]: args.result };
+    const doneCount = Object.keys(done).length;
+    const total = synthesis.chunks.length;
+    await ctx.db.patch(args.audioOverviewId, {
+      updatedAt: Date.now(),
+      metadata: {
+        ...audioOverview.metadata,
+        progress: 70 + Math.floor((doneCount / total) * 25),
+        synthesis: { ...synthesis, done },
+      },
+    });
+    const isLast = doneCount === total;
+    if (isLast) {
+      await ctx.scheduler.runAfter(0, internal.studio.audio.job.assembleAudioOverviewPhase, {
+        audioOverviewId: args.audioOverviewId,
+        userId: audioOverview.userId,
+        notebookId: audioOverview.notebookId,
+      });
+    }
+    return { isLast };
   },
 });
 
