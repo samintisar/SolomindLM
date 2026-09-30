@@ -18,6 +18,7 @@ export interface InvariantCheck {
 }
 
 interface QuizQuestionLike {
+  question?: unknown;
   options?: unknown;
   answer?: unknown;
   hint?: unknown;
@@ -187,6 +188,55 @@ export function quizPositionalReferences(questions: QuizQuestionLike[]): Invaria
   };
 }
 
+// ─── Quiz: stem length ───────────────────────────────────────
+
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Nearest-rank percentile of an ascending-sorted list. */
+function percentile(sorted: number[], p: number): number {
+  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+}
+
+/**
+ * Reports how many words each question stem takes to read (median and p90),
+ * labelled with the difficulty the quiz was requested at. Informational only:
+ * a fixed word limit would push prompts toward a number rather than toward
+ * shorter stems, so this tracks the trend across runs instead of gating on it.
+ * Whitespace-delimited counting undercounts unspaced scripts (e.g. Chinese).
+ */
+export function quizStemLength(questions: QuizQuestionLike[], difficulty?: string): InvariantCheck {
+  const metric = "quiz_stem_length";
+  const words = questions
+    .filter(
+      (q): q is { question: string } => typeof q.question === "string" && !isBlank(q.question)
+    )
+    .map((q) => wordCount(q.question))
+    .sort((a, b) => a - b);
+  const label = difficulty ?? "unspecified";
+
+  if (words.length === 0) {
+    return {
+      metric,
+      status: "info",
+      score: 1,
+      detail: "No question stems to measure.",
+      breakdown: { difficulty: label, n: 0 },
+    };
+  }
+
+  const median = percentile(words, 0.5);
+  const p90 = percentile(words, 0.9);
+  return {
+    metric,
+    status: "info",
+    score: 1,
+    detail: `Question stem length at ${label} difficulty: median ${median} words, p90 ${p90} words (n=${words.length}).`,
+    breakdown: { difficulty: label, n: words.length, median, p90, max: words[words.length - 1] },
+  };
+}
+
 // ─── Flashcards: card validity ───────────────────────────────
 
 export function flashcardCardValidity(cards: FlashcardLike[]): InvariantCheck {
@@ -258,10 +308,14 @@ export function flashcardAnswerLeak(cards: FlashcardLike[]): InvariantCheck {
   };
 }
 
-export function quizInvariantChecks(questions: QuizQuestionLike[]): InvariantCheck[] {
+export function quizInvariantChecks(
+  questions: QuizQuestionLike[],
+  difficulty?: string
+): InvariantCheck[] {
   return [
     quizAnswerPositionBalance(questions),
     quizOptionValidity(questions),
     quizPositionalReferences(questions),
+    quizStemLength(questions, difficulty),
   ];
 }
