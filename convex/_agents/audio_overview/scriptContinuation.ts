@@ -24,11 +24,11 @@ const MAX_WORDS_PER_TURN = 25;
 /** Scripts may run this far past their requested turns before being trimmed. */
 const MAX_LINES_OVER_TARGET_RATIO = 1.2;
 /**
- * Most lines one TTS action synthesizes reliably. Synthesis time and memory scale with lines:
- * on dev, 350 lines ran into the 10-minute action limit when TTS was slow, and 440 lines ran out
- * of memory. Raise this once synthesis is split across actions.
+ * Hard ceiling on script lines, whatever the length setting: long's full 1.2× overshoot.
+ * Synthesis runs in parallel chunks (#257), and 415–418-line episodes synthesized in about
+ * 100 seconds on dev.
  */
-const MAX_SYNTHESIZABLE_LINES = 350;
+const MAX_SYNTHESIZABLE_LINES = 420;
 
 /** Line ceiling for a finished script with `targetLines` requested turns. */
 export function getScriptMaxLines(targetLines: number): number {

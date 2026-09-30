@@ -371,9 +371,10 @@ describe("first drafts over the line cap", () => {
 });
 
 describe("getScriptMaxLines", () => {
-  it("allows some overshoot per length but never past what one TTS action can synthesize", () => {
+  it("allows the same overshoot for every length, up to a hard ceiling", () => {
     expect(getScriptMaxLines(100)).toBe(120);
     expect(getScriptMaxLines(220)).toBe(264);
-    expect(getScriptMaxLines(350)).toBe(350);
+    expect(getScriptMaxLines(350)).toBe(420);
+    expect(getScriptMaxLines(1000)).toBe(420);
   });
 });
