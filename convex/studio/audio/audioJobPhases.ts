@@ -23,15 +23,24 @@ import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggre
 import {
   type AudioLength,
   type AudioType,
+  ESTIMATED_WORDS_PER_LINE,
+  getContinuationPrompt,
   getMapPrompt,
   getReducePrompt,
+  getWrapUpPrompt,
   MAP_SYSTEM_PROMPT,
   REDUCE_SYSTEM_PROMPT,
   TARGET_LINE_COUNTS,
 } from "../../_agents/audio_overview/prompts";
 import {
+  continueScriptIfNeeded,
+  getContinuationMaxTokens,
+  getScriptMaxLines,
+} from "../../_agents/audio_overview/scriptContinuation";
+import {
   generateValidatedDialogueScript,
   getMinimumDialogueLines,
+  removeRepeatedDialogueLines,
 } from "../../_agents/audio_overview/scriptParsing";
 import type { DialogueLine } from "../../_agents/audio_overview/state";
 import { internal } from "../../_generated/api";
@@ -65,6 +74,12 @@ const CONFIG = {
    * thinking and returned no script (finish_reason=length, #198).
    */
   REDUCE_REASONING_ENABLED: false,
+  /**
+   * Continuation calls (see continueScriptIfNeeded) get a timeout scaled to their output budget,
+   * assuming at least ~30 tokens/s, and never less than this minimum.
+   */
+  CONTINUATION_MIN_TIMEOUT_MS: 60_000,
+  CONTINUATION_MS_PER_OUTPUT_TOKEN: 33,
   TTS_TIMEOUT_MS: 300_000, // 5 minutes
   /** Lines each synthesis chunk sends to TTS at once. */
   TTS_BATCH_SIZE: 5,
@@ -592,6 +607,10 @@ export async function runFinalizeAudioOverviewPhase(
     // Convex action time limit.
     const REDUCE_MAX_ATTEMPTS = 2;
     const REDUCE_PARSE_RETRY_BUDGET_MS = 180_000;
+    // This action only writes the script (TTS runs in its own action), so continuation calls may
+    // use the phase budget, leaving headroom under the action time limit for the title and store.
+    const REDUCE_PHASE_BUDGET_MS = 480_000;
+    const remainingReduceBudgetMs = () => REDUCE_PHASE_BUDGET_MS - (Date.now() - reduceStartTime);
     const REDUCE_FORMAT_REMINDER =
       "\n\nIMPORTANT: Your previous reply could not be used because it was not a complete, valid JSON array of dialogue lines. Respond with ONLY the JSON array (no commentary, no code fences), make sure every object is complete, and close the array.";
     const REDUCE_LENGTH_REMINDER =
@@ -599,50 +618,103 @@ export async function runFinalizeAudioOverviewPhase(
     let reduceUsage: TokenUsage | undefined;
     const reduceStartTime = Date.now();
 
-    const { script: fullDialogueScript, attempt: scriptAttempt } =
-      await generateValidatedDialogueScript({
-        minimumLines: minimumDialogueLines,
-        maxAttempts: REDUCE_MAX_ATTEMPTS,
-        canRetry: () => Date.now() - reduceStartTime < REDUCE_PARSE_RETRY_BUDGET_MS,
-        onAttemptFailed: ({ attempt, reason, responseText }) => {
-          console.log(
-            `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${reason}. Response preview: ${responseText.slice(0, 500)}`
-          );
-        },
-        generate: (attempt, previousFailure) =>
-          invokeStudioLlm({
-            invoke: () =>
-              invokeTogetherText({
-                systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-                userPrompt:
-                  previousFailure === "empty_response"
-                    ? reducePrompt + REDUCE_LENGTH_REMINDER
-                    : previousFailure === "invalid_script"
-                      ? reducePrompt + REDUCE_FORMAT_REMINDER
-                      : reducePrompt,
-                model: env.AUDIO_LLM,
-                maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
-                temperature: attempt === 1 ? 0.6 : 0.3,
-                reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
-                onUsage: (usage) => {
-                  reduceUsage = addTokenUsage(reduceUsage, usage);
-                },
-              }),
-            timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-            phaseLabel: "AudioReduce",
-            retry: {
-              maxAttempts: attempt === 1 ? 2 : 1,
-              baseDelayMs: 1000,
-              // Empty completions are retried by the script loop, with a length reminder.
-              retryableErrors: (error) =>
-                !(error instanceof EmptyLlmResponseError) && isRetryableError(error),
-            },
-          }),
-      });
+    const {
+      script: generatedScript,
+      attempt: scriptAttempt,
+      truncated: scriptTruncated,
+    } = await generateValidatedDialogueScript({
+      minimumLines: minimumDialogueLines,
+      maxAttempts: REDUCE_MAX_ATTEMPTS,
+      canRetry: () => Date.now() - reduceStartTime < REDUCE_PARSE_RETRY_BUDGET_MS,
+      onAttemptFailed: ({ attempt, reason, responseText }) => {
+        console.log(
+          `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${reason}. Response preview: ${responseText.slice(0, 500)}`
+        );
+      },
+      generate: (attempt, previousFailure) =>
+        invokeStudioLlm({
+          invoke: () =>
+            invokeTogetherText({
+              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              userPrompt:
+                previousFailure === "empty_response"
+                  ? reducePrompt + REDUCE_LENGTH_REMINDER
+                  : previousFailure === "invalid_script"
+                    ? reducePrompt + REDUCE_FORMAT_REMINDER
+                    : reducePrompt,
+              model: env.AUDIO_LLM,
+              maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
+              temperature: attempt === 1 ? 0.6 : 0.3,
+              reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
+              onUsage: (usage) => {
+                reduceUsage = addTokenUsage(reduceUsage, usage);
+              },
+            }),
+          timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+          phaseLabel: "AudioReduce",
+          retry: {
+            maxAttempts: attempt === 1 ? 2 : 1,
+            baseDelayMs: 1000,
+            // Empty completions are retried by the script loop, with a length reminder.
+            retryableErrors: (error) =>
+              !(error instanceof EmptyLlmResponseError) && isRetryableError(error),
+          },
+        }),
+    });
+
+    const {
+      script: dedupedScript,
+      removed: repeatedLinesRemoved,
+      endedInRepeat,
+    } = removeRepeatedDialogueLines(generatedScript);
 
     console.log(
-      `[AudioJob] Parsed ${fullDialogueScript.length} dialogue lines on attempt ${scriptAttempt}/${REDUCE_MAX_ATTEMPTS}`
+      `[AudioJob] Parsed ${generatedScript.length} dialogue lines on attempt ${scriptAttempt}/${REDUCE_MAX_ATTEMPTS}; removed ${repeatedLinesRemoved} repeated lines`
     );
+
+    const fullDialogueScript = await continueScriptIfNeeded({
+      script: dedupedScript,
+      // Truncated at the token limit, or a repetition loop ran to the end: there is no real ending.
+      cutOff: scriptTruncated || endedInRepeat,
+      targetWords: targetLines * ESTIMATED_WORDS_PER_LINE,
+      maxLines: getScriptMaxLines(targetLines),
+      canContinue: () => remainingReduceBudgetMs() >= CONFIG.CONTINUATION_MIN_TIMEOUT_MS,
+      generate: (scriptSoFar, turns, wrapUp) => {
+        const maxTokens = getContinuationMaxTokens(turns, CONFIG.REDUCE_MAX_OUTPUT_TOKENS);
+        const focus = sanitizedFocus || "general overview";
+        return invokeStudioLlm({
+          invoke: () =>
+            invokeTogetherText({
+              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              userPrompt: wrapUp
+                ? getWrapUpPrompt({ scriptSoFar, audioType, focus })
+                : getContinuationPrompt({
+                    content: combined,
+                    scriptSoFar,
+                    turns,
+                    audioType,
+                    focus,
+                  }),
+              model: env.AUDIO_LLM,
+              maxTokens,
+              temperature: 0.6,
+              reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
+              onUsage: (usage) => {
+                reduceUsage = addTokenUsage(reduceUsage, usage);
+              },
+            }),
+          timeoutMs: Math.min(
+            remainingReduceBudgetMs(),
+            Math.max(
+              CONFIG.CONTINUATION_MIN_TIMEOUT_MS,
+              maxTokens * CONFIG.CONTINUATION_MS_PER_OUTPUT_TOKEN
+            )
+          ),
+          phaseLabel: "AudioContinue",
+          retry: { maxAttempts: 1 },
+        });
+      },
+    });
 
     console.log(`[AudioJob] Generated ${fullDialogueScript.length} dialogue lines`);
 

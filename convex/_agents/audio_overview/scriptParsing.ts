@@ -2,7 +2,11 @@ import { EmptyLlmResponseError } from "../_shared/llmErrors";
 import type { DialogueLine } from "./state";
 
 export type DialogueScriptParseResult =
-  | { ok: true; script: DialogueLine[] }
+  /**
+   * `salvaged`: the array was cut off or malformed and only its complete lines were kept.
+   * `truncated`: salvaged because the array was never closed (output cut off), so no real ending.
+   */
+  | { ok: true; script: DialogueLine[]; salvaged: boolean; truncated: boolean }
   | { ok: false; reason: "missing_json_array" }
   | { ok: false; reason: "invalid_json"; message: string }
   | { ok: false; reason: "not_array" }
@@ -29,8 +33,12 @@ export function getMinimumDialogueLines(targetLines: number): number {
  * is a valid dialogue line. Tolerates truncated output (an unfinished trailing object is
  * dropped) and isolated malformed entries, which a strict `JSON.parse` would reject wholesale.
  */
-function salvageDialogueLines(responseText: string, startIndex: number): DialogueLine[] {
+function salvageDialogueLines(
+  responseText: string,
+  startIndex: number
+): { lines: DialogueLine[]; closed: boolean } {
   const lines: DialogueLine[] = [];
+  let closed = false;
   let depth = 0;
   let objectStart = -1;
   let inString = false;
@@ -64,10 +72,13 @@ function salvageDialogueLines(responseText: string, startIndex: number): Dialogu
         }
         objectStart = -1;
       }
+    } else if (char === "]" && depth === 0) {
+      closed = true;
+      break;
     }
   }
 
-  return lines;
+  return { lines, closed };
 }
 
 function parseStrictDialogueScript(
@@ -117,6 +128,8 @@ function parseStrictDialogueScript(
       speaker: line.speaker,
       text: line.text.trim(),
     })),
+    salvaged: false,
+    truncated: false,
   };
 }
 
@@ -132,8 +145,8 @@ export function parseDialogueScriptResponse(
 
   // Truncated output or a few malformed entries: keep the valid lines if there are enough.
   const salvaged = salvageDialogueLines(responseText, jsonStart);
-  if (salvaged.length >= minimumLines) {
-    return { ok: true, script: salvaged };
+  if (salvaged.lines.length >= minimumLines) {
+    return { ok: true, script: salvaged.lines, salvaged: true, truncated: !salvaged.closed };
   }
 
   return strict;
@@ -162,7 +175,7 @@ export type GenerateValidatedDialogueScriptOptions = {
  */
 export async function generateValidatedDialogueScript(
   options: GenerateValidatedDialogueScriptOptions
-): Promise<{ script: DialogueLine[]; attempt: number }> {
+): Promise<{ script: DialogueLine[]; attempt: number; truncated: boolean }> {
   const { generate, minimumLines, maxAttempts, canRetry, onAttemptFailed } = options;
   let lastReason = "no usable script was produced";
   let lastFailure: DialogueScriptFailureKind | undefined;
@@ -174,7 +187,9 @@ export async function generateValidatedDialogueScript(
     try {
       responseText = await generate(attempt, lastFailure);
       const parseResult = parseDialogueScriptResponse(responseText, minimumLines);
-      if (parseResult.ok) return { script: parseResult.script, attempt };
+      if (parseResult.ok) {
+        return { script: parseResult.script, attempt, truncated: parseResult.truncated };
+      }
       lastFailure = "invalid_script";
       lastReason = describeDialogueScriptParseFailure(parseResult);
     } catch (error) {
@@ -191,6 +206,57 @@ export async function generateValidatedDialogueScript(
   throw new Error(
     `Dialogue script generation failed after ${attemptsMade} attempt(s): ${lastReason}`
   );
+}
+
+/** Chinese and Japanese are written without spaces between words. */
+const UNSPACED_SCRIPT_CHARS = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+/** Rough characters per word for unspaced scripts, so word targets mean the same spoken length. */
+const CHARS_PER_UNSPACED_WORD = 2;
+
+/** Counts words in dialogue text, including languages that don't separate words with spaces. */
+export function countDialogueWords(text: string): number {
+  const unspacedChars = text.match(UNSPACED_SCRIPT_CHARS)?.length ?? 0;
+  const spacedWords = text.replace(UNSPACED_SCRIPT_CHARS, " ").split(/\s+/).filter(Boolean).length;
+  return spacedWords + Math.ceil(unspacedChars / CHARS_PER_UNSPACED_WORD);
+}
+
+/** Lines shorter than this (in words) are reactions ("Right.", "Exactly.") that may recur. */
+const MIN_WORDS_FOR_REPEAT_CHECK = 6;
+
+function normalizeLineForRepeatCheck(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Drops substantive lines that repeat an earlier line. Long generations can fall into a
+ * degenerate loop, restating whole stretches of dialogue verbatim; the repeats add minutes of
+ * duplicated audio without new content.
+ *
+ * `endedInRepeat` is true when the script's last substantive line was a repeat: the loop ran to
+ * the end of the output, so the script has no real ending.
+ */
+export function removeRepeatedDialogueLines(script: DialogueLine[]): {
+  script: DialogueLine[];
+  removed: number;
+  endedInRepeat: boolean;
+} {
+  const seen = new Set<string>();
+  const kept: DialogueLine[] = [];
+  let endedInRepeat = false;
+  for (const line of script) {
+    const normalized = normalizeLineForRepeatCheck(line.text);
+    if (countDialogueWords(normalized) >= MIN_WORDS_FOR_REPEAT_CHECK) {
+      endedInRepeat = seen.has(normalized);
+      if (endedInRepeat) continue;
+      seen.add(normalized);
+    }
+    kept.push(line);
+  }
+  return { script: kept, removed: script.length - kept.length, endedInRepeat };
 }
 
 export function describeDialogueScriptParseFailure(

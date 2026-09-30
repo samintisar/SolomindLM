@@ -59,6 +59,7 @@ import type * as _agents_audio_overview_nodeExtractBeats from "../_agents/audio_
 import type * as _agents_audio_overview_nodeSynthesizeAudio from "../_agents/audio_overview/nodeSynthesizeAudio.js";
 import type * as _agents_audio_overview_nodeWriteScript from "../_agents/audio_overview/nodeWriteScript.js";
 import type * as _agents_audio_overview_prompts from "../_agents/audio_overview/prompts.js";
+import type * as _agents_audio_overview_scriptContinuation from "../_agents/audio_overview/scriptContinuation.js";
 import type * as _agents_audio_overview_scriptParsing from "../_agents/audio_overview/scriptParsing.js";
 import type * as _agents_audio_overview_state from "../_agents/audio_overview/state.js";
 import type * as _agents_audio_overview_voices from "../_agents/audio_overview/voices.js";
@@ -437,6 +438,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/audio_overview/nodeSynthesizeAudio": typeof _agents_audio_overview_nodeSynthesizeAudio;
   "_agents/audio_overview/nodeWriteScript": typeof _agents_audio_overview_nodeWriteScript;
   "_agents/audio_overview/prompts": typeof _agents_audio_overview_prompts;
+  "_agents/audio_overview/scriptContinuation": typeof _agents_audio_overview_scriptContinuation;
   "_agents/audio_overview/scriptParsing": typeof _agents_audio_overview_scriptParsing;
   "_agents/audio_overview/state": typeof _agents_audio_overview_state;
   "_agents/audio_overview/voices": typeof _agents_audio_overview_voices;
