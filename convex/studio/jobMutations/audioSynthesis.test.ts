@@ -2,12 +2,14 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { internal } from "../../_generated/api";
+import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, ["./studio/jobMutations/audio.ts"]);
 
 const settings = { audioType: "debate", length: "short" };
 
