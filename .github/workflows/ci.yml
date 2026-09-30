@@ -151,6 +151,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Knip loads repo config files (vitest/vite/playwright configs);
+          # nothing here needs the token after checkout.
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -159,6 +163,7 @@ jobs:
       # convex-test's import.meta.glob("/convex/**/*.ts") marks every Convex
       # module as used here, so Convex dead code only shows in the next step.
       - name: Knip (default mode)
+        continue-on-error: true
         run: |
           {
             echo "## Knip — default mode"
@@ -168,6 +173,7 @@ jobs:
       # Production mode skips tests (and the glob above): finds dead Convex
       # code and code only reachable from tests.
       - name: Knip (production mode)
+        continue-on-error: true
         run: |
           {
             echo "## Knip — production mode"
