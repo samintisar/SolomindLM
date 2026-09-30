@@ -202,6 +202,42 @@ describe("continueScriptIfNeeded runaway guard", () => {
     expect(result.at(-1)?.text).toBe("Thanks for listening, everyone.");
   });
 
+  it("returns the complete original script when the extension ends without a closing", async () => {
+    const script = lines(100, 20);
+    const runaway = asJson(
+      Array.from({ length: 400 }, (_, i) => `Runaway turn number ${i} with enough words.`)
+    );
+    const cases: Array<{ canContinue: () => boolean; generate: ReturnType<typeof vi.fn> }> = [];
+    // The wrap-up pass throws, returns unusable output, is out of time, or has no ending either.
+    for (const second of [
+      () => Promise.reject(new Error("timeout")),
+      () => Promise.resolve("not json"),
+      () => Promise.resolve(runaway),
+    ]) {
+      cases.push({
+        canContinue: () => true,
+        generate: vi.fn().mockResolvedValueOnce(runaway).mockImplementationOnce(second),
+      });
+    }
+    let calls = 0;
+    cases.push({
+      canContinue: () => ++calls === 1,
+      generate: vi.fn().mockResolvedValueOnce(runaway),
+    });
+
+    for (const { canContinue, generate } of cases) {
+      const result = await continueScriptIfNeeded({
+        script,
+        cutOff: false,
+        targetWords: 2400,
+        maxLines: 10_000,
+        canContinue,
+        generate,
+      });
+      expect(result).toBe(script);
+    }
+  });
+
   it("asks for a wrap-up when the continuation itself was cut off", async () => {
     const script = lines(100, 20);
     const truncated = `${asJson(["Picking the thread back up here.", "And pushing on it a bit more."]).slice(0, -1)}, {"speaker": "host_a", "text": "Cut off mid`;

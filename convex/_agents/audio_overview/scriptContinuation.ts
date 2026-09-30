@@ -120,7 +120,8 @@ export function getContinuationMaxTokens(turns: number, limit: number): number {
  * dropping any that repeat the script so far. A continuation that was cut off, ran past its turn
  * budget, or ended in a repetition loop has no closing, so one follow-up pass asks only for a
  * wrap-up. The script as generated is already usable, so a failed or unusable continuation is
- * logged and the script so far is returned, trimmed to `maxLines`.
+ * logged and a fallback returned: the original script if it was complete and within the cap and
+ * continuation left no ending, otherwise the script so far, trimmed to `maxLines`.
  */
 export async function continueScriptIfNeeded(options: {
   script: DialogueLine[];
@@ -139,8 +140,15 @@ export async function continueScriptIfNeeded(options: {
   const { targetWords, maxLines, canContinue, generate } = options;
   let script = options.script;
   let cutOff = options.cutOff;
-  // Falling back to the script so far must still respect the cap, even at the cost of its ending.
-  const keepScript = () => (script.length > maxLines ? script.slice(0, maxLines) : script);
+  // A complete input within the cap has a real ending. If continuation drops its sign-off and
+  // can't replace it, the input beats a longer script that stops mid-conversation.
+  const completeInput =
+    !options.cutOff && options.script.length <= maxLines ? options.script : undefined;
+  // Otherwise fall back to the script so far, within the cap even at the cost of its ending.
+  const keepScript = () => {
+    if (cutOff && completeInput) return completeInput;
+    return script.length > maxLines ? script.slice(0, maxLines) : script;
+  };
 
   for (let pass = 1; pass <= MAX_CONTINUATION_PASSES; pass += 1) {
     const plan = planScriptContinuation({ script, targetWords, maxLines, cutOff });
@@ -185,5 +193,5 @@ export async function continueScriptIfNeeded(options: {
   }
 
   console.warn("[AudioScript] Continuation still has no ending after the wrap-up pass");
-  return script;
+  return keepScript();
 }
