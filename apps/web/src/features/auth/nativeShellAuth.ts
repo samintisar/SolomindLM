@@ -2,8 +2,6 @@ import { clearShellAuthMirror, getShellConvexDeploymentUrl } from "@/features/au
 import { getNativeWebViewBridge, isNativeShell } from "@/utils/platformDetection";
 import type { NativeAuthResponse } from "./nativeShellAuthTypes";
 
-export type { NativeAuthResponse } from "./nativeShellAuthTypes";
-
 const AUTH_TIMEOUT_MS = 120_000;
 const TOKEN_SYNC_TIMEOUT_MS = 5_000;
 
@@ -185,6 +183,6 @@ export async function requestNativeSignOut(): Promise<void> {
 }
 
 /** Clears mirrored JWT in the WebView and notifies the shell auth hook (sign-out). */
-export function clearShellAuthStorageAndNotify(): void {
+function clearShellAuthStorageAndNotify(): void {
   clearShellAuthMirror();
 }

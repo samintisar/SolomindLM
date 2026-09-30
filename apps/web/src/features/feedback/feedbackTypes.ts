@@ -3,19 +3,13 @@ import { getLastRequestId } from "./lastRequestId";
 
 export type FeedbackType = "bug" | "feature";
 
-export const MAX_FEEDBACK_TEXT = 5000;
+const MAX_FEEDBACK_TEXT = 5000;
 
 export interface FeedbackContextCapture {
   route: string;
   surface: "web" | "mobile";
   appVersion: string;
   lastRequestId?: string;
-}
-
-export interface FeedbackDraft {
-  type: FeedbackType;
-  body: string;
-  detail: string;
 }
 
 export function captureFeedbackContext(

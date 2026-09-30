@@ -99,8 +99,3 @@ export const mlAmbiguousFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlAmbiguousFixture(id: string): EvalFixture | undefined {
-  return mlAmbiguousFixtures.find((f) => f.id === id);
-}

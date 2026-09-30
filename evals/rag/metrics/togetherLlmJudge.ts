@@ -7,7 +7,6 @@
 
 import Together from "together-ai";
 import type { LlmJudgeOptions } from "./llmJudge";
-import { DEFAULT_LLM_JUDGE_MODEL } from "./llmJudge";
 
 // ============================================================
 // Configuration
@@ -29,12 +28,6 @@ export interface TogetherJudgeConfig {
 /** Default judge model for eval binary judges and pairwise compare */
 const DEFAULT_JUDGE_MODEL = "deepseek-ai/DeepSeek-V4.1-Flash";
 
-/** Cheaper alternative for quick iterations */
-const FAST_JUDGE_MODEL = "meta-llama/Llama-3.3-8B-Instruct-Turbo";
-
-/** Alternative premium judge */
-const PREMIUM_JUDGE_MODEL = "Qwen/Qwen2.5-72B-Instruct-Turbo";
-
 // ============================================================
 // Client Factory
 // ============================================================
@@ -42,7 +35,7 @@ const PREMIUM_JUDGE_MODEL = "Qwen/Qwen2.5-72B-Instruct-Turbo";
 /**
  * Create a Together AI client for judge operations.
  */
-export function createTogetherClient(config: TogetherJudgeConfig = {}): Together {
+function createTogetherClient(config: TogetherJudgeConfig = {}): Together {
   const apiKey = config.apiKey ?? process.env.TOGETHER_AI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -183,122 +176,5 @@ export function createTogetherJudgeInvoker(
   };
 }
 
-// ============================================================
-// Preset Configurations
-// ============================================================
-
-export const JUDGE_PRESETS: Record<string, TogetherJudgeConfig> = {
-  /** Default: DeepSeek V4.1 Flash for eval judges */
-  default: {
-    model: DEFAULT_JUDGE_MODEL,
-    temperature: 0.1,
-    maxTokens: 8192,
-  },
-
-  /** Fast: for quick iterations during development */
-  fast: {
-    model: FAST_JUDGE_MODEL,
-    temperature: 0.1,
-    maxTokens: 512,
-  },
-
-  /** Premium: alternative high-quality judge */
-  premium: {
-    model: PREMIUM_JUDGE_MODEL,
-    temperature: 0.0,
-    maxTokens: 2048,
-  },
-
-  /** GPT-OSS 120B: legacy Likert judges */
-  gptOss120b: {
-    model: "openai/gpt-oss-120b",
-    temperature: 0.1,
-    maxTokens: 8192,
-  },
-
-  /** Qwen 3.5 9B: fast alternative */
-  qwen35_9b: {
-    model: DEFAULT_LLM_JUDGE_MODEL,
-    temperature: 0.1,
-    maxTokens: 8192,
-  },
-};
-
-/**
- * Get a preset invoker by name.
- */
-export function getPresetInvoker(
-  preset: keyof typeof JUDGE_PRESETS = "default"
-): ReturnType<typeof createTogetherJudgeInvoker> {
-  return createTogetherJudgeInvoker(JUDGE_PRESETS[preset]);
-}
-
-// ============================================================
-// Batch Evaluation Helper
-// ============================================================
-
-/**
- * Evaluate multiple fixtures in parallel using the LLM judge.
- *
- * @param fixturesAndArtifacts - Pairs of fixtures and their artifacts
- * @param config - Together judge configuration
- * @returns Array of metric results for all fixtures
- */
-export async function batchEvaluateWithLlmJudge(
-  fixturesAndArtifacts: Array<{
-    fixture: import("../types").EvalFixture;
-    artifact: import("../types").EvalRunArtifact;
-  }>,
-  config: TogetherJudgeConfig = {}
-): Promise<import("../types").MetricResult[]> {
-  const { scoreAllLlmJudgeMetrics } = await import("./llmJudge");
-  const invoker = createTogetherJudgeInvoker(config);
-
-  // Run all evaluations in parallel (with concurrency limit could be added)
-  const allResults = await Promise.all(
-    fixturesAndArtifacts.map(({ fixture, artifact }) =>
-      scoreAllLlmJudgeMetrics(fixture, artifact, { invoke: invoker })
-    )
-  );
-
-  return allResults.flat();
-}
-
-// ============================================================
-// CLI Helper
-// ============================================================
-
-/**
- * Parse CLI arguments for judge configuration.
- * Supports: --judge-model, --judge-preset, --together-key
- */
-export function parseJudgeArgs(args: string[] = process.argv.slice(2)): TogetherJudgeConfig {
-  const config: TogetherJudgeConfig = {};
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    const next = args[i + 1];
-
-    switch (arg) {
-      case "--judge-model":
-      case "-m":
-        if (next) config.model = next;
-        break;
-      case "--judge-preset":
-      case "-p":
-        if (next && next in JUDGE_PRESETS) {
-          Object.assign(config, JUDGE_PRESETS[next as keyof typeof JUDGE_PRESETS]);
-        }
-        break;
-      case "--together-key":
-      case "-k":
-        if (next) config.apiKey = next;
-        break;
-    }
-  }
-
-  return config;
-}
-
 // Export model constants for convenience
-export { DEFAULT_JUDGE_MODEL, FAST_JUDGE_MODEL, PREMIUM_JUDGE_MODEL };
+export { DEFAULT_JUDGE_MODEL };

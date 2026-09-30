@@ -106,17 +106,6 @@ export function useCancelSubscription() {
 }
 
 /**
- * Reactivate subscription (if canceled but still active)
- */
-export function useReactivateSubscription() {
-  const reactivate = useAction(api.billing.index.removeCancelAtPeriodEnd);
-
-  return async () => {
-    return await reactivate({});
-  };
-}
-
-/**
  * Create customer portal session
  */
 export function useCreatePortalSession() {
@@ -126,14 +115,6 @@ export function useCreatePortalSession() {
     const result = await create({ returnUrl });
     return { url: result.url };
   };
-}
-
-/**
- * Check if user is subscribed (convenience hook)
- */
-export function useIsSubscribed(): boolean {
-  const subscription = useQuery(api.billing.index.getCurrent);
-  return subscription?.status === "active" || false;
 }
 
 /**

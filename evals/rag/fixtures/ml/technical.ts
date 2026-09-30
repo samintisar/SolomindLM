@@ -69,8 +69,3 @@ export const mlTechnicalFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlTechnicalFixture(id: string): EvalFixture | undefined {
-  return mlTechnicalFixtures.find((f) => f.id === id);
-}

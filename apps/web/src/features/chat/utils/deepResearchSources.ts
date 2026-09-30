@@ -1,4 +1,4 @@
-export type DeepResearchSourceStatus = "usedInAnswer" | "searchedOnly";
+type DeepResearchSourceStatus = "usedInAnswer" | "searchedOnly";
 
 export interface ResearchEvidenceRow {
   subQuestionId: string;
@@ -46,7 +46,7 @@ export function parseCitationNumbers(content: string): Set<number> {
   return cited;
 }
 
-export function orderEvidenceBySubQuestions(
+function orderEvidenceBySubQuestions(
   evidence: ResearchEvidenceRow[],
   subQuestions: Array<{ id: string }>
 ): ResearchEvidenceRow[] {

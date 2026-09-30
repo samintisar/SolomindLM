@@ -372,5 +372,3 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
     </div>
   );
 };
-
-export default BibtexImportModal;

@@ -325,7 +325,7 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
 
 // --- Structured service errors (ConvexError.data.type from convex/_lib/errors.ts) ---
 
-export type ParsedExternalServiceError = {
+type ParsedExternalServiceError = {
   kind: "external_service";
   service: string;
   retryable: boolean;
@@ -334,7 +334,7 @@ export type ParsedExternalServiceError = {
   detail?: string;
 };
 
-export type ParsedStorageError = {
+type ParsedStorageError = {
   kind: "storage";
   operation: string;
   fileName?: string;
@@ -342,7 +342,7 @@ export type ParsedStorageError = {
   detail?: string;
 };
 
-export type ParsedInputValidationError = {
+type ParsedInputValidationError = {
   kind: "input_validation";
   field?: string;
   detail?: string;

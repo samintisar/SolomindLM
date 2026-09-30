@@ -10,7 +10,7 @@ export type SrsRating = "again" | "hard" | "good" | "easy";
 /**
  * Human-readable time until next review (matches convex/_lib/srsScheduling.ts).
  */
-export function formatIntervalUntilNextReview(deltaMs: number): string {
+function formatIntervalUntilNextReview(deltaMs: number): string {
   if (!Number.isFinite(deltaMs) || deltaMs <= 0) {
     return "Due soon";
   }

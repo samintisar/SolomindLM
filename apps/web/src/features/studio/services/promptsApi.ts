@@ -59,27 +59,6 @@ export function useMyPrompts(studioTool?: StudioTool) {
   );
 }
 
-/** Get a single prompt by ID. */
-export function usePrompt(promptId: Id<"studioPrompts"> | null) {
-  return useQuery(api.studio.prompts.index.getPrompt, promptId ? { promptId } : "skip");
-}
-
-/** Check if the current user has saved a public prompt. */
-export function useHasSavedPrompt(publicPromptId: Id<"studioPrompts"> | null) {
-  return useQuery(
-    api.studio.prompts.index.hasSavedPrompt,
-    publicPromptId ? { publicPromptId } : "skip"
-  );
-}
-
-/** Get the current user's rating for a public prompt. */
-export function useMyRating(publicPromptId: Id<"studioPrompts"> | null) {
-  return useQuery(
-    api.studio.prompts.index.getMyRating,
-    publicPromptId ? { publicPromptId } : "skip"
-  );
-}
-
 // ── Mutations ──────────────────────────────────────────────────────────
 
 /** Create a new private prompt. */
@@ -131,17 +110,6 @@ export function useRatePrompt() {
   const rate = useMutation(api.studio.prompts.index.ratePrompt);
   return async (publicPromptId: Id<"studioPrompts">, rating: number) => {
     await rate({ publicPromptId, rating });
-  };
-}
-
-/** Update a prompt the user owns. */
-export function useUpdatePrompt() {
-  const update = useMutation(api.studio.prompts.index.updatePrompt);
-  return async (
-    promptId: Id<"studioPrompts">,
-    updates: { title?: string; description?: string; promptText?: string }
-  ) => {
-    await update({ promptId, ...updates });
   };
 }
 
