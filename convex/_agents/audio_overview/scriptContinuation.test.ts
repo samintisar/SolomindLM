@@ -347,6 +347,27 @@ describe("first drafts over the line cap", () => {
     expect(result).toHaveLength(96);
     expect(result.at(-1)?.text).toBe("Agreed. Thanks for listening, everyone.");
   });
+
+  it("still enforces the cap when the wrap-up can't run", async () => {
+    const script = lines(180, 22);
+    const cases: Array<{ canContinue: () => boolean; generate: ReturnType<typeof vi.fn> }> = [
+      { canContinue: () => false, generate: vi.fn() },
+      { canContinue: () => true, generate: vi.fn().mockRejectedValue(new Error("timeout")) },
+      { canContinue: () => true, generate: vi.fn().mockResolvedValue("not json") },
+    ];
+
+    for (const { canContinue, generate } of cases) {
+      const result = await continueScriptIfNeeded({
+        script,
+        cutOff: true,
+        targetWords: 2000,
+        maxLines: 100,
+        canContinue,
+        generate,
+      });
+      expect(result).toEqual(script.slice(0, 100));
+    }
+  });
 });
 
 describe("getScriptMaxLines", () => {

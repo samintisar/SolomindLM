@@ -120,7 +120,7 @@ export function getContinuationMaxTokens(turns: number, limit: number): number {
  * dropping any that repeat the script so far. A continuation that was cut off, ran past its turn
  * budget, or ended in a repetition loop has no closing, so one follow-up pass asks only for a
  * wrap-up. The script as generated is already usable, so a failed or unusable continuation is
- * logged and the script so far is returned.
+ * logged and the script so far is returned, trimmed to `maxLines`.
  */
 export async function continueScriptIfNeeded(options: {
   script: DialogueLine[];
@@ -139,6 +139,8 @@ export async function continueScriptIfNeeded(options: {
   const { targetWords, maxLines, canContinue, generate } = options;
   let script = options.script;
   let cutOff = options.cutOff;
+  // Falling back to the script so far must still respect the cap, even at the cost of its ending.
+  const keepScript = () => (script.length > maxLines ? script.slice(0, maxLines) : script);
 
   for (let pass = 1; pass <= MAX_CONTINUATION_PASSES; pass += 1) {
     const plan = planScriptContinuation({ script, targetWords, maxLines, cutOff });
@@ -147,7 +149,7 @@ export async function continueScriptIfNeeded(options: {
       console.warn(
         "[AudioScript] Continuation needed but the time budget is spent; keeping script"
       );
-      return script;
+      return keepScript();
     }
 
     const wrapUp = pass > 1 || plan.wrapUp;
@@ -159,7 +161,7 @@ export async function continueScriptIfNeeded(options: {
         console.warn(
           `[AudioScript] Continuation unusable (${describeDialogueScriptParseFailure(parsed)}); keeping script`
         );
-        return script;
+        return keepScript();
       }
       // Keep a runaway continuation's first turns; they follow on from the script so far.
       const maxAdded = Math.min(
@@ -178,7 +180,7 @@ export async function continueScriptIfNeeded(options: {
       console.warn(
         `[AudioScript] Continuation failed (${error instanceof Error ? error.message : String(error)}); keeping script`
       );
-      return script;
+      return keepScript();
     }
   }
 
