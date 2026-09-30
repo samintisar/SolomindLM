@@ -1,0 +1,137 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit AI PR review — advisory only. CI (see .github/BRANCHING.md) is the merge gate.
+# CLAUDE.md and AGENTS.md are read as code guidelines by default; filePatterns below add
+# the repo's other standards docs. Retune after ~15 reviewed PRs: tighten path_filters for
+# noise, or switch profile to "assertive" if reviews miss too much.
+
+language: en-US
+
+reviews:
+  # "chill" = bugs, security, logic errors; skips style nitpicks (Biome owns style).
+  profile: chill
+  # Comment only; never block merges (repo runs with 0 required approvals).
+  request_changes_workflow: false
+  high_level_summary: true
+  changed_files_summary: true
+  sequence_diagrams: false
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    # Drafts are WIP (BRANCHING.md) — reviewed once marked ready. Comment
+    # "@coderabbitai review" on a draft to review it early.
+    drafts: false
+    ignore_title_keywords:
+      - WIP
+
+  pre_merge_checks:
+    # Title format is enforced deterministically by the "Lint (PR title)" workflow.
+    title:
+      mode: "off"
+    # TS codebase without a docstring convention.
+    docstrings:
+      mode: "off"
+    description:
+      mode: "warning"
+    custom_checks:
+      - name: "Linked issue"
+        mode: "warning"
+        instructions: >-
+          Pass if the PR description links an issue with a closing keyword
+          (e.g. "Closes #123"). Fail otherwise.
+      - name: "Agent cache invalidation"
+        mode: "warning"
+        instructions: >-
+          Pass if the PR does not change prompt text or agent output shape under convex/_agents/
+          or convex/studio/. If it does, pass only if the PR also bumps the relevant cacheVersions
+          value or the description explains why no bump is needed.
+
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!convex/_generated/**"
+    - "!bun.lock"
+    - "!archive/**"
+    - "!flowcharts/**"
+    - "!evals/rag/reports/**"
+    - "!evals/rag/baselines/**"
+
+  path_instructions:
+    - path: "convex/**"
+      instructions: |
+        Convex backend. Follow convex/_generated/ai/guidelines.md over general Convex knowledge.
+        - Every public query/mutation/action validates all args with `v.*` validators.
+        - Public functions check auth and notebook/document ownership before reading or writing.
+        - New query patterns use an index (`withIndex`), not `.filter()` over a full table scan.
+        - Errors: throw the typed errors in convex/_lib/errors.ts and map with `toConvexError`;
+          flag silent catches or fallbacks that hide failures from the user.
+        - Background work is scheduled with `ctx.scheduler.runAfter()`; flag long-running work
+          done inline in a mutation.
+        - Flag new `any` types.
+
+    - path: "convex/schema.ts"
+      instructions: |
+        Schema changes must be backward compatible with existing documents (widen-migrate-narrow):
+        new fields optional first, backfill via a migration, then tighten. Flag required-field
+        additions or removals/renames that would break existing rows, and new indexes that
+        duplicate an existing index's prefix.
+
+    - path: "convex/{_agents,studio}/**"
+      instructions: |
+        LLM agents and studio generation. Prompts must work for arbitrary user-uploaded
+        sources (any topic, length, or format).
+        - Flag prompt text that references eval fixtures, golden notebooks, expected-item lists,
+          test source filenames, or examples that look tuned to a specific eval case.
+        - LLM/HTTP calls should go through the shared retry/timeout helpers in
+          convex/_agents/_shared/ rather than ad-hoc retry loops.
+
+    - path: "apps/web/**"
+      instructions: |
+        React 19 + Vite + Tailwind 4 web app.
+        - Errors from Convex calls must surface to the user (see shared/utils/errorParser.ts);
+          flag swallowed promise rejections.
+        - Hooks: correct dependency arrays, no hooks inside conditions, no state updates during render.
+        - No new `any` in files being edited.
+        - Accessibility: interactive elements are buttons/links with accessible names.
+
+    - path: "apps/mobile/**"
+      instructions: |
+        Expo WebView shell. Focus on native auth, file upload, and push notification handling;
+        flag secrets or API keys in app config.
+
+    - path: "**/*.test.ts"
+      instructions: |
+        Vitest (+ convex-test for backend). Check that bug fixes include a regression test that
+        would fail without the fix, and that tests assert behavior rather than implementation details.
+
+    - path: "evals/**"
+      instructions: |
+        Eval harness. Referencing fixtures here is expected. Flag changes that loosen metrics or
+        thresholds without a stated reason in the PR description.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        Pin third-party actions to a full commit SHA, use least-privilege `permissions:`, and
+        never echo secrets.
+
+  tools:
+    biome:
+      enabled: true
+    actionlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - ".github/BRANCHING.md"
+      - "docs/engineering/code-quality.md"
+      - "convex/_generated/ai/guidelines.md"
