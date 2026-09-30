@@ -1,4 +1,4 @@
-const { withProjectBuildGradle } = require("@expo/config-plugins");
+const { withProjectBuildGradle } = require("expo/config-plugins");
 
 const CMAKE_FIX_MARKER = "CMAKE_OBJECT_PATH_MAX=1024";
 const CMAKE_FIX_BLOCK = `
