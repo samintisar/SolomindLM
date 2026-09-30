@@ -25,7 +25,7 @@ subprojects { subproject ->
 }
 `;
 
-/** @type {import('@expo/config-plugins').ConfigPlugin} */
+/** @type {import('expo/config-plugins').ConfigPlugin} */
 module.exports = function withAndroidCmakePathFix(config) {
   return withProjectBuildGradle(config, (config) => {
     if (config.modResults.language !== "groovy") {
