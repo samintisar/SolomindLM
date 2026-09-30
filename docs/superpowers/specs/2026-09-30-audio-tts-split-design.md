@@ -57,12 +57,12 @@ finalize ──▶ synthesize (planner) ──fan-out──▶ chunk 0 … chunk
    - Reads the row and returns early if the row is gone or its status isn't `generating`. That covers the job being deleted or already failed.
    - Synthesizes its lines as today (5 concurrent requests, per-line timeout, a failed line is skipped).
    - Joins its own WAVs and encodes one MP3 with the existing `concatenateWavBuffers` and `encodePcmWavToMp3`.
-   - Stores the MP3 and calls `recordAudioSynthesisChunk`.
+   - Stores the MP3 and calls `recordAudioSynthesisChunk`. A chunk in which every line failed stores no file.
    - If that mutation reports this was the last chunk, schedules the assemble action.
 3. **Assemble action** `assembleAudioOverviewPhase({ audioOverviewId })`:
    - Checks the failed-line total against the existing rule: the job fails when fewer than 50% of lines are synthesized.
    - Reads the chunk MP3s in order, joins them and stores the final MP3.
-   - Deletes the chunk files and saves the results as today: `audioUrl`, transcript, title, telemetry with a `tts` stage span.
+   - Saves the results as today: `audioUrl`, transcript, title, telemetry with a `tts` stage span. The save mutation deletes the chunk files.
 
 ### Chunk planning
 
@@ -73,7 +73,7 @@ planSynthesisChunks(lineCount: number): { start: number; end: number }[]
 // chunkSize = max(MIN_LINES_PER_CHUNK, ceil(lineCount / MAX_PARALLEL_CHUNKS))
 ```
 
-The `CONFIG` values:
+The constants, exported from the same module:
 
 | Constant | Value | Why |
 |---|---|---|
@@ -100,8 +100,8 @@ Chunk state goes in `audioOverviews.metadata`, like `mapResults` does. `metadata
 metadata.synthesis = {
   chunks: { start: number; end: number }[];          // the plan
   done: Record<number, {
-    storageId: Id<"_storage">;
-    lines: number;             // lines synthesized
+    storageId?: Id<"_storage">; // absent when every line in the chunk failed
+    synthesizedLines: number;
     failedLines: number;
     firstError?: string;
     latencyMs: number;
@@ -112,8 +112,8 @@ metadata.synthesis = {
 
 Three mutations in `convex/studio/jobMutations/audio.ts` manage it:
 
-- **`initAudioSynthesis`.** Writes the plan, `phase: "synthesizing"` and progress 60.
-- **`recordAudioSynthesisChunk`.** Stores one chunk's result, sets progress to `60 + 30 × done / total`, and bumps `updatedAt`. It returns `{ isLast }`, which is true only for the call that fills the last missing index. Mutations are serialized, so exactly one chunk schedules assembly.
+- **`initAudioSynthesis`.** Writes the plan, `phase: "synthesizing"` and progress 70. It returns false, without writing, when the row is gone, isn't `generating`, or already has a plan.
+- **`recordAudioSynthesisChunk`.** Stores one chunk's result, sets progress to `70 + 25 × done / total`, and bumps `updatedAt`. It returns `{ isLast }`, which is true only for the call that fills the last missing index. Mutations are serialized, so exactly one chunk schedules assembly.
   - If a retried chunk records an index that is already done, the new file is deleted and `isLast` is false.
   - If the row is gone or no longer `generating`, the file is deleted and `isLast` is false.
 - **Cleanup on completion and failure.** `saveAudioOverviewResults` and `markAudioOverviewFailed` already drop `synthesisInput`. They now also drop `synthesis`, and delete every chunk storage ID listed in `synthesis.done`.
