@@ -28,7 +28,7 @@ const REPORT_ENUMERATION_PROMPT =
   "Use [Source N] citations where appropriate. " +
   "Cover only agentic AI design patterns — exclude unrelated topics.";
 
-export const studioReportAgentic20: EvalFixture = {
+const studioReportAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-report-agentic-patterns-20",
   question: "Generate a report covering the 20 agentic AI design patterns.",
@@ -50,7 +50,7 @@ export const studioReportAgentic20: EvalFixture = {
   tags: sharedTags("report"),
 };
 
-export const studioQuizAgentic20: EvalFixture = {
+const studioQuizAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-quiz-agentic-patterns-20",
   question: "Generate a quiz covering the 20 agentic AI design patterns.",
@@ -64,7 +64,7 @@ export const studioQuizAgentic20: EvalFixture = {
   tags: sharedTags("quiz"),
 };
 
-export const studioMindmapAgentic20: EvalFixture = {
+const studioMindmapAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-mindmap-agentic-patterns-20",
   question: "Build a mindmap of the 20 agentic AI design patterns.",
@@ -77,7 +77,7 @@ export const studioMindmapAgentic20: EvalFixture = {
   tags: sharedTags("mindmap"),
 };
 
-export const studioInfographicAgentic20: EvalFixture = {
+const studioInfographicAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-infographic-agentic-patterns-20",
   question: "Create an infographic visualizing the 20 agentic AI design patterns.",
@@ -95,7 +95,7 @@ export const studioInfographicAgentic20: EvalFixture = {
   tags: sharedTags("infographic"),
 };
 
-export const studioSpreadsheetAgentic20: EvalFixture = {
+const studioSpreadsheetAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-spreadsheet-agentic-patterns-20",
   question: "Build a spreadsheet comparing the 20 agentic AI design patterns.",
@@ -112,7 +112,7 @@ export const studioSpreadsheetAgentic20: EvalFixture = {
   tags: sharedTags("spreadsheet"),
 };
 
-export const studioWrittenQuestionsAgentic20: EvalFixture = {
+const studioWrittenQuestionsAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-written-questions-agentic-patterns-20",
   question: "Generate written-response questions on the 20 agentic AI design patterns.",
@@ -126,7 +126,7 @@ export const studioWrittenQuestionsAgentic20: EvalFixture = {
   tags: sharedTags("written-questions"),
 };
 
-export const studioAudioScriptAgentic20: EvalFixture = {
+const studioAudioScriptAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-agentic-patterns-20",
   question: "Generate an audio overview script covering the 20 agentic AI design patterns.",
@@ -138,7 +138,7 @@ export const studioAudioScriptAgentic20: EvalFixture = {
   tags: sharedTags("audio-script"),
 };
 
-export const studioAudioScriptShort: EvalFixture = {
+const studioAudioScriptShort: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-short",
   question: "Generate a SHORT audio overview script covering the 20 agentic AI design patterns.",
@@ -152,7 +152,7 @@ export const studioAudioScriptShort: EvalFixture = {
   tags: [...sharedTags("audio-script"), "length-short"],
 };
 
-export const studioAudioScriptDefault: EvalFixture = {
+const studioAudioScriptDefault: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-default",
   question: "Generate a DEFAULT audio overview script covering the 20 agentic AI design patterns.",
@@ -166,7 +166,7 @@ export const studioAudioScriptDefault: EvalFixture = {
   tags: [...sharedTags("audio-script"), "length-default"],
 };
 
-export const studioAudioScriptLong: EvalFixture = {
+const studioAudioScriptLong: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-long",
   question: "Generate a LONG audio overview script covering the 20 agentic AI design patterns.",
@@ -182,7 +182,7 @@ export const studioAudioScriptLong: EvalFixture = {
 
 // ─── Script-only fixtures (no TTS, faster iteration) ─────────
 
-export const studioAudioScriptOnlyShort: EvalFixture = {
+const studioAudioScriptOnlyShort: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-only-short",
   question: "Generate a SHORT audio overview script (script only, no TTS).",
@@ -195,7 +195,7 @@ export const studioAudioScriptOnlyShort: EvalFixture = {
   tags: [...sharedTags("audio-script"), "length-short", "script-only"],
 };
 
-export const studioAudioScriptOnlyDefault: EvalFixture = {
+const studioAudioScriptOnlyDefault: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-only-default",
   question: "Generate a DEFAULT audio overview script (script only, no TTS).",
@@ -208,7 +208,7 @@ export const studioAudioScriptOnlyDefault: EvalFixture = {
   tags: [...sharedTags("audio-script"), "length-default", "script-only"],
 };
 
-export const studioAudioScriptOnlyLong: EvalFixture = {
+const studioAudioScriptOnlyLong: EvalFixture = {
   schemaVersion: 1,
   id: "studio-audio-script-only-long",
   question: "Generate a LONG audio overview script (script only, no TTS).",
@@ -238,5 +238,3 @@ export const STUDIO_FIXTURES: EvalFixture[] = [
   studioAudioScriptOnlyLong,
   ...ML_STUDIO_FIXTURES,
 ];
-
-export { studioFlashcardsAgentic20 };

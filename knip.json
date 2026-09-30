@@ -1,0 +1,76 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreIssues": {
+    "apps/web/src/shared/components/ui/**": ["exports", "types"],
+    "apps/web/src/test/setup.ts": ["files"]
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "convex/{http,auth,schema,crons,convex.config}.ts!",
+        "convex/!(_*).ts!",
+        "convex/!(_*)/**/!(_*).ts!",
+        "!convex/!(_*)/**/_*/**/*.ts!",
+        "!convex/**/*.d.ts!",
+        "convex/_agents/_shared/cachedLlm.ts!",
+        "convex/_agents/_shared/jobHelpers.ts!",
+        "convex/_agents/chat/rerankCache.ts!",
+        "convex/_agents/chat/sourceSuggestions.ts!",
+        "convex/_lib/arxivThrottle.ts!",
+        "convex/_lib/externalProviderCooldowns.ts!",
+        "convex/_lib/limits.ts!",
+        "convex/_lib/semanticScholarThrottle.ts!",
+        "convex/_migration/*.ts!",
+        "convex/_services/ai/embeddingClient.ts!",
+        "convex/_services/ai/titleGenerator.ts!",
+        "convex/_services/cache/cacheMetrics.ts!",
+        "convex/_services/extractors.ts!",
+        "convex/_services/search/AcademicSearchService.ts!",
+        "convex/_services/search/DiscoveryService.ts!",
+        "convex/_services/search/TavilySearchService.ts!",
+        "convex/eval/_studioRowCreators.ts!",
+        "evals/rag/runners/*.ts",
+        "evals/rag/fixtures/{fixtureTemplate,notebookLM_converter,scenarioCategories}.ts",
+        "scripts/**/*.{js,mjs,ts}",
+        "e2e/**/*.ts"
+      ],
+      "project": [
+        "convex/**/*.ts!",
+        "!convex/_testing/**!",
+        "evals/**/*.ts",
+        "scripts/**/*.{js,mjs,ts}",
+        "e2e/**/*.ts",
+        "*.{js,mjs,ts}",
+        "!convex/_generated/**",
+        "!archive/**",
+        "!flowcharts/**"
+      ],
+      "convex": false,
+      "ignoreBinaries": ["conda"],
+      "ignoreDependencies": ["vite", "@langchain/openai"]
+    },
+    "apps/web": {
+      "entry": ["scripts/**/*.ts!", "src/test/mocks/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx,css}!", "scripts/**/*.ts!", "*.{js,ts}"]
+    },
+    "apps/mobile": {
+      "entry": [
+        "app/**/*.{ts,tsx}!",
+        "**/*.{web,native,ios,android}.{ts,tsx}!",
+        "plugins/**/*.js!",
+        "scripts/**/*.mjs"
+      ],
+      "project": [
+        "app/**/*.{ts,tsx}!",
+        "src/**/*.{ts,tsx}!",
+        "components/**/*.{ts,tsx}!",
+        "constants/**/*.ts!",
+        "plugins/**/*.js!",
+        "scripts/**/*.mjs",
+        "*.js"
+      ],
+      "ignoreBinaries": ["subst"],
+      "ignoreDependencies": ["@expo/cli", "@react-native/gradle-plugin"]
+    }
+  }
+}

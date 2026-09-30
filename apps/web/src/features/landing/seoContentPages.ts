@@ -2,26 +2,26 @@ import type { FAQItem } from "./constants";
 
 export const SEO_CONTENT_LAST_UPDATED = "2026-09-15";
 
-export type SeoContentPageType = "compare" | "guide";
+type SeoContentPageType = "compare" | "guide";
 
-export type SeoContentSection = {
+type SeoContentSection = {
   h2: string;
   paragraphs: string[];
   bullets?: string[];
 };
 
-export type SeoContentComparisonRow = {
+type SeoContentComparisonRow = {
   topic: string;
   solomindlm: string;
   competitor: string;
 };
 
-export type SeoContentQuickAnswer = {
+type SeoContentQuickAnswer = {
   chooseSolomindlm: string;
   chooseCompetitor?: string;
 };
 
-export type SeoContentRelatedLink = {
+type SeoContentRelatedLink = {
   path: string;
   label: string;
   description: string;

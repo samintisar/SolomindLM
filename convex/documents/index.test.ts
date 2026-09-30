@@ -3,12 +3,14 @@ import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, ["./documents/index.ts"]);
 
 const MOCK_SOURCE_GUIDE = {
   summary: "A paper about neural networks.",

@@ -9,5 +9,3 @@ export const SEO_DEFAULT_KEYWORDS =
   "free ai study tool, ai study tool online, ai pdf study tool, ai study tools for students, AI flashcards, quizzes, mind maps, educational AI";
 
 export const SEO_DEFAULT_OG_IMAGE = `${SEO_BASE_URL}/SolomindLM_logo.png`;
-
-export const SEO_SITE_NAME = "SolomindLM";

@@ -2,13 +2,13 @@
  * Report type definitions and utilities
  */
 
-export interface ReportTypeConfig {
+interface ReportTypeConfig {
   id: string;
   displayName: string;
   description: string;
 }
 
-export const REPORT_TYPES: Record<string, ReportTypeConfig> = {
+const REPORT_TYPES: Record<string, ReportTypeConfig> = {
   custom: {
     id: "custom",
     displayName: "Custom",
@@ -84,7 +84,7 @@ export function normalizeReportTypeId(reportTypeId: string): string {
  * @param reportTypeId - The report type ID
  * @returns The display name for the report type
  */
-export function getReportTypeDisplayName(reportTypeId: string): string {
+function getReportTypeDisplayName(reportTypeId: string): string {
   const normalized = normalizeReportTypeId(reportTypeId);
   return REPORT_TYPES[normalized]?.displayName || "Report";
 }

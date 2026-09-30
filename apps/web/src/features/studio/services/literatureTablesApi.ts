@@ -27,13 +27,6 @@ export function useLiteratureTable(tableId: string | null) {
   );
 }
 
-export function useLiteratureReport(reportId: string | null) {
-  return useQuery(
-    api.studio.literature_tables.index.getLiteratureReport,
-    reportId ? { reportId: reportId as Id<"literatureReports"> } : "skip"
-  );
-}
-
 export function useLiteratureReportDetail(reportId: string | null) {
   return useQuery(
     api.studio.literature_tables.index.getLiteratureReportDetail,
@@ -46,14 +39,6 @@ export function useRankedPapersForSession(sessionId: string | null) {
     api.studio.literature_tables.index.getRankedPapersForSession,
     sessionId ? { sessionId: sessionId as Id<"literatureReviewSessions"> } : "skip"
   );
-}
-
-export function useConfirmLiteratureReviewColumns() {
-  return useMutation(api.studio.literature_tables.index.confirmLiteratureReviewColumns);
-}
-
-export function useRetryLiteratureReview() {
-  return useMutation(api.studio.literature_tables.index.retryLiteratureReview);
 }
 
 export function useSaveLiteratureReportAsStudioReport() {

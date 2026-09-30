@@ -2,7 +2,7 @@ import { ExternalLink, Globe, GraduationCap, Newspaper, Plus, TrendingUp, X } fr
 import React, { useCallback, useEffect, useState } from "react";
 import { Favicon } from "@/shared/components/Favicon";
 
-export interface ExternalSource {
+interface ExternalSource {
   title: string;
   url: string;
   snippet: string;

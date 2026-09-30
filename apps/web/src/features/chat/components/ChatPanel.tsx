@@ -461,7 +461,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
       const id = await onCreateConversation();
       if (id) {
-        // New thread has no messages; stale session ids would keep showing LiteratureReviewChatFlow
+        // New thread has no messages; stale session ids would keep showing the literature review
         // (or research overlays) from the previous conversation instead of a fresh empty chat.
         setActiveLiteratureSessionId(null);
         setComposerMode("chat");

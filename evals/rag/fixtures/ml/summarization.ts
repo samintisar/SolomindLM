@@ -54,8 +54,3 @@ export const mlSummarizationFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlSummarizationFixture(id: string): EvalFixture | undefined {
-  return mlSummarizationFixtures.find((f) => f.id === id);
-}

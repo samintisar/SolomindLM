@@ -70,18 +70,6 @@ function mapFlashcardToNote(dbFlashcard: any): FlashcardNote {
 }
 
 /**
- * Get all flashcard sets for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useFlashcards(notebookId: string | null) {
-  const flashcards = useQuery(
-    api.studio.flashcards.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return flashcards?.map(mapFlashcardToNote);
-}
-
-/**
  * Get a specific flashcard set by ID
  */
 export function useFlashcard(flashcardId: string | null) {
@@ -258,71 +246,6 @@ export async function exportFlashcardsCSV(
   window.URL.revokeObjectURL(url);
 }
 
-// ============================================================
-// Imperative API (for use in event handlers, outside React)
-// ============================================================
-
-import { ConvexClient } from "convex/browser";
-
-// Get or create a singleton Convex client
-let convexClient: ConvexClient | null = null;
-function getConvexClient(): ConvexClient {
-  if (!convexClient) {
-    const convexUrl = import.meta.env.VITE_CONVEX_URL;
-    if (!convexUrl) {
-      throw new Error("VITE_CONVEX_URL environment variable is not set");
-    }
-    convexClient = new ConvexClient(convexUrl);
-  }
-  return convexClient;
-}
-
-/**
- * Get a flashcard set (imperative version)
- */
-export async function getFlashcard(flashcardId: string): Promise<FlashcardNote> {
-  const client = getConvexClient();
-  const dbFlashcard = await client.query(api.studio.flashcards.index.get, {
-    id: flashcardId as Id<"flashcards">,
-  });
-  if (!dbFlashcard) {
-    throw new Error("Flashcard set not found");
-  }
-  return mapFlashcardToNote(dbFlashcard);
-}
-
-/**
- * Rename a flashcard set (imperative version)
- */
-export async function renameFlashcard(flashcardId: string, newTitle: string): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.update, {
-    id: flashcardId as Id<"flashcards">,
-    title: newTitle,
-  });
-}
-
-/**
- * Delete a flashcard set (imperative version)
- */
-export async function deleteFlashcard(flashcardId: string): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.remove, {
-    id: flashcardId as Id<"flashcards">,
-  });
-}
-
-/**
- * Get flashcards (imperative version)
- */
-export async function getFlashcards(notebookId: string): Promise<FlashcardNote[]> {
-  const client = getConvexClient();
-  const dbFlashcards = await client.query(api.studio.flashcards.index.list, {
-    notebookId: notebookId as Id<"notebooks">,
-  });
-  return dbFlashcards?.map(mapFlashcardToNote) ?? [];
-}
-
 // ============================================================================
 // NEW HOOKS FOR FLASHCARD FEATURES
 // ============================================================================
@@ -425,88 +348,4 @@ export function useUpdateFlashcardPreferences() {
       ...preferences,
     });
   };
-}
-
-/**
- * Submit card review (imperative version)
- */
-export async function submitCardReview(
-  flashcardId: string,
-  cardIndex: number,
-  rating: "again" | "hard" | "good" | "easy"
-): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.submitCardReview, {
-    id: flashcardId as Id<"flashcards">,
-    cardIndex,
-    rating,
-  });
-}
-
-/**
- * Get due cards (imperative version)
- */
-export async function getDueCards(
-  flashcardId: string
-): Promise<Array<{ index: number; card: Flashcard }>> {
-  const client = getConvexClient();
-  return await client.query(api.studio.flashcards.index.getDueCards, {
-    id: flashcardId as Id<"flashcards">,
-    nowMs: Date.now(),
-  });
-}
-
-/**
- * Update card (imperative version)
- */
-export async function updateCard(
-  flashcardId: string,
-  cardIndex: number,
-  updates: { front?: string; back?: string }
-): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.updateCard, {
-    id: flashcardId as Id<"flashcards">,
-    cardIndex,
-    ...updates,
-  });
-}
-
-/**
- * Add card (imperative version)
- */
-export async function addCard(
-  flashcardId: string,
-  card: { front: string; back: string; topic?: string; type?: Flashcard["type"] }
-): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.addCard, {
-    id: flashcardId as Id<"flashcards">,
-    ...card,
-  });
-}
-
-/**
- * Delete card (imperative version)
- */
-export async function deleteCard(flashcardId: string, cardIndex: number): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.deleteCard, {
-    id: flashcardId as Id<"flashcards">,
-    cardIndex,
-  });
-}
-
-/**
- * Update flashcard preferences (imperative version)
- */
-export async function updateFlashcardPreferences(
-  flashcardId: string,
-  preferences: { showMastered?: boolean }
-): Promise<void> {
-  const client = getConvexClient();
-  await client.mutation(api.studio.flashcards.index.updatePreferences, {
-    id: flashcardId as Id<"flashcards">,
-    ...preferences,
-  });
 }

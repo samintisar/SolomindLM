@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/useAuth";
-import { Source } from "@/shared/types";
-import { useDocumentContent } from "../services/documentsApi";
 
 interface UseSourceContentResult {
   // State
@@ -132,32 +130,4 @@ export function useSourceContent(): UseSourceContentResult {
     onLoadingStart,
     normalizeContentNewlines,
   };
-}
-
-/**
- * Hook to fetch and cache content for a specific source
- */
-export function useSourceContentFetcher(
-  source: Source | null | undefined,
-  sourceId: string | null,
-  onContentUpdate: (sourceId: string, content: string) => void,
-  onError: (sourceId: string, error: string) => void,
-  onLoadingStart: (sourceId: string) => void
-) {
-  const documentContent = useDocumentContent(
-    source && source.status === "completed" ? sourceId : null
-  );
-
-  useEffect(() => {
-    if (sourceId && documentContent) {
-      if (documentContent.content) {
-        onContentUpdate(sourceId, documentContent.content);
-      }
-    } else if (sourceId && source?.status === "completed") {
-      // Check if we've been waiting too long (might be an error)
-      if (documentContent === undefined) {
-        onLoadingStart(sourceId);
-      }
-    }
-  }, [sourceId, documentContent, source?.status, onContentUpdate, onError, onLoadingStart]);
 }
