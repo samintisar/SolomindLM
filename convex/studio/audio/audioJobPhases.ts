@@ -46,6 +46,7 @@ import {
 import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import type { AudioSynthesisInput } from "../jobMutations/audio";
 
 // ============================================================
 // CONFIGURATION
@@ -87,6 +88,8 @@ export type FinalizeAudioOverviewPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
 };
+
+export type SynthesizeAudioOverviewPhaseArgs = FinalizeAudioOverviewPhaseArgs;
 
 /** Kokoro (or other Together TTS) voice IDs per host */
 const VOICES = {
@@ -433,7 +436,7 @@ export async function runProcessAudioMapChunkPhase(
 }
 
 // ============================================================
-// PHASE 3: Finalize (Collapse + Write Script + Synthesize + Upload)
+// PHASE 3: Finalize (Collapse + Write Script, then schedule synthesis)
 // ============================================================
 
 export async function runFinalizeAudioOverviewPhase(
@@ -632,22 +635,123 @@ export async function runFinalizeAudioOverviewPhase(
 
     console.log(`[AudioJob] Generated ${fullDialogueScript.length} dialogue lines`);
 
-    // Update status for audio synthesis
-    await ctx.runMutation(internal.studio.jobMutations.audio.updateAudioOverviewStatus, {
+    const reduceLatencyMs = Date.now() - reduceStartTime;
+
+    // Generate title
+    let title = "Audio Overview";
+    try {
+      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
+        chunk: combined.substring(0, 2000),
+      });
+    } catch (_e) {
+      console.log("[AudioJob] Title generation failed, using default");
+    }
+
+    // TTS runs in its own action so it gets a full action time budget: script writing plus TTS
+    // in one action could exceed the 10-minute limit and leave the job stuck.
+    const stored = await ctx.runMutation(
+      internal.studio.jobMutations.audio.storeAudioOverviewScript,
+      {
+        audioOverviewId,
+        synthesisInput: {
+          script: fullDialogueScript,
+          title,
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+          telemetry: aggregateStudioJobTelemetry({
+            mapResults: Object.values(mapResults),
+            reduce: {
+              latencyMs: reduceLatencyMs,
+              ...(reduceUsage !== undefined ? { tokenUsage: reduceUsage } : {}),
+            },
+          }),
+        },
+      }
+    );
+    if (!stored) {
+      console.log("[AudioJob] Audio overview deleted during finalization");
+      return;
+    }
+    await ctx.scheduler.runAfter(0, internal.studio.audio.job.synthesizeAudioOverviewPhase, {
       audioOverviewId,
-      status: "generating",
+      userId,
+      notebookId,
+    });
+    logger.info("Script ready, scheduled synthesis", {
+      dialogueLines: fullDialogueScript.length,
+    });
+  } catch (error) {
+    const errorMeta = createErrorMetadata(error, "finalization");
+
+    logger.jobError(error, {
+      phase: "finalization",
+      errorType: errorMeta.type,
+      retryable: errorMeta.retryable,
+    });
+
+    await ctx.runMutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
+      audioOverviewId,
+      error: errorMeta.message,
       metadata: {
-        phase: "synthesizing",
-        progress: 70,
-        currentStep: "Synthesizing audio...",
+        phase: "failed",
+        errorPhase: "finalization",
+        errorType: errorMeta.type,
+        retryable: errorMeta.retryable,
+        failedAt: Date.now(),
       },
     });
 
-    const reduceLatencyMs = Date.now() - reduceStartTime;
+    throw error;
+  }
+}
+
+// ============================================================
+// PHASE 4: Synthesize (TTS + Upload + Save)
+// ============================================================
+
+export async function runSynthesizeAudioOverviewPhase(
+  ctx: ActionCtx,
+  args: SynthesizeAudioOverviewPhaseArgs
+): Promise<void> {
+  "use node";
+
+  const { audioOverviewId, userId, notebookId } = args;
+
+  const logger = createJobLogger({
+    jobType: "audio",
+    jobId: audioOverviewId,
+    notebookId,
+    userId,
+  });
+
+  try {
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    if (!audioOverview) {
+      console.log("[AudioJob] Audio overview deleted before synthesis");
+      return;
+    }
+
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    if (!synthesisInput || synthesisInput.script.length === 0) {
+      throw new Error("No dialogue script stored for synthesis");
+    }
+    const {
+      script: fullDialogueScript,
+      title,
+      mapSuccessCount,
+      mapFailedCount,
+      telemetry,
+    } = synthesisInput;
+
     const ttsStartTime = Date.now();
     const ttsClient = createTogetherTtsClient();
     const results: { index: number; buffer: Buffer | null }[] = [];
     const BATCH_SIZE = 5;
+    let firstSynthesisError: string | undefined;
 
     for (let i = 0; i < fullDialogueScript.length; i += BATCH_SIZE) {
       const batchLines = fullDialogueScript.slice(i, i + BATCH_SIZE);
@@ -664,8 +768,10 @@ export async function runFinalizeAudioOverviewPhase(
             timeoutMs: CONFIG.TTS_TIMEOUT_MS,
           });
           return { index: globalIndex, buffer };
-        } catch (_error) {
-          console.log(`[AudioJob] Failed line ${globalIndex + 1}`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          firstSynthesisError ??= message;
+          console.log(`[AudioJob] Failed line ${globalIndex + 1}: ${message}`);
           return { index: globalIndex, buffer: null };
         }
       });
@@ -682,7 +788,9 @@ export async function runFinalizeAudioOverviewPhase(
     const successCount = sortedBuffers.length;
 
     if (successCount < fullDialogueScript.length * 0.5) {
-      throw new Error(`Too many synthesis failures: ${successCount}/${fullDialogueScript.length}`);
+      throw new Error(
+        `Too many synthesis failures: ${successCount}/${fullDialogueScript.length} lines synthesized (first error: ${firstSynthesisError ?? "unknown"})`
+      );
     }
 
     const wavBuffer = concatenateWavBuffers(sortedBuffers);
@@ -726,16 +834,6 @@ export async function runFinalizeAudioOverviewPhase(
     // Build transcript
     const transcript = fullDialogueScript.map((l) => l.text).join("\n");
 
-    // Generate title
-    let title = "Audio Overview";
-    try {
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: combined.substring(0, 2000),
-      });
-    } catch (_e) {
-      console.log("[AudioJob] Title generation failed, using default");
-    }
-
     // Save results
     await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
       audioOverviewId,
@@ -747,15 +845,17 @@ export async function runFinalizeAudioOverviewPhase(
           phase: "completed",
           progress: 100,
           completedAt: Date.now(),
-          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-          mapFailedCount: failedCount.count,
+          mapSuccessCount,
+          mapFailedCount,
           dialogueLines: successCount,
         },
-        aggregateStudioJobTelemetry({
-          mapResults: Object.values(mapResults),
-          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
-          extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
-        })
+        {
+          ...telemetry,
+          stageSpans: [
+            ...(telemetry.stageSpans ?? []),
+            { stage: "tts", latencyMs: Date.now() - ttsStartTime },
+          ],
+        }
       ),
     });
 
@@ -763,14 +863,14 @@ export async function runFinalizeAudioOverviewPhase(
       title,
       audioUrl,
       transcriptLength: transcript.length,
-      mapSuccess: Object.keys(mapResults).length - failedCount.count,
-      mapFailed: failedCount.count,
+      mapSuccess: mapSuccessCount,
+      mapFailed: mapFailedCount,
     });
   } catch (error) {
-    const errorMeta = createErrorMetadata(error, "finalization");
+    const errorMeta = createErrorMetadata(error, "synthesis");
 
     logger.jobError(error, {
-      phase: "finalization",
+      phase: "synthesis",
       errorType: errorMeta.type,
       retryable: errorMeta.retryable,
     });
@@ -780,7 +880,7 @@ export async function runFinalizeAudioOverviewPhase(
       error: errorMeta.message,
       metadata: {
         phase: "failed",
-        errorPhase: "finalization",
+        errorPhase: "synthesis",
         errorType: errorMeta.type,
         retryable: errorMeta.retryable,
         failedAt: Date.now(),
