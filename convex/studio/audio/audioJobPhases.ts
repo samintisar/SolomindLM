@@ -777,6 +777,36 @@ export async function runSynthesizeAudioOverviewPhase(
       throw new Error("No dialogue script stored for synthesis");
     }
 
+    // Script-only eval jobs measure the script, so they complete here without TTS time or cost.
+    if (audioOverview.metadata?.skipTts === true) {
+      const { script, title, mapSuccessCount, mapFailedCount, telemetry } = synthesisInput;
+      const transcript = script.map((l) => l.text).join("\n");
+      await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
+        audioOverviewId,
+        transcript,
+        metadata: withStudioTelemetryMetadata(
+          {
+            title,
+            phase: "completed",
+            progress: 100,
+            completedAt: Date.now(),
+            mapSuccessCount,
+            mapFailedCount,
+            dialogueLines: script.length,
+          },
+          telemetry
+        ),
+      });
+      logger.jobComplete({
+        title,
+        skippedTts: true,
+        transcriptLength: transcript.length,
+        mapSuccess: mapSuccessCount,
+        mapFailed: mapFailedCount,
+      });
+      return;
+    }
+
     const chunks = planSynthesisChunks(synthesisInput.script.length);
     const planned = await ctx.runMutation(internal.studio.jobMutations.audio.initAudioSynthesis, {
       audioOverviewId,
