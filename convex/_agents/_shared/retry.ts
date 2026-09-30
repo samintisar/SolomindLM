@@ -7,6 +7,7 @@
  */
 
 import { ExternalServiceError, isRetryableHttpStatus } from "../../_lib/errors";
+import { EmptyLlmResponseError } from "./llmErrors.js";
 
 /**
  * Configuration for retry behavior.
@@ -28,8 +29,11 @@ export interface RetryConfig {
  * Default error detection function.
  * Returns true for errors that should be retried (rate limits, server errors, network issues).
  * Returns false for errors that should not be retried (validation, timeout, auth).
+ * An empty completion is a bad sample (e.g. reasoning spent the output budget), so it is retried.
  */
-function isRetryableError(error: Error): boolean {
+export function isRetryableError(error: Error): boolean {
+  if (error instanceof EmptyLlmResponseError) return true;
+
   const msg = error.message.toLowerCase();
 
   // Don't retry: validation, timeout, auth errors

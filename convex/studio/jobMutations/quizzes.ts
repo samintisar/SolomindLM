@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import { normalizeQuizQuestion } from "../../_agents/quiz/optionLabels";
+import type { QuizQuestion } from "../../_agents/quiz/prompts";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
@@ -14,7 +16,11 @@ export const saveQuizResults = internalMutation({
     const quiz = await ctx.db.get(args.quizId);
     if (!quiz) return null;
 
-    const normalizedQuestions = normalizeMathMarkdownDeep(args.questions);
+    // Normalize at the storage boundary so every generation path gets label stripping,
+    // 4-option coercion and the answer-position shuffle (LLMs put the answer first).
+    const normalizedQuestions = normalizeMathMarkdownDeep(
+      (args.questions as QuizQuestion[]).map((q) => normalizeQuizQuestion(q))
+    );
     const title = args.metadata?.title ?? "Quiz";
 
     await ctx.db.patch(args.quizId, {

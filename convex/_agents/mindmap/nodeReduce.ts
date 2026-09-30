@@ -5,6 +5,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messag
 
 import { invokeWithTimeout, validateWithPreset } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 
 import { GRAPH_CONFIG } from "./config.js";
 import { createSmartFallback } from "./fallbacks.js";
@@ -77,7 +78,7 @@ export async function reduceNode(
       () =>
         (smartLlm as any).invoke([
           new SystemMessage(REDUCE_SYSTEM_PROMPT),
-          new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
+          new HumanMessage(fillTemplate(REDUCE_PROMPT, { extractions: safeInput })),
         ]),
       GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
       "MindMapReduce"

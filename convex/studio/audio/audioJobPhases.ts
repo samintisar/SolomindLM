@@ -9,7 +9,9 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { EmptyLlmResponseError } from "../../_agents/_shared/llmErrors";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { isRetryableError } from "../../_agents/_shared/retry";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
 import {
   aggregateStudioJobTelemetry,
@@ -55,6 +57,12 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk
   REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
   REDUCE_MAX_OUTPUT_TOKENS: 16_384,
+  /**
+   * Script writing runs with reasoning off. The smart model thinks by default and its reasoning
+   * shares `max_tokens` with the answer; on a ~220-line script it often spent the whole budget
+   * thinking and returned no script (finish_reason=length, #198).
+   */
+  REDUCE_REASONING_ENABLED: false,
   TTS_TIMEOUT_MS: 300_000, // 5 minutes
 } as const;
 
@@ -470,6 +478,12 @@ export async function runFinalizeAudioOverviewPhase(
 
     const mapResults = (audioOverview.metadata?.mapResults as Record<string, string>) || {};
 
+    // Map output is held in memory from here; drop it from the row so the finalize-phase
+    // status updates don't rewrite and re-send it.
+    await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
+      audioOverviewId,
+    });
+
     // Separate successful and failed results
     const allBeats: string[] = [];
     const failedCount = { count: 0 };
@@ -544,7 +558,7 @@ export async function runFinalizeAudioOverviewPhase(
     const minimumDialogueLines = getMinimumDialogueLines(targetLines);
 
     console.log(
-      `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`
+      `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, reasoning=${CONFIG.REDUCE_REASONING_ENABLED}`
     );
 
     const reducePrompt = getReducePrompt({
@@ -566,6 +580,8 @@ export async function runFinalizeAudioOverviewPhase(
     const REDUCE_PARSE_RETRY_BUDGET_MS = 180_000;
     const REDUCE_FORMAT_REMINDER =
       "\n\nIMPORTANT: Your previous reply could not be used because it was not a complete, valid JSON array of dialogue lines. Respond with ONLY the JSON array (no commentary, no code fences), make sure every object is complete, and close the array.";
+    const REDUCE_LENGTH_REMINDER =
+      "\n\nIMPORTANT: Your previous reply was empty because it ran out of output space before any usable script was produced. Respond with ONLY the JSON array (no commentary, no code fences), keep each turn concise so the complete script fits, and close the array.";
     let reduceUsage: TokenUsage | undefined;
     const reduceStartTime = Date.now();
 
@@ -579,23 +595,34 @@ export async function runFinalizeAudioOverviewPhase(
             `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${reason}. Response preview: ${responseText.slice(0, 500)}`
           );
         },
-        generate: (attempt) =>
+        generate: (attempt, previousFailure) =>
           invokeStudioLlm({
             invoke: () =>
               invokeTogetherText({
                 systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-                userPrompt: attempt === 1 ? reducePrompt : reducePrompt + REDUCE_FORMAT_REMINDER,
+                userPrompt:
+                  previousFailure === "empty_response"
+                    ? reducePrompt + REDUCE_LENGTH_REMINDER
+                    : previousFailure === "invalid_script"
+                      ? reducePrompt + REDUCE_FORMAT_REMINDER
+                      : reducePrompt,
                 model: env.AUDIO_LLM,
                 maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
                 temperature: attempt === 1 ? 0.6 : 0.3,
-                reasoningEnabled: true,
+                reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
                 onUsage: (usage) => {
                   reduceUsage = addTokenUsage(reduceUsage, usage);
                 },
               }),
             timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
             phaseLabel: "AudioReduce",
-            retry: { maxAttempts: attempt === 1 ? 2 : 1, baseDelayMs: 1000 },
+            retry: {
+              maxAttempts: attempt === 1 ? 2 : 1,
+              baseDelayMs: 1000,
+              // Empty completions are retried by the script loop, with a length reminder.
+              retryableErrors: (error) =>
+                !(error instanceof EmptyLlmResponseError) && isRetryableError(error),
+            },
           }),
       });
 
@@ -730,11 +757,6 @@ export async function runFinalizeAudioOverviewPhase(
           extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
         })
       ),
-    });
-
-    // Clear intermediate data
-    await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
-      audioOverviewId,
     });
 
     logger.jobComplete({

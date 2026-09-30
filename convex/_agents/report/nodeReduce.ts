@@ -4,6 +4,7 @@ import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
@@ -171,9 +172,10 @@ Do NOT combine topics or focus primarily on one.
     );
   }
 
-  let prompt = promptTemplate
-    .replace("{content}", combined)
-    .replace("{customPrompt}", sanitizeUserInput(state.customPrompt || ""));
+  let prompt = fillTemplate(promptTemplate, {
+    content: combined,
+    customPrompt: sanitizeUserInput(state.customPrompt || ""),
+  });
 
   const customFocus = state.customPrompt?.trim();
   if (customFocus && state.reportType !== "custom") {
