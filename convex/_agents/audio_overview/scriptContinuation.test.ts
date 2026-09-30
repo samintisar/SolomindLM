@@ -48,7 +48,7 @@ describe("planScriptContinuation", () => {
       cutOff: true,
     });
 
-    expect(plan).toEqual({ keepLines: 220, turns: expect.any(Number) });
+    expect(plan).toMatchObject({ keepLines: 220, wrapUp: true });
     expect(plan?.turns).toBeGreaterThanOrEqual(2);
     expect(plan?.turns).toBeLessThanOrEqual(6);
   });
@@ -99,7 +99,7 @@ describe("continueScriptIfNeeded", () => {
       generate,
     });
 
-    expect(generate).toHaveBeenCalledWith(script.slice(0, 98), expect.any(Number));
+    expect(generate).toHaveBeenCalledWith(script.slice(0, 98), expect.any(Number), false);
     expect(result).toHaveLength(100);
     expect(result.slice(-2).map((l) => l.text)).toEqual(["Continuing the point.", "And closing."]);
   });
@@ -192,7 +192,9 @@ describe("continueScriptIfNeeded runaway guard", () => {
     const requested = generate.mock.calls[0][1] as number;
     const maxLines = Math.ceil(requested * 1.5);
     expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[0][2]).toBe(false);
     expect(generate.mock.calls[1][1]).toBe(4);
+    expect(generate.mock.calls[1][2]).toBe(true);
     // No middle cut: the kept continuation runs straight on from the script so far.
     expect(result.slice(98, 98 + maxLines).map((l) => l.text)).toEqual(runaway.slice(0, maxLines));
     expect(result).toHaveLength(98 + maxLines + 2);
@@ -282,7 +284,7 @@ describe("script line cap", () => {
         maxLines: 350,
         cutOff: true,
       })
-    ).toEqual({ keepLines: 346, turns: 4 });
+    ).toEqual({ keepLines: 344, turns: 4, wrapUp: true });
   });
 
   it("keeps a continuation that overshoots within the cap, then wraps up", async () => {
@@ -307,5 +309,41 @@ describe("script line cap", () => {
 
     expect(result.length).toBeLessThanOrEqual(350);
     expect(result.at(-1)?.text).toBe("Thanks for listening, everyone.");
+  });
+});
+
+describe("first drafts over the line cap", () => {
+  it("trims a complete over-cap draft and asks only for a wrap-up", () => {
+    expect(
+      planScriptContinuation({
+        script: lines(180, 22),
+        targetWords: 2000,
+        maxLines: 100,
+        cutOff: false,
+      })
+    ).toEqual({ keepLines: 94, turns: 4, wrapUp: true });
+  });
+
+  it("ends an over-cap draft with the wrap-up within the cap", async () => {
+    const generate = vi.fn().mockResolvedValue(
+      JSON.stringify([
+        { speaker: "host_a", text: "Which is a fair place to land on that point." },
+        { speaker: "host_b", text: "Agreed. Thanks for listening, everyone." },
+      ])
+    );
+
+    const result = await continueScriptIfNeeded({
+      script: lines(180, 22),
+      cutOff: false,
+      targetWords: 2000,
+      maxLines: 100,
+      canContinue: () => true,
+      generate,
+    });
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(generate.mock.calls[0][2]).toBe(true);
+    expect(result).toHaveLength(96);
+    expect(result.at(-1)?.text).toBe("Agreed. Thanks for listening, everyone.");
   });
 });

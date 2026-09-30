@@ -281,6 +281,31 @@ SCRIPT SO FAR (JSON):
 
 Write the next ~{turns} turns as a JSON array. Output ONLY the JSON, no markdown formatting:`;
 
+/** Ends a dialogue script that stopped mid-conversation. */
+export const WRAP_UP_PROMPT = `You are finishing a two-host podcast script that stops mid-conversation. Write the FINAL 2–4 dialogue turns that bring the episode to a natural close.
+
+Output ONLY a valid JSON array of the NEW dialogue lines (do not repeat the script so far):
+[
+  {"speaker": "host_a", "text": "..."},
+  {"speaker": "host_b", "text": "..."}
+]
+
+RULES:
+- The first new turn responds to the last line of the script so far and settles that point in a sentence or two.
+- Do NOT raise new topics, questions, or examples. This is the end of the episode.
+- The LAST turn is host_b's closing: one or two sentences with a takeaway or sign-off for the listener.
+- Write no more than 4 turns.
+- Keep the same voices: host_a is the scattered but specific domain expert; host_b is the skeptical audience surrogate who challenges and translates.
+- Do not use "..." as a stylistic pause. Do not include host names in the text.
+
+AUDIO TYPE: {audioType}
+FOCUS AREA: {focus}
+
+SCRIPT SO FAR (JSON):
+{scriptSoFar}
+
+Write the final turns as a JSON array. Output ONLY the JSON, no markdown formatting:`;
+
 // ============================================================
 // Helper Functions
 // ============================================================
@@ -331,6 +356,21 @@ export function getContinuationPrompt(params: {
     content: params.content,
     scriptSoFar: JSON.stringify(params.scriptSoFar),
     turns: params.turns.toString(),
+    audioType: params.audioType,
+    focus: params.focus || "general overview",
+  });
+}
+
+/**
+ * Gets the wrap-up prompt for ending a script that stops mid-conversation.
+ */
+export function getWrapUpPrompt(params: {
+  scriptSoFar: DialogueLine[];
+  audioType: AudioType;
+  focus: string;
+}): string {
+  return fillTemplate(WRAP_UP_PROMPT, {
+    scriptSoFar: JSON.stringify(params.scriptSoFar),
     audioType: params.audioType,
     focus: params.focus || "general overview",
   });

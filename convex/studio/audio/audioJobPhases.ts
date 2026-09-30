@@ -27,6 +27,7 @@ import {
   getContinuationPrompt,
   getMapPrompt,
   getReducePrompt,
+  getWrapUpPrompt,
   MAP_SYSTEM_PROMPT,
   REDUCE_SYSTEM_PROMPT,
   TARGET_LINE_COUNTS,
@@ -668,19 +669,22 @@ export async function runFinalizeAudioOverviewPhase(
       // out of TTS action time or memory.
       maxLines: targetLines,
       canContinue: () => remainingReduceBudgetMs() >= CONFIG.CONTINUATION_MIN_TIMEOUT_MS,
-      generate: (scriptSoFar, turns) => {
+      generate: (scriptSoFar, turns, wrapUp) => {
         const maxTokens = getContinuationMaxTokens(turns, CONFIG.REDUCE_MAX_OUTPUT_TOKENS);
+        const focus = sanitizedFocus || "general overview";
         return invokeStudioLlm({
           invoke: () =>
             invokeTogetherText({
               systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-              userPrompt: getContinuationPrompt({
-                content: combined,
-                scriptSoFar,
-                turns,
-                audioType,
-                focus: sanitizedFocus || "general overview",
-              }),
+              userPrompt: wrapUp
+                ? getWrapUpPrompt({ scriptSoFar, audioType, focus })
+                : getContinuationPrompt({
+                    content: combined,
+                    scriptSoFar,
+                    turns,
+                    audioType,
+                    focus,
+                  }),
               model: env.AUDIO_LLM,
               maxTokens,
               temperature: 0.6,

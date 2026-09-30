@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getContinuationPrompt, getMapPrompt, getReducePrompt } from "./prompts";
+import { getContinuationPrompt, getMapPrompt, getReducePrompt, getWrapUpPrompt } from "./prompts";
 
 const baseParams = {
   content: "BEATS",
@@ -51,5 +51,18 @@ describe("getContinuationPrompt", () => {
     expect(prompt).toContain("Last line so far.");
     expect(prompt).toMatch(/\b42\b/);
     expect(prompt).not.toMatch(/\{(content|scriptSoFar|turns|audioType|focus)\}/);
+  });
+});
+
+describe("getWrapUpPrompt", () => {
+  it("includes the script so far with no unfilled placeholders", () => {
+    const prompt = getWrapUpPrompt({
+      scriptSoFar: [{ speaker: "host_a", text: "Last line so far." }],
+      audioType: "deep_dive",
+      focus: "general overview",
+    });
+
+    expect(prompt).toContain("Last line so far.");
+    expect(prompt).not.toMatch(/\{(scriptSoFar|audioType|focus)\}/);
   });
 });
