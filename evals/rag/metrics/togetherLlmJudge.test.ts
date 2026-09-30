@@ -64,6 +64,48 @@ describe("createTogetherJudgeInvoker", () => {
     );
   });
 
+  it("does not take a draft verdict from reasoning prose as the answer", async () => {
+    create.mockResolvedValueOnce(
+      choice(
+        { content: "", reasoning: 'Tentatively {"pass": true, "reason": "ok"}. But wait, item X' },
+        "length"
+      )
+    );
+
+    await expect(createTogetherJudgeInvoker({ apiKey: "k" })("prompt")).rejects.toThrow(
+      /no JSON verdict.*finish_reason=length/i
+    );
+  });
+
+  it("does not take a verdict after prose in content that was cut off", async () => {
+    create.mockResolvedValueOnce(
+      choice({ content: 'Draft {"pass": true, "reason": "ok"}. But wait, item X' }, "length")
+    );
+
+    await expect(createTogetherJudgeInvoker({ apiKey: "k" })("prompt")).rejects.toThrow(
+      /no JSON verdict/i
+    );
+  });
+
+  it("returns the outer verdict, not an object nested inside it", async () => {
+    create.mockResolvedValueOnce(
+      choice({ content: 'Checked. {"pass": false, "evidence": {"missing": 2}, "reason": "x"}' })
+    );
+
+    await expect(createTogetherJudgeInvoker({ apiKey: "k" })("prompt")).resolves.toBe(
+      '{"pass": false, "evidence": {"missing": 2}, "reason": "x"}'
+    );
+  });
+
+  it("rejects JSON that is null or an array", async () => {
+    create.mockResolvedValueOnce(choice({ content: "null" }));
+    create.mockResolvedValueOnce(choice({ content: "[1, 2]" }));
+    const invoke = createTogetherJudgeInvoker({ apiKey: "k" });
+
+    await expect(invoke("prompt")).rejects.toThrow(/no JSON verdict/i);
+    await expect(invoke("prompt")).rejects.toThrow(/no JSON verdict/i);
+  });
+
   it("still accepts a JSON verdict that arrived in the reasoning field", async () => {
     create.mockResolvedValueOnce(
       choice({ content: "", reasoning: '{"pass": false, "reason": "missing items"}' })
