@@ -150,5 +150,6 @@ describe("script-only (skipTts) jobs", () => {
     expect(done?.title).toBe("Generated Title");
     expect(done?.metadata).toMatchObject({ phase: "completed", dialogueLines: 2 });
     expect(done?.metadata.synthesisInput).toBeUndefined();
-  });
+    // Generous timeout: the first action call loads the whole audio job module.
+  }, 30000);
 });
