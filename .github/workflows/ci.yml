@@ -15,6 +15,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege for every job's GITHUB_TOKEN: jobs only check out code.
+# actions/cache and upload-artifact use the runtime token, not this one.
+# A job that needs more must declare its own `permissions:` block.
+permissions:
+  contents: read
+
 env:
   NODE_OPTIONS: "--max-old-space-size=4096"
 
