@@ -8,6 +8,7 @@ import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { cn } from "@/shared/utils/cn";
 import { notebookMeta } from "../../notebookMeta";
 import { type CardAction, CardActionsMenu } from "./CardActionsMenu";
+import { CARD_OPEN_BUTTON_CLASS } from "./cardClasses";
 
 interface NotebookCardProps {
   notebook: NotebookItem;
@@ -88,7 +89,10 @@ export function NotebookCard(props: NotebookCardProps) {
           <button
             type="button"
             onClick={open}
-            className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            className={cn(
+              CARD_OPEN_BUTTON_CLASS,
+              "flex min-w-0 flex-1 items-center gap-3 p-3 text-left"
+            )}
           >
             <span
               className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", fill)}
@@ -125,7 +129,7 @@ export function NotebookCard(props: NotebookCardProps) {
         <button
           type="button"
           onClick={open}
-          className="flex h-full flex-col text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          className={cn(CARD_OPEN_BUTTON_CLASS, "flex h-full flex-col text-left")}
         >
           <span className={cn("flex h-20 w-full items-end p-3", fill)}>
             <Icon aria-hidden className={cn("size-8", COVER_ICON_CLASS)} />
