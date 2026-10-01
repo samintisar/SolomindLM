@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { FiltersPopover } from "./FiltersPopover";
@@ -16,7 +16,62 @@ describe("ResearchDatabaseMenu", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Research databases/ }));
     await userEvent.click(await screen.findByRole("radio", { name: /PubMed/ }));
     expect(onChange).toHaveBeenCalledWith("pubmed");
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
+  });
+
+  test("clicking the row text selects and closes", async () => {
+    const onChange = vi.fn();
+    render(<ResearchDatabaseMenu value="all" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Research databases/ }));
+    await userEvent.click(await screen.findByText("Explore research preprints from arXiv"));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("arxiv");
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
+  });
+
+  test("arrow keys change the value but keep the popover open", async () => {
+    const onChange = vi.fn();
+    render(<ResearchDatabaseMenu value="all" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Research databases/ }));
+    const first = await screen.findByRole("radio", { name: "All Papers" });
+    first.focus();
+    // Hold the key: Radix selects on focus only while an arrow key is down.
+    await userEvent.keyboard("{ArrowDown>}");
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith("pubmed"));
+    await userEvent.keyboard("{/ArrowDown}");
+    expect(screen.getByRole("radio", { name: "PubMed" })).toBeInTheDocument();
+  });
+
+  test("Enter on a radio chooses it and closes", async () => {
+    const onChange = vi.fn();
+    render(<ResearchDatabaseMenu value="all" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Research databases/ }));
+    const radio = await screen.findByRole("radio", { name: "ArXiv" });
+    radio.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(onChange).toHaveBeenLastCalledWith("arxiv");
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
+  });
+
+  test("Space on a radio chooses it and closes", async () => {
+    const onChange = vi.fn();
+    render(<ResearchDatabaseMenu value="all" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Research databases/ }));
+    const radio = await screen.findByRole("radio", { name: "PubMed" });
+    radio.focus();
+    await userEvent.keyboard(" ");
+    expect(onChange).toHaveBeenLastCalledWith("pubmed");
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
+  });
+
+  test("Escape closes and focus returns to the trigger", async () => {
+    render(<ResearchDatabaseMenu value="all" onChange={vi.fn()} />);
+    const trigger = screen.getByRole("button", { name: /^Research databases/ });
+    await userEvent.click(trigger);
+    await screen.findByRole("radio", { name: "PubMed" });
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 
   test("checks the current database and exposes its description", async () => {
@@ -61,6 +116,69 @@ describe("FiltersPopover", () => {
     );
     expect(screen.getByRole("checkbox", { name: "Notebook sources" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Web" })).toBeEnabled();
+  });
+
+  test("explains why the last channel is locked", async () => {
+    render(
+      <FiltersPopover mode="chat" sourceFilters={["notebook"]} onSourceFilterChange={vi.fn()} />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const locked = await screen.findByRole("checkbox", { name: "Notebook sources" });
+    expect(locked).toHaveAccessibleDescription("At least one source is required");
+    expect(screen.getByRole("checkbox", { name: "Web" })).not.toHaveAccessibleDescription();
+  });
+
+  test("shows no lock hint while several channels are on", async () => {
+    render(
+      <FiltersPopover
+        mode="chat"
+        sourceFilters={["notebook", "web"]}
+        onSourceFilterChange={vi.fn()}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    await screen.findByRole("checkbox", { name: "Web" });
+    expect(screen.queryByText("At least one source is required")).not.toBeInTheDocument();
+  });
+
+  test("clicking a row's label text toggles exactly once", async () => {
+    const onSourceFilterChange = vi.fn();
+    render(
+      <FiltersPopover
+        mode="chat"
+        sourceFilters={["notebook"]}
+        onSourceFilterChange={onSourceFilterChange}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    await userEvent.click(await screen.findByText("Finance"));
+    expect(onSourceFilterChange).toHaveBeenCalledTimes(1);
+    expect(onSourceFilterChange).toHaveBeenCalledWith(["notebook", "finance"]);
+  });
+
+  test("without a change handler every checkbox is disabled", async () => {
+    render(<FiltersPopover mode="chat" sourceFilters={["notebook", "web"]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const boxes = await screen.findAllByRole("checkbox");
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const box of boxes) expect(box).toBeDisabled();
+  });
+
+  test("Escape closes and focus returns to the trigger", async () => {
+    render(
+      <FiltersPopover mode="chat" sourceFilters={["notebook"]} onSourceFilterChange={vi.fn()} />
+    );
+    const trigger = screen.getByRole("button", { name: "Filters" });
+    await userEvent.click(trigger);
+    await screen.findByRole("checkbox", { name: "Web" });
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("checkbox")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+  });
+
+  test("literature mode without a filter handler renders nothing", () => {
+    const { container } = render(<FiltersPopover mode="literatureReview" sourceFilters={[]} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   test("turning a channel on adds it", async () => {
@@ -124,7 +242,8 @@ describe("FiltersPopover", () => {
         onAcademicDiscoveryFiltersChange={vi.fn()}
       />
     );
-    expect(screen.getByRole("button", { name: "Filters (active)" })).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Filters" });
+    expect(trigger).toHaveAccessibleDescription("academic filters applied");
   });
 
   test("academic filters count as active in chat only while the Academic channel is on", () => {
@@ -138,6 +257,21 @@ describe("FiltersPopover", () => {
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
 
     rerender(<FiltersPopover {...props} sourceFilters={["notebook", "academic"]} />);
-    expect(screen.getByRole("button", { name: "Filters (active)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filters" })).toHaveAccessibleDescription(
+      "academic filters applied"
+    );
+  });
+
+  test("the tooltip mentions applied academic filters", async () => {
+    render(
+      <FiltersPopover
+        mode="literatureReview"
+        sourceFilters={["notebook"]}
+        academicDiscoveryFilters={{ openAccessOnly: true }}
+        onAcademicDiscoveryFiltersChange={vi.fn()}
+      />
+    );
+    await userEvent.hover(screen.getByRole("button", { name: "Filters" }));
+    expect(await screen.findAllByText("Filters · academic filters applied")).not.toHaveLength(0);
   });
 });

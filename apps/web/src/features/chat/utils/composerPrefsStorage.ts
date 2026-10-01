@@ -4,16 +4,16 @@ import {
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
   isComposerMode,
   isResearchDatabase,
+  isSourceFilterId,
   type ResearchDatabaseOption,
+  type SourceFilterId,
 } from "../components/composer/constants";
 
 const COMPOSER_PREFS_STORAGE_KEY_PREFIX = "solomind:chat-composer:v1:";
 
-const SOURCE_CHANNEL_IDS = ["notebook", "academic", "web", "news", "finance"] as const;
-
 export type PersistedComposerPrefs = {
   mode: ChatComposerMode;
-  sourceFilters: string[];
+  sourceFilters: SourceFilterId[];
   researchDatabase: ResearchDatabaseOption;
 };
 
@@ -57,10 +57,9 @@ export function parseStoredComposerPrefs(raw: string | null): PersistedComposerP
     return null;
   }
 
-  const allowed = new Set<string>(SOURCE_CHANNEL_IDS);
-  const filters: string[] = [];
+  const filters: SourceFilterId[] = [];
   for (const item of sourceFilters) {
-    if (typeof item !== "string" || !allowed.has(item)) {
+    if (!isSourceFilterId(item)) {
       return null;
     }
     if (!filters.includes(item)) {

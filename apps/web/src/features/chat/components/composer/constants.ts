@@ -20,6 +20,12 @@ export const SOURCE_FILTERS = [
   { id: "finance", label: "Finance", icon: TrendingUp },
 ] as const;
 
+export type SourceFilterId = (typeof SOURCE_FILTERS)[number]["id"];
+
+export function isSourceFilterId(value: unknown): value is SourceFilterId {
+  return SOURCE_FILTERS.some((f) => f.id === value);
+}
+
 /** Default source channels when the composer is in Chat mode. */
 export const CHAT_DEFAULT_SOURCE_FILTERS = ["notebook"] as const;
 

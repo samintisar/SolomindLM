@@ -32,6 +32,7 @@ import {
   RESEARCH_DATABASES,
   type ResearchDatabaseOption,
   SOURCE_FILTERS,
+  type SourceFilterId,
 } from "./composer/constants";
 
 interface ChatInputProps {
@@ -50,8 +51,8 @@ interface ChatInputProps {
   onModeChange: (mode: ChatComposerMode) => void;
   researchDatabase: ResearchDatabaseOption;
   onResearchDatabaseChange: (db: ResearchDatabaseOption) => void;
-  sourceFilters?: string[];
-  onSourceFilterChange?: (filters: string[]) => void;
+  sourceFilters?: SourceFilterId[];
+  onSourceFilterChange?: (filters: SourceFilterId[]) => void;
   /** Academic sub-filters when the Academic channel is enabled (persisted in session). */
   academicDiscoveryFilters?: DiscoveryAcademicFilterState;
   onAcademicDiscoveryFiltersChange?: (patch: Partial<DiscoveryAcademicFilterState>) => void;
@@ -278,7 +279,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     [onSend]
   );
 
-  const toggleFilter = (id: string) => {
+  const toggleFilter = (id: SourceFilterId) => {
     if (!onSourceFilterChange) return;
     if (activeFilters.includes(id)) {
       if (activeFilters.length > 1) {

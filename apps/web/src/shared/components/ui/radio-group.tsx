@@ -1,18 +1,29 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
 import { CircleIcon } from "lucide-react";
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
 import * as React from "react";
 import { cn } from "@/shared/utils/cn";
 
+const radioGroupVariants = cva("grid", {
+  variants: {
+    /** `compact`: rows that carry their own padding and hover surface. */
+    density: { default: "gap-3", compact: "gap-0.5" },
+  },
+  defaultVariants: { density: "default" },
+});
+
 function RadioGroup({
   className,
+  density,
   ...props
-}: React.ComponentProps<typeof RadioGroupPrimitive.Root>) {
+}: React.ComponentProps<typeof RadioGroupPrimitive.Root> &
+  VariantProps<typeof radioGroupVariants>) {
   return (
     <RadioGroupPrimitive.Root
       data-slot="radio-group"
-      className={cn("grid gap-3", className)}
+      className={cn(radioGroupVariants({ density }), className)}
       {...props}
     />
   );

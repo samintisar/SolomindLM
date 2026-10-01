@@ -265,6 +265,7 @@ describe("shadcn ui components render", () => {
         <RadioGroup>
           <RadioGroupItem value="a" aria-label="a" />
         </RadioGroup>
+        <RadioGroup density="compact" data-testid="compact-radios" />
         <Collapsible>
           <CollapsibleTrigger>t</CollapsibleTrigger>
           <CollapsibleContent>x</CollapsibleContent>
@@ -275,6 +276,10 @@ describe("shadcn ui components render", () => {
     );
     expect(screen.getByRole("checkbox", { name: "c" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "a" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "a" }).closest("[role=radiogroup]")).toHaveClass(
+      "gap-3"
+    );
+    expect(screen.getByTestId("compact-radios")).toHaveClass("gap-0.5");
     expect(screen.getByRole("button", { name: "t" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveClass("bg-warning-muted");
     const composer = screen.getByTestId("ig");
