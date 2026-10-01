@@ -16,6 +16,8 @@
     },
     "production": {
       "channel": "production",
+      "environment": "production",
+      "autoIncrement": true,
       "ios": { "image": "latest" },
       "android": { "image": "latest" }
     }
