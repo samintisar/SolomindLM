@@ -38,7 +38,7 @@ export const languageLearnersPack: UseCasePack = {
       id: "answer-key-supported",
       question:
         "Is every answer, answer key and explanation supported by the source, with no reversed rules, invented reasons or distractors that are also correct?",
-      appliesTo: ["flashcards", "quiz"],
+      appliesTo: ["flashcards", "quiz", "writtenQuestions"],
       evidence: "sources",
     },
     {
