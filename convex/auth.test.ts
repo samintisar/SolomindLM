@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -54,5 +54,25 @@ describe("auth.getCurrentUser", () => {
     const user = await t.query(api.auth.getCurrentUser, {});
 
     expect(user).toBeNull();
+  });
+});
+
+describe("auth.getSignInOptions", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  test("offers Apple once its Services ID and secret are both set", async () => {
+    vi.stubEnv("AUTH_APPLE_ID", "com.solomindlm.web");
+    vi.stubEnv("AUTH_APPLE_SECRET", "secret-jwt");
+    const t = convexTest(schema, modules);
+
+    expect(await t.query(api.auth.getSignInOptions, {})).toEqual({ apple: true });
+  });
+
+  test("hides Apple while either credential is missing", async () => {
+    vi.stubEnv("AUTH_APPLE_ID", "com.solomindlm.web");
+    vi.stubEnv("AUTH_APPLE_SECRET", "");
+    const t = convexTest(schema, modules);
+
+    expect(await t.query(api.auth.getSignInOptions, {})).toEqual({ apple: false });
   });
 });

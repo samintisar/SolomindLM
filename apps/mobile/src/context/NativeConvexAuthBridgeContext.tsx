@@ -20,6 +20,7 @@ type NativeAuthMessage =
   | { type: "native-auth:webview-ready"; requestId?: string; convexDeploymentUrl?: string }
   | { type: "native-auth:token-sync"; requestId: string }
   | { type: "native-auth:google-sign-in"; requestId: string }
+  | { type: "native-auth:apple-sign-in"; requestId: string }
   | {
       type: "native-auth:password-sign-in";
       requestId: string;
@@ -234,8 +235,14 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
             return;
           }
 
-          if (msg.type === "native-auth:google-sign-in") {
-            await completeNativeOAuthSignIn("google", signIn);
+          if (
+            msg.type === "native-auth:google-sign-in" ||
+            msg.type === "native-auth:apple-sign-in"
+          ) {
+            await completeNativeOAuthSignIn(
+              msg.type === "native-auth:apple-sign-in" ? "apple" : "google",
+              signIn
+            );
             await syncAuthToWebView();
             const jwt = await convexAuthSecureStorage.getItem(keys.jwt);
             respond(msg.requestId, true, { authenticated: Boolean(jwt) });
