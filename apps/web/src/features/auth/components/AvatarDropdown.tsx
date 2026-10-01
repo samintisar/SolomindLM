@@ -77,8 +77,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      {/* z-80 clears the z-70 header and z-60 layers under it (mobile notebook tabs). */}
-      <DropdownMenuContent align="end" className="z-80 w-64">
+      <DropdownMenuContent align="end" className="w-64">
         {isAuthenticated && displayLabel ? (
           <>
             <DropdownMenuLabel title={displayLabel}>
