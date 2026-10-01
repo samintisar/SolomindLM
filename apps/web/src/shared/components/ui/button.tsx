@@ -27,19 +27,24 @@ const buttonVariants = cva(
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         "ghost-destructive":
           "rounded-lg text-destructive hover:bg-destructive-muted hover:text-destructive-muted-foreground active:bg-destructive-muted",
-        /** Ghost toggle that turns destructive while pressed (`aria-pressed`), e.g. a recording mic. */
-        "ghost-record":
+        /**
+         * Toggle: looks like `ghost` (same base classes, repeated here) until pressed, then holds a
+         * destructive tint while `aria-pressed` (e.g. a recording mic).
+         */
+        "ghost-toggle-destructive":
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-pressed:bg-destructive-muted aria-pressed:text-destructive-muted-foreground aria-pressed:hover:bg-destructive-muted aria-pressed:hover:text-destructive-muted-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-6",
         sm: "h-9 px-4 text-xs",
-        /** `sm` whose side padding tightens when its nearest `@container` is narrow (toolbars). */
+        /** `sm` whose side padding tightens when its nearest `@container` is narrow (toolbars); no-op outside any @container. */
         "sm-adaptive": "h-9 px-4 text-xs @max-md:px-2.5",
         lg: "h-12 px-8 text-base",
         icon: "size-10 rounded-xl",
         "icon-sm": "size-8 rounded-lg",
+        /** Icon button as tall as `sm` / `sm-adaptive` (h-9), for toolbars mixing both. */
+        "icon-md": "size-9 rounded-lg",
         "icon-lg": "size-12 rounded-xl",
         avatar: "size-8 rounded-full p-0 hover:ring-2 hover:ring-ring/40",
       },

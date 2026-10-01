@@ -47,7 +47,7 @@ export function SendButton({
       <Button
         type="button"
         variant="destructive"
-        size="icon-sm"
+        size="icon-md"
         title="Stop generating"
         aria-label="Stop generating"
         onClick={onStop}
@@ -64,7 +64,7 @@ export function SendButton({
       <Button
         type="button"
         variant="outline"
-        size="icon-sm"
+        size="icon-md"
         disabled={sendDisabled}
         title={REMOTE_GENERATION_TITLE}
         aria-label={REMOTE_GENERATION_TITLE}
@@ -80,7 +80,7 @@ export function SendButton({
   return (
     <Button
       type="button"
-      size="icon-sm"
+      size="icon-md"
       disabled={sendDisabled}
       title={label}
       aria-label={label}
