@@ -58,7 +58,7 @@ Section numbers and titles are confirmed against the downloaded PDF before cutti
 
 ## 2. Fixtures
 
-There are 10 fixtures: 2 smoke, 6 train, 2 holdout. Every runner and every source appears at least twice. Ids are `medical-students/<slug>`. `useCase` and `split` are always set; `notebookId` and `documentIds` never are.
+There are 10 fixtures: 2 smoke, 6 train, 2 holdout. Every source appears in at least two fixtures. Flashcards, quiz and chat have at least two fixtures each; written questions has one. Ids are `medical-students/<slug>`. `useCase` and `split` are always set; `notebookId` and `documentIds` never are.
 
 Requests are worded the way a medical student asks. `studioParams.topic` carries the focus for studio runners. Every fixture has `expectedAnswer` (a short reference for judges) and `expectedBehavior`.
 
