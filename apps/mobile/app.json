@@ -80,7 +80,13 @@
           "project": "react-native"
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow SolomindLM to use the microphone so you can dictate chat messages by voice.",
+          "enableBackgroundPlayback": false
+        }
+      ],
       "expo-font",
       "expo-secure-store",
       "expo-web-browser",

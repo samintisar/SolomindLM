@@ -1,5 +1,6 @@
 import type { EvalReport, MetricResult } from "../types";
 import { groupFailures } from "./failureGrouper";
+import { buildScorecard, formatScorecard } from "./scorecard";
 
 export interface GenerateReportOptions {
   /** Commit SHA to include in the report */
@@ -10,6 +11,8 @@ export interface GenerateReportOptions {
   includeWarnings?: boolean;
   /** Group results by source policy for A/B comparison */
   groupBySourcePolicy?: boolean;
+  /** caseId → use-case pack id, for the scorecard */
+  useCaseByCase?: Map<string, string>;
 }
 
 /**
@@ -31,6 +34,11 @@ export function generateReport(
   // Deduplicate case count
   const uniqueCases = new Set(metrics.map((m) => `${m.caseId}::${m.runner}`));
 
+  const scorecard =
+    options.useCaseByCase && options.useCaseByCase.size > 0
+      ? buildScorecard(metrics, options.useCaseByCase)
+      : undefined;
+
   return {
     timestamp: new Date().toISOString(),
     commitSha: options.commitSha,
@@ -39,6 +47,7 @@ export function generateReport(
     summary,
     metrics,
     failureGroups,
+    ...(scorecard && scorecard.cells.length > 0 ? { scorecard } : {}),
   };
 }
 
@@ -88,6 +97,10 @@ export function formatReport(report: EvalReport): string {
       lines.push("");
     }
     lines.push("");
+  }
+
+  if (report.scorecard) {
+    lines.push(...formatScorecard(report.scorecard));
   }
 
   if (report.failureGroups.length > 0) {

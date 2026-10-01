@@ -176,8 +176,10 @@ export const PrivacyPolicy: React.FC = () => {
           We keep information while your account is active and for a limited period afterward for
           backups, legal compliance, and dispute resolution. You can delete many items inside the
           app (conversations, sources, notebooks, generated content) subject to product controls.
-          You may request account deletion or other privacy requests by emailing us; we will respond
-          within a reasonable time.
+          You can delete your account at any time from the account menu in the app (Delete account).
+          This permanently deletes your account and the content in it, and cancels any active
+          subscription. Billing records our payment processor must retain are kept as required by
+          law. For other privacy requests, email us; we will respond within a reasonable time.
         </p>
         <p className="text-muted-foreground">
           Where the product offers export or download for a given artifact (for example certain

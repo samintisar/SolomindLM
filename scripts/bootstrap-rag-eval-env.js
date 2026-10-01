@@ -130,6 +130,15 @@ function main() {
   setConvexEnv("RAG_EVALS_ENABLED", "true");
   setConvexEnv("RAG_EVAL_SECRET", secret);
 
+  const ownerEmail = process.env.RAG_EVAL_OWNER_EMAIL?.trim();
+  if (ownerEmail) {
+    setConvexEnv("RAG_EVAL_OWNER_EMAIL", ownerEmail);
+  } else {
+    console.log(
+      "  (skipped RAG_EVAL_OWNER_EMAIL: run `npx convex env set RAG_EVAL_OWNER_EMAIL <your-email>` to use eval:seed)"
+    );
+  }
+
   if (stripRagEvalKeysFromEnvFile(REPO_ENV_LOCAL_PATH)) {
     console.log(
       `\nRemoved RAG eval vars from ${REPO_ENV_LOCAL_PATH} (eval CLI reads repo-root .env only).`
@@ -140,6 +149,7 @@ function main() {
   console.log("Next steps:");
   console.log("  1. Verify:  bun run eval:rag:dry");
   console.log("  2. Run one: bun run eval:rag -- --case agentic-patterns-20");
+  console.log("  3. Use-case packs: bun run eval:seed && bun run eval:usecases");
 
   if (!appended) {
     console.log("\nNOTE: RAG_EVAL_CONVEX_URL was already present in .env.");

@@ -88,6 +88,10 @@ bun run eval:rag -- --case agentic-patterns-20 --export-artifacts --artifacts-di
 bun run eval:compare -- evals/rag/generated/run-a evals/rag/generated/run-b
 ```
 
+### Use-case packs
+
+Fixtures for advertised use cases (language learners, medical students, professionals, researchers) live in [`../usecases/`](../usecases/README.md), not here. Seed with `bun run eval:seed`, run with `bun run eval:usecases`.
+
 ### Loop 1 — quality ops
 
 1. Daily: `bun run eval:rag:smoke` (writes `evals/rag/generated/judge-queue.json`).
