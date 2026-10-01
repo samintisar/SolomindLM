@@ -62,7 +62,6 @@ vi.mock("./ConfigureChatModal", () => ({
     isOpen ? <div role="dialog" aria-label="Configure chat" /> : null,
 }));
 vi.mock("./MessageBubble", () => ({ MessageBubble: () => null }));
-vi.mock("./ReferenceTooltip", () => ({ ReferenceTooltip: () => null }));
 vi.mock("./ResearchPlanMessage", () => ({ ResearchPlanMessage: () => null }));
 vi.mock("./LiteratureReviewMessage", () => ({ LiteratureReviewMessage: () => null }));
 
