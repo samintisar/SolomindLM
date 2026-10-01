@@ -1,10 +1,10 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
-import { Separator } from "@/shared/components/ui/separator";
 import { cn } from "@/shared/utils/cn";
 
 const buttonGroupVariants = cva(
-  "flex w-fit items-stretch has-[>[data-slot=button-group]]:gap-2 [&>*]:focus-visible:relative [&>*]:focus-visible:z-10 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
+  // Segments move as one button: the per-button hover lift/press scale is cancelled inside a group.
+  "flex w-fit items-stretch has-[>[data-slot=button-group]]:gap-2 [&>*]:hover:translate-y-0 [&>*]:active:scale-100 [&>*]:focus-visible:relative [&>*]:focus-visible:z-10 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
   {
     variants: {
       orientation: {
@@ -56,16 +56,27 @@ function ButtonGroupText({
   );
 }
 
+const buttonGroupSeparatorVariants = cva("relative shrink-0 self-stretch", {
+  variants: {
+    orientation: { vertical: "w-px", horizontal: "h-px" },
+    // `primary`: a soft seam between filled primary segments instead of a light page border.
+    tone: { default: "bg-border", primary: "bg-primary-foreground/25" },
+  },
+  defaultVariants: { orientation: "vertical", tone: "default" },
+});
+
 function ButtonGroupSeparator({
   className,
-  orientation = "vertical",
+  orientation,
+  tone,
   ...props
-}: React.ComponentProps<typeof Separator>) {
+}: React.ComponentProps<"div"> & VariantProps<typeof buttonGroupSeparatorVariants>) {
   return (
-    <Separator
+    <div
+      role="separator"
+      aria-orientation={orientation ?? "vertical"}
       data-slot="button-group-separator"
-      orientation={orientation}
-      className={cn("relative m-0! self-stretch data-[orientation=vertical]:h-auto", className)}
+      className={cn(buttonGroupSeparatorVariants({ orientation, tone }), className)}
       {...props}
     />
   );

@@ -27,11 +27,11 @@ export function CreateMenuButton({
         <span className="sm:hidden">New</span>
         <span className="hidden sm:inline">New notebook</span>
       </Button>
-      <ButtonGroupSeparator />
+      <ButtonGroupSeparator tone="primary" />
       {/* modal={false}: the item opens a dialog (see CardActionsMenu). */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button size="icon" aria-label="More create options">
+          <Button size="icon" aria-label="More create options" className="h-auto">
             <ChevronDown />
           </Button>
         </DropdownMenuTrigger>
