@@ -228,6 +228,8 @@ export default defineSchema({
     status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
     audioType: v.optional(v.string()), // 'deep_dive' | 'brief' | 'critique' | 'debate'
     audioUrl: v.optional(v.string()), // Public URL to audio file in storage
+    /** File behind `audioUrl`; unset on overviews saved before it was recorded. */
+    audioStorageId: v.optional(v.id("_storage")),
     metadata: v.optional(v.any()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -707,7 +709,9 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_prompt", ["promptId"])
-    .index("by_prompt_and_reporter", ["promptId", "reporterUserId"]),
+    .index("by_prompt_and_reporter", ["promptId", "reporterUserId"])
+    // Account deletion removes the reports a user filed on other people's prompts.
+    .index("by_reporter", ["reporterUserId"]),
 
   // ── Literature Review & Citation tables ─────────────────────────────
 
@@ -793,7 +797,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
-    .index("by_table", ["tableId"]),
+    .index("by_table", ["tableId"])
+    .index("by_user", ["userId"]),
 
   researchSteps: defineTable({
     researchId: v.string(),
@@ -1011,8 +1016,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    // No by_user index: the user-facing "My feedback" list was cut from
-    // scope (see docs/engineering/in-app-feedback.md) and nothing else reads
-    // this table by userId — add one back if/when that query returns.
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    // Account deletion purges a user's feedback by owner.
+    .index("by_user", ["userId"]),
 });

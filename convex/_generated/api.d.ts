@@ -244,6 +244,9 @@ import type * as _services_search_DiscoveryService from "../_services/search/Dis
 import type * as _services_search_TavilySearchService from "../_services/search/TavilySearchService.js";
 import type * as _shared_mathMarkdown from "../_shared/mathMarkdown.js";
 import type * as _utils_CitationEngine from "../_utils/CitationEngine.js";
+import type * as account__purge from "../account/_purge.js";
+import type * as account_actions from "../account/actions.js";
+import type * as account_deletion from "../account/deletion.js";
 import type * as auth from "../auth.js";
 import type * as billing_actions from "../billing/actions.js";
 import type * as billing_index from "../billing/index.js";
@@ -626,6 +629,9 @@ declare const fullApi: ApiFromModules<{
   "_services/search/TavilySearchService": typeof _services_search_TavilySearchService;
   "_shared/mathMarkdown": typeof _shared_mathMarkdown;
   "_utils/CitationEngine": typeof _utils_CitationEngine;
+  "account/_purge": typeof account__purge;
+  "account/actions": typeof account_actions;
+  "account/deletion": typeof account_deletion;
   auth: typeof auth;
   "billing/actions": typeof billing_actions;
   "billing/index": typeof billing_index;

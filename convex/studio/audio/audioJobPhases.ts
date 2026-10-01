@@ -1137,6 +1137,7 @@ export async function runAssembleAudioOverviewPhase(
     await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
       audioOverviewId,
       audioUrl,
+      audioStorageId: storageId,
       transcript,
       metadata: withStudioTelemetryMetadata(
         {
