@@ -1,10 +1,18 @@
 import type { Doc } from "@convex/_generated/dataModel";
 import { Check, MoreVertical, Pencil, Pin, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Button } from "@/shared/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { Input } from "@/shared/components/ui/input";
 import { useToast } from "@/shared/contexts/useToast";
-import { useAnchoredPosition } from "@/shared/ui/anchoredPosition";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import { cn } from "@/shared/utils/cn";
 
 interface ConversationListProps {
   conversations: Doc<"conversations">[] | undefined;
@@ -36,23 +44,13 @@ export function ConversationList({
   pinnedIds,
   onTogglePin,
 }: ConversationListProps) {
-  /** Submenu is portaled to body so parent overflow can't clip it; `useAnchoredPosition` places it next to `threadMenuAnchorRef`. */
-  const [threadMenu, setThreadMenu] = useState<{ convId: string } | null>(null);
-  const threadMenuAnchorRef = useRef<HTMLElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  /** Row whose action menu is open: its trigger stays visible while the pointer is over the menu. */
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
-  const threadMenuBoxRef = useRef<HTMLDivElement>(null);
-  const { style: threadMenuStyle } = useAnchoredPosition(
-    threadMenuAnchorRef,
-    threadMenuBoxRef,
-    !!threadMenu,
-    {
-      side: "bottom",
-      align: "end",
-      repositionKey: threadMenu?.convId,
-    }
-  );
+  /** Set once a rename is saved or cancelled so the blur that follows (Enter, Escape, unmount) is a no-op. */
+  const renameSettledRef = useRef(false);
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const toast = useToast();
 
@@ -78,45 +76,20 @@ export function ConversationList({
     return { pinned: pin, recents: rest };
   }, [conversations, pinnedIds]);
 
-  const threadMenuDoc = useMemo(() => {
-    if (!conversations || !threadMenu) return null;
-    return conversations.find((c) => c._id === threadMenu.convId) ?? null;
-  }, [conversations, threadMenu]);
-
-  useEffect(() => {
-    if (!threadMenu) return;
-    const onScroll = (e: Event) => {
-      // Scrolling the (height-capped) menu itself must not close it.
-      if (threadMenuBoxRef.current?.contains(e.target as Node)) return;
-      setThreadMenu(null);
-    };
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [threadMenu]);
-
-  useEffect(() => {
-    if (!threadMenu) return;
-    const onPointerDown = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (threadMenuBoxRef.current?.contains(t)) return;
-      if ((e.target as Element | null)?.closest?.("[data-thread-menu-trigger]")) return;
-      setThreadMenu(null);
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [threadMenu]);
-
   const handleStartRename = (conv: Doc<"conversations">) => {
+    renameSettledRef.current = false;
     setEditingId(conv._id);
     setEditTitle((conv.title as string | undefined) ?? "New Chat");
-    setThreadMenu(null);
+  };
+
+  const handleCancelRename = () => {
+    renameSettledRef.current = true;
+    setEditingId(null);
   };
 
   const handleFinishRename = async () => {
+    if (renameSettledRef.current) return;
+    renameSettledRef.current = true;
     if (!editingId || !editTitle.trim()) {
       setEditingId(null);
       return;
@@ -130,7 +103,6 @@ export function ConversationList({
   };
 
   const handleDelete = async (conv: Doc<"conversations">) => {
-    setThreadMenu(null);
     const ok = await confirm(
       "Delete thread?",
       "This will permanently delete this thread and all its messages.",
@@ -148,36 +120,47 @@ export function ConversationList({
     const isActive = conv._id === activeConversationId;
     const isEditing = conv._id === editingId;
     const isPinned = pinnedIds?.has(conv._id) ?? false;
+    const title = (conv.title as string | undefined) ?? "New chat";
 
     if (isEditing) {
       return (
-        <div key={conv._id} className="px-1.5 py-0.5">
-          <div className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5">
-            <input
-              ref={editInputRef}
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleFinishRename();
-                if (e.key === "Escape") setEditingId(null);
-              }}
-              className="min-w-0 flex-1 border-0 bg-transparent font-sans text-xs text-foreground outline-none"
-            />
-            <button
-              type="button"
-              onClick={handleFinishRename}
-              className="p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <Check className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditingId(null)}
-              className="p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
+        <div key={conv._id} className="flex items-center gap-1 px-1.5 py-0.5">
+          <Input
+            ref={editInputRef}
+            aria-label="Rename thread"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleFinishRename();
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                handleCancelRename();
+              }
+            }}
+            onBlur={() => void handleFinishRename()}
+            className="h-8 flex-1"
+          />
+          {/* Default mousedown is prevented so the input keeps focus; otherwise its blur-save would beat these clicks. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Save name"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => void handleFinishRename()}
+          >
+            <Check />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Cancel rename"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleCancelRename}
+          >
+            <X />
+          </Button>
         </div>
       );
     }
@@ -185,51 +168,59 @@ export function ConversationList({
     return (
       <div
         key={conv._id}
-        className={`group flex min-h-[38px] w-full max-w-full items-stretch overflow-hidden rounded-lg transition-colors duration-150 ${
-          isActive ? "bg-muted/50 text-foreground" : "text-foreground/90 hover:bg-muted/45"
-        }`}
+        className={cn(
+          "group flex min-h-10 w-full max-w-full items-center rounded-lg pr-1 transition-colors",
+          isActive ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-accent"
+        )}
       >
         <button
           type="button"
           onClick={() => onSelect(conv._id)}
-          className={`flex min-w-0 flex-1 items-center gap-2.5 pl-2.5 pr-1.5 text-left font-sans text-xs font-normal antialiased leading-snug transition-colors ${
-            isActive ? "text-foreground/92" : "text-foreground/78"
-          }`}
+          className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 pl-2.5 pr-1.5 text-left font-sans text-xs leading-snug outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {isPinned ? (
-            <Pin
-              className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-muted-foreground" : "text-muted-foreground/80"}`}
-              strokeWidth={1.75}
-            />
-          ) : null}
-          <span className="min-w-0 flex-1 truncate">
-            {(conv.title as string | undefined) ?? "New chat"}
-          </span>
+          {isPinned ? <Pin className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+          <span className="min-w-0 flex-1 truncate">{title}</span>
         </button>
-        <div className="flex shrink-0 items-center pr-0.5">
-          <button
-            type="button"
-            data-thread-menu-trigger
-            onClick={(e) => {
-              e.stopPropagation();
-              if (threadMenu?.convId === conv._id) {
-                setThreadMenu(null);
-                return;
-              }
-              threadMenuAnchorRef.current = e.currentTarget;
-              setThreadMenu({ convId: conv._id });
-            }}
-            className={`rounded-md p-1.5 text-muted-foreground transition-[opacity,background-color,color] hover:bg-foreground/5 hover:text-foreground ${
-              isActive || threadMenu?.convId === conv._id
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100"
-            }`}
-            aria-label="Thread options"
-            aria-expanded={threadMenu?.convId === conv._id}
+        <DropdownMenu
+          modal={false}
+          open={openMenuId === conv._id}
+          onOpenChange={(open) => setOpenMenuId(open ? conv._id : null)}
+        >
+          <div
+            className={cn(
+              "shrink-0 focus-within:opacity-100 group-hover:opacity-100",
+              isActive || openMenuId === conv._id ? "opacity-100" : "opacity-0"
+            )}
           >
-            <MoreVertical className="h-4 w-4" strokeWidth={1.75} />
-          </button>
-        </div>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Thread actions for ${title}`}
+              >
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+          </div>
+          <DropdownMenuContent align="end">
+            {onTogglePin && (
+              <DropdownMenuItem onSelect={() => onTogglePin(conv._id)}>
+                <Pin />
+                {isPinned ? "Unpin" : "Pin"}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => handleStartRename(conv)}>
+              <Pencil />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => void handleDelete(conv)}>
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   };
@@ -248,8 +239,6 @@ export function ConversationList({
     );
   }
 
-  const threadMenuPinned = threadMenuDoc ? (pinnedIds?.has(threadMenuDoc._id) ?? false) : false;
-
   return (
     <>
       <div className="flex flex-col gap-1 pb-2 pt-1 font-sans antialiased">
@@ -266,52 +255,9 @@ export function ConversationList({
           </>
         )}
       </div>
+      {/* The confirm renders in a body portal but its state lives here: the parent must keep this list mounted
+          (outside any popover that closes on outside interaction) while a delete confirm is open. */}
       <ConfirmDialogComponent />
-      {threadMenu &&
-        threadMenuDoc &&
-        createPortal(
-          <div
-            ref={threadMenuBoxRef}
-            role="menu"
-            data-thread-submenu-root
-            className="fixed z-200 min-w-36 max-h-(--anchored-max-height) overflow-y-auto rounded-lg border border-border bg-card py-1 font-sans text-sm antialiased shadow-lg"
-            style={threadMenuStyle}
-          >
-            {onTogglePin && (
-              <button
-                type="button"
-                onClick={() => {
-                  onTogglePin(threadMenuDoc._id);
-                  setThreadMenu(null);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
-                role="menuitem"
-              >
-                <Pin className="h-3.5 w-3.5" strokeWidth={1.75} />
-                {threadMenuPinned ? "Unpin" : "Pin"}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => handleStartRename(threadMenuDoc)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
-              role="menuitem"
-            >
-              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Rename
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleDelete(threadMenuDoc)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans text-destructive hover:bg-muted/80"
-              role="menuitem"
-            >
-              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Delete
-            </button>
-          </div>,
-          document.body
-        )}
     </>
   );
 }
