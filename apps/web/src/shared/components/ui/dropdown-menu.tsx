@@ -60,7 +60,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/menu-item relative flex min-h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm outline-hidden select-none focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive!",
+        "group/menu-item relative flex min-h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm outline-hidden select-none focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-muted data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive!",
         className
       )}
       {...props}
@@ -78,7 +78,7 @@ function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "group/menu-item relative flex min-h-9 cursor-default items-center gap-2.5 rounded-lg py-2 pr-8 pl-2.5 text-sm outline-hidden select-none focus:bg-muted focus:text-foreground data-[state=checked]:bg-accent/60 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground",
+        "group/menu-item relative flex min-h-9 cursor-default items-center gap-2.5 rounded-lg py-2 pr-8 pl-2.5 text-sm outline-hidden select-none focus:bg-muted focus:text-foreground data-[state=checked]:bg-accent/60 data-[state=checked]:focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground",
         className
       )}
       checked={checked}
@@ -109,7 +109,7 @@ function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        "group/menu-item relative flex min-h-9 cursor-default items-center gap-2.5 rounded-lg py-2 pr-8 pl-2.5 text-sm outline-hidden select-none focus:bg-muted focus:text-foreground data-[state=checked]:bg-accent/60 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground",
+        "group/menu-item relative flex min-h-9 cursor-default items-center gap-2.5 rounded-lg py-2 pr-8 pl-2.5 text-sm outline-hidden select-none focus:bg-muted focus:text-foreground data-[state=checked]:bg-accent/60 data-[state=checked]:focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground",
         className
       )}
       {...props}
@@ -211,7 +211,10 @@ function DropdownMenuSubContent({
   );
 }
 
-/** Icon tile for rich menu items; turns solid when its item is checked. */
+/**
+ * Icon tile for rich menu items. Turns solid when its item is checked; that only applies
+ * inside radio or checkbox items, which expose `data-state="checked"`.
+ */
 function DropdownMenuItemIcon({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -236,6 +239,7 @@ function DropdownMenuItemText({ className, ...props }: React.ComponentProps<"spa
   );
 }
 
+/** One-line muted description under the title inside `DropdownMenuItemText`. */
 function DropdownMenuItemDescription({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span

@@ -24,6 +24,7 @@ import { Checkbox } from "./checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuItemDescription,
@@ -438,6 +439,72 @@ describe("shadcn ui components render", () => {
       expect(screen.getByText("First")).toHaveClass("text-xs", "text-muted-foreground");
     });
 
+    it("radio items show a trailing check only when checked, and keep focus visible", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuRadioGroup value="a">
+              <DropdownMenuRadioItem value="a">Alpha</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="b">Beta</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      const checked = await screen.findByRole("menuitemradio", { name: "Alpha" });
+      const indicator = checked.querySelector("span.absolute");
+      expect(indicator).not.toBeNull();
+      expect(indicator).toHaveClass("right-2.5");
+      expect(indicator?.querySelector("svg")).not.toBeNull();
+      expect(indicator?.querySelector("svg.lucide-check")).not.toBeNull();
+      expect(indicator?.querySelector("svg.lucide-circle")).toBeNull();
+      expect(checked).toHaveClass("data-[state=checked]:focus:bg-accent");
+
+      const unchecked = screen.getByRole("menuitemradio", { name: "Beta" });
+      expect(unchecked).toHaveAttribute("data-state", "unchecked");
+      expect(unchecked.querySelector("svg")).toBeNull();
+    });
+
+    it("checkbox items show a trailing check and keep focus visible", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuCheckboxItem checked>Gamma</DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      const item = await screen.findByRole("menuitemcheckbox", { name: "Gamma" });
+      expect(item).toHaveAttribute("data-state", "checked");
+      expect(item).toHaveClass("data-[state=checked]:focus:bg-accent");
+      expect(item.querySelector("span.absolute svg.lucide-check")).not.toBeNull();
+    });
+
+    it("rich item parts expose their data-slots", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem>
+              <DropdownMenuItemIcon data-testid="icon" />
+              <DropdownMenuItemText data-testid="text">
+                T<DropdownMenuItemDescription data-testid="desc">D</DropdownMenuItemDescription>
+              </DropdownMenuItemText>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      expect(await screen.findByTestId("icon")).toHaveAttribute(
+        "data-slot",
+        "dropdown-menu-item-icon"
+      );
+      expect(screen.getByTestId("text")).toHaveAttribute("data-slot", "dropdown-menu-item-text");
+      expect(screen.getByTestId("desc")).toHaveAttribute(
+        "data-slot",
+        "dropdown-menu-item-description"
+      );
+    });
+
     it("Select content floats softly", async () => {
       render(
         <Select defaultOpen value="a">
@@ -452,7 +519,9 @@ describe("shadcn ui components render", () => {
       const listbox = await screen.findByRole("listbox");
       expect(listbox).toHaveClass("rounded-xl", "shadow-xl", "ring-1", "ring-hairline");
       expect(listbox).not.toHaveClass("border");
-      expect(screen.getByRole("option", { name: "Option A" })).toHaveClass("rounded-lg", "min-h-9");
+      const option = screen.getByRole("option", { name: "Option A" });
+      expect(option).toHaveClass("rounded-lg", "min-h-9", "data-[state=checked]:focus:bg-accent");
+      expect(option.querySelector("svg.lucide-check")).toHaveClass("text-foreground");
     });
 
     it("PopoverContent floats softly", () => {
