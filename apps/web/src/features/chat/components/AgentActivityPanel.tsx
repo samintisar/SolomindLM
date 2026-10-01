@@ -293,7 +293,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
             )}
 
             {showGroundingCallout && (
-              <Alert variant="warning" className={useClaudeLayout ? "mt-3" : "mt-2"}>
+              <Alert variant="warning" role="status" className={useClaudeLayout ? "mt-3" : "mt-2"}>
                 <AlertTriangle aria-hidden />
                 <AlertTitle>Grounding check</AlertTitle>
                 <AlertDescription>

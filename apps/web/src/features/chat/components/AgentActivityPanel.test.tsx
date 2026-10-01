@@ -57,22 +57,23 @@ describe("AgentActivityPanel", () => {
     );
   });
 
-  test("a failed hard grounding check renders as an alert", () => {
+  test("a failed hard grounding check renders as a polite status note", () => {
     renderPanel({
       groundingChecks: [
         { passed: false, message: "Some claims are not supported", issues: ["Claim A"] },
       ],
     });
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent("Some claims are not supported");
-    expect(alert).toHaveTextContent("Claim A");
+    const note = screen.getByRole("status");
+    expect(note).toHaveTextContent("Some claims are not supported");
+    expect(note).toHaveTextContent("Claim A");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  test("soft grounding notes are not alerts", () => {
+  test("soft grounding notes are not status alerts", () => {
     renderPanel({
       groundingChecks: [{ passed: true, soft: true, message: "Low confidence", issues: [] }],
     });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByText("Low confidence")).toBeInTheDocument();
   });
 
