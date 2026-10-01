@@ -4,6 +4,7 @@ import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { allWithConcurrency, clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
@@ -27,9 +28,10 @@ async function collapseGroup(
 
   const collapseTemplate =
     customPrompt && customPrompt.trim() ? COLLAPSE_PROMPTS["custom"] : COLLAPSE_PROMPTS["default"];
-  const prompt = collapseTemplate
-    .replace("{content}", combined)
-    .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+  const prompt = fillTemplate(collapseTemplate, {
+    content: combined,
+    customPrompt: sanitizeUserInput(customPrompt || ""),
+  });
 
   const response = await invokeWithRetry(
     () =>

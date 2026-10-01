@@ -1,5 +1,5 @@
 export type SubscriptionInterval = "month" | "year";
-export type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid";
+type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid";
 
 export interface SubscriptionStatusResponse {
   hasSubscription: boolean;
@@ -11,13 +11,6 @@ export interface SubscriptionStatusResponse {
   cancelAtPeriodEnd?: boolean;
   interval?: SubscriptionInterval;
   amount?: number;
-}
-
-export interface CheckoutSessionRequest {
-  interval: SubscriptionInterval;
-  successUrl: string;
-  cancelUrl: string;
-  userId?: string; // Optional, sent by client for validation
 }
 
 export interface CheckoutSessionResponse {

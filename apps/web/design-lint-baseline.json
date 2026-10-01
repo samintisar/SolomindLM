@@ -6,8 +6,8 @@
     "shadcn/no-raw-colors": 1
   },
   "features/chat": {
-    "shadcn/no-arbitrary-values": 90,
-    "shadcn/no-inline-styles": 26,
+    "shadcn/no-arbitrary-values": 79,
+    "shadcn/no-inline-styles": 23,
     "shadcn/no-raw-colors": 14
   },
   "features/feedback": {
@@ -15,10 +15,10 @@
     "shadcn/no-restyle": 3
   },
   "features/landing": {
-    "shadcn/no-arbitrary-values": 68,
+    "shadcn/no-arbitrary-values": 66,
     "shadcn/no-inline-styles": 16,
     "shadcn/no-raw-colors": 15,
-    "shadcn/no-restyle": 72
+    "shadcn/no-restyle": 59
   },
   "features/legal": {
     "shadcn/no-arbitrary-values": 1
@@ -42,9 +42,9 @@
     "shadcn/no-unknown-classes": 67
   },
   "shared": {
-    "shadcn/no-arbitrary-values": 55,
-    "shadcn/no-inline-styles": 16,
-    "shadcn/no-raw-colors": 26,
+    "shadcn/no-arbitrary-values": 54,
+    "shadcn/no-inline-styles": 8,
+    "shadcn/no-raw-colors": 20,
     "shadcn/no-restyle": 22,
     "shadcn/require-static-classes": 1
   }

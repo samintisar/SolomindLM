@@ -364,7 +364,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ```bash
 # LLM Configuration
 TOGETHER_AI_API_KEY=xxx
-FAST_LLM=meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
+FAST_LLM=Qwen/Qwen3.5-9B
 
 # Image Generation
 ZHIPUAI_API_KEY=xxx

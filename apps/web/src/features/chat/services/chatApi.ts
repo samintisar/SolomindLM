@@ -1,84 +1,18 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 import type { SendMessageCallbacks } from "./chatStream";
 import { CHAT_STREAM_URL, consumePersistentTextStream } from "./chatStream";
 
-export type {
-  ApiMessage,
-  ChatError,
-  ChatHistoryResponse,
-  ParsedStreamData,
-  SendMessageCallbacks,
-} from "./chatStream";
+export type { SendMessageCallbacks } from "./chatStream";
 export { CONVEX_SITE_URL, consumePersistentTextStream, parseStreamBody } from "./chatStream";
 
 // ============================================================
 // Chat API Hooks
 // ============================================================
-
-/**
- * Get conversation history for a notebook
- */
-export function useChatHistory(notebookId: string | null) {
-  // First get the conversation for this notebook
-  const conversation = useQuery(
-    api.chat.conversations.getOrCreate,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-
-  // Then get messages for that conversation
-  const messages = useQuery(
-    api.chat.index.getMessages,
-    conversation?._id ? { conversationId: conversation._id } : "skip"
-  );
-
-  // Return combined data
-  if (!conversation) return undefined;
-  return {
-    conversationId: conversation._id,
-    title: conversation.title || "",
-    messages: messages || [],
-  };
-}
-
-/**
- * Rename a conversation
- * Note: This functionality is not yet implemented in the Convex API
- */
-export function useRenameConversation() {
-  const renameMutation = useMutation(api.chat.messages.renameConversation);
-  return useCallback(
-    (conversationId: string, title: string) =>
-      renameMutation({ conversationId: conversationId as Id<"conversations">, title }),
-    [renameMutation]
-  );
-}
-
-/**
- * Clear conversation history for a notebook
- */
-export function useClearHistory(notebookId: string | null) {
-  // Get the conversation for this notebook
-  const conversation = useQuery(
-    api.chat.conversations.getOrCreate,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-
-  const clearMessages = useMutation(api.chat.index.clearMessages);
-
-  return async () => {
-    if (!conversation?._id) {
-      throw new Error("Conversation not found");
-    }
-    return await clearMessages({
-      conversationId: conversation._id,
-    });
-  };
-}
 
 /**
  * Send a message using Persistent Text Streaming with optimistic updates

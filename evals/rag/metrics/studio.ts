@@ -14,6 +14,7 @@ import type {
   MetricStatus,
 } from "../types";
 import {
+  flashcardAnswerLeak,
   flashcardCardValidity,
   type InvariantCheck,
   quizInvariantChecks,
@@ -314,12 +315,13 @@ export async function scoreStudioMetrics(
       results.push(flashcardCountMatch(fixture, artifact));
       const cards = (artifact.studioOutput.raw as ItemArrayPayload | undefined)?.cards ?? [];
       results.push(fromInvariant(flashcardCardValidity(cards as object[]), fixture, artifact));
+      results.push(fromInvariant(flashcardAnswerLeak(cards as object[]), fixture, artifact));
       break;
     }
     case "quiz": {
       results.push(quizCountMatch(fixture, artifact));
       const qs = (artifact.studioOutput.raw as ItemArrayPayload | undefined)?.questions ?? [];
-      for (const check of quizInvariantChecks(qs as object[])) {
+      for (const check of quizInvariantChecks(qs as object[], fixture.studioParams?.difficulty)) {
         results.push(fromInvariant(check, fixture, artifact));
       }
       break;

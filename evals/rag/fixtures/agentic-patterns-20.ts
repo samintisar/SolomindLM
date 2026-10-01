@@ -33,7 +33,7 @@ export const AGENTIC_20_ITEMS: readonly string[] = [
 export const AGENTIC_20_NOTEBOOK_ID = "jd702jq641ensjca91c9hwp4d985pgax";
 
 /** Substring matched against document `fileName` to scope evals to the patterns source. */
-export const AGENTIC_20_DOCUMENT_TITLE_HINT = "agentic";
+const AGENTIC_20_DOCUMENT_TITLE_HINT = "agentic";
 
 /** Shared studio eval params so jobs ignore unrelated docs in the same notebook. */
 export const AGENTIC_20_STUDIO_PARAMS = {

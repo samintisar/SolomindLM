@@ -132,6 +132,42 @@ describe("quiz_explanation_positional_refs", () => {
   });
 });
 
+describe("quiz_stem_length", () => {
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+
+  it("reports median and p90 word counts labelled with the requested difficulty", async () => {
+    const lengths = [4, 6, 8, 10, 12, 14, 16, 18, 20, 60];
+    const easyFixture = {
+      id: "case",
+      runner: "quiz",
+      studioParams: { difficulty: "easy" },
+    } as EvalFixture;
+    const a = artifact("quiz", {
+      questions: lengths.map((n) => quizQuestion(0, { question: words(n) })),
+    });
+    const m = (await scoreStudioMetrics(easyFixture, a)).find(
+      (r) => r.metric === "quiz_stem_length"
+    );
+    expect(m?.status).toBe("info");
+    expect(m?.breakdown).toMatchObject({ difficulty: "easy", n: 10, median: 12, p90: 20, max: 60 });
+  });
+
+  it("falls back to an unspecified difficulty label and ignores blank stems", async () => {
+    const m = await metric(
+      artifact("quiz", {
+        questions: [quizQuestion(0, { question: words(5) }), quizQuestion(0, { question: "  " })],
+      }),
+      "quiz_stem_length"
+    );
+    expect(m.breakdown).toMatchObject({ difficulty: "unspecified", n: 1, median: 5, p90: 5 });
+  });
+
+  it("stays informational with no stems", async () => {
+    const m = await metric(artifact("quiz", { questions: [] }), "quiz_stem_length");
+    expect(m.status).toBe("info");
+  });
+});
+
 describe("flashcard_card_validity", () => {
   it("flags empty sides and duplicate fronts", async () => {
     const m = await metric(
@@ -159,6 +195,37 @@ describe("flashcard_card_validity", () => {
         ],
       }),
       "flashcard_card_validity"
+    );
+    expect(m.status).toBe("pass");
+  });
+});
+
+describe("flashcard_answer_leak", () => {
+  it("flags cards that give the answer away or break the blank", async () => {
+    const m = await metric(
+      artifact("flashcards", {
+        cards: [
+          { front: "Il cherche ___ (ses) clés.", back: "ses" },
+          { front: "Je ___ habite à Paris.", back: "j'" },
+          { front: "What is the capital of France?", back: "Paris" },
+          { front: "Tu ___ à Paris.", back: "habites" },
+        ],
+      }),
+      "flashcard_answer_leak"
+    );
+    expect(m.status).toBe("fail");
+    expect(m.score).toBeCloseTo(2 / 4);
+  });
+
+  it("passes clean cards", async () => {
+    const m = await metric(
+      artifact("flashcards", {
+        cards: [
+          { front: "What is the capital of France?", back: "Paris" },
+          { question: "Il ___ (chercher) ses clés.", answer: "cherche" },
+        ],
+      }),
+      "flashcard_answer_leak"
     );
     expect(m.status).toBe("pass");
   });

@@ -59,7 +59,7 @@ Respond in JSON:
 // Vision Judge Implementation
 // ============================================================
 
-export interface VisionJudgeResult {
+interface VisionJudgeResult {
   visual_quality: { score: number; reasoning: string };
   content_accuracy: { score: number; reasoning: string };
   style_adherence: { score: number; reasoning: string };

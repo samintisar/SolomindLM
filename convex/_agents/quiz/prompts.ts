@@ -230,6 +230,7 @@ ${chunk}`;
  */
 interface ExpandSettings {
   scenarioComplexity: string;
+  stemLength: string;
   distractorQuality: string;
   explanationLength: string;
   questionStyle: string;
@@ -238,6 +239,8 @@ interface ExpandSettings {
 const EXPAND_SETTINGS: Record<string, ExpandSettings> = {
   easy: {
     scenarioComplexity: "Simple, direct scenarios. One clear step to the answer.",
+    stemLength:
+      "One short sentence, about 20 words at most. No backstory or setup; put only the essential wording in the question.",
     distractorQuality: "Obviously incorrect distractors (opposites, clearly unrelated concepts).",
     explanationLength:
       "1-2 sentences total. State the correct answer and briefly mention one key reason why distractors are wrong.",
@@ -245,6 +248,8 @@ const EXPAND_SETTINGS: Record<string, ExpandSettings> = {
   },
   medium: {
     scenarioComplexity: "Moderate scenarios. May require connecting 2-3 concepts.",
+    stemLength:
+      "One or two sentences, about 40 words at most. Include only the context needed to answer.",
     distractorQuality: "Plausible distractors (common misconceptions, related but wrong concepts).",
     explanationLength:
       "1-2 sentences total. Focus on the key distinction between correct and incorrect options.",
@@ -254,6 +259,8 @@ const EXPAND_SETTINGS: Record<string, ExpandSettings> = {
   hard: {
     scenarioComplexity:
       "Complex scenarios requiring analysis. May involve multi-step reasoning or synthesis.",
+    stemLength:
+      "Up to a short paragraph, about 70 words at most, and only when the scenario needs it. Cut any detail that does not change the answer.",
     distractorQuality:
       "Subtle distractors (nuanced differences, partially correct but incomplete answers).",
     explanationLength: "1-2 sentences total. Cut to the core conceptual distinction - be precise.",
@@ -275,6 +282,7 @@ TASK: Refine this draft into a ${candidate.difficulty.toUpperCase()}, scenario-b
 **DIFFICULTY: ${candidate.difficulty.toUpperCase()}**
 
 **Scenario Complexity:** ${settings.scenarioComplexity}
+**Question Length:** ${settings.stemLength}
 **Distractor Quality:** ${settings.distractorQuality}
 **Explanation Length:** ${settings.explanationLength}
 **Question Style:** ${settings.questionStyle}
@@ -283,7 +291,7 @@ Draft Question: "${candidate.question}"
 Correct Answer: "${candidate.correctAnswer}"
 
 INSTRUCTIONS:
-1. **SCENARIO-BASED:** ${settings.questionStyle} Create a hypothetical scenario that fits the ${candidate.difficulty} difficulty level.
+1. **SCENARIO-BASED:** ${settings.questionStyle} Frame it with a hypothetical scenario only when the difficulty level calls for one, and keep the question within the Question Length limit; the reader should spend their time on the answer, not on the setup.
 2. **DISTRACTORS:** Use the CONTEXT to find ${candidate.difficulty === "easy" ? "obviously incorrect" : candidate.difficulty === "medium" ? "plausible but wrong" : "subtle and nuanced"} options. ${settings.distractorQuality}
 3. **EXACTLY FOUR OPTIONS:** The options array must have length 4. Each option is plain text (or code in backticks) with no A./B./C./D. or 1) 2) prefixes.
 4. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like

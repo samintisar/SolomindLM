@@ -116,8 +116,8 @@ export function mergeModelKwargs(
  * // With separate map and reduce models
  * const llms = createLLMs({
  *   apiKey: env.TOGETHER_AI_API_KEY,
- *   mapModel: 'meta-llama/Llama-3-70b-chat-hf',
- *   reduceModel: 'meta-llama/Llama-3-70b-chat-hf',
+ *   mapModel: 'Qwen/Qwen3.5-9B',
+ *   reduceModel: 'deepseek-ai/DeepSeek-V4.1-Flash',
  *   temperatures: {
  *     map: 0.3,
  *     reduce: 0.6,
@@ -127,7 +127,7 @@ export function mergeModelKwargs(
  * // With single model for both phases
  * const llms = createLLMs({
  *   apiKey: env.TOGETHER_AI_API_KEY,
- *   mapModel: 'meta-llama/Llama-3-70b-chat-hf',
+ *   mapModel: 'Qwen/Qwen3.5-9B',
  * });
  * ```
  */
@@ -170,7 +170,7 @@ export function createLLMs(config: LLMConfig): LLMInstances {
  * ```typescript
  * const llm = createLLM({
  *   apiKey: env.TOGETHER_AI_API_KEY,
- *   mapModel: 'meta-llama/Llama-3-70b-chat-hf',
+ *   mapModel: 'Qwen/Qwen3.5-9B',
  *   temperatures: { map: 0.1 },
  * });
  * ```

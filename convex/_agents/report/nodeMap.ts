@@ -1,5 +1,6 @@
 "use node";
 
+import { fillTemplate } from "../_shared/promptTemplate.js";
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
 import { invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
@@ -34,9 +35,10 @@ export async function mapProcess(
   );
 
   const promptTemplate = MAP_PROMPTS[reportType] || MAP_PROMPTS["custom"];
-  const prompt = promptTemplate
-    .replace("{chunk}", chunk)
-    .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+  const prompt = fillTemplate(promptTemplate, {
+    chunk,
+    customPrompt: sanitizeUserInput(customPrompt || ""),
+  });
 
   const customFocus = customPrompt?.trim();
   let structuredPrompt = `${prompt}

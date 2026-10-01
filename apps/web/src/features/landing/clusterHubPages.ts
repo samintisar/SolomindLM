@@ -5,7 +5,7 @@ import {
   type IntentLandingPageConfig,
 } from "./intentLandingPages";
 
-export type ClusterHubGuideLink = {
+type ClusterHubGuideLink = {
   path: string;
   label: string;
   description: string;

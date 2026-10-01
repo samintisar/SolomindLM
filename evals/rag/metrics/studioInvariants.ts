@@ -6,6 +6,7 @@
  * fine one question at a time. They need no API calls, so they run on every
  * studio eval. `studio.ts` wraps each check into a `MetricResult`.
  */
+import { findFlashcardDefect } from "../../../convex/_agents/flashcard/flashcardDefects";
 import type { MetricStatus } from "../types";
 
 export interface InvariantCheck {
@@ -17,6 +18,7 @@ export interface InvariantCheck {
 }
 
 interface QuizQuestionLike {
+  question?: unknown;
   options?: unknown;
   answer?: unknown;
   hint?: unknown;
@@ -67,7 +69,7 @@ function binomialUpperTail(n: number, k: number, p: number): number {
  * compared with a uniform spread (one-sided binomial tail, Bonferroni-corrected
  * across the four positions).
  */
-export function quizAnswerPositionBalance(questions: QuizQuestionLike[]): InvariantCheck {
+function quizAnswerPositionBalance(questions: QuizQuestionLike[]): InvariantCheck {
   const metric = "quiz_answer_position_balance";
   const counts = new Array<number>(OPTION_COUNT).fill(0);
   for (const q of questions) {
@@ -107,7 +109,7 @@ export function quizAnswerPositionBalance(questions: QuizQuestionLike[]): Invari
 
 // ─── Quiz: option validity ───────────────────────────────────
 
-export function quizOptionValidity(questions: QuizQuestionLike[]): InvariantCheck {
+function quizOptionValidity(questions: QuizQuestionLike[]): InvariantCheck {
   const metric = "quiz_option_validity";
   const invalid: Array<{ index: number; reasons: string[] }> = [];
 
@@ -162,7 +164,7 @@ const POSITIONAL_REF_PATTERNS: RegExp[] = [
   /\b(?:first|second|third|fourth|last)\s+(?:option|choice|alternative)s?\b/i,
 ];
 
-export function quizPositionalReferences(questions: QuizQuestionLike[]): InvariantCheck {
+function quizPositionalReferences(questions: QuizQuestionLike[]): InvariantCheck {
   const metric = "quiz_explanation_positional_refs";
   const flagged: number[] = [];
   questions.forEach((q, index) => {
@@ -183,6 +185,55 @@ export function quizPositionalReferences(questions: QuizQuestionLike[]): Invaria
             .map((i) => `Q${i + 1}`)
             .join(", ")}`,
     breakdown: { flagged, total },
+  };
+}
+
+// ─── Quiz: stem length ───────────────────────────────────────
+
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Nearest-rank percentile of an ascending-sorted list. */
+function percentile(sorted: number[], p: number): number {
+  return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+}
+
+/**
+ * Reports how many words each question stem takes to read (median and p90),
+ * labelled with the difficulty the quiz was requested at. Informational only:
+ * a fixed word limit would push prompts toward a number rather than toward
+ * shorter stems, so this tracks the trend across runs instead of gating on it.
+ * Whitespace-delimited counting undercounts unspaced scripts (e.g. Chinese).
+ */
+function quizStemLength(questions: QuizQuestionLike[], difficulty?: string): InvariantCheck {
+  const metric = "quiz_stem_length";
+  const words = questions
+    .filter(
+      (q): q is { question: string } => typeof q.question === "string" && !isBlank(q.question)
+    )
+    .map((q) => wordCount(q.question))
+    .sort((a, b) => a - b);
+  const label = difficulty ?? "unspecified";
+
+  if (words.length === 0) {
+    return {
+      metric,
+      status: "info",
+      score: 1,
+      detail: "No question stems to measure.",
+      breakdown: { difficulty: label, n: 0 },
+    };
+  }
+
+  const median = percentile(words, 0.5);
+  const p90 = percentile(words, 0.9);
+  return {
+    metric,
+    status: "info",
+    score: 1,
+    detail: `Question stem length at ${label} difficulty: median ${median} words, p90 ${p90} words (n=${words.length}).`,
+    breakdown: { difficulty: label, n: words.length, median, p90, max: words[words.length - 1] },
   };
 }
 
@@ -224,10 +275,47 @@ export function flashcardCardValidity(cards: FlashcardLike[]): InvariantCheck {
   };
 }
 
-export function quizInvariantChecks(questions: QuizQuestionLike[]): InvariantCheck[] {
+// ─── Flashcards: answer leak ─────────────────────────────────
+
+/** Cards whose front gives the answer away, or whose blank breaks the sentence. */
+export function flashcardAnswerLeak(cards: FlashcardLike[]): InvariantCheck {
+  const metric = "flashcard_answer_leak";
+  const flagged: Array<{ index: number; defect: string }> = [];
+  let total = 0;
+
+  cards.forEach((card, index) => {
+    const front = card.front ?? card.question;
+    const back = card.back ?? card.answer;
+    if (isBlank(front) || isBlank(back)) return;
+    total++;
+    const defect = findFlashcardDefect({ front: front as string, back: back as string });
+    if (defect) flagged.push({ index, defect });
+  });
+
+  const score = total === 0 ? 1 : (total - flagged.length) / total;
+  return {
+    metric,
+    status: total === 0 ? "info" : validityStatus(score),
+    score,
+    detail:
+      flagged.length === 0
+        ? `None of ${total} cards give the answer away on the front.`
+        : `${flagged.length}/${total} cards give the answer away or break their blank: ${flagged
+            .slice(0, 5)
+            .map((i) => `#${i.index + 1} (${i.defect})`)
+            .join("; ")}`,
+    breakdown: { flagged, total },
+  };
+}
+
+export function quizInvariantChecks(
+  questions: QuizQuestionLike[],
+  difficulty?: string
+): InvariantCheck[] {
   return [
     quizAnswerPositionBalance(questions),
     quizOptionValidity(questions),
     quizPositionalReferences(questions),
+    quizStemLength(questions, difficulty),
   ];
 }

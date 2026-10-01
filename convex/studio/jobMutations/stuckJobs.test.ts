@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
+import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema";
 import {
   failStuckJobs,
@@ -16,6 +17,16 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, [
+  "./studio/jobMutations/audio.ts",
+  "./studio/jobMutations/flashcards.ts",
+  "./studio/jobMutations/infographics.ts",
+  "./studio/jobMutations/mindmaps.ts",
+  "./studio/jobMutations/quizzes.ts",
+  "./studio/jobMutations/reports.ts",
+  "./studio/jobMutations/spreadsheets.ts",
+  "./studio/jobMutations/writtenQuestions.ts",
+]);
 
 type T = ReturnType<typeof convexTest>;
 

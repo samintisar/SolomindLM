@@ -3,6 +3,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "../../_generated/api";
+import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema.js";
 import {
   PROMPT_REPORT_AUTO_HIDE_THRESHOLD,
@@ -20,6 +21,7 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, ["./studio/prompts/index.ts"]);
 
 async function seedUser(t: ReturnType<typeof convexTest>) {
   return await t.run(async (ctx) => {

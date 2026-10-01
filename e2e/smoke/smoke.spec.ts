@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { devices, expect, type Page, test } from "@playwright/test";
 
 test.describe("Smoke tests — public pages", () => {
   test("landing page loads with hero content", async ({ page }) => {
@@ -54,5 +54,28 @@ test.describe("Smoke tests — public pages", () => {
 
     const url = page.url();
     expect(url).toMatch(/\/(home|sign-in)/);
+  });
+});
+
+const viewportContent = (page: Page) =>
+  page.locator('meta[name="viewport"]').getAttribute("content");
+
+test.describe("Viewport — iOS focus zoom", () => {
+  test.describe("iPhone", () => {
+    test.use({ userAgent: devices["iPhone 13"].userAgent, hasTouch: true });
+
+    test("caps maximum-scale so focusing a field doesn't zoom", async ({ page }) => {
+      await page.goto("/");
+      expect(await viewportContent(page)).toContain("maximum-scale=1");
+    });
+  });
+
+  test.describe("Android", () => {
+    test.use({ userAgent: devices["Pixel 7"].userAgent, hasTouch: true });
+
+    test("leaves maximum-scale unset so pinch-zoom keeps working", async ({ page }) => {
+      await page.goto("/");
+      expect(await viewportContent(page)).not.toContain("maximum-scale");
+    });
   });
 });

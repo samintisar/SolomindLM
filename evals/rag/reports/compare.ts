@@ -19,7 +19,7 @@ export interface CompareArtifactsOptions {
   commitSha?: string;
 }
 
-export function artifactFileName(artifact: EvalRunArtifact): string {
+function artifactFileName(artifact: EvalRunArtifact): string {
   return `${artifact.caseId}__${artifact.runner}.json`;
 }
 

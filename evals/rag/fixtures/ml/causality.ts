@@ -99,8 +99,3 @@ export const mlCausalityFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlCausalityFixture(id: string): EvalFixture | undefined {
-  return mlCausalityFixtures.find((f) => f.id === id);
-}

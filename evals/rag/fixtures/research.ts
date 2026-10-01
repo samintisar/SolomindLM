@@ -8,7 +8,7 @@ import type { EvalFixture } from "../types";
 const RESEARCH_NOTEBOOK_ID = "jd72h9qsq5zap11ede5k8rqkx585djmc";
 
 /** Align eval runs with production Deep Research retrieval breadth. */
-export const DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL = 8;
+const DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL = 8;
 
 function deepResearchPolicy(channels: string[]) {
   return { channels, maxResultsPerChannel: DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL };

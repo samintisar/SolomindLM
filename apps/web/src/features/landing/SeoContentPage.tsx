@@ -7,7 +7,6 @@ import { Button } from "@/shared/components/ui/button";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { isNativeShell } from "@/utils/platformDetection";
 import { Footer } from "./components/Footer";
-import { setSignupIntent } from "./landingSignup";
 import {
   getSeoContentBreadcrumbItems,
   getSeoContentPageByPath,
@@ -36,10 +35,7 @@ export function SeoContentPage({ pagePath }: SeoContentPageProps) {
     return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
   }
 
-  const openSignup = () => {
-    setSignupIntent(page.signupIntentKey);
-    setAuthModalOpen(true);
-  };
+  const openSignup = () => setAuthModalOpen(true);
 
   return (
     <>

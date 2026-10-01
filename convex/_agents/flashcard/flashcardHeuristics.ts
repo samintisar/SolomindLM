@@ -2,6 +2,7 @@
 
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
+import { findFlashcardDefect } from "./flashcardDefects.js";
 import { PROBLEMATIC_PHRASES } from "./prompts.js";
 import type { Flashcard } from "./state.js";
 import { cleanBackText, cleanFrontText } from "./textCleanup.js";
@@ -72,6 +73,27 @@ export function validateSelfContained(card: Flashcard): boolean {
   }
 
   return !shouldReject;
+}
+
+/**
+ * A card is usable when both sides are present, it doesn't point at content the
+ * learner can't see, and its front doesn't give the answer away.
+ */
+export function isUsableFlashcard(card: Flashcard): boolean {
+  if (!card.front || !card.back || !validateSelfContained(card)) return false;
+
+  const defect = findFlashcardDefect(card);
+  if (defect) {
+    createAgentGraphLogger("FlashcardGraph", "flashcard").warn(`Flashcard rejected: ${defect}`, {
+      agent: "FlashcardGraph",
+      phase: "validate_answer_leak",
+      defect,
+      questionPreview: card.front.substring(0, 100),
+      answerPreview: card.back.substring(0, 60),
+    });
+    return false;
+  }
+  return true;
 }
 
 export function levenshteinDistance(str1: string, str2: string): number {

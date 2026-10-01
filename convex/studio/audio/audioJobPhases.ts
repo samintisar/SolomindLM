@@ -9,7 +9,9 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { EmptyLlmResponseError } from "../../_agents/_shared/llmErrors";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { isRetryableError } from "../../_agents/_shared/retry";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
 import {
   aggregateStudioJobTelemetry,
@@ -21,22 +23,31 @@ import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggre
 import {
   type AudioLength,
   type AudioType,
+  ESTIMATED_WORDS_PER_LINE,
+  getContinuationPrompt,
   getMapPrompt,
   getReducePrompt,
+  getWrapUpPrompt,
   MAP_SYSTEM_PROMPT,
   REDUCE_SYSTEM_PROMPT,
   TARGET_LINE_COUNTS,
 } from "../../_agents/audio_overview/prompts";
 import {
+  continueScriptIfNeeded,
+  getContinuationMaxTokens,
+  getScriptMaxLines,
+} from "../../_agents/audio_overview/scriptContinuation";
+import {
   generateValidatedDialogueScript,
   getMinimumDialogueLines,
+  removeRepeatedDialogueLines,
 } from "../../_agents/audio_overview/scriptParsing";
 import type { DialogueLine } from "../../_agents/audio_overview/state";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
+import { concatenateMp3Buffers, encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
 import {
   createTogetherTtsClient,
   synthesizeSpeechToBuffer,
@@ -44,6 +55,8 @@ import {
 import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
+import { planSynthesisChunks } from "./synthesisChunks";
 
 // ============================================================
 // CONFIGURATION
@@ -55,7 +68,23 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk
   REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
   REDUCE_MAX_OUTPUT_TOKENS: 16_384,
+  /**
+   * Script writing runs with reasoning off. The smart model thinks by default and its reasoning
+   * shares `max_tokens` with the answer; on a ~220-line script it often spent the whole budget
+   * thinking and returned no script (finish_reason=length, #198).
+   */
+  REDUCE_REASONING_ENABLED: false,
+  /**
+   * Continuation calls (see continueScriptIfNeeded) get a timeout scaled to their output budget,
+   * assuming at least ~30 tokens/s, and never less than this minimum.
+   */
+  CONTINUATION_MIN_TIMEOUT_MS: 60_000,
+  CONTINUATION_MS_PER_OUTPUT_TOKEN: 33,
   TTS_TIMEOUT_MS: 300_000, // 5 minutes
+  /** Lines each synthesis chunk sends to TTS at once. */
+  TTS_BATCH_SIZE: 5,
+  /** Delay before a failed synthesis chunk's one retry. */
+  SYNTHESIS_CHUNK_RETRY_DELAY_MS: 5_000,
 } as const;
 
 export type AudioOverviewGenerationPhaseArgs = {
@@ -78,6 +107,14 @@ export type FinalizeAudioOverviewPhaseArgs = {
   audioOverviewId: Id<"audioOverviews">;
   userId: string;
   notebookId: Id<"notebooks">;
+};
+
+export type SynthesizeAudioOverviewPhaseArgs = FinalizeAudioOverviewPhaseArgs;
+
+export type SynthesizeAudioOverviewChunkPhaseArgs = SynthesizeAudioOverviewPhaseArgs & {
+  chunkIndex: number;
+  /** 0 on the first run, 1 on the retry. */
+  attempt: number;
 };
 
 /** Kokoro (or other Together TTS) voice IDs per host */
@@ -425,7 +462,7 @@ export async function runProcessAudioMapChunkPhase(
 }
 
 // ============================================================
-// PHASE 3: Finalize (Collapse + Write Script + Synthesize + Upload)
+// PHASE 3: Finalize (Collapse + Write Script, then schedule synthesis)
 // ============================================================
 
 export async function runFinalizeAudioOverviewPhase(
@@ -469,6 +506,12 @@ export async function runFinalizeAudioOverviewPhase(
     const language = userPrefs?.outputLanguage;
 
     const mapResults = (audioOverview.metadata?.mapResults as Record<string, string>) || {};
+
+    // Map output is held in memory from here; drop it from the row so the finalize-phase
+    // status updates don't rewrite and re-send it.
+    await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
+      audioOverviewId,
+    });
 
     // Separate successful and failed results
     const allBeats: string[] = [];
@@ -544,7 +587,7 @@ export async function runFinalizeAudioOverviewPhase(
     const minimumDialogueLines = getMinimumDialogueLines(targetLines);
 
     console.log(
-      `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`
+      `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, reasoning=${CONFIG.REDUCE_REASONING_ENABLED}`
     );
 
     const reducePrompt = getReducePrompt({
@@ -564,104 +607,495 @@ export async function runFinalizeAudioOverviewPhase(
     // Convex action time limit.
     const REDUCE_MAX_ATTEMPTS = 2;
     const REDUCE_PARSE_RETRY_BUDGET_MS = 180_000;
+    // This action only writes the script (TTS runs in its own action), so continuation calls may
+    // use the phase budget, leaving headroom under the action time limit for the title and store.
+    const REDUCE_PHASE_BUDGET_MS = 480_000;
+    const remainingReduceBudgetMs = () => REDUCE_PHASE_BUDGET_MS - (Date.now() - reduceStartTime);
     const REDUCE_FORMAT_REMINDER =
       "\n\nIMPORTANT: Your previous reply could not be used because it was not a complete, valid JSON array of dialogue lines. Respond with ONLY the JSON array (no commentary, no code fences), make sure every object is complete, and close the array.";
+    const REDUCE_LENGTH_REMINDER =
+      "\n\nIMPORTANT: Your previous reply was empty because it ran out of output space before any usable script was produced. Respond with ONLY the JSON array (no commentary, no code fences), keep each turn concise so the complete script fits, and close the array.";
     let reduceUsage: TokenUsage | undefined;
     const reduceStartTime = Date.now();
 
-    const { script: fullDialogueScript, attempt: scriptAttempt } =
-      await generateValidatedDialogueScript({
-        minimumLines: minimumDialogueLines,
-        maxAttempts: REDUCE_MAX_ATTEMPTS,
-        canRetry: () => Date.now() - reduceStartTime < REDUCE_PARSE_RETRY_BUDGET_MS,
-        onAttemptFailed: ({ attempt, reason, responseText }) => {
-          console.log(
-            `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${reason}. Response preview: ${responseText.slice(0, 500)}`
-          );
-        },
-        generate: (attempt) =>
-          invokeStudioLlm({
-            invoke: () =>
-              invokeTogetherText({
-                systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-                userPrompt: attempt === 1 ? reducePrompt : reducePrompt + REDUCE_FORMAT_REMINDER,
-                model: env.AUDIO_LLM,
-                maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
-                temperature: attempt === 1 ? 0.6 : 0.3,
-                reasoningEnabled: true,
-                onUsage: (usage) => {
-                  reduceUsage = addTokenUsage(reduceUsage, usage);
-                },
-              }),
-            timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-            phaseLabel: "AudioReduce",
-            retry: { maxAttempts: attempt === 1 ? 2 : 1, baseDelayMs: 1000 },
-          }),
-      });
+    const {
+      script: generatedScript,
+      attempt: scriptAttempt,
+      truncated: scriptTruncated,
+    } = await generateValidatedDialogueScript({
+      minimumLines: minimumDialogueLines,
+      maxAttempts: REDUCE_MAX_ATTEMPTS,
+      canRetry: () => Date.now() - reduceStartTime < REDUCE_PARSE_RETRY_BUDGET_MS,
+      onAttemptFailed: ({ attempt, reason, responseText }) => {
+        console.log(
+          `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${reason}. Response preview: ${responseText.slice(0, 500)}`
+        );
+      },
+      generate: (attempt, previousFailure) =>
+        invokeStudioLlm({
+          invoke: () =>
+            invokeTogetherText({
+              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              userPrompt:
+                previousFailure === "empty_response"
+                  ? reducePrompt + REDUCE_LENGTH_REMINDER
+                  : previousFailure === "invalid_script"
+                    ? reducePrompt + REDUCE_FORMAT_REMINDER
+                    : reducePrompt,
+              model: env.AUDIO_LLM,
+              maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
+              temperature: attempt === 1 ? 0.6 : 0.3,
+              reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
+              onUsage: (usage) => {
+                reduceUsage = addTokenUsage(reduceUsage, usage);
+              },
+            }),
+          timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+          phaseLabel: "AudioReduce",
+          retry: {
+            maxAttempts: attempt === 1 ? 2 : 1,
+            baseDelayMs: 1000,
+            // Empty completions are retried by the script loop, with a length reminder.
+            retryableErrors: (error) =>
+              !(error instanceof EmptyLlmResponseError) && isRetryableError(error),
+          },
+        }),
+    });
+
+    const {
+      script: dedupedScript,
+      removed: repeatedLinesRemoved,
+      endedInRepeat,
+    } = removeRepeatedDialogueLines(generatedScript);
 
     console.log(
-      `[AudioJob] Parsed ${fullDialogueScript.length} dialogue lines on attempt ${scriptAttempt}/${REDUCE_MAX_ATTEMPTS}`
+      `[AudioJob] Parsed ${generatedScript.length} dialogue lines on attempt ${scriptAttempt}/${REDUCE_MAX_ATTEMPTS}; removed ${repeatedLinesRemoved} repeated lines`
     );
 
-    console.log(`[AudioJob] Generated ${fullDialogueScript.length} dialogue lines`);
-
-    // Update status for audio synthesis
-    await ctx.runMutation(internal.studio.jobMutations.audio.updateAudioOverviewStatus, {
-      audioOverviewId,
-      status: "generating",
-      metadata: {
-        phase: "synthesizing",
-        progress: 70,
-        currentStep: "Synthesizing audio...",
+    const fullDialogueScript = await continueScriptIfNeeded({
+      script: dedupedScript,
+      // Truncated at the token limit, or a repetition loop ran to the end: there is no real ending.
+      cutOff: scriptTruncated || endedInRepeat,
+      targetWords: targetLines * ESTIMATED_WORDS_PER_LINE,
+      maxLines: getScriptMaxLines(targetLines),
+      canContinue: () => remainingReduceBudgetMs() >= CONFIG.CONTINUATION_MIN_TIMEOUT_MS,
+      generate: (scriptSoFar, turns, wrapUp) => {
+        const maxTokens = getContinuationMaxTokens(turns, CONFIG.REDUCE_MAX_OUTPUT_TOKENS);
+        const focus = sanitizedFocus || "general overview";
+        return invokeStudioLlm({
+          invoke: () =>
+            invokeTogetherText({
+              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              userPrompt: wrapUp
+                ? getWrapUpPrompt({ scriptSoFar, audioType, focus })
+                : getContinuationPrompt({
+                    content: combined,
+                    scriptSoFar,
+                    turns,
+                    audioType,
+                    focus,
+                  }),
+              model: env.AUDIO_LLM,
+              maxTokens,
+              temperature: 0.6,
+              reasoningEnabled: CONFIG.REDUCE_REASONING_ENABLED,
+              onUsage: (usage) => {
+                reduceUsage = addTokenUsage(reduceUsage, usage);
+              },
+            }),
+          timeoutMs: Math.min(
+            remainingReduceBudgetMs(),
+            Math.max(
+              CONFIG.CONTINUATION_MIN_TIMEOUT_MS,
+              maxTokens * CONFIG.CONTINUATION_MS_PER_OUTPUT_TOKEN
+            )
+          ),
+          phaseLabel: "AudioContinue",
+          retry: { maxAttempts: 1 },
+        });
       },
     });
 
+    console.log(`[AudioJob] Generated ${fullDialogueScript.length} dialogue lines`);
+
     const reduceLatencyMs = Date.now() - reduceStartTime;
-    const ttsStartTime = Date.now();
-    const ttsClient = createTogetherTtsClient();
-    const results: { index: number; buffer: Buffer | null }[] = [];
-    const BATCH_SIZE = 5;
 
-    for (let i = 0; i < fullDialogueScript.length; i += BATCH_SIZE) {
-      const batchLines = fullDialogueScript.slice(i, i + BATCH_SIZE);
+    // Generate title
+    let title = "Audio Overview";
+    try {
+      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
+        chunk: combined.substring(0, 2000),
+      });
+    } catch (_e) {
+      console.log("[AudioJob] Title generation failed, using default");
+    }
 
-      const batchPromises = batchLines.map(async (line, batchIdx) => {
-        const globalIndex = i + batchIdx;
-        const voice = line.speaker === "host_a" ? VOICES.host_a : VOICES.host_b;
+    // TTS runs in its own action so it gets a full action time budget: script writing plus TTS
+    // in one action could exceed the 10-minute limit and leave the job stuck.
+    const stored = await ctx.runMutation(
+      internal.studio.jobMutations.audio.storeAudioOverviewScript,
+      {
+        audioOverviewId,
+        synthesisInput: {
+          script: fullDialogueScript,
+          title,
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+          telemetry: aggregateStudioJobTelemetry({
+            mapResults: Object.values(mapResults),
+            reduce: {
+              latencyMs: reduceLatencyMs,
+              ...(reduceUsage !== undefined ? { tokenUsage: reduceUsage } : {}),
+            },
+          }),
+        },
+      }
+    );
+    if (!stored) {
+      console.log("[AudioJob] Audio overview deleted during finalization");
+      return;
+    }
+    await ctx.scheduler.runAfter(0, internal.studio.audio.job.synthesizeAudioOverviewPhase, {
+      audioOverviewId,
+      userId,
+      notebookId,
+    });
+    logger.info("Script ready, scheduled synthesis", {
+      dialogueLines: fullDialogueScript.length,
+    });
+  } catch (error) {
+    const errorMeta = createErrorMetadata(error, "finalization");
 
+    logger.jobError(error, {
+      phase: "finalization",
+      errorType: errorMeta.type,
+      retryable: errorMeta.retryable,
+    });
+
+    await ctx.runMutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
+      audioOverviewId,
+      error: errorMeta.message,
+      metadata: {
+        phase: "failed",
+        errorPhase: "finalization",
+        errorType: errorMeta.type,
+        retryable: errorMeta.retryable,
+        failedAt: Date.now(),
+      },
+    });
+
+    throw error;
+  }
+}
+
+// ============================================================
+// PHASE 4: Synthesize — plan chunks and fan out
+// ============================================================
+
+/** Marks the job failed in the synthesis phase. The mutation also deletes stored chunk MP3s. */
+async function failSynthesisPhase(
+  ctx: ActionCtx,
+  logger: ReturnType<typeof createJobLogger>,
+  audioOverviewId: Id<"audioOverviews">,
+  error: unknown
+): Promise<void> {
+  const errorMeta = createErrorMetadata(error, "synthesis");
+
+  logger.jobError(error, {
+    phase: "synthesis",
+    errorType: errorMeta.type,
+    retryable: errorMeta.retryable,
+  });
+
+  await ctx.runMutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
+    audioOverviewId,
+    error: errorMeta.message,
+    metadata: {
+      phase: "failed",
+      errorPhase: "synthesis",
+      errorType: errorMeta.type,
+      retryable: errorMeta.retryable,
+      failedAt: Date.now(),
+    },
+  });
+}
+
+/**
+ * Plans the synthesis chunks and schedules one action per chunk. Each chunk runs in its own
+ * action, so TTS time and memory per action stay bounded however long the script is.
+ */
+export async function runSynthesizeAudioOverviewPhase(
+  ctx: ActionCtx,
+  args: SynthesizeAudioOverviewPhaseArgs
+): Promise<void> {
+  "use node";
+
+  const { audioOverviewId, userId, notebookId } = args;
+  const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
+
+  try {
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    if (!audioOverview) {
+      console.log("[AudioJob] Audio overview deleted before synthesis");
+      return;
+    }
+
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    if (!synthesisInput || synthesisInput.script.length === 0) {
+      throw new Error("No dialogue script stored for synthesis");
+    }
+
+    // Script-only eval jobs measure the script, so they complete here without TTS time or cost.
+    if (audioOverview.metadata?.skipTts === true) {
+      const { script, title, mapSuccessCount, mapFailedCount, telemetry } = synthesisInput;
+      const transcript = script.map((l) => l.text).join("\n");
+      await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
+        audioOverviewId,
+        transcript,
+        metadata: withStudioTelemetryMetadata(
+          {
+            title,
+            phase: "completed",
+            progress: 100,
+            completedAt: Date.now(),
+            mapSuccessCount,
+            mapFailedCount,
+            dialogueLines: script.length,
+          },
+          telemetry
+        ),
+      });
+      logger.jobComplete({
+        title,
+        skippedTts: true,
+        transcriptLength: transcript.length,
+        mapSuccess: mapSuccessCount,
+        mapFailed: mapFailedCount,
+      });
+      return;
+    }
+
+    const chunks = planSynthesisChunks(synthesisInput.script.length);
+    const planned = await ctx.runMutation(internal.studio.jobMutations.audio.initAudioSynthesis, {
+      audioOverviewId,
+      chunks,
+    });
+    if (!planned) {
+      console.log("[AudioJob] Synthesis already planned, or the job is no longer generating");
+      return;
+    }
+
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      await ctx.scheduler.runAfter(0, internal.studio.audio.job.synthesizeAudioOverviewChunk, {
+        audioOverviewId,
+        userId,
+        notebookId,
+        chunkIndex,
+        attempt: 0,
+      });
+    }
+    logger.info("Scheduled synthesis chunks", {
+      chunks: chunks.length,
+      dialogueLines: synthesisInput.script.length,
+    });
+  } catch (error) {
+    await failSynthesisPhase(ctx, logger, audioOverviewId, error);
+    throw error;
+  }
+}
+
+/**
+ * Synthesizes dialogue lines in order, CONFIG.TTS_BATCH_SIZE at a time. A line that fails is
+ * skipped and counted. `lineOffset` is the first line's index in the script, for logs.
+ */
+async function synthesizeDialogueLines(
+  lines: DialogueLine[],
+  lineOffset: number
+): Promise<{ buffers: Buffer[]; failedLines: number; firstError?: string }> {
+  const ttsClient = createTogetherTtsClient();
+  const buffers: Buffer[] = [];
+  let failedLines = 0;
+  let firstError: string | undefined;
+
+  for (let i = 0; i < lines.length; i += CONFIG.TTS_BATCH_SIZE) {
+    const batch = await Promise.all(
+      lines.slice(i, i + CONFIG.TTS_BATCH_SIZE).map(async (line, batchIdx) => {
         try {
-          const buffer = await synthesizeSpeechToBuffer(ttsClient, {
+          return await synthesizeSpeechToBuffer(ttsClient, {
             model: env.AUDIO_TTS_MODEL,
             input: line.text,
-            voice,
+            voice: line.speaker === "host_a" ? VOICES.host_a : VOICES.host_b,
             timeoutMs: CONFIG.TTS_TIMEOUT_MS,
           });
-          return { index: globalIndex, buffer };
-        } catch (_error) {
-          console.log(`[AudioJob] Failed line ${globalIndex + 1}`);
-          return { index: globalIndex, buffer: null };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          firstError ??= message;
+          failedLines += 1;
+          console.log(`[AudioJob] Failed line ${lineOffset + i + batchIdx + 1}: ${message}`);
+          return null;
         }
-      });
+      })
+    );
+    for (const buffer of batch) {
+      if (buffer) buffers.push(buffer);
+    }
+  }
 
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
+  return { buffers, failedLines, firstError };
+}
+
+/**
+ * Synthesizes one chunk of the script, stores it as an MP3 and records it. Recording the last
+ * chunk schedules assembly. A failed chunk retries once, then fails the job.
+ */
+export async function runSynthesizeAudioOverviewChunkPhase(
+  ctx: ActionCtx,
+  args: SynthesizeAudioOverviewChunkPhaseArgs
+): Promise<void> {
+  "use node";
+
+  const { audioOverviewId, userId, notebookId, chunkIndex, attempt } = args;
+  const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
+  // Stored but not yet recorded: nothing else would delete it if this action fails.
+  let unrecordedStorageId: Id<"_storage"> | undefined;
+
+  try {
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    if (!audioOverview || audioOverview.status !== "generating") {
+      console.log(
+        `[AudioJob] Skipping synthesis chunk ${chunkIndex}: job deleted or no longer generating`
+      );
+      return;
     }
 
-    const sortedBuffers = results
-      .sort((a, b) => a.index - b.index)
-      .map((r) => r.buffer)
-      .filter((b): b is Buffer => b !== null);
-
-    const successCount = sortedBuffers.length;
-
-    if (successCount < fullDialogueScript.length * 0.5) {
-      throw new Error(`Too many synthesis failures: ${successCount}/${fullDialogueScript.length}`);
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    const synthesis = audioOverview.metadata?.synthesis as AudioSynthesisState | undefined;
+    const range = synthesis?.chunks[chunkIndex];
+    if (!synthesisInput || !synthesis || !range) {
+      throw new Error(`No script or plan stored for synthesis chunk ${chunkIndex}`);
     }
 
-    const wavBuffer = concatenateWavBuffers(sortedBuffers);
-    const audioBuffer = encodePcmWavToMp3(wavBuffer);
+    const startTime = Date.now();
+    const { buffers, failedLines, firstError } = await synthesizeDialogueLines(
+      synthesisInput.script.slice(range.start, range.end),
+      range.start
+    );
+    let storageId: Id<"_storage"> | undefined;
+    if (buffers.length > 0) {
+      const mp3 = encodePcmWavToMp3(concatenateWavBuffers(buffers));
+      storageId = await ctx.storage.store(new Blob([new Uint8Array(mp3)], { type: "audio/mpeg" }));
+      unrecordedStorageId = storageId;
+    }
+    const latencyMs = Date.now() - startTime;
     console.log(
-      `[AudioJob] Audio synthesis complete: ${successCount} lines, ${wavBuffer.length} WAV bytes, ${audioBuffer.length} MP3 bytes`
+      `[AudioJob] Synthesis chunk ${chunkIndex + 1}/${synthesis.chunks.length} (lines ${range.start + 1}-${range.end}): ${buffers.length} synthesized, ${failedLines} failed, ${latencyMs} ms`
+    );
+
+    // Recording the last chunk also schedules assembly, in the same transaction.
+    await ctx.runMutation(internal.studio.jobMutations.audio.recordAudioSynthesisChunk, {
+      audioOverviewId,
+      chunkIndex,
+      result: {
+        ...(storageId ? { storageId } : {}),
+        synthesizedLines: buffers.length,
+        failedLines,
+        ...(firstError ? { firstError } : {}),
+        latencyMs,
+      },
+    });
+    unrecordedStorageId = undefined;
+  } catch (error) {
+    if (unrecordedStorageId) {
+      await ctx.storage.delete(unrecordedStorageId).catch((deleteError: unknown) => {
+        console.warn(
+          `[AudioJob] Could not delete unrecorded chunk audio ${unrecordedStorageId}: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`
+        );
+      });
+    }
+    if (attempt === 0) {
+      console.log(
+        `[AudioJob] Synthesis chunk ${chunkIndex} failed, retrying: ${error instanceof Error ? error.message : String(error)}`
+      );
+      await ctx.scheduler.runAfter(
+        CONFIG.SYNTHESIS_CHUNK_RETRY_DELAY_MS,
+        internal.studio.audio.job.synthesizeAudioOverviewChunk,
+        { ...args, attempt: 1 }
+      );
+      return;
+    }
+    await failSynthesisPhase(ctx, logger, audioOverviewId, error);
+    throw error;
+  }
+}
+
+// ============================================================
+// PHASE 5: Assemble (join chunk MP3s + Upload + Save)
+// ============================================================
+
+export async function runAssembleAudioOverviewPhase(
+  ctx: ActionCtx,
+  args: SynthesizeAudioOverviewPhaseArgs
+): Promise<void> {
+  "use node";
+
+  const { audioOverviewId, userId, notebookId } = args;
+  const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
+
+  try {
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    if (!audioOverview || audioOverview.status !== "generating") {
+      console.log("[AudioJob] Skipping assembly: job deleted or no longer generating");
+      return;
+    }
+
+    const synthesisInput = audioOverview.metadata?.synthesisInput as
+      | AudioSynthesisInput
+      | undefined;
+    const synthesis = audioOverview.metadata?.synthesis as AudioSynthesisState | undefined;
+    if (!synthesisInput || !synthesis) {
+      throw new Error("No script or synthesis results stored for assembly");
+    }
+    const {
+      script: fullDialogueScript,
+      title,
+      mapSuccessCount,
+      mapFailedCount,
+      telemetry,
+    } = synthesisInput;
+
+    const results = synthesis.chunks.map((_, chunkIndex) => {
+      const result = synthesis.done[chunkIndex];
+      if (!result) throw new Error(`Synthesis chunk ${chunkIndex} has no result`);
+      return result;
+    });
+    const successCount = results.reduce((sum, result) => sum + result.synthesizedLines, 0);
+    if (successCount < fullDialogueScript.length * 0.5) {
+      const firstSynthesisError = results.find((result) => result.firstError)?.firstError;
+      throw new Error(
+        `Too many synthesis failures: ${successCount}/${fullDialogueScript.length} lines synthesized (first error: ${firstSynthesisError ?? "unknown"})`
+      );
+    }
+
+    const chunkMp3s: Buffer[] = [];
+    for (const result of results) {
+      if (!result.storageId) continue;
+      const blob = await ctx.storage.get(result.storageId);
+      if (!blob) throw new Error(`Synthesis chunk audio ${result.storageId} is missing`);
+      chunkMp3s.push(Buffer.from(await blob.arrayBuffer()));
+    }
+    const audioBuffer = concatenateMp3Buffers(chunkMp3s);
+    console.log(
+      `[AudioJob] Audio synthesis complete: ${successCount} lines in ${results.length} chunks, ${audioBuffer.length} MP3 bytes`
     );
 
     // Update status for uploading
@@ -670,7 +1104,7 @@ export async function runFinalizeAudioOverviewPhase(
       status: "generating",
       metadata: {
         phase: "uploading",
-        progress: 90,
+        progress: 95,
         currentStep: "Uploading audio...",
       },
     });
@@ -699,17 +1133,7 @@ export async function runFinalizeAudioOverviewPhase(
     // Build transcript
     const transcript = fullDialogueScript.map((l) => l.text).join("\n");
 
-    // Generate title
-    let title = "Audio Overview";
-    try {
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: combined.substring(0, 2000),
-      });
-    } catch (_e) {
-      console.log("[AudioJob] Title generation failed, using default");
-    }
-
-    // Save results
+    // Save results. This also deletes the chunk MP3s.
     await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
       audioOverviewId,
       audioUrl,
@@ -720,51 +1144,29 @@ export async function runFinalizeAudioOverviewPhase(
           phase: "completed",
           progress: 100,
           completedAt: Date.now(),
-          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-          mapFailedCount: failedCount.count,
+          mapSuccessCount,
+          mapFailedCount,
           dialogueLines: successCount,
         },
-        aggregateStudioJobTelemetry({
-          mapResults: Object.values(mapResults),
-          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
-          extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
-        })
+        {
+          ...telemetry,
+          stageSpans: [
+            ...(telemetry.stageSpans ?? []),
+            { stage: "tts", latencyMs: Date.now() - synthesis.startedAt },
+          ],
+        }
       ),
-    });
-
-    // Clear intermediate data
-    await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
-      audioOverviewId,
     });
 
     logger.jobComplete({
       title,
       audioUrl,
       transcriptLength: transcript.length,
-      mapSuccess: Object.keys(mapResults).length - failedCount.count,
-      mapFailed: failedCount.count,
+      mapSuccess: mapSuccessCount,
+      mapFailed: mapFailedCount,
     });
   } catch (error) {
-    const errorMeta = createErrorMetadata(error, "finalization");
-
-    logger.jobError(error, {
-      phase: "finalization",
-      errorType: errorMeta.type,
-      retryable: errorMeta.retryable,
-    });
-
-    await ctx.runMutation(internal.studio.jobMutations.audio.markAudioOverviewFailed, {
-      audioOverviewId,
-      error: errorMeta.message,
-      metadata: {
-        phase: "failed",
-        errorPhase: "finalization",
-        errorType: errorMeta.type,
-        retryable: errorMeta.retryable,
-        failedAt: Date.now(),
-      },
-    });
-
+    await failSynthesisPhase(ctx, logger, audioOverviewId, error);
     throw error;
   }
 }
