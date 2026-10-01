@@ -41,6 +41,8 @@ const rules = (level) => ({
   "shadcn/no-inline-styles": level,
   "shadcn/no-unknown-classes": level,
   "shadcn/require-static-classes": level,
+  // Soft layered look (docs/design/principles.md): warn in general, error in MIGRATED like the shadcn rules.
+  "solomind/soft-surfaces": level,
 });
 
 export default defineConfig([
@@ -51,7 +53,7 @@ export default defineConfig([
       parser: tsParser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    plugins: { shadcn },
+    plugins: { shadcn, solomind },
     settings: {
       shadcn: {
         ui: "@/shared/components/ui",
@@ -63,9 +65,6 @@ export default defineConfig([
     rules: rules("warn"),
   },
   { files: MIGRATED, rules: rules("error") },
-  // Soft layered look (docs/design/principles.md). Warn everywhere, including MIGRATED, for now; once those areas are
-  // swept it is promoted to error in MIGRATED.
-  { files: ["src/**/*.tsx"], plugins: { solomind }, rules: { "solomind/soft-surfaces": "warn" } },
   // Upstream shadcn CLI markup that predates the linter (arbitrary values like ring-[3px], top-[50%],
   // transition-[color,box-shadow]). Stays at warn until each file is regenerated/adapted; all other rules
   // remain errors for these files. Do not add authored components here.
