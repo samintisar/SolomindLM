@@ -49,7 +49,7 @@ export const citationMarkdownComponents: MarkdownRendererProps["components"] = {
   ),
   li: ({ children }) => <li className="text-sm leading-relaxed">{children}</li>,
   blockquote: ({ children }) => (
-    <blockquote className="my-2 border-l-2 border-border pl-3 italic text-muted-foreground">
+    <blockquote className="my-2 border-l border-border pl-3 italic text-muted-foreground">
       {children}
     </blockquote>
   ),

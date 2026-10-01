@@ -1,14 +1,6 @@
-import {
-  Brain,
-  Check,
-  FileText,
-  ListOrdered,
-  Loader2,
-  PenLine,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { Brain, Check, FileText, ListOrdered, PenLine, Search, Sparkles } from "lucide-react";
 import React from "react";
+import { Spinner } from "@/shared/components/ui/spinner";
 
 export function getStatusIcon(status?: string): React.ReactNode {
   switch (status) {
@@ -21,7 +13,7 @@ export function getStatusIcon(status?: string): React.ReactNode {
     case "thinking":
       return <Brain className="w-3.5 h-3.5" />;
     case "generating":
-      return <Loader2 className="w-3.5 h-3.5 animate-spin" />;
+      return <Spinner className="size-3.5" />;
     case "writing":
       return <PenLine className="w-3.5 h-3.5 text-foreground/70" />;
     case "retrieving":

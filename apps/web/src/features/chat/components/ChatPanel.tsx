@@ -68,12 +68,7 @@ const NO_EXTERNAL_SOURCES: ExternalSource[] = [];
  * Spacer below the last message so it can scroll clear of the floating composer. Its height
  * tracks the composer's rendered height via `useComposerClearance` (fallback until measured).
  */
-const MessageListFooter = () => (
-  <div
-    className="h-[var(--chat-composer-clearance,18rem)] shrink-0 md:h-[var(--chat-composer-clearance,14rem)]"
-    aria-hidden
-  />
-);
+const MessageListFooter = () => <div className="composer-clearance shrink-0" aria-hidden />;
 const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
 
 /** Escape in a thread's rename input cancels only the rename (ConversationList handles it), not the history popover. */
@@ -816,8 +811,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             ) : (
               <Virtuoso
                 ref={virtuosoRef}
-                className="min-h-0 w-full min-w-0"
-                style={{ height: "100%" }}
+                className="h-full min-h-0 w-full min-w-0"
                 data={memoizedMessages}
                 itemContent={(_index, message) => (
                   <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
