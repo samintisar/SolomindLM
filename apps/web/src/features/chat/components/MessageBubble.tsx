@@ -1,5 +1,5 @@
 import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
-import React, { useState } from "react";
+import React from "react";
 import { Favicon } from "@/shared/components/Favicon";
 import { type ChatActivityPhase, Message } from "@/shared/types/index";
 import { renderMessageWithReferences } from "../utils/messageRendering";
@@ -7,15 +7,7 @@ import { RefHandlers } from "../utils/messageRendering.utils";
 import { getStatusIcon, getStatusMessage } from "../utils/messageStatus";
 import { AgentActivityPanel } from "./AgentActivityPanel";
 import { DeepResearchSourcesSection } from "./DeepResearchSourcesSection";
-import { ExternalSourcesModal } from "./ExternalSourcesModal";
-
-interface ExternalSource {
-  title: string;
-  url: string;
-  snippet: string;
-  sourceType: string;
-  score?: number;
-}
+import type { ExternalSource } from "./ExternalSourcesModal";
 
 interface MessageBubbleProps {
   message: Message;
@@ -29,8 +21,8 @@ interface MessageBubbleProps {
   onRetry?: (messageId: string) => void;
   /** External sources discovered during this query — shown via the sources button */
   externalSources?: ExternalSource[];
-  /** Called when user adds external sources from the modal or tooltip */
-  onAddExternalSources?: (sources: ExternalSource[]) => void;
+  /** Opens the panel-level external sources dialog for this message. Must be a stable callback. */
+  onOpenExternalSources?: (messageId: string, sources: ExternalSource[]) => void;
   /** Whether to show the "X sources" button for this message */
   showSourcesButton?: boolean;
   notebookId?: string;
@@ -51,7 +43,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     onSendFollowUp,
     onRetry,
     externalSources,
-    onAddExternalSources,
+    onOpenExternalSources,
     showSourcesButton = false,
     notebookId,
     onOpenNotebookSource,
@@ -61,8 +53,6 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     const isCopied = copiedMessageId === message.id;
     const [flashedActionId, setFlashedActionId] = React.useState<string | null>(null);
     const flashTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [isSourcesModalOpen, setIsSourcesModalOpen] = useState(false);
-    const [isAddingSources, setIsAddingSources] = useState(false);
 
     React.useEffect(() => {
       return () => {
@@ -199,7 +189,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
         {showSourcesButton && externalSources && externalSources.length > 0 ? (
           <button
             type="button"
-            onClick={() => setIsSourcesModalOpen(true)}
+            onClick={() => onOpenExternalSources?.(message.id, externalSources)}
             className="ml-2 sm:ml-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-left font-sans text-xs font-medium text-muted-foreground transition-[color,background-color] duration-200 ease-out hover:bg-primary/10 hover:text-foreground dark:hover:bg-primary/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-10 md:min-h-8 md:py-1 md:px-2.5 motion-reduce:transition-none"
             aria-label={`View ${externalSources.length} source${externalSources.length === 1 ? "" : "s"}`}
           >
@@ -299,17 +289,6 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
           </div>
         </div>
       );
-    };
-
-    const handleAddExternalSources = async (selectedSources: ExternalSource[]) => {
-      if (!onAddExternalSources) return;
-      setIsAddingSources(true);
-      try {
-        await onAddExternalSources(selectedSources);
-        setIsSourcesModalOpen(false);
-      } finally {
-        setIsAddingSources(false);
-      }
     };
 
     const FollowUpChips = () => {
@@ -429,13 +408,6 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
                     notebookDocumentIds={notebookDocumentIds}
                   />
                 ) : null}
-                <ExternalSourcesModal
-                  isOpen={isSourcesModalOpen}
-                  onClose={() => setIsSourcesModalOpen(false)}
-                  sources={externalSources ?? []}
-                  onAddSelected={handleAddExternalSources}
-                  isLoading={isAddingSources}
-                />
               </div>
             )}
           </>
@@ -460,7 +432,8 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     prev.showSourcesButton === next.showSourcesButton &&
     JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources) &&
     prev.message.deepResearch?.researchRunId === next.message.deepResearch?.researchRunId &&
-    prev.notebookId === next.notebookId
+    prev.notebookId === next.notebookId &&
+    prev.onOpenExternalSources === next.onOpenExternalSources
 );
 
 MessageBubble.displayName = "MessageBubble";

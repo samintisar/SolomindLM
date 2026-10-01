@@ -1,8 +1,21 @@
-import { ExternalLink, Globe, GraduationCap, Newspaper, Plus, TrendingUp, X } from "lucide-react";
+import { ExternalLink, Globe, GraduationCap, Newspaper, Plus, TrendingUp } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { Favicon } from "@/shared/components/Favicon";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { cn } from "@/shared/utils/cn";
 
-interface ExternalSource {
+export interface ExternalSource {
   title: string;
   url: string;
   snippet: string;
@@ -34,11 +47,13 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
 }) => {
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
+  // Start each opening (or a different message's sources) with nothing selected.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on open and the source list
   useEffect(() => {
     if (isOpen) {
       setSelected(new Set());
     }
-  }, [isOpen]);
+  }, [isOpen, sources]);
 
   const toggleIndex = useCallback((index: number) => {
     setSelected((prev) => {
@@ -54,14 +69,6 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
 
   const allSelected = sources.length > 0 && selected.size === sources.length;
 
-  const selectAll = useCallback(() => {
-    setSelected(new Set(sources.map((_, i) => i)));
-  }, [sources]);
-
-  const deselectAll = useCallback(() => {
-    setSelected(new Set());
-  }, []);
-
   const handleAdd = () => {
     const chosen = sources.filter((_, i) => selected.has(i));
     if (chosen.length > 0) {
@@ -69,111 +76,81 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent size="wide">
+        <DialogHeader>
+          <DialogTitle>Sources</DialogTitle>
+          <DialogDescription>Choose which sources to add to this notebook.</DialogDescription>
+        </DialogHeader>
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="external-sources-modal-title"
-        className="relative flex max-h-[90vh] min-h-0 w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-center justify-between border-b border-border/50 bg-card p-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Globe className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <h2
-              id="external-sources-modal-title"
-              className="truncate text-xl font-bold tracking-tight text-foreground"
-            >
-              Sources
-            </h2>
-          </div>
-          <button
+        <div className="flex items-center justify-between gap-3">
+          <Button
             type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 bg-card px-6 py-3">
-          <button
-            type="button"
-            onClick={allSelected ? deselectAll : selectAll}
-            className="text-sm font-semibold text-primary transition-colors hover:text-primary/90 hover:underline underline-offset-4"
+            variant="link"
+            size="sm"
+            onClick={() => setSelected(allSelected ? new Set() : new Set(sources.map((_, i) => i)))}
           >
             {allSelected ? "Deselect all" : "Select all"}
-          </button>
-          <span className="tabular-nums text-xs text-muted-foreground">
+          </Button>
+          <span className="font-sans text-xs text-muted-foreground tabular-nums">
             {selected.size} selected
           </span>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-card/50 p-6">
-          <ul className="space-y-2">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <ul className="flex flex-col gap-2">
             {sources.map((source, index) => {
               const Icon = SOURCE_TYPE_ICON[source.sourceType] ?? Globe;
               const isChecked = selected.has(index);
               return (
                 <li key={`${source.url}-${index}`}>
                   <label
-                    className={[
-                      "group flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition-[border-color,background-color,box-shadow] duration-200",
-                      isChecked
-                        ? "border-border/55 bg-secondary/30 shadow-sm"
-                        : "border-border/45 bg-card/90 hover:border-border/65 hover:bg-secondary/15",
-                    ].join(" ")}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 font-sans transition-colors hover:bg-accent/40",
+                      isChecked && "bg-accent/40"
+                    )}
                   >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    <Checkbox
+                      className="mt-0.5"
                       checked={isChecked}
-                      onChange={() => toggleIndex(index)}
+                      onCheckedChange={() => toggleIndex(index)}
                       aria-label={`Include ${source.title}`}
                     />
                     {source.sourceType === "web" ? (
-                      <Favicon url={source.url} size={16} className="mt-0.5 shrink-0 opacity-90" />
+                      <Favicon url={source.url} size={16} className="mt-0.5 shrink-0" />
                     ) : (
-                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
                     )}
-                    <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <a
                           href={source.url}
                           target="_blank"
-                          rel="noopener noreferrer"
-                          className="min-w-0 truncate font-serif text-[0.9375rem] font-semibold leading-snug tracking-tight text-foreground underline-offset-2 transition-colors hover:text-primary hover:underline"
+                          rel="noreferrer"
+                          className="min-w-0 truncate text-sm font-semibold hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {source.title}
                         </a>
                         <ExternalLink
-                          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                          className="size-3.5 shrink-0 text-muted-foreground"
                           aria-hidden
                         />
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className="rounded-lg border border-border/50 bg-background/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                          {source.sourceType}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Badge variant="outline">{source.sourceType}</Badge>
                         {source.score !== undefined ? (
-                          <span className="text-[11px] tabular-nums text-muted-foreground">
+                          <span className="text-xs text-muted-foreground tabular-nums">
                             Score {source.score.toFixed(2)}
                           </span>
                         ) : null}
                       </div>
+                      {source.snippet ? (
+                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                          {source.snippet}
+                        </p>
+                      ) : null}
                     </div>
                   </label>
                 </li>
@@ -182,30 +159,20 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
           </ul>
         </div>
 
-        <div className="flex shrink-0 justify-end gap-3 border-t border-border bg-secondary/10 p-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          >
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={selected.size === 0 || isLoading}
-            className="inline-flex items-center gap-2 rounded-xl px-6 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all bg-primary hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2} />
+          </Button>
+          <Button type="button" onClick={handleAdd} disabled={selected.size === 0 || isLoading}>
+            {isLoading ? <Spinner aria-hidden /> : <Plus aria-hidden />}
             {isLoading
               ? "Adding…"
               : selected.size === 0
                 ? "Add to notebook"
                 : `Add ${selected.size}`}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

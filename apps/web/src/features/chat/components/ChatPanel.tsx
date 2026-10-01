@@ -55,10 +55,13 @@ import {
 } from "./ChatInput";
 import { ConfigureChatModal } from "./ConfigureChatModal";
 import { ConversationList } from "./ConversationList";
+import { type ExternalSource, ExternalSourcesModal } from "./ExternalSourcesModal";
 import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
 import { MessageBubble } from "./MessageBubble";
 import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
+
+const NO_EXTERNAL_SOURCES: ExternalSource[] = [];
 
 /**
  * Spacer below the last message so it can scroll clear of the floating composer. Its height
@@ -246,6 +249,48 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const approvePlanMutation = useApproveResearchPlan();
   const rejectPlanMutation = useRejectResearchPlan();
   const addExternalSourcesMutation = useAddExternalSources();
+  // One external-sources dialog for the whole panel (not one per message bubble). The sources
+  // are kept while the dialog closes so its exit animation doesn't flash an empty list.
+  const [externalSourcesFor, setExternalSourcesFor] = useState<{
+    messageId: string;
+    sources: ExternalSource[];
+  } | null>(null);
+  const [isExternalSourcesOpen, setIsExternalSourcesOpen] = useState(false);
+  const [isAddingExternalSources, setIsAddingExternalSources] = useState(false);
+
+  const handleOpenExternalSources = useCallback((messageId: string, sources: ExternalSource[]) => {
+    setExternalSourcesFor({ messageId, sources });
+    setIsExternalSourcesOpen(true);
+  }, []);
+
+  const handleCloseExternalSources = useCallback(() => setIsExternalSourcesOpen(false), []);
+
+  const handleAddExternalSources = useCallback(
+    async (selectedSources: ExternalSource[]) => {
+      if (!notebookId) {
+        setIsExternalSourcesOpen(false);
+        return;
+      }
+      setIsAddingExternalSources(true);
+      try {
+        await addExternalSourcesMutation({
+          notebookId: notebookId as Id<"notebooks">,
+          sources: selectedSources.map((s) => ({
+            title: s.title,
+            url: s.url,
+            snippet: s.snippet,
+            sourceType: s.sourceType,
+          })),
+        });
+      } catch (e) {
+        console.error("Failed to add external sources:", e);
+      } finally {
+        setIsAddingExternalSources(false);
+        setIsExternalSourcesOpen(false);
+      }
+    },
+    [notebookId, addExternalSourcesMutation]
+  );
   const { startLiteratureReview, isStarting: isStartingLiteratureReview } =
     useStartLiteratureReview();
 
@@ -882,22 +927,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           onSendFollowUp={handleSendChip}
                           onRetry={onRetry}
                           externalSources={message.externalSources}
-                          onAddExternalSources={async (selectedSources) => {
-                            if (!notebookId) return;
-                            try {
-                              await addExternalSourcesMutation({
-                                notebookId: notebookId as Id<"notebooks">,
-                                sources: selectedSources.map((s) => ({
-                                  title: s.title,
-                                  url: s.url,
-                                  snippet: s.snippet,
-                                  sourceType: s.sourceType,
-                                })),
-                              });
-                            } catch (e) {
-                              console.error("Failed to add external sources:", e);
-                            }
-                          }}
+                          onOpenExternalSources={handleOpenExternalSources}
                           showSourcesButton={
                             message.role === "assistant" &&
                             !!message.externalSources &&
@@ -1036,6 +1066,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         chatSettings={chatSettings}
         saving={isSavingConfig}
         instructionModeLocked={messages.length > 0}
+      />
+      <ExternalSourcesModal
+        isOpen={isExternalSourcesOpen}
+        onClose={handleCloseExternalSources}
+        sources={externalSourcesFor?.sources ?? NO_EXTERNAL_SOURCES}
+        onAddSelected={handleAddExternalSources}
+        isLoading={isAddingExternalSources}
       />
     </>
   );
