@@ -69,6 +69,8 @@ export interface PackReadiness {
   notebookId: string | null;
   /** Documents matching the pack's sources (never hand-added docs) */
   documentIds: string[];
+  /** Source file name of each entry in `documentIds` */
+  documentFileNames: Record<string, string>;
   /** Empty when the pack is ready to run */
   problems: string[];
 }
@@ -84,6 +86,7 @@ export function checkPackReady(
       useCase: pack.id,
       notebookId: null,
       documentIds: [],
+      documentFileNames: {},
       problems: [
         `notebook "${pack.notebookTitle}" not found in the ${EVAL_PACK_FOLDER_NAME} folder`,
       ],
@@ -91,6 +94,7 @@ export function checkPackReady(
   }
   const problems: string[] = [];
   const documentIds: string[] = [];
+  const documentFileNames: Record<string, string> = {};
   for (const file of local) {
     const matches = remote.docs.filter((d) => d.fileName === file.fileName);
     if (matches.length === 0) {
@@ -103,6 +107,7 @@ export function checkPackReady(
     }
     const doc = matches[0];
     documentIds.push(doc.documentId);
+    documentFileNames[doc.documentId] = file.fileName;
     if (doc.status === "failed") {
       problems.push(`${file.fileName}: failed${doc.error ? ` (${doc.error})` : ""}`);
     } else if (doc.sha256 !== file.sha256) {
@@ -111,5 +116,11 @@ export function checkPackReady(
       problems.push(`${file.fileName}: ${doc.status}`);
     }
   }
-  return { useCase: pack.id, notebookId: remote.notebookId, documentIds, problems };
+  return {
+    useCase: pack.id,
+    notebookId: remote.notebookId,
+    documentIds,
+    documentFileNames,
+    problems,
+  };
 }

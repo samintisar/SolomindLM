@@ -6,6 +6,7 @@ import {
   excludeUnselectedPackFixtures,
   formatPlannedJobs,
   PackNotReadyError,
+  packSourceTextsFor,
   pinForDryRun,
   prepareUseCaseRun,
   resolvePackReadiness,
@@ -35,6 +36,7 @@ const ready: PackReadiness = {
   useCase: "language-learners",
   notebookId: "nb-lang",
   documentIds: ["d1", "d2"],
+  documentFileNames: { d1: "unit-1.md", d2: "Unit-2-Verbs.md" },
   problems: [],
 };
 
@@ -52,11 +54,31 @@ describe("applyPackResolution", () => {
     expect(legacy.notebookId).toBe("legacy-nb");
   });
 
+  it("narrows a fixture to the pack sources its documentTitleHint matches (case-insensitive)", () => {
+    const scoped = {
+      ...fixture("language-learners/b", "language-learners", "flashcards"),
+      studioParams: { documentTitleHint: "unit-2" },
+    };
+    const [pinned] = applyPackResolution([scoped], new Map([["language-learners", ready]]));
+    expect(pinned.documentIds).toEqual(["d2"]);
+  });
+
+  it("throws when a documentTitleHint matches no pack source", () => {
+    const scoped = {
+      ...fixture("language-learners/b", "language-learners", "flashcards"),
+      studioParams: { documentTitleHint: "unit-9" },
+    };
+    expect(() => applyPackResolution([scoped], new Map([["language-learners", ready]]))).toThrow(
+      'language-learners/b: documentTitleHint "unit-9" matches no pack source'
+    );
+  });
+
   it("throws PackNotReadyError naming the seed command", () => {
     const notReady: PackReadiness = {
       useCase: "medical-students",
       notebookId: null,
       documentIds: [],
+      documentFileNames: {},
       problems: ['notebook "Medical Students" not found in the Test folder'],
     };
     const run = () =>
@@ -90,6 +112,7 @@ describe("resolvePackReadiness", () => {
       useCase: "language-learners",
       notebookId: "nb",
       documentIds: ["d1"],
+      documentFileNames: { d1: "a.md" },
       problems: [],
     });
   });
@@ -245,5 +268,30 @@ describe("excludeUnselectedPackFixtures", () => {
     expect(
       excludeUnselectedPackFixtures(ids, get, { idPrefix: "language-learners" }, known)
     ).toEqual(["ml-x", "agentic-patterns-20"]);
+  });
+});
+
+describe("packSourceTextsFor", () => {
+  const texts = [
+    { fileName: "unit-1.md", text: "one" },
+    { fileName: "Unit-2-Verbs.md", text: "two" },
+  ];
+
+  it("returns every pack source when the fixture has no documentTitleHint", () => {
+    const f = fixture("language-learners/a", "language-learners", "flashcards");
+    expect(packSourceTextsFor(f, texts)).toEqual(texts);
+  });
+
+  it("returns only the sources the documentTitleHint matches", () => {
+    const f = {
+      ...fixture("language-learners/a", "language-learners", "flashcards"),
+      studioParams: { documentTitleHint: "UNIT-2" },
+    };
+    expect(packSourceTextsFor(f, texts)).toEqual([texts[1]]);
+  });
+
+  it("passes undefined through", () => {
+    const f = fixture("language-learners/a", "language-learners", "flashcards");
+    expect(packSourceTextsFor(f, undefined)).toBeUndefined();
   });
 });
