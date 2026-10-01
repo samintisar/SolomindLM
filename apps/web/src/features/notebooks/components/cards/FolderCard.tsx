@@ -1,222 +1,125 @@
-import {
-  BarChart3,
-  Book,
-  Brain,
-  FileText,
-  Folder,
-  Globe,
-  GraduationCap,
-  Lightbulb,
-  Monitor,
-  MoreVertical,
-  Search,
-  Settings2,
-  Trash2,
-} from "lucide-react";
-import React from "react";
+import { Settings2, Trash2 } from "lucide-react";
+import { Card } from "@/shared/components/ui/card";
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
-import { FolderItem } from "@/shared/types/index";
+import { folderIcon } from "@/shared/notebook/notebookIcons";
+import type { FolderItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-
-const IconMap: Record<string, React.FC<any>> = {
-  Folder,
-  Book,
-  BarChart: BarChart3,
-  Monitor,
-  Search,
-  Brain,
-  Globe,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-};
+import { cn } from "@/shared/utils/cn";
+import { folderMeta } from "../../notebookMeta";
+import { CardActionsMenu } from "./CardActionsMenu";
 
 interface FolderCardProps {
   folder: FolderItem;
   viewMode: "grid" | "list";
-  isMenuOpen: boolean;
-  isExpanded?: boolean; // Optional now since we're not using expansion
   onSelectFolder: () => void;
   onOpenFolderCustomize: () => void;
   onDeleteFolder: (id: string) => void;
-  onToggleMenu: () => void;
-  onCloseMenu: () => void;
 }
 
-export const FolderCard: React.FC<FolderCardProps> = ({
+export function FolderCard({
   folder,
   viewMode,
-  isMenuOpen,
-  isExpanded = false, // Default to false since we're not using expansion
   onSelectFolder,
   onOpenFolderCustomize,
   onDeleteFolder,
-  onToggleMenu,
-  onCloseMenu,
-}) => {
-  const FolderIcon = folder.icon ? IconMap[folder.icon] : Folder;
+}: FolderCardProps) {
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+  const Icon = folderIcon(folder.icon);
+  const fill = coverFillClass(folder.color);
+  const meta = folderMeta(folder);
+  const menu = (
+    <CardActionsMenu
+      label="Folder actions"
+      actions={[
+        { label: "Customize", icon: Settings2, onSelect: onOpenFolderCustomize },
+        {
+          label: "Delete",
+          icon: Trash2,
+          destructive: true,
+          onSelect: async () => {
+            const ok = await confirm(
+              "Delete Folder",
+              `Are you sure you want to delete "${folder.name}"? This will also remove all notebooks inside this folder.`,
+              { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
+            );
+            if (ok) onDeleteFolder(folder.id);
+          },
+        },
+      ]}
+    />
+  );
 
-  const handleDeleteWithConfirmation = async () => {
-    const confirmed = await confirm(
-      "Delete Folder",
-      `Are you sure you want to delete "${folder.name}"? This will also remove all notebooks inside this folder.`,
-      { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
-    );
-    if (confirmed) {
-      onDeleteFolder(folder.id);
-    }
-  };
-
-  if (viewMode === "grid") {
+  if (viewMode === "list") {
     return (
       <>
-        <div className="relative">
-          {/* Folder Card */}
-          <div
-            className={`group relative aspect-16/10 rounded-2xl bg-card border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col ring-1 ring-border/50 ${isExpanded ? "ring-2 ring-primary/50" : ""}`}
+        <Card variant="interactive" className="flex-row items-center">
+          <button
+            type="button"
+            onClick={onSelectFolder}
+            className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left outline-none"
           >
-            {/* Top Decorative Half */}
-            <div
-              onClick={() => onSelectFolder()}
-              className={`h-[55%] ${coverFillClass(folder.color)} transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
-            >
-              <FolderIcon
-                className={`w-10 h-10 ${COVER_ICON_CLASS} group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`}
+            {/* Icon chip with a folder tab */}
+            <span className="relative flex size-9 shrink-0 items-center justify-center">
+              <span
+                aria-hidden
+                className={cn("absolute -top-1 left-0.5 h-1.5 w-4 rounded-t-sm", fill)}
               />
-
-              <div className="relative folder-kebab-menu z-20" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => (isMenuOpen ? onCloseMenu() : onToggleMenu())}
-                  className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-xl text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-
-                {isMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-border shadow-xl rounded-md z-30 py-1 animate-in fade-in zoom-in-95 duration-150">
-                    <button
-                      onClick={onOpenFolderCustomize}
-                      className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-accent flex items-center gap-2 text-popover-foreground"
-                    >
-                      <Settings2 className="w-3.5 h-3.5" /> Customize
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleDeleteWithConfirmation();
-                        onCloseMenu();
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
-                  </div>
+              <span
+                className={cn(
+                  "flex size-9 items-center justify-center rounded-md rounded-tl-none",
+                  fill
                 )}
-              </div>
-            </div>
-
-            {/* Bottom Info Half */}
-            <div
-              onClick={() => onSelectFolder()}
-              className="h-[45%] p-5 flex flex-col justify-end bg-card relative rounded-b-2xl"
-            >
-              <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-border to-transparent opacity-50" />
-
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 font-sans">
-                  {folder.name}
-                </h3>
-
-                <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium uppercase tracking-wider shrink-0">
-                  <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-0.5 rounded-xl">
-                    <Folder className="w-3 h-3" />
-                    <span>{folder.notebookCount}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              >
+                <Icon aria-hidden className={cn("size-4", COVER_ICON_CLASS)} />
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-sans text-sm font-medium text-card-foreground">
+                {folder.name}
+              </span>
+              <span className="block text-xs text-muted-foreground sm:hidden">{meta}</span>
+            </span>
+            <span className="hidden w-40 shrink-0 text-right text-xs text-muted-foreground sm:block">
+              {meta}
+            </span>
+          </button>
+          <div className="flex w-8 shrink-0 justify-center pr-2">{menu}</div>
+        </Card>
         <ConfirmDialogComponent />
       </>
     );
   }
 
-  // List view
   return (
     <>
-      <div className="relative">
-        <div
-          className={`group grid grid-cols-[minmax(200px,1fr)_100px_48px] items-center gap-4 p-4 rounded-xl bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative`}
-        >
-          <div onClick={() => onSelectFolder()} className="absolute inset-0 z-0 rounded-xl" />
-
-          {/* Title Column */}
-          <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">
-            <div
-              className={`w-9 h-9 rounded-md ${coverFillClass(folder.color)} flex items-center justify-center shrink-0`}
-            >
-              <FolderIcon className={`w-4 h-4 ${COVER_ICON_CLASS}`} />
-            </div>
-
-            <div className="min-w-0">
-              <span className="font-bold text-foreground font-serif group-hover:text-primary transition-colors truncate block">
+      <div className="relative h-full">
+        {/* Folder silhouette: a tab above the top-left edge and a sheet peeking out underneath. */}
+        <span aria-hidden className={cn("absolute -top-2 left-4 h-3 w-14 rounded-t-md", fill)} />
+        <span
+          aria-hidden
+          className="absolute inset-x-2 -bottom-1.5 top-3 rounded-xl border bg-card shadow-sm"
+        />
+        <Card variant="interactive" className="h-full">
+          <button
+            type="button"
+            onClick={onSelectFolder}
+            className="flex h-full flex-col text-left outline-none"
+          >
+            <span className="relative flex h-20 w-full items-end p-3">
+              <span aria-hidden className={cn("absolute inset-0 opacity-60", fill)} />
+              <Icon aria-hidden className={cn("relative size-8", COVER_ICON_CLASS)} />
+            </span>
+            <span className="flex flex-1 flex-col gap-1 p-3">
+              <span className="line-clamp-2 font-sans text-sm font-semibold leading-snug text-card-foreground">
                 {folder.name}
               </span>
-              <span className="text-xs text-muted-foreground">Folder</span>
-            </div>
-          </div>
-
-          {/* Notebook Count Column */}
-          <div className="text-right z-10 pointer-events-none flex items-center justify-end gap-1.5">
-            <div className="inline-flex items-center gap-1.5">
-              <Folder className="w-3 h-3 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">
-                {folder.notebookCount}
-              </span>
-            </div>
-          </div>
-
-          {/* Action Column */}
-          <div className="flex justify-end z-20 pointer-events-auto folder-kebab-menu relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isMenuOpen) onCloseMenu();
-                else onToggleMenu();
-              }}
-              className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? "bg-secondary" : ""}`}
-            >
-              <MoreVertical className="w-4 h-4 shrink-0" />
-            </button>
-
-            {isMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-border shadow-xl rounded-lg z-50 py-1 animate-in fade-in zoom-in-95 duration-150">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenFolderCustomize();
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-accent flex items-center gap-2 text-popover-foreground transition-colors"
-                >
-                  <Settings2 className="w-3.5 h-3.5 shrink-0" /> Customize
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteWithConfirmation();
-                    onCloseMenu();
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+              <span className="text-xs text-muted-foreground">{meta}</span>
+            </span>
+          </button>
+          <div className="absolute top-2 right-2">{menu}</div>
+        </Card>
       </div>
       <ConfirmDialogComponent />
     </>
   );
-};
+}
