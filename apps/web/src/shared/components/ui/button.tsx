@@ -27,11 +27,16 @@ const buttonVariants = cva(
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         "ghost-destructive":
           "rounded-lg text-destructive hover:bg-destructive-muted hover:text-destructive-muted-foreground active:bg-destructive-muted",
+        /** Ghost toggle that turns destructive while pressed (`aria-pressed`), e.g. a recording mic. */
+        "ghost-record":
+          "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-pressed:bg-destructive-muted aria-pressed:text-destructive-muted-foreground aria-pressed:hover:bg-destructive-muted aria-pressed:hover:text-destructive-muted-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-6",
         sm: "h-9 px-4 text-xs",
+        /** `sm` whose side padding tightens when its nearest `@container` is narrow (toolbars). */
+        "sm-adaptive": "h-9 px-4 text-xs @max-md:px-2.5",
         lg: "h-12 px-8 text-base",
         icon: "size-10 rounded-xl",
         "icon-sm": "size-8 rounded-lg",

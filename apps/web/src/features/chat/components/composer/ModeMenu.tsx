@@ -32,7 +32,7 @@ export function ModeMenu({ mode, onModeChange, disabled, crowded = false }: Mode
         <DropdownMenuTrigger asChild disabled={disabled}>
           <Button
             variant="ghost"
-            size="sm"
+            size="sm-adaptive"
             disabled={disabled}
             aria-label={`Composer mode: ${current.label}`}
           >

@@ -37,7 +37,12 @@ export function ModelMenu({ value, onModelChange, disabled, hideLabel = false }:
     <DropdownMenu>
       <ControlTooltip label={name}>
         <DropdownMenuTrigger asChild disabled={disabled}>
-          <Button variant="ghost" size="sm" disabled={disabled} aria-label={`Model: ${name}`}>
+          <Button
+            variant="ghost"
+            size="sm-adaptive"
+            disabled={disabled}
+            aria-label={`Model: ${name}`}
+          >
             <ModelBrandIcon brand={current.brand} />
             <span
               className={cn(
