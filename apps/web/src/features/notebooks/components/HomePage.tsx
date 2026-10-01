@@ -1,11 +1,11 @@
-import { ArrowUpAZ, Calendar, CheckCircle2, ChevronDown, LayoutGrid, List } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
-import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
-import { useCreateFolder, useUpdateFolder } from "../services/foldersApi";
-import { useCreateNotebook, useUpdateNotebook } from "../services/notebooksApi";
+import { useCreateFolder } from "../services/foldersApi";
+import { useCreateNotebook } from "../services/notebooksApi";
 import { useNotebookContext } from "../useNotebookContext";
+import type { ViewMode } from "./home/CardGrid";
+import { HomeHeader, type HomeTab } from "./home/HomeHeader";
 import { CustomizeFolderModal, CustomizeNotebookModal, MoveToFolderModal } from "./modals";
 import { FeaturedSection, RecentSection } from "./views";
 
@@ -21,24 +21,7 @@ interface FolderCreateData {
   icon: string;
 }
 
-interface HomePageProps {
-  featuredNotebooks?: NotebookItem[];
-  recentNotebooks?: NotebookItem[];
-  onSelectNotebook?: (notebook: NotebookItem) => void;
-  onSelectFolder?: (folderId: string) => void;
-  onCreateNotebook?: () => void;
-  onUpdateNotebook?: (id: string, updates: Partial<NotebookItem>) => void;
-  onDeleteNotebook?: (id: string) => void;
-  folders?: FolderItem[];
-  onCreateFolder?: () => void;
-  onUpdateFolder?: (id: string, updates: Partial<FolderItem>) => void;
-  onDeleteFolder?: (id: string) => void;
-  onMoveNotebookToFolder?: (notebookId: string, folderId: string | null) => void;
-  onRequireAuth?: (errorMessage: string) => void;
-}
-
-// Props kept for backward compatibility during migration; context is preferred.
-export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
+export const HomePage: React.FC = () => {
   const ctx = useNotebookContext();
   const featuredNotebooks = ctx.featuredNotebooks;
   const recentNotebooks = ctx.recentNotebooks;
@@ -53,8 +36,8 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   const onRequireAuth = ctx.onRequireAuth;
   const isAuthenticated = ctx.isAuthenticated;
 
-  const [activeTab, setActiveTab] = useState("All");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [tab, setTab] = useState<HomeTab>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   // Limit error handling
   const { handleLimitError } = useLimitErrorToast();
@@ -92,9 +75,7 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
 
   // Convex hooks for mutations
   const createNotebookHook = useCreateNotebook();
-  useUpdateNotebook();
   const createFolderHook = useCreateFolder();
-  useUpdateFolder();
 
   // Handlers for creating notebooks and folders via modal
   const handleCreateNotebookFromModal = async (data: NotebookCreateData) => {
@@ -163,30 +144,11 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
     }
   };
 
-  const { sortOption, isSortMenuOpen, setSortOption, setIsSortMenuOpen, getSortedNotebooks } =
-    useNotebookSorting();
+  const { sortOption, setSortOption, getSortedNotebooks } = useNotebookSorting();
 
   // Sort notebooks based on current sort option
   const sortedRecentNotebooks = getSortedNotebooks(recentNotebooks);
   const sortedFeaturedNotebooks = getSortedNotebooks(featuredNotebooks);
-
-  // Destructure handlers to use as stable dependencies
-  const { activeMenuId, setActiveMenuId } = notebookHandlers;
-  const { folderActiveMenuId, setFolderActiveMenuId } = folderHandlers;
-
-  // Click outside to close menus
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (activeMenuId && !(e.target as Element).closest(".kebab-menu")) {
-        setActiveMenuId(null);
-      }
-      if (folderActiveMenuId && !(e.target as Element).closest(".folder-kebab-menu")) {
-        setFolderActiveMenuId(null);
-      }
-    };
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => window.removeEventListener("mousedown", handleClickOutside);
-  }, [activeMenuId, folderActiveMenuId, setActiveMenuId, setFolderActiveMenuId]);
 
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
     if (onMoveNotebookToFolder) {
@@ -196,136 +158,42 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6 md:p-12 font-serif animate-in fade-in duration-500">
-      <div className="max-w-[1600px] mx-auto space-y-10">
-        {/* Top Navigation Bar */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Left Tabs */}
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            {["All", "My notebooks", "Featured notebooks"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`
-                  px-5 py-2 rounded-xl text-sm font-sans font-bold transition-all
-                  ${
-                    activeTab === tab
-                      ? "bg-foreground text-background shadow-md"
-                      : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                  }
-                `}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Right Actions */}
-          <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end">
-            {/* View Toggles */}
-            <div className="flex items-center bg-card border border-border rounded-lg p-1 shadow-sm">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-2 rounded-md transition-all ${viewMode === "grid" ? "bg-secondary text-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary/50"}`}
-                title="Grid View"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <div className="w-px h-4 bg-border mx-1" />
-              <button
-                onClick={() => setViewMode("list")}
-                className={`p-2 rounded-md transition-all ${viewMode === "list" ? "bg-secondary text-foreground shadow-sm" : "text-muted-foreground hover:bg-secondary/50"}`}
-                title="List View"
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-secondary/50 transition-colors text-sm font-medium shadow-sm min-w-[140px] justify-between"
-              >
-                <span className="truncate">
-                  {sortOption === "date" ? "Most recent" : "Title (A-Z)"}
-                </span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-
-              {isSortMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-in fade-in zoom-in-95 duration-200">
-                  <button
-                    onClick={() => {
-                      setSortOption("date");
-                      setIsSortMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center justify-between text-popover-foreground"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 opacity-70 shrink-0" /> Most recent
-                    </span>
-                    {sortOption === "date" && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortOption("title");
-                      setIsSortMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center justify-between text-popover-foreground"
-                  >
-                    <span className="flex items-center gap-2">
-                      <ArrowUpAZ className="w-3.5 h-3.5 opacity-70 shrink-0" /> Title (A-Z)
-                    </span>
-                    {sortOption === "title" && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div className="space-y-12">
-          {/* Featured Section */}
-          {(activeTab === "All" || activeTab === "Featured notebooks") && (
-            <FeaturedSection
-              featuredNotebooks={sortedFeaturedNotebooks}
-              viewMode={viewMode}
-              onSelectNotebook={onSelectNotebook}
-            />
-          )}
-
-          {/* Recent Notebooks Section */}
-          {(activeTab === "All" || activeTab === "My notebooks") && (
-            <RecentSection
-              recentNotebooks={sortedRecentNotebooks}
-              folders={folders}
-              viewMode={viewMode}
-              onCreateNotebook={handleCreateNotebookClick}
-              onCreateFolder={handleCreateFolderClick}
-              onSelectNotebook={onSelectNotebook}
-              onSelectFolder={onSelectFolder}
-              // Notebook handlers
-              activeMenuId={notebookHandlers.activeMenuId}
-              onOpenCustomize={notebookHandlers.openCustomize}
-              onOpenMoveToFolder={notebookHandlers.openMoveToFolder}
-              onDeleteNotebook={deleteNotebookHandler}
-              setActiveMenuId={notebookHandlers.setActiveMenuId}
-              // Folder handlers
-              folderActiveMenuId={folderHandlers.folderActiveMenuId}
-              onOpenFolderCustomize={folderHandlers.openFolderCustomize}
-              onDeleteFolder={onDeleteFolder ?? ((_id: string) => undefined)}
-              setFolderActiveMenuId={folderHandlers.setFolderActiveMenuId}
-              // Sorting
-              getSortedNotebooks={getSortedNotebooks}
-            />
-          )}
-        </div>
+    <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 font-serif sm:px-6 md:px-10 md:pt-10">
+      <div className="mx-auto flex max-w-400 flex-col gap-8">
+        <HomeHeader
+          tab={tab}
+          onTabChange={setTab}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          sortOption={sortOption}
+          onSortChange={setSortOption}
+          onCreateNotebook={handleCreateNotebookClick}
+          onCreateFolder={handleCreateFolderClick}
+        />
+        {tab !== "mine" && (
+          <FeaturedSection
+            featuredNotebooks={sortedFeaturedNotebooks}
+            viewMode={viewMode}
+            onSelectNotebook={onSelectNotebook}
+            showEmpty={tab === "featured"}
+          />
+        )}
+        {tab !== "featured" && (
+          <RecentSection
+            recentNotebooks={sortedRecentNotebooks}
+            folders={folders}
+            viewMode={viewMode}
+            isLoading={ctx.notebooksLoading}
+            onCreateNotebook={handleCreateNotebookClick}
+            onSelectNotebook={onSelectNotebook}
+            onSelectFolder={onSelectFolder}
+            onOpenCustomize={notebookHandlers.openCustomize}
+            onOpenMoveToFolder={notebookHandlers.openMoveToFolder}
+            onDeleteNotebook={deleteNotebookHandler}
+            onOpenFolderCustomize={folderHandlers.openFolderCustomize}
+            onDeleteFolder={onDeleteFolder ?? ((_id: string) => undefined)}
+          />
+        )}
       </div>
 
       {/* CUSTOMIZE NOTEBOOK MODAL */}
