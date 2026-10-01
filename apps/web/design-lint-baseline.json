@@ -1,0 +1,61 @@
+{
+  "features/audio": {
+    "shadcn/no-inline-styles": 2
+  },
+  "features/auth": {
+    "shadcn/no-arbitrary-values": 18,
+    "shadcn/no-inline-styles": 8,
+    "shadcn/no-raw-colors": 12
+  },
+  "features/billing": {
+    "shadcn/no-raw-colors": 1
+  },
+  "features/chat": {
+    "shadcn/no-arbitrary-values": 79,
+    "shadcn/no-inline-styles": 23,
+    "shadcn/no-raw-colors": 14
+  },
+  "features/feedback": {
+    "shadcn/no-arbitrary-values": 1,
+    "shadcn/no-restyle": 3
+  },
+  "features/landing": {
+    "shadcn/no-arbitrary-values": 66,
+    "shadcn/no-inline-styles": 16,
+    "shadcn/no-raw-colors": 15,
+    "shadcn/no-restyle": 59
+  },
+  "features/legal": {
+    "shadcn/no-arbitrary-values": 1
+  },
+  "features/notebooks": {
+    "shadcn/no-arbitrary-values": 24,
+    "shadcn/no-inline-styles": 1,
+    "shadcn/no-raw-colors": 10,
+    "shadcn/no-restyle": 14,
+    "shadcn/no-unknown-classes": 5
+  },
+  "features/onboarding": {
+    "shadcn/no-arbitrary-values": 1,
+    "shadcn/no-inline-styles": 3,
+    "shadcn/no-raw-colors": 3
+  },
+  "features/sources": {
+    "shadcn/no-arbitrary-values": 57,
+    "shadcn/no-inline-styles": 3,
+    "shadcn/no-unknown-classes": 13
+  },
+  "features/studio": {
+    "shadcn/no-arbitrary-values": 133,
+    "shadcn/no-inline-styles": 15,
+    "shadcn/no-raw-colors": 63,
+    "shadcn/no-unknown-classes": 67
+  },
+  "shared": {
+    "shadcn/no-arbitrary-values": 54,
+    "shadcn/no-inline-styles": 8,
+    "shadcn/no-raw-colors": 20,
+    "shadcn/no-restyle": 22,
+    "shadcn/require-static-classes": 1
+  }
+}

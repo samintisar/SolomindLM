@@ -79,6 +79,9 @@ jobs:
       - name: Biome check
         run: bun run lint -- --diagnostic-level=error
 
+      - name: Design-system lint (shadcn/lint ratchet)
+        run: bun run lint:design
+
   workflow-lint:
     name: Lint (Workflows)
     runs-on: ubuntu-latest
