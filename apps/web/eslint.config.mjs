@@ -2,6 +2,9 @@
 import { plugin as shadcn } from "@shadcn/lint";
 import tsParser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
+import softSurfaces from "./scripts/design-lint/soft-surfaces-rule.mjs";
+
+const solomind = { meta: { name: "solomind" }, rules: { "soft-surfaces": softSurfaces } };
 
 /** Migrated to the design system: violations are errors. Add a feature dir when its PR lands. */
 const MIGRATED = [
@@ -60,6 +63,9 @@ export default defineConfig([
     rules: rules("warn"),
   },
   { files: MIGRATED, rules: rules("error") },
+  // Soft layered look (docs/design/principles.md). Warn everywhere, including MIGRATED, for now: Task 8
+  // sweeps the migrated areas and promotes this to error there.
+  { files: ["src/**/*.tsx"], plugins: { solomind }, rules: { "solomind/soft-surfaces": "warn" } },
   // Upstream shadcn CLI markup that predates the linter (arbitrary values like ring-[3px], top-[50%],
   // transition-[color,box-shadow]). Stays at warn until each file is regenerated/adapted; all other rules
   // remain errors for these files. Do not add authored components here.
@@ -72,4 +78,6 @@ export default defineConfig([
     files: ["src/shared/components/ui/field.tsx", "src/shared/components/ui/input-group.tsx"],
     rules: { "shadcn/no-restyle": "warn", "shadcn/require-static-classes": "warn" },
   },
+  // Primitives own the look; outline exceptions there are reviewed variants (docs/design/principles.md).
+  { files: ["src/shared/components/ui/**/*.tsx"], rules: { "solomind/soft-surfaces": "off" } },
 ]);

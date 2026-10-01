@@ -21,7 +21,7 @@ export interface CountChange {
   current: number;
 }
 
-const RULE_PREFIX = "shadcn/";
+const RULE_PREFIXES = ["shadcn/", "solomind/"];
 
 export function areaOf(filePath: string): string {
   const normalized = filePath.replaceAll("\\", "/");
@@ -41,10 +41,11 @@ export function countViolations(results: LintResult[]): { counts: Counts; fatal:
         fatal.push(`${result.filePath}: ${message.message}`);
         continue;
       }
-      if (!message.ruleId?.startsWith(RULE_PREFIX)) continue;
+      const ruleId = message.ruleId;
+      if (!ruleId || !RULE_PREFIXES.some((p) => ruleId.startsWith(p))) continue;
       const area = areaOf(result.filePath);
       counts[area] ??= {};
-      counts[area][message.ruleId] = (counts[area][message.ruleId] ?? 0) + 1;
+      counts[area][ruleId] = (counts[area][ruleId] ?? 0) + 1;
     }
   }
   return { counts, fatal };
@@ -69,6 +70,21 @@ export function compareCounts(
     }
   }
   return { increases, decreases };
+}
+
+/**
+ * Separates increases for a brand-new rule (its ID is absent from the whole baseline, so its first
+ * counts are being recorded) from increases for rules the baseline already tracks.
+ */
+export function splitIncreases(
+  increases: CountChange[],
+  baseline: Counts
+): { newRule: CountChange[]; refused: CountChange[] } {
+  const known = new Set(Object.values(baseline).flatMap((rules) => Object.keys(rules)));
+  return {
+    newRule: increases.filter((c) => !known.has(c.rule)),
+    refused: increases.filter((c) => known.has(c.rule)),
+  };
 }
 
 export function sortCounts(counts: Counts): Counts {

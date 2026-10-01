@@ -6,6 +6,7 @@ import {
   isDegradedRun,
   type LintResult,
   sortCounts,
+  splitIncreases,
 } from "./baseline";
 
 const msg = (ruleId: string | null, severity = 1) => ({ ruleId, severity, message: "m", line: 1 });
@@ -52,6 +53,18 @@ describe("countViolations", () => {
   });
 });
 
+describe("countViolations prefixes", () => {
+  it("counts solomind/ rules alongside shadcn/", () => {
+    const { counts } = countViolations([
+      {
+        filePath: "/r/src/features/chat/A.tsx",
+        messages: [msg("solomind/soft-surfaces"), msg("other/rule")],
+      },
+    ]);
+    expect(counts).toEqual({ "features/chat": { "solomind/soft-surfaces": 1 } });
+  });
+});
+
 describe("compareCounts", () => {
   const baseline = { "features/chat": { "shadcn/no-raw-colors": 5, "shadcn/no-inline-styles": 1 } };
 
@@ -74,6 +87,35 @@ describe("compareCounts", () => {
       { area: "features/chat", rule: "shadcn/no-inline-styles", baseline: 1, current: 0 },
       { area: "features/chat", rule: "shadcn/no-raw-colors", baseline: 5, current: 3 },
     ]);
+  });
+});
+
+describe("splitIncreases", () => {
+  const baseline = { "features/chat": { "shadcn/no-raw-colors": 5 } };
+
+  it("allows increases for a rule that appears nowhere in the baseline", () => {
+    const current = {
+      "features/chat": { "shadcn/no-raw-colors": 5, "solomind/soft-surfaces": 3 },
+      shared: { "solomind/soft-surfaces": 2 },
+    };
+    const { increases } = compareCounts(current, baseline);
+    const { newRule, refused } = splitIncreases(increases, baseline);
+    expect(refused).toEqual([]);
+    expect(newRule.map((c) => c.rule)).toEqual([
+      "solomind/soft-surfaces",
+      "solomind/soft-surfaces",
+    ]);
+  });
+
+  it("refuses an increase for a rule that is already in the baseline", () => {
+    const current = {
+      "features/chat": { "shadcn/no-raw-colors": 6 },
+      shared: { "shadcn/no-raw-colors": 1 },
+    };
+    const { increases } = compareCounts(current, baseline);
+    const { newRule, refused } = splitIncreases(increases, baseline);
+    expect(newRule).toEqual([]);
+    expect(refused).toHaveLength(2);
   });
 });
 

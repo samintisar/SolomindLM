@@ -8,6 +8,7 @@ import {
   isDegradedRun,
   type LintResult,
   sortCounts,
+  splitIncreases,
 } from "./design-lint/baseline";
 
 const webRoot = path.resolve(import.meta.dir, "..");
@@ -58,9 +59,15 @@ const hasBaseline = existsSync(baselinePath);
 const baseline: Counts = hasBaseline ? JSON.parse(readFileSync(baselinePath, "utf8")) : {};
 const { increases, decreases } = compareCounts(counts, baseline);
 
-if (hasBaseline && increases.length > 0) {
+// A rule the baseline has never tracked can record its first counts, but only when updating.
+const { newRule, refused } = hasBaseline
+  ? splitIncreases(increases, baseline)
+  : { newRule: [], refused: [] };
+const blocked = update ? refused : [...refused, ...newRule];
+
+if (blocked.length > 0) {
   console.error("design-lint: design-system violations increased (fix them, don't add new ones):");
-  for (const change of increases) console.error(format(change));
+  for (const change of blocked) console.error(format(change));
   if (update) console.error("design-lint: refusing to update a baseline that would go up.");
   process.exit(1);
 }
