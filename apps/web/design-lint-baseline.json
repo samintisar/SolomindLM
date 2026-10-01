@@ -30,7 +30,7 @@
     "shadcn/no-unknown-classes": 67
   },
   "shared": {
-    "shadcn/no-arbitrary-values": 54,
+    "shadcn/no-arbitrary-values": 50,
     "shadcn/no-inline-styles": 8,
     "shadcn/no-raw-colors": 20,
     "shadcn/no-restyle": 22,

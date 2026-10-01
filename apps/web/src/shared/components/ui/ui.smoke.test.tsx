@@ -55,6 +55,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet";
 import { Skeleton } from "./skeleton";
 import { Toaster } from "./sonner";
 import { Spinner } from "./spinner";
+import { Textarea } from "./textarea";
 import { Toggle } from "./toggle";
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
@@ -407,6 +408,74 @@ describe("shadcn ui components render", () => {
     it("Badge outline uses the hairline ring", () => {
       render(<Badge variant="outline">b</Badge>);
       expect(screen.getByText("b")).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");
+    });
+
+    it("fields are soft filled, the composer is borderless", () => {
+      render(
+        <>
+          <Input aria-label="i" />
+          <Textarea aria-label="ta" />
+          <InputGroup variant="composer" size="auto" data-testid="composer">
+            <InputGroupTextarea aria-label="c" />
+          </InputGroup>
+        </>
+      );
+      const input = screen.getByRole("textbox", { name: "i" });
+      expect(input).toHaveClass("bg-muted/40", "ring-1", "ring-hairline");
+      expect(input).not.toHaveClass("border");
+      const textarea = screen.getByRole("textbox", { name: "ta" });
+      expect(textarea).toHaveClass("bg-muted/40", "ring-1", "ring-hairline");
+      expect(textarea).not.toHaveClass("border");
+      const composer = screen.getByTestId("composer");
+      expect(composer).toHaveClass("shadow-lg", "bg-surface-raised", "rounded-2xl");
+      expect(composer).not.toHaveClass("border");
+      // The composer variant beats the plain group's soft well and focus lift.
+      expect(composer).not.toHaveClass("bg-muted/40");
+      expect(composer).toHaveClass(
+        "has-[[data-slot=input-group-control]:focus-visible]:bg-surface-raised",
+        "has-[[data-slot=input-group-control]:focus-visible]:ring-1"
+      );
+      expect(composer).not.toHaveClass(
+        "has-[[data-slot=input-group-control]:focus-visible]:bg-card",
+        "has-[[data-slot=input-group-control]:focus-visible]:ring-2"
+      );
+      // The inner control draws no second well or ring.
+      const inner = screen.getByRole("textbox", { name: "c" });
+      expect(inner).toHaveClass("ring-0", "bg-transparent", "shadow-none");
+      for (const dropped of [
+        "bg-muted/40",
+        "ring-1",
+        "focus-visible:bg-card",
+        "focus-visible:ring-2",
+      ]) {
+        expect(inner).not.toHaveClass(dropped);
+      }
+      for (const el of [input, textarea, composer, inner]) {
+        expect(el.className).not.toContain("dark:");
+      }
+    });
+
+    it("plain InputGroup and SelectTrigger are soft filled wells", () => {
+      render(
+        <>
+          <InputGroup data-testid="group">
+            <InputGroupInput aria-label="gi" />
+          </InputGroup>
+          <Select>
+            <SelectTrigger>
+              <SelectValue placeholder="pick" />
+            </SelectTrigger>
+          </Select>
+        </>
+      );
+      const group = screen.getByTestId("group");
+      expect(group).toHaveClass("bg-muted/40", "ring-1", "ring-hairline");
+      expect(group).not.toHaveClass("border");
+      expect(group.className).not.toContain("dark:");
+      const trigger = screen.getByRole("combobox");
+      expect(trigger).toHaveClass("bg-muted/40", "ring-1", "ring-hairline", "hover:bg-muted/60");
+      expect(trigger).not.toHaveClass("border");
+      expect(trigger.className).not.toContain("dark:");
     });
   });
 
