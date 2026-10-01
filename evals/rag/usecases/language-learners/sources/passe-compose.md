@@ -192,7 +192,7 @@ Tammy: Puis, Bette et moi, nous nous sommes parlé.
 
 In the negative, the ne precedes the reflexive pronoun and the pas follows the auxiliary:
 
-| je ne me suis pas amusé(e) | nous ne nous sommes pas / amusé(e)(s) |
+| je ne me suis pas amusé(e) | nous ne nous sommes pas amusé(e)(s) |
 | --- | --- |
 | tu ne t'es pas amusé(e) | vous ne vous êtes pas amusé(e)(s) |
 | il / on ne s'est pas amusé | ils ne se sont pas amusés |

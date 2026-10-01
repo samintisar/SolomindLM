@@ -16,7 +16,7 @@ export const languageLearnersPack: UseCasePack = {
     {
       id: "front-hides-answer",
       question:
-        "Does every card's front avoid stating, translating or hinting at the answer given on its back?",
+        "Does every card's front avoid revealing the tested answer? Translation cues and base forms (e.g. '(his)', '(bon)') are allowed when the learner must still supply the correct target-language form.",
       appliesTo: ["flashcards"],
       evidence: "output",
     },

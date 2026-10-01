@@ -128,7 +128,7 @@ The majority of adjectives are regular in the plural; that is, an -**s** is adde
 
 | 1. | Do not add an s to the masculine form of adjectives ending in s or x. The masculine singular and plural forms are thus identical: un animal heureux (a happy animal), des animaux heureux (happy animals). However, the feminine plural form of these adjectives is regular; it is formed by simply adding an s to the feminine singular form: une fille heureuse (a happy girl), des filles heureuses (happy girls). |
 | --- | --- |
-| 2. | Adjectives ending in al in the masculine singular form change to auxin the masculine plural form. |
+| 2. | Adjectives ending in al in the masculine singular form change to aux in the masculine plural form. |
 
 | Tex est un tatou international. Edouard et Tex sont des animaux internationaux. | Tex is an international armadillo. Edouard and Tex are international animals. |
 | --- | --- |
