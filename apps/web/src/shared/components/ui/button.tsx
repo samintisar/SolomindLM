@@ -47,7 +47,7 @@ const buttonVariants = cva(
         "icon-md": "size-9 rounded-lg",
         "icon-lg": "size-12 rounded-xl",
         /** Suggestion chip whose label may run long: grows in height and wraps instead of overflowing. */
-        chip: "h-auto min-h-9 px-4 py-2 text-left text-sm font-medium leading-snug whitespace-normal",
+        chip: "h-auto min-h-9 px-4 py-2 text-left text-sm font-medium leading-snug whitespace-normal pointer-coarse:min-h-10",
         avatar: "size-8 rounded-full p-0 hover:ring-2 hover:ring-ring/40",
       },
     },

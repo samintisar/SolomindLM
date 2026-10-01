@@ -1,13 +1,15 @@
 import { getStatusIcon, getStatusMessage } from "../../utils/messageStatus";
 
-/** Pending-answer indicator: the phase label shimmers, three dots bounce in sequence. */
+/**
+ * Pending-answer indicator: the phase label shimmers, three dots bounce in sequence. A live
+ * region announces its visible text. Not mounted yet; Task 12 wires it into AgentActivityPanel.
+ */
 export function ThinkingIndicator({ status }: { status?: string }) {
   const label = getStatusMessage(status) ?? "Thinking";
   const icon = getStatusIcon(status);
   return (
     <div
       role="status"
-      aria-label={label}
       className="flex items-center gap-2 py-2 font-sans text-sm text-muted-foreground"
     >
       {icon ? (
