@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { AVAILABLE_SMART_MODELS } from "@/shared/constants/models";
 import type { ChatVoiceState } from "../hooks/useChatVoiceTranscription";
 import { ChatInput } from "./ChatInput";
 
@@ -14,6 +15,10 @@ vi.mock("../hooks/useChatVoiceTranscription", () => ({
   useChatVoiceTranscription: () => ({ ...voice.state, toggleRecording: voice.toggleRecording }),
 }));
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 beforeEach(() => {
   voice.state = { voiceState: "idle", formatElapsed: "0:00" };
   voice.toggleRecording.mockClear();
@@ -21,13 +26,13 @@ beforeEach(() => {
 
 type Props = ComponentProps<typeof ChatInput>;
 
-function renderInput(props: Partial<Props> = {}) {
-  const onSend = vi.fn();
-  const utils = render(
+/** A ChatInput with test defaults; `props` override them. */
+function chatInput(props: Partial<Props> = {}) {
+  return (
     <ChatInput
       value="Hello"
       onChange={vi.fn()}
-      onSend={onSend}
+      onSend={vi.fn()}
       notebookId="nb1"
       mode="chat"
       onModeChange={vi.fn()}
@@ -37,6 +42,11 @@ function renderInput(props: Partial<Props> = {}) {
       {...props}
     />
   );
+}
+
+function renderInput(props: Partial<Props> = {}) {
+  const onSend = vi.fn();
+  const utils = render(chatInput({ onSend, ...props }));
   return { ...utils, onSend, textarea: screen.getByRole("textbox") };
 }
 
@@ -44,7 +54,7 @@ const modeTrigger = () => screen.queryByRole("button", { name: /^Composer mode:/
 const dbTrigger = () => screen.queryByRole("button", { name: /^Research databases/ });
 const filtersTrigger = () => screen.queryByRole("button", { name: "Filters" });
 const modelTrigger = () => screen.queryByRole("button", { name: /^Model:/ });
-const voiceTrigger = () => screen.queryByRole("button", { name: "Dictate (microphone)" });
+const voiceTrigger = () => screen.queryByRole("button", { name: "Voice input" });
 
 describe("ChatInput keyboard", () => {
   test("Enter sends; Shift+Enter and IME composition don't", () => {
@@ -124,42 +134,29 @@ describe("ChatInput toolbar", () => {
     expect(filtersTrigger()).not.toBeInTheDocument();
   });
 
-  test("model menu only with a model handler, naming the saved model", () => {
-    const { rerender } = renderInput();
+  test("no model menu without a model handler", () => {
+    renderInput();
     expect(modelTrigger()).not.toBeInTheDocument();
-    rerender(
-      <ChatInput
-        value="Hello"
-        onChange={vi.fn()}
-        onSend={vi.fn()}
-        notebookId="nb1"
-        mode="chat"
-        onModeChange={vi.fn()}
-        researchDatabase="all"
-        onResearchDatabaseChange={vi.fn()}
-        onModelChange={vi.fn()}
-      />
-    );
-    expect(modelTrigger()).toBeInTheDocument();
   });
 
-  test("voice only with a transcription handler", () => {
-    const { rerender } = renderInput();
+  test("the model menu names the saved model", () => {
+    const model = AVAILABLE_SMART_MODELS[1];
+    renderInput({
+      onModelChange: vi.fn(),
+      chatSettings: { smartModel: model.id } as Props["chatSettings"],
+    });
+    expect(modelTrigger()).toHaveAccessibleName(`Model: ${model.name}`);
+  });
+
+  test("no voice control without a transcription handler", () => {
+    renderInput();
     expect(voiceTrigger()).not.toBeInTheDocument();
-    rerender(
-      <ChatInput
-        value="Hello"
-        onChange={vi.fn()}
-        onSend={vi.fn()}
-        notebookId="nb1"
-        mode="chat"
-        onModeChange={vi.fn()}
-        researchDatabase="all"
-        onResearchDatabaseChange={vi.fn()}
-        onAppendTranscription={vi.fn()}
-      />
-    );
+  });
+
+  test("voice control with a transcription handler", () => {
+    renderInput({ onAppendTranscription: vi.fn() });
     expect(voiceTrigger()).toBeEnabled();
+    expect(voiceTrigger()).toHaveAttribute("aria-pressed", "false");
   });
 
   test("voice is disabled without a notebook", () => {
@@ -170,10 +167,7 @@ describe("ChatInput toolbar", () => {
   test("voice reflects the recording state", () => {
     voice.state = { voiceState: "recording", formatElapsed: "0:03" };
     renderInput({ onAppendTranscription: vi.fn() });
-    expect(screen.getByRole("button", { name: "Stop and transcribe" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+    expect(voiceTrigger()).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("0:03")).toBeInTheDocument();
   });
 
@@ -228,5 +222,48 @@ describe("ChatInput focus", () => {
     expect(onSourceFilterChange).toHaveBeenCalledWith(["notebook", "web"]);
     expect(textarea).not.toHaveFocus();
     await waitFor(() => expect(screen.getByText("Source channels")).toBeInTheDocument());
+  });
+});
+
+describe("ChatInput textarea", () => {
+  test("hints that Enter sends", () => {
+    const { textarea } = renderInput();
+    expect(textarea).toHaveAttribute("enterkeyhint", "send");
+  });
+
+  test("browsers with field-sizing leave the height to CSS", () => {
+    vi.stubGlobal("CSS", { supports: () => true });
+    const { textarea } = renderInput();
+    expect(textarea.style.height).toBe("");
+  });
+
+  describe("without field-sizing (older iOS WebViews)", () => {
+    let scrollHeight = 90;
+    beforeEach(() => {
+      vi.stubGlobal("CSS", { supports: () => false });
+      vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(
+        () => scrollHeight
+      );
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+      scrollHeight = 90;
+    });
+
+    test("fits the height to the content and re-fits on change", () => {
+      const { textarea, rerender } = renderInput();
+      expect(textarea.style.height).toBe("90px");
+      scrollHeight = 120;
+      rerender(chatInput({ value: "Hello\nworld" }));
+      expect(textarea.style.height).toBe("120px");
+    });
+
+    test("caps the height at the computed max-height", () => {
+      scrollHeight = 500;
+      const { textarea, rerender } = renderInput();
+      textarea.style.maxHeight = "160px";
+      rerender(chatInput({ value: "Longer" }));
+      expect(textarea.style.height).toBe("160px");
+    });
   });
 });

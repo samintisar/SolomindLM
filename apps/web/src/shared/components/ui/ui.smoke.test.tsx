@@ -242,6 +242,9 @@ describe("shadcn ui components render", () => {
       <>
         <Card variant="interactive" />
         <Button variant="ghost-destructive">x</Button>
+        <Button variant="ghost-toggle-destructive" size="icon-md" aria-pressed>
+          rec
+        </Button>
         <ToggleGroup type="single" variant="swatch" size="sm">
           <ToggleGroupItem value="a" aria-label="a" />
         </ToggleGroup>
@@ -249,6 +252,9 @@ describe("shadcn ui components render", () => {
     );
     expect(container.querySelector('[data-variant="interactive"]')).not.toBeNull();
     expect(screen.getByRole("button", { name: "x" })).toHaveClass("text-destructive");
+    const toggle = screen.getByRole("button", { name: "rec", pressed: true });
+    expect(toggle).toHaveAttribute("data-variant", "ghost-toggle-destructive");
+    expect(toggle).toHaveClass("aria-pressed:bg-destructive-muted", "size-9");
     const swatch = screen.getByRole("radio", { name: "a" });
     expect(swatch).toHaveClass("rounded-full", "size-8", "p-1");
     for (const sizeClass of ["px-1.5", "px-2", "h-8", "h-9"]) {

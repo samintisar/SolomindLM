@@ -1,6 +1,6 @@
 import type { Id } from "@convex/_generated/dataModel";
 import type React from "react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { DiscoveryAcademicFilterState } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
 import {
   InputGroup,
@@ -58,6 +58,18 @@ const PLACEHOLDERS: Record<ChatComposerMode, string> = {
 /** keyCode 229 marks keys handled by an IME (older Safari doesn't set `isComposing`). */
 const IME_KEY_CODE = 229;
 
+/**
+ * The textarea auto-grows with `field-sizing: content`. iOS WKWebView before 26.2 lacks it, so there
+ * the height is fitted by hand. jsdom has no `CSS.supports`; treat that as supported.
+ */
+function lacksFieldSizing(): boolean {
+  return (
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    !CSS.supports("field-sizing", "content")
+  );
+}
+
 export const ChatInput: React.FC<ChatInputProps> = ({
   value,
   onChange,
@@ -83,11 +95,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDisabled = Boolean(disabled);
 
-  const activeFilters =
+  const activeFilters: readonly SourceFilterId[] =
     sourceFilters ??
-    (mode === "deepResearch"
-      ? [...DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS]
-      : [...CHAT_DEFAULT_SOURCE_FILTERS]);
+    (mode === "deepResearch" ? DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS : CHAT_DEFAULT_SOURCE_FILTERS);
+  const placeholder = PLACEHOLDERS[mode];
 
   const voice = useChatVoiceTranscription({
     notebookId: (notebookId ?? null) as Id<"notebooks"> | null,
@@ -115,6 +126,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   /** Icon-only model control when the left toolbar is crowded (e.g. literature review). */
   const hideModelButtonLabel = toolbarControlCount >= 3;
 
+  /** Fallback auto-grow: fit the height to the content, capped by the CSS `max-height`. */
+  const fitTextareaHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const max = Number.parseFloat(getComputedStyle(el).maxHeight);
+    // Collapse first so scrollHeight shrinks when text is deleted.
+    el.style.height = "0px";
+    const content = el.scrollHeight;
+    el.style.height = `${Number.isFinite(max) ? Math.min(content, max) : content}px`;
+  }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-fit when the text or placeholder changes
+  useLayoutEffect(() => {
+    if (lacksFieldSizing()) fitTextareaHeight();
+  }, [value, placeholder, fitTextareaHeight]);
+
+  // Wrapping depends on width, so re-fit when the composer is resized.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || !lacksFieldSizing() || typeof ResizeObserver === "undefined") return;
+    let lastWidth = -1;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width } = entry.contentRect;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      fitTextareaHeight();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitTextareaHeight]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key !== "Enter" || e.shiftKey) return;
@@ -141,7 +183,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={PLACEHOLDERS[mode]}
+          placeholder={placeholder}
+          enterKeyHint="send"
           disabled={disabled}
           rows={1}
           className="max-h-40 min-h-12"
@@ -184,7 +227,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               />
             ) : null}
             {onAppendTranscription ? (
-              <VoiceButton {...voice} disabled={isDisabled || !notebookId} />
+              <VoiceButton
+                voiceState={voice.voiceState}
+                formatElapsed={voice.formatElapsed}
+                toggleRecording={voice.toggleRecording}
+                disabled={isDisabled || !notebookId}
+              />
             ) : null}
             <SendButton
               mode={mode}

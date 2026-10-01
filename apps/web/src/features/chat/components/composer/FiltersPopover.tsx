@@ -61,7 +61,7 @@ export function FiltersPopover({
         <PopoverTrigger asChild disabled={disabled}>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-md"
             disabled={disabled}
             aria-label="Filters"
             aria-describedby={active ? activeHintId : undefined}

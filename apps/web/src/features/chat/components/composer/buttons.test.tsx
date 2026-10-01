@@ -93,35 +93,64 @@ function renderVoice(props: Partial<ComponentProps<typeof VoiceButton>> = {}) {
 }
 
 describe("VoiceButton", () => {
-  test("idle: unpressed dictate control that starts recording", async () => {
+  const voiceButton = () => screen.getByRole("button", { name: "Voice input" });
+
+  test("idle: unpressed, stably named, starts recording", async () => {
     const { toggleRecording } = renderVoice();
-    const b = screen.getByRole("button", { name: "Dictate (microphone)" });
+    const b = voiceButton();
     expect(b).toHaveAttribute("aria-pressed", "false");
     expect(b).not.toHaveAttribute("title");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(screen.queryByText("0:00")).not.toBeInTheDocument();
     await userEvent.click(b);
     expect(toggleRecording).toHaveBeenCalledTimes(1);
   });
 
-  test("recording: pressed, with a live elapsed timer", async () => {
+  test("the tooltip carries the per-state hint", async () => {
+    renderVoice();
+    await userEvent.tab();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Dictate (microphone)");
+  });
+
+  test("recording: pressed, same name, visual-only timer", async () => {
     const { toggleRecording } = renderVoice({ voiceState: "recording", formatElapsed: "0:07" });
-    const b = screen.getByRole("button", { name: "Stop and transcribe" });
+    const b = voiceButton();
     expect(b).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("0:07")).toHaveAttribute("aria-live", "polite");
+    const timer = screen.getByText("0:07");
+    expect(timer).toHaveAttribute("aria-hidden");
+    expect(timer).not.toHaveAttribute("aria-live");
     await userEvent.click(b);
     expect(toggleRecording).toHaveBeenCalledTimes(1);
   });
 
   test("transcribing: disabled with a hidden spinner", () => {
     renderVoice({ voiceState: "transcribing" });
-    const b = screen.getByRole("button", { name: "Transcribing…" });
+    const b = voiceButton();
     expect(b).toBeDisabled();
     expect(b.querySelector(".animate-spin")).not.toBeNull();
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    // Only the announcement region has role=status; the spinner is hidden.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  test("announces state changes in a persistent status region", () => {
+    const toggleRecording = vi.fn(async () => {});
+    const props = { formatElapsed: "0:00", toggleRecording };
+    const { rerender } = render(<VoiceButton voiceState="idle" {...props} />);
+    const status = screen.getByRole("status");
+    rerender(<VoiceButton voiceState="recording" {...props} />);
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent("Recording started");
+    rerender(<VoiceButton voiceState="transcribing" {...props} />);
+    expect(status).toHaveTextContent("Transcribing…");
+    rerender(<VoiceButton voiceState="idle" {...props} />);
+    expect(status).toBeEmptyDOMElement();
+    rerender(<VoiceButton voiceState="recording" {...props} />);
+    rerender(<VoiceButton voiceState="idle" {...props} />);
+    expect(status).toHaveTextContent("Recording stopped");
   });
 
   test("disabled blocks recording", () => {
     renderVoice({ disabled: true });
-    expect(screen.getByRole("button", { name: "Dictate (microphone)" })).toBeDisabled();
+    expect(voiceButton()).toBeDisabled();
   });
 });
