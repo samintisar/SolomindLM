@@ -12,7 +12,7 @@ const cardVariants = cva(
           "rounded-2xl border-border/90 bg-card/90 shadow-lg shadow-primary/5 backdrop-blur-sm",
         // Clickable cards: the inner <button> carries focus; the card shows the ring, lifts on hover.
         interactive:
-          "relative gap-0 overflow-hidden py-0 shadow-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:scale-99 has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background motion-reduce:transform-none",
+          "relative gap-0 overflow-hidden py-0 shadow-sm transition duration-200 ease-out motion-safe:hover:-translate-y-0.5 hover:shadow-md motion-safe:active:scale-99 has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background",
       },
     },
     defaultVariants: { variant: "default" },

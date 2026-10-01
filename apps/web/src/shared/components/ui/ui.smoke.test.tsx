@@ -232,14 +232,17 @@ describe("shadcn ui components render", () => {
       <>
         <Card variant="interactive" />
         <Button variant="ghost-destructive">x</Button>
-        <ToggleGroup type="single">
-          <ToggleGroupItem value="a" variant="swatch" aria-label="a" />
+        <ToggleGroup type="single" variant="swatch">
+          <ToggleGroupItem value="a" aria-label="a" />
         </ToggleGroup>
       </>
     );
     expect(container.querySelector('[data-variant="interactive"]')).not.toBeNull();
     expect(screen.getByRole("button", { name: "x" })).toHaveClass("text-destructive");
-    expect(screen.getByRole("radio", { name: "a" })).toBeInTheDocument();
+    const swatch = screen.getByRole("radio", { name: "a" });
+    expect(swatch).toHaveClass("rounded-full", "p-1");
+    expect(swatch).not.toHaveClass("px-3");
+    expect(swatch).not.toHaveClass("rounded-none");
   });
 
   it("Toaster renders inside the app ThemeContext", () => {
