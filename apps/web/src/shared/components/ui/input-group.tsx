@@ -13,16 +13,24 @@ const inputGroupVariants = cva("", {
       default: "h-9",
       /** Pair with `<InputGroupInput size="lg">`; matches the default `Button` height (h-11). */
       lg: "h-11",
+      auto: "h-auto",
+    },
+    variant: {
+      default: "",
+      // Chat composer: a raised card that stacks the textarea over a toolbar row.
+      composer: "h-auto flex-col items-stretch rounded-2xl bg-card shadow-lg",
     },
   },
   defaultVariants: {
     size: "default",
+    variant: "default",
   },
 });
 
 function InputGroup({
   className,
   size,
+  variant,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupVariants>) {
   return (
@@ -32,7 +40,7 @@ function InputGroup({
       role="group"
       className={cn(
         "group/input-group relative flex w-full items-center rounded-md border border-input shadow-xs transition-[color,box-shadow] outline-none dark:bg-input/30",
-        inputGroupVariants({ size }),
+        inputGroupVariants({ size, variant }),
         "min-w-0 has-[>textarea]:h-auto",
 
         // Variants based on alignment.

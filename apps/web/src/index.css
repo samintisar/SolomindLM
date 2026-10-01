@@ -421,6 +421,42 @@
     );
 }
 
+/* Chat: spacer height that keeps the last message clear of the floating composer (set by useComposerClearance). */
+@utility composer-clearance {
+  height: var(--chat-composer-clearance, 18rem);
+  @media (width >= 48rem) {
+    height: var(--chat-composer-clearance, 14rem);
+  }
+}
+
+/* Chat empty state: room for the floating composer plus the iOS home indicator. */
+@utility pb-composer-safe {
+  padding-bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* "Thinking..." label shimmer; static under reduced motion (global rule zeroes animation-duration). */
+@utility text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-muted-foreground) 0%,
+    var(--color-foreground) 50%,
+    var(--color-muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 1.6s linear infinite;
+}
+
+@keyframes text-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
 /* Sonner reads these; the :root prefix outranks its [data-sonner-toaster][data-sonner-theme] rules. */
 :root [data-sonner-toaster].toaster {
   --normal-bg: var(--popover);
