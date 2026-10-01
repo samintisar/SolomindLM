@@ -1,5 +1,3 @@
-import React from "react";
-
 export function stripReferencesSection(content: string): string {
   const referencesPattern = /\n?(?:References|Reference):\s*\n?[\d\s.,\-:–—]*$/i;
   const match = content.match(referencesPattern);
@@ -9,12 +7,19 @@ export function stripReferencesSection(content: string): string {
   return content;
 }
 
+/** How a citation toggle was triggered; a keyboard toggle moves focus into the popover. */
+export type RefToggleSource = "pointer" | "keyboard";
+
 export interface RefHandlers {
-  onRefHover: (refId: number, messageId: string, event: React.MouseEvent) => void;
+  /** Pointer entered a citation chip (desktop hover intent). */
+  onRefEnter: (refId: number, messageId: string, el: HTMLElement) => void;
+  /** Pointer left a citation chip. */
   onRefLeave: () => void;
-  onRefClick: (
+  /** Click/tap or Enter/Space toggles the popover for this chip. */
+  onRefToggle: (
     refId: number,
     messageId: string,
-    event: React.MouseEvent | React.TouchEvent
+    el: HTMLElement,
+    source?: RefToggleSource
   ) => void;
 }

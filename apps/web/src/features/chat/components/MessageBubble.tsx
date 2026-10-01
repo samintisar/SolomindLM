@@ -3,7 +3,7 @@ import React from "react";
 import { Favicon } from "@/shared/components/Favicon";
 import { type ChatActivityPhase, Message } from "@/shared/types/index";
 import { renderMessageWithReferences } from "../utils/messageRendering";
-import { RefHandlers } from "../utils/messageRendering.utils";
+import type { RefHandlers } from "../utils/messageRendering.utils";
 import { getStatusIcon, getStatusMessage } from "../utils/messageStatus";
 import { AgentActivityPanel } from "./AgentActivityPanel";
 import { DeepResearchSourcesSection } from "./DeepResearchSourcesSection";
@@ -433,7 +433,8 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources) &&
     prev.message.deepResearch?.researchRunId === next.message.deepResearch?.researchRunId &&
     prev.notebookId === next.notebookId &&
-    prev.onOpenExternalSources === next.onOpenExternalSources
+    prev.onOpenExternalSources === next.onOpenExternalSources &&
+    prev.refHandlers === next.refHandlers
 );
 
 MessageBubble.displayName = "MessageBubble";

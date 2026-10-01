@@ -2,13 +2,66 @@ import React, { Suspense } from "react";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { replaceCitationMarkersOutsideMath } from "./citationMarkers";
 import { MarkdownRendererLazy } from "./MarkdownRendererLazy";
-import { RefHandlers, stripReferencesSection } from "./messageRendering.utils";
+import { type RefHandlers, stripReferencesSection } from "./messageRendering.utils";
+
+/**
+ * Inline citation pill. With handlers it is a keyboard- and touch-operable button that drives the
+ * panel's citation popover; without them it is a plain label. `title="Reference N"` is an e2e hook.
+ */
+export function CitationChip({
+  refId,
+  messageId,
+  handlers,
+}: {
+  refId: number;
+  messageId: string;
+  handlers?: RefHandlers;
+}) {
+  if (!handlers) {
+    return (
+      <span
+        title={`Reference ${refId}`}
+        className="mx-1 inline-flex size-5 items-center justify-center rounded-full bg-primary align-middle font-sans text-xs font-bold text-primary-foreground"
+      >
+        {refId}
+      </span>
+    );
+  }
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-haspopup="dialog"
+      data-citation-chip=""
+      title={`Reference ${refId}`}
+      aria-label={`Reference ${refId}`}
+      onPointerEnter={(e) =>
+        e.pointerType === "mouse" && handlers.onRefEnter(refId, messageId, e.currentTarget)
+      }
+      onPointerLeave={(e) => e.pointerType === "mouse" && handlers.onRefLeave()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handlers.onRefToggle(refId, messageId, e.currentTarget, "pointer");
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handlers.onRefToggle(refId, messageId, e.currentTarget, "keyboard");
+        }
+      }}
+      className="mx-1 inline-flex size-5 cursor-pointer touch-manipulation items-center justify-center rounded-full bg-primary align-middle font-sans text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/80"
+    >
+      {refId}
+    </span>
+  );
+}
 
 export function renderMessageWithReferences(
   messageId: string,
   content: string,
   _references: any[] | undefined,
-  handlers: RefHandlers,
+  handlers: RefHandlers | undefined,
   options?: { isStreamingVisual?: boolean }
 ): React.ReactNode {
   const cleanContent = stripReferencesSection(content);
@@ -70,19 +123,7 @@ export function renderMessageWithReferences(
               if (text.startsWith("CITE:")) {
                 const refId = parseInt(text.slice(5), 10);
                 if (!Number.isNaN(refId)) {
-                  return (
-                    <span
-                      onMouseEnter={(e) => handlers.onRefHover(refId, messageId, e)}
-                      onMouseLeave={handlers.onRefLeave}
-                      onClick={(e) => handlers.onRefClick(refId, messageId, e)}
-                      onTouchStart={(e) => handlers.onRefClick(refId, messageId, e)}
-                      className="inline-flex items-center justify-center w-5 h-5 rounded-xl bg-primary text-primary-foreground text-xs font-bold cursor-pointer hover:bg-primary/90 active:bg-primary/80 transition-colors mx-1 align-middle relative touch-manipulation"
-                      title={`Reference ${refId}`}
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      {refId}
-                    </span>
-                  );
+                  return <CitationChip refId={refId} messageId={messageId} handlers={handlers} />;
                 }
               }
               return (

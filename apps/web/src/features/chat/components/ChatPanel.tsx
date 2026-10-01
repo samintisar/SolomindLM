@@ -44,9 +44,10 @@ import { useApproveResearchPlan, useRejectResearchPlan } from "../services/resea
 import { useSaveChat } from "../services/userNotesApi";
 import { useChatStreamingContext } from "../useChatStreaming";
 import { exportAsMarkdown } from "../utils/exportChat";
-import { RefHandlers, stripReferencesSection } from "../utils/messageRendering.utils";
+import { stripReferencesSection } from "../utils/messageRendering.utils";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput } from "./ChatInput";
+import { useCitationPopover } from "./CitationPopover";
 import { ConfigureChatModal } from "./ConfigureChatModal";
 import { ControlTooltip } from "./ControlTooltip";
 import { ConversationList } from "./ConversationList";
@@ -58,7 +59,6 @@ import {
 import { type ExternalSource, ExternalSourcesModal } from "./ExternalSourcesModal";
 import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
 import { MessageBubble } from "./MessageBubble";
-import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
 
 const NO_EXTERNAL_SOURCES: ExternalSource[] = [];
@@ -90,7 +90,7 @@ interface ChatPanelProps {
   notebookIcon?: string | null;
   notebookCoverColor?: string | null;
   chatSettings?: ChatSettings;
-  /** Open a notebook document in the sources panel (citation / reference tooltip) */
+  /** Open a notebook document in the sources panel (citation popover title) */
   onOpenNotebookSource?: (documentId: string) => void;
   onOpenLiteratureTable?: (tableId: Id<"literatureTables">) => void;
   onOpenLiteratureReport?: (reportId: Id<"literatureReports">) => void;
@@ -137,11 +137,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
   const notebookDocumentIds = useMemo(() => new Set(sources.map((s) => s.id)), [sources]);
-  const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<"top" | "bottom">("top");
-  const [tooltipStyle, setTooltipStyle] = useState<{ top?: number; left?: number }>({});
-  const [isTooltipHovered, setIsTooltipHovered] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -319,8 +314,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const waitingOnRemoteGeneration = remoteGenerationBlocksSend && !isLoading && !isSending;
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const hideTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const virtuosoRef = useRef<any>(null);
   const messageScrollerRef = useRef<HTMLElement | null>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -394,85 +387,73 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     [notebookId, updateNotebook, success, toastError]
   );
 
-  // --- Tooltip / citation handlers ---
+  // --- Citation popover ---
 
-  const closeTooltip = useCallback(() => {
-    if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-    setHoveredRefId(null);
-    setHoveredMessageId(null);
-    setIsTooltipHovered(false);
-  }, []);
-
-  const handleRefEnter = useCallback(() => {
-    if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-  }, []);
-
-  const handleRefLeave = useCallback(() => {
-    if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-    hideTooltipTimeoutRef.current = setTimeout(() => {
-      if (!isTooltipHovered) {
-        setHoveredRefId(null);
-        setHoveredMessageId(null);
-      }
-    }, 150);
-  }, [isTooltipHovered]);
-
-  const handleRefHover = useCallback(
-    (refId: number, messageId: string, event: React.MouseEvent) => {
-      handleRefEnter();
-      setHoveredRefId(refId);
-      setHoveredMessageId(messageId);
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const containerRect = messagesContainerRef.current?.getBoundingClientRect();
-      if (!containerRect) return;
-      const position =
-        rect.top - containerRect.top > containerRect.bottom - rect.bottom ? "top" : "bottom";
-      setTooltipPosition(position);
-      const refCenterX = rect.left - containerRect.left + rect.width / 2;
-      const refCenterY = rect.top - containerRect.top;
-      setTooltipStyle(
-        position === "top"
-          ? { left: refCenterX, top: refCenterY - 2 }
-          : { left: refCenterX, top: refCenterY + rect.height + 2 }
-      );
+  // Citations [n] match the n-th source in the grounded prompt order, not retrieval chunk.id.
+  const resolveReference = useCallback(
+    (messageId: string, refId: number): ReferenceChunk | null => {
+      const message = messages.find((msg) => msg.id === messageId);
+      const refsArray = Array.isArray(message?.references) ? message.references : [];
+      const ref =
+        refId >= 1 && refId <= refsArray.length
+          ? refsArray[refId - 1]
+          : refsArray.find((r) => Number(r.id) === refId);
+      return ref ?? null;
     },
-    [handleRefEnter]
+    [messages]
   );
 
-  const handleRefClick = useCallback(
-    (refId: number, messageId: string, event: React.MouseEvent | React.TouchEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-      if (hoveredRefId === refId && hoveredMessageId === messageId) {
-        setHoveredRefId(null);
-        setHoveredMessageId(null);
-      } else {
-        handleRefHover(refId, messageId, event as React.MouseEvent);
+  const getOpenReferenceInSources = useCallback(
+    (reference: ReferenceChunk) => {
+      const docId = reference.documentId?.trim();
+      if (!docId || !onOpenNotebookSource || !sources.some((s) => s.id === docId)) {
+        return undefined;
       }
+      return () => onOpenNotebookSource(docId);
     },
-    [hoveredRefId, hoveredMessageId, handleRefHover]
+    [onOpenNotebookSource, sources]
   );
 
+  const getAddReferenceToNotebook = useCallback(
+    (reference: ReferenceChunk) => {
+      const sourceUrl = reference.sourceUrl;
+      const isExternal = !reference.documentId && !!sourceUrl;
+      if (!isExternal || !notebookId) return undefined;
+      return async () => {
+        try {
+          const ids = await addExternalSourcesMutation({
+            notebookId: notebookId as Id<"notebooks">,
+            sources: [
+              {
+                title: reference.sourceTitle,
+                url: sourceUrl,
+                snippet: reference.content.slice(0, 500),
+                sourceType: "web",
+              },
+            ],
+          });
+          // The mutation skips URLs already in the notebook.
+          success(ids.length === 0 ? "Already in this notebook" : "Added to notebook");
+        } catch (e) {
+          console.error("Failed to add external source:", e);
+          toastError("Couldn't add this source. Please try again.");
+        }
+      };
+    },
+    [notebookId, addExternalSourcesMutation, success, toastError]
+  );
+
+  const citation = useCitationPopover({
+    resolveReference,
+    onOpenInSources: getOpenReferenceInSources,
+    onAddToNotebook: getAddReferenceToNotebook,
+  });
+  const closeCitation = citation.close;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: close the popover when the conversation changes
   useEffect(() => {
-    if (!hoveredRefId) return;
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (tooltipRef.current?.contains(event.target as Node)) return;
-      if ((event.target as HTMLElement)?.closest('span[title^="Reference"]')) return;
-      closeTooltip();
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [hoveredRefId, closeTooltip]);
-
-  const refHandlers: RefHandlers = useMemo(
-    () => ({ onRefHover: handleRefHover, onRefLeave: handleRefLeave, onRefClick: handleRefClick }),
-    [handleRefHover, handleRefLeave, handleRefClick]
-  );
+    closeCitation();
+  }, [activeConversationId, closeCitation]);
 
   const handleNewConversation = useCallback(async () => {
     if (!onCreateConversation) return;
@@ -481,7 +462,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (messages.length === 0) {
       setActiveLiteratureSessionId(null);
       setComposerMode("chat");
-      closeTooltip();
+      closeCitation();
       setHistoryOpen(false);
       return;
     }
@@ -495,7 +476,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setActiveLiteratureSessionId(null);
         setComposerMode("chat");
         setInputMessage("");
-        closeTooltip();
+        closeCitation();
         onSelectConversation?.(id);
         setHistoryOpen(false);
       } else {
@@ -513,7 +494,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onCreateConversation,
     onSelectConversation,
     toastError,
-    closeTooltip,
+    closeCitation,
     setComposerMode,
   ]);
 
@@ -655,53 +636,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }, 100);
     }
   }, [messages.length]);
-
-  // --- Tooltip position computation ---
-
-  const tooltipContent = useMemo(() => {
-    if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current)
-      return null;
-    const hoveredMessage = messages.find((msg) => msg.id === hoveredMessageId);
-    const refsArray = Array.isArray(hoveredMessage?.references) ? hoveredMessage.references : [];
-    // Citations [n] match the n-th source in the grounded prompt order, not retrieval chunk.id.
-    const ref =
-      hoveredRefId >= 1 && hoveredRefId <= refsArray.length
-        ? refsArray[hoveredRefId - 1]
-        : refsArray.find((r) => Number(r.id) === hoveredRefId);
-
-    const containerRect = messagesContainerRef.current.getBoundingClientRect();
-    if (!ref || !containerRect) return null;
-
-    const tooltipWidth = 384;
-    const rawX = (tooltipStyle.left || 0) + containerRect.left - tooltipWidth / 2;
-    const x = Math.max(
-      containerRect.left + 16,
-      Math.min(rawX, containerRect.right - tooltipWidth - 16)
-    );
-    const y =
-      tooltipPosition === "top"
-        ? containerRect.top + (tooltipStyle.top || 0) - 256 - 2
-        : containerRect.top + (tooltipStyle.top || 0);
-
-    return { ref, x, y };
-  }, [hoveredRefId, hoveredMessageId, messages, tooltipStyle, tooltipPosition]);
-
-  const handleOpenReferenceInSources = useCallback(
-    (reference: ReferenceChunk) => {
-      const docId = reference.documentId?.trim();
-      if (!docId || !onOpenNotebookSource) return;
-      if (!sources.some((s) => s.id === docId)) return;
-      onOpenNotebookSource(docId);
-      setHoveredRefId(null);
-      setHoveredMessageId(null);
-      setIsTooltipHovered(false);
-      if (hideTooltipTimeoutRef.current) {
-        clearTimeout(hideTooltipTimeoutRef.current);
-        hideTooltipTimeoutRef.current = null;
-      }
-    },
-    [onOpenNotebookSource, sources]
-  );
 
   const memoizedMessages = useMemo(() => messages, [messages]);
 
@@ -900,7 +834,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           isAssistantStreamActive={
                             message.id === "__streaming__" ? isLoading : false
                           }
-                          refHandlers={refHandlers}
+                          refHandlers={citation.handlers}
                           onCopyMessage={copyMessageAsMarkdown}
                           copiedMessageId={copiedMessageId}
                           onSetFeedback={onSetFeedback}
@@ -928,57 +862,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               />
             )}
 
-            {/* Floating Reference Tooltip */}
-            {tooltipContent && (
-              <ReferenceTooltip
-                hoveredRefId={hoveredRefId!}
-                tooltipRef={tooltipRef}
-                reference={tooltipContent.ref}
-                position={{ x: tooltipContent.x, y: tooltipContent.y }}
-                onOpenInSources={(() => {
-                  const docId = tooltipContent.ref.documentId?.trim();
-                  if (!docId || !onOpenNotebookSource || !sources.some((s) => s.id === docId)) {
-                    return undefined;
-                  }
-                  return () => handleOpenReferenceInSources(tooltipContent.ref);
-                })()}
-                onAddToNotebook={(() => {
-                  const isExternal =
-                    !tooltipContent.ref.documentId && !!tooltipContent.ref.sourceUrl;
-                  if (!isExternal || !notebookId) return undefined;
-                  return async () => {
-                    try {
-                      await addExternalSourcesMutation({
-                        notebookId: notebookId as Id<"notebooks">,
-                        sources: [
-                          {
-                            title: tooltipContent.ref.sourceTitle,
-                            url: tooltipContent.ref.sourceUrl!,
-                            snippet: tooltipContent.ref.content.slice(0, 500),
-                            sourceType: "web",
-                          },
-                        ],
-                      });
-                    } catch (e) {
-                      console.error("Failed to add external source:", e);
-                    }
-                  };
-                })()}
-                onMouseEnter={() => {
-                  setIsTooltipHovered(true);
-                  if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-                }}
-                onMouseLeave={() => {
-                  setIsTooltipHovered(false);
-                  hideTooltipTimeoutRef.current = setTimeout(() => {
-                    if (!isTooltipHovered) {
-                      setHoveredRefId(null);
-                      setHoveredMessageId(null);
-                    }
-                  }, 100);
-                }}
-              />
-            )}
+            {citation.popover}
           </div>
         </div>
 

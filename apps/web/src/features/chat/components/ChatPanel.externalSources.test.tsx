@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { Message } from "@/shared/types/index";
+import type { RefHandlers } from "../utils/messageRendering.utils";
 import { ChatPanel } from "./ChatPanel";
 
 const externalSources = [
@@ -11,7 +12,22 @@ const externalSources = [
 
 const chat = {
   messages: [
-    { id: "m1", role: "assistant", content: "Answer", externalSources },
+    {
+      id: "m1",
+      role: "assistant",
+      content: "Answer",
+      externalSources,
+      references: [
+        {
+          id: 7,
+          sourceId: "w",
+          sourceTitle: "Web Page",
+          sourceUrl: "https://w.example",
+          content: "Web excerpt",
+          chunkIndex: 0,
+        },
+      ],
+    },
   ] as unknown as Message[],
   isChatStreaming: false,
   remoteGenerationBlocksSend: false,
@@ -75,20 +91,29 @@ vi.mock("./ChatInput", () => ({
 }));
 vi.mock("./ChatEmptyState", () => ({ ChatEmptyState: () => null }));
 vi.mock("./ConfigureChatModal", () => ({ ConfigureChatModal: () => null }));
+vi.mock("@/shared/components/MarkdownRenderer", () => ({
+  default: ({ children }: { children: string }) => <div>{children}</div>,
+}));
 vi.mock("./MessageBubble", () => ({
   MessageBubble: ({
     externalSources: sources,
     onOpenExternalSources,
+    refHandlers,
   }: {
     externalSources: unknown[];
     onOpenExternalSources: (sources: unknown[]) => void;
+    refHandlers: RefHandlers;
   }) => (
-    <button type="button" onClick={() => onOpenExternalSources(sources)}>
-      open sources
-    </button>
+    <>
+      <button type="button" onClick={() => onOpenExternalSources(sources)}>
+        open sources
+      </button>
+      <button type="button" onClick={(e) => refHandlers.onRefToggle(1, "m1", e.currentTarget)}>
+        cite 1
+      </button>
+    </>
   ),
 }));
-vi.mock("./ReferenceTooltip", () => ({ ReferenceTooltip: () => null }));
 vi.mock("./ResearchPlanMessage", () => ({ ResearchPlanMessage: () => null }));
 vi.mock("./LiteratureReviewMessage", () => ({ LiteratureReviewMessage: () => null }));
 
@@ -155,5 +180,40 @@ describe("ChatPanel external sources dialog", () => {
     expect(dialog()).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /include paper a/i })).toBeChecked();
     expect(screen.getByRole("button", { name: /^add 1/i })).toBeEnabled();
+  });
+});
+
+describe("ChatPanel citation popover", () => {
+  async function openCitation() {
+    await userEvent.click(screen.getByRole("button", { name: "cite 1" }));
+    expect(await screen.findByRole("dialog", { name: "Reference 1" })).toHaveTextContent(
+      "Web Page"
+    );
+  }
+
+  test("adds a cited web source to the notebook and toasts", async () => {
+    addExternalSources.mockResolvedValue(["d1"]);
+    setup();
+    await openCitation();
+    await userEvent.click(screen.getByRole("button", { name: "Add to notebook" }));
+    expect(addExternalSources).toHaveBeenCalledWith({
+      notebookId: "n1",
+      sources: [
+        { title: "Web Page", url: "https://w.example", snippet: "Web excerpt", sourceType: "web" },
+      ],
+    });
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Added to notebook"));
+  });
+
+  test("toasts when adding a cited source fails", async () => {
+    addExternalSources.mockRejectedValue(new Error("boom"));
+    setup();
+    await openCitation();
+    await userEvent.click(screen.getByRole("button", { name: "Add to notebook" }));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Couldn't add this source. Please try again.")
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Add to notebook" })).toBeEnabled();
   });
 });
