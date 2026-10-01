@@ -20,10 +20,12 @@ import {
 } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemIcon,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
@@ -694,81 +696,91 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </ControlTooltip>
         )}
       </div>
-      <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
-        <ControlTooltip label="Thread history">
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" size="icon-sm" aria-label="Thread history">
-              <History />
-            </Button>
-          </PopoverTrigger>
+      <ButtonGroup variant="tray" aria-label="Chat actions">
+        <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+          <ControlTooltip label="Thread history">
+            <PopoverTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Thread history">
+                <History />
+              </Button>
+            </PopoverTrigger>
+          </ControlTooltip>
+          <PopoverContent
+            align="end"
+            collisionPadding={16}
+            aria-label="Thread history"
+            onEscapeKeyDown={keepHistoryOpenOnRenameEscape}
+            padding="none"
+            className="flex max-h-(--radix-popover-content-available-height) w-80 max-w-(--radix-popover-content-available-width) flex-col"
+          >
+            {/* A plain scroller, not ScrollArea: its display:table content wrapper defeats the rows' truncate. */}
+            <div className="max-h-120 min-h-0 overflow-y-auto overscroll-contain p-1.5">
+              <ConversationList
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onSelect={(id) => {
+                  onSelectConversation?.(id);
+                  setHistoryOpen(false);
+                }}
+                onRename={onRenameConversation}
+                onDelete={onDeleteConversation}
+                pinnedIds={pinnedIds}
+                onTogglePin={handleTogglePin}
+              />
+            </div>
+          </PopoverContent>
+        </Popover>
+        <ControlTooltip label={newChatLabel}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleNewConversation}
+            disabled={isCreatingConversation}
+            aria-label={newChatLabel}
+          >
+            {isCreatingConversation ? <Spinner aria-hidden /> : <Plus />}
+          </Button>
         </ControlTooltip>
-        <PopoverContent
-          align="end"
-          collisionPadding={16}
-          aria-label="Thread history"
-          onEscapeKeyDown={keepHistoryOpenOnRenameEscape}
-          padding="none"
-          className="flex max-h-(--radix-popover-content-available-height) w-80 max-w-(--radix-popover-content-available-width) flex-col"
-        >
-          {/* A plain scroller, not ScrollArea: its display:table content wrapper defeats the rows' truncate. */}
-          <div className="max-h-120 min-h-0 overflow-y-auto overscroll-contain p-1.5">
-            <ConversationList
-              conversations={conversations}
-              activeConversationId={activeConversationId}
-              onSelect={(id) => {
-                onSelectConversation?.(id);
-                setHistoryOpen(false);
-              }}
-              onRename={onRenameConversation}
-              onDelete={onDeleteConversation}
-              pinnedIds={pinnedIds}
-              onTogglePin={handleTogglePin}
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
-      <ControlTooltip label={newChatLabel}>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          onClick={handleNewConversation}
-          disabled={isCreatingConversation}
-          aria-label={newChatLabel}
-        >
-          {isCreatingConversation ? <Spinner aria-hidden /> : <Plus />}
-        </Button>
-      </ControlTooltip>
-      <DropdownMenu modal={false}>
-        <ControlTooltip label="Chat options">
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="icon-sm" aria-label="Chat options">
-              <MoreVertical />
-            </Button>
-          </DropdownMenuTrigger>
-        </ControlTooltip>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setIsConfigModalOpen(true)}>
-            <Settings2 />
-            Configure chat
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleExportChat}>
-            <Download />
-            Export chat
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void handleSaveToNote()}>
-            <FileText />
-            Save to note
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={handlePinActiveChat}>
-            <Pin />
-            {activeConversationId && pinnedIds.has(activeConversationId)
-              ? "Unpin chat"
-              : "Pin chat"}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        <DropdownMenu modal={false}>
+          <ControlTooltip label="Chat options">
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Chat options">
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+          </ControlTooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setIsConfigModalOpen(true)}>
+              <DropdownMenuItemIcon>
+                <Settings2 />
+              </DropdownMenuItemIcon>
+              Configure chat
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleExportChat}>
+              <DropdownMenuItemIcon>
+                <Download />
+              </DropdownMenuItemIcon>
+              Export chat
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void handleSaveToNote()}>
+              <DropdownMenuItemIcon>
+                <FileText />
+              </DropdownMenuItemIcon>
+              Save to note
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={handlePinActiveChat}>
+              <DropdownMenuItemIcon>
+                <Pin />
+              </DropdownMenuItemIcon>
+              {activeConversationId && pinnedIds.has(activeConversationId)
+                ? "Unpin chat"
+                : "Pin chat"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ButtonGroup>
     </div>
   );
 

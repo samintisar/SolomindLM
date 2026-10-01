@@ -3,6 +3,9 @@ import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItemDescription,
+  DropdownMenuItemIcon,
+  DropdownMenuItemText,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -46,7 +49,7 @@ export function ModeMenu({ mode, onModeChange, disabled, crowded = false }: Mode
           </Button>
         </DropdownMenuTrigger>
       </ControlTooltip>
-      <DropdownMenuContent side="top" align="start" className="w-60">
+      <DropdownMenuContent side="top" align="start" className="w-72">
         <DropdownMenuLabel>Mode</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={mode}
@@ -54,10 +57,15 @@ export function ModeMenu({ mode, onModeChange, disabled, crowded = false }: Mode
             if (isComposerMode(value)) onModeChange(value);
           }}
         >
-          {COMPOSER_MODES.map(({ id, label, icon: ItemIcon }) => (
+          {COMPOSER_MODES.map(({ id, label, icon: ItemIcon, description }) => (
             <DropdownMenuRadioItem key={id} value={id}>
-              <ItemIcon />
-              {label}
+              <DropdownMenuItemIcon>
+                <ItemIcon />
+              </DropdownMenuItemIcon>
+              <DropdownMenuItemText>
+                {label}
+                <DropdownMenuItemDescription>{description}</DropdownMenuItemDescription>
+              </DropdownMenuItemText>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
