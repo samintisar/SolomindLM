@@ -39,7 +39,7 @@ export const userCanAccessStorage = internalQuery({
   },
 });
 
-async function deleteAllChunksForDocument(
+export async function deleteAllChunksForDocument(
   ctx: MutationCtx,
   documentId: Id<"documents">
 ): Promise<void> {
