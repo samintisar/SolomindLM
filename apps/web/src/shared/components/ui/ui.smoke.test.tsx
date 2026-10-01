@@ -608,6 +608,23 @@ describe("shadcn ui components render", () => {
   });
 
   describe("soft modal and card surfaces", () => {
+    it("alerts separate with a hairline ring, not a border", () => {
+      render(
+        <>
+          <Alert data-testid="default-alert">a</Alert>
+          <Alert data-testid="warning-alert" variant="warning">
+            w
+          </Alert>
+        </>
+      );
+      const plain = screen.getByTestId("default-alert");
+      expect(plain).toHaveClass("ring-1", "ring-hairline", "shadow-xs");
+      expect(plain).not.toHaveClass("border");
+      const warning = screen.getByTestId("warning-alert");
+      expect(warning).toHaveClass("ring-warning-border", "bg-warning-muted");
+      expect(warning).not.toHaveClass("border", "border-warning-border");
+    });
+
     it("modal and card surfaces are borderless", async () => {
       render(
         <>

@@ -3,16 +3,17 @@ import * as React from "react";
 import { cn } from "@/shared/utils/cn";
 
 const alertVariants = cva(
-  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-0.5 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-0.5 rounded-xl px-4 py-3 text-sm ring-1 has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
   {
     variants: {
       variant: {
-        default: "bg-card text-card-foreground",
+        // In-flow surface: a card with a hairline, not an outline.
+        default: "bg-card text-card-foreground shadow-xs ring-hairline",
         // Semantic status tokens: tinted surface + AA-contrast text (see tokenContrast.test.ts).
         destructive:
-          "border-destructive-border bg-destructive-muted text-destructive-muted-foreground [&>svg]:text-destructive *:data-[slot=alert-description]:text-destructive-muted-foreground",
+          "bg-destructive-muted text-destructive-muted-foreground ring-destructive-border [&>svg]:text-destructive *:data-[slot=alert-description]:text-destructive-muted-foreground",
         warning:
-          "border-warning-border bg-warning-muted text-warning-muted-foreground [&>svg]:text-warning *:data-[slot=alert-description]:text-warning-muted-foreground",
+          "bg-warning-muted text-warning-muted-foreground ring-warning-border [&>svg]:text-warning *:data-[slot=alert-description]:text-warning-muted-foreground",
       },
     },
     defaultVariants: {
