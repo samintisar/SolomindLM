@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   areaOf,
+  blockedIncreases,
   compareCounts,
   countViolations,
   isDegradedRun,
   type LintResult,
+  rulesInBaseline,
   sortCounts,
-  splitIncreases,
 } from "./baseline";
 
 const msg = (ruleId: string | null, severity = 1) => ({ ruleId, severity, message: "m", line: 1 });
@@ -90,32 +91,51 @@ describe("compareCounts", () => {
   });
 });
 
-describe("splitIncreases", () => {
+describe("blockedIncreases", () => {
   const baseline = { "features/chat": { "shadcn/no-raw-colors": 5 } };
+  const fresh = {
+    "features/chat": { "shadcn/no-raw-colors": 5, "solomind/soft-surfaces": 3 },
+    shared: { "solomind/soft-surfaces": 2 },
+  };
+  const blocked = (
+    current: typeof fresh | Record<string, Record<string, number>>,
+    opts: { update: boolean; newRules?: string[] }
+  ) =>
+    blockedIncreases(compareCounts(current, baseline).increases, baseline, {
+      update: opts.update,
+      newRules: opts.newRules ?? [],
+    });
 
-  it("allows increases for a rule that appears nowhere in the baseline", () => {
-    const current = {
-      "features/chat": { "shadcn/no-raw-colors": 5, "solomind/soft-surfaces": 3 },
-      shared: { "solomind/soft-surfaces": 2 },
-    };
-    const { increases } = compareCounts(current, baseline);
-    const { newRule, refused } = splitIncreases(increases, baseline);
-    expect(refused).toEqual([]);
-    expect(newRule.map((c) => c.rule)).toEqual([
-      "solomind/soft-surfaces",
-      "solomind/soft-surfaces",
-    ]);
+  it("blocks a new rule when it was not named with --new-rule", () => {
+    expect(blocked(fresh, { update: true })).toHaveLength(2);
   });
 
-  it("refuses an increase for a rule that is already in the baseline", () => {
+  it("allows a new rule that was named with --new-rule", () => {
+    expect(blocked(fresh, { update: true, newRules: ["solomind/soft-surfaces"] })).toEqual([]);
+  });
+
+  it("blocks a flagged rule that is already in the baseline", () => {
+    const current = { "features/chat": { "shadcn/no-raw-colors": 6 } };
+    expect(blocked(current, { update: true, newRules: ["shadcn/no-raw-colors"] })).toHaveLength(1);
+  });
+
+  it("blocks a rule that was fixed to zero, dropped from the baseline and came back", () => {
+    // sortCounts drops zero counts, so the regressed rule is absent from the baseline like a new one.
     const current = {
-      "features/chat": { "shadcn/no-raw-colors": 6 },
-      shared: { "shadcn/no-raw-colors": 1 },
+      "features/chat": { "shadcn/no-raw-colors": 5, "shadcn/no-inline-styles": 1 },
     };
-    const { increases } = compareCounts(current, baseline);
-    const { newRule, refused } = splitIncreases(increases, baseline);
-    expect(newRule).toEqual([]);
-    expect(refused).toHaveLength(2);
+    expect(blocked(current, { update: true })).toHaveLength(1);
+  });
+
+  it("blocks every increase outside update mode, flagged or not", () => {
+    expect(blocked(fresh, { update: false, newRules: ["solomind/soft-surfaces"] })).toHaveLength(2);
+  });
+});
+
+describe("rulesInBaseline", () => {
+  it("returns the requested rules that the baseline already tracks", () => {
+    const baseline = { a: { "r/x": 1 }, b: { "r/y": 2 } };
+    expect(rulesInBaseline(["r/y", "r/z"], baseline)).toEqual(["r/y"]);
   });
 });
 

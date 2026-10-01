@@ -72,19 +72,27 @@ export function compareCounts(
   return { increases, decreases };
 }
 
+/** The requested rule IDs that already appear anywhere in the baseline. */
+export function rulesInBaseline(rules: string[], baseline: Counts): string[] {
+  const known = new Set(Object.values(baseline).flatMap((byRule) => Object.keys(byRule)));
+  return rules.filter((rule) => known.has(rule));
+}
+
 /**
- * Separates increases for a brand-new rule (its ID is absent from the whole baseline, so its first
- * counts are being recorded) from increases for rules the baseline already tracks.
+ * The increases that must fail the run. Nothing may go up, except that when updating, a rule
+ * explicitly named with `--new-rule` and absent from the baseline may record its first counts.
+ * (sortCounts drops zero counts, so "absent" alone is not enough: a rule that was fixed and then
+ * regressed looks new, which is why the exemption has to be asked for by name.)
  */
-export function splitIncreases(
+export function blockedIncreases(
   increases: CountChange[],
-  baseline: Counts
-): { newRule: CountChange[]; refused: CountChange[] } {
-  const known = new Set(Object.values(baseline).flatMap((rules) => Object.keys(rules)));
-  return {
-    newRule: increases.filter((c) => !known.has(c.rule)),
-    refused: increases.filter((c) => known.has(c.rule)),
-  };
+  baseline: Counts,
+  options: { update: boolean; newRules: string[] }
+): CountChange[] {
+  if (!options.update) return increases;
+  const tracked = new Set(rulesInBaseline(options.newRules, baseline));
+  const allowed = new Set(options.newRules.filter((rule) => !tracked.has(rule)));
+  return increases.filter((change) => !allowed.has(change.rule));
 }
 
 export function sortCounts(counts: Counts): Counts {

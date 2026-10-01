@@ -27,9 +27,16 @@ tester.run("soft-surfaces", rule, {
     { code: `const v = cva("flex gap-2", { variants: { a: { b: "shadow-md" } } });` },
     { code: `<div className="focus-visible:border-primary data-[state=open]:border-primary" />` },
     { code: `<div className="has-data-[state=checked]:border-primary" />` },
+    {
+      code: `<div className="group-data-[state=open]:border-primary peer-data-[state=on]:border-primary" />`,
+    },
+    { code: `<button className="border-collapse border-separate border-spacing-2" />` },
   ],
   invalid: [
-    { code: `<div className="border-2 border-border" />`, errors: [err] },
+    {
+      code: `<div className="border-2 border-border" />`,
+      errors: [{ messageId: "softSurfaces", data: { token: "border-2" } }],
+    },
     { code: `<div className="sm:border-t-4" />`, errors: [err] },
     { code: `<div className="border border-input" />`, errors: [err] },
     { code: `<div className="border-foreground/40" />`, errors: [err] },
@@ -42,5 +49,30 @@ tester.run("soft-surfaces", rule, {
     { code: "<div className={`p-2 ${x} border-2`} />", errors: [err] },
     { code: `const c = cn("p-2", "border-primary");`, errors: [err] },
     { code: `const v = cva("p-2", { variants: { tone: { loud: "border-4" } } });`, errors: [err] },
+    { code: `<div className="hover:border-primary" />`, errors: [err] },
+    { code: `<div className="!border-2" />`, errors: [err] },
+    { code: `<div className="border-2!" />`, errors: [err] },
+    { code: `<div className="[&:hover]:border-2" />`, errors: [err] },
+    { code: `<div className="bg-white/10" />`, errors: [err] },
+    { code: `const c = clsx({ "border-2": on });`, errors: [err] },
+    { code: `<div className="border-2 bg-black/50" />`, errors: [err, err] },
+    { code: `<div className="border-3" />`, errors: [err] },
+    { code: `<div className="border-x-6" />`, errors: [err] },
+    { code: `<div className="shadow-(--ring-shadow)" />`, errors: [err] },
+    { code: `<div className="border-primary/[0.3]" />`, errors: [err] },
+    { code: `<div className="bg-black/[0.4]" />`, errors: [err] },
+    {
+      code: `const v = cva("p-2", { variants: { a: { b: "border-4" } } } as const);`,
+      errors: [err],
+    },
+    {
+      code: `const v = cva("p-2", { variants: { a: { b: "border-4" } } } satisfies X);`,
+      errors: [err],
+    },
+    { code: '<div className={`p-2 ${on ? "border-2" : ""}`} />', errors: [err] },
+    // Each nested/wrapped class string is reported once, not once per enclosing call.
+    { code: `<div className={cn("border-2")} />`, errors: [err] },
+    { code: `const c = cn("p-2", on && cn("border-2"));`, errors: [err] },
+    { code: `const c = twMerge(clsx("border-2"));`, errors: [err] },
   ],
 });

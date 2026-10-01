@@ -1,21 +1,33 @@
 /**
  * solomind/soft-surfaces — the soft layered house style (docs/design/principles.md):
  * separate with fill and shadow, not borders. Flags outline patterns in static class strings.
+ *
+ * Known limitations: only string literals inside className and cn/cva/clsx/twMerge calls are
+ * checked; class strings held in identifiers or constants (`const base = "border-2"`) are not followed.
  */
 const CLASS_FUNCTIONS = new Set(["cn", "cva", "clsx", "twMerge"]);
-const THICK_BORDER = /^border(?:-[xytrbse])?-(?:2|4|8)$/;
-const LOUD_BORDER = /^border(?:-[xytrbse])?-(?:input|foreground|black|primary)(?:\/\d+)?$/;
+const THICK_BORDER = /^border(?:-[xytrbse])?-(?:[2-9]|\d{2,})$/;
+const OPACITY = String.raw`(?:\/(?:\d+|\[[^\]]+\]))?`;
+const LOUD_BORDER = new RegExp(
+  String.raw`^border(?:-[xytrbse])?-(?:input|foreground|black|primary)${OPACITY}$`
+);
+const OVERLAY_BG = new RegExp(String.raw`^bg-(?:black|white)\/(?:\d+|\[[^\]]+\])$`);
 // The side is only a side when followed by "-" or the end, so "border-t-0" is side t + value 0, never value "t-0".
 const BORDER_PARTS = /^border(?:-([xytrbse])(?=-|$))?(?:-(.+))?$/;
 const NO_BORDER = /^(?:0|none|transparent)$/;
+// Table layout utilities that share the `border-` prefix but draw nothing.
+const TABLE_BORDER = /^(?:collapse|separate|spacing(?:-.+)?)$/;
+// Variants that gate a border on interaction or validity state; those are allowed.
+const STATE_PREFIX =
+  /^(?:focus|aria-invalid|data-\[state|has-data-\[state|group-data-\[state|peer-data-\[state|group-focus|peer-focus)/;
 
 /** Any border utility (width, color, style, with or without a side) except the 0/none/transparent ones. */
 function isVisibleBorder(utility) {
   const match = BORDER_PARTS.exec(utility);
-  return match !== null && !(match[2] !== undefined && NO_BORDER.test(match[2]));
+  if (match === null) return false;
+  const value = match[2];
+  return value === undefined || !(NO_BORDER.test(value) || TABLE_BORDER.test(value));
 }
-const STATE_PREFIX =
-  /^(?:focus|focus-visible|focus-within|aria-invalid|data-\[state|has-data-\[state|group-data-\[state|peer-data-\[state|group-focus|peer-focus)/;
 
 /** "hover:sm:border-2" → { variants: ["hover", "sm"], utility: "border-2" } (brackets may contain ':'). */
 function splitToken(token) {
@@ -36,11 +48,11 @@ function splitToken(token) {
 function violation(token, onButton) {
   const { variants, utility } = splitToken(token);
   if (THICK_BORDER.test(utility)) return true;
-  if (utility.startsWith("shadow-[")) return true;
-  if (/^bg-(?:black|white)\/\d+$/.test(utility)) return true;
-  const stateOnly = variants.some((v) => STATE_PREFIX.test(v));
-  if (LOUD_BORDER.test(utility) && !stateOnly) return true;
-  if (onButton && !stateOnly && isVisibleBorder(utility)) return true;
+  if (utility.startsWith("shadow-[") || utility.startsWith("shadow-(")) return true;
+  if (OVERLAY_BG.test(utility)) return true;
+  const stateGated = variants.some((v) => STATE_PREFIX.test(v));
+  if (LOUD_BORDER.test(utility) && !stateGated) return true;
+  if (onButton && !stateGated && isVisibleBorder(utility)) return true;
   return false;
 }
 
@@ -53,6 +65,12 @@ function collect(node, out) {
       break;
     case "TemplateLiteral":
       for (const q of node.quasis) out.push({ node, text: q.value.cooked ?? "" });
+      for (const e of node.expressions) collect(e, out);
+      break;
+    case "TSAsExpression":
+    case "TSSatisfiesExpression":
+    case "TSNonNullExpression":
+      collect(node.expression, out);
       break;
     case "JSXExpressionContainer":
       collect(node.expression, out);
@@ -98,6 +116,7 @@ export default {
     schema: [],
   },
   create(context) {
+    // Nodes already reported by an enclosing className/class call. Relies on ESLint visiting parents before children.
     const seen = new WeakSet();
     const report = (pieces, onButton) => {
       for (const { node, text } of pieces) {
@@ -122,10 +141,9 @@ export default {
         if (node.callee.type !== "Identifier" || !CLASS_FUNCTIONS.has(node.callee.name)) return;
         const pieces = [];
         for (const a of node.arguments) collect(a, pieces);
-        report(
-          pieces.filter((p) => !seen.has(p.node)),
-          false
-        );
+        const fresh = pieces.filter((p) => !seen.has(p.node));
+        for (const p of fresh) seen.add(p.node);
+        report(fresh, false);
       },
     };
   },

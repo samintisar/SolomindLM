@@ -63,8 +63,8 @@ export default defineConfig([
     rules: rules("warn"),
   },
   { files: MIGRATED, rules: rules("error") },
-  // Soft layered look (docs/design/principles.md). Warn everywhere, including MIGRATED, for now: Task 8
-  // sweeps the migrated areas and promotes this to error there.
+  // Soft layered look (docs/design/principles.md). Warn everywhere, including MIGRATED, for now; once those areas are
+  // swept it is promoted to error in MIGRATED.
   { files: ["src/**/*.tsx"], plugins: { solomind }, rules: { "solomind/soft-surfaces": "warn" } },
   // Upstream shadcn CLI markup that predates the linter (arbitrary values like ring-[3px], top-[50%],
   // transition-[color,box-shadow]). Stays at warn until each file is regenerated/adapted; all other rules
