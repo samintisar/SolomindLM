@@ -37,7 +37,7 @@ Pack modules must import only types from `../types` and `../../types`; importing
 
 ### Task 1: (done) Choose the sources
 
-Decided 2026-10-01 with the user. OpenStax is out: the 2e is CC BY-NC-SA, and the 1e's pages forbid non-commercial-only reuse and ingestion into AI products without permission. SEER (US government) is too shallow. Sources are four **English Wikipedia articles at pinned revisions** (CC BY-SA 4.0):
+Decided 2026-10-01 with the user. OpenStax is out: the 2e is CC BY-NC-SA, and the 1e's pages restrict reuse to non-commercial purposes and forbid ingestion into AI products without permission. SEER (US government) is too shallow. Sources are four **English Wikipedia articles at pinned revisions** (CC BY-SA 4.0):
 
 | File | Title | `oldid` |
 |---|---|---|

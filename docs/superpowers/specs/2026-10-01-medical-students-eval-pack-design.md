@@ -1,7 +1,7 @@
 # Medical Students eval pack — design
 
 **Date:** 2026-10-01
-**Status:** Approved in brainstorming, awaiting spec review
+**Status:** Approved; implemented on `feature/eval-pack-medical-students`
 **Issue:** #270
 **Builds on:** the use-case eval packs framework (#229, [design](2026-09-29-use-case-eval-packs-design.md)). Sibling of the Language Learners pack (#230).
 
@@ -47,7 +47,7 @@ How we got here (2026-10-01, user decisions):
 - **The OpenStax 1st edition** carries CC BY 4.0 metadata, but its pages restrict reuse to non-commercial purposes. They also state the book "may not be used in the training of large language models or otherwise be ingested into large language models or generative AI offerings without OpenStax's prior written permission". That is our use.
 - **NIH/NCI SEER Training** (US government) is too shallow: no cranial-nerve table, a three-sentence cardiac cycle, and no GFR material.
 
-Each article is printed to PDF from its pinned revision URL (`https://en.wikipedia.org/w/index.php?title=<Title>&oldid=<revid>`) with headless Chrome (Playwright) and Wikipedia's own print stylesheet. Raster figures wider than 1,200 px are downscaled to 1,200 px (JPEG) to keep files small; SVG images (e.g. math formulas) pass through untouched. Text, tables and captions are not altered. The file still goes through OCR like an uploaded lecture PDF, with figures and tables. The trade-off is encyclopedic rather than lecture-style prose, including reference lists.
+Each article is printed to PDF from its pinned revision URL (`https://en.wikipedia.org/w/index.php?title=<Title>&oldid=<revid>`) with headless Chrome (Playwright) and Wikipedia's own print stylesheet. Site notices and the old-revision banner are hidden, wide formulas are scaled to the page width, and raster figures wider than 1,200 px are downscaled to 1,200 px (JPEG) to keep files small; SVG images (e.g. math formulas) are otherwise passed through untouched. Text, tables and captions are not altered. The file still goes through OCR like an uploaded lecture PDF, with figures and tables. The trade-off is encyclopedic rather than lecture-style prose, including reference lists.
 
 | File | Article (revision checked 2026-10-01) | What it stresses |
 |---|---|---|
@@ -122,7 +122,7 @@ These need, on this machine, a repo-root `.env` with `RAG_EVAL_CONVEX_URL`, `RAG
 ## 5. Delivery
 
 - Branch `feature/eval-pack-medical-students` from `main` (which includes #229). One PR, `Closes #270`.
-- The PR body lists the page ranges, total source size, the live-check result or why it is pending, and the scorecard row if a live run happened.
+- The PR body lists each source's page count and size, total source size, the live-check result or why it is pending, and the scorecard row if a live run happened.
 
 ## Out of scope
 
