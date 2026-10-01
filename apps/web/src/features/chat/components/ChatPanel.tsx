@@ -251,15 +251,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const addExternalSourcesMutation = useAddExternalSources();
   // One external-sources dialog for the whole panel (not one per message bubble). The sources
   // are kept while the dialog closes so its exit animation doesn't flash an empty list.
-  const [externalSourcesFor, setExternalSourcesFor] = useState<{
-    messageId: string;
-    sources: ExternalSource[];
-  } | null>(null);
+  const [externalSourcesFor, setExternalSourcesFor] = useState<ExternalSource[] | null>(null);
   const [isExternalSourcesOpen, setIsExternalSourcesOpen] = useState(false);
   const [isAddingExternalSources, setIsAddingExternalSources] = useState(false);
 
-  const handleOpenExternalSources = useCallback((messageId: string, sources: ExternalSource[]) => {
-    setExternalSourcesFor({ messageId, sources });
+  const handleOpenExternalSources = useCallback((sources: ExternalSource[]) => {
+    setExternalSourcesFor(sources);
     setIsExternalSourcesOpen(true);
   }, []);
 
@@ -268,12 +265,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleAddExternalSources = useCallback(
     async (selectedSources: ExternalSource[]) => {
       if (!notebookId) {
-        setIsExternalSourcesOpen(false);
+        toastError("Couldn't add sources. Please try again.");
         return;
       }
       setIsAddingExternalSources(true);
       try {
-        await addExternalSourcesMutation({
+        const ids = await addExternalSourcesMutation({
           notebookId: notebookId as Id<"notebooks">,
           sources: selectedSources.map((s) => ({
             title: s.title,
@@ -282,14 +279,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             sourceType: s.sourceType,
           })),
         });
+        // The mutation skips URLs already in the notebook, so ids can be shorter than the input.
+        const n = ids.length;
+        success(n === 0 ? "Already in this notebook" : `Added ${n} source${n === 1 ? "" : "s"}`);
+        setIsExternalSourcesOpen(false);
       } catch (e) {
         console.error("Failed to add external sources:", e);
+        toastError("Couldn't add sources. Please try again.");
       } finally {
         setIsAddingExternalSources(false);
-        setIsExternalSourcesOpen(false);
       }
     },
-    [notebookId, addExternalSourcesMutation]
+    [notebookId, addExternalSourcesMutation, success, toastError]
   );
   const { startLiteratureReview, isStarting: isStartingLiteratureReview } =
     useStartLiteratureReview();
@@ -1070,7 +1071,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <ExternalSourcesModal
         isOpen={isExternalSourcesOpen}
         onClose={handleCloseExternalSources}
-        sources={externalSourcesFor?.sources ?? NO_EXTERNAL_SOURCES}
+        sources={externalSourcesFor ?? NO_EXTERNAL_SOURCES}
         onAddSelected={handleAddExternalSources}
         isLoading={isAddingExternalSources}
       />

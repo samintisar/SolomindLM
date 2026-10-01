@@ -22,7 +22,7 @@ interface MessageBubbleProps {
   /** External sources discovered during this query — shown via the sources button */
   externalSources?: ExternalSource[];
   /** Opens the panel-level external sources dialog for this message. Must be a stable callback. */
-  onOpenExternalSources?: (messageId: string, sources: ExternalSource[]) => void;
+  onOpenExternalSources?: (sources: ExternalSource[]) => void;
   /** Whether to show the "X sources" button for this message */
   showSourcesButton?: boolean;
   notebookId?: string;
@@ -189,7 +189,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
         {showSourcesButton && externalSources && externalSources.length > 0 ? (
           <button
             type="button"
-            onClick={() => onOpenExternalSources?.(message.id, externalSources)}
+            onClick={() => onOpenExternalSources?.(externalSources)}
             className="ml-2 sm:ml-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-left font-sans text-xs font-medium text-muted-foreground transition-[color,background-color] duration-200 ease-out hover:bg-primary/10 hover:text-foreground dark:hover:bg-primary/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-10 md:min-h-8 md:py-1 md:px-2.5 motion-reduce:transition-none"
             aria-label={`View ${externalSources.length} source${externalSources.length === 1 ? "" : "s"}`}
           >
