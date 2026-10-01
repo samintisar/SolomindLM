@@ -7,7 +7,7 @@
 import type { EvalFixture, SourcePolicyConfig } from "../types";
 
 /** Common channel combinations to test */
-export const DEFAULT_SOURCE_MATRIX: SourcePolicyConfig[] = [
+const DEFAULT_SOURCE_MATRIX: SourcePolicyConfig[] = [
   { channels: ["notebook"] },
   { channels: ["notebook", "web"] },
   { channels: ["notebook", "web", "news"] },
@@ -33,27 +33,4 @@ export function withSourceMatrix(
     sourcePolicy: policy,
     tags: [...base.tags, `source-matrix`, `channels-${policy.channels.join("-")}`],
   }));
-}
-
-/**
- * Generate a source matrix focused on academic vs web comparison.
- */
-export function withAcademicWebMatrix(base: EvalFixture): EvalFixture[] {
-  return withSourceMatrix(base, [
-    { channels: ["notebook"] },
-    { channels: ["notebook", "web"] },
-    { channels: ["notebook", "academic"] },
-    { channels: ["notebook", "web", "academic"] },
-  ]);
-}
-
-/**
- * Generate a source matrix for news-sensitive queries.
- */
-export function withNewsMatrix(base: EvalFixture): EvalFixture[] {
-  return withSourceMatrix(base, [
-    { channels: ["notebook"] },
-    { channels: ["notebook", "news"] },
-    { channels: ["notebook", "web", "news"] },
-  ]);
 }

@@ -12,7 +12,6 @@ import {
   resolveHubSectionPages,
 } from "./clusterHubPages";
 import { Footer } from "./components/Footer";
-import { setSignupIntent } from "./landingSignup";
 
 type ClusterHubLandingPageProps = {
   pagePath: string;
@@ -36,10 +35,7 @@ export function ClusterHubLandingPage({ pagePath }: ClusterHubLandingPageProps) 
     return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
   }
 
-  const openSignup = () => {
-    setSignupIntent(page.cluster);
-    setAuthModalOpen(true);
-  };
+  const openSignup = () => setAuthModalOpen(true);
 
   const clusterLabel = page.cluster === "students" ? "For students" : "For researchers";
 

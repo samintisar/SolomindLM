@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import type { AudioOverviewNote } from "@/shared/types/index";
 
 export interface CreateAudioOverviewParams {
@@ -58,28 +58,6 @@ function getPreviewText(status: string, metadata?: Record<string, unknown>): str
     return `Audio Overview · ${mmss}`;
   }
   return "Audio Overview";
-}
-
-/**
- * Get all audio overviews for a notebook
- */
-export function useAudioOverviews(notebookId: string | null) {
-  const audioOverviews = useQuery(
-    api.studio.audio.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return audioOverviews?.map(mapAudioOverviewToNote) ?? [];
-}
-
-/**
- * Get a specific audio overview by ID
- */
-export function useAudioOverview(audioOverviewId: string | null) {
-  const audioOverview = useQuery(
-    api.studio.audio.index.get,
-    audioOverviewId ? { id: audioOverviewId as Id<"audioOverviews"> } : "skip"
-  );
-  return audioOverview ? mapAudioOverviewToNote(audioOverview) : null;
 }
 
 /**

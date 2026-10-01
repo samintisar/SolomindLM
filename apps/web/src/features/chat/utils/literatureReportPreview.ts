@@ -8,7 +8,7 @@ const SKIP_CHAT_PREVIEW_HEADINGS = new Set(["abstract", "introduction", "methods
 /** Prefer synthesis sections over the formal abstract for in-chat previews. */
 const CHAT_PREVIEW_SECTION_PRIORITY = ["conclusion", "discussion", "results"] as const;
 
-export function stripMarkdownPreview(text: string, maxLength = 520): string {
+function stripMarkdownPreview(text: string, maxLength = 520): string {
   const plain = text
     .replace(/^#+\s+/gm, "")
     .replace(/\*\*([^*]+)\*\*/g, "$1")

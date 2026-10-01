@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-export interface QuoteBlock {
+interface QuoteBlock {
   id: string;
   text: string;
   sourceType: "message" | "source";

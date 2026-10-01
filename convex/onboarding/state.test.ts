@@ -2,6 +2,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
+import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
 // convex-test resolves function references via module keys relative to the
@@ -10,6 +11,7 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, ["./onboarding/state.ts"]);
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
   return t.withIdentity({ subject: `${userId}|session1` });

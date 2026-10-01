@@ -14,7 +14,7 @@ const SOURCE_TEST_NOTEBOOK_ID = "jd72h9qsq5zap11ede5k8rqkx585djmc";
 // Academic Source Tests
 // ============================================================
 
-export const academicFixtures: EvalFixture[] = [
+const academicFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "academic-transformer-architecture",
@@ -55,7 +55,7 @@ export const academicFixtures: EvalFixture[] = [
 // Web Source Tests
 // ============================================================
 
-export const webFixtures: EvalFixture[] = [
+const webFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "web-react-best-practices",
@@ -90,7 +90,7 @@ export const webFixtures: EvalFixture[] = [
 // Finance Source Tests
 // ============================================================
 
-export const financeFixtures: EvalFixture[] = [
+const financeFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "finance-market-analysis",
@@ -124,7 +124,7 @@ export const financeFixtures: EvalFixture[] = [
 // News Source Tests
 // ============================================================
 
-export const newsFixtures: EvalFixture[] = [
+const newsFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "news-ai-regulation",
@@ -159,7 +159,7 @@ export const newsFixtures: EvalFixture[] = [
 // Cross-Source Comparison Tests
 // ============================================================
 
-export const crossSourceFixtures: EvalFixture[] = [
+const crossSourceFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "cross-source-quantum-computing",

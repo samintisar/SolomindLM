@@ -9,6 +9,7 @@ import {
   invokeWithTimeout,
   withoutMapOutputs,
 } from "../_shared/index.js";
+import { fillTemplate } from "../_shared/promptTemplate.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { cleanCsvOutput, getMessageContent, validateTableCompleteness } from "./csvHelpers.js";
@@ -55,10 +56,11 @@ export async function reduce(
     state.customPrompt && state.customPrompt.trim()
       ? REDUCE_PROMPTS["custom"]
       : REDUCE_PROMPTS[state.spreadsheetType] || REDUCE_PROMPTS["custom"];
-  const prompt = reducePrompt
-    .replace("{spreadsheetType}", state.spreadsheetType)
-    .replace("{customPrompt}", sanitizeUserInput(state.customPrompt || ""))
-    .replace("{content}", combined);
+  const prompt = fillTemplate(reducePrompt, {
+    spreadsheetType: state.spreadsheetType,
+    customPrompt: sanitizeUserInput(state.customPrompt || ""),
+    content: combined,
+  });
 
   console.log(`[SpreadsheetGraph] Reduce: prompt length: ${prompt.length} chars`);
 

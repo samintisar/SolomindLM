@@ -3,7 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { useCallback, useState } from "react";
 
-export type LiteratureReviewSearchOptions = {
+type LiteratureReviewSearchOptions = {
   researchDatabase: "all" | "pubmed" | "arxiv";
   academicFilters?: {
     publicationYearFrom?: number;
@@ -15,7 +15,7 @@ export type LiteratureReviewSearchOptions = {
   };
 };
 
-export type StartLiteratureReviewResult = {
+type StartLiteratureReviewResult = {
   sessionId: Id<"literatureReviewSessions">;
   conversationId: Id<"conversations">;
 };

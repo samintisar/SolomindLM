@@ -2,12 +2,7 @@ import { CLUSTER_HUB_PAGES } from "./clusterHubPages";
 import type { FAQItem } from "./constants";
 import { INTENT_LANDING_PAGES } from "./intentLandingPages";
 
-export type FaqCategoryId =
-  | "getting-started"
-  | "students"
-  | "researchers"
-  | "billing"
-  | "privacy-trust";
+type FaqCategoryId = "getting-started" | "students" | "researchers" | "billing" | "privacy-trust";
 
 export type RegisteredFaq = FAQItem & {
   category: FaqCategoryId;

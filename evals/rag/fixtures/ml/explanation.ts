@@ -54,8 +54,3 @@ export const mlExplanationFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlExplanationFixture(id: string): EvalFixture | undefined {
-  return mlExplanationFixtures.find((f) => f.id === id);
-}

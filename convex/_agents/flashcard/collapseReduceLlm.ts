@@ -8,9 +8,14 @@ import { withLanguageInstruction } from "../_shared/languageInstruction";
 import type { JobLogger } from "../_shared/logging.js";
 import type { TokenUsage } from "../_shared/usageAggregate.js";
 import { FLASHCARD_CONFIG } from "./config.js";
-import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
+import {
+  detectSimilarFlashcards,
+  groupFlashcardsByTopic,
+  isUsableFlashcard,
+} from "./flashcardHeuristics.js";
 import { formatFlashcardsAsText } from "./formatFlashcards.js";
 import {
+  ANSWER_NOT_ON_FRONT_RULES,
   COLLAPSE_SYSTEM_PROMPT,
   FlashcardArraySchema,
   type FlashcardResponse,
@@ -97,6 +102,9 @@ export async function collapseGroup(
 2. Keep the highest quality, most diverse set
 3. Target approximately ${Math.floor(allCards.length * 0.7)} flashcards (remove ~30%)
 ${topicGuidance}
+
+${ANSWER_NOT_ON_FRONT_RULES}
+
 Condense these flashcards while maintaining quality and diversity:
 
 ${flashcardsText}
@@ -189,6 +197,8 @@ When you find similar flashcards:
 - Ensure the merged card is self-contained
 - Keep the most comprehensive explanation or examples
 
+${ANSWER_NOT_ON_FRONT_RULES}
+
 TOPIC DIVERSITY:
 Additionally, select flashcards from DIFFERENT topics. Do NOT select more than 3 cards from any single topic.
 If there are 6+ topics available, select 1-3 cards from each topic.
@@ -227,12 +237,16 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     "FlashcardRefineSelection"
   );
 
-  const selected = (response as FlashcardResponse).flashcards;
+  // Refining rewrites and merges cards, which can reintroduce answer leaks; drop
+  // them here so the backfill below replaces them with already-validated cards.
+  const refined = (response as FlashcardResponse).flashcards;
+  const selected = refined.filter(isUsableFlashcard);
 
   deps.logger.info(`Refine selection complete: ${selected.length} cards`, {
     agent: "FlashcardGraph",
     phase: "refine_selection_complete",
     selectedCount: selected.length,
+    rejectedCount: refined.length - selected.length,
   });
 
   const topicGroups = groupFlashcardsByTopic(selected);
@@ -242,7 +256,7 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     topicDistribution: topicGroups,
   });
 
-  if (selected.length === 0) {
+  if (refined.length === 0) {
     deps.logger.phaseError(
       "refine_selection",
       new Error("LLM returned empty selection - this should not happen with structured output"),

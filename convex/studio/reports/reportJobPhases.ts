@@ -7,6 +7,7 @@
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { fillTemplate } from "../../_agents/_shared/promptTemplate";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
 import {
   aggregateStudioJobTelemetry,
@@ -268,9 +269,10 @@ export async function runProcessReportMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     const promptTemplate = MAP_PROMPTS[reportType] || MAP_PROMPTS["custom"];
-    const prompt = promptTemplate
-      .replace("{chunk}", chunk)
-      .replace("{customPrompt}", customPrompt ? sanitizeUserInput(customPrompt) : "");
+    const prompt = fillTemplate(promptTemplate, {
+      chunk,
+      customPrompt: customPrompt ? sanitizeUserInput(customPrompt) : "",
+    });
 
     const customFocus = customPrompt?.trim();
     let structuredPrompt = `${prompt}
@@ -503,9 +505,10 @@ export async function runFinalizeReportPhase(
     const reduceModel = smartLlm || env.REPORT_LLM;
     const promptTemplate = REDUCE_PROMPTS[reportType] || REDUCE_PROMPTS["custom"];
 
-    let prompt = promptTemplate
-      .replace("{content}", combinedContent)
-      .replace("{customPrompt}", customPrompt ? sanitizeUserInput(customPrompt) : "");
+    let prompt = fillTemplate(promptTemplate, {
+      content: combinedContent,
+      customPrompt: customPrompt ? sanitizeUserInput(customPrompt) : "",
+    });
 
     const customFocus = customPrompt?.trim();
     if (customFocus && reportType !== "custom") {

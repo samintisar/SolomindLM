@@ -13,6 +13,7 @@ import {
 } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { fillTemplate } from "../../_agents/_shared/promptTemplate";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
 import {
   aggregateStudioJobTelemetry,
@@ -394,9 +395,10 @@ export async function runProcessSpreadsheetMapChunkPhase(
       customPrompt && customPrompt.trim()
         ? MAP_PROMPTS["custom"]
         : MAP_PROMPTS[spreadsheetType] || MAP_PROMPTS["custom"];
-    const prompt = promptTemplate
-      .replace("{chunk}", chunk)
-      .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+    const prompt = fillTemplate(promptTemplate, {
+      chunk,
+      customPrompt: sanitizeUserInput(customPrompt || ""),
+    });
 
     console.log(`[SpreadsheetJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
@@ -665,10 +667,11 @@ export async function runFinalizeSpreadsheetPhase(
       customPrompt && customPrompt.trim()
         ? REDUCE_PROMPTS["custom"]
         : REDUCE_PROMPTS[spreadsheetType] || REDUCE_PROMPTS["custom"];
-    const prompt = reducePromptTemplate
-      .replace("{spreadsheetType}", spreadsheetType)
-      .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""))
-      .replace("{content}", combined);
+    const prompt = fillTemplate(reducePromptTemplate, {
+      spreadsheetType,
+      customPrompt: sanitizeUserInput(customPrompt || ""),
+      content: combined,
+    });
 
     console.log(`[SpreadsheetJob] Reduce prompt: ${prompt.length} chars`);
 
@@ -843,9 +846,10 @@ export async function recursiveCollapse(
             ? COLLAPSE_PROMPTS["custom"]
             : COLLAPSE_PROMPTS[spreadsheetType] || COLLAPSE_PROMPTS["custom"];
 
-        const prompt = collapsePromptTemplate
-          .replace("{content}", combined)
-          .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+        const prompt = fillTemplate(collapsePromptTemplate, {
+          content: combined,
+          customPrompt: sanitizeUserInput(customPrompt || ""),
+        });
 
         try {
           return await invokeWithinBudget({

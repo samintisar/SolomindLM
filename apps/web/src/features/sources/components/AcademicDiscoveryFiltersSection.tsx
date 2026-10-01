@@ -7,7 +7,7 @@ import {
   collectFieldSearchTerms,
 } from "../constants/academicFieldTaxonomy";
 
-export type PublicationYearMode = "all" | "lastN" | "custom";
+type PublicationYearMode = "all" | "lastN" | "custom";
 
 export interface DiscoveryAcademicFilterState {
   minCitations?: number;

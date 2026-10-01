@@ -1,7 +1,7 @@
 import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 
 /** Matches production `LIST_QUERY_CONTEXT_TOKEN_BUDGET` (chatConfig). Do not import chatConfig here — it needs Convex env. */
-export const EVAL_CONTEXT_TOKEN_BUDGET = 5200;
+const EVAL_CONTEXT_TOKEN_BUDGET = 5200;
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);

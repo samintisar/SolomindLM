@@ -122,8 +122,3 @@ export const mlFactoidFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlFactoidFixture(id: string): EvalFixture | undefined {
-  return mlFactoidFixtures.find((f) => f.id === id);
-}

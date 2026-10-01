@@ -17,14 +17,6 @@ export function useNotebooks() {
 }
 
 /**
- * Get a specific notebook by ID
- * Returns undefined while loading, null when not found
- */
-export function useNotebook(id: string | null) {
-  return useQuery(api.notebooks.index.get, id ? { id: id as any } : "skip");
-}
-
-/**
  * Create a new notebook with optimistic update
  */
 export function useCreateNotebook() {
@@ -184,16 +176,6 @@ export function useDeleteNotebook() {
   };
 }
 
-/**
- * Get reports for a notebook (renamed from useNotebookNotes)
- */
-export function useNotebookReports(notebookId: string | null) {
-  return useQuery(
-    api.notebooks.index.getReports,
-    notebookId ? { notebookId: notebookId as any } : "skip"
-  );
-}
-
 // ============================================================
 // Sharing Hooks
 // ============================================================
@@ -206,10 +188,6 @@ export function useShareLinks(notebookId: string) {
 
 export function useCreateShareLink() {
   return useMutation(api.notebooks.sharing.createShareLink);
-}
-
-export function useRevokeShareLink() {
-  return useMutation(api.notebooks.sharing.revokeShareLink);
 }
 
 export function useRevokeShareLinkWithOptimisticUpdate(notebookId: string) {
