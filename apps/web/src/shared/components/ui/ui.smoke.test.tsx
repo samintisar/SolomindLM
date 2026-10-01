@@ -18,6 +18,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
+import { Checkbox } from "./checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +31,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "./field";
 import { Input } from "./input";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { RadioGroup, RadioGroupItem } from "./radio-group";
 import { ScrollArea } from "./scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { Separator } from "./separator";
@@ -246,6 +249,28 @@ describe("shadcn ui components render", () => {
     }
     expect(swatch).not.toHaveClass("px-3");
     expect(swatch).not.toHaveClass("rounded-none");
+  });
+
+  it("chat foundations render: Checkbox, RadioGroup, Collapsible, Alert warning, InputGroup composer", () => {
+    render(
+      <>
+        <Checkbox aria-label="c" />
+        <RadioGroup>
+          <RadioGroupItem value="a" aria-label="a" />
+        </RadioGroup>
+        <Collapsible>
+          <CollapsibleTrigger>t</CollapsibleTrigger>
+          <CollapsibleContent>x</CollapsibleContent>
+        </Collapsible>
+        <Alert variant="warning">w</Alert>
+        <InputGroup variant="composer" size="auto" data-testid="ig" />
+      </>
+    );
+    expect(screen.getByRole("checkbox", { name: "c" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "a" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "t" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveClass("bg-warning-muted");
+    expect(screen.getByTestId("ig")).toHaveClass("rounded-2xl", "h-auto");
   });
 
   it("Toaster renders inside the app ThemeContext", () => {
