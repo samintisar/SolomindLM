@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useUserLimits } from "@/features/billing/services/subscriptionApi";
 import { useToast } from "@/shared/contexts/useToast";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { canOfferPurchases } from "@/utils/platformDetection";
 import { useCreateDocument, useUploadDocument } from "../services/documentsApi";
 
 const ACCEPTED_FILE_TYPES = [
@@ -81,17 +82,21 @@ export function useSourceUpload({
 
   // Shared "source limit reached" toast. Upgrading to Pro raises the per-notebook
   // source cap 20 -> 200, so free users are told that; Pro users only hear the
-  // remove-a-source path.
+  // remove-a-source path. The native app can't sell Pro and drops upgrade copy,
+  // so the remove-a-source hint rides in the error message there.
   const emitSourceLimitReached = () => {
+    const limitMessage = `You've reached your source limit (${sourcesCount}/${maxSources}).`;
     const upgradeHint = userLimits.isPremium
       ? "Remove a source to add another."
       : "Upgrade to Pro for up to 200 sources per notebook, or remove a source to add another.";
     return handleLimitError(
       new Error(`Source limit reached (${sourcesCount}/${maxSources}). ${upgradeHint}`),
-      {
-        errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-        upgradeMessage: `This notebook allows up to ${maxSources} sources. ${upgradeHint}`,
-      }
+      canOfferPurchases()
+        ? {
+            errorMessage: limitMessage,
+            upgradeMessage: `This notebook allows up to ${maxSources} sources. ${upgradeHint}`,
+          }
+        : { errorMessage: `${limitMessage} Remove a source to add another.` }
     );
   };
 

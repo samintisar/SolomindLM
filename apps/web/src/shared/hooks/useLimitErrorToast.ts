@@ -5,6 +5,7 @@
 
 import { useCallback } from "react";
 import { useCreateCheckout } from "@/features/billing/services/subscriptionApi";
+import { canOfferPurchases } from "@/utils/platformDetection";
 import { useToast } from "../contexts/useToast";
 import {
   getLimitErrorMessage,
@@ -61,9 +62,10 @@ export function useLimitErrorToast() {
 
       const { errorMessage, upgradeMessage, showUpgradeButton = true, onUpgrade } = options;
 
-      // Get messages
+      // Get messages. The native app can't sell Pro, so it gets no upgrade copy at all.
+      const purchasable = canOfferPurchases();
       const message = errorMessage || getLimitErrorMessage(parsedError);
-      const upgradeText = upgradeMessage || getUpgradeMessage(parsedError);
+      const upgradeText = purchasable ? upgradeMessage || getUpgradeMessage(parsedError) : "";
 
       // Default upgrade handler: open Stripe checkout
       const defaultOnUpgrade = async () => {
@@ -81,7 +83,7 @@ export function useLimitErrorToast() {
       // Build full message
       const fullMessage = upgradeText ? `${message} ${upgradeText}` : message;
 
-      const effectiveShowUpgrade = showUpgradeButton && !parsedError.isPro;
+      const effectiveShowUpgrade = purchasable && showUpgradeButton && !parsedError.isPro;
 
       // Show toast with upgrade button (free tier only)
       showError(fullMessage, {
