@@ -1,19 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { NotebookItem } from "@/shared/types/index";
 import { NotebookCard } from "./NotebookCard";
-
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-  Element.prototype.scrollIntoView ??= () => {};
-  Element.prototype.hasPointerCapture ??= () => false;
-  Element.prototype.releasePointerCapture ??= () => {};
-});
 
 const nb: NotebookItem = {
   id: "n1",
@@ -68,5 +57,51 @@ describe("NotebookCard", () => {
     );
     expect(screen.queryByRole("button", { name: "Notebook actions" })).toBeNull();
     expect(screen.getByText("Shared")).toBeInTheDocument();
+  });
+
+  test("list view keeps the Shared badge inside the open button", () => {
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isSharedNotebook: true }}
+        viewMode="list"
+        onSelectNotebook={vi.fn()}
+      />
+    );
+    const open = screen.getByRole("button", { name: /Cell Biology/ });
+    expect(within(open).getByText("Shared")).toBeInTheDocument();
+  });
+
+  describe("delete", () => {
+    const renderCard = (onDelete: (id: string) => void) =>
+      render(
+        <NotebookCard
+          notebook={nb}
+          viewMode="grid"
+          onSelectNotebook={vi.fn()}
+          onDeleteNotebook={onDelete}
+        />
+      );
+
+    async function chooseDelete() {
+      await userEvent.click(screen.getByRole("button", { name: "Notebook actions" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+      return screen.findByRole("alertdialog");
+    }
+
+    test("confirming deletes the notebook", async () => {
+      const onDelete = vi.fn();
+      renderCard(onDelete);
+      const dialog = await chooseDelete();
+      await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+      expect(onDelete).toHaveBeenCalledWith("n1");
+    });
+
+    test("cancelling keeps the notebook", async () => {
+      const onDelete = vi.fn();
+      renderCard(onDelete);
+      const dialog = await chooseDelete();
+      await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(onDelete).not.toHaveBeenCalled();
+    });
   });
 });

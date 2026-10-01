@@ -56,7 +56,7 @@ export function FolderCard({
           <button
             type="button"
             onClick={onSelectFolder}
-            className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left outline-none"
+            className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             {/* Icon chip with a folder tab */}
             <span className="relative flex size-9 shrink-0 items-center justify-center">
@@ -83,7 +83,7 @@ export function FolderCard({
               {meta}
             </span>
           </button>
-          <div className="flex w-8 shrink-0 justify-center pr-2">{menu}</div>
+          <div className="mr-2 flex w-8 shrink-0 justify-center">{menu}</div>
         </Card>
         <ConfirmDialogComponent />
       </>
@@ -103,7 +103,7 @@ export function FolderCard({
           <button
             type="button"
             onClick={onSelectFolder}
-            className="flex h-full flex-col text-left outline-none"
+            className="flex h-full flex-col text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             <span className="relative flex h-20 w-full items-end p-3">
               <span aria-hidden className={cn("absolute inset-0 opacity-60", fill)} />

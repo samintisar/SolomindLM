@@ -1,20 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Settings2, Trash2 } from "lucide-react";
-import { beforeAll, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { CardActionsMenu } from "./CardActionsMenu";
-
-// jsdom lacks the layout APIs Radix menus touch.
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-  Element.prototype.scrollIntoView ??= () => {};
-  Element.prototype.hasPointerCapture ??= () => false;
-  Element.prototype.releasePointerCapture ??= () => {};
-});
 
 describe("CardActionsMenu", () => {
   test("opens from a labelled trigger and runs the chosen action", async () => {

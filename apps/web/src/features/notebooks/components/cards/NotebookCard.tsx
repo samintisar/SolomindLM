@@ -49,15 +49,26 @@ function useNotebookActions({
   return { actions, ConfirmDialogComponent };
 }
 
-function CornerSlot({ props, actions }: { props: NotebookCardProps; actions: CardAction[] }) {
-  if (props.featured) return <Badge variant="secondary">Featured</Badge>;
+function StatusBadge({ props }: { props: NotebookCardProps }) {
+  if (props.featured)
+    return (
+      <Badge variant="secondary" className="shrink-0">
+        Featured
+      </Badge>
+    );
   if (props.notebook.isSharedNotebook)
     return (
-      <Badge variant="secondary">
+      <Badge variant="secondary" className="shrink-0">
         <Users aria-hidden />
         Shared
       </Badge>
     );
+  return null;
+}
+
+/** Grid corner: a status badge, or the actions menu when the card has actions. */
+function CornerSlot({ props, actions }: { props: NotebookCardProps; actions: CardAction[] }) {
+  if (props.featured || props.notebook.isSharedNotebook) return <StatusBadge props={props} />;
   if (actions.length === 0) return null;
   return <CardActionsMenu label="Notebook actions" actions={actions} />;
 }
@@ -77,7 +88,7 @@ export function NotebookCard(props: NotebookCardProps) {
           <button
             type="button"
             onClick={open}
-            className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left outline-none"
+            className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             <span
               className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", fill)}
@@ -85,8 +96,11 @@ export function NotebookCard(props: NotebookCardProps) {
               <Icon aria-hidden className={cn("size-4", COVER_ICON_CLASS)} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-sans text-sm font-medium text-card-foreground">
-                {notebook.title}
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-sans text-sm font-medium text-card-foreground">
+                  {notebook.title}
+                </span>
+                <StatusBadge props={props} />
               </span>
               <span className="block truncate text-xs text-muted-foreground sm:hidden">{meta}</span>
             </span>
@@ -94,8 +108,10 @@ export function NotebookCard(props: NotebookCardProps) {
               {meta}
             </span>
           </button>
-          <div className="flex w-8 shrink-0 justify-center pr-2">
-            <CornerSlot props={props} actions={actions} />
+          <div className="mr-2 flex w-8 shrink-0 justify-center">
+            {actions.length > 0 && !props.featured && !notebook.isSharedNotebook && (
+              <CardActionsMenu label="Notebook actions" actions={actions} />
+            )}
           </div>
         </Card>
         <ConfirmDialogComponent />
@@ -109,7 +125,7 @@ export function NotebookCard(props: NotebookCardProps) {
         <button
           type="button"
           onClick={open}
-          className="flex h-full flex-col text-left outline-none"
+          className="flex h-full flex-col text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <span className={cn("flex h-20 w-full items-end p-3", fill)}>
             <Icon aria-hidden className={cn("size-8", COVER_ICON_CLASS)} />

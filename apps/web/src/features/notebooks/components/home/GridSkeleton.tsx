@@ -3,7 +3,7 @@ import { GRID_CLASS } from "./gridClass";
 
 export function GridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className={GRID_CLASS} aria-busy="true" aria-label="Loading notebooks">
+    <div className={GRID_CLASS} role="status" aria-busy="true" aria-label="Loading notebooks">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-col overflow-hidden rounded-xl border bg-card">
           <Skeleton className="h-20 w-full" />

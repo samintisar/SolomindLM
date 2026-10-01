@@ -7,7 +7,7 @@ export type ViewMode = "grid" | "list";
 
 const LIST_CLASS = "flex flex-col gap-2";
 
-// Static list so Tailwind sees every class; ~40ms steps for the first 12 cards only.
+// Static list so Tailwind sees every class; ~40ms steps, later cards share the last delay.
 const STAGGER = [
   "delay-0",
   "delay-40",
@@ -22,7 +22,8 @@ const STAGGER = [
   "delay-400",
   "delay-440",
 ] as const;
-const ENTER = "animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-320 ease-out";
+const ENTER =
+  "animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-320 ease-out motion-reduce:delay-0";
 
 /** `initial={false}`: the first paint uses the CSS entrance; motion only handles reorders/exits. */
 export function CardGrid({ viewMode, children }: { viewMode: ViewMode; children: ReactNode }) {
@@ -40,7 +41,9 @@ export function CardGrid({ viewMode, children }: { viewMode: ViewMode; children:
 export function CardGridItem({ index, children }: { index: number; children: ReactNode }) {
   return (
     <LayoutItem className="h-full">
-      <div className={cn("h-full", ENTER, STAGGER[index])}>{children}</div>
+      <div className={cn("h-full", ENTER, STAGGER[Math.min(index, STAGGER.length - 1)])}>
+        {children}
+      </div>
     </LayoutItem>
   );
 }
