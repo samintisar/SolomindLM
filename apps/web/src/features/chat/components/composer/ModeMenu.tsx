@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { cn } from "@/shared/utils/cn";
-import { type ChatComposerMode, COMPOSER_MODES } from "./constants";
+import { ControlTooltip } from "../ControlTooltip";
+import { type ChatComposerMode, COMPOSER_MODES, isComposerMode } from "./constants";
 
 type ModeMenuProps = {
   mode: ChatComposerMode;
@@ -27,27 +28,31 @@ export function ModeMenu({ mode, onModeChange, disabled, crowded = false }: Mode
   const Icon = current.icon;
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={disabled}
-          aria-label={`Composer mode: ${current.label}`}
-        >
-          <Icon />
-          <span
-            className={cn(crowded ? "@max-md/chat-input:sr-only" : "@max-xs/chat-input:sr-only")}
+      <ControlTooltip label={current.label}>
+        <DropdownMenuTrigger asChild disabled={disabled}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            aria-label={`Composer mode: ${current.label}`}
           >
-            {current.label}
-          </span>
-          <ChevronDown className="@max-xs/chat-input:hidden" />
-        </Button>
-      </DropdownMenuTrigger>
+            <Icon />
+            <span
+              className={cn(crowded ? "@max-md/chat-input:sr-only" : "@max-xs/chat-input:sr-only")}
+            >
+              {current.label}
+            </span>
+            <ChevronDown className="@max-xs/chat-input:hidden" />
+          </Button>
+        </DropdownMenuTrigger>
+      </ControlTooltip>
       <DropdownMenuContent side="top" align="start" className="w-60">
         <DropdownMenuLabel>Mode</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={mode}
-          onValueChange={(value) => onModeChange(value as ChatComposerMode)}
+          onValueChange={(value) => {
+            if (isComposerMode(value)) onModeChange(value);
+          }}
         >
           {COMPOSER_MODES.map(({ id, label, icon: ItemIcon }) => (
             <DropdownMenuRadioItem key={id} value={id}>

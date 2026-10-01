@@ -29,7 +29,6 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Spinner } from "@/shared/components/ui/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { useToast } from "@/shared/contexts/useToast";
 import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
@@ -49,6 +48,7 @@ import { RefHandlers, stripReferencesSection } from "../utils/messageRendering.u
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput } from "./ChatInput";
 import { ConfigureChatModal } from "./ConfigureChatModal";
+import { ControlTooltip } from "./ControlTooltip";
 import { ConversationList } from "./ConversationList";
 import {
   CHAT_DEFAULT_SOURCE_FILTERS,
@@ -74,27 +74,6 @@ const MessageListFooter = () => (
   />
 );
 const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
-
-/**
- * Opens a header tooltip only for keyboard focus. Popover and DropdownMenu hand focus back to their trigger
- * when they close; without this the tooltip would pop open then (and stick on touch). Radix skips its own
- * focus handler when the event is default-prevented.
- */
-const openTooltipOnFocusVisibleOnly = (e: React.FocusEvent<HTMLElement>) => {
-  if (!e.currentTarget.matches(":focus-visible")) e.preventDefault();
-};
-
-/** Hover/focus label for a header icon button. `children` is the trigger (a Button, or a Popover/DropdownMenu trigger around one). */
-function HeaderTooltip({ label, children }: { label: string; children: React.ReactElement }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild onFocus={openTooltipOnFocusVisibleOnly}>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
 
 /** Escape in a thread's rename input cancels only the rename (ConversationList handles it), not the history popover. */
 const keepHistoryOpenOnRenameEscape = (e: KeyboardEvent) => {
@@ -748,7 +727,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     <div className="flex shrink-0 items-center gap-2">
       <div className="hidden items-center gap-2 md:flex">
         {!isLeftOpen && (
-          <HeaderTooltip label="Open Sources">
+          <ControlTooltip label="Open Sources">
             <Button
               type="button"
               variant="outline"
@@ -758,10 +737,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             >
               <PanelLeftOpen />
             </Button>
-          </HeaderTooltip>
+          </ControlTooltip>
         )}
         {!isRightOpen && (
-          <HeaderTooltip label="Open Studio">
+          <ControlTooltip label="Open Studio">
             <Button
               type="button"
               variant="outline"
@@ -772,17 +751,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             >
               <PanelRightOpen />
             </Button>
-          </HeaderTooltip>
+          </ControlTooltip>
         )}
       </div>
       <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
-        <HeaderTooltip label="Thread history">
+        <ControlTooltip label="Thread history">
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" size="icon-sm" aria-label="Thread history">
               <History />
             </Button>
           </PopoverTrigger>
-        </HeaderTooltip>
+        </ControlTooltip>
         <PopoverContent
           align="end"
           collisionPadding={16}
@@ -808,7 +787,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         </PopoverContent>
       </Popover>
-      <HeaderTooltip label={newChatLabel}>
+      <ControlTooltip label={newChatLabel}>
         <Button
           type="button"
           variant="outline"
@@ -819,15 +798,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         >
           {isCreatingConversation ? <Spinner aria-hidden /> : <Plus />}
         </Button>
-      </HeaderTooltip>
+      </ControlTooltip>
       <DropdownMenu modal={false}>
-        <HeaderTooltip label="Chat options">
+        <ControlTooltip label="Chat options">
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="outline" size="icon-sm" aria-label="Chat options">
               <MoreVertical />
             </Button>
           </DropdownMenuTrigger>
-        </HeaderTooltip>
+        </ControlTooltip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setIsConfigModalOpen(true)}>
             <Settings2 />

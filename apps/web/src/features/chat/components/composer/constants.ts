@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import {
   Atom,
   BookOpen,
@@ -10,7 +11,6 @@ import {
   Telescope,
   TrendingUp,
 } from "lucide-react";
-import type React from "react";
 
 export const SOURCE_FILTERS = [
   { id: "notebook", label: "Notebook sources", icon: BookOpen },
@@ -26,26 +26,19 @@ export const CHAT_DEFAULT_SOURCE_FILTERS = ["notebook"] as const;
 /** Default source channels when the composer is in Deep Research mode. */
 export const DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS = ["notebook", "web", "academic"] as const;
 
-export type ChatComposerMode = "chat" | "deepResearch" | "literatureReview";
-
-export type ResearchDatabaseOption = "all" | "pubmed" | "arxiv";
-
-export const COMPOSER_MODES: {
-  id: ChatComposerMode;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
+export const COMPOSER_MODES = [
   { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "deepResearch", label: "Deep Research", icon: Telescope },
   { id: "literatureReview", label: "Literature Review", icon: FileText },
-];
+] as const satisfies readonly { id: string; label: string; icon: LucideIcon }[];
 
-export const RESEARCH_DATABASES: {
-  id: ResearchDatabaseOption;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
+export type ChatComposerMode = (typeof COMPOSER_MODES)[number]["id"];
+
+export function isComposerMode(value: unknown): value is ChatComposerMode {
+  return COMPOSER_MODES.some((m) => m.id === value);
+}
+
+export const RESEARCH_DATABASES = [
   {
     id: "all",
     title: "All Papers",
@@ -64,4 +57,15 @@ export const RESEARCH_DATABASES: {
     description: "Explore research preprints from arXiv",
     icon: Atom,
   },
-];
+] as const satisfies readonly {
+  id: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}[];
+
+export type ResearchDatabaseOption = (typeof RESEARCH_DATABASES)[number]["id"];
+
+export function isResearchDatabase(value: unknown): value is ResearchDatabaseOption {
+  return RESEARCH_DATABASES.some((d) => d.id === value);
+}
