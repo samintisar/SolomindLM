@@ -2026,6 +2026,12 @@ Render `<PanelResizeHandle …/>` with the same props.
 ```
 
   - Line ~33's `page.locator('[class*="notebook"]')` → `page.locator('[data-slot="card"]')`. Read the surrounding test and keep its intent.
+  - `e2e/helpers/notebook-cleanup.ts`: the teardown helper still uses the old markup, and its caller swallows failures, so teardown would silently stop deleting. Make these swaps:
+    - `getByRole("button", { name: "All" })` → `getByRole("tab", { name: "All" })`
+    - `.kebab-menu button` → the card's `getByRole("button", { name: "Notebook actions" })` inside `page.locator('[data-slot="card"]', …)`
+    - `div.bg-popover` items → `getByRole("menuitem", { name: "Delete" })`, then confirm in the `alertdialog` (button "Delete").
+  - Run `rg -n "Create new notebook|kebab|bg-popover|name: \"All\"" e2e` and fix any other stale selector it finds.
+  - `apps/web/src/features/onboarding/steps.ts`: the `createNotebook` step's `side: "right"` → `"bottom"`. The anchor is now at the page's top-right.
 
 - [ ] **Step 2:** From the repo root, run `bunx playwright test --list e2e/notebooks e2e/onboarding` to confirm the specs still parse. The full run needs E2E credentials and a backend, so it isn't run here.
 
