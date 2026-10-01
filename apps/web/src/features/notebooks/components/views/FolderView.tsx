@@ -3,7 +3,6 @@ import React, { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/shared/components/ui/empty";
-import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { useNotebookHandlers, useNotebookSorting } from "../../hooks";
 import { useFolderNotebooks } from "../../services/foldersApi";
 import { useCreateNotebook } from "../../services/notebooksApi";
@@ -18,15 +17,6 @@ import { CustomizeNotebookModal, MoveToFolderModal } from "../modals";
 interface FolderViewProps {
   folderId: string;
   viewMode: ViewMode;
-  onBack?: () => void;
-  onSelectNotebook?: (notebook: NotebookItem) => void;
-  onCreateNotebook?: () => void;
-  onUpdateNotebook?: (id: string, updates: Partial<NotebookItem>) => void;
-  onDeleteNotebook?: (id: string) => void;
-  onMoveNotebookToFolder?: (notebookId: string, folderId: string | null) => void;
-  folders?: FolderItem[];
-  loadFolders?: () => void;
-  onRequireAuth?: (errorMessage: string) => void;
 }
 
 export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: initialViewMode }) => {
@@ -73,15 +63,13 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   };
 
   const handleMoveNotebook = async (notebookId: string, targetFolderId: string | null) => {
-    if (onMoveNotebookToFolder) {
-      await onMoveNotebookToFolder(notebookId, targetFolderId);
-      // Optimistic updates handle the UI update automatically
-    }
+    await onMoveNotebookToFolder(notebookId, targetFolderId);
+    // Optimistic updates handle the UI update automatically
     notebookHandlers.closeMoveToFolder();
   };
 
   // Loading state
-  if (folderNotebooks === undefined) {
+  if (folderNotebooks === undefined || ctx.notebooksLoading) {
     return (
       <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 font-serif sm:px-6 md:px-10 md:pt-10">
         <div className="mx-auto flex max-w-400 flex-col gap-6">
@@ -200,7 +188,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
                   errorMessage.includes("Unauthenticated")
                 ) {
                   notebookHandlers.closeCustomize();
-                  if (onRequireAuth) onRequireAuth("You need to sign in to create a notebook.");
+                  onRequireAuth("You need to sign in to create a notebook.");
                 }
               }
             } else {

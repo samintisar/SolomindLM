@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { Tabs, TabsContent } from "@/shared/components/ui/tabs";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
 import { useCreateFolder } from "../services/foldersApi";
@@ -42,14 +43,11 @@ export const HomePage: React.FC = () => {
   // Limit error handling
   const { handleLimitError } = useLimitErrorToast();
 
-  const deleteNotebookHandler: (id: string) => void =
-    onDeleteNotebook ?? ((_id: string) => undefined);
-
   // Custom hooks for state and handlers
   const notebookHandlers = useNotebookHandlers({
     notebooks: recentNotebooks,
     onUpdateNotebook,
-    onDeleteNotebook: deleteNotebookHandler,
+    onDeleteNotebook,
   });
 
   const folderHandlers = useFolderHandlers({
@@ -96,7 +94,7 @@ export const HomePage: React.FC = () => {
 
         if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
           notebookHandlers.closeCustomize();
-          if (onRequireAuth) onRequireAuth("You need to sign in to create a notebook.");
+          onRequireAuth("You need to sign in to create a notebook.");
         }
       }
     }
@@ -127,7 +125,7 @@ export const HomePage: React.FC = () => {
 
       if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
         folderHandlers.closeFolderCustomize();
-        if (onRequireAuth) onRequireAuth("You need to sign in to create a folder.");
+        onRequireAuth("You need to sign in to create a folder.");
       }
     }
   };
@@ -135,9 +133,7 @@ export const HomePage: React.FC = () => {
   const handleUpdateFolderFromModal = async (id: string, data: FolderCreateData) => {
     try {
       // Call the parent's onUpdateFolder which handles state management
-      if (onUpdateFolder) {
-        await onUpdateFolder(id, data);
-      }
+      await onUpdateFolder(id, data);
       folderHandlers.closeFolderCustomize();
     } catch (error) {
       console.error("Failed to update folder:", error);
@@ -151,49 +147,59 @@ export const HomePage: React.FC = () => {
   const sortedFeaturedNotebooks = getSortedNotebooks(featuredNotebooks);
 
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
-    if (onMoveNotebookToFolder) {
-      onMoveNotebookToFolder(notebookId, folderId);
-    }
+    onMoveNotebookToFolder(notebookId, folderId);
     notebookHandlers.closeMoveToFolder();
   };
 
+  const featuredSection = (
+    <FeaturedSection
+      featuredNotebooks={sortedFeaturedNotebooks}
+      viewMode={viewMode}
+      onSelectNotebook={onSelectNotebook}
+      showEmpty={tab === "featured"}
+    />
+  );
+
+  const recentSection = (
+    <RecentSection
+      recentNotebooks={sortedRecentNotebooks}
+      folders={folders}
+      viewMode={viewMode}
+      isLoading={ctx.notebooksLoading}
+      onCreateNotebook={handleCreateNotebookClick}
+      onSelectNotebook={onSelectNotebook}
+      onSelectFolder={onSelectFolder}
+      onOpenCustomize={notebookHandlers.openCustomize}
+      onOpenMoveToFolder={notebookHandlers.openMoveToFolder}
+      onDeleteNotebook={onDeleteNotebook}
+      onOpenFolderCustomize={folderHandlers.openFolderCustomize}
+      onDeleteFolder={onDeleteFolder}
+    />
+  );
+
   return (
     <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 font-serif sm:px-6 md:px-10 md:pt-10">
-      <div className="mx-auto flex max-w-400 flex-col gap-8">
-        <HomeHeader
-          tab={tab}
-          onTabChange={setTab}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          sortOption={sortOption}
-          onSortChange={setSortOption}
-          onCreateNotebook={handleCreateNotebookClick}
-          onCreateFolder={handleCreateFolderClick}
-        />
-        {tab !== "mine" && (
-          <FeaturedSection
-            featuredNotebooks={sortedFeaturedNotebooks}
-            viewMode={viewMode}
-            onSelectNotebook={onSelectNotebook}
-            showEmpty={tab === "featured"}
-          />
-        )}
-        {tab !== "featured" && (
-          <RecentSection
-            recentNotebooks={sortedRecentNotebooks}
-            folders={folders}
-            viewMode={viewMode}
-            isLoading={ctx.notebooksLoading}
-            onCreateNotebook={handleCreateNotebookClick}
-            onSelectNotebook={onSelectNotebook}
-            onSelectFolder={onSelectFolder}
-            onOpenCustomize={notebookHandlers.openCustomize}
-            onOpenMoveToFolder={notebookHandlers.openMoveToFolder}
-            onDeleteNotebook={deleteNotebookHandler}
-            onOpenFolderCustomize={folderHandlers.openFolderCustomize}
-            onDeleteFolder={onDeleteFolder ?? ((_id: string) => undefined)}
-          />
-        )}
+      <div className="mx-auto max-w-400">
+        <Tabs value={tab} onValueChange={(value) => setTab(value as HomeTab)}>
+          <div className="flex flex-col gap-8">
+            <HomeHeader
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              sortOption={sortOption}
+              onSortChange={setSortOption}
+              onCreateNotebook={handleCreateNotebookClick}
+              onCreateFolder={handleCreateFolderClick}
+            />
+            <TabsContent value="all">
+              <div className="flex flex-col gap-8">
+                {featuredSection}
+                {recentSection}
+              </div>
+            </TabsContent>
+            <TabsContent value="mine">{recentSection}</TabsContent>
+            <TabsContent value="featured">{featuredSection}</TabsContent>
+          </div>
+        </Tabs>
       </div>
 
       {/* CUSTOMIZE NOTEBOOK MODAL */}

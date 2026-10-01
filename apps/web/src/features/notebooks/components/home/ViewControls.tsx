@@ -44,7 +44,7 @@ export function ViewControls({
         <SelectTrigger size="sm" aria-label="Sort notebooks" className="w-36">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent align="end">
+        <SelectContent position="popper" align="end">
           <SelectItem value="date">Most recent</SelectItem>
           <SelectItem value="title">Title (A–Z)</SelectItem>
         </SelectContent>

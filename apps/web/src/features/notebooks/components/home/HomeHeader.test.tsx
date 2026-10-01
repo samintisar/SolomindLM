@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
+import { Tabs } from "@/shared/components/ui/tabs";
 import { HomeHeader } from "./HomeHeader";
 
 function setup() {
   const props = {
-    tab: "all" as const,
     onTabChange: vi.fn(),
     viewMode: "grid" as const,
     onViewModeChange: vi.fn(),
@@ -14,7 +14,12 @@ function setup() {
     onCreateNotebook: vi.fn(),
     onCreateFolder: vi.fn(),
   };
-  render(<HomeHeader {...props} />);
+  const { onTabChange, ...headerProps } = props;
+  render(
+    <Tabs value="all" onValueChange={onTabChange}>
+      <HomeHeader {...headerProps} />
+    </Tabs>
+  );
   return props;
 }
 
@@ -40,5 +45,12 @@ describe("HomeHeader", () => {
     expect(props.onTabChange).toHaveBeenCalledWith("mine");
     await userEvent.click(screen.getByRole("radio", { name: "List view" }));
     expect(props.onViewModeChange).toHaveBeenCalledWith("list");
+  });
+
+  test("sort select reports the chosen option", async () => {
+    const props = setup();
+    await userEvent.click(screen.getByRole("combobox", { name: "Sort notebooks" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Title (A–Z)" }));
+    expect(props.onSortChange).toHaveBeenCalledWith("title");
   });
 });
