@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { ExternalSourcesModal } from "./ExternalSourcesModal";
@@ -63,14 +63,32 @@ describe("ExternalSourcesModal", () => {
     expect(checkbox("Paper B")).not.toBeChecked();
   });
 
-  test("clicking a source link does not toggle its checkbox", async () => {
+  test("clicking a source link follows the link and does not toggle its checkbox", async () => {
     setup();
     const link = screen.getByRole("link", { name: /paper a/i });
     expect(link).toHaveAttribute("href", "https://a.example");
     expect(link).toHaveAttribute("target", "_blank");
-    link.addEventListener("click", (e) => e.preventDefault());
-    await userEvent.click(link);
+    // fireEvent returns false if any handler called preventDefault. The click must stay
+    // uncancelled so the browser can open the link. (fireEvent rather than userEvent: user-event
+    // emulates label activation itself, including for links, which browsers do not.)
+    expect(fireEvent.click(link)).toBe(true);
     expect(checkbox("Paper A")).not.toBeChecked();
+  });
+
+  test("Escape and overlay clicks are ignored while adding", async () => {
+    const { onClose } = setup({ isLoading: true });
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]') as HTMLElement;
+    await userEvent.click(overlay);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  test("Escape closes the dialog when idle", async () => {
+    const { onClose } = setup();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
   });
 
   test("the loading state disables Add and Cancel", async () => {
