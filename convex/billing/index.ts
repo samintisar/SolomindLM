@@ -146,6 +146,12 @@ export const upsertSubscription = internalMutation({
     currency: v.string(),
   },
   handler: async (ctx, args) => {
+    if (!(await ctx.db.get(args.userId))) {
+      // The account was deleted; a late webhook must not recreate its subscription.
+      console.log("[Stripe webhook] Ignoring subscription for deleted user", args.userId);
+      return null;
+    }
+
     const existing = await ctx.db
       .query("stripeSubscriptions")
       .withIndex("stripe_subscription", (q) =>
@@ -218,6 +224,12 @@ export const applyWebhookSubscriptionUpdate = internalMutation({
       throw new Error(
         `[Stripe webhook] Could not resolve userId/customerId for subscription.updated (${args.stripeSubscriptionId})`
       );
+    }
+
+    if (!(await ctx.db.get(userId))) {
+      // The account was deleted; a late webhook must not recreate its subscription.
+      console.log("[Stripe webhook] Ignoring subscription update for deleted user", userId);
+      return null;
     }
 
     const now = Date.now();
