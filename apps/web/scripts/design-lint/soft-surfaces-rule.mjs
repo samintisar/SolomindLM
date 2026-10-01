@@ -6,14 +6,14 @@
  * checked; class strings held in identifiers or constants (`const base = "border-2"`) are not followed.
  */
 const CLASS_FUNCTIONS = new Set(["cn", "cva", "clsx", "twMerge"]);
-const THICK_BORDER = /^border(?:-[xytrbse])?-(?:[2-9]|\d{2,})$/;
+const THICK_BORDER = /^border(?:-[xytrblse])?-(?:[2-9]|\d{2,})$/;
 const OPACITY = String.raw`(?:\/(?:\d+|\[[^\]]+\]))?`;
 const LOUD_BORDER = new RegExp(
-  String.raw`^border(?:-[xytrbse])?-(?:input|foreground|black|primary)${OPACITY}$`
+  String.raw`^border(?:-[xytrblse])?-(?:input|foreground|black|primary)${OPACITY}$`
 );
 const OVERLAY_BG = new RegExp(String.raw`^bg-(?:black|white)\/(?:\d+|\[[^\]]+\])$`);
 // The side is only a side when followed by "-" or the end, so "border-t-0" is side t + value 0, never value "t-0".
-const BORDER_PARTS = /^border(?:-([xytrbse])(?=-|$))?(?:-(.+))?$/;
+const BORDER_PARTS = /^border(?:-([xytrblse])(?=-|$))?(?:-(.+))?$/;
 const NO_BORDER = /^(?:0|none|transparent)$/;
 // Table layout utilities that share the `border-` prefix but draw nothing.
 const TABLE_BORDER = /^(?:collapse|separate|spacing(?:-.+)?)$/;

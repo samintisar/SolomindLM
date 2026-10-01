@@ -45,6 +45,13 @@ tester.run("soft-surfaces", rule, {
     { code: `<button className="border px-2" />`, errors: [err] },
     { code: `<button className="border-t" />`, errors: [err] },
     { code: `<button className="border-x-border" />`, errors: [err] },
+    { code: `<div className="border-l-2" />`, errors: [err] },
+    { code: `<div className="border-l-primary" />`, errors: [err] },
+    // "l" starts the color "lime", so it must not be parsed as a left side.
+    {
+      code: `<button className="border-lime-500" />`,
+      errors: [{ messageId: "softSurfaces", data: { token: "border-lime-500" } }],
+    },
     { code: `<button className={cn("rounded", active ? "border-border" : "")} />`, errors: [err] },
     { code: "<div className={`p-2 ${x} border-2`} />", errors: [err] },
     { code: `const c = cn("p-2", "border-primary");`, errors: [err] },
