@@ -11,6 +11,9 @@ const toggleVariants = cva(
         default: "bg-transparent",
         outline:
           "border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground",
+        // Colour swatch picker: the colour is a child <span>; selection is a ring, not a fill.
+        swatch:
+          "rounded-full bg-transparent p-1 hover:bg-transparent data-[state=on]:bg-transparent data-[state=on]:ring-2 data-[state=on]:ring-ring",
       },
       size: {
         default: "h-9 min-w-9 px-2",

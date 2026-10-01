@@ -227,6 +227,21 @@ describe("shadcn ui components render", () => {
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   });
 
+  it("design-system variants render: Card interactive, Button ghost-destructive, ToggleGroup swatch", () => {
+    const { container } = render(
+      <>
+        <Card variant="interactive" />
+        <Button variant="ghost-destructive">x</Button>
+        <ToggleGroup type="single">
+          <ToggleGroupItem value="a" variant="swatch" aria-label="a" />
+        </ToggleGroup>
+      </>
+    );
+    expect(container.querySelector('[data-variant="interactive"]')).not.toBeNull();
+    expect(screen.getByRole("button", { name: "x" })).toHaveClass("text-destructive");
+    expect(screen.getByRole("radio", { name: "a" })).toBeInTheDocument();
+  });
+
   it("Toaster renders inside the app ThemeContext", () => {
     const { container } = render(
       <ThemeContext.Provider value={{ theme: "dark", toggleTheme: () => {} }}>

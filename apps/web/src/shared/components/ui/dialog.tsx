@@ -44,8 +44,10 @@ const dialogContentVariants = cva(
   {
     variants: {
       theme: { default: "", light: "auth-form-light" },
+      size: { default: "", wide: "flex max-h-svh flex-col sm:max-w-3xl" },
+      padding: { default: "", none: "gap-0 p-0" },
     },
-    defaultVariants: { theme: "default" },
+    defaultVariants: { theme: "default", size: "default", padding: "default" },
   }
 );
 
@@ -54,6 +56,8 @@ function DialogContent({
   children,
   showCloseButton = true,
   theme,
+  size,
+  padding,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof dialogContentVariants> & {
@@ -64,7 +68,7 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        className={cn(dialogContentVariants({ theme }), className)}
+        className={cn(dialogContentVariants({ theme, size, padding }), className)}
         {...props}
       >
         {children}
