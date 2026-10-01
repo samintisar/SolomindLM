@@ -223,8 +223,6 @@ export const remove = mutation({
   },
 });
 
-export const deleteWrittenQuestions = remove;
-
 export const updateStatus = internalMutation({
   args: { writtenQuestionId: v.id("writtenQuestions"), status: v.string() },
   handler: async (ctx, args) => {

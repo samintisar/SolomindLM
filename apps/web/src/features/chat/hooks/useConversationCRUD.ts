@@ -3,7 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback } from "react";
 
-export function useConversationsForNotebook(notebookId: string | null) {
+function useConversationsForNotebook(notebookId: string | null) {
   return useQuery(
     api.chat.conversations.listForNotebook,
     notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"

@@ -105,12 +105,6 @@ function addStudyTypeLabel(labels: string[], candidate: string) {
   labels.push(trimmed);
 }
 
-/** @deprecated Use collectStudyTypeLabels */
-export function getStudyTypeLabel(paper: TablePaperRow, columns: TableColumn[]): string | null {
-  const labels = collectStudyTypeLabels(paper, columns);
-  return labels[0] ?? null;
-}
-
 /** Labels for paper-type pills in the Papers column (extracted data + title/abstract inference). */
 export function collectStudyTypeLabels(paper: TablePaperRow, columns: TableColumn[]): string[] {
   const labels: string[] = [];
@@ -216,18 +210,8 @@ export function getStudyTypePillStyle(label: string): StudyTypePillStyle {
   };
 }
 
-/** @deprecated Use getStudyTypePillStyle */
-export function studyTypePillClass(label: string): string {
-  return getStudyTypePillStyle(label).className;
-}
-
-/** @deprecated Use getStudyTypePillStyle */
-export function studyTypePillIcon(label: string): StudyTypePillIcon {
-  return getStudyTypePillStyle(label).icon;
-}
-
 /** System columns rendered inside the Papers column — not as separate grid columns. */
-export const SYSTEM_COLUMN_TYPES = new Set(["paper_title", "authors", "year", "study_type"]);
+const SYSTEM_COLUMN_TYPES = new Set(["paper_title", "authors", "year", "study_type"]);
 
 export function isDataColumn(col: TableColumn): boolean {
   return col.isVisible && !SYSTEM_COLUMN_TYPES.has(col.type);

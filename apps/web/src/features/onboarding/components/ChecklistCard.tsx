@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { Button } from "@/shared/components/ui/button";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import {
   useChecklistProgress,
@@ -75,28 +77,23 @@ export const ChecklistCard: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-[45] w-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg sm:bottom-4 sm:left-auto sm:right-4 sm:w-72">
-      <div className="flex items-center justify-between p-3 border-b border-border">
+    <div className="fixed right-4 bottom-20 left-4 z-45 w-auto animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-border bg-popover text-popover-foreground shadow-lg duration-320 ease-out sm:bottom-4 sm:left-auto sm:w-72">
+      <div className="flex items-center justify-between border-b border-border p-3">
         <span className="text-sm font-semibold">
           Get started — {completed} of {ORDER.length}
         </span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label={collapsed ? "Expand" : "Collapse"}
             onClick={() => setCollapsed((c) => !c)}
-            className="p-1 hover:bg-accent rounded"
           >
-            {collapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={handleDismiss}
-            className="p-1 hover:bg-accent rounded"
-          >
-            <X className="w-4 h-4" />
-          </button>
+            {collapsed ? <ChevronUp /> : <ChevronDown />}
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Dismiss" onClick={handleDismiss}>
+            <X />
+          </Button>
         </div>
       </div>
       {!collapsed && (

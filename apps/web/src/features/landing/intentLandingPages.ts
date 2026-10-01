@@ -847,12 +847,12 @@ export function isIntentLandingPath(path: string): boolean {
   return getIntentLandingPageByPath(path) !== undefined;
 }
 
-export const CLUSTER_HUB_PATHS: Record<IntentLandingCluster, string> = {
+const CLUSTER_HUB_PATHS: Record<IntentLandingCluster, string> = {
   students: "/students",
   research: "/research",
 };
 
-export const CLUSTER_HUB_LABELS: Record<IntentLandingCluster, string> = {
+const CLUSTER_HUB_LABELS: Record<IntentLandingCluster, string> = {
   students: "Students",
   research: "Research",
 };

@@ -41,7 +41,7 @@ describe("mergeModelKwargs", () => {
   });
 
   it("returns chat_template_kwargs for non-openai models", () => {
-    expect(mergeModelKwargs("meta-llama/Llama-3-70b", "fast")).toEqual({
+    expect(mergeModelKwargs("deepseek-ai/DeepSeek-V4.1-Flash", "fast")).toEqual({
       chat_template_kwargs: { thinking: false },
     });
     expect(mergeModelKwargs("deepseek-ai/DeepSeek-V3", "smart")).toEqual({
@@ -91,7 +91,7 @@ describe("createLLMs", () => {
   it("uses fastLlm as smartLlm when reduceModel is omitted", () => {
     const result = createLLMs({
       apiKey: "test-key",
-      mapModel: "meta-llama/Llama-3-70b",
+      mapModel: "deepseek-ai/DeepSeek-V4.1-Flash",
     });
 
     expect(ChatTogetherAI).toHaveBeenCalledTimes(1);

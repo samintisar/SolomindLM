@@ -62,7 +62,7 @@ export function sanitizeMarkdown(content: string): string {
  * Configuration for sanitizing HTML content (post-rendering)
  * Use this when you need to sanitize already-rendered HTML
  */
-export const SANITIZE_CONFIG = {
+const SANITIZE_CONFIG = {
   ALLOWED_TAGS: [
     "p",
     "br",

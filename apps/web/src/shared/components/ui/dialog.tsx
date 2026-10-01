@@ -1,3 +1,4 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import { XIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import * as React from "react";
@@ -36,23 +37,34 @@ function DialogOverlay({
   );
 }
 
+// `light` pins the light-theme tokens (the `.auth-form-light` class in index.css) for
+// always-light surfaces rendered in a portal.
+const dialogContentVariants = cva(
+  "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+  {
+    variants: {
+      theme: { default: "", light: "auth-form-light" },
+    },
+    defaultVariants: { theme: "default" },
+  }
+);
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  theme,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean;
-}) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> &
+  VariantProps<typeof dialogContentVariants> & {
+    showCloseButton?: boolean;
+  }) {
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
-          className
-        )}
+        className={cn(dialogContentVariants({ theme }), className)}
         {...props}
       >
         {children}

@@ -146,14 +146,3 @@ export async function scoreAllMetrics(
 
   return results;
 }
-
-// Re-export individual metrics for direct consumption
-export {
-  abstentionCorrectness,
-  citationValidity,
-  expectedItemRecall,
-  latencyCostBudget,
-  retrievalItemRecall,
-  retrievalNdcgAtK,
-  retrievalPrecisionAtK,
-};

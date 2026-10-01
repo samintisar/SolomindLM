@@ -98,18 +98,6 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
 }
 
 /**
- * Get all quizzes for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useQuizzes(notebookId: string | null) {
-  const quizzes = useQuery(
-    api.studio.quizzes.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return quizzes?.map(mapQuizToNote);
-}
-
-/**
  * Get a specific quiz by ID
  */
 export function useQuiz(quizId: string | null) {

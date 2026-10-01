@@ -33,6 +33,7 @@ const buttonVariants = cva(
         icon: "size-10 rounded-xl",
         "icon-sm": "size-8 rounded-lg",
         "icon-lg": "size-12 rounded-xl",
+        avatar: "size-8 rounded-full p-0 hover:ring-2 hover:ring-ring/40",
       },
     },
     defaultVariants: {

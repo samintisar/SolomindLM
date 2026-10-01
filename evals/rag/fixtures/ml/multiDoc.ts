@@ -54,8 +54,3 @@ export const mlMultiDocFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlMultiDocFixture(id: string): EvalFixture | undefined {
-  return mlMultiDocFixtures.find((f) => f.id === id);
-}

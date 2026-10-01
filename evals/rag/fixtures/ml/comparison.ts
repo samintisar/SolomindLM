@@ -108,8 +108,3 @@ export const mlComparisonFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlComparisonFixture(id: string): EvalFixture | undefined {
-  return mlComparisonFixtures.find((f) => f.id === id);
-}

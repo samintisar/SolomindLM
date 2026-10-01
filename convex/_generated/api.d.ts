@@ -59,6 +59,7 @@ import type * as _agents_audio_overview_nodeExtractBeats from "../_agents/audio_
 import type * as _agents_audio_overview_nodeSynthesizeAudio from "../_agents/audio_overview/nodeSynthesizeAudio.js";
 import type * as _agents_audio_overview_nodeWriteScript from "../_agents/audio_overview/nodeWriteScript.js";
 import type * as _agents_audio_overview_prompts from "../_agents/audio_overview/prompts.js";
+import type * as _agents_audio_overview_scriptContinuation from "../_agents/audio_overview/scriptContinuation.js";
 import type * as _agents_audio_overview_scriptParsing from "../_agents/audio_overview/scriptParsing.js";
 import type * as _agents_audio_overview_state from "../_agents/audio_overview/state.js";
 import type * as _agents_audio_overview_voices from "../_agents/audio_overview/voices.js";
@@ -336,6 +337,7 @@ import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhase
 import type * as studio_audio_fixAudioUrl from "../studio/audio/fixAudioUrl.js";
 import type * as studio_audio_index from "../studio/audio/index.js";
 import type * as studio_audio_job from "../studio/audio/job.js";
+import type * as studio_audio_synthesisChunks from "../studio/audio/synthesisChunks.js";
 import type * as studio_flashcards_flashcardJobPhases from "../studio/flashcards/flashcardJobPhases.js";
 import type * as studio_flashcards_index from "../studio/flashcards/index.js";
 import type * as studio_flashcards_job from "../studio/flashcards/job.js";
@@ -439,6 +441,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/audio_overview/nodeSynthesizeAudio": typeof _agents_audio_overview_nodeSynthesizeAudio;
   "_agents/audio_overview/nodeWriteScript": typeof _agents_audio_overview_nodeWriteScript;
   "_agents/audio_overview/prompts": typeof _agents_audio_overview_prompts;
+  "_agents/audio_overview/scriptContinuation": typeof _agents_audio_overview_scriptContinuation;
   "_agents/audio_overview/scriptParsing": typeof _agents_audio_overview_scriptParsing;
   "_agents/audio_overview/state": typeof _agents_audio_overview_state;
   "_agents/audio_overview/voices": typeof _agents_audio_overview_voices;
@@ -716,6 +719,7 @@ declare const fullApi: ApiFromModules<{
   "studio/audio/fixAudioUrl": typeof studio_audio_fixAudioUrl;
   "studio/audio/index": typeof studio_audio_index;
   "studio/audio/job": typeof studio_audio_job;
+  "studio/audio/synthesisChunks": typeof studio_audio_synthesisChunks;
   "studio/flashcards/flashcardJobPhases": typeof studio_flashcards_flashcardJobPhases;
   "studio/flashcards/index": typeof studio_flashcards_index;
   "studio/flashcards/job": typeof studio_flashcards_job;

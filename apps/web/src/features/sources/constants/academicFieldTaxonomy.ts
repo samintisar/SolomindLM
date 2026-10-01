@@ -2,7 +2,7 @@
  * Field-of-study taxonomy for discovery UI (aligned with common Scopus-style groupings).
  * Selected labels are sent as optional query boost terms to academic search.
  */
-export interface AcademicFieldItem {
+interface AcademicFieldItem {
   id: string;
   /** Short phrase appended to the search query when selected */
   searchTerm: string;

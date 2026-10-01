@@ -22,7 +22,7 @@ export interface LocalSourceFile extends SourceDigest {
   bytes: Uint8Array;
 }
 
-export function sha256Hex(bytes: Uint8Array): string {
+function sha256Hex(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 

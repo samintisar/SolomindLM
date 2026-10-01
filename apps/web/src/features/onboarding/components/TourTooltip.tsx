@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@/shared/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent } from "@/shared/components/ui/popover";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { useOnboarding } from "../OnboardingContext";
 import { findStep, STEP_IDS, type StepDefinition, TOTAL_STEPS } from "../steps";
@@ -49,33 +51,6 @@ function readRect(selector: string): Rect | null {
     return { top, left, width, height, rx };
   }
   return null;
-}
-
-function tooltipPosition(rect: Rect, side: StepDefinition["side"]) {
-  const gap = 12;
-  switch (side) {
-    case "right":
-      return { top: rect.top + rect.height / 2, left: rect.left + rect.width + gap };
-    case "left":
-      return { top: rect.top + rect.height / 2, left: rect.left - gap };
-    case "top":
-      return { top: rect.top - gap, left: rect.left + rect.width / 2 };
-    case "bottom":
-      return { top: rect.top + rect.height + gap, left: rect.left + rect.width / 2 };
-  }
-}
-
-function anchorTransform(side: StepDefinition["side"]): string {
-  switch (side) {
-    case "right":
-      return "translate(0, -50%)";
-    case "left":
-      return "translate(-100%, -50%)";
-    case "top":
-      return "translate(-50%, -100%)";
-    case "bottom":
-      return "translate(-50%, 0)";
-  }
 }
 
 function logSelectorInvariants(step: StepDefinition) {
@@ -167,9 +142,26 @@ export const TourTooltip: React.FC = () => {
     };
   }, [step, tourStatus]);
 
+  const rectRef = useRef<Rect | null>(null);
+  rectRef.current = rect;
+  const virtualAnchor = useMemo(
+    () => ({
+      current: {
+        getBoundingClientRect: () => {
+          const r = rectRef.current;
+          return DOMRect.fromRect(
+            r
+              ? { x: r.left, y: r.top, width: r.width, height: r.height }
+              : { x: 0, y: 0, width: 0, height: 0 }
+          );
+        },
+      },
+    }),
+    []
+  );
+
   if (tourStatus !== "active" || !step || !rect) return null;
 
-  const pos = tooltipPosition(rect, step.side);
   const stepNumber = STEP_IDS.indexOf(step.id) + 1;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -181,45 +173,64 @@ export const TourTooltip: React.FC = () => {
     });
   };
 
-  return createPortal(
+  return (
     <>
-      <svg className="fixed inset-0 z-40 pointer-events-none" width={vw} height={vh} aria-hidden>
-        <defs>
-          <mask id={spotlightMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width={vw} height={vh}>
-            <rect width={vw} height={vh} fill="white" />
-            <rect
-              x={rect.left}
-              y={rect.top}
-              width={rect.width}
-              height={rect.height}
-              rx={rect.rx}
-              ry={rect.rx}
-              fill="black"
-            />
-          </mask>
-        </defs>
-        <rect width={vw} height={vh} fill="rgba(0, 0, 0, 0.42)" mask={`url(#${spotlightMaskId})`} />
-      </svg>
-      <div
-        role="dialog"
-        className="fixed z-50 max-w-xs rounded-lg border border-border bg-popover text-popover-foreground p-4 shadow-lg"
-        style={{ top: pos.top, left: pos.left, transform: anchorTransform(step.side) }}
-      >
-        <p className="text-sm">{step.copy}</p>
-        <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-          <span>
-            {stepNumber} of {TOTAL_STEPS}
-          </span>
-          <button
-            type="button"
-            onClick={handleSkip}
-            className="underline hover:text-foreground transition-colors"
-          >
-            Skip tour
-          </button>
-        </div>
-      </div>
-    </>,
-    document.body
+      {createPortal(
+        <svg className="pointer-events-none fixed inset-0 z-40" width={vw} height={vh} aria-hidden>
+          <defs>
+            <mask
+              id={spotlightMaskId}
+              maskUnits="userSpaceOnUse"
+              x="0"
+              y="0"
+              width={vw}
+              height={vh}
+            >
+              <rect width={vw} height={vh} className="fill-white" />
+              <rect
+                x={rect.left}
+                y={rect.top}
+                width={rect.width}
+                height={rect.height}
+                rx={rect.rx}
+                ry={rect.rx}
+                className="fill-black"
+              />
+            </mask>
+          </defs>
+          <rect
+            width={vw}
+            height={vh}
+            className="fill-black/40"
+            mask={`url(#${spotlightMaskId})`}
+          />
+        </svg>,
+        document.body
+      )}
+      <Popover open>
+        <PopoverAnchor virtualRef={virtualAnchor} />
+        <PopoverContent
+          side={step.side}
+          sideOffset={12}
+          collisionPadding={8}
+          updatePositionStrategy="always"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          className="max-w-xs"
+        >
+          <p className="text-sm">{step.copy}</p>
+          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {stepNumber} of {TOTAL_STEPS}
+            </span>
+            {/* -mr-4 cancels size sm's px-4 so the label lines up with the popover's padding edge. */}
+            <Button variant="link" size="sm" className="-mr-4" onClick={handleSkip}>
+              Skip tour
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </>
   );
 };

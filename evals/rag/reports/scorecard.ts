@@ -1,6 +1,6 @@
 import type { ConcreteRunnerKind, MetricResult } from "../types";
 
-export interface ScorecardCell {
+interface ScorecardCell {
   useCase: string;
   runner: ConcreteRunnerKind;
   pass: number;

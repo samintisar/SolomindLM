@@ -37,7 +37,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.ts"],
     execArgv: webstorageExecArgv,
     // CI has no apps/web .env; chatApi.ts validates CONVEX URL at import time
     env: {

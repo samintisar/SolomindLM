@@ -258,5 +258,3 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
     </div>
   );
 };
-
-export default ZoteroImportModal;

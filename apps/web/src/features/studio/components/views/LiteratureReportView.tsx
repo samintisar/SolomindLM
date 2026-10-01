@@ -26,12 +26,12 @@ const MarkdownRenderer = lazy(() =>
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-export interface ReportSection {
+interface ReportSection {
   heading: string;
   content: string;
 }
 
-export interface LiteratureReport {
+interface LiteratureReport {
   title: string;
   content: string;
   citationStyle: CitationStyle;

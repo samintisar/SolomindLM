@@ -134,7 +134,7 @@ function SharedBadge({ size = "sm" }: { size?: "sm" | "md" }) {
 
 // ─── Grid Variant ──────────────────────────────────────────────────────────────
 
-export function NotebookCardGrid(props: SharedNotebookCardProps) {
+function NotebookCardGrid(props: SharedNotebookCardProps) {
   const { notebook, onSelectNotebook } = props;
   const {
     isMenuOpen,
@@ -206,7 +206,7 @@ export function NotebookCardGrid(props: SharedNotebookCardProps) {
 
 // ─── List-in-Folder Variant ────────────────────────────────────────────────────
 
-export function NotebookCardListInFolder(props: SharedNotebookCardProps) {
+function NotebookCardListInFolder(props: SharedNotebookCardProps) {
   const { notebook, onSelectNotebook } = props;
   const {
     isMenuOpen,
@@ -284,7 +284,7 @@ interface NotebookCardListProps extends SharedNotebookCardProps {
   showAuthor?: boolean;
 }
 
-export function NotebookCardList({ showAuthor = false, ...props }: NotebookCardListProps) {
+function NotebookCardList({ showAuthor = false, ...props }: NotebookCardListProps) {
   const { notebook, onSelectNotebook } = props;
   const {
     isMenuOpen,

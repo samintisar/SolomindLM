@@ -54,8 +54,3 @@ export const mlTemporalFixtures: EvalFixture[] = [
     runner: "chat",
   },
 ];
-
-// Helper to get individual fixture
-export function getMlTemporalFixture(id: string): EvalFixture | undefined {
-  return mlTemporalFixtures.find((f) => f.id === id);
-}

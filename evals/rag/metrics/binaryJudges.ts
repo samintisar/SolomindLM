@@ -6,7 +6,7 @@ import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from ".
 import type { LlmJudgeOptions } from "./llmJudge";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
 
-export interface BinaryJudgeResult {
+interface BinaryJudgeResult {
   pass: boolean;
   reason: string;
 }
@@ -34,6 +34,15 @@ function baseMetric(
     detail: reason,
     breakdown,
   };
+}
+
+/**
+ * Caps output shown to a judge. A cut excerpt says so; otherwise judges fail long outputs for
+ * "ending mid-sentence" at the cut.
+ */
+function excerptForJudge(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n[… output cut off here for judging; the full output is ${text.length} characters and continues. Do not treat this cut as the output ending early.]`;
 }
 
 function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
@@ -86,7 +95,7 @@ Retrieved chunks:
 ${context.slice(0, 12000)}
 
 Answer:
-${artifact.answer.slice(0, 8000)}
+${excerptForJudge(artifact.answer, 8000)}
 
 Pass only if substantive claims are supported by the chunks (minor phrasing ok).
 Respond JSON only: {"pass": boolean, "reason": string}`;
@@ -100,7 +109,7 @@ Citations in answer: ${artifact.citations.join(", ") || "(none)"}
 Available chunk source titles: ${chunkTitles || "(none)"}
 
 Answer excerpt:
-${artifact.answer.slice(0, 4000)}
+${excerptForJudge(artifact.answer, 4000)}
 
 Pass if citations map to listed sources or the answer has no citations when none were required.
 Respond JSON only: {"pass": boolean, "reason": string}`;
@@ -128,7 +137,7 @@ Evidence:
 ${evidence.slice(0, 12000) || "(no evidence recorded)"}
 
 Answer:
-${artifact.answer.slice(0, 8000)}
+${excerptForJudge(artifact.answer, 8000)}
 
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
@@ -155,7 +164,7 @@ Min items: ${minItems ?? "n/a"}
 Required sections: ${sections || "n/a"}
 
 Output (truncated):
-${artifact.answer.slice(0, 10000)}
+${excerptForJudge(artifact.answer, 10000)}
 
 Pass if required structure is present (non-empty items, sections, answer keys as applicable).
 Respond JSON only: {"pass": boolean, "reason": string}`;
@@ -165,7 +174,7 @@ function studioGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact):
   const context = combineChunkContents(artifact.selectedChunks);
   if (!context.trim()) {
     return `No chunks available — pass if output is coherent for: ${fixture.question}
-Output: ${artifact.answer.slice(0, 4000)}
+Output: ${excerptForJudge(artifact.answer, 4000)}
 Respond JSON only: {"pass": boolean, "reason": string}`;
   }
   return `Pass if studio output is grounded in notebook chunks.
@@ -176,7 +185,7 @@ Chunks:
 ${context.slice(0, 12000)}
 
 Output:
-${artifact.answer.slice(0, 8000)}
+${excerptForJudge(artifact.answer, 8000)}
 
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }

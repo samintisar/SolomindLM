@@ -1,7 +1,7 @@
 export const STEP_IDS = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 
 export type StepId = (typeof STEP_IDS)[number];
-export type StepRoute = "home" | "notebook";
+type StepRoute = "home" | "notebook";
 
 export interface StepDefinition {
   id: StepId;
@@ -47,12 +47,6 @@ export function findStep(id: StepId): StepDefinition {
   const step = STEP_DEFINITIONS.find((s) => s.id === id);
   if (!step) throw new Error(`Unknown step id: ${id}`);
   return step;
-}
-
-export function nextStep(id: StepId): StepDefinition | null {
-  const idx = STEP_IDS.indexOf(id);
-  if (idx === -1 || idx === STEP_IDS.length - 1) return null;
-  return findStep(STEP_IDS[idx + 1]);
 }
 
 export const TOTAL_STEPS = STEP_IDS.length;
