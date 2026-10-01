@@ -18,9 +18,14 @@ export function CreateMenuButton({
 }) {
   return (
     <ButtonGroup>
-      <Button data-onboarding="create-notebook-button" onClick={onCreateNotebook}>
+      <Button
+        data-onboarding="create-notebook-button"
+        aria-label="New notebook"
+        onClick={onCreateNotebook}
+      >
         <Plus />
-        New notebook
+        <span className="sm:hidden">New</span>
+        <span className="hidden sm:inline">New notebook</span>
       </Button>
       <ButtonGroupSeparator />
       {/* modal={false}: the item opens a dialog (see CardActionsMenu). */}
