@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { CoverCustomizeDialog } from "./CoverCustomizeDialog";
 
+const toast = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock("@/shared/contexts/useToast", () => ({ useToast: () => toast }));
+
 describe("CoverCustomizeDialog", () => {
   test("create notebook: no folder icon, saves trimmed name", async () => {
     const onSave = vi.fn();
@@ -75,7 +78,7 @@ describe("CoverCustomizeDialog", () => {
     await waitFor(() => expect(create).toBeEnabled());
   });
 
-  test("a failed save re-enables the button", async () => {
+  test("a failed save shows the error and re-enables the button", async () => {
     const onSave = vi.fn().mockRejectedValue(new Error("nope"));
     render(<CoverCustomizeDialog kind="notebook" onClose={vi.fn()} onSave={onSave} />);
     await userEvent.type(screen.getByPlaceholderText("Notebook title"), "Physics");
@@ -83,6 +86,7 @@ describe("CoverCustomizeDialog", () => {
     await userEvent.click(create);
     await waitFor(() => expect(create).toBeEnabled());
     expect(onSave).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("nope");
   });
 
   test("swatches have friendly labels", () => {

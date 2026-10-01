@@ -11,6 +11,7 @@ import {
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
+import { useToast } from "@/shared/contexts/useToast";
 import {
   COVER_COLORS,
   COVER_ICON_CLASS,
@@ -73,6 +74,7 @@ export function CoverCustomizeDialog({
   );
   const [saving, setSaving] = useState(false);
   const nameId = useId();
+  const { error: showError } = useToast();
   const PreviewIcon = COVER_ICONS[icon];
 
   const submit = async (event: FormEvent) => {
@@ -81,8 +83,10 @@ export function CoverCustomizeDialog({
     setSaving(true);
     try {
       await onSave({ name: name.trim(), color, icon });
-    } catch {
-      // Callers report their own failures; keep the dialog open so the user can retry.
+    } catch (error) {
+      // Callers handle sign-in and plan-limit errors and rethrow anything else; keep the dialog
+      // open so the user can retry.
+      showError(error instanceof Error ? error.message : "Could not save. Try again.");
     } finally {
       setSaving(false);
     }

@@ -95,19 +95,18 @@ export const HomePage: React.FC = () => {
         if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
           notebookHandlers.closeCustomize();
           onRequireAuth("You need to sign in to create a notebook.");
+          return;
         }
+        // Anything else is reported by the dialog.
+        throw error;
       }
     }
   };
 
+  // Failures propagate to the dialog, which reports them and stays open for a retry.
   const handleUpdateNotebookFromModal = async (id: string, data: NotebookCreateData) => {
-    try {
-      // Call the parent's onUpdateNotebook which handles optimistic updates and state management
-      await onUpdateNotebook(id, data);
-      notebookHandlers.closeCustomize();
-    } catch (error) {
-      console.error("Failed to update notebook:", error);
-    }
+    await onUpdateNotebook(id, data);
+    notebookHandlers.closeCustomize();
   };
 
   const handleCreateFolderFromModal = async (data: FolderCreateData) => {
@@ -126,18 +125,16 @@ export const HomePage: React.FC = () => {
       if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
         folderHandlers.closeFolderCustomize();
         onRequireAuth("You need to sign in to create a folder.");
+        return;
       }
+      // Anything else is reported by the dialog.
+      throw error;
     }
   };
 
   const handleUpdateFolderFromModal = async (id: string, data: FolderCreateData) => {
-    try {
-      // Call the parent's onUpdateFolder which handles state management
-      await onUpdateFolder(id, data);
-      folderHandlers.closeFolderCustomize();
-    } catch (error) {
-      console.error("Failed to update folder:", error);
-    }
+    await onUpdateFolder(id, data);
+    folderHandlers.closeFolderCustomize();
   };
 
   const { sortOption, setSortOption, getSortedNotebooks } = useNotebookSorting();
@@ -156,7 +153,8 @@ export const HomePage: React.FC = () => {
       featuredNotebooks={sortedFeaturedNotebooks}
       viewMode={viewMode}
       onSelectNotebook={onSelectNotebook}
-      showEmpty={tab === "featured"}
+      // Not while loading: an empty list then means "not loaded yet", not "none".
+      showEmpty={tab === "featured" && !ctx.notebooksLoading}
     />
   );
 

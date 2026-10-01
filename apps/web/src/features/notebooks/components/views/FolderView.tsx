@@ -189,7 +189,10 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
                 ) {
                   notebookHandlers.closeCustomize();
                   onRequireAuth("You need to sign in to create a notebook.");
+                  return;
                 }
+                // Anything else is reported by the dialog.
+                throw error;
               }
             } else {
               await onUpdateNotebook(notebookHandlers.customizingId!, data);
