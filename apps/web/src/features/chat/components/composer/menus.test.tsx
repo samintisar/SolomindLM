@@ -1,7 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
-import { AVAILABLE_SMART_MODELS } from "@/shared/constants/models";
+import {
+  AVAILABLE_SMART_MODELS,
+  DEFAULT_SMART_MODEL_ID,
+  findSmartModelById,
+} from "@/shared/constants/models";
 import { ModelMenu } from "./ModelMenu";
 import { ModeMenu } from "./ModeMenu";
 
@@ -27,9 +31,12 @@ describe("ModeMenu", () => {
     );
   });
 
-  test("a disabled trigger cannot be opened", () => {
+  test("a disabled trigger cannot be opened", async () => {
     render(<ModeMenu mode="chat" onModeChange={vi.fn()} disabled />);
-    expect(screen.getByRole("button", { name: "Composer mode: Chat" })).toBeDisabled();
+    const trigger = screen.getByRole("button", { name: "Composer mode: Chat" });
+    expect(trigger).toBeDisabled();
+    await userEvent.click(trigger);
+    expect(screen.queryByRole("menuitemradio")).not.toBeInTheDocument();
   });
 });
 
@@ -55,9 +62,35 @@ describe("ModelMenu", () => {
   });
 
   test("falls back to the default model for an unknown id", () => {
+    const fallback = findSmartModelById(DEFAULT_SMART_MODEL_ID);
     render(<ModelMenu value="not/a-model" onModelChange={vi.fn()} />);
-    expect(
-      screen.getByRole("button", { name: `Model: ${AVAILABLE_SMART_MODELS[0].name}` })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Model: ${fallback?.name}` })).toBeInTheDocument();
+  });
+
+  test("a legacy saved model id resolves to its successor", async () => {
+    const successor = findSmartModelById("zai-org/GLM-5.3-Flash");
+    render(<ModelMenu value="zai-org/GLM-5.2" onModelChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: `Model: ${successor?.name}` }));
+    expect(await screen.findByRole("menuitemradio", { name: successor?.name })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+  });
+
+  test("hideLabel keeps the name for assistive tech but hides it visually", () => {
+    const name = AVAILABLE_SMART_MODELS[0].name;
+    render(<ModelMenu value={undefined} onModelChange={vi.fn()} hideLabel />);
+    const trigger = screen.getByRole("button", { name: `Model: ${name}` });
+    expect(trigger).toHaveTextContent(name);
+    expect(screen.getByText(name)).toHaveClass("sr-only");
+  });
+
+  test("the name span can truncate", () => {
+    render(<ModelMenu value={undefined} onModelChange={vi.fn()} />);
+    expect(screen.getByText(AVAILABLE_SMART_MODELS[0].name)).toHaveClass(
+      "min-w-0",
+      "max-w-36",
+      "truncate"
+    );
   });
 });
