@@ -9,7 +9,7 @@
 **Tech Stack:** React 19, Tailwind v4, shadcn/ui (Radix), `class-variance-authority`, ESLint 10 (flat config, `@shadcn/lint`), vitest 4 (`globals: true`, jsdom), Playwright 1.63, Bun.
 
 **Spec:** `docs/superpowers/specs/2026-10-01-soft-layered-design.md`. Read §1 (principles) before any task.
-**Branch:** `feature/ds-migrate-chat`, worktree `C:\Users\samin\Documents\GitHub\SolomindLM\.claude\worktrees\premium-ui-shadcn-linter-74efdb`.
+**Branch:** `feature/soft-layered-design`, stacked on `feature/ds-migrate-chat` (#260), whose primitives it builds on.
 
 ## Ground rules for every task
 
@@ -895,7 +895,7 @@ Not a subagent task. The controller does this in the in-app browser, signed in, 
     - the options menu
     - Configure chat open, then Esc
 - [ ] **Step 2: Show the user the screenshots** grouped by screen before any push. Record requested tweaks as follow-up commits to the relevant primitive, never at call sites.
-- [ ] **Step 3: Push** after the user approves: `git push origin feature/ds-migrate-chat`.
+- [ ] **Step 3: Push** after the user approves: `git push origin feature/soft-layered-design`.
 
 ---
 

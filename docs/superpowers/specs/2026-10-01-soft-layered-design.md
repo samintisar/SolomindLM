@@ -115,7 +115,7 @@ Already true via `shadcn/no-restyle` (layout-only classes at call sites). No cha
 
 ## 4. Rollout and verification
 
-**Phase 1** is done on `feature/ds-migrate-chat`, the active stack. It's one commit per group:
+**Phase 1** lives on `feature/soft-layered-design`, its own PR stacked on the chat migration (`feature/ds-migrate-chat`, #260), because it builds on primitives that migration added. It's one commit per group:
 1. Tokens and primitives (§2 ui files).
 2. The lint rule (§3b), with the baseline updated to count existing violations.
 3. Docs (§3c).
@@ -127,7 +127,7 @@ Then a controller visual pass, with screenshots shown to the user before any pus
 
 **Phase 2** (§3d) is a follow-up issue or PR after phase 1 merges, so the baselines capture the approved look.
 
-The chat migration (Tasks 11–15 of `docs/superpowers/plans/2026-10-01-chat.md`) resumes after phase 1. Task 11's pending reviews pick up from there.
+The chat migration (Tasks 11–15 of `docs/superpowers/plans/2026-10-01-chat.md`) continues on its own branch; this branch is rebased onto it as that work lands.
 
 ## Out of scope
 - Palette or font changes (tokens stay; only elevation, radii and borders change).
