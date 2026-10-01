@@ -10,6 +10,8 @@ export const saveAudioOverviewResults = internalMutation({
     audioOverviewId: v.id("audioOverviews"),
     /** Omitted for script-only (`skipTts`) eval jobs. */
     audioUrl: v.optional(v.string()),
+    /** The joined MP3 behind `audioUrl`, kept so the file can be deleted with the row. */
+    audioStorageId: v.optional(v.id("_storage")),
     transcript: v.string(),
     metadata: v.any(),
   },
@@ -30,6 +32,7 @@ export const saveAudioOverviewResults = internalMutation({
     await ctx.db.patch(args.audioOverviewId, {
       transcript: normalizedTranscript,
       audioUrl: args.audioUrl,
+      audioStorageId: args.audioStorageId,
       status: "completed",
       updatedAt: Date.now(),
       title,
@@ -244,7 +247,10 @@ export type AudioSynthesisState = {
 };
 
 /** Deletes the chunk MP3s a synthesis stored. A finished or failed job no longer needs them. */
-async function deleteSynthesisChunkFiles(ctx: MutationCtx, metadata: unknown): Promise<void> {
+export async function deleteSynthesisChunkFiles(
+  ctx: MutationCtx,
+  metadata: unknown
+): Promise<void> {
   const synthesis = (metadata as { synthesis?: AudioSynthesisState } | undefined)?.synthesis;
   for (const chunk of Object.values(synthesis?.done ?? {})) {
     if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
