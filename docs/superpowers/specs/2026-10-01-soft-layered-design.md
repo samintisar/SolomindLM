@@ -75,7 +75,7 @@ All in `apps/web/src/shared/components/ui`. Variant names stay the same so call 
 Already true via `shadcn/no-restyle` (layout-only classes at call sites). No change.
 
 ### 3b. Lint rule `solomind/soft-surfaces`
-- **Where:** a local ESLint plugin at `apps/web/eslint-rules/soft-surfaces.mjs`, registered in `apps/web/eslint.config.mjs` and counted by the existing ratchet (`bun run lint:design`, baseline JSON). It runs at `warn` everywhere and `error` in `MIGRATED`.
+- **Where:** a local ESLint plugin at `apps/web/scripts/design-lint/soft-surfaces-rule.mjs`, registered in `apps/web/eslint.config.mjs` and counted by the existing ratchet (`bun run lint:design`, baseline JSON). It runs at `warn` everywhere and `error` in `MIGRATED`.
 - **What it checks:** static class strings in `className`, `cn(...)` and `cva(...)` arguments.
 - **What it flags:**
   - `border(-[xytrbl])?-(2|4|8)`
@@ -84,7 +84,7 @@ Already true via `shadcn/no-restyle` (layout-only classes at call sites). No cha
   - `bg-black/` or `bg-white/`
   - `border` or `border-*` on an intrinsic `<button>`
 - **Exemptions:** `src/shared/components/ui/**`, where primitives may need a border, e.g. a `ring`-based focus state. Any exception there must be a reviewed variant.
-- **Tests:** `apps/web/eslint-rules/soft-surfaces.test.ts` uses ESLint's `RuleTester` (vitest), with valid and invalid cases for each pattern.
+- **Tests:** `apps/web/scripts/design-lint/soft-surfaces-rule.test.ts` uses ESLint's `RuleTester` (vitest), with valid and invalid cases for each pattern.
 - **Error message:** "Soft layered design: separate with fill and shadow, not borders. Use a ui variant (see docs/design/principles.md)."
 
 ### 3c. Written rules where agents and people look
