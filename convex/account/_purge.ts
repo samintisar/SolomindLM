@@ -192,6 +192,29 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       ),
   },
   {
+    // The deep-research workflow keys its steps by plan id, and a plan can exist without a run.
+    tables: ["researchPlans", "researchSteps"],
+    run: (ctx, userId, budget) =>
+      drainWithChildren(
+        ctx,
+        budget,
+        (n) =>
+          ctx.db
+            .query("researchPlans")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .take(n),
+        (plan) => [
+          {
+            take: (n) =>
+              ctx.db
+                .query("researchSteps")
+                .withIndex("by_research", (q) => q.eq("researchId", plan._id))
+                .take(n),
+          },
+        ]
+      ),
+  },
+  {
     tables: [
       "literatureReviewSessions",
       "literatureReviewScreeningDecisions",
@@ -440,12 +463,6 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
   direct("searchAnalytics", (ctx, userId, n) =>
     ctx.db
       .query("searchAnalytics")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(n)
-  ),
-  direct("researchPlans", (ctx, userId, n) =>
-    ctx.db
-      .query("researchPlans")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(n)
   ),

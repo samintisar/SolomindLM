@@ -4,6 +4,8 @@ import { StripeSubscriptions } from "@convex-dev/stripe";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { action } from "../_generated/server";
+import { ExternalServiceError } from "../_lib/errors";
+import { toConvexError } from "../_lib/serviceErrors";
 import { getAuthUserId } from "../auth";
 
 const stripeClient = new StripeSubscriptions(components.stripe, {});
@@ -28,10 +30,20 @@ export const deleteAccount = action({
       { userId }
     );
     for (const stripeSubscriptionId of subscriptionIds) {
-      await stripeClient.cancelSubscription(ctx, {
-        stripeSubscriptionId,
-        cancelAtPeriodEnd: false,
-      });
+      try {
+        await stripeClient.cancelSubscription(ctx, {
+          stripeSubscriptionId,
+          cancelAtPeriodEnd: false,
+        });
+      } catch (error) {
+        console.error(`[accountDeletion] could not cancel ${stripeSubscriptionId}`, error);
+        // Typed, so the dialog says billing is unavailable rather than "Server Error".
+        throw toConvexError(
+          new ExternalServiceError("Billing", "Could not cancel your subscription", {
+            retryable: true,
+          })
+        );
+      }
     }
 
     await ctx.runMutation(internal.account.deletion.deleteUserIdentity, { userId });

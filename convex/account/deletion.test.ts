@@ -54,7 +54,6 @@ const DIRECT_USER_TABLES = [
   "rateLimits",
   "mobilePushTokens",
   "searchAnalytics",
-  "researchPlans",
   "literatureTables",
   "literatureReports",
   "feedback",
@@ -100,7 +99,10 @@ async function seedUser(t: T, email: string) {
     const conversationId = await add("conversations", { userId, notebookId });
     await add("messages", { conversationId });
 
-    const runId = await add("researchRuns", { userId });
+    // Deep-research workflow steps are keyed by plan id; run steps by run id.
+    const planId = await add("researchPlans", { userId });
+    await add("researchSteps", { researchId: planId, userId });
+    const runId = await add("researchRuns", { userId, planId });
     await add("researchEvidence", { runId });
     await add("researchSteps", { researchId: runId, userId });
 
@@ -212,6 +214,22 @@ describe("account deletion", () => {
       expect(await ctx.db.query("documentChunks").take(1)).toHaveLength(0);
       expect(await ctx.db.query("documents").take(1)).toHaveLength(0);
     });
+  });
+
+  test("schedules a second full pass after access tokens issued before deletion expire", async () => {
+    const t = setup();
+    const { userId } = await seedUser(t, "late@example.com");
+    const deletedAt = Date.now();
+
+    await t.mutation(internal.account.deletion.deleteUserIdentity, { userId });
+
+    const runTimes = await t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect())
+        .filter((job) => job.name.includes("purgeUserData"))
+        .map((job) => job.scheduledTime - deletedAt)
+    );
+    expect(runTimes.some((delay) => delay < 1000)).toBe(true);
+    expect(runTimes.some((delay) => delay > 60 * 60 * 1000)).toBe(true);
   });
 
   test("is a no-op for a user that no longer exists", async () => {

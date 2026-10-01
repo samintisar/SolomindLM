@@ -3,6 +3,13 @@ import { internal } from "../_generated/api";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { PURGE_BATCH_SIZE, PURGE_STEPS } from "./_purge";
 
+/**
+ * Convex Auth access tokens live for an hour and keep working after their session is
+ * deleted, so a client holding one could still write rows after the first purge pass.
+ * A second full pass once they have all expired removes anything written that way.
+ */
+const STALE_TOKEN_SWEEP_DELAY_MS = 65 * 60 * 1000;
+
 /** Stripe statuses that still bill (or can resume billing) and must be cancelled first. */
 const SETTLED_SUBSCRIPTION_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
@@ -27,7 +34,8 @@ export const listBillableSubscriptionIds = internalQuery({
 /**
  * Deletes the user row and every sign-in record in one transaction, which signs the
  * user out on every device and frees their email for a new account, then schedules the
- * batched purge of everything they own. Safe to call again for a deleted user.
+ * batched purge of everything they own, plus a second pass once any access token issued
+ * before deletion has expired. Safe to call again for a deleted user.
  */
 export const deleteUserIdentity = internalMutation({
   args: { userId: v.id("users") },
@@ -72,6 +80,11 @@ export const deleteUserIdentity = internalMutation({
 
     await ctx.db.delete(userId);
     await ctx.scheduler.runAfter(0, internal.account.deletion.purgeUserData, { userId, step: 0 });
+    await ctx.scheduler.runAfter(
+      STALE_TOKEN_SWEEP_DELAY_MS,
+      internal.account.deletion.purgeUserData,
+      { userId, step: 0 }
+    );
     console.log(`[accountDeletion] identity deleted; purge scheduled for ${userId}`);
     return null;
   },
