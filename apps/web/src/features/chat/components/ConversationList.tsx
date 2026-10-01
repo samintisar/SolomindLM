@@ -1,6 +1,16 @@
 import type { Doc } from "@convex/_generated/dataModel";
 import { Check, MoreVertical, Pencil, Pin, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +21,6 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { Input } from "@/shared/components/ui/input";
 import { useToast } from "@/shared/contexts/useToast";
-import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { cn } from "@/shared/utils/cn";
 
 interface ConversationListProps {
@@ -51,7 +60,8 @@ export function ConversationList({
   const editInputRef = useRef<HTMLInputElement>(null);
   /** Set once a rename is saved or cancelled so the blur that follows (Enter, Escape, unmount) is a no-op. */
   const renameSettledRef = useRef(false);
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+  /** Thread awaiting delete confirmation. */
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -105,15 +115,12 @@ export function ConversationList({
     closeIfStillEditing();
   };
 
-  const handleDelete = async (conv: Doc<"conversations">) => {
-    const ok = await confirm(
-      "Delete thread?",
-      "This will permanently delete this thread and all its messages.",
-      { confirmText: "Delete", variant: "danger" }
-    );
-    if (!ok) return;
+  const handleConfirmDelete = async () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (!id) return;
     try {
-      await onDelete(conv._id);
+      await onDelete(id);
     } catch {
       toast.error("Failed to delete thread");
     }
@@ -225,7 +232,7 @@ export function ConversationList({
               Rename
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={() => void handleDelete(conv)}>
+            <DropdownMenuItem variant="destructive" onSelect={() => setPendingDeleteId(conv._id)}>
               <Trash2 />
               Delete
             </DropdownMenuItem>
@@ -265,10 +272,29 @@ export function ConversationList({
           </>
         )}
       </div>
-      {/* The confirm's state lives in this component. Inside a Radix popover that is fine (the dialog is part of
-          the popover's React tree), but if the host unmounts the list while a confirm is open, the confirm()
-          promise never resolves, so the host must keep the list mounted until the confirm closes. */}
-      <ConfirmDialogComponent />
+      {/* A nested Radix layer: inside a host Popover/Dialog, Escape and outside clicks close only this alert, and
+          its pointer events count as inside the host. The host must not unmount the list while it is open. */}
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete thread?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this thread and all its messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => void handleConfirmDelete()}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -1,8 +1,10 @@
 import type { Doc } from "@convex/_generated/dataModel";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ToastProvider } from "@/shared/contexts/ToastContext";
+import type { Message } from "@/shared/types/index";
+import type { useChatStreamingContext } from "../useChatStreaming";
 import { ChatPanel } from "./ChatPanel";
 
 const conversations = [
@@ -11,7 +13,7 @@ const conversations = [
 ] as unknown as Doc<"conversations">[];
 
 const chat = {
-  messages: [] as unknown[],
+  messages: [] as Message[],
   isChatStreaming: false,
   remoteGenerationBlocksSend: false,
   onSendMessage: vi.fn(),
@@ -30,7 +32,7 @@ const chat = {
   onRenameConversation: vi.fn(),
   onDeleteConversation: vi.fn(),
   consumeResearchExecuteStream: vi.fn(),
-};
+} satisfies Partial<ReturnType<typeof useChatStreamingContext>>;
 
 vi.mock("../useChatStreaming", () => ({ useChatStreamingContext: () => chat }));
 vi.mock("../../sources/useSourcesContext", () => ({ useSourcesContext: () => ({ sources: [] }) }));
@@ -94,15 +96,13 @@ beforeEach(() => {
   chat.onDeleteConversation.mockReset().mockResolvedValue(undefined);
 });
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe("ChatPanel header", () => {
-  test("icon buttons keep their labels and e2e hooks", () => {
+  test("icon buttons are labelled by aria-label, without native titles", () => {
     setup();
     for (const name of ["Open Sources", "Open Studio", "Thread history", "Chat options"]) {
-      expect(screen.getByRole("button", { name })).toHaveAttribute("title", name);
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveAttribute("aria-label", name);
+      expect(button).not.toHaveAttribute("title");
     }
     expect(screen.getByRole("button", { name: "Open Studio" })).toHaveAttribute(
       "data-onboarding",
@@ -110,6 +110,22 @@ describe("ChatPanel header", () => {
     );
     // Empty thread: the new-chat button explains why it is a no-op.
     expect(screen.getByRole("button", { name: "Already in a new chat" })).toBeInTheDocument();
+  });
+
+  test("focus returning to a trigger after its menu closes does not open the tooltip", async () => {
+    setup();
+    const trigger = screen.getByRole("button", { name: "Chat options" });
+    await userEvent.click(trigger);
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Export chat" }));
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  test("keyboard focus on a header button shows its tooltip", async () => {
+    setup();
+    await userEvent.tab();
+    expect(screen.getByRole("button", { name: "Open Sources" })).toHaveFocus();
+    expect(await screen.findByRole("tooltip", { name: "Open Sources" })).toBeInTheDocument();
   });
 
   test("history popover lists threads and closes when one is selected", async () => {
@@ -139,22 +155,39 @@ describe("ChatPanel header", () => {
     await waitFor(() => expect(historyDialog()).not.toBeInTheDocument());
   });
 
-  test("the delete confirm keeps the popover open until it resolves", async () => {
-    setup();
-    const dialog = await openHistory();
+  async function openDeleteConfirm(dialog: HTMLElement) {
     await userEvent.click(
       within(dialog).getByRole("button", { name: "Thread actions for Cell cycle" })
     );
     await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
-    const confirm = await screen.findByRole("alertdialog");
+    return screen.findByRole("alertdialog", { name: "Delete thread?" });
+  }
 
-    // Escape while the confirm is up must not close (and unmount) the list that owns it.
-    await userEvent.keyboard("{Escape}");
-    expect(historyDialog()).toBeInTheDocument();
-
+  test("confirming the delete deletes the thread and keeps the popover open", async () => {
+    setup();
+    const confirm = await openDeleteConfirm(await openHistory());
     await userEvent.click(within(confirm).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(chat.onDeleteConversation).toHaveBeenCalledWith("c2"));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(historyDialog()).toBeInTheDocument();
+  });
+
+  test("cancelling the delete keeps the thread and the popover", async () => {
+    setup();
+    const confirm = await openDeleteConfirm(await openHistory());
+    await userEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(chat.onDeleteConversation).not.toHaveBeenCalled();
+    expect(historyDialog()).toBeInTheDocument();
+  });
+
+  test("Escape in the delete confirm closes only the confirm", async () => {
+    setup();
+    await openDeleteConfirm(await openHistory());
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(historyDialog()).toBeInTheDocument();
+    expect(chat.onDeleteConversation).not.toHaveBeenCalled();
   });
 
   test("options menu opens configure and toggles the pin", async () => {
