@@ -237,10 +237,17 @@ describe("shadcn ui components render", () => {
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   });
 
-  it("design-system variants render: Card interactive, Button ghost-destructive, ToggleGroup swatch", () => {
+  it("design-system variants render: Card flush + interactive, Button ghost-destructive, ToggleGroup swatch", () => {
     const { container } = render(
       <>
         <Card variant="interactive" />
+        <Card variant="flush" data-testid="flush-card">
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button>toggle</Button>
+            </CollapsibleTrigger>
+          </Collapsible>
+        </Card>
         <Button variant="ghost-destructive">x</Button>
         <Button variant="ghost-toggle-destructive" size="icon-md" aria-pressed>
           rec
@@ -251,6 +258,17 @@ describe("shadcn ui components render", () => {
       </>
     );
     expect(container.querySelector('[data-variant="interactive"]')).not.toBeNull();
+    const flush = screen.getByTestId("flush-card");
+    expect(flush).toHaveAttribute("data-variant", "flush");
+    expect(flush).toHaveClass("overflow-hidden", "gap-0", "py-0");
+    // The trigger must keep the slot the flush variant targets, so its focus ring can go inset.
+    expect(screen.getByRole("button", { name: "toggle" })).toHaveAttribute(
+      "data-slot",
+      "collapsible-trigger"
+    );
+    expect(flush.className).toContain(
+      "[&_[data-slot=collapsible-trigger]]:focus-visible:ring-inset"
+    );
     expect(screen.getByRole("button", { name: "x" })).toHaveClass("text-destructive");
     const toggle = screen.getByRole("button", { name: "rec", pressed: true });
     expect(toggle).toHaveAttribute("data-variant", "ghost-toggle-destructive");
