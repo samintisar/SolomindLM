@@ -17,15 +17,15 @@
 
 ## Design
 
-### 1. Header: one row (`HomeHeader`, new)
+### 1. Header (`HomeHeader`, new)
 
-The left side has the page title **"Your notebooks"** (serif display). The right side, in order:
+Two compact rows at every width. The first holds the page title **"Your notebooks"** (serif display) and the primary create action. The second holds the tabs on the left and the view controls on the right. The controls:
 - **Tabs:** All · My notebooks · Featured. shadcn `Tabs`, list only. The panels stay as today's conditional sections.
 - **View toggle:** `ToggleGroup` type single, grid or list, each item with an `aria-label`.
 - **Sort:** `Select` with "Most recent" and "Title (A–Z)". It replaces the custom dropdown and its open state.
 - **Primary action:** a split button. **New notebook** is `Button` default. Next to it, a `DropdownMenu` trigger (chevron, `aria-label="More create options"`) holds **New folder**. The onboarding target `data-onboarding="create-notebook-button"` moves onto the New notebook button.
 
-On phone (<640px) the title and New notebook share the first row. The tabs and toggle/sort move to a second row, and the tabs scroll horizontally if needed. The signed-out behaviour is unchanged: create actions call `onRequireAuth(...)`.
+On phone the second row wraps if needed. The signed-out behaviour is unchanged: create actions call `onRequireAuth(...)`.
 
 The dashed create tiles and list rows are **removed** from `RecentSection` and `FolderView`. Inside a folder, the folder header gets its own **New notebook** button, which creates the notebook directly in that folder, as today.
 
@@ -88,6 +88,6 @@ When a signed-in user has no notebooks or folders, the grid area shows `Empty`: 
 - Folder and notebook cards with the same swatch are distinguishable in grid and list view. New notebooks never show the folder icon (#226).
 - Every dialog traps focus, closes on Esc and returns focus to its trigger.
 - Keyboard: cards are focusable and open on Enter. The actions menu is reachable without opening the card.
-- Unit tests updated: `useNotebookCRUD.test.ts` (Book default), plus new tests for the icon fallback mapping, the header create split-button (signed-out → `onRequireAuth`) and the card actions menu.
+- Unit tests updated: `useNotebookCRUD.test.ts` (Book default), plus new tests for the icon fallback mapping, card meta text, the header (create split button, tabs, view toggle), notebook/folder cards and their actions menu, and the customize dialog. The signed-out guard in `HomePage` is unchanged and not newly tested.
 - `typecheck:web`, `typecheck:convex`, `lint`, `lint:design` and `test:web` all pass. `test:convex` passes if the create fallback changes.
 - Visual check (Playwright) at 1440×900, 768×1024 and 390×844: grid, list, empty state and each dialog.
