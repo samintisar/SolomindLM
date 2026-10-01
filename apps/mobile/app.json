@@ -17,6 +17,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
       "associatedDomains": ["applinks:www.solomindlm.com"],
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
