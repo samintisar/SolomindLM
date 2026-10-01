@@ -306,9 +306,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         await rejectPlanMutation({ planId });
       } catch (err) {
         console.error("[ResearchPlan] Reject failed:", err);
+        toastError("Couldn't cancel the research plan. Please try again.");
       }
     },
-    [rejectPlanMutation]
+    [rejectPlanMutation, toastError]
   );
 
   const chatInputDisabled = isSending || isLoading || remoteGenerationBlocksSend;

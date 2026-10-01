@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   session: null as unknown,
   table: null as unknown,
   report: null as unknown,
+  toastError: vi.fn(),
+}));
+
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: mocks.toastError }),
 }));
 
 vi.mock("../services/literatureReviewApi", () => ({
@@ -45,6 +50,7 @@ function renderMessage(
 }
 
 beforeEach(() => {
+  mocks.toastError.mockReset();
   mocks.session = null;
   mocks.table = null;
   mocks.report = null;
@@ -62,6 +68,17 @@ describe("LiteratureReviewMessage failed state", () => {
     expect(alert).toHaveTextContent("Search provider timed out");
     await userEvent.click(screen.getByRole("button", { name: "Retry from last step" }));
     expect(mocks.retry).toHaveBeenCalledWith({ sessionId: "s1" });
+  });
+
+  test("a failed retry is reported instead of left unhandled", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.retry.mockRejectedValue(new Error("boom"));
+    renderMessage({ status: "failed", error: "Search provider timed out" });
+    await userEvent.click(screen.getByRole("button", { name: "Retry from last step" }));
+    expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Retry from last step" })).toBeEnabled();
+    consoleError.mockRestore();
   });
 
   test("falls back to generic copy when there is no error message", () => {
@@ -89,6 +106,20 @@ describe("LiteratureReviewMessage column confirmation", () => {
         { id: "c2", name: "Outcome", instructions: undefined, isVisible: true },
       ],
     });
+  });
+
+  test("a failed confirm shows a toast and keeps the edited columns", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.confirm.mockRejectedValue(new Error("boom"));
+    const input = screen.getByRole("textbox", { name: "Column name 1" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "N per group");
+    await userEvent.click(screen.getByRole("button", { name: /Continue/ }));
+    expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "Column name 1" })).toHaveValue("N per group");
+    expect(screen.getByRole("button", { name: /Continue/ })).toBeEnabled();
+    consoleError.mockRestore();
   });
 
   test("toggling a column off updates the count and what is sent", async () => {
