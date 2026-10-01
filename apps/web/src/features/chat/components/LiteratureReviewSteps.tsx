@@ -136,6 +136,7 @@ export const LiteratureReviewSteps: React.FC<LiteratureReviewStepsProps> = ({
               <button
                 type="button"
                 onClick={() => toggleStep(index)}
+                aria-expanded={isExpanded}
                 className="group flex w-full items-start gap-1.5 text-left font-sans"
               >
                 <span className="text-base font-semibold leading-snug tracking-tight text-foreground">
