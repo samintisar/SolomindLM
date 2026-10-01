@@ -5,11 +5,6 @@
   "features/billing": {
     "shadcn/no-raw-colors": 1
   },
-  "features/chat": {
-    "shadcn/no-arbitrary-values": 79,
-    "shadcn/no-inline-styles": 23,
-    "shadcn/no-raw-colors": 14
-  },
   "features/feedback": {
     "shadcn/no-arbitrary-values": 1,
     "shadcn/no-restyle": 3
