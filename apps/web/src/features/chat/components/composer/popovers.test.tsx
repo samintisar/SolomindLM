@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { FiltersPopover } from "./FiltersPopover";
@@ -40,6 +40,18 @@ describe("ResearchDatabaseMenu", () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("pubmed"));
     await userEvent.keyboard("{/ArrowDown}");
     expect(screen.getByRole("radio", { name: "PubMed" })).toBeInTheDocument();
+  });
+
+  test("a lost arrow keyup doesn't stop a later click from closing", async () => {
+    const onChange = vi.fn();
+    render(<ResearchDatabaseMenu value="all" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Research databases/ }));
+    const first = await screen.findByRole("radio", { name: "All Papers" });
+    // Arrow keydown with no keyup (e.g. the window lost focus while the key was held).
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    await userEvent.click(screen.getByRole("radio", { name: "ArXiv" }));
+    expect(onChange).toHaveBeenLastCalledWith("arxiv");
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
   });
 
   test("Enter on a radio chooses it and closes", async () => {

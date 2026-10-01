@@ -41,8 +41,9 @@ export function FiltersPopover({
   const active = hasAcademicFilters && (isLiterature || academicChannelOn);
   const onlyOneChannel = sourceFilters.length === 1;
 
-  // Literature Review has nothing to show without the academic handler.
-  if (isLiterature && !onAcademicDiscoveryFiltersChange) return null;
+  // Literature Review shows only the academic filters, so it has nothing to show without their handler.
+  const literatureFiltersHandler = isLiterature ? onAcademicDiscoveryFiltersChange : undefined;
+  if (isLiterature && !literatureFiltersHandler) return null;
 
   // A channel can be turned off only while another stays on, so a query always has a source.
   const toggleChannel = (id: SourceFilterId, checked: boolean) => {
@@ -87,14 +88,12 @@ export function FiltersPopover({
         collisionPadding={16}
         className="max-h-(--radix-popover-content-available-height) w-76 max-w-(--radix-popover-content-available-width) overflow-y-auto overscroll-contain"
       >
-        {isLiterature ? (
-          onAcademicDiscoveryFiltersChange ? (
-            <AcademicDiscoveryFiltersSection
-              academic={academicDiscoveryFilters ?? {}}
-              setAcademic={onAcademicDiscoveryFiltersChange}
-              showTopDivider={false}
-            />
-          ) : null
+        {literatureFiltersHandler ? (
+          <AcademicDiscoveryFiltersSection
+            academic={academicDiscoveryFilters ?? {}}
+            setAcademic={literatureFiltersHandler}
+            showTopDivider={false}
+          />
         ) : (
           <>
             <p className="mb-2 font-sans text-xs font-medium text-muted-foreground">

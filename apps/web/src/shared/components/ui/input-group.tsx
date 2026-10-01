@@ -18,7 +18,9 @@ const inputGroupVariants = cva("", {
     variant: {
       default: "",
       // Chat composer: a raised card that stacks the textarea over a toolbar row.
-      composer: "h-auto flex-col items-stretch rounded-2xl bg-card shadow-lg dark:bg-card",
+      // The textarea gets roomier side and top padding than a plain input group's.
+      composer:
+        "h-auto flex-col items-stretch rounded-2xl bg-card shadow-lg dark:bg-card *:data-[slot=input-group-control]:px-4 *:data-[slot=input-group-control]:pt-3.5",
     },
   },
   defaultVariants: {
@@ -93,6 +95,11 @@ function InputGroupAddon({
       data-align={align}
       className={cn(inputGroupAddonVariants({ align }), className)}
       onClick={(e) => {
+        // React bubbles clicks from portalled content (popovers opened from the addon) through
+        // here; only clicks on the addon's own DOM should move focus.
+        if (!e.currentTarget.contains(e.target as Node)) {
+          return;
+        }
         if ((e.target as HTMLElement).closest("button")) {
           return;
         }

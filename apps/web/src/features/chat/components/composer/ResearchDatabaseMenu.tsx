@@ -20,12 +20,19 @@ export function ResearchDatabaseMenu({ value, onChange, disabled }: ResearchData
   const current = RESEARCH_DATABASES.find((d) => d.id === value) ?? RESEARCH_DATABASES[0];
   const CurrentIcon = current.icon;
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        // A keyup lost to a window blur would leave the flag stuck; start each opening clean.
+        arrowKeyDownRef.current = false;
+        setOpen(next);
+      }}
+    >
       <ControlTooltip label={current.title}>
         <PopoverTrigger asChild disabled={disabled}>
           <Button
             variant="ghost"
-            size="sm"
+            size="sm-adaptive"
             disabled={disabled}
             aria-label={`Research databases: ${current.title}`}
           >
@@ -56,6 +63,9 @@ export function ResearchDatabaseMenu({ value, onChange, disabled }: ResearchData
             arrowKeyDownRef.current = e.key.startsWith("Arrow");
           }}
           onKeyUp={() => {
+            arrowKeyDownRef.current = false;
+          }}
+          onPointerDown={() => {
             arrowKeyDownRef.current = false;
           }}
           value={value}
