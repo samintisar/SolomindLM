@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Favicon } from "@/shared/components/Favicon";
 import { Button } from "@/shared/components/ui/button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
@@ -10,10 +10,8 @@ import {
   getSourceHost,
   prepareCitationExcerpt,
 } from "../utils/citationContent";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
+// The same lazy component messages render with, so it's already loaded when a card first opens.
+import { MarkdownRendererLazy } from "../utils/MarkdownRendererLazy";
 
 interface CitationCardProps {
   /** The citation number shown on the chip (not the retrieval chunk id). */
@@ -88,7 +86,9 @@ export function CitationCard({
       </div>
       <div className="max-h-64 min-h-0 overflow-y-auto overscroll-contain border-t border-border/60 px-4 py-3 leading-relaxed wrap-break-word">
         <Suspense fallback={<Skeleton className="h-4 w-full" />}>
-          <MarkdownRenderer components={citationMarkdownComponents}>{excerpt}</MarkdownRenderer>
+          <MarkdownRendererLazy components={citationMarkdownComponents}>
+            {excerpt}
+          </MarkdownRendererLazy>
         </Suspense>
       </div>
       {onAddToNotebook && (
