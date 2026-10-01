@@ -8,11 +8,15 @@ describe("caseFileStem", () => {
 
   it("flattens namespaced use-case pack ids into one path segment", () => {
     expect(caseFileStem("medical-students/flashcards-heart-anatomy")).toBe(
-      "medical-students__flashcards-heart-anatomy"
+      "medical-students%2Fflashcards-heart-anatomy"
     );
   });
 
-  it("flattens backslashes too, so no id can escape its directory", () => {
-    expect(caseFileStem("a\\b/c")).toBe("a__b__c");
+  it("encodes backslashes too, so no id can escape its directory", () => {
+    expect(caseFileStem("a\\b/c")).toBe("a%5Cb%2Fc");
+  });
+
+  it("never maps two distinct ids to the same stem", () => {
+    expect(caseFileStem("a/b")).not.toBe(caseFileStem("a__b"));
   });
 });
