@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the `medical-students` use-case eval pack: four OpenStax *Anatomy and Physiology* (1st edition, CC BY 4.0) sections printed to PDF, 10 fixtures and a six-check rubric, registered so `eval:usecases` scores it.
+**Goal:** Add the `medical-students` use-case eval pack: four English Wikipedia anatomy & physiology articles (pinned revisions, CC BY-SA 4.0) printed to PDF, 10 fixtures and a six-check rubric, registered so `eval:usecases` scores it.
 
 **Architecture:** A pack is a folder under `evals/rag/usecases/<id>/` with `manifest.ts`, `fixtures.ts` and `sources/` (+ `LICENSES.md`), registered in `evals/rag/usecases/index.ts`. The framework (#229, already on `main`) validates, seeds and runs it; this plan adds content only. No Convex, prompt or agent code changes.
 
@@ -23,7 +23,7 @@
 | Path | Action | Responsibility |
 |---|---|---|
 | `.cache/openstax/` | create (gitignored) | print and check scripts; never committed |
-| `evals/rag/usecases/medical-students/sources/*.pdf` | create | the four 1st-edition sections printed to PDF |
+| `evals/rag/usecases/medical-students/sources/*.pdf` | create | the four pinned Wikipedia revisions printed to PDF |
 | `evals/rag/usecases/medical-students/sources/LICENSES.md` | create | attribution + page range per file (parsed by `validatePack`) |
 | `evals/rag/usecases/medical-students/manifest.ts` | create | `medicalStudentsPack: UseCasePack` (claim, features, sources, rubric) |
 | `evals/rag/usecases/medical-students/fixtures.ts` | create | `medicalStudentsFixtures: EvalFixture[]` (10 fixtures) |
@@ -35,31 +35,37 @@ Pack modules must import only types from `../types` and `../../types`; importing
 
 ---
 
-### Task 1: (done) Choose the source edition
+### Task 1: (done) Choose the sources
 
-The 2nd edition is CC BY-NC-SA 4.0 (non-commercial), so it was dropped (user decision, 2026-10-01). Sources are the **1st edition** (2013, CC BY 4.0), which is web-only. Nothing to do; Tasks 2–4 replace the old download/locate/cut steps.
+Decided 2026-10-01 with the user. OpenStax is out: the 2e is CC BY-NC-SA, and the 1e's pages forbid non-commercial-only reuse and ingestion into AI products without permission. SEER (US government) is too shallow. Sources are four **English Wikipedia articles at pinned revisions** (CC BY-SA 4.0):
+
+| File | Title | `oldid` |
+|---|---|---|
+| `heart-anatomy.pdf` | Heart | 1375195018 |
+| `cardiac-cycle.pdf` | Cardiac cycle | 1376968670 |
+| `cranial-nerves.pdf` | Cranial nerves | 1357482168 |
+| `glomerular-filtration.pdf` | Glomerular filtration rate | 1372412934 |
 
 ---
 
 ### Task 2: Write the print script
 
 **Files:**
-- Create: `.cache/openstax/print.mjs` (gitignored by `.gitignore:120` `.cache`; never committed)
+- Create: `.cache/openstax/print-wp.mjs` (gitignored by `.gitignore:120` `.cache`; never committed)
 
 - [ ] **Step 1: Write the script**
 
 ```js
-// .cache/openstax/print.mjs — usage: node print.mjs <slug> <out.pdf>
-// Prints one OpenStax A&P 1e section to PDF with the site chrome and cookie banner hidden.
+// .cache/openstax/print-wp.mjs — usage: node print-wp.mjs <Title> <oldid> <out.pdf>
+// Prints one pinned Wikipedia revision to PDF with Wikipedia's print stylesheet; downscales large figures.
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { chromium } from "playwright";
 
 const MAX_WIDTH = 1200;
-const [slug, out] = process.argv.slice(2);
+const [title, oldid, out] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: "chrome" });
-const page = await browser.newPage();
-// Downscale figures wider than MAX_WIDTH to keep the PDFs small (OpenStax serves ~300 dpi figures).
-// Figure URLs (openstax.org/apps/image-cdn/v1/f=webp/...) have no file extension, so match by resource type.
+const page = await browser.newPage({ userAgent: "SolomindLM-eval-pack/1.0 (samintisardev@gmail.com)" });
+// Downscale figures wider than MAX_WIDTH (image URLs may lack extensions, so match by resource type).
 await page.route("**/*", async (route) => {
   if (route.request().resourceType() !== "image") return route.continue();
   const response = await route.fetch();
@@ -78,11 +84,9 @@ await page.route("**/*", async (route) => {
     return route.fulfill({ response, body }); // not decodable (e.g. svg): pass through
   }
 });
-await page.goto(`https://openstax.org/books/anatomy-and-physiology/pages/${slug}`, {
-  waitUntil: "networkidle",
-  timeout: 90_000,
-});
-await page.waitForSelector("main h1, [data-type='page'] h1, h1", { timeout: 30_000 });
+const url = `https://en.wikipedia.org/w/index.php?title=${encodeURIComponent(title)}&oldid=${oldid}`;
+await page.goto(url, { waitUntil: "networkidle", timeout: 90_000 });
+await page.waitForSelector("#mw-content-text", { timeout: 30_000 });
 // Load lazy images: scroll to the bottom in steps.
 await page.evaluate(async () => {
   for (let y = 0; y < document.body.scrollHeight; y += 800) {
@@ -91,12 +95,9 @@ await page.evaluate(async () => {
   }
 });
 await page.waitForLoadState("networkidle");
-// Hide the cookie/consent banner and fixed site chrome without interacting with them.
+// Hide site notices (fundraising/CentralNotice banners) and the old-revision warning; not article content.
 await page.addStyleTag({
-  content: `
-    #onetrust-consent-sdk, .onetrust-pc-dark-filter, [id*="cookie" i], [class*="cookie" i],
-    [class*="consent" i], header, nav, footer, [data-testid="toolbar"], [data-testid="topbar"] { display: none !important; }
-  `,
+  content: `#siteNotice, #centralNotice, .cn-fundraising, .frb, #mw-revision-info, .mw-revision, #contentSub { display: none !important; }`,
 });
 await page.emulateMedia({ media: "print" });
 await page.pdf({ path: out, format: "Letter", printBackground: true, margin: { top: "0.5in", bottom: "0.5in", left: "0.5in", right: "0.5in" } });
@@ -104,11 +105,11 @@ await browser.close();
 console.log(out);
 ```
 
-Playwright (1.63) and `@napi-rs/canvas` are already in `node_modules`; `channel: "chrome"` uses the installed Google Chrome. Hiding the banner with CSS means no consent choice is made. Without the downscaling route the heart and cranial-nerve sections print at 19 MB and 14 MB.
+`playwright` (1.63) and `@napi-rs/canvas` are already in `node_modules`; `channel: "chrome"` uses the installed Google Chrome.
 
 ---
 
-### Task 3: Print the four sections and check them
+### Task 3: Print the four articles and check them
 
 **Files:**
 - Create: `evals/rag/usecases/medical-students/sources/heart-anatomy.pdf`
@@ -121,31 +122,42 @@ Playwright (1.63) and `@napi-rs/canvas` are already in `node_modules`; `channel:
 ```bash
 D=evals/rag/usecases/medical-students/sources
 mkdir -p $D
-node .cache/openstax/print.mjs 19-1-heart-anatomy $D/heart-anatomy.pdf
-node .cache/openstax/print.mjs 19-3-cardiac-cycle $D/cardiac-cycle.pdf
-node .cache/openstax/print.mjs 13-4-the-peripheral-nervous-system $D/cranial-nerves.pdf
-node .cache/openstax/print.mjs 25-5-physiology-of-urine-formation $D/glomerular-filtration.pdf
+node .cache/openstax/print-wp.mjs "Heart" 1375195018 $D/heart-anatomy.pdf
+node .cache/openstax/print-wp.mjs "Cardiac cycle" 1376968670 $D/cardiac-cycle.pdf
+node .cache/openstax/print-wp.mjs "Cranial nerves" 1357482168 $D/cranial-nerves.pdf
+node .cache/openstax/print-wp.mjs "Glomerular filtration rate" 1372412934 $D/glomerular-filtration.pdf
 ```
 
-- [ ] **Step 2: Check size, heading, banner text and the cranial nerve table**
+- [ ] **Step 2: Check size, title, notices and coverage**
 
 ```bash
-ls -l $D/*.pdf                                    # each < 5 MB, total < 15 MB
-for f in $D/*.pdf; do echo "== $f"; pdfinfo "$f" | grep Pages; pdftotext -l 1 "$f" - | head -2; done
-for f in $D/*.pdf; do printf "%s banner hits: " "$f"; pdftotext "$f" - | grep -ciE "cookie|privacy notice|reject all|accept all"; done   # expected: 0 each
+ls -l $D/*.pdf                                    # target each < 5 MB, total < 15 MB
+for f in $D/*.pdf; do echo "== $f"; pdfinfo "$f" | grep Pages; pdftotext -l 1 "$f" - | head -3; done
+for f in $D/*.pdf; do printf "%s notice hits: " "$f"; pdftotext "$f" - | grep -ciE "donate|fundraising|this is an old revision|cookie"; done   # expected: 0 each
 pdftotext -layout $D/cranial-nerves.pdf - | grep -ioE "olfactory|optic|oculomotor|trochlear|trigeminal|abducens|facial|vestibulocochlear|glossopharyngeal|vagus|accessory|hypoglossal" | tr A-Z a-z | sort -u | wc -l   # expected: 12
-pdftotext $D/glomerular-filtration.pdf - | grep -ciE "net filtration pressure|GFR"   # expected: > 0
+pdftotext $D/glomerular-filtration.pdf - | grep -ciE "net filtration pressure|125"   # expected: > 0
+pdftotext $D/cardiac-cycle.pdf - | grep -ciE "isovolumic|isovolumetric"            # expected: > 0
 ```
 
-Expected: the first line of each file is its section heading (e.g. `19.3 Cardiac Cycle`); no banner text; all 12 cranial nerves; GFR material present.
+Expected: the article title is near the top of page 1; no fundraising or old-revision notices; all 12 cranial nerves; GFR and isovolumic material present. If a notice remains, add its selector to the hide list and re-print; never hide article content.
 
-- [ ] **Step 3: Check figures rendered**
+- [ ] **Step 3: Check figures and their licences**
 
 ```bash
-pdfimages -list $D/heart-anatomy.pdf | head -5   # expected: image rows listed (figures present)
+pdfimages -list $D/heart-anatomy.pdf | head -8     # figures present, max width 1200
 ```
 
-If `pdfimages` is unavailable, render a page (`pdftoppm -f 2 -l 2 -png -r 60 <file> .cache/openstax/check`) and look at it. If figures are blank, increase the scroll wait in `print.mjs` (e.g. 400 ms) and re-print. Also confirm figures are at most 1,200 px wide (`pdfimages -list`) and their labels are legible (render a figure page with `pdftoppm -r 100` and look at it). If a file still exceeds 5 MB, keep it and note the size in the PR body.
+Render one figure page (`pdftoppm -f 2 -l 2 -png -r 100 $D/heart-anatomy.pdf .cache/openstax/check`) and look at it: labels legible. Then confirm every image is freely licensed (Commons), with no non-free/fair-use files:
+
+```bash
+for t in Heart "Cardiac cycle" "Cranial nerves" "Glomerular filtration rate"; do
+  curl -s -A "SolomindLM-eval-pack/1.0" --get "https://en.wikipedia.org/w/api.php" \
+    --data-urlencode "titles=$t" --data "action=query&generator=images&gimlimit=max&prop=imageinfo&iiprop=extmetadata&iiextmetadatafilter=LicenseShortName&format=json&formatversion=2" \
+  | python -c "import json,sys; d=json.load(sys.stdin); [print(p['title'], '|', (p.get('imageinfo') or [{}])[0].get('extmetadata',{}).get('LicenseShortName',{}).get('value','?')) for p in d.get('query',{}).get('pages',[])]"
+done | grep -viE "\| (CC BY|CC0|Public domain|PD|GFDL)" || echo "all images freely licensed"
+```
+
+Any image listed as non-free or with an unknown licence: report it. Don't commit until it's resolved, e.g. by hiding that one figure with a CSS rule on its file name and noting it in `LICENSES.md`.
 
 ---
 
@@ -154,28 +166,43 @@ If `pdfimages` is unavailable, render a page (`pdftoppm -f 2 -l 2 -png -r 60 <fi
 **Files:**
 - Create: `evals/rag/usecases/medical-students/sources/LICENSES.md`
 
-- [ ] **Step 1: Write the file**
+- [ ] **Step 1: Get revision timestamps**
 
-`validatePack` parses lines of the form `- <fileName>: …` (file name followed directly by `:`). Check the author list against the 1st edition's preface or book page before committing.
+```bash
+for id in 1375195018 1376968670 1357482168 1372412934; do
+  curl -s -A "SolomindLM-eval-pack/1.0" "https://en.wikipedia.org/w/api.php?action=query&prop=revisions&revids=$id&rvprop=ids|timestamp&format=json&formatversion=2" \
+  | python -c "import json,sys; p=json.load(sys.stdin)['query']['pages'][0]; print(p['title'], p['revisions'][0]['revid'], p['revisions'][0]['timestamp'])"
+done
+```
+
+- [ ] **Step 2: Write the file**
+
+`validatePack` parses lines of the form `- <fileName>: …` (file name followed directly by `:`).
 
 ```markdown
 # Source licences: medical-students
 
-All sources are from **Anatomy and Physiology** (1st edition) by J. Gordon Betts, Kelly A. Young, James A. Wise, Eddie Johnson, Brandon Poe, Dean H. Kruse, Oksana Korol, Jody E. Johnson, Mark Womble and Peter DeSaix, published by OpenStax (Rice University), 2013. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Book: https://openstax.org/books/anatomy-and-physiology/pages/1-introduction
+All sources are English Wikipedia articles, licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/). Authors are the Wikipedia contributors listed in each article's revision history (linked below).
 
-Each file is one whole section of the web edition, printed to PDF from openstax.org on 2026-10-01 with headless Chrome. Site navigation and the cookie banner were hidden before printing, and figures wider than 1,200 px were downscaled to 1,200 px (JPEG) to keep the files small; the section's text, captions and tables were not changed. The OpenStax name, OpenStax logo, OpenStax book covers, Rice University name and Rice University logo are not subject to the Creative Commons licence.
+Each file is the pinned article revision printed to PDF from en.wikipedia.org on 2026-10-01 with headless Chrome and Wikipedia's print stylesheet. Site notices were hidden, and figures wider than 1,200 px were downscaled to 1,200 px (JPEG) to keep the files small; the article text, tables and captions were not changed. Images keep their own licences, given on each image's Wikimedia Commons file page.
 
-- heart-anatomy.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 19.1 Heart Anatomy, printed from https://openstax.org/books/anatomy-and-physiology/pages/19-1-heart-anatomy
-- cardiac-cycle.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 19.3 Cardiac Cycle, printed from https://openstax.org/books/anatomy-and-physiology/pages/19-3-cardiac-cycle
-- cranial-nerves.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 13.4 The Peripheral Nervous System (includes the cranial nerves and their table), printed from https://openstax.org/books/anatomy-and-physiology/pages/13-4-the-peripheral-nervous-system
-- glomerular-filtration.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 25.5 Physiology of Urine Formation, printed from https://openstax.org/books/anatomy-and-physiology/pages/25-5-physiology-of-urine-formation
+- heart-anatomy.pdf: CC BY-SA 4.0, Wikipedia, "Heart", revision 1375195018 (<timestamp>), https://en.wikipedia.org/w/index.php?title=Heart&oldid=1375195018, authors: https://en.wikipedia.org/w/index.php?title=Heart&action=history
+- cardiac-cycle.pdf: CC BY-SA 4.0, Wikipedia, "Cardiac cycle", revision 1376968670 (<timestamp>), https://en.wikipedia.org/w/index.php?title=Cardiac_cycle&oldid=1376968670, authors: https://en.wikipedia.org/w/index.php?title=Cardiac_cycle&action=history
+- cranial-nerves.pdf: CC BY-SA 4.0, Wikipedia, "Cranial nerves", revision 1357482168 (<timestamp>), https://en.wikipedia.org/w/index.php?title=Cranial_nerves&oldid=1357482168, authors: https://en.wikipedia.org/w/index.php?title=Cranial_nerves&action=history
+- glomerular-filtration.pdf: CC BY-SA 4.0, Wikipedia, "Glomerular filtration rate", revision 1372412934 (<timestamp>), https://en.wikipedia.org/w/index.php?title=Glomerular_filtration_rate&oldid=1372412934, authors: https://en.wikipedia.org/w/index.php?title=Glomerular_filtration_rate&action=history
 ```
 
-- [ ] **Step 2: Commit the sources**
+Replace each `<timestamp>` with the value from Step 1. If you hid any notice beyond those listed in `print-wp.mjs`, or any figure (Task 3 Step 3), say so in the second paragraph. No angle-bracket placeholder may remain:
+
+```bash
+grep -n "<" evals/rag/usecases/medical-students/sources/LICENSES.md   # expected: no output
+```
+
+- [ ] **Step 3: Commit the sources**
 
 ```bash
 git add evals/rag/usecases/medical-students/sources
-git commit -m "feat(evals): add OpenStax A&P (1st edition) sources for the medical students pack" -m "Refs #270" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "feat(evals): add Wikipedia sources for the medical students pack" -m "Refs #270" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -252,8 +279,8 @@ Expected: FAIL with `Unknown use-case pack "medical-students". Registered: …`.
 import type { UseCasePack } from "../types";
 
 /**
- * Medical students: lecture material uploaded as PDF (here OpenStax anatomy &
- * physiology excerpts). Rubric checks describe what a good study aid looks like
+ * Medical students: study material uploaded as PDF (here Wikipedia anatomy &
+ * physiology articles). Rubric checks describe what a good study aid looks like
  * for any medical content, not these particular sources.
  */
 export const medicalStudentsPack: UseCasePack = {
@@ -650,7 +677,7 @@ Expected: the use-case dry run says `Running 10 fixture(s)` (plus 10 per other r
 git add evals/rag/usecases/index.ts evals/rag/usecases/medical-students/manifest.ts evals/rag/usecases/medical-students/fixtures.ts evals/rag/usecases/medical-students/pack.test.ts
 git commit -m "feat(evals): add Medical Students use-case pack
 
-Four OpenStax A&P (1st edition) sections as PDF (heart anatomy, cardiac cycle,
+Four Wikipedia anatomy & physiology articles as PDF (pinned revisions) (heart anatomy, cardiac cycle,
 cranial nerves, glomerular filtration), 10 fixtures across flashcards,
 quiz, written questions and chat (smoke 2, train 6, holdout 2), and six
 general rubric checks for medical study material.
@@ -802,7 +829,7 @@ gh pr create --base main --title "feat(evals): add Medical Students use-case pac
 ## What
 The Medical Students use-case eval pack (#270), on the framework from #229.
 
-- **Sources:** four sections of OpenStax *Anatomy and Physiology* (1st edition, CC BY 4.0) printed to PDF, so they go through OCR like a lecture upload: <list each file with section, page count and size>. The 2nd edition is CC BY-NC-SA (non-commercial), so it is not used.
+- **Sources:** four English Wikipedia articles at pinned revisions (CC BY-SA 4.0) printed to PDF, so they go through OCR like an uploaded study PDF: <list each file with article, revision, page count and size>. OpenStax was not used: its terms restrict commercial use and ingestion into AI products.
 - **Fixtures:** 10 across flashcards, quiz, written questions and chat (smoke 2, train 6, holdout 2).
 - **Rubric:** six checks for any medical study material: card fronts hide answers, one fact per item, terms and values exact, answer keys supported, mechanisms in source order, no unsourced clinical claims.
 - **CI:** `eval:usecases:dry` <added | already added by #230>.

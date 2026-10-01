@@ -19,7 +19,7 @@ Medical study material fails in its own ways:
 
 ## Goal
 
-A pack that scores flashcards, quiz, written questions and chat on real anatomy & physiology lecture material uploaded as PDF, with rubric checks that would apply to any medical study material.
+A pack that scores flashcards, quiz, written questions and chat on anatomy & physiology study material uploaded as PDF, with rubric checks that would apply to any medical study material.
 
 **Non-goal:** tuning agents or prompts to this pack. Scorecard-driven fixes follow the CLAUDE.md prompt rule: general pipeline engineering only.
 
@@ -39,18 +39,26 @@ evals/rag/usecases/medical-students/
 
 **Manifest:** `id: "medical-students"`, `title` and `notebookTitle: "Medical Students"`, `advertisedClaim` set to the landing-page line above, `features: ["flashcards", "quiz", "writtenQuestions", "chat"]`, `sources` listing the four PDFs.
 
-**Sources:** OpenStax *Anatomy and Physiology* **1st edition** (Rice University, 2013), licensed **CC BY 4.0**. The 2nd edition was the first choice, but it is now CC BY-NC-SA 4.0 (non-commercial). SolomindLM is a paid product, so it was dropped on 2026-10-01 (user decision). The 1st edition is web-only, so each file is one whole web section printed to PDF from openstax.org with headless Chrome (Playwright). Site chrome and the cookie banner are hidden before printing. Figures wider than 1,200 px are downscaled to 1,200 px (JPEG), because full-resolution figures made two files 14–19 MB. Text, captions and tables are not altered. Figures, captions, tables and the section's own text are kept, so the file still goes through OCR like an uploaded lecture PDF. What's lost compared with a book PDF is the typeset page layout (running headers, page numbers, page breaks).
+**Sources:** four English Wikipedia articles at pinned revisions, licensed **CC BY-SA 4.0**. Commercial use is allowed, and nothing in the licence restricts ingestion into an AI product.
 
-| File | Section (1st edition) | What it stresses |
+How we got here (2026-10-01, user decisions):
+
+- **OpenStax *Anatomy and Physiology* 2e** was the first choice. It is CC BY-NC-SA 4.0 (non-commercial), and SolomindLM is a paid product.
+- **The OpenStax 1st edition** carries CC BY 4.0 metadata, but its pages restrict reuse to non-commercial purposes. They also state the book "may not be used in the training of large language models or otherwise be ingested into large language models or generative AI offerings without OpenStax's prior written permission". That is our use.
+- **NIH/NCI SEER Training** (US government) is too shallow: no cranial-nerve table, a three-sentence cardiac cycle, and no GFR material.
+
+Each article is printed to PDF from its pinned revision URL (`https://en.wikipedia.org/w/index.php?title=<Title>&oldid=<revid>`) with headless Chrome (Playwright) and Wikipedia's own print stylesheet. Figures wider than 1,200 px are downscaled to 1,200 px (JPEG) to keep files small. Text, tables and captions are not altered. The file still goes through OCR like an uploaded lecture PDF, with figures and tables. The trade-off is encyclopedic rather than lecture-style prose, including reference lists.
+
+| File | Article (revision checked 2026-10-01) | What it stresses |
 |---|---|---|
-| `heart-anatomy.pdf` | §19.1 Heart Anatomy | structure names in labelled figures |
-| `cardiac-cycle.pdf` | §19.3 Cardiac Cycle | phase order, valve timing, pressures and volumes |
-| `cranial-nerves.pdf` | §13.4 The Peripheral Nervous System (whole section; includes the cranial nerves and their reference table, and the spinal nerves) | table rows into one-fact items |
-| `glomerular-filtration.pdf` | §25.5 Physiology of Urine Formation | mechanism, normal values, pressure balance |
+| `heart-anatomy.pdf` | [Heart](https://en.wikipedia.org/w/index.php?title=Heart&oldid=1375195018) | structure names in labelled figures |
+| `cardiac-cycle.pdf` | [Cardiac cycle](https://en.wikipedia.org/w/index.php?title=Cardiac_cycle&oldid=1376968670) | phase order, valve timing, pressures and volumes |
+| `cranial-nerves.pdf` | [Cranial nerves](https://en.wikipedia.org/w/index.php?title=Cranial_nerves&oldid=1357482168) | the nerve/function table into one-fact items |
+| `glomerular-filtration.pdf` | [Glomerular filtration rate](https://en.wikipedia.org/w/index.php?title=Glomerular_filtration_rate&oldid=1372412934) | mechanism, normal values, pressure balance |
 
-Section slugs come from the 1st edition's table of contents (`13-4-the-peripheral-nervous-system`, `19-1-heart-anatomy`, `19-3-cardiac-cycle`, `25-5-physiology-of-urine-formation`). Each file is a whole section, so no page-range choice is needed. Target under 5 MB per file and under 15 MB for the pack.
+The revision ids above are pinned; re-printing uses the same `oldid`, so the sources never drift. Target under 5 MB per file and under 15 MB for the pack. "Heart" is long (about 12,500 words), so it is the likeliest to exceed that; if it does, keep it and note the size.
 
-**`LICENSES.md`:** a header gives the book, authors, publisher, edition, year, licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/) and book URL. It notes that each file is the named web section printed to PDF on 2026-10-01, with site navigation and the cookie banner hidden and figures downscaled to at most 1,200 px wide (text, captions and tables unaltered), and that the OpenStax name and logo are not covered by the licence. Below it is one entry per file in the format `validatePack` parses: `- <fileName>: CC BY 4.0, Anatomy and Physiology (1st edition), section <n> <title>, printed from <section URL>`. The section URLs are the reproduction record; the print script is not committed.
+**`LICENSES.md`:** a header gives the licence (CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/) and says the authors are the Wikipedia contributors listed in each article's history. It notes that each file is the pinned revision printed to PDF on 2026-10-01 with Wikipedia's print stylesheet, with figures wider than 1,200 px downscaled and text, tables and captions unaltered. It also notes that images keep their own licences, given on each image's Wikimedia Commons page. Below it is one entry per file in the format `validatePack` parses: `- <fileName>: CC BY-SA 4.0, Wikipedia, "<Title>", revision <revid> (<timestamp>), <oldid URL>, authors: <history URL>`. The `oldid` URLs are the reproduction record; the print script is not committed.
 
 **Registration:** `evals/rag/usecases/index.ts` adds `registerPack(medicalStudentsPack, medicalStudentsFixtures)`. Whichever pack PR lands second resolves a one-line conflict there.
 
@@ -96,7 +104,7 @@ The first two mirror the Language Learners checks, so answer leaks (#218) compar
 
 ## 4. Building and verification
 
-**Excerpts:** print the four 1st-edition sections to PDF with Playwright (headless Chrome), hiding site chrome and the cookie banner and downscaling figures wider than 1,200 px. Check each file opens, starts with its section heading, has text in a PDF text dump with no cookie-banner text, and keeps its figures.
+**Excerpts:** print the four pinned Wikipedia revisions to PDF with Playwright (headless Chrome), hiding site notices and downscaling figures wider than 1,200 px. Check each file opens, has its article title near the top, has text in a PDF text dump with no notice text, keeps its figures, and that every embedded image is freely licensed (no non-free/fair-use files).
 
 **Offline checks (required for the PR):**
 
