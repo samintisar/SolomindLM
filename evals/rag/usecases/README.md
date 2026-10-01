@@ -64,4 +64,4 @@ bun run eval:usecases:dry                   # offline dry run of pack fixtures (
 
 Deployment env (dev only): `RAG_EVALS_ENABLED=true`, `RAG_EVAL_SECRET`, `RAG_EVAL_OWNER_EMAIL`. Set the owner with `npx convex env set RAG_EVAL_OWNER_EMAIL you@example.com`. The bootstrap script only pushes it if `RAG_EVAL_OWNER_EMAIL` is exported in your shell; otherwise run `npx convex env set RAG_EVAL_OWNER_EMAIL <email>` against the dev deployment.
 
-Pack consistency (sources, licences, fixtures, rubric) is validated by `bun run test:convex` (`evals/rag/usecases/registry.test.ts`) by `eval:seed`, and by every `eval:rag` run that selects a pack.
+Pack consistency (sources, licences, fixtures, rubric) is validated by `bun run test:convex` (`evals/rag/usecases/registry.test.ts`), by `eval:seed`, by every `eval:rag` run that selects a pack, and in CI by `eval:usecases:dry`.
