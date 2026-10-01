@@ -5,7 +5,7 @@ test.describe("Notebook CRUD", () => {
   test("creates a new notebook", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
-    const createBtn = page.getByText("Create new notebook").first();
+    const createBtn = page.getByRole("button", { name: "New notebook" }).first();
     await createBtn.click();
 
     await expect(page.getByRole("heading", { name: "Create notebook" })).toBeVisible();
@@ -30,7 +30,7 @@ test.describe("Notebook CRUD", () => {
   test("navigates into a notebook", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
-    const notebookCards = page.locator('[class*="notebook"]').filter({ hasText: "" });
+    const notebookCards = page.locator('[data-slot="card"]');
     const count = await notebookCards.count();
 
     if (count > 0) {
@@ -45,28 +45,21 @@ test.describe("Notebook CRUD", () => {
     const beforeName = `e2e-rename-a-${Date.now()}`;
     const afterName = `e2e-rename-b-${Date.now()}`;
 
-    await page.getByText("Create new notebook").first().click();
+    await page.getByRole("button", { name: "New notebook" }).first().click();
     await page.getByPlaceholder("Notebook title").fill(beforeName);
     await page.getByRole("button", { name: "Create" }).click();
     await expect(page.getByText(beforeName, { exact: true })).toBeVisible({ timeout: 10_000 });
 
-    const notebookEl = page.getByText(beforeName, { exact: true });
-    const card = notebookEl.locator("..");
+    const card = page.locator('[data-slot="card"]', { hasText: beforeName });
+    await card.getByRole("button", { name: "Notebook actions" }).click();
+    await page.getByRole("menuitem", { name: "Customize" }).click();
 
-    await card.hover();
+    const titleInput = page.getByPlaceholder("Notebook title");
+    await titleInput.clear();
+    await titleInput.fill(afterName);
 
-    const menuBtn = card.locator('[class*="kebab"]').first();
-    if (await menuBtn.isVisible()) {
-      await menuBtn.click();
-      await page.getByText("Customize").click();
-
-      const titleInput = page.getByPlaceholder("Notebook title");
-      await titleInput.clear();
-      await titleInput.fill(afterName);
-
-      await page.getByRole("button", { name: "Save" }).click();
-      await expect(page.getByText(afterName, { exact: true })).toBeVisible({ timeout: 5_000 });
-    }
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText(afterName, { exact: true })).toBeVisible({ timeout: 5_000 });
 
     await tryDeleteNotebookByTitleFromHome(page, afterName);
     await tryDeleteNotebookByTitleFromHome(page, beforeName);

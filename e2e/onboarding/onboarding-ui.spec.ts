@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { test as authTest, expect as expectAuth } from "../fixtures/auth.fixture";
 import { expect, test } from "../fixtures/notebook.fixture";
 import { tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
-import { expectFixedBackdropZIndex100 } from "../helpers/onboarding-assertions";
+import { expectDialogAboveOnboarding } from "../helpers/onboarding-assertions";
 
 test.describe("Onboarding UI", () => {
   test("chat composer exposes data-onboarding anchor wrapping the textarea", async ({
@@ -13,40 +13,32 @@ test.describe("Onboarding UI", () => {
     await expect(anchor.locator("textarea")).toBeVisible();
   });
 
-  test("share modal backdrop uses z-index 100 for tour stacking", async ({ notebookPage }) => {
+  test("share dialog stacks above the tour", async ({ notebookPage }) => {
     await notebookPage.getByRole("button", { name: /Share/ }).click();
-    await expectFixedBackdropZIndex100(notebookPage, "Share notebook");
+    await expectDialogAboveOnboarding(notebookPage, "Share notebook");
     const shareDialog = notebookPage.getByRole("dialog", { name: /Share notebook/i });
     await shareDialog.getByRole("button", { name: "Close", exact: true }).click();
   });
 });
 
 authTest.describe("Onboarding UI (home)", () => {
-  authTest("customize notebook modal backdrop uses z-index 100", async ({ authenticatedPage }) => {
+  authTest("customize notebook dialog stacks above the tour", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
     const title = `e2e-onboard-${randomUUID().slice(0, 8)}`;
 
-    await page.getByText("Create new notebook").first().click();
+    await page.getByRole("button", { name: "New notebook" }).first().click();
     await page.getByPlaceholder("Notebook title").fill(title);
     await page.getByRole("button", { name: "Create" }).click();
     await expectAuth(page.getByText(title, { exact: true })).toBeVisible({ timeout: 45_000 });
 
-    const card = page
-      .locator("div.group")
-      .filter({ has: page.getByText(title, { exact: true }) })
-      .first();
-    await card.hover();
-    await card.locator(".kebab-menu button").first().click();
-    await page.getByRole("button", { name: "Customize" }).click();
+    const card = page.locator('[data-slot="card"]', { hasText: title });
+    await card.getByRole("button", { name: "Notebook actions" }).click();
+    await page.getByRole("menuitem", { name: "Customize" }).click();
 
-    await expectFixedBackdropZIndex100(page, "Customize notebook");
+    await expectDialogAboveOnboarding(page, "Customize notebook");
 
-    await page
-      .getByRole("heading", { name: "Customize notebook" })
-      .locator("..")
-      .getByRole("button")
-      .first()
-      .click();
+    await page.keyboard.press("Escape");
+    await expectAuth(page.getByRole("dialog", { name: "Customize notebook" })).not.toBeVisible();
 
     await tryDeleteNotebookByTitleFromHome(page, title);
   });
