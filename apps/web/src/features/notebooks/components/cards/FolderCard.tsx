@@ -78,7 +78,7 @@ export function FolderCard({
               </span>
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-sans text-sm font-medium text-card-foreground">
+              <span className="block truncate text-sm font-semibold text-card-foreground">
                 {folder.name}
               </span>
               <span className="block text-xs text-muted-foreground sm:hidden">{meta}</span>
@@ -98,10 +98,13 @@ export function FolderCard({
     <>
       <div className="relative h-full">
         {/* Folder silhouette: a tab above the top-left edge and a sheet peeking out underneath. */}
-        <span aria-hidden className={cn("absolute -top-2 left-4 h-3 w-14 rounded-t-md", fill)} />
         <span
           aria-hidden
-          className="absolute inset-x-2 -bottom-1.5 top-3 rounded-xl border bg-card shadow-sm"
+          className={cn("absolute -top-2 left-4 h-3 w-14 rounded-t-md opacity-60", fill)}
+        />
+        <span
+          aria-hidden
+          className="absolute inset-x-2 -bottom-1.5 top-3 rounded-xl border border-border bg-card shadow-sm"
         />
         <Card variant="interactive" className="h-full">
           <button
@@ -114,7 +117,7 @@ export function FolderCard({
               <Icon aria-hidden className={cn("relative size-8", COVER_ICON_CLASS)} />
             </span>
             <span className="flex flex-1 flex-col gap-1 p-3">
-              <span className="line-clamp-2 font-sans text-sm font-semibold leading-snug text-card-foreground">
+              <span className="line-clamp-2 text-base font-semibold leading-snug text-card-foreground">
                 {folder.name}
               </span>
               <span className="text-xs text-muted-foreground">{meta}</span>

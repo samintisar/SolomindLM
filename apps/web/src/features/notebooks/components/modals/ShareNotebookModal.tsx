@@ -156,7 +156,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent size="wide" padding="none">
-        <div className="border-b p-6">
+        <div className="border-b border-border p-6">
           <DialogHeader>
             <DialogTitle>
               <span className="flex items-center gap-3">

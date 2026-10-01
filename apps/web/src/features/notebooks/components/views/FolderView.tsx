@@ -71,7 +71,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   // Loading state
   if (folderNotebooks === undefined || ctx.notebooksLoading) {
     return (
-      <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 font-serif sm:px-6 md:px-10 md:pt-10">
+      <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 sm:px-6 md:px-10 md:pt-10">
         <div className="mx-auto flex max-w-400 flex-col gap-6">
           <Button variant="ghost" size="sm" onClick={onBack} className="self-start">
             <ArrowLeft />
@@ -101,7 +101,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 font-serif sm:px-6 md:px-10 md:pt-10">
+    <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 sm:px-6 md:px-10 md:pt-10">
       <div className="mx-auto flex max-w-400 flex-col gap-6">
         <header className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">

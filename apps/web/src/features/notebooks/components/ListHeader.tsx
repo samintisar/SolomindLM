@@ -6,7 +6,7 @@
  */
 export function ListHeader() {
   return (
-    <div className="hidden border-b pb-2 font-sans text-xs font-medium uppercase tracking-wide text-muted-foreground sm:block">
+    <div className="hidden border-b border-border pb-2 font-sans text-xs font-medium uppercase tracking-wide text-muted-foreground sm:block">
       <div className="flex items-center gap-2 border-x border-transparent px-3">
         <span className="flex-1 pl-12">Title</span>
         <span className="w-40 text-right">Details</span>

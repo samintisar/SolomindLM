@@ -98,11 +98,11 @@ export function CoverCustomizeDialog({
           </DialogHeader>
 
           <div className="flex justify-center" aria-hidden>
-            <div className="flex w-40 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+            <div className="flex w-40 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <div className={cn("flex h-16 items-end p-2.5", color)}>
                 <PreviewIcon className={cn("size-7", COVER_ICON_CLASS)} />
               </div>
-              <div className="truncate p-2.5 font-sans text-sm font-semibold text-card-foreground">
+              <div className="truncate p-2.5 text-sm font-semibold text-card-foreground">
                 {name.trim() || copy.placeholder}
               </div>
             </div>

@@ -178,7 +178,7 @@ export const HomePage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 font-serif sm:px-6 md:px-10 md:pt-10">
+    <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 sm:px-6 md:px-10 md:pt-10">
       <div className="mx-auto max-w-400">
         <Tabs value={tab} onValueChange={(value) => setTab(value as HomeTab)}>
           <div className="flex flex-col gap-8">

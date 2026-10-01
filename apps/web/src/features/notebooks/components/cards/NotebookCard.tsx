@@ -101,7 +101,7 @@ export function NotebookCard(props: NotebookCardProps) {
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-sans text-sm font-medium text-card-foreground">
+                <span className="truncate text-sm font-semibold text-card-foreground">
                   {notebook.title}
                 </span>
                 <StatusBadge props={props} />
@@ -135,7 +135,7 @@ export function NotebookCard(props: NotebookCardProps) {
             <Icon aria-hidden className={cn("size-8", COVER_ICON_CLASS)} />
           </span>
           <span className="flex flex-1 flex-col gap-1 p-3">
-            <span className="line-clamp-2 font-sans text-sm font-semibold leading-snug text-card-foreground">
+            <span className="line-clamp-2 text-base font-semibold leading-snug text-card-foreground">
               {notebook.title}
             </span>
             <span className="text-xs text-muted-foreground">{meta}</span>
