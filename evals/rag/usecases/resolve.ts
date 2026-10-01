@@ -23,11 +23,13 @@ export async function resolvePackReadiness(
   packs: Array<{ pack: UseCasePack; local: SourceDigest[] }>,
   api: Pick<PackSeedApi, "resolve">
 ): Promise<Map<string, PackReadiness>> {
-  const readiness = new Map<string, PackReadiness>();
-  for (const { pack, local } of packs) {
-    readiness.set(pack.id, checkPackReady(pack, local, await api.resolve(pack.notebookTitle)));
-  }
-  return readiness;
+  const remotes = await Promise.all(packs.map(({ pack }) => api.resolve(pack.notebookTitle)));
+  return new Map(
+    packs.map(({ pack, local }, i): [string, PackReadiness] => [
+      pack.id,
+      checkPackReady(pack, local, remotes[i]),
+    ])
+  );
 }
 
 /**
@@ -90,9 +92,9 @@ export async function prepareUseCaseRun(
 
   const readiness = await resolvePackReadiness(packIds.map(loadPack), api);
   const pinned = applyPackResolution(fixtures, readiness);
-  for (const [id, resolved] of readiness) {
-    sourceTexts.set(id, await api.sourceText(resolved.documentIds));
-  }
+  const resolved = [...readiness];
+  const texts = await Promise.all(resolved.map(([, r]) => api.sourceText(r.documentIds)));
+  resolved.forEach(([id], i) => sourceTexts.set(id, texts[i]));
   return { fixtures: pinned, sourceTexts };
 }
 

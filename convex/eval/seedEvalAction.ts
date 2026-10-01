@@ -98,9 +98,16 @@ export const getPackSourceText = action({
   returns: packSourceTextValidator,
   handler: async (ctx, args): Promise<PackSourceText> => {
     assertRagEvalGate(args.evalSecret);
-    return await ctx.runQuery(internal.eval._seedPack.packSourceText, {
-      ownerEmail: requireOwnerEmail(),
-      documentIds: args.documentIds,
-    });
+    const ownerEmail = requireOwnerEmail();
+    // One query per document: a single query over a large pack could exceed the read limit.
+    const perDocument = await Promise.all(
+      args.documentIds.map((documentId) =>
+        ctx.runQuery(internal.eval._seedPack.packSourceText, {
+          ownerEmail,
+          documentIds: [documentId],
+        })
+      )
+    );
+    return perDocument.flat();
   },
 });

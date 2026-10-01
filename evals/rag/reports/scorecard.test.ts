@@ -87,6 +87,23 @@ describe("buildScorecard", () => {
   });
 });
 
+describe("rubric judge errors reported as warnings", () => {
+  it("still counts them as judge errors", () => {
+    const scorecard = buildScorecard(
+      [
+        m({
+          caseId: "language-learners/a",
+          metric: "rubric:language-learners:one-item",
+          status: "warn",
+          breakdown: { judgeError: true },
+        }),
+      ],
+      useCaseByCase
+    );
+    expect(scorecard.cells.map((c) => [c.pass, c.fail, c.judgeErrors])).toEqual([[0, 0, 1]]);
+  });
+});
+
 describe("judge-error-only cells", () => {
   it("has a null pass rate and prints n/a (0/0)", () => {
     const scorecard = buildScorecard(

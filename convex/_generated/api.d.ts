@@ -280,6 +280,7 @@ import type * as e2e_seedFlashcards from "../e2e/seedFlashcards.js";
 import type * as e2e_seedWrittenQuestions from "../e2e/seedWrittenQuestions.js";
 import type * as eval__discoverResult from "../eval/_discoverResult.js";
 import type * as eval__gate from "../eval/_gate.js";
+import type * as eval__packFolder from "../eval/_packFolder.js";
 import type * as eval__seedPack from "../eval/_seedPack.js";
 import type * as eval__studioRowCreators from "../eval/_studioRowCreators.js";
 import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
@@ -659,6 +660,7 @@ declare const fullApi: ApiFromModules<{
   "e2e/seedWrittenQuestions": typeof e2e_seedWrittenQuestions;
   "eval/_discoverResult": typeof eval__discoverResult;
   "eval/_gate": typeof eval__gate;
+  "eval/_packFolder": typeof eval__packFolder;
   "eval/_seedPack": typeof eval__seedPack;
   "eval/_studioRowCreators": typeof eval__studioRowCreators;
   "eval/chatEvalAction": typeof eval_chatEvalAction;

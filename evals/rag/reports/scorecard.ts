@@ -23,7 +23,7 @@ export function isJudgeError(m: MetricResult): boolean {
   return m.breakdown?.judgeError === true || typeof m.breakdown?.error === "string";
 }
 
-/** Pass rates per use-case pack × runner (pass/fail metrics only). */
+/** Pass rates per use-case pack × runner (pass/fail metrics, plus judge errors of any status). */
 export function buildScorecard(
   metrics: MetricResult[],
   useCaseByCase: Map<string, string>
@@ -31,7 +31,9 @@ export function buildScorecard(
   const cells = new Map<string, ScorecardCell>();
   for (const metric of metrics) {
     const useCase = useCaseByCase.get(metric.caseId);
-    if (!useCase || (metric.status !== "pass" && metric.status !== "fail")) continue;
+    if (!useCase) continue;
+    // Rubric judge errors are "warn"; binary-judge errors are "fail".
+    if (!isJudgeError(metric) && metric.status !== "pass" && metric.status !== "fail") continue;
     const key = `${useCase}::${metric.runner}`;
     const cell = cells.get(key) ?? {
       useCase,

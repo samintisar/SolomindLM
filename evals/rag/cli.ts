@@ -404,14 +404,14 @@ async function main(): Promise<void> {
       process.exit(2);
     }
   }
-  if (opts.dryRun) {
-    const packProblems = formatPackProblems(
-      packsToValidate(USE_CASE_PACKS, fixtureIds.map(getFixture), opts.useCases !== undefined)
-    );
-    if (packProblems.length > 0) {
-      console.error(packProblems.join("\n"));
-      process.exit(2);
-    }
+  // Validate selected packs on live runs too, so a missing source fails with
+  // "INVALID PACK" instead of a raw ENOENT when the run reads pack sources.
+  const packProblems = formatPackProblems(
+    packsToValidate(USE_CASE_PACKS, fixtureIds.map(getFixture), opts.useCases !== undefined)
+  );
+  if (packProblems.length > 0) {
+    console.error(packProblems.join("\n"));
+    process.exit(2);
   }
   if (opts.caseId && opts.idPrefix) {
     console.warn("Warning: --prefix is ignored when --case is set.");
@@ -492,6 +492,12 @@ async function main(): Promise<void> {
   let packSourceTexts = new Map<string, SourceText[]>();
   if (expandedFixtures.some((f) => f.useCase)) {
     console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
+    if (!opts.dryRun && !process.env.TOGETHER_AI_API_KEY?.trim()) {
+      console.error(
+        "Use-case packs are scored by rubric judges: set TOGETHER_AI_API_KEY (repo-root .env)."
+      );
+      process.exit(2);
+    }
     if (seedApi) {
       try {
         ({ fixtures: fixturesToRun, sourceTexts: packSourceTexts } = await prepareUseCaseRun(

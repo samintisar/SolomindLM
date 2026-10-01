@@ -4,8 +4,8 @@
  */
 import type { ConcreteRunnerKind, EvalFixture } from "../types";
 
-/** Folder in the eval owner's account that holds every pack notebook. */
-export const EVAL_PACK_FOLDER_NAME = "Test";
+/** Folder in the eval owner's account that holds every pack notebook (shared with Convex). */
+export { EVAL_PACK_FOLDER_NAME } from "../../../convex/eval/_packFolder";
 
 /**
  * A yes/no quality check a judge answers about one output.

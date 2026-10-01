@@ -9,6 +9,8 @@ import { parseBinaryResponse } from "./binaryJudges";
 
 const OUTPUT_LIMIT = 10_000;
 const SOURCES_LIMIT = 12_000;
+/** Whole-pack source text spans every document, so it gets a larger budget than retrieved chunks. */
+const SOURCE_TEXTS_LIMIT = 48_000;
 
 export interface RubricJudgeOptions {
   invoke: (prompt: string) => Promise<string>;
@@ -21,11 +23,19 @@ export function rubricMetricName(packId: string, checkId: string): string {
   return `rubric:${packId}:${checkId}`;
 }
 
-/** Split `limit` chars evenly across documents. */
+/** Split `limit` chars evenly across documents; budget a short document leaves unused goes to the rest. */
 export function formatSourceTexts(texts: SourceText[], limit: number): string {
   if (texts.length === 0) return "";
-  const perDoc = Math.floor(limit / texts.length);
-  return texts.map((t) => `[${t.fileName}]\n${t.text.slice(0, perDoc)}`).join("\n\n---\n\n");
+  const budgets = new Array<number>(texts.length);
+  let remaining = limit;
+  const shortestFirst = texts
+    .map((_, i) => i)
+    .sort((a, b) => texts[a].text.length - texts[b].text.length);
+  shortestFirst.forEach((i, done) => {
+    budgets[i] = Math.min(texts[i].text.length, Math.floor(remaining / (texts.length - done)));
+    remaining -= budgets[i];
+  });
+  return texts.map((t, i) => `[${t.fileName}]\n${t.text.slice(0, budgets[i])}`).join("\n\n---\n\n");
 }
 
 function truncateOutput(output: string): string {
@@ -40,7 +50,7 @@ function sourceEvidence(artifact: EvalRunArtifact, sourceTexts: SourceText[]): s
       .join("\n\n---\n\n")
       .slice(0, SOURCES_LIMIT);
   }
-  return formatSourceTexts(sourceTexts, SOURCES_LIMIT);
+  return formatSourceTexts(sourceTexts, SOURCE_TEXTS_LIMIT);
 }
 
 export function buildRubricPrompt(
@@ -104,9 +114,10 @@ export async function scoreRubricMetrics(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      // No verdict: a warning, so a flaky judge does not fail the run (scorecard counts it apart).
       results.push({
         ...base,
-        status: "fail",
+        status: "warn",
         score: 0,
         detail: `Rubric judge failed: ${message}`,
         breakdown: {
