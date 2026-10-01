@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
-import { getNotebookLucideIcon } from "@/shared/notebook/notebookLucideIcon";
+import { notebookIcon as resolveNotebookIcon } from "@/shared/notebook/notebookIcons";
 
 const STARTER_PROMPTS = [
   "Summarize the key concepts",
@@ -49,7 +49,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
       return true;
     });
   }, [hasSources, suggestions]);
-  const notebookGlyph = getNotebookLucideIcon(notebookIcon);
+  const notebookGlyph = resolveNotebookIcon(notebookIcon);
   const iconBgClass = coverFillClass(notebookCoverColor);
   const heading =
     notebookTitle?.trim() ||

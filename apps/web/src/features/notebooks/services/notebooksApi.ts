@@ -2,8 +2,8 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
+import { DEFAULT_NOTEBOOK_ICON } from "@/shared/notebook/notebookIcons";
 import type { ChatSettings } from "@/shared/types";
-import { DEFAULT_NOTEBOOK_ICON } from "../notebookIcons";
 
 // ============================================================
 // Hooks (for use in React components)

@@ -2,9 +2,9 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
+import { DEFAULT_NOTEBOOK_ICON } from "@/shared/notebook/notebookIcons";
 import { NotebookItem } from "@/shared/types/index";
 import { isNativeShell } from "@/utils/platformDetection";
-import { DEFAULT_NOTEBOOK_ICON } from "../notebookIcons";
 import { useCreateNotebook, useDeleteNotebook, useUpdateNotebook } from "../services/notebooksApi";
 
 interface UseNotebookCRUDProps {
