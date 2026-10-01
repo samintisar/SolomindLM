@@ -28,7 +28,6 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
-import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { useToast } from "@/shared/contexts/useToast";
@@ -73,19 +72,31 @@ const MessageListFooter = () => (
 );
 const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
 
+/**
+ * Opens a header tooltip only for keyboard focus. Popover and DropdownMenu hand focus back to their trigger
+ * when they close; without this the tooltip would pop open then (and stick on touch). Radix skips its own
+ * focus handler when the event is default-prevented.
+ */
+const openTooltipOnFocusVisibleOnly = (e: React.FocusEvent<HTMLElement>) => {
+  if (!e.currentTarget.matches(":focus-visible")) e.preventDefault();
+};
+
 /** Hover/focus label for a header icon button. `children` is the trigger (a Button, or a Popover/DropdownMenu trigger around one). */
 function HeaderTooltip({ label, children }: { label: string; children: React.ReactElement }) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger asChild onFocus={openTooltipOnFocusVisibleOnly}>
+        {children}
+      </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }
 
-/** The history popover must stay open while the delete confirm (portaled to body) is up, or the list unmounts mid-confirm. */
-const isInsideConfirmDialog = (target: EventTarget | null) =>
-  !!(target as Element | null)?.closest?.('[role="alertdialog"],[data-confirm-dialog-root]');
+/** Escape in a thread's rename input cancels only the rename (ConversationList handles it), not the history popover. */
+const keepHistoryOpenOnRenameEscape = (e: KeyboardEvent) => {
+  if ((e.target as HTMLElement | null)?.closest?.("[data-rename-input]")) e.preventDefault();
+};
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -697,7 +708,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               variant="outline"
               size="icon-sm"
               onClick={toggleLeft}
-              title="Open Sources"
               aria-label="Open Sources"
             >
               <PanelLeftOpen />
@@ -712,7 +722,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               size="icon-sm"
               data-onboarding="studio-panel-toggle"
               onClick={toggleRight}
-              title="Open Studio"
               aria-label="Open Studio"
             >
               <PanelRightOpen />
@@ -723,13 +732,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
         <HeaderTooltip label="Thread history">
           <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              title="Thread history"
-              aria-label="Thread history"
-            >
+            <Button type="button" variant="outline" size="icon-sm" aria-label="Thread history">
               <History />
             </Button>
           </PopoverTrigger>
@@ -738,38 +741,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           align="end"
           collisionPadding={16}
           aria-label="Thread history"
-          onInteractOutside={(e) => {
-            if (isInsideConfirmDialog(e.target)) e.preventDefault();
-          }}
-          onEscapeKeyDown={(e) => {
-            // Escape in the rename input cancels only the rename (ConversationList handles it).
-            if ((e.target as HTMLElement | null)?.closest?.("[data-rename-input]")) {
-              e.preventDefault();
-              return;
-            }
-            // The delete confirm has no Escape handling of its own; closing here would unmount it mid-confirm.
-            if (document.querySelector("[data-confirm-dialog-root]")) e.preventDefault();
-          }}
+          onEscapeKeyDown={keepHistoryOpenOnRenameEscape}
           padding="none"
-          className="flex max-h-(--radix-popover-content-available-height) w-80 flex-col"
+          className="flex max-h-(--radix-popover-content-available-height) w-80 max-w-(--radix-popover-content-available-width) flex-col"
         >
-          {/* flex-col lets the scroll area's viewport shrink to the max height and scroll (a plain max-h does not). */}
-          <ScrollArea className="flex max-h-120 min-h-0 flex-col">
-            <div className="p-1.5">
-              <ConversationList
-                conversations={conversations}
-                activeConversationId={activeConversationId}
-                onSelect={(id) => {
-                  onSelectConversation?.(id);
-                  setHistoryOpen(false);
-                }}
-                onRename={onRenameConversation}
-                onDelete={onDeleteConversation}
-                pinnedIds={pinnedIds}
-                onTogglePin={handleTogglePin}
-              />
-            </div>
-          </ScrollArea>
+          {/* A plain scroller, not ScrollArea: its display:table content wrapper defeats the rows' truncate. */}
+          <div className="max-h-120 min-h-0 overflow-y-auto overscroll-contain p-1.5">
+            <ConversationList
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onSelect={(id) => {
+                onSelectConversation?.(id);
+                setHistoryOpen(false);
+              }}
+              onRename={onRenameConversation}
+              onDelete={onDeleteConversation}
+              pinnedIds={pinnedIds}
+              onTogglePin={handleTogglePin}
+            />
+          </div>
         </PopoverContent>
       </Popover>
       <HeaderTooltip label={newChatLabel}>
@@ -779,7 +769,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           size="icon-sm"
           onClick={handleNewConversation}
           disabled={isCreatingConversation}
-          title={messages.length === 0 ? "Already in a new chat" : "New chat"}
           aria-label={newChatLabel}
         >
           {isCreatingConversation ? <Spinner aria-hidden /> : <Plus />}
@@ -788,13 +777,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <DropdownMenu modal={false}>
         <HeaderTooltip label="Chat options">
           <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              title="Chat options"
-              aria-label="Chat options"
-            >
+            <Button type="button" variant="outline" size="icon-sm" aria-label="Chat options">
               <MoreVertical />
             </Button>
           </DropdownMenuTrigger>
@@ -831,7 +814,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div className="flex items-center justify-between gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0 md:z-10">
           <div className="flex min-w-0 items-center gap-2 text-foreground">
             <MessageCircle className="h-4 w-4 shrink-0" />
-            <span className="truncate font-sans text-sm font-semibold">Chat</span>
+            <span className="truncate font-display font-bold text-sm tracking-wide uppercase">
+              Chat
+            </span>
           </div>
           {chatHeaderToolbar}
         </div>

@@ -1,5 +1,5 @@
 import type { Doc } from "@convex/_generated/dataModel";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as React from "react";
 import { toast as sonner } from "sonner";
@@ -150,20 +150,47 @@ describe("ConversationList", () => {
     expect(error).toHaveBeenCalledWith("Failed to rename thread", expect.anything());
   });
 
-  test("delete asks for confirmation before calling onDelete", async () => {
-    const props = setup();
+  async function openDeleteConfirm() {
     await userEvent.click(screen.getByRole("button", CELL_CYCLE_ACTIONS));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    return screen.findByRole("alertdialog", { name: "Delete thread?" });
+  }
+
+  test("delete asks for confirmation before calling onDelete", async () => {
+    const props = setup();
+    const alert = await openDeleteConfirm();
+    expect(alert).toHaveTextContent(
+      "This will permanently delete this thread and all its messages."
+    );
     expect(props.onDelete).not.toHaveBeenCalled();
-    await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Delete" }));
     expect(props.onDelete).toHaveBeenCalledWith("c2");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
   test("cancelling the delete confirm does not call onDelete", async () => {
     const props = setup();
-    await userEvent.click(screen.getByRole("button", CELL_CYCLE_ACTIONS));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    const alert = await openDeleteConfirm();
+    await userEvent.click(within(alert).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(props.onDelete).not.toHaveBeenCalled();
+  });
+
+  test("Escape closes the delete confirm without deleting", async () => {
+    const props = setup();
+    await openDeleteConfirm();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(props.onDelete).not.toHaveBeenCalled();
+  });
+
+  test("a rejected delete shows an error toast", async () => {
+    const error = vi.spyOn(sonner, "error").mockImplementation(() => "");
+    setup({ onDelete: vi.fn().mockRejectedValue(new Error("nope")) });
+    const alert = await openDeleteConfirm();
+    await userEvent.click(within(alert).getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(error).toHaveBeenCalledWith("Failed to delete thread", expect.anything())
+    );
   });
 });
