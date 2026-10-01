@@ -54,7 +54,7 @@ function InputGroup({
         "has-[[data-slot=input-group-control]:focus-visible]:bg-card has-[[data-slot=input-group-control]:focus-visible]:ring-2 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/40",
 
         // Error state.
-        "has-[[data-slot][aria-invalid=true]]:ring-destructive/60",
+        "has-[[data-slot][aria-invalid=true]]:ring-destructive",
 
         // Variant classes come last so `composer` overrides the base well and focus lift.
         inputGroupVariants({ size, variant }),

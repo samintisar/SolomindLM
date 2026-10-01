@@ -20,7 +20,7 @@ const buttonVariants = cva(
         destructive:
           "rounded-xl bg-destructive text-destructive-foreground shadow-md shadow-destructive/25 dark:shadow-destructive/35 hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35 active:translate-y-0 active:scale-98",
         outline:
-          "rounded-xl bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground active:scale-98 aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-invalid:ring-destructive/60",
+          "rounded-xl bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground active:scale-98 aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-invalid:ring-destructive",
         secondary:
           "rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/70 active:scale-98 aria-expanded:bg-secondary/70",
         ghost:
@@ -33,7 +33,7 @@ const buttonVariants = cva(
          */
         "ghost-toggle-destructive":
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-pressed:bg-destructive-muted aria-pressed:text-destructive-muted-foreground aria-pressed:hover:bg-destructive-muted aria-pressed:hover:text-destructive-muted-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-link underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-6",
