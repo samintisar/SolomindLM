@@ -37,6 +37,7 @@ import { useSourcesContext } from "../../sources/useSourcesContext";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 import { useComposerClearance } from "../hooks/useComposerClearance";
 import { usePersistedComposerPrefs } from "../hooks/usePersistedComposerPrefs";
+import { useStableCallback } from "../hooks/useStableCallback";
 import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useLiteratureReviewSession } from "../services/literatureReviewApi";
@@ -623,6 +624,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     ]
   );
 
+  // Memoized bubbles compare callbacks by identity. `onRetry` is rebuilt on every streamed token
+  // and `handleSendChip` whenever send state changes, so bubbles get stable wrappers instead.
+  const handleRetryStable = useStableCallback(onRetry);
+  const handleSendFollowUp = useStableCallback(handleSendChip);
+
   // --- Scroll to bottom ---
 
   useEffect(() => {
@@ -838,8 +844,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           onCopyMessage={copyMessageAsMarkdown}
                           copiedMessageId={copiedMessageId}
                           onSetFeedback={onSetFeedback}
-                          onSendFollowUp={handleSendChip}
-                          onRetry={onRetry}
+                          onSendFollowUp={handleSendFollowUp}
+                          onRetry={handleRetryStable}
                           externalSources={message.externalSources}
                           onOpenExternalSources={handleOpenExternalSources}
                           showSourcesButton={
