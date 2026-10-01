@@ -33,14 +33,15 @@ Automated, non-negotiable:
 
 | Gate | Where |
 | ---- | ----- |
+| Biome format + safe fixes on staged files | pre-commit hook (`.githooks/pre-commit`) |
 | `typecheck:convex` + `typecheck:web` + `typecheck:mobile` + `lint` | pre-push hook (`.githooks/pre-push`) and CI |
 | `test:convex` + `test:web` + RAG eval fixture dry-run | CI **Unit Tests** (required) |
 | web coverage floor | CI **Coverage Report** (required) |
 | conventional PR title, `area:*` labels | CI advisory |
 
-The pre-push hook is set up automatically by `bun install` (`prepare` →
-`scripts/setup-git-hooks.mjs`). Bypass a work-in-progress push with
-`git push --no-verify`; CI still enforces everything.
+Both git hooks are set up automatically by `bun install` (`prepare` →
+`scripts/setup-git-hooks.mjs`). Bypass a work-in-progress commit or push with
+`--no-verify`; CI still enforces everything.
 
 Run deeper suites locally when the change warrants (per `CLAUDE.md` validation
 gates): `test:e2e` before merging UI flows; `eval:rag --case=… / --runner=…` or
