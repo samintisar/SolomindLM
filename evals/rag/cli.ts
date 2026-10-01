@@ -51,6 +51,7 @@ import {
   excludeUnselectedPackFixtures,
   formatPlannedJobs,
   PackNotReadyError,
+  packSourceTextsFor,
   pinForDryRun,
   prepareUseCaseRun,
 } from "./usecases/resolve";
@@ -582,7 +583,9 @@ async function main(): Promise<void> {
         likertJudges: opts.likertJudges,
         dryRun: opts.dryRun,
         judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
-        packSourceTexts: fixture.useCase ? packSourceTexts.get(fixture.useCase) : undefined,
+        packSourceTexts: fixture.useCase
+          ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
+          : undefined,
       });
       allMetrics.push(...metrics);
 
