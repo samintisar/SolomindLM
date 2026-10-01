@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { OnboardingContextValue } from "../OnboardingContext";
 import { OnboardingContext } from "../OnboardingContext";
+import { findStep } from "../steps";
 import { TourTooltip } from "./TourTooltip";
 
 vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
@@ -89,5 +90,32 @@ describe("TourTooltip", () => {
     makeMeasuredTarget("chat-input");
     render(withCtx({ tourStatus: "active", currentStepId: "askQuestion" }));
     expect(screen.getByText(/3 of 4/)).toBeInTheDocument();
+  });
+
+  test("renders the step in a popover dialog next to a masked spotlight", () => {
+    makeMeasuredTarget("create-notebook-button");
+    render(withCtx({ tourStatus: "active", currentStepId: "createNotebook" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-slot", "popover-content");
+    expect(dialog).toHaveTextContent(/Create your first one/);
+    expect(dialog).toHaveTextContent("1 of 4");
+    expect(dialog).toHaveAttribute("data-side", findStep("createNotebook")?.side);
+
+    const spotlight = document.body.querySelector("svg[aria-hidden]");
+    expect(spotlight).not.toBeNull();
+    const mask = spotlight?.querySelector("mask");
+    expect(mask).not.toBeNull();
+    const dimmer = spotlight?.querySelector(":scope > rect");
+    expect(dimmer?.getAttribute("mask")).toBe(`url(#${mask?.id})`);
+    // Cutout matches the measured target plus the 4px spotlight padding.
+    const hole = mask?.querySelectorAll("rect")[1];
+    expect(hole?.getAttribute("x")).toBe("96");
+    expect(hole?.getAttribute("y")).toBe("96");
+  });
+
+  test("does not steal focus when the tooltip opens", () => {
+    makeMeasuredTarget("create-notebook-button");
+    render(withCtx({ tourStatus: "active", currentStepId: "createNotebook" }));
+    expect(screen.getByRole("dialog")).not.toContainElement(document.activeElement as HTMLElement);
   });
 });

@@ -1,6 +1,27 @@
-import { ListChecks, LogIn, LogOut, MessageSquarePlus, Moon, Sun, Wrench } from "lucide-react";
-import React from "react";
+import {
+  ListChecks,
+  LogIn,
+  LogOut,
+  MessageSquarePlus,
+  Moon,
+  Sun,
+  User as UserIcon,
+  Wrench,
+} from "lucide-react";
+import type React from "react";
 import { useNavigate } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
+import { Button } from "@/shared/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
@@ -10,11 +31,18 @@ interface AvatarDropdownProps {
   user: User | null;
   isAuthenticated: boolean;
   onLogin: () => void;
-  onLogout: () => void;
+  /** May be async (e.g. Convex `signOut`); a rejection is shown as an error toast. */
+  onLogout: () => Promise<void> | void;
   theme: "light" | "dark";
   toggleTheme: () => void;
   onShowChecklist?: () => void;
   showChecklistDismissed?: boolean;
+}
+
+/** First letter of the user's name (else email), uppercased; null when neither is set. */
+function userInitial(user: User | null): string | null {
+  const source = user?.name?.trim() || user?.email?.trim();
+  return source ? source.charAt(0).toUpperCase() : null;
 }
 
 export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
@@ -28,95 +56,77 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   showChecklistDismissed,
 }) => {
   const navigate = useNavigate();
+  const { showError } = useServiceErrorToast();
   const { open: openFeedback } = useFeedback();
   // Only the "Feedback triage" item needs this, and it's staff-only — don't open
   // the subscription for signed-out menus.
   const isFeedbackAdmin = useIsFeedbackAdmin(isAuthenticated);
-
-  const handleLogout = async () => {
-    await onLogout();
-  };
-
   const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? "Signed in" : null);
+  const initial = isAuthenticated ? userInitial(user) : null;
 
   return (
-    <>
-      {/* User Section (when authenticated) - show email/name at top */}
-      {isAuthenticated && displayLabel && (
-        <div className="px-4 py-3 border-b border-border/50">
-          <p className="text-sm font-medium text-foreground truncate" title={displayLabel}>
-            {displayLabel}
-          </p>
-        </div>
-      )}
-
-      {/* Menu Items */}
-      <div className="py-1">
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-          role="menuitem"
-        >
-          {theme === "dark" ? (
-            <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
-          ) : (
-            <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
-          )}
-          <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
-        </button>
-
-        {/* Language Selector */}
-        <LanguageSelector isAuthenticated={isAuthenticated} />
-
-        {isAuthenticated && showChecklistDismissed && onShowChecklist && (
-          <button
-            onClick={onShowChecklist}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Show getting-started checklist</span>
-          </button>
-        )}
-
-        {isAuthenticated && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="avatar" aria-label="Account menu">
+          <Avatar>
+            {isAuthenticated && user?.image ? (
+              // Google photo URLs can 403 when a referrer is sent.
+              <AvatarImage src={user.image} alt="" referrerPolicy="no-referrer" />
+            ) : null}
+            <AvatarFallback>{initial ?? <UserIcon />}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      {/* z-80 clears the z-70 header and z-60 layers under it (mobile notebook tabs). */}
+      <DropdownMenuContent align="end" className="z-80 w-64">
+        {isAuthenticated && displayLabel ? (
           <>
-            <button
-              onClick={() => openFeedback("bug")}
-              className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-              role="menuitem"
-            >
-              <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span>Send feedback</span>
-            </button>
-            {isFeedbackAdmin && (
-              <button
-                onClick={() => navigate("/admin/feedback")}
-                className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-                role="menuitem"
-              >
-                <Wrench className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span>Feedback triage</span>
-              </button>
-            )}
+            <DropdownMenuLabel title={displayLabel}>
+              <span className="block truncate">{displayLabel}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
           </>
-        )}
-
-        {/* Login/Logout */}
-        <button
-          onClick={isAuthenticated ? handleLogout : onLogin}
-          className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-          role="menuitem"
-        >
+        ) : null}
+        <DropdownMenuGroup>
+          <DropdownMenuItem onSelect={toggleTheme}>
+            {theme === "dark" ? <Sun /> : <Moon />}
+            {theme === "light" ? "Dark mode" : "Light mode"}
+          </DropdownMenuItem>
+          <LanguageSelector isAuthenticated={isAuthenticated} />
+          {isAuthenticated && showChecklistDismissed && onShowChecklist ? (
+            <DropdownMenuItem onSelect={onShowChecklist}>
+              <ListChecks />
+              Show getting-started checklist
+            </DropdownMenuItem>
+          ) : null}
           {isAuthenticated ? (
-            <LogOut className="w-4 h-4 text-muted-foreground shrink-0" />
-          ) : (
-            <LogIn className="w-4 h-4 text-muted-foreground shrink-0" />
-          )}
-          <span>{isAuthenticated ? "Logout" : "Login"}</span>
-        </button>
-      </div>
-    </>
+            <DropdownMenuItem onSelect={() => openFeedback("bug")}>
+              <MessageSquarePlus />
+              Send feedback
+            </DropdownMenuItem>
+          ) : null}
+          {isAuthenticated && isFeedbackAdmin ? (
+            <DropdownMenuItem onSelect={() => navigate("/admin/feedback")}>
+              <Wrench />
+              Feedback triage
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            if (!isAuthenticated) {
+              onLogin();
+              return;
+            }
+            // Promise.resolve also wraps a sync onLogout; a sync throw still propagates to Radix.
+            Promise.resolve(onLogout()).catch(showError);
+          }}
+        >
+          {isAuthenticated ? <LogOut /> : <LogIn />}
+          {isAuthenticated ? "Logout" : "Login"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

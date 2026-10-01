@@ -4,6 +4,8 @@ export interface User {
   id: string;
   email?: string;
   name?: string;
+  /** Profile photo URL (e.g. the Google account picture). */
+  image?: string;
 }
 
 export interface AuthContextType {

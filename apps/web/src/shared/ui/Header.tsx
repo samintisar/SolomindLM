@@ -1,13 +1,12 @@
 import { api } from "@convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
-import { Share2, User as UserIcon } from "lucide-react";
+import { Share2 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 import { useAuth } from "../../features/auth/useAuth";
 import { useTheme } from "../contexts/useTheme";
 import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
-import { DropdownMenu } from "./DropdownMenu";
 
 interface HeaderProps {
   title: string;
@@ -211,34 +210,25 @@ export const Header: React.FC<HeaderProps> = ({
             Pro
           </button>
         )}
-        <DropdownMenu
-          trigger={
-            <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center hover:ring-2 hover:ring-ring transition-all shrink-0">
-              <UserIcon className="w-4 h-4 text-secondary-foreground shrink-0" />
-            </div>
+        <AvatarDropdown
+          user={user}
+          isAuthenticated={isAuthenticated}
+          onLogin={() =>
+            navigate("/sign-in", {
+              state: {
+                from:
+                  authLocation.pathname === "/"
+                    ? "/home"
+                    : `${authLocation.pathname}${authLocation.search}`,
+              },
+            } as never)
           }
-          align="right"
-        >
-          <AvatarDropdown
-            user={user}
-            isAuthenticated={isAuthenticated}
-            onLogin={() =>
-              navigate("/sign-in", {
-                state: {
-                  from:
-                    authLocation.pathname === "/"
-                      ? "/home"
-                      : `${authLocation.pathname}${authLocation.search}`,
-                },
-              } as never)
-            }
-            onLogout={signOut}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            onShowChecklist={handleShowChecklist}
-            showChecklistDismissed={showChecklistDismissed}
-          />
-        </DropdownMenu>
+          onLogout={signOut}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onShowChecklist={handleShowChecklist}
+          showChecklistDismissed={showChecklistDismissed}
+        />
       </div>
     </header>
   );
