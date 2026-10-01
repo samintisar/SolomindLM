@@ -90,16 +90,19 @@ export function ConversationList({
   const handleFinishRename = async () => {
     if (renameSettledRef.current) return;
     renameSettledRef.current = true;
-    if (!editingId || !editTitle.trim()) {
-      setEditingId(null);
+    const id = editingId;
+    // Only close the editor this save belongs to: a slow save on one thread must not close another thread's editor.
+    const closeIfStillEditing = () => setEditingId((cur) => (cur === id ? null : cur));
+    if (!id || !editTitle.trim()) {
+      closeIfStillEditing();
       return;
     }
     try {
-      await onRename(editingId, editTitle.trim());
+      await onRename(id, editTitle.trim());
     } catch {
       toast.error("Failed to rename thread");
     }
-    setEditingId(null);
+    closeIfStillEditing();
   };
 
   const handleDelete = async (conv: Doc<"conversations">) => {
@@ -128,39 +131,45 @@ export function ConversationList({
           <Input
             ref={editInputRef}
             aria-label="Rename thread"
+            data-rename-input
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void handleFinishRename();
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                handleCancelRename();
-              }
+              // A hosting Popover/Dialog listens for Escape on the document (capture), which this handler cannot
+              // stop: the host must ignore Escape coming from `[data-rename-input]`.
+              if (e.key === "Escape") handleCancelRename();
             }}
-            onBlur={() => void handleFinishRename()}
+            onBlur={(e) => {
+              // Tabbing to Save/Cancel must not save first: those buttons decide.
+              if ((e.relatedTarget as HTMLElement | null)?.closest("[data-rename-actions]")) return;
+              void handleFinishRename();
+            }}
             className="h-8 flex-1"
           />
           {/* Default mousedown is prevented so the input keeps focus; otherwise its blur-save would beat these clicks. */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Save name"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => void handleFinishRename()}
-          >
-            <Check />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Cancel rename"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={handleCancelRename}
-          >
-            <X />
-          </Button>
+          <div data-rename-actions className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Save name"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => void handleFinishRename()}
+            >
+              <Check />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Cancel rename"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCancelRename}
+            >
+              <X />
+            </Button>
+          </div>
         </div>
       );
     }
@@ -176,6 +185,7 @@ export function ConversationList({
         <button
           type="button"
           onClick={() => onSelect(conv._id)}
+          aria-current={isActive ? "true" : undefined}
           className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 pl-2.5 pr-1.5 text-left font-sans text-xs leading-snug outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {isPinned ? <Pin className="size-3.5 shrink-0 text-muted-foreground" /> : null}
@@ -188,7 +198,7 @@ export function ConversationList({
         >
           <div
             className={cn(
-              "shrink-0 focus-within:opacity-100 group-hover:opacity-100",
+              "shrink-0 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100",
               isActive || openMenuId === conv._id ? "opacity-100" : "opacity-0"
             )}
           >
@@ -255,8 +265,9 @@ export function ConversationList({
           </>
         )}
       </div>
-      {/* The confirm renders in a body portal but its state lives here: the parent must keep this list mounted
-          (outside any popover that closes on outside interaction) while a delete confirm is open. */}
+      {/* The confirm's state lives in this component. Inside a Radix popover that is fine (the dialog is part of
+          the popover's React tree), but if the host unmounts the list while a confirm is open, the confirm()
+          promise never resolves, so the host must keep the list mounted until the confirm closes. */}
       <ConfirmDialogComponent />
     </>
   );
