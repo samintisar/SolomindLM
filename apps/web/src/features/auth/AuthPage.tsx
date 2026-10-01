@@ -180,10 +180,10 @@ function AuthHeroMockup() {
                         type="button"
                         onClick={() => setSourceId(s.id)}
                         className={cn(
-                          "rounded-lg border px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          "rounded-lg px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                           active
-                            ? "border-primary/50 bg-primary/8 shadow-sm"
-                            : "border-border/80 bg-background/60 hover:border-border hover:bg-accent/40"
+                            ? "bg-primary/8 shadow-sm ring-2 ring-ring/40"
+                            : "bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-accent/40"
                         )}
                       >
                         <p className="truncate font-sans text-xs font-medium text-foreground">
@@ -226,7 +226,7 @@ function AuthHeroMockup() {
                       <button
                         type="button"
                         onClick={() => setActivityOpen((o) => !o)}
-                        className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2.5 text-left text-sm text-muted-foreground shadow-sm transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex w-full items-center gap-2 rounded-lg bg-surface-raised px-3 py-2.5 text-left text-sm text-muted-foreground shadow-xs ring-1 ring-hairline transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <Search className="size-4 shrink-0 text-primary/80" aria-hidden />
                         <span className="font-sans">Searching your sources</span>
@@ -239,7 +239,7 @@ function AuthHeroMockup() {
                         />
                       </button>
                       {activityOpen ? (
-                        <ul className="flex flex-col gap-1.5 border-l-2 border-primary/20 py-1 pl-3 font-sans text-xs text-muted-foreground">
+                        <ul className="flex flex-col gap-1.5 border-l border-border/60 py-1 pl-3 font-sans text-xs text-muted-foreground">
                           <li className="flex items-center gap-2">
                             <Check className="size-3.5 shrink-0 text-success" aria-hidden />
                             HyDE + embeddings
@@ -319,7 +319,7 @@ function AuthHeroMockup() {
                 <div className="shrink-0 border-t border-border bg-background/90 p-3 backdrop-blur-sm">
                   <div
                     className={cn(
-                      "flex items-center gap-2 rounded-xl border border-input bg-card px-3 py-2 shadow-sm transition",
+                      "flex items-center gap-2 rounded-xl bg-surface-raised px-3 py-2 shadow-sm ring-1 ring-hairline transition",
                       inputFlash && "ring-2 ring-primary/35"
                     )}
                   >

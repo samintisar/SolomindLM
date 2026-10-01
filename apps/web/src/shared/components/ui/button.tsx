@@ -37,6 +37,8 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-11 px-6",
+        /** Compact inline action inside a dense row (e.g. per-source "Open" / "Add to notebook"). */
+        xs: "h-7 gap-1 rounded-lg px-2.5 text-xs",
         sm: "h-9 px-4 text-xs",
         /** `sm` whose side padding tightens when its nearest `@container` is narrow (toolbars); no-op outside any @container. */
         "sm-adaptive": "h-9 px-4 text-xs @max-md:px-2.5",
