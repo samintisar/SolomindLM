@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ConcreteRunnerKind, EvalSplit } from "../../types";
 import { getPack } from "../index";
 import { validatePack } from "../validate";
 
@@ -13,15 +14,16 @@ describe("medical-students pack", () => {
   });
 
   it("has 2 smoke, 6 train and 2 holdout fixtures", () => {
-    const count = (split: string) => fixtures.filter((f) => f.split === split).length;
+    const count = (split: EvalSplit) => fixtures.filter((f) => f.split === split).length;
     expect([count("smoke"), count("train"), count("holdout")]).toEqual([2, 6, 2]);
   });
 
-  it("exercises every feature (written questions once, the rest at least twice)", () => {
+  it("exercises every feature (written questions at least once, the rest at least twice)", () => {
     expect(pack.features).toEqual([...RUNNERS]);
-    const count = (runner: string) => fixtures.filter((f) => f.runner === runner).length;
+    const count = (runner: ConcreteRunnerKind) =>
+      fixtures.filter((f) => f.runner === runner).length;
     expect(count("writtenQuestions")).toBeGreaterThanOrEqual(1);
-    for (const runner of ["flashcards", "quiz", "chat"]) {
+    for (const runner of ["flashcards", "quiz", "chat"] as const) {
       expect(count(runner)).toBeGreaterThanOrEqual(2);
     }
   });

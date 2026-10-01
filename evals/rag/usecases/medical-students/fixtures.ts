@@ -150,7 +150,7 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     runner: "writtenQuestions",
     question:
       "Give me exam-style short-answer questions on glomerular filtration, with model answers.",
-    expectedItems: ["net filtration pressure"],
+    expectedItems: ["Bowman's capsule", "colloid osmotic", "hydrostatic"],
     expectedAnswer:
       "Questions such as 'Explain how net filtration pressure is calculated', with model answers that follow the source's equation, " +
       "GFR = K_f × (P_G − P_B − Π_G + Π_B): hydrostatic pressure in the glomerular capillaries " +
@@ -189,7 +189,7 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "What's a normal GFR, and what sets the net filtration pressure?",
-    expectedItems: ["125", "net filtration pressure"],
+    expectedItems: ["125", "colloid osmotic", "hydrostatic"],
     expectedAnswer:
       "The source gives a normal GFR of 100–130 (average 125) mL/min/1.73 m² in men and 90–120 mL/min/1.73 m² in women " +
       "younger than 40. Net filtration pressure is P_G − P_B − Π_G + Π_B: hydrostatic pressure in the glomerular " +

@@ -21,7 +21,7 @@ describe("use-case pack registry", () => {
     expect(new Set(titles).size).toBe(titles.length);
   });
 
-  it("pack fixtures are registered in FIXTURES", () => {
+  it("pack fixtures are resolvable through getFixture", () => {
     for (const fixture of listPackFixtures()) {
       expect(getFixture(fixture.id)).toBe(fixture);
     }

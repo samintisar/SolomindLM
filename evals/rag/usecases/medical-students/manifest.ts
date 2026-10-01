@@ -28,7 +28,8 @@ export const medicalStudentsPack: UseCasePack = {
     },
     {
       id: "one-fact-per-item",
-      question: "Does each card or question test a single structure, function, value or step?",
+      question:
+        "Does each card or question test a single structure, function, value or step (one structure or nerve together with its functions counts as a single item)?",
       appliesTo: ["flashcards", "quiz"],
       evidence: "output",
     },
@@ -49,7 +50,7 @@ export const medicalStudentsPack: UseCasePack = {
     {
       id: "mechanism-in-order",
       question:
-        "Does the explanation give the cause-and-effect steps of the mechanism in the order the source does, rather than just naming terms?",
+        "If the output explains a mechanism or process, does it give the cause-and-effect steps in the order the source does, rather than just naming terms (or does the output explain no mechanism)?",
       appliesTo: ["chat", "writtenQuestions"],
       evidence: "sources",
     },
