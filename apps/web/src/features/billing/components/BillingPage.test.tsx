@@ -60,5 +60,6 @@ describe("BillingPage", () => {
     expect(screen.getByRole("button", { name: "Cancel Subscription" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Switch to/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Free Plan" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
   });
 });

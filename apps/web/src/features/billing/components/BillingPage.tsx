@@ -141,13 +141,17 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                       )}
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-muted-foreground mb-2">Current Price</div>
-                      <p className="text-3xl font-serif font-bold mb-3">
-                        ${status.amount ? (status.amount / 100).toFixed(0) : 0}
-                        <span className="text-lg font-normal text-muted-foreground">
-                          /{status.interval}
-                        </span>
-                      </p>
+                      {purchasable && (
+                        <>
+                          <div className="text-sm text-muted-foreground mb-2">Current Price</div>
+                          <p className="text-3xl font-serif font-bold mb-3">
+                            ${status.amount ? (status.amount / 100).toFixed(0) : 0}
+                            <span className="text-lg font-normal text-muted-foreground">
+                              /{status.interval}
+                            </span>
+                          </p>
+                        </>
+                      )}
                       <div className="text-sm">
                         <p className="inline-block rounded-md bg-success/10 px-2 py-0.5 font-medium capitalize text-success">
                           ✓ {status.status}
