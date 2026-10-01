@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import type { ChatSettings } from "@/shared/types";
+import { DEFAULT_NOTEBOOK_ICON } from "../notebookIcons";
 
 // ============================================================
 // Hooks (for use in React components)
@@ -36,7 +37,7 @@ export function useCreateNotebook() {
         }),
         sourceCount: 0,
         coverColor: args.coverColor || DEFAULT_COVER_COLOR,
-        icon: args.icon || "Folder",
+        icon: args.icon || DEFAULT_NOTEBOOK_ICON,
         isFeatured: args.isFeatured || false,
         isSharedNotebook: false,
         folderId: args.folderId,

@@ -4,6 +4,7 @@ import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import { NotebookItem } from "@/shared/types/index";
 import { isNativeShell } from "@/utils/platformDetection";
+import { DEFAULT_NOTEBOOK_ICON } from "../notebookIcons";
 import { useCreateNotebook, useDeleteNotebook, useUpdateNotebook } from "../services/notebooksApi";
 
 interface UseNotebookCRUDProps {
@@ -42,7 +43,7 @@ export function useNotebookCRUD({
       const newNotebook = await createNotebook({
         title: "Untitled Notebook",
         coverColor: DEFAULT_COVER_COLOR,
-        icon: "Folder",
+        icon: DEFAULT_NOTEBOOK_ICON,
       });
       navigate(`/notebook/${newNotebook.id}`);
     } catch (error) {
