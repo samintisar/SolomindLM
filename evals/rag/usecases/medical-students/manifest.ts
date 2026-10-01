@@ -50,7 +50,7 @@ export const medicalStudentsPack: UseCasePack = {
     {
       id: "mechanism-in-order",
       question:
-        "If the output explains a mechanism or process, does it give the cause-and-effect steps in the order the source does, rather than just naming terms (or does the output explain no mechanism)?",
+        "If the request or the output concerns a mechanism or process, does the output give the cause-and-effect steps in the order the source does, rather than just naming terms (or does neither the request nor the output concern a mechanism or process)?",
       appliesTo: ["chat", "writtenQuestions"],
       evidence: "sources",
     },

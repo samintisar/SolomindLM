@@ -94,13 +94,13 @@ There are six checks. Each describes what any medical study output should do; no
 | Id | Question (yes = pass) | Applies to | Evidence |
 |---|---|---|---|
 | `front-hides-answer` | Does every card's front avoid stating, abbreviating or hinting at the answer on its back? | flashcards | output |
-| `one-fact-per-item` | Does each card or question test a single structure, function, value or step? | flashcards, quiz | output |
+| `one-fact-per-item` | Does each card or question test a single structure, function, value or step (one structure or nerve together with its functions counts as a single item)? | flashcards, quiz | output |
 | `terms-and-values-exact` | Are all anatomical and physiological terms spelled correctly, and do all numbers and units match the source exactly? | flashcards, quiz, writtenQuestions, chat | sources |
 | `answer-key-supported` | Is every answer, answer key and model answer supported by the source, with no distractor that is also correct? | flashcards, quiz, writtenQuestions | sources |
-| `mechanism-in-order` | Does the explanation give the cause→effect steps of the mechanism in the order the source does, rather than just naming terms? | chat, writtenQuestions | sources |
+| `mechanism-in-order` | If the request or the output concerns a mechanism or process, does the output give the cause-and-effect steps in the order the source does, rather than just naming terms (or does neither the request nor the output concern a mechanism or process)? | chat, writtenQuestions | sources |
 | `no-unsourced-clinical-claims` | Does the output avoid clinical claims (diagnoses, treatments, drug or dose facts) that the source does not contain? | chat, writtenQuestions | sources |
 
-The first two mirror the Language Learners checks, so answer leaks (#218) compare across use cases. Studio runners give judges the pack's OCR'd source text, up to the 48K-character budget; chat gives them its retrieved chunks.
+`mechanism-in-order` is conditional because the binary judge has no "not applicable" answer; without it, correct factoid chat answers would fail. The first two mirror the Language Learners checks, so answer leaks (#218) compare across use cases. Studio runners give judges the pack's OCR'd source text, up to the 48K-character budget; chat gives them its retrieved chunks.
 
 ## 4. Building and verification
 

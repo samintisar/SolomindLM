@@ -362,6 +362,8 @@ bunx biome format --write evals/rag/usecases/medical-students/manifest.ts
 **Files:**
 - Create: `evals/rag/usecases/medical-students/fixtures.ts`
 
+> **Implementation note (2026-10-01):** review changed some fixture text after this plan was written: `expectedAnswer`/`expectedBehavior` now state only what the pinned Wikipedia sources say; the GFR fixtures' `expectedItems` use "Bowman's capsule", "colloid osmotic" and "hydrostatic" instead of "net filtration pressure" (which echoed the request); `one-fact-per-item` and `mechanism-in-order` are reworded (see the spec). `fixtures.ts` and `manifest.ts` are authoritative.
+
 - [ ] **Step 1: Write the fixtures**
 
 `expectedItems` uses only terms the output almost certainly contains (recall passes at ≥ 0.9), and only where the term is distinctive. Task 8 checks every term against the excerpt text.
