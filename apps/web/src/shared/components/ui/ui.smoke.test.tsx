@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { SearchIcon } from "lucide-react";
 import type { ReactElement } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -29,7 +30,13 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "./field";
 import { Input } from "./input";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupTextarea,
+} from "./input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { RadioGroup, RadioGroupItem } from "./radio-group";
 import { ScrollArea } from "./scroll-area";
@@ -251,7 +258,7 @@ describe("shadcn ui components render", () => {
     expect(swatch).not.toHaveClass("rounded-none");
   });
 
-  it("chat foundations render: Checkbox, RadioGroup, Collapsible, Alert warning, InputGroup composer", () => {
+  it("chat foundations render: Checkbox, RadioGroup, Collapsible, Alert warning, InputGroup composer", async () => {
     render(
       <>
         <Checkbox aria-label="c" />
@@ -270,7 +277,29 @@ describe("shadcn ui components render", () => {
     expect(screen.getByRole("radio", { name: "a" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "t" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveClass("bg-warning-muted");
-    expect(screen.getByTestId("ig")).toHaveClass("rounded-2xl", "h-auto");
+    const composer = screen.getByTestId("ig");
+    expect(composer).toHaveClass("rounded-2xl", "h-auto");
+    for (const dropped of ["h-9", "rounded-md", "shadow-xs", "dark:bg-input/30"]) {
+      expect(composer).not.toHaveClass(dropped);
+    }
+
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: "t" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("x")).toBeVisible();
+  });
+
+  it("clicking blank space in an InputGroupAddon focuses the group's textarea", async () => {
+    render(
+      <InputGroup variant="composer" size="auto">
+        <InputGroupTextarea aria-label="message" />
+        <InputGroupAddon align="block-end" data-testid="addon" />
+      </InputGroup>
+    );
+    await userEvent.setup().click(screen.getByTestId("addon"));
+    expect(screen.getByRole("textbox", { name: "message" })).toHaveFocus();
   });
 
   it("Toaster renders inside the app ThemeContext", () => {

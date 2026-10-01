@@ -18,7 +18,7 @@ const inputGroupVariants = cva("", {
     variant: {
       default: "",
       // Chat composer: a raised card that stacks the textarea over a toolbar row.
-      composer: "h-auto flex-col items-stretch rounded-2xl bg-card shadow-lg",
+      composer: "h-auto flex-col items-stretch rounded-2xl bg-card shadow-lg dark:bg-card",
     },
   },
   defaultVariants: {
@@ -96,7 +96,9 @@ function InputGroupAddon({
         if ((e.target as HTMLElement).closest("button")) {
           return;
         }
-        e.currentTarget.parentElement?.querySelector("input")?.focus();
+        e.currentTarget.parentElement
+          ?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea")
+          ?.focus();
       }}
       {...props}
     />
