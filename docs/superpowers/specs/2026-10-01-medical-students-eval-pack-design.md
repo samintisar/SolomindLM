@@ -39,7 +39,7 @@ evals/rag/usecases/medical-students/
 
 **Manifest:** `id: "medical-students"`, `title` and `notebookTitle: "Medical Students"`, `advertisedClaim` set to the landing-page line above, `features: ["flashcards", "quiz", "writtenQuestions", "chat"]`, `sources` listing the four PDFs.
 
-**Sources:** OpenStax *Anatomy and Physiology* **1st edition** (Rice University, 2013), licensed **CC BY 4.0**. The 2nd edition was the first choice, but it is now CC BY-NC-SA 4.0 (non-commercial). SolomindLM is a paid product, so it was dropped on 2026-10-01 (user decision). The 1st edition is web-only, so each file is one whole web section printed to PDF from openstax.org with headless Chrome (Playwright). Site chrome and the cookie banner are hidden before printing, and the content is not altered. Figures, captions, tables and the section's own text are kept, so the file still goes through OCR like an uploaded lecture PDF. What's lost compared with a book PDF is the typeset page layout (running headers, page numbers, page breaks).
+**Sources:** OpenStax *Anatomy and Physiology* **1st edition** (Rice University, 2013), licensed **CC BY 4.0**. The 2nd edition was the first choice, but it is now CC BY-NC-SA 4.0 (non-commercial). SolomindLM is a paid product, so it was dropped on 2026-10-01 (user decision). The 1st edition is web-only, so each file is one whole web section printed to PDF from openstax.org with headless Chrome (Playwright). Site chrome and the cookie banner are hidden before printing. Figures wider than 1,200 px are downscaled to 1,200 px (JPEG), because full-resolution figures made two files 14–19 MB. Text, captions and tables are not altered. Figures, captions, tables and the section's own text are kept, so the file still goes through OCR like an uploaded lecture PDF. What's lost compared with a book PDF is the typeset page layout (running headers, page numbers, page breaks).
 
 | File | Section (1st edition) | What it stresses |
 |---|---|---|
@@ -50,7 +50,7 @@ evals/rag/usecases/medical-students/
 
 Section slugs come from the 1st edition's table of contents (`13-4-the-peripheral-nervous-system`, `19-1-heart-anatomy`, `19-3-cardiac-cycle`, `25-5-physiology-of-urine-formation`). Each file is a whole section, so no page-range choice is needed. Target under 5 MB per file and under 15 MB for the pack.
 
-**`LICENSES.md`:** a header gives the book, authors, publisher, edition, year, licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/) and book URL. It notes that each file is the named web section printed to PDF on 2026-10-01, with site navigation and the cookie banner hidden and the content unaltered, and that the OpenStax name and logo are not covered by the licence. Below it is one entry per file in the format `validatePack` parses: `- <fileName>: CC BY 4.0, Anatomy and Physiology (1st edition), section <n> <title>, printed from <section URL>`. The section URLs are the reproduction record; the print script is not committed.
+**`LICENSES.md`:** a header gives the book, authors, publisher, edition, year, licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/) and book URL. It notes that each file is the named web section printed to PDF on 2026-10-01, with site navigation and the cookie banner hidden and figures downscaled to at most 1,200 px wide (text, captions and tables unaltered), and that the OpenStax name and logo are not covered by the licence. Below it is one entry per file in the format `validatePack` parses: `- <fileName>: CC BY 4.0, Anatomy and Physiology (1st edition), section <n> <title>, printed from <section URL>`. The section URLs are the reproduction record; the print script is not committed.
 
 **Registration:** `evals/rag/usecases/index.ts` adds `registerPack(medicalStudentsPack, medicalStudentsFixtures)`. Whichever pack PR lands second resolves a one-line conflict there.
 
@@ -96,7 +96,7 @@ The first two mirror the Language Learners checks, so answer leaks (#218) compar
 
 ## 4. Building and verification
 
-**Excerpts:** print the four 1st-edition sections to PDF with Playwright (headless Chrome), hiding site chrome and the cookie banner. Check each file opens, starts with its section heading, has text in a PDF text dump with no cookie-banner text, and keeps its figures.
+**Excerpts:** print the four 1st-edition sections to PDF with Playwright (headless Chrome), hiding site chrome and the cookie banner and downscaling figures wider than 1,200 px. Check each file opens, starts with its section heading, has text in a PDF text dump with no cookie-banner text, and keeps its figures.
 
 **Offline checks (required for the PR):**
 

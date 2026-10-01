@@ -51,11 +51,33 @@ The 2nd edition is CC BY-NC-SA 4.0 (non-commercial), so it was dropped (user dec
 ```js
 // .cache/openstax/print.mjs — usage: node print.mjs <slug> <out.pdf>
 // Prints one OpenStax A&P 1e section to PDF with the site chrome and cookie banner hidden.
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { chromium } from "playwright";
 
+const MAX_WIDTH = 1200;
 const [slug, out] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: "chrome" });
 const page = await browser.newPage();
+// Downscale figures wider than MAX_WIDTH to keep the PDFs small (OpenStax serves ~300 dpi figures).
+// Figure URLs (openstax.org/apps/image-cdn/v1/f=webp/...) have no file extension, so match by resource type.
+await page.route("**/*", async (route) => {
+  if (route.request().resourceType() !== "image") return route.continue();
+  const response = await route.fetch();
+  const body = await response.body();
+  try {
+    const img = await loadImage(body);
+    if (img.width <= MAX_WIDTH) return route.fulfill({ response, body });
+    const height = Math.round((img.height * MAX_WIDTH) / img.width);
+    const canvas = createCanvas(MAX_WIDTH, height);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, MAX_WIDTH, height);
+    ctx.drawImage(img, 0, 0, MAX_WIDTH, height);
+    return route.fulfill({ response, body: canvas.toBuffer("image/jpeg", 85), headers: { ...response.headers(), "content-type": "image/jpeg" } });
+  } catch {
+    return route.fulfill({ response, body }); // not decodable (e.g. svg): pass through
+  }
+});
 await page.goto(`https://openstax.org/books/anatomy-and-physiology/pages/${slug}`, {
   waitUntil: "networkidle",
   timeout: 90_000,
@@ -82,7 +104,7 @@ await browser.close();
 console.log(out);
 ```
 
-Playwright (1.63) is a repo dependency; `channel: "chrome"` uses the installed Google Chrome. Hiding the banner with CSS means no consent choice is made.
+Playwright (1.63) and `@napi-rs/canvas` are already in `node_modules`; `channel: "chrome"` uses the installed Google Chrome. Hiding the banner with CSS means no consent choice is made. Without the downscaling route the heart and cranial-nerve sections print at 19 MB and 14 MB.
 
 ---
 
@@ -123,7 +145,7 @@ Expected: the first line of each file is its section heading (e.g. `19.3 Cardiac
 pdfimages -list $D/heart-anatomy.pdf | head -5   # expected: image rows listed (figures present)
 ```
 
-If `pdfimages` is unavailable, render a page (`pdftoppm -f 2 -l 2 -png -r 60 <file> .cache/openstax/check`) and look at it. If figures are blank, increase the scroll wait in `print.mjs` (e.g. 400 ms) and re-print. If a file exceeds 5 MB, keep it and note the size in the PR body; don't re-compress (that alters figures).
+If `pdfimages` is unavailable, render a page (`pdftoppm -f 2 -l 2 -png -r 60 <file> .cache/openstax/check`) and look at it. If figures are blank, increase the scroll wait in `print.mjs` (e.g. 400 ms) and re-print. Also confirm figures are at most 1,200 px wide (`pdfimages -list`) and their labels are legible (render a figure page with `pdftoppm -r 100` and look at it). If a file still exceeds 5 MB, keep it and note the size in the PR body.
 
 ---
 
@@ -141,7 +163,7 @@ If `pdfimages` is unavailable, render a page (`pdftoppm -f 2 -l 2 -png -r 60 <fi
 
 All sources are from **Anatomy and Physiology** (1st edition) by J. Gordon Betts, Kelly A. Young, James A. Wise, Eddie Johnson, Brandon Poe, Dean H. Kruse, Oksana Korol, Jody E. Johnson, Mark Womble and Peter DeSaix, published by OpenStax (Rice University), 2013. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Book: https://openstax.org/books/anatomy-and-physiology/pages/1-introduction
 
-Each file is one whole section of the web edition, printed to PDF from openstax.org on 2026-10-01 with headless Chrome. Site navigation and the cookie banner were hidden before printing; the section's text, figures, captions and tables were not changed. The OpenStax name, OpenStax logo, OpenStax book covers, Rice University name and Rice University logo are not subject to the Creative Commons licence.
+Each file is one whole section of the web edition, printed to PDF from openstax.org on 2026-10-01 with headless Chrome. Site navigation and the cookie banner were hidden before printing, and figures wider than 1,200 px were downscaled to 1,200 px (JPEG) to keep the files small; the section's text, captions and tables were not changed. The OpenStax name, OpenStax logo, OpenStax book covers, Rice University name and Rice University logo are not subject to the Creative Commons licence.
 
 - heart-anatomy.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 19.1 Heart Anatomy, printed from https://openstax.org/books/anatomy-and-physiology/pages/19-1-heart-anatomy
 - cardiac-cycle.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 19.3 Cardiac Cycle, printed from https://openstax.org/books/anatomy-and-physiology/pages/19-3-cardiac-cycle
