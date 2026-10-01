@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { ButtonGroup } from "./button-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
 import { Checkbox } from "./checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
@@ -350,5 +351,33 @@ describe("shadcn ui components render", () => {
     const className = screen.getByRole("button", { name: "Go" }).className;
     expect(className).toContain("[&_svg:not([class*='size-'])]:size-3.5");
     expect(className).not.toContain("[&_svg:not([class*='size-'])]:size-4");
+  });
+
+  it("soft layered controls", () => {
+    render(
+      <>
+        <Button variant="outline">o</Button>
+        <ButtonGroup variant="tray" aria-label="tray">
+          <Button variant="ghost" size="icon-sm" aria-label="a" aria-expanded="true" />
+        </ButtonGroup>
+        <Toggle variant="outline" aria-label="t" />
+        <Badge variant="outline">b</Badge>
+        <ButtonGroup aria-label="plain">
+          <Button>1</Button>
+          <Button>2</Button>
+        </ButtonGroup>
+      </>
+    );
+    const outline = screen.getByRole("button", { name: "o" });
+    expect(outline).toHaveClass("ring-1", "shadow-xs", "bg-card");
+    expect(outline).not.toHaveClass("border-2");
+    const tray = screen.getByRole("group", { name: "tray" });
+    expect(tray).toHaveClass("bg-secondary", "rounded-xl");
+    expect(tray).toHaveAttribute("data-variant", "tray");
+    expect(screen.getByRole("button", { name: "t" })).not.toHaveClass("border");
+    expect(screen.getByText("b")).toHaveClass("ring-1");
+    const plain = screen.getByRole("group", { name: "plain" });
+    expect(plain.className).toContain("[&>*:not(:first-child)]:rounded-l-none");
+    expect(tray.className).not.toContain("rounded-l-none");
   });
 });
