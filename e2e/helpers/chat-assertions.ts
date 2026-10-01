@@ -5,70 +5,84 @@ import { expect } from "@playwright/test";
 export const CHAT_TEXTAREA_PLACEHOLDER =
   /Ask a question about your sources|Ask a complex research question with multi-step investigation/;
 
-/**
- * Open the Research Options dropdown menu ("+" button) in the chat input area.
- * The menu contains "Deep Research" toggle and source filter checkboxes.
- */
-export async function openResearchOptionsMenu(page: Page) {
-  const menuBtn = page.locator('button[title="Research options"]');
-  await menuBtn.click();
-  // Wait for dropdown to render — "Deep Research" text is always present
-  await expect(page.getByText("Deep Research")).toBeVisible({ timeout: 5_000 });
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Open the composer mode dropdown (trigger: "Composer mode: <Label>"). */
+export async function openComposerModeMenu(page: Page) {
+  await page.getByRole("button", { name: /^Composer mode:/ }).click();
 }
 
 /**
- * Dismiss the Research Options dropup. `ChatInput` does not close it on Escape
- * (only outside mousedown); toggle the "+" control instead.
+ * Switch the composer mode ("Chat", "Deep Research", "Literature Review").
+ * Items are menuitemradios whose accessible name may gain a description, so match the start only.
  */
-export async function closeResearchOptionsMenu(page: Page) {
-  await page.locator('button[title="Research options"]').click();
-  await expect(page.getByRole("button", { name: "Deep Research", exact: true })).toBeHidden({
-    timeout: 5_000,
-  });
+export async function selectComposerMode(page: Page, label: string) {
+  await openComposerModeMenu(page);
+  await page.getByRole("menuitemradio", { name: new RegExp(`^${escapeRegExp(label)}`) }).click();
+}
+
+/** Open the Filters popover (source channel checkboxes). */
+export async function openFiltersPopover(page: Page) {
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await expect(page.getByRole("checkbox").first()).toBeVisible({ timeout: 5_000 });
 }
 
 /**
- * Switch to Web-only source filter: opens the Research Options menu,
- * enables "Web" and disables "Notebook sources" so chat queries go to
- * web search instead of requiring notebook sources.
+ * Toggle one source channel checkbox in the Filters popover.
+ * Channel names: "Notebook sources", "Academic", "Web", "News", "Finance".
+ * The popover is left open; call `closeFiltersPopover` when done.
+ */
+export async function toggleSourceChannel(page: Page, name: string) {
+  await page.getByRole("checkbox", { name }).click();
+}
+
+/** Assert a source channel checkbox is checked / unchecked (Filters popover must be open). */
+export async function expectChannelChecked(page: Page, name: string, checked: boolean) {
+  const checkbox = page.getByRole("checkbox", { name });
+  if (checked) await expect(checkbox).toBeChecked();
+  else await expect(checkbox).not.toBeChecked();
+}
+
+/** Dismiss the Filters popover with Escape (Radix closes it and restores focus to the trigger). */
+export async function closeFiltersPopover(page: Page) {
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("checkbox").first()).toBeHidden({ timeout: 5_000 });
+}
+
+/** Make a source channel checkbox match `checked`, clicking only when it differs. */
+async function setSourceChannel(page: Page, name: string, checked: boolean) {
+  const checkbox = page.getByRole("checkbox", { name });
+  if ((await checkbox.isChecked()) !== checked) await checkbox.click();
+  await expectChannelChecked(page, name, checked);
+}
+
+/**
+ * Switch to Web-only source filter so chat queries go to web search instead of requiring
+ * notebook sources. Idempotent: works from Chat mode (Notebook only) and from Deep Research
+ * mode (Notebook, Web and Academic). Web is enabled first because at least one channel must
+ * stay on. In Deep Research, pick the mode before calling this: entering the mode re-adds the
+ * default channels.
  */
 export async function enableWebOnlyFilter(page: Page) {
-  await openResearchOptionsMenu(page);
-
-  // Enable "Web" filter (adds to active list)
-  const webLabel = page.locator("label").filter({ hasText: /^Web$/ });
-  await webLabel.click();
-
-  // Disable "Notebook sources" filter (must have ≥1 active, so Web is added first)
-  const notebookLabel = page.locator("label").filter({ hasText: /^Notebook sources$/ });
-  await notebookLabel.click();
-
-  await closeResearchOptionsMenu(page);
+  await openFiltersPopover(page);
+  await setSourceChannel(page, "Web", true);
+  for (const name of ["Notebook sources", "Academic", "News", "Finance"]) {
+    await setSourceChannel(page, name, false);
+  }
+  await closeFiltersPopover(page);
 }
 
 /**
  * Send a chat message: fill the input and click the Send button.
- * Works for both normal mode (title="Send message (Enter)") and
- * deep research mode (title="Start deep research (Enter)").
+ * The send button title varies by mode but always contains "(Enter)".
  */
 export async function sendMessage(page: Page, text: string) {
   const input = page.getByPlaceholder(CHAT_TEXTAREA_PLACEHOLDER);
   await input.fill(text);
-  // The send button title varies: "Send message (Enter)" or "Start deep research (Enter)"
   const send = page.locator('button[title*="(Enter)"]');
   await send.click();
-}
-
-/**
- * Switch the source filter in chat input area by name.
- * Opens the Research Options menu and toggles the named filter.
- * Filter names: "Notebook sources", "Web", "News", "Finance"
- */
-export async function switchSourceFilter(page: Page, filterName: string) {
-  await openResearchOptionsMenu(page);
-  const filterLabel = page.locator("label").filter({ hasText: new RegExp(`^${filterName}$`) });
-  await filterLabel.click();
-  await closeResearchOptionsMenu(page);
 }
 
 /**

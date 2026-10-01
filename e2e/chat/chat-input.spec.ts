@@ -1,42 +1,38 @@
 import { expect, test } from "../fixtures/notebook.fixture";
-import { closeResearchOptionsMenu, openResearchOptionsMenu } from "../helpers/chat-assertions";
+import {
+  closeFiltersPopover,
+  expectChannelChecked,
+  openFiltersPopover,
+  selectComposerMode,
+  toggleSourceChannel,
+} from "../helpers/chat-assertions";
 
 test.describe("Chat Input", () => {
   test("source filter can switch to Web", async ({ notebookPage }) => {
     const page = notebookPage;
 
-    // Open the Research Options menu
-    await openResearchOptionsMenu(page);
+    await openFiltersPopover(page);
 
-    // Source filter checkboxes should be visible inside the dropdown
-    const webLabel = page.locator("label").filter({ hasText: /^Web$/ });
-    await expect(webLabel).toBeVisible();
+    // Chat mode starts on Notebook sources only
+    await expectChannelChecked(page, "Notebook sources", true);
+    await expectChannelChecked(page, "Web", false);
 
-    // Enable Web filter
-    await webLabel.click();
+    await toggleSourceChannel(page, "Web");
+    await expectChannelChecked(page, "Web", true);
 
-    // Verify Web checkbox is now checked
-    const webCheckbox = webLabel.locator('input[type="checkbox"]');
-    await expect(webCheckbox).toBeChecked();
-
-    await closeResearchOptionsMenu(page);
+    await closeFiltersPopover(page);
   });
 
-  test("deep research toggle is visible in options menu", async ({ notebookPage }) => {
+  test("deep research can be selected from the composer mode menu", async ({ notebookPage }) => {
     const page = notebookPage;
 
-    // Open the Research Options menu
-    await openResearchOptionsMenu(page);
+    // Default mode is Chat
+    await expect(page.getByRole("button", { name: "Composer mode: Chat" })).toBeVisible();
 
-    // "Deep Research" toggle should be visible in the dropdown
-    const deepResearchBtn = page.getByRole("button", { name: /Deep Research/i });
-    await expect(deepResearchBtn).toBeVisible();
+    await selectComposerMode(page, "Deep Research");
 
-    // Click to enable
-    await deepResearchBtn.click();
-
-    // The toggle pill should now appear next to the "+" button showing "Deep research"
-    await expect(page.getByText("Deep research")).toBeVisible();
+    // The mode trigger reflects the new mode
+    await expect(page.getByRole("button", { name: "Composer mode: Deep Research" })).toBeVisible();
 
     // Placeholder should change to research-specific text
     await expect(page.getByPlaceholder(/Ask a complex research question/)).toBeVisible();
@@ -45,7 +41,7 @@ test.describe("Chat Input", () => {
   test("chat input shows correct placeholder", async ({ notebookPage }) => {
     const page = notebookPage;
 
-    // Default placeholder when deep research is off
+    // Default placeholder when in Chat mode
     await expect(page.getByPlaceholder(/Ask a question about your sources/)).toBeVisible();
   });
 });
