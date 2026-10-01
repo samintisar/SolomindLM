@@ -48,3 +48,5 @@ Hairlines (`border-border/50`, `ring-hairline`) are fine where content meets con
 - `bun run lint:design` must not go up. A brand-new design rule records its first counts with
   `bun run lint:design:update -- --new-rule=<rule-id>`.
 - Screenshot UI changes in light, dark and at 390px wide, and attach them to the PR.
+- Changing a primitive? Run `bun run test:design` (Docker); if the change is intended, run
+  `bun run test:design:update` and commit the new PNGs. Browse every primitive at `/dev/design` in dev.
