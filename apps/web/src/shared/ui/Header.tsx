@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 import { useAuth } from "../../features/auth/useAuth";
+import { canOfferPurchases } from "../../utils/platformDetection";
 import { useTheme } from "../contexts/useTheme";
 import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
 
@@ -194,7 +195,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Share</span>
           </button>
         )}
-        {onBillingClick && !hasSubscription && (
+        {onBillingClick && !hasSubscription && canOfferPurchases() && (
           <button
             onClick={onBillingClick}
             className="px-3 py-1.5 text-sm font-medium bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors"

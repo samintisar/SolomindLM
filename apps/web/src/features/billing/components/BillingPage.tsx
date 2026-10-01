@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import React from "react";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import { canOfferPurchases } from "@/utils/platformDetection";
 import {
   useCancelSubscription,
   useCreateCheckout,
@@ -40,6 +41,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
   const createCheckout = useCreateCheckout();
   const createPortalSession = useCreatePortalSession();
   const cancelSubscription = useCancelSubscription();
+  const purchasable = canOfferPurchases();
 
   const handleUpgrade = async (interval: "month" | "year") => {
     try {
@@ -96,11 +98,15 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
             >
               <span>←</span> Back
             </button>
-            <h1 className="text-5xl font-serif font-bold mb-4 text-foreground">Choose Your Plan</h1>
+            <h1 className="text-5xl font-serif font-bold mb-4 text-foreground">
+              {purchasable ? "Choose Your Plan" : "Your Plan"}
+            </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               {status?.hasSubscription
                 ? "Manage your subscription and billing information below"
-                : "Unlock unlimited access to all SolomindLM features"}
+                : purchasable
+                  ? "Unlock unlimited access to all SolomindLM features"
+                  : "Here's what your plan includes"}
             </p>
           </div>
         </div>
@@ -135,13 +141,17 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                       )}
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-muted-foreground mb-2">Current Price</div>
-                      <p className="text-3xl font-serif font-bold mb-3">
-                        ${status.amount ? (status.amount / 100).toFixed(0) : 0}
-                        <span className="text-lg font-normal text-muted-foreground">
-                          /{status.interval}
-                        </span>
-                      </p>
+                      {purchasable && (
+                        <>
+                          <div className="text-sm text-muted-foreground mb-2">Current Price</div>
+                          <p className="text-3xl font-serif font-bold mb-3">
+                            ${status.amount ? (status.amount / 100).toFixed(0) : 0}
+                            <span className="text-lg font-normal text-muted-foreground">
+                              /{status.interval}
+                            </span>
+                          </p>
+                        </>
+                      )}
                       <div className="text-sm">
                         <p className="inline-block rounded-md bg-success/10 px-2 py-0.5 font-medium capitalize text-success">
                           ✓ {status.status}
@@ -161,43 +171,12 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
               </div>
             )}
 
-            {/* Pricing Cards Grid */}
-            <div
-              className={`grid gap-8 mb-12 ${status?.hasSubscription ? "lg:grid-cols-3" : "lg:grid-cols-3"}`}
-            >
-              {/* Free Plan */}
-              <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg transition-all duration-300">
-                <div className="mb-6">
-                  <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Free</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {status?.hasSubscription ? "Your previous plan" : "Get started today"}
-                  </p>
-                </div>
-
-                <div className="mb-6">
-                  <p className="text-5xl font-serif font-bold text-foreground">
-                    $0
-                    <span className="text-lg font-normal text-muted-foreground">/month</span>
-                  </p>
-                </div>
-
-                {status?.hasSubscription ? (
-                  <button
-                    onClick={onBack}
-                    className="w-full mb-8 py-3 border-2 border-border text-foreground font-medium rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    Downgrade
-                  </button>
-                ) : (
-                  <div className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg text-center">
-                    Current Plan
-                  </div>
-                )}
-
-                <div className="space-y-3 flex-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                    Included:
-                  </p>
+            {/* Native app: plan summary only — no prices or checkout (see canOfferPurchases) */}
+            {!purchasable && !status?.hasSubscription && (
+              <div className="mb-12 max-w-md mx-auto bg-card border-2 border-border rounded-xl p-8">
+                <h2 className="text-2xl font-serif font-bold mb-1 text-foreground">Free Plan</h2>
+                <p className="text-sm text-muted-foreground mb-6">Your current plan</p>
+                <div className="space-y-3">
                   {freeFeatures.map((feature) => (
                     <div key={feature} className="flex items-start gap-3">
                       <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
@@ -206,35 +185,129 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   ))}
                 </div>
               </div>
+            )}
 
-              {/* Yearly */}
-              <div className="relative">
-                {/* Save Badge */}
-                <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-10">
-                  <div className="bg-primary text-primary-foreground px-4 py-1 rounded-xl text-sm font-semibold whitespace-nowrap">
-                    Save 50%
-                  </div>
-                </div>
-
-                <div className="bg-card border-2 border-primary rounded-xl p-8 flex flex-col shadow-lg hover:shadow-xl transition-all duration-300">
+            {/* Pricing Cards Grid */}
+            {purchasable && (
+              <div
+                className={`grid gap-8 mb-12 ${status?.hasSubscription ? "lg:grid-cols-3" : "lg:grid-cols-3"}`}
+              >
+                {/* Free Plan */}
+                <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg transition-all duration-300">
                   <div className="mb-6">
-                    <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Yearly</h3>
+                    <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Free</h3>
                     <p className="text-sm text-muted-foreground">
-                      Best value – billed once per year
+                      {status?.hasSubscription ? "Your previous plan" : "Get started today"}
                     </p>
                   </div>
 
                   <div className="mb-6">
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-5xl font-serif font-bold text-foreground">
-                        $7.50
-                        <span className="text-lg font-normal text-muted-foreground">/month</span>
-                      </p>
-                      <p className="text-sm text-muted-foreground font-normal">($90/year)</p>
+                    <p className="text-5xl font-serif font-bold text-foreground">
+                      $0
+                      <span className="text-lg font-normal text-muted-foreground">/month</span>
+                    </p>
+                  </div>
+
+                  {status?.hasSubscription ? (
+                    <button
+                      onClick={onBack}
+                      className="w-full mb-8 py-3 border-2 border-border text-foreground font-medium rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      Downgrade
+                    </button>
+                  ) : (
+                    <div className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg text-center">
+                      Current Plan
+                    </div>
+                  )}
+
+                  <div className="space-y-3 flex-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                      Included:
+                    </p>
+                    {freeFeatures.map((feature) => (
+                      <div key={feature} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                        <span className="text-sm text-foreground">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Yearly */}
+                <div className="relative">
+                  {/* Save Badge */}
+                  <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-10">
+                    <div className="bg-primary text-primary-foreground px-4 py-1 rounded-xl text-sm font-semibold whitespace-nowrap">
+                      Save 50%
                     </div>
                   </div>
 
-                  {status?.hasSubscription && status.interval === "year" ? (
+                  <div className="bg-card border-2 border-primary rounded-xl p-8 flex flex-col shadow-lg hover:shadow-xl transition-all duration-300">
+                    <div className="mb-6">
+                      <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Yearly</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Best value – billed once per year
+                      </p>
+                    </div>
+
+                    <div className="mb-6">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-5xl font-serif font-bold text-foreground">
+                          $7.50
+                          <span className="text-lg font-normal text-muted-foreground">/month</span>
+                        </p>
+                        <p className="text-sm text-muted-foreground font-normal">($90/year)</p>
+                      </div>
+                    </div>
+
+                    {status?.hasSubscription && status.interval === "year" ? (
+                      <button
+                        disabled={true}
+                        className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
+                      >
+                        Current Plan
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          status?.hasSubscription ? handleManagePlan() : handleUpgrade("year")
+                        }
+                        className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                      >
+                        {status?.hasSubscription ? "Switch to Yearly" : "Get Started"}
+                      </button>
+                    )}
+
+                    <div className="space-y-3 flex-1">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                        Everything included:
+                      </p>
+                      {proFeatures.map((feature) => (
+                        <div key={feature} className="flex items-start gap-3">
+                          <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span className="text-sm text-foreground">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monthly */}
+                <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+                  <div className="mb-6">
+                    <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Monthly</h3>
+                    <p className="text-sm text-muted-foreground">Billed every month</p>
+                  </div>
+
+                  <div className="mb-6">
+                    <p className="text-5xl font-serif font-bold text-foreground">
+                      $15
+                      <span className="text-lg font-normal text-muted-foreground">/month</span>
+                    </p>
+                  </div>
+
+                  {status?.hasSubscription && status.interval === "month" ? (
                     <button
                       disabled={true}
                       className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
@@ -244,11 +317,11 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   ) : (
                     <button
                       onClick={() =>
-                        status?.hasSubscription ? handleManagePlan() : handleUpgrade("year")
+                        status?.hasSubscription ? handleManagePlan() : handleUpgrade("month")
                       }
                       className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
                     >
-                      {status?.hasSubscription ? "Switch to Yearly" : "Get Started"}
+                      {status?.hasSubscription ? "Switch to Monthly" : "Get Started"}
                     </button>
                   )}
 
@@ -265,52 +338,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   </div>
                 </div>
               </div>
-
-              {/* Monthly */}
-              <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg hover:border-primary/50 transition-all duration-300">
-                <div className="mb-6">
-                  <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Monthly</h3>
-                  <p className="text-sm text-muted-foreground">Billed every month</p>
-                </div>
-
-                <div className="mb-6">
-                  <p className="text-5xl font-serif font-bold text-foreground">
-                    $15
-                    <span className="text-lg font-normal text-muted-foreground">/month</span>
-                  </p>
-                </div>
-
-                {status?.hasSubscription && status.interval === "month" ? (
-                  <button
-                    disabled={true}
-                    className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
-                  >
-                    Current Plan
-                  </button>
-                ) : (
-                  <button
-                    onClick={() =>
-                      status?.hasSubscription ? handleManagePlan() : handleUpgrade("month")
-                    }
-                    className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    {status?.hasSubscription ? "Switch to Monthly" : "Get Started"}
-                  </button>
-                )}
-
-                <div className="space-y-3 flex-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                    Everything included:
-                  </p>
-                  {proFeatures.map((feature) => (
-                    <div key={feature} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

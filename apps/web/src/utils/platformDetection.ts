@@ -12,6 +12,16 @@ export function isNativeShell(): boolean {
   return typeof window !== "undefined" && !!window.__IS_NATIVE_SHELL__;
 }
 
+/**
+ * Whether this surface may offer subscription purchases (prices, Stripe checkout,
+ * "Upgrade to Pro" CTAs). Off inside the native shell: App Store guideline 3.1.1
+ * requires digital subscriptions sold in an iOS app to use in-app purchase, so the
+ * shell must not steer users to Stripe. Existing subscribers keep Pro either way.
+ */
+export function canOfferPurchases(): boolean {
+  return !isNativeShell();
+}
+
 export function getNativeWebViewBridge(): { postMessage: (message: string) => void } | undefined {
   if (typeof window === "undefined") return undefined;
   return window.ReactNativeWebView;
