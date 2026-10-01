@@ -20,7 +20,7 @@ interface MoveToFolderModalProps {
 }
 
 const ROW =
-  "flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
 export function MoveToFolderModal({
   notebookId,
@@ -30,7 +30,7 @@ export function MoveToFolderModal({
 }: MoveToFolderModalProps) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Move to folder</DialogTitle>
           <DialogDescription>Choose where this notebook lives.</DialogDescription>

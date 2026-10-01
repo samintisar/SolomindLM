@@ -11,11 +11,18 @@ import {
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
-import { COVER_COLORS, COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
+import {
+  COVER_COLORS,
+  COVER_ICON_CLASS,
+  coverColorLabel,
+  coverFillClass,
+} from "@/shared/notebook/coverColor";
 import {
   COVER_ICONS,
+  type CoverIconName,
   FOLDER_ICON_NAMES,
   folderIconName,
+  isCoverIconName,
   NOTEBOOK_ICON_NAMES,
   notebookIconName,
 } from "@/shared/notebook/notebookIcons";
@@ -42,8 +49,6 @@ const COPY = {
   },
 } as const;
 
-const swatchName = (cls: string) => cls.replace("bg-vintage-", "").replace("-", " ");
-
 interface CoverCustomizeDialogProps {
   kind: "notebook" | "folder";
   /** Omit to create. */
@@ -63,12 +68,12 @@ export function CoverCustomizeDialog({
   const iconNames = kind === "notebook" ? NOTEBOOK_ICON_NAMES : FOLDER_ICON_NAMES;
   const [name, setName] = useState(initial?.name ?? "");
   const [color, setColor] = useState(coverFillClass(initial?.color));
-  const [icon, setIcon] = useState<string>(
+  const [icon, setIcon] = useState<CoverIconName>(
     kind === "notebook" ? notebookIconName(initial?.icon) : folderIconName(initial?.icon)
   );
   const [saving, setSaving] = useState(false);
   const nameId = useId();
-  const PreviewIcon = COVER_ICONS[icon as keyof typeof COVER_ICONS];
+  const PreviewIcon = COVER_ICONS[icon];
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -76,6 +81,8 @@ export function CoverCustomizeDialog({
     setSaving(true);
     try {
       await onSave({ name: name.trim(), color, icon });
+    } catch {
+      // Callers report their own failures; keep the dialog open so the user can retry.
     } finally {
       setSaving(false);
     }
@@ -83,7 +90,7 @@ export function CoverCustomizeDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-svh overflow-y-auto">
         <form onSubmit={submit} className="flex flex-col gap-5">
           <DialogHeader>
             <DialogTitle>{isCreate ? copy.create : copy.edit}</DialogTitle>
@@ -124,11 +131,7 @@ export function CoverCustomizeDialog({
               className="flex-wrap"
             >
               {COVER_COLORS.map((swatch) => (
-                <ToggleGroupItem
-                  key={swatch}
-                  value={swatch}
-                  aria-label={`Colour ${swatchName(swatch)}`}
-                >
+                <ToggleGroupItem key={swatch} value={swatch} aria-label={coverColorLabel(swatch)}>
                   <span aria-hidden className={cn("size-full rounded-full", swatch)} />
                 </ToggleGroupItem>
               ))}
@@ -142,7 +145,7 @@ export function CoverCustomizeDialog({
               variant="outline"
               spacing={1}
               value={icon}
-              onValueChange={(value) => value && setIcon(value)}
+              onValueChange={(value) => isCoverIconName(value) && setIcon(value)}
               className="flex-wrap"
             >
               {iconNames.map((iconName) => {
