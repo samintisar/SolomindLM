@@ -1,6 +1,8 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { EvalFixture } from "../types";
+import { medicalStudentsFixtures } from "./medical-students/fixtures";
+import { medicalStudentsPack } from "./medical-students/manifest";
 import type { RegisteredPack, UseCasePack } from "./types";
 
 const USECASES_DIR = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +19,9 @@ export function registerPack(pack: UseCasePack, fixtures: EvalFixture[]): Regist
  * Registered use-case packs. Each pack PR adds one entry, e.g.
  *   registerPack(languageLearnersPack, languageLearnersFixtures),
  */
-export const USE_CASE_PACKS: RegisteredPack[] = [];
+export const USE_CASE_PACKS: RegisteredPack[] = [
+  registerPack(medicalStudentsPack, medicalStudentsFixtures),
+];
 
 export function getPack(id: string): RegisteredPack {
   const found = USE_CASE_PACKS.find((p) => p.pack.id === id);
