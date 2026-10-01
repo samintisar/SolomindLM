@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the `medical-students` use-case eval pack: four OpenStax *Anatomy and Physiology 2e* PDF excerpts, 10 fixtures and a six-check rubric, registered so `eval:usecases` scores it.
+**Goal:** Add the `medical-students` use-case eval pack: four OpenStax *Anatomy and Physiology* (1st edition, CC BY 4.0) sections printed to PDF, 10 fixtures and a six-check rubric, registered so `eval:usecases` scores it.
 
 **Architecture:** A pack is a folder under `evals/rag/usecases/<id>/` with `manifest.ts`, `fixtures.ts` and `sources/` (+ `LICENSES.md`), registered in `evals/rag/usecases/index.ts`. The framework (#229, already on `main`) validates, seeds and runs it; this plan adds content only. No Convex, prompt or agent code changes.
 
-**Tech Stack:** TypeScript (Bun), vitest (`vitest.convex.config.ts`), Python `pypdf` 6.x and `pdftotext` (both installed locally) for cutting and checking PDFs.
+**Tech Stack:** TypeScript (Bun), vitest (`vitest.convex.config.ts`), Playwright (repo dependency) with installed Chrome for printing, `pdftotext`/`pdfinfo` for checking PDFs.
 
 **Spec:** [docs/superpowers/specs/2026-10-01-medical-students-eval-pack-design.md](../specs/2026-10-01-medical-students-eval-pack-design.md). **Issue:** #270. **Branch:** `feature/eval-pack-medical-students` (from `main`).
 
@@ -22,8 +22,8 @@
 
 | Path | Action | Responsibility |
 |---|---|---|
-| `.cache/openstax/` | create (gitignored) | downloaded book PDF and the two helper scripts; never committed |
-| `evals/rag/usecases/medical-students/sources/*.pdf` | create | the four unmodified page-range excerpts |
+| `.cache/openstax/` | create (gitignored) | print and check scripts; never committed |
+| `evals/rag/usecases/medical-students/sources/*.pdf` | create | the four 1st-edition sections printed to PDF |
 | `evals/rag/usecases/medical-students/sources/LICENSES.md` | create | attribution + page range per file (parsed by `validatePack`) |
 | `evals/rag/usecases/medical-students/manifest.ts` | create | `medicalStudentsPack: UseCasePack` (claim, features, sources, rubric) |
 | `evals/rag/usecases/medical-students/fixtures.ts` | create | `medicalStudentsFixtures: EvalFixture[]` (10 fixtures) |
@@ -35,152 +35,95 @@ Pack modules must import only types from `../types` and `../../types`; importing
 
 ---
 
-### Task 1: Download the OpenStax book PDF
+### Task 1: (done) Choose the source edition
 
-**Files:**
-- Create: `.cache/openstax/anatomy-and-physiology-2e.pdf` (gitignored by `.gitignore:120` `.cache`)
-
-- [ ] **Step 1: Find the official PDF link**
-
-Open https://openstax.org/details/books/anatomy-and-physiology-2e in the browser pane and find the "Download a PDF" link (it points at `assets.openstax.org`). Note the URL and the file size shown on the page or via:
-
-```bash
-curl -sI "<pdf-url>" | grep -i content-length
-```
-
-- [ ] **Step 2: Ask the user before downloading**
-
-Downloading needs explicit permission. Ask in chat, stating file name, source URL and size, e.g. "Download `Anatomy_and_Physiology_2e…pdf` (≈ N MB) from assets.openstax.org into `.cache/openstax/`?" Wait for a clear yes.
-
-- [ ] **Step 3: Download and confirm the file**
-
-```bash
-mkdir -p .cache/openstax
-curl -L --fail -o .cache/openstax/anatomy-and-physiology-2e.pdf "<pdf-url>"
-pdfinfo .cache/openstax/anatomy-and-physiology-2e.pdf | grep -E "Title|Pages"
-git status --short .cache   # expected: no output (ignored)
-```
-
-Expected: `Title` mentions Anatomy and Physiology 2e; `Pages` is over 1,000.
+The 2nd edition is CC BY-NC-SA 4.0 (non-commercial), so it was dropped (user decision, 2026-10-01). Sources are the **1st edition** (2013, CC BY 4.0), which is web-only. Nothing to do; Tasks 2–4 replace the old download/locate/cut steps.
 
 ---
 
-### Task 2: Locate the four sections in the book
+### Task 2: Write the print script
 
 **Files:**
-- Create: `.cache/openstax/locate.py` (not committed)
+- Create: `.cache/openstax/print.mjs` (gitignored by `.gitignore:120` `.cache`; never committed)
 
-- [ ] **Step 1: Write the locator script**
+- [ ] **Step 1: Write the script**
 
-```python
-# .cache/openstax/locate.py — print 0-based page indices where section headings appear.
-import re
-import sys
-from pypdf import PdfReader
+```js
+// .cache/openstax/print.mjs — usage: node print.mjs <slug> <out.pdf>
+// Prints one OpenStax A&P 1e section to PDF with the site chrome and cookie banner hidden.
+import { chromium } from "playwright";
 
-BOOK = ".cache/openstax/anatomy-and-physiology-2e.pdf"
-PATTERNS = {
-    "19.1": r"19\.1\s+Heart Anatomy",
-    "19.2": r"19\.2\s+",
-    "19.3": r"19\.3\s+Cardiac Cycle",
-    "19.4": r"19\.4\s+",
-    "13.4": r"13\.4\s+",
-    "cranial": r"Cranial Nerves",
-    "spinal": r"Spinal Nerves",
-    "13.5": r"13\.5\s+",
-    "25.6": r"25\.6\s+",
-    "25.7": r"25\.7\s+",
-}
-
-reader = PdfReader(BOOK)
-for i, page in enumerate(reader.pages):
-    text = page.extract_text() or ""
-    head = " ".join(text.split())[:160]
-    for key, pattern in PATTERNS.items():
-        if re.search(pattern, text):
-            print(f"{key:8} page_index={i:5}  {head}")
-    if i % 200 == 0:
-        print(f"... scanned {i}", file=sys.stderr)
+const [slug, out] = process.argv.slice(2);
+const browser = await chromium.launch({ channel: "chrome" });
+const page = await browser.newPage();
+await page.goto(`https://openstax.org/books/anatomy-and-physiology/pages/${slug}`, {
+  waitUntil: "networkidle",
+  timeout: 90_000,
+});
+await page.waitForSelector("main h1, [data-type='page'] h1, h1", { timeout: 30_000 });
+// Load lazy images: scroll to the bottom in steps.
+await page.evaluate(async () => {
+  for (let y = 0; y < document.body.scrollHeight; y += 800) {
+    window.scrollTo(0, y);
+    await new Promise((r) => setTimeout(r, 150));
+  }
+});
+await page.waitForLoadState("networkidle");
+// Hide the cookie/consent banner and fixed site chrome without interacting with them.
+await page.addStyleTag({
+  content: `
+    #onetrust-consent-sdk, .onetrust-pc-dark-filter, [id*="cookie" i], [class*="cookie" i],
+    [class*="consent" i], header, nav, footer, [data-testid="toolbar"], [data-testid="topbar"] { display: none !important; }
+  `,
+});
+await page.emulateMedia({ media: "print" });
+await page.pdf({ path: out, format: "Letter", printBackground: true, margin: { top: "0.5in", bottom: "0.5in", left: "0.5in", right: "0.5in" } });
+await browser.close();
+console.log(out);
 ```
 
-- [ ] **Step 2: Run it**
-
-```bash
-python .cache/openstax/locate.py > .cache/openstax/locate.txt
-grep -E "^(19\.1|19\.2|19\.3|19\.4|13\.4|cranial|spinal|13\.5|25\.6|25\.7)" .cache/openstax/locate.txt
-```
-
-Each heading also appears in the chapter's opening list of sections, so ignore hits on the chapter-intro page. The body start of a section is the hit whose page text begins at (or shortly after) that heading.
-
-- [ ] **Step 3: Decide the four ranges and confirm the titles**
-
-Write down 0-based, inclusive `start..end` page indices:
-
-| File | Start | End |
-|---|---|---|
-| `heart-anatomy.pdf` | body page of "19.1 Heart Anatomy" | page before "19.2" begins (include it if 19.2 starts mid-page) |
-| `cardiac-cycle.pdf` | body page of "19.3 Cardiac Cycle" | page where "19.4" begins |
-| `cranial-nerves.pdf` | first body page under 13.4 that contains the "Cranial Nerves" subsection | page where the "Spinal Nerves" subsection begins |
-| `glomerular-filtration.pdf` | body page of "25.6" | page where "25.7" begins |
-
-If the book puts a topic under a different section number or title than the spec says (§13.4 cranial nerves, §25.6 Physiology of Urine Formation), use the section that actually covers the topic and record the real number and title for Task 4. Open the candidate pages (`pdftotext -f <idx+1> -l <idx+1> -layout <book> -`; pdftotext pages are 1-based) to confirm.
-
-Also note each range's **printed book page numbers** (from the page footers) for `LICENSES.md`.
+Playwright (1.63) is a repo dependency; `channel: "chrome"` uses the installed Google Chrome. Hiding the banner with CSS means no consent choice is made.
 
 ---
 
-### Task 3: Cut the excerpts and check their text
+### Task 3: Print the four sections and check them
 
 **Files:**
-- Create: `.cache/openstax/cut.py` (not committed)
 - Create: `evals/rag/usecases/medical-students/sources/heart-anatomy.pdf`
 - Create: `evals/rag/usecases/medical-students/sources/cardiac-cycle.pdf`
 - Create: `evals/rag/usecases/medical-students/sources/cranial-nerves.pdf`
 - Create: `evals/rag/usecases/medical-students/sources/glomerular-filtration.pdf`
 
-- [ ] **Step 1: Write the cutter**
-
-```python
-# .cache/openstax/cut.py — usage: python cut.py <out.pdf> <start_idx> <end_idx>  (0-based, inclusive)
-import sys
-from pypdf import PdfReader, PdfWriter
-
-BOOK = ".cache/openstax/anatomy-and-physiology-2e.pdf"
-out, start, end = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-reader = PdfReader(BOOK)
-writer = PdfWriter()
-for i in range(start, end + 1):
-    writer.add_page(reader.pages[i])
-writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
-with open(out, "wb") as f:
-    writer.write(f)
-print(out, end - start + 1, "pages")
-```
-
-- [ ] **Step 2: Cut the four files with the ranges from Task 2**
+- [ ] **Step 1: Print**
 
 ```bash
-mkdir -p evals/rag/usecases/medical-students/sources
 D=evals/rag/usecases/medical-students/sources
-python .cache/openstax/cut.py $D/heart-anatomy.pdf <start> <end>
-python .cache/openstax/cut.py $D/cardiac-cycle.pdf <start> <end>
-python .cache/openstax/cut.py $D/cranial-nerves.pdf <start> <end>
-python .cache/openstax/cut.py $D/glomerular-filtration.pdf <start> <end>
+mkdir -p $D
+node .cache/openstax/print.mjs 19-1-heart-anatomy $D/heart-anatomy.pdf
+node .cache/openstax/print.mjs 19-3-cardiac-cycle $D/cardiac-cycle.pdf
+node .cache/openstax/print.mjs 13-4-the-peripheral-nervous-system $D/cranial-nerves.pdf
+node .cache/openstax/print.mjs 25-5-physiology-of-urine-formation $D/glomerular-filtration.pdf
 ```
 
-(`<start>`/`<end>` are the integers you recorded in Task 2 Step 3.)
-
-- [ ] **Step 3: Check sizes, first headings and the cranial nerve table**
+- [ ] **Step 2: Check size, heading, banner text and the cranial nerve table**
 
 ```bash
-ls -l $D/*.pdf                                   # each ideally 0.5–3 MB, total < 10 MB
-for f in $D/*.pdf; do echo "== $f"; pdftotext -l 1 "$f" - | head -5; done
-pdftotext -layout $D/cranial-nerves.pdf - | grep -iE "olfactory|optic|oculomotor|trochlear|trigeminal|abducens|facial|vestibulocochlear|glossopharyngeal|vagus|accessory|hypoglossal" | head -20
+ls -l $D/*.pdf                                    # each < 5 MB, total < 15 MB
+for f in $D/*.pdf; do echo "== $f"; pdfinfo "$f" | grep Pages; pdftotext -l 1 "$f" - | head -2; done
+for f in $D/*.pdf; do printf "%s banner hits: " "$f"; pdftotext "$f" - | grep -ciE "cookie|privacy notice|reject all|accept all"; done   # expected: 0 each
+pdftotext -layout $D/cranial-nerves.pdf - | grep -ioE "olfactory|optic|oculomotor|trochlear|trigeminal|abducens|facial|vestibulocochlear|glossopharyngeal|vagus|accessory|hypoglossal" | tr A-Z a-z | sort -u | wc -l   # expected: 12
+pdftotext $D/glomerular-filtration.pdf - | grep -ciE "net filtration pressure|GFR"   # expected: > 0
 ```
 
-Expected: each file's first lines include its section heading; all 12 cranial nerve names appear in the cranial nerves text. If a file exceeds 5 MB, re-check that the range didn't run long; if it is still large, keep it and note the size in the PR body.
+Expected: the first line of each file is its section heading (e.g. `19.3 Cardiac Cycle`); no banner text; all 12 cranial nerves; GFR material present.
 
-Do not commit yet. The PDFs are committed with `LICENSES.md` in Task 4.
+- [ ] **Step 3: Check figures rendered**
+
+```bash
+pdfimages -list $D/heart-anatomy.pdf | head -5   # expected: image rows listed (figures present)
+```
+
+If `pdfimages` is unavailable, render a page (`pdftoppm -f 2 -l 2 -png -r 60 <file> .cache/openstax/check`) and look at it. If figures are blank, increase the scroll wait in `print.mjs` (e.g. 400 ms) and re-print. If a file exceeds 5 MB, keep it and note the size in the PR body; don't re-compress (that alters figures).
 
 ---
 
@@ -191,37 +134,27 @@ Do not commit yet. The PDFs are committed with `LICENSES.md` in Task 4.
 
 - [ ] **Step 1: Write the file**
 
-Use the real section numbers/titles and page numbers from Tasks 2–3. `validatePack` parses lines of the form `- <fileName>: …` (the file name must be followed directly by `:`).
+`validatePack` parses lines of the form `- <fileName>: …` (file name followed directly by `:`). Check the author list against the 1st edition's preface or book page before committing.
 
 ```markdown
 # Source licences: medical-students
 
-All sources are excerpts from **Anatomy and Physiology 2e** by J. Gordon Betts, Kelly A. Young, James A. Wise, Eddie Johnson, Brandon Poe, Dean H. Kruse, Oksana Korol, Jody E. Johnson, Mark Womble and Peter DeSaix, published by OpenStax (Rice University), 2022. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Book: https://openstax.org/details/books/anatomy-and-physiology-2e
+All sources are from **Anatomy and Physiology** (1st edition) by J. Gordon Betts, Kelly A. Young, James A. Wise, Eddie Johnson, Brandon Poe, Dean H. Kruse, Oksana Korol, Jody E. Johnson, Mark Womble and Peter DeSaix, published by OpenStax (Rice University), 2013. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Book: https://openstax.org/books/anatomy-and-physiology/pages/1-introduction
 
-Each file is a contiguous page range cut from the official OpenStax PDF. Pages are reproduced unmodified; no text, figures or layout were changed. The OpenStax name, OpenStax logo, OpenStax book covers, Rice University name and Rice University logo are not subject to the Creative Commons licence.
+Each file is one whole section of the web edition, printed to PDF from openstax.org on 2026-10-01 with headless Chrome. Site navigation and the cookie banner were hidden before printing; the section's text, figures, captions and tables were not changed. The OpenStax name, OpenStax logo, OpenStax book covers, Rice University name and Rice University logo are not subject to the Creative Commons licence.
 
-- heart-anatomy.pdf: CC BY 4.0, Anatomy and Physiology 2e, section 19.1 Heart Anatomy, book pages <first>–<last> (PDF page indices <start>–<end>). Source: https://openstax.org/books/anatomy-and-physiology-2e/pages/19-1-heart-anatomy
-- cardiac-cycle.pdf: CC BY 4.0, Anatomy and Physiology 2e, section 19.3 Cardiac Cycle, book pages <first>–<last> (PDF page indices <start>–<end>). Source: https://openstax.org/books/anatomy-and-physiology-2e/pages/19-3-cardiac-cycle
-- cranial-nerves.pdf: CC BY 4.0, Anatomy and Physiology 2e, section 13.4, cranial nerves subsection and table, book pages <first>–<last> (PDF page indices <start>–<end>). Source: https://openstax.org/books/anatomy-and-physiology-2e/pages/13-4-the-peripheral-nervous-system
-- glomerular-filtration.pdf: CC BY 4.0, Anatomy and Physiology 2e, section 25.6 Physiology of Urine Formation, book pages <first>–<last> (PDF page indices <start>–<end>). Source: https://openstax.org/books/anatomy-and-physiology-2e/pages/25-6-physiology-of-urine-formation
-```
-
-Replace every `<first>`, `<last>`, `<start>`, `<end>` with the recorded numbers, and fix any section number, title, author list, year or URL slug that differs from the book's own copyright page (check it with `pdftotext -f 3 -l 6 <book> - | grep -iE "authors|CC BY|copyright|202"`). No angle-bracket placeholder may remain:
-
-```bash
-grep -n "<" evals/rag/usecases/medical-students/sources/LICENSES.md   # expected: no output
+- heart-anatomy.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 19.1 Heart Anatomy, printed from https://openstax.org/books/anatomy-and-physiology/pages/19-1-heart-anatomy
+- cardiac-cycle.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 19.3 Cardiac Cycle, printed from https://openstax.org/books/anatomy-and-physiology/pages/19-3-cardiac-cycle
+- cranial-nerves.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 13.4 The Peripheral Nervous System (includes the cranial nerves and their table), printed from https://openstax.org/books/anatomy-and-physiology/pages/13-4-the-peripheral-nervous-system
+- glomerular-filtration.pdf: CC BY 4.0, Anatomy and Physiology (1st edition), section 25.5 Physiology of Urine Formation, printed from https://openstax.org/books/anatomy-and-physiology/pages/25-5-physiology-of-urine-formation
 ```
 
 - [ ] **Step 2: Commit the sources**
 
 ```bash
 git add evals/rag/usecases/medical-students/sources
-git commit -m "feat(evals): add OpenStax A&P excerpts for the medical students pack
-
-Refs #270"
+git commit -m "feat(evals): add OpenStax A&P (1st edition) sources for the medical students pack" -m "Refs #270" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
-
-(End every commit message in this plan with a blank line and `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.)
 
 ---
 
@@ -695,7 +628,7 @@ Expected: the use-case dry run says `Running 10 fixture(s)` (plus 10 per other r
 git add evals/rag/usecases/index.ts evals/rag/usecases/medical-students/manifest.ts evals/rag/usecases/medical-students/fixtures.ts evals/rag/usecases/medical-students/pack.test.ts
 git commit -m "feat(evals): add Medical Students use-case pack
 
-Four OpenStax A&P 2e excerpts as PDF (heart anatomy, cardiac cycle,
+Four OpenStax A&P (1st edition) sections as PDF (heart anatomy, cardiac cycle,
 cranial nerves, glomerular filtration), 10 fixtures across flashcards,
 quiz, written questions and chat (smoke 2, train 6, holdout 2), and six
 general rubric checks for medical study material.
@@ -847,7 +780,7 @@ gh pr create --base main --title "feat(evals): add Medical Students use-case pac
 ## What
 The Medical Students use-case eval pack (#270), on the framework from #229.
 
-- **Sources:** four unmodified page-range excerpts from OpenStax *Anatomy and Physiology 2e* (CC BY 4.0), as PDF so they go through OCR like a lecture upload: <list each file with section and book pages, total size>.
+- **Sources:** four sections of OpenStax *Anatomy and Physiology* (1st edition, CC BY 4.0) printed to PDF, so they go through OCR like a lecture upload: <list each file with section, page count and size>. The 2nd edition is CC BY-NC-SA (non-commercial), so it is not used.
 - **Fixtures:** 10 across flashcards, quiz, written questions and chat (smoke 2, train 6, holdout 2).
 - **Rubric:** six checks for any medical study material: card fronts hide answers, one fact per item, terms and values exact, answer keys supported, mechanisms in source order, no unsourced clinical claims.
 - **CI:** `eval:usecases:dry` <added | already added by #230>.

@@ -39,18 +39,18 @@ evals/rag/usecases/medical-students/
 
 **Manifest:** `id: "medical-students"`, `title` and `notebookTitle: "Medical Students"`, `advertisedClaim` set to the landing-page line above, `features: ["flashcards", "quiz", "writtenQuestions", "chat"]`, `sources` listing the four PDFs.
 
-**Sources:** OpenStax *Anatomy and Physiology 2e* (Rice University, CC BY 4.0). Each file is one contiguous page range cut unchanged from the official book PDF. Running headers, page numbers, figures, captions and tables stay as typeset, because that is what a student uploads.
+**Sources:** OpenStax *Anatomy and Physiology* **1st edition** (Rice University, 2013), licensed **CC BY 4.0**. The 2nd edition was the first choice, but it is now CC BY-NC-SA 4.0 (non-commercial). SolomindLM is a paid product, so it was dropped on 2026-10-01 (user decision). The 1st edition is web-only, so each file is one whole web section printed to PDF from openstax.org with headless Chrome (Playwright). Site chrome and the cookie banner are hidden before printing, and the content is not altered. Figures, captions, tables and the section's own text are kept, so the file still goes through OCR like an uploaded lecture PDF. What's lost compared with a book PDF is the typeset page layout (running headers, page numbers, page breaks).
 
-| File | Section | What it stresses |
+| File | Section (1st edition) | What it stresses |
 |---|---|---|
 | `heart-anatomy.pdf` | §19.1 Heart Anatomy | structure names in labelled figures |
 | `cardiac-cycle.pdf` | §19.3 Cardiac Cycle | phase order, valve timing, pressures and volumes |
-| `cranial-nerves.pdf` | §13.4, the cranial nerves and their reference table | table rows into one-fact items |
-| `glomerular-filtration.pdf` | §25.6 Physiology of Urine Formation | mechanism, normal values, pressure balance |
+| `cranial-nerves.pdf` | §13.4 The Peripheral Nervous System (whole section; includes the cranial nerves and their reference table, and the spinal nerves) | table rows into one-fact items |
+| `glomerular-filtration.pdf` | §25.5 Physiology of Urine Formation | mechanism, normal values, pressure balance |
 
-Section numbers and titles are confirmed against the downloaded PDF before cutting. If the book places a topic under a different number, the topic wins and `LICENSES.md` records the real section. Each excerpt starts at its section heading and ends where the next section begins, so it may include part of a neighbouring section's page. Target 1–3 MB per file and under 10 MB for the pack.
+Section slugs come from the 1st edition's table of contents (`13-4-the-peripheral-nervous-system`, `19-1-heart-anatomy`, `19-3-cardiac-cycle`, `25-5-physiology-of-urine-formation`). Each file is a whole section, so no page-range choice is needed. Target under 5 MB per file and under 15 MB for the pack.
 
-**`LICENSES.md`:** a header gives the book, authors, publisher, edition, licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/), the book URL, and a note that pages are reproduced unmodified and that the OpenStax name and logo are not covered by the licence. Below it is one entry per file in the format `validatePack` parses: `- <fileName>: CC BY 4.0, <section>, book pages <first>–<last> (PDF pages <first>–<last>)`. These page ranges are the reproduction record; no extraction script is committed.
+**`LICENSES.md`:** a header gives the book, authors, publisher, edition, year, licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/) and book URL. It notes that each file is the named web section printed to PDF on 2026-10-01, with site navigation and the cookie banner hidden and the content unaltered, and that the OpenStax name and logo are not covered by the licence. Below it is one entry per file in the format `validatePack` parses: `- <fileName>: CC BY 4.0, Anatomy and Physiology (1st edition), section <n> <title>, printed from <section URL>`. The section URLs are the reproduction record; the print script is not committed.
 
 **Registration:** `evals/rag/usecases/index.ts` adds `registerPack(medicalStudentsPack, medicalStudentsFixtures)`. Whichever pack PR lands second resolves a one-line conflict there.
 
@@ -96,7 +96,7 @@ The first two mirror the Language Learners checks, so answer leaks (#218) compar
 
 ## 4. Building and verification
 
-**Excerpts:** download the OpenStax *A&P 2e* PDF once, asking the user first and stating its size. Cut the four page ranges with a local PDF tool (qpdf, or `pdf-lib` if already installed). Check each file opens, starts at its section heading and has text in a PDF text dump.
+**Excerpts:** print the four 1st-edition sections to PDF with Playwright (headless Chrome), hiding site chrome and the cookie banner. Check each file opens, starts with its section heading, has text in a PDF text dump with no cookie-banner text, and keeps its figures.
 
 **Offline checks (required for the PR):**
 
