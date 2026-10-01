@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReferenceChunk } from "@/shared/types/index";
-import { CitationChip } from "../utils/messageRendering";
+import { CitationChip } from "./CitationChip";
 import { useCitationPopover } from "./CitationPopover";
 
 vi.mock("@/shared/components/MarkdownRenderer", () => ({
@@ -24,11 +24,9 @@ function resolveReference(messageId: string, refId: number): ReferenceChunk | nu
   };
 }
 
-function Harness({ onAddToNotebook }: { onAddToNotebook?: () => void }) {
-  const { handlers, popover } = useCitationPopover({
-    resolveReference,
-    onAddToNotebook: onAddToNotebook ? () => onAddToNotebook : undefined,
-  });
+/** The plan's harness: plain elements calling the handlers directly. */
+function Harness() {
+  const { handlers, popover } = useCitationPopover({ resolveReference });
   return (
     <div>
       <button type="button" onClick={(e) => handlers.onRefToggle(1, "m1", e.currentTarget)}>
@@ -41,39 +39,182 @@ function Harness({ onAddToNotebook }: { onAddToNotebook?: () => void }) {
       >
         chip two
       </button>
-      <span
-        data-testid="hover-chip"
-        onPointerEnter={(e) => handlers.onRefEnter(1, "m1", e.currentTarget)}
-        onPointerLeave={handlers.onRefLeave}
-      />
       <button type="button">outside</button>
       {popover}
     </div>
   );
 }
 
-/** Real chips inside a scroller that can be unmounted, like a Virtuoso row scrolling away. */
-function ChipHarness() {
-  const [showChip, setShowChip] = useState(true);
-  const { handlers, popover } = useCitationPopover({ resolveReference });
+/** Real chips in a message row inside a scroller; chips can remount or unmount. */
+function ChipHarness({ onAddToNotebook }: { onAddToNotebook?: () => void }) {
+  const [version, setVersion] = useState(0);
+  const [showChips, setShowChips] = useState(true);
+  const { handlers, popover } = useCitationPopover({
+    resolveReference,
+    onAddToNotebook: onAddToNotebook ? () => onAddToNotebook : undefined,
+  });
   return (
     <div>
       <div data-testid="scroller">
-        {showChip && <CitationChip refId={1} messageId="m1" handlers={handlers} />}
+        <div data-message-id="m1">
+          {showChips && (
+            <p key={version}>
+              <CitationChip refId={1} messageId="m1" handlers={handlers} />
+              <CitationChip refId={2} messageId="m1" handlers={handlers} />
+            </p>
+          )}
+        </div>
       </div>
-      <button type="button" onClick={() => setShowChip(false)}>
-        unmount chip
+      <button type="button" onClick={() => setVersion((v) => v + 1)}>
+        remount chips
+      </button>
+      <button type="button" onClick={() => setShowChips(false)}>
+        unmount chips
       </button>
       {popover}
     </div>
   );
 }
 
-const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+const chip = (n: number) => screen.getByRole("button", { name: `Reference ${n}` });
+const isOpen = (title: string) => screen.queryByText(title) !== null;
+const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+const hoverIn = (el: Element) => fireEvent.pointerEnter(el, { pointerType: "mouse" });
+const hoverOut = (el: Element) => fireEvent.pointerLeave(el, { pointerType: "mouse" });
 
-describe("CitationPopover", () => {
+describe("CitationPopover: hover and pinning", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  test("hover intent opens after the delay; leaving closes after the delay", () => {
+    render(<ChipHarness />);
+    hoverIn(chip(1));
+    advance(40);
+    expect(isOpen("Doc A")).toBe(false);
+    advance(60);
+    expect(isOpen("Doc A")).toBe(true);
+    hoverOut(chip(1));
+    advance(100);
+    expect(isOpen("Doc A")).toBe(true);
+    advance(60);
+    expect(isOpen("Doc A")).toBe(false);
+  });
+
+  test("a brief hover that leaves before the open delay never opens", () => {
+    render(<ChipHarness />);
+    hoverIn(chip(1));
+    advance(40);
+    hoverOut(chip(1));
+    advance(100);
+    expect(isOpen("Doc A")).toBe(false);
+  });
+
+  test("moving the pointer from the chip into the card keeps it open", () => {
+    render(<ChipHarness />);
+    hoverIn(chip(1));
+    advance(100);
+    hoverOut(chip(1));
+    advance(50);
+    expect(isOpen("Doc A")).toBe(true);
+    hoverIn(screen.getByRole("dialog"));
+    advance(300);
+    expect(isOpen("Doc A")).toBe(true);
+    hoverOut(screen.getByRole("dialog"));
+    advance(160);
+    expect(isOpen("Doc A")).toBe(false);
+  });
+
+  test("clicking a hover-opened chip pins it; clicking again closes it", () => {
+    render(<ChipHarness />);
+    hoverIn(chip(1));
+    advance(100);
+    fireEvent.click(chip(1));
+    hoverOut(chip(1));
+    advance(300);
+    expect(isOpen("Doc A")).toBe(true);
+    fireEvent.click(chip(1));
+    expect(isOpen("Doc A")).toBe(false);
+  });
+
+  test("hovering another chip while pinned does not retarget", () => {
+    render(<ChipHarness />);
+    fireEvent.click(chip(1));
+    hoverIn(chip(2));
+    advance(300);
+    expect(isOpen("Doc A")).toBe(true);
+    expect(isOpen("Doc B")).toBe(false);
+  });
+
+  test("a toggle cancels a pending hover open", () => {
+    render(<ChipHarness />);
+    hoverIn(chip(2));
+    advance(40);
+    fireEvent.click(chip(1));
+    advance(300);
+    expect(isOpen("Doc A")).toBe(true);
+    expect(isOpen("Doc B")).toBe(false);
+  });
+
+  test("marks the active chip aria-expanded", () => {
+    render(<ChipHarness />);
+    fireEvent.click(chip(1));
+    expect(chip(1)).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(chip(2));
+    expect(chip(1)).toHaveAttribute("aria-expanded", "false");
+    expect(chip(2)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("follows a chip that remounts instead of closing", () => {
+    render(<ChipHarness />);
+    const original = chip(1);
+    fireEvent.click(original);
+    fireEvent.click(screen.getByRole("button", { name: "remount chips" }));
+    const replacement = chip(1);
+    expect(replacement).not.toBe(original);
+    expect(isOpen("Doc A")).toBe(true);
+    expect(replacement).toHaveAttribute("aria-expanded", "true");
+    // The replacement counts as the open chip: toggling it closes the pinned card.
+    fireEvent.click(replacement);
+    expect(isOpen("Doc A")).toBe(false);
+  });
+
+  test("closes when the chip unmounts", () => {
+    render(<ChipHarness />);
+    fireEvent.click(chip(1));
+    fireEvent.click(screen.getByRole("button", { name: "unmount chips" }));
+    expect(isOpen("Doc A")).toBe(false);
+  });
+
+  test("ignores scrolls inside the card; closes when the chip scrolls out of its scroller", () => {
+    render(<ChipHarness />);
+    fireEvent.click(chip(1));
+    const scroller = screen.getByTestId("scroller");
+    vi.spyOn(scroller, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 100, width: 500, height: 400 })
+    );
+    const chipRect = vi
+      .spyOn(chip(1), "getBoundingClientRect")
+      .mockReturnValue(DOMRect.fromRect({ x: 10, y: 50, width: 20, height: 20 }));
+
+    // The chip is out of view, but the scroll happened inside the card: ignored.
+    fireEvent.scroll(screen.getByRole("dialog").querySelector(".overflow-y-auto") as Element);
+    expect(isOpen("Doc A")).toBe(true);
+
+    chipRect.mockReturnValue(DOMRect.fromRect({ x: 10, y: 200, width: 20, height: 20 }));
+    fireEvent.scroll(scroller);
+    expect(isOpen("Doc A")).toBe(true);
+
+    chipRect.mockReturnValue(DOMRect.fromRect({ x: 10, y: 50, width: 20, height: 20 }));
+    fireEvent.scroll(scroller);
+    expect(isOpen("Doc A")).toBe(false);
+  });
+});
+
+describe("CitationPopover: click, keyboard and focus", () => {
+  // userEvent and Radix's deferred outside-click listener need real time to pass.
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
   afterEach(() => vi.useRealTimers());
+  const user = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
   test("tap toggles open and closed", async () => {
     const u = user();
@@ -82,53 +223,6 @@ describe("CitationPopover", () => {
     expect(await screen.findByText("Doc A")).toBeInTheDocument();
     await u.click(screen.getByRole("button", { name: "chip" }));
     expect(screen.queryByText("Doc A")).toBeNull();
-  });
-
-  test("hover intent opens; leaving closes after a delay", async () => {
-    render(<Harness />);
-    const chip = screen.getByTestId("hover-chip");
-    fireEvent.pointerEnter(chip, { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(120));
-    expect(screen.getByText("Doc A")).toBeInTheDocument();
-    fireEvent.pointerLeave(chip, { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(200));
-    expect(screen.queryByText("Doc A")).toBeNull();
-  });
-
-  test("a brief hover that leaves before the open delay never opens", async () => {
-    render(<Harness />);
-    const chip = screen.getByTestId("hover-chip");
-    fireEvent.pointerEnter(chip, { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(40));
-    fireEvent.pointerLeave(chip, { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(300));
-    expect(screen.queryByText("Doc A")).toBeNull();
-  });
-
-  test("moving the pointer from the chip into the popover keeps it open", async () => {
-    render(<Harness />);
-    const chip = screen.getByTestId("hover-chip");
-    fireEvent.pointerEnter(chip, { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(120));
-    fireEvent.pointerLeave(chip, { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(50));
-    fireEvent.pointerEnter(screen.getByRole("dialog"), { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(300));
-    expect(screen.getByText("Doc A")).toBeInTheDocument();
-
-    fireEvent.pointerLeave(screen.getByRole("dialog"), { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(200));
-    expect(screen.queryByText("Doc A")).toBeNull();
-  });
-
-  test("a tapped-open popover is pinned: pointer leave does not close it", async () => {
-    const u = user();
-    render(<Harness />);
-    await u.click(screen.getByRole("button", { name: "chip" }));
-    await screen.findByText("Doc A");
-    fireEvent.pointerLeave(screen.getByRole("dialog"), { pointerType: "mouse" });
-    await act(async () => vi.advanceTimersByTime(300));
-    expect(screen.getByText("Doc A")).toBeInTheDocument();
   });
 
   test("clicking a different chip retargets instead of closing", async () => {
@@ -163,33 +257,57 @@ describe("CitationPopover", () => {
   test("Add to notebook calls the handler", async () => {
     const u = user();
     const onAdd = vi.fn();
-    render(<Harness onAddToNotebook={onAdd} />);
-    await u.click(screen.getByRole("button", { name: "chip" }));
+    render(<ChipHarness onAddToNotebook={onAdd} />);
+    await u.click(chip(1));
     await u.click(await screen.findByRole("button", { name: "Add to notebook" }));
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
-  test("keyboard toggle moves focus into the card; Escape returns it to the chip", async () => {
+  test("keyboard open focuses the card itself; a held Enter does not add; Escape returns focus", async () => {
     const u = user();
-    render(<ChipHarness />);
-    const chip = screen.getByRole("button", { name: "Reference 1" });
-    act(() => chip.focus());
+    const onAdd = vi.fn();
+    render(<ChipHarness onAddToNotebook={onAdd} />);
+    act(() => chip(1).focus());
     await u.keyboard("{Enter}");
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", { name: "Reference 1" });
+    expect(dialog).toHaveFocus();
+
+    // Auto-repeat of the Enter that opened it lands on the card (and the chip ignores repeats).
+    fireEvent.keyDown(document.activeElement as Element, { key: "Enter", repeat: true });
+    fireEvent.keyDown(chip(1), { key: "Enter", repeat: true });
+    await u.keyboard("{Enter}");
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await u.tab();
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
     await u.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(chip).toHaveFocus();
+    expect(chip(1)).toHaveFocus();
   });
 
-  test("closes on scroll once the anchored chip has unmounted", async () => {
+  test("a pointer-opened card returns focus to the chip if focus was inside it", async () => {
     const u = user();
     render(<ChipHarness />);
-    await u.click(screen.getByRole("button", { name: "Reference 1" }));
-    await screen.findByText("Doc A");
-    await u.click(screen.getByRole("button", { name: "unmount chip" }));
-    fireEvent.scroll(screen.getByTestId("scroller"));
-    expect(screen.queryByText("Doc A")).toBeNull();
+    await u.click(chip(1));
+    const dialog = await screen.findByRole("dialog");
+    act(() => dialog.focus());
+    await u.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(chip(1)).toHaveFocus();
+  });
+
+  test("an outside click does not pull focus back to the chip", async () => {
+    const u = user();
+    render(<ChipHarness />);
+    act(() => chip(1).focus());
+    await u.keyboard("{Enter}");
+    await screen.findByRole("dialog");
+    await act(async () => vi.advanceTimersByTime(10));
+    await u.click(screen.getByRole("button", { name: "remount chips" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "remount chips" })).toHaveFocus();
   });
 });
 
@@ -198,34 +316,35 @@ describe("CitationChip", () => {
 
   test("renders a labelled button that keeps the e2e title", () => {
     render(<CitationChip refId={3} messageId="m1" handlers={handlers()} />);
-    const chip = screen.getByRole("button", { name: "Reference 3" });
-    expect(chip).toHaveAttribute("title", "Reference 3");
-    expect(chip).toHaveTextContent("3");
+    const el = chip(3);
+    expect(el).toHaveAttribute("title", "Reference 3");
+    expect(el).toHaveTextContent("3");
   });
 
-  test("Enter and Space toggle; click toggles", () => {
+  test("Enter and Space toggle; held keys don't repeat; click toggles", () => {
     const h = handlers();
     render(<CitationChip refId={3} messageId="m1" handlers={h} />);
-    const chip = screen.getByRole("button", { name: "Reference 3" });
-    fireEvent.keyDown(chip, { key: "Enter" });
-    fireEvent.keyDown(chip, { key: " " });
+    const el = chip(3);
+    fireEvent.keyDown(el, { key: "Enter" });
+    fireEvent.keyDown(el, { key: " " });
+    fireEvent.keyDown(el, { key: "Enter", repeat: true });
     expect(h.onRefToggle).toHaveBeenCalledTimes(2);
-    expect(h.onRefToggle).toHaveBeenCalledWith(3, "m1", chip, "keyboard");
-    fireEvent.click(chip);
-    expect(h.onRefToggle).toHaveBeenLastCalledWith(3, "m1", chip, "pointer");
+    expect(h.onRefToggle).toHaveBeenCalledWith(3, "m1", el, "keyboard");
+    fireEvent.click(el);
+    expect(h.onRefToggle).toHaveBeenLastCalledWith(3, "m1", el, "pointer");
   });
 
   test("hover intent is mouse-only", () => {
     const h = handlers();
     render(<CitationChip refId={3} messageId="m1" handlers={h} />);
-    const chip = screen.getByRole("button", { name: "Reference 3" });
-    fireEvent.pointerEnter(chip, { pointerType: "touch" });
-    fireEvent.pointerLeave(chip, { pointerType: "touch" });
+    const el = chip(3);
+    fireEvent.pointerEnter(el, { pointerType: "touch" });
+    fireEvent.pointerLeave(el, { pointerType: "touch" });
     expect(h.onRefEnter).not.toHaveBeenCalled();
     expect(h.onRefLeave).not.toHaveBeenCalled();
-    fireEvent.pointerEnter(chip, { pointerType: "mouse" });
-    fireEvent.pointerLeave(chip, { pointerType: "mouse" });
-    expect(h.onRefEnter).toHaveBeenCalledWith(3, "m1", chip);
+    hoverIn(el);
+    hoverOut(el);
+    expect(h.onRefEnter).toHaveBeenCalledWith(3, "m1", el);
     expect(h.onRefLeave).toHaveBeenCalledTimes(1);
   });
 
