@@ -22,6 +22,7 @@ import { ButtonGroup } from "./button-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
 import { Checkbox } from "./checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -534,6 +535,67 @@ describe("shadcn ui components render", () => {
       const content = screen.getByText("Popover body");
       expect(content).toHaveClass("rounded-2xl", "shadow-xl", "ring-1", "ring-hairline");
       expect(content).not.toHaveClass("border");
+    });
+  });
+
+  describe("soft modal and card surfaces", () => {
+    it("modal and card surfaces are borderless", async () => {
+      render(
+        <>
+          <Card data-testid="card">c</Card>
+          <Dialog defaultOpen>
+            <DialogContent>
+              <DialogTitle>d</DialogTitle>
+              <DialogDescription>x</DialogDescription>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+      const card = screen.getByTestId("card");
+      expect(card).toHaveClass("ring-1", "ring-hairline", "rounded-2xl");
+      expect(card).not.toHaveClass("border");
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveClass("rounded-2xl", "shadow-xl", "ring-hairline");
+      expect(dialog).not.toHaveClass("border");
+      expect(dialog.className).not.toContain("dark:");
+      const overlay = document.body.querySelector("[data-slot=dialog-overlay]");
+      expect(overlay).toHaveClass("bg-overlay", "backdrop-blur-xs");
+      expect(overlay?.className).not.toContain("dark:");
+    });
+
+    it("AlertDialog is borderless over a soft overlay", async () => {
+      render(
+        <AlertDialog defaultOpen>
+          <AlertDialogContent>
+            <AlertDialogTitle>t</AlertDialogTitle>
+            <AlertDialogDescription>x</AlertDialogDescription>
+          </AlertDialogContent>
+        </AlertDialog>
+      );
+      const dialog = await screen.findByRole("alertdialog");
+      expect(dialog).toHaveClass("rounded-2xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(dialog).not.toHaveClass("border");
+      expect(dialog.className).not.toContain("dark:");
+      const overlay = document.body.querySelector("[data-slot=alert-dialog-overlay]");
+      expect(overlay).toHaveClass("bg-overlay", "backdrop-blur-xs");
+      expect(overlay?.className).not.toContain("dark:");
+    });
+
+    it("Sheet is separated by shadow, not a border", async () => {
+      render(
+        <Sheet defaultOpen>
+          <SheetContent side="right">
+            <SheetTitle>s</SheetTitle>
+            <SheetDescription>x</SheetDescription>
+          </SheetContent>
+        </Sheet>
+      );
+      const sheet = await screen.findByRole("dialog");
+      expect(sheet).toHaveClass("bg-card", "shadow-xl");
+      expect(sheet).not.toHaveClass("border-l");
+      expect(sheet.className).not.toContain("dark:");
+      const overlay = document.body.querySelector("[data-slot=sheet-overlay]");
+      expect(overlay).toHaveClass("bg-overlay");
     });
   });
 });

@@ -15,6 +15,7 @@
     /* Soft-layered surfaces: a raised chip/segment and a faint ring that stands in for a border. */
     --surface-raised: var(--card);
     --hairline: color-mix(in oklab, var(--border) 50%, transparent);
+    --overlay: color-mix(in oklab, var(--foreground) 25%, transparent);
     --card-foreground: oklch(0.21 0.01 0);
     --popover: oklch(0.9914 0.0098 87.4695);
     --popover-foreground: oklch(0.21 0.01 0);
@@ -116,6 +117,7 @@
     --card: oklch(0.22 0.008 65);
     --surface-raised: oklch(0.32 0.008 65);
     --hairline: color-mix(in oklab, var(--foreground) 8%, transparent);
+    --overlay: color-mix(in oklab, var(--background) 70%, transparent);
     --card-foreground: oklch(0.97 0.004 85);
 
     --popover: oklch(0.22 0.008 65);
@@ -236,6 +238,7 @@
     --card: oklch(0.9914 0.0098 87.4695);
     --surface-raised: var(--card);
     --hairline: color-mix(in oklab, var(--border) 50%, transparent);
+    --overlay: color-mix(in oklab, var(--foreground) 25%, transparent);
     --card-foreground: oklch(0.21 0.01 0);
     --primary: oklch(0.38 0.05 65.5444);
     --primary-foreground: oklch(1 0 0);
@@ -321,6 +324,7 @@
   --color-card: var(--card);
   --color-surface-raised: var(--surface-raised);
   --color-hairline: var(--hairline);
+  --color-overlay: var(--overlay);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
