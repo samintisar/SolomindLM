@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import type { EvalFixture } from "../types";
 import { languageLearnersFixtures } from "./language-learners/fixtures";
 import { languageLearnersPack } from "./language-learners/manifest";
+import { medicalStudentsFixtures } from "./medical-students/fixtures";
+import { medicalStudentsPack } from "./medical-students/manifest";
 import type { RegisteredPack, UseCasePack } from "./types";
 
 const USECASES_DIR = dirname(fileURLToPath(import.meta.url));
@@ -21,6 +23,7 @@ export function registerPack(pack: UseCasePack, fixtures: EvalFixture[]): Regist
  */
 export const USE_CASE_PACKS: RegisteredPack[] = [
   registerPack(languageLearnersPack, languageLearnersFixtures),
+  registerPack(medicalStudentsPack, medicalStudentsFixtures),
 ];
 
 export function getPack(id: string): RegisteredPack {

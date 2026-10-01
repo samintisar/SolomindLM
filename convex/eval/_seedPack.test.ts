@@ -174,6 +174,29 @@ describe("insertPackDocument / deletePackDocument", () => {
     expect(after).toEqual({ doc: null, url: null });
   });
 
+  test("keeps the source hash when successful ingestion writes document metadata", async () => {
+    const { t } = await setup();
+    const nb = await createPack(t);
+    const { documentId } = await addDoc(t, nb);
+    // The success path of docEmbedding: document-level stats, then completed.
+    await t.mutation(internal.documents.internal.updateMetadata, {
+      documentId,
+      metadata: { wordCount: 2, totalChunks: 1 },
+    });
+    await t.mutation(internal.documents.internal.updateStatus, {
+      documentId,
+      status: "completed",
+    });
+
+    const found = await t.query(internal.eval._seedPack.findPackNotebook, {
+      ownerEmail: OWNER,
+      notebookTitle: TITLE,
+    });
+    expect(found?.docs).toEqual([
+      expect.objectContaining({ status: "completed", sha256: "abc123", totalChunks: 1 }),
+    ]);
+  });
+
   test("schedules exactly one docEmbedding job for the new document", async () => {
     const { t, ownerId } = await setup();
     const notebookId = await createPack(t);

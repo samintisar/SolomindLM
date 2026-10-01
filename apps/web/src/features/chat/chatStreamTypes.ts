@@ -1,5 +1,5 @@
 /** Passed in POST /api/chat/stream body `sourcePolicy` (Convex mirrors this shape). */
-export type ChatStreamAcademicFilters = {
+type ChatStreamAcademicFilters = {
   publicationYearFrom?: number;
   publicationYearTo?: number;
   minCitations?: number;
@@ -9,7 +9,7 @@ export type ChatStreamAcademicFilters = {
 };
 
 /** Maps composer corpus picker to AcademicSearchService source allowlist. */
-export type ChatAcademicSource = "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+type ChatAcademicSource = "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
 
 export type ChatStreamSourcePolicy = {
   channels: string[];

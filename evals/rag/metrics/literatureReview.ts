@@ -233,7 +233,7 @@ function paperMatchesQuery(paper: { title: string; abstract: string }, query: st
  * Papers found per search query.
  * Pass if >= 3 papers per query on average.
  */
-export function lrSearchYield(
+function lrSearchYield(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -277,7 +277,7 @@ export function lrSearchYield(
  * Ratio of papers removed by deduplication.
  * Info-only metric to track whether dedup is working.
  */
-export function lrDeduplicationRatio(
+function lrDeduplicationRatio(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -316,7 +316,7 @@ export function lrDeduplicationRatio(
  * Check whether top-5 ranked papers contain query keywords.
  * Pass if >= 3/5 match.
  */
-export function lrRankingTopRelevance(
+function lrRankingTopRelevance(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -363,7 +363,7 @@ export function lrRankingTopRelevance(
  * Ratio of screened papers that were included.
  * Warn if < 0.2 (too restrictive) or > 0.9 (too lax).
  */
-export function lrScreeningInclusionRate(
+function lrScreeningInclusionRate(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -407,7 +407,7 @@ export function lrScreeningInclusionRate(
  * % of custom column cells with non-empty, non-trivial data.
  * Pass if >= 0.8, warn if >= 0.5.
  */
-export function lrExtractionCoverage(
+function lrExtractionCoverage(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -458,7 +458,7 @@ export function lrExtractionCoverage(
  * Average length of extracted text per cell.
  * Info-only metric to track extraction verbosity.
  */
-export function lrExtractionDepth(
+function lrExtractionDepth(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -498,7 +498,7 @@ export function lrExtractionDepth(
  * Check whether the report cites papers that appear in the table.
  * Pass if >= 80% of table papers are cited in the report.
  */
-export function lrReportCitationCoverage(
+function lrReportCitationCoverage(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -557,7 +557,7 @@ export function lrReportCitationCoverage(
  * Check if fixture.expectedItems appear in the report content.
  * Same scoring as chat expected_item_recall.
  */
-export function lrExpectedItemRecall(
+function lrExpectedItemRecall(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -635,7 +635,7 @@ function parseJudgeResponse(content: string): JudgeResponse {
  * LLM judge: rate the literature review report on coherence, structure,
  * and coverage of included papers.
  */
-export async function lrLlmJudgeReportQuality(
+async function lrLlmJudgeReportQuality(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -714,7 +714,7 @@ Respond with JSON: {"score": number, "reasoning": string}`;
  * because literature review reports are long and the key synthesis
  * may appear in the middle or end sections.
  */
-export async function lrLlmJudgeCompleteness(
+async function lrLlmJudgeCompleteness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -798,7 +798,7 @@ Respond with JSON: {"score": number, "reasoning": string}`;
 /**
  * LLM judge: evaluate extraction accuracy on sampled cells.
  */
-export async function lrLlmJudgeExtractionQuality(
+async function lrLlmJudgeExtractionQuality(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
@@ -959,7 +959,7 @@ export function lrRequiredSectionNames(
   );
 }
 
-export function lrSummaryOfEvidencePresent(
+function lrSummaryOfEvidencePresent(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline

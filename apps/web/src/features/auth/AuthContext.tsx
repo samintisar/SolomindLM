@@ -3,7 +3,11 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { requestNativeGoogleSignIn, requestNativeSignOut } from "@/features/auth/nativeShellAuth";
+import {
+  requestNativeAppleSignIn,
+  requestNativeGoogleSignIn,
+  requestNativeSignOut,
+} from "@/features/auth/nativeShellAuth";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthContext, User } from "./useAuth";
@@ -11,17 +15,28 @@ import { AuthContext, User } from "./useAuth";
 type AuthProviderContentProps = {
   children: ReactNode;
   signInGoogle: () => Promise<void>;
+  signInApple: () => Promise<void>;
   signOutUser: () => Promise<void>;
 };
 
-function AuthProviderContent({ children, signInGoogle, signOutUser }: AuthProviderContentProps) {
+function AuthProviderContent({
+  children,
+  signInGoogle,
+  signInApple,
+  signOutUser,
+}: AuthProviderContentProps) {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const currentUser = useQuery(api.auth.getCurrentUser);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const user: User | null = currentUser
-    ? { id: currentUser.id, email: currentUser.email, name: currentUser.name }
+    ? {
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        image: currentUser.image,
+      }
     : null;
 
   const signInWithGoogle = async (): Promise<void> => {
@@ -30,6 +45,16 @@ function AuthProviderContent({ children, signInGoogle, signOutUser }: AuthProvid
       await signInGoogle();
     } catch (error) {
       setAuthError(getConvexAuthUserMessage(error, "Google sign-in failed"));
+      throw error;
+    }
+  };
+
+  const signInWithApple = async (): Promise<void> => {
+    setAuthError(null);
+    try {
+      await signInApple();
+    } catch (error) {
+      setAuthError(getConvexAuthUserMessage(error, "Apple sign-in failed"));
       throw error;
     }
   };
@@ -49,6 +74,7 @@ function AuthProviderContent({ children, signInGoogle, signOutUser }: AuthProvid
         isAuthenticated,
         authError,
         signInWithGoogle,
+        signInWithApple,
         signOut,
         clearAuthError,
       }}
@@ -65,6 +91,9 @@ function AuthProviderWithConvexAuth({ children }: { children: ReactNode }) {
       signInGoogle={async () => {
         await signIn("google", { redirectTo: "/home" });
       }}
+      signInApple={async () => {
+        await signIn("apple", { redirectTo: "/home" });
+      }}
       signOutUser={authSignOut}
     >
       {children}
@@ -79,6 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       <AuthProviderContent
         signInGoogle={async () => {
           await requestNativeGoogleSignIn();
+        }}
+        signInApple={async () => {
+          await requestNativeAppleSignIn();
         }}
         signOutUser={requestNativeSignOut}
       >

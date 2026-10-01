@@ -11,13 +11,6 @@ export function useFolders() {
 }
 
 /**
- * Get a specific folder by ID
- */
-export function useFolder(id: string | null) {
-  return useQuery(api.folders.index.get, id ? { id: id as any } : "skip");
-}
-
-/**
  * Get notebooks in a folder
  * Returns undefined while loading, empty array when loaded but no results
  */

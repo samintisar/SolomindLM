@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import type { ReportNote } from "@/shared/types/index";
 import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
 
@@ -57,29 +57,6 @@ function mapDatabaseReportToNote(dbReport: any): ReportNote {
       chunksProcessed: dbReport.metadata?.chunksProcessed,
     },
   };
-}
-
-/**
- * Get all reports for a notebook
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useReports(notebookId: string | null) {
-  const reports = useQuery(
-    api.studio.reports.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
-  );
-  return reports?.map(mapDatabaseReportToNote);
-}
-
-/**
- * Get a specific report by ID
- */
-export function useReport(reportId: string | null) {
-  const report = useQuery(
-    api.studio.reports.index.get,
-    reportId ? { id: reportId as Id<"reports"> } : "skip"
-  );
-  return report ? mapDatabaseReportToNote(report) : null;
 }
 
 /**

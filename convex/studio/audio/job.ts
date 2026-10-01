@@ -8,9 +8,12 @@
 import { v } from "convex/values";
 import { internalAction } from "../../_generated/server";
 import {
+  runAssembleAudioOverviewPhase,
   runAudioOverviewGenerationPhase,
   runFinalizeAudioOverviewPhase,
   runProcessAudioMapChunkPhase,
+  runSynthesizeAudioOverviewChunkPhase,
+  runSynthesizeAudioOverviewPhase,
 } from "./audioJobPhases";
 
 export const audioOverviewGeneration = internalAction({
@@ -50,5 +53,43 @@ export const finalizeAudioOverviewPhase = internalAction({
   handler: async (ctx, args) => {
     "use node";
     await runFinalizeAudioOverviewPhase(ctx, args);
+  },
+});
+
+export const synthesizeAudioOverviewPhase = internalAction({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    userId: v.string(),
+    notebookId: v.id("notebooks"),
+  },
+  handler: async (ctx, args) => {
+    "use node";
+    await runSynthesizeAudioOverviewPhase(ctx, args);
+  },
+});
+
+export const synthesizeAudioOverviewChunk = internalAction({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    userId: v.string(),
+    notebookId: v.id("notebooks"),
+    chunkIndex: v.number(),
+    attempt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    "use node";
+    await runSynthesizeAudioOverviewChunkPhase(ctx, args);
+  },
+});
+
+export const assembleAudioOverviewPhase = internalAction({
+  args: {
+    audioOverviewId: v.id("audioOverviews"),
+    userId: v.string(),
+    notebookId: v.id("notebooks"),
+  },
+  handler: async (ctx, args) => {
+    "use node";
+    await runAssembleAudioOverviewPhase(ctx, args);
   },
 });

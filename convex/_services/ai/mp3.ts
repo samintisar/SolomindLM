@@ -87,3 +87,16 @@ export function encodePcmWavToMp3(
 
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 }
+
+/**
+ * Joins MP3s encoded separately by {@link encodePcmWavToMp3}, one per synthesis chunk. lamejs
+ * writes bare constant-bitrate frames with no ID3 tag or Xing/Info header, so the files join byte
+ * for byte into one valid stream whose duration players compute from the bitrate. Each join adds
+ * only the encoder's padding, tens of milliseconds between dialogue lines.
+ */
+export function concatenateMp3Buffers(buffers: Buffer[]): Buffer {
+  if (buffers.length === 0) {
+    throw new Error("No MP3 audio to join");
+  }
+  return Buffer.concat(buffers);
+}

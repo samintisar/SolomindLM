@@ -1,10 +1,18 @@
 import { api } from "@convex/_generated/api";
 import { useAction, useQuery } from "convex/react";
+import { canOfferPurchases } from "@/utils/platformDetection";
 import type {
   CheckoutSessionResponse,
   SubscriptionInterval,
   SubscriptionStatusResponse,
 } from "../types";
+
+/** Backstop for canOfferPurchases: no Stripe checkout or portal from the native app. */
+function assertPurchasesAllowed() {
+  if (!canOfferPurchases()) {
+    throw new Error("Subscriptions can't be purchased or changed in the app.");
+  }
+}
 
 /**
  * Get subscription status for current user
@@ -81,6 +89,7 @@ export function useCreateCheckout() {
     successUrl: string,
     cancelUrl: string
   ): Promise<CheckoutSessionResponse> => {
+    assertPurchasesAllowed();
     const result = await create({
       interval,
       successUrl,
@@ -106,34 +115,16 @@ export function useCancelSubscription() {
 }
 
 /**
- * Reactivate subscription (if canceled but still active)
- */
-export function useReactivateSubscription() {
-  const reactivate = useAction(api.billing.index.removeCancelAtPeriodEnd);
-
-  return async () => {
-    return await reactivate({});
-  };
-}
-
-/**
  * Create customer portal session
  */
 export function useCreatePortalSession() {
   const create = useAction(api.billing.index.createPortalSession);
 
   return async (returnUrl: string): Promise<{ url: string }> => {
+    assertPurchasesAllowed();
     const result = await create({ returnUrl });
     return { url: result.url };
   };
-}
-
-/**
- * Check if user is subscribed (convenience hook)
- */
-export function useIsSubscribed(): boolean {
-  const subscription = useQuery(api.billing.index.getCurrent);
-  return subscription?.status === "active" || false;
 }
 
 /**

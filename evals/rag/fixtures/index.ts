@@ -16,27 +16,10 @@ import { researchFixtures } from "./research";
 import { allSourceFixtures } from "./sourceTests";
 import { STUDIO_FIXTURES } from "./studio";
 
-// Export fixture creation helpers
-export { createFixture, createFixtureBatch, exampleMlFixture } from "./fixtureTemplate";
-// Export NotebookLM converter
-export {
-  convertNotebookLM,
-  notebookLMToFixtures,
-  parseNotebookLMOutput,
-} from "./notebookLM_converter";
-export type { ScenarioCategory } from "./scenarioCategories";
-// Export scenario category types and helpers
-export { inferCategory, SCENARIO_CATEGORIES } from "./scenarioCategories";
-
-export {
-  DEFAULT_SOURCE_MATRIX,
-  withAcademicWebMatrix,
-  withNewsMatrix,
-  withSourceMatrix,
-} from "./sourceFilterVariants";
+export { withSourceMatrix } from "./sourceFilterVariants";
 
 /** Registry of all golden eval fixtures */
-export const FIXTURES: Record<string, EvalFixture> = {
+const FIXTURES: Record<string, EvalFixture> = {
   [agenticPatterns20.id]: agenticPatterns20,
   // ML fixtures
   ...Object.fromEntries(mlFactoidFixtures.map((f) => [f.id, f])),

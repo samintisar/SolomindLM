@@ -2,8 +2,6 @@ import { clearShellAuthMirror, getShellConvexDeploymentUrl } from "@/features/au
 import { getNativeWebViewBridge, isNativeShell } from "@/utils/platformDetection";
 import type { NativeAuthResponse } from "./nativeShellAuthTypes";
 
-export type { NativeAuthResponse } from "./nativeShellAuthTypes";
-
 const AUTH_TIMEOUT_MS = 120_000;
 const TOKEN_SYNC_TIMEOUT_MS = 5_000;
 
@@ -76,6 +74,7 @@ type NativeAuthRequest =
   | { type: "native-auth:webview-ready"; requestId: string; convexDeploymentUrl: string }
   | { type: "native-auth:token-sync"; requestId: string }
   | { type: "native-auth:google-sign-in"; requestId: string }
+  | { type: "native-auth:apple-sign-in"; requestId: string }
   | {
       type: "native-auth:password-sign-in";
       requestId: string;
@@ -87,6 +86,7 @@ type NativeAuthRequestWithoutId =
   | { type: "native-auth:webview-ready"; convexDeploymentUrl: string }
   | { type: "native-auth:token-sync" }
   | { type: "native-auth:google-sign-in" }
+  | { type: "native-auth:apple-sign-in" }
   | {
       type: "native-auth:password-sign-in";
       params: Record<string, string>;
@@ -169,6 +169,11 @@ export async function requestNativeGoogleSignIn(): Promise<boolean> {
   return response.authenticated ?? false;
 }
 
+export async function requestNativeAppleSignIn(): Promise<boolean> {
+  const response = await requestNativeAuth({ type: "native-auth:apple-sign-in" });
+  return response.authenticated ?? false;
+}
+
 export async function requestNativePasswordSignIn(
   params: Record<string, string>
 ): Promise<boolean> {
@@ -185,6 +190,6 @@ export async function requestNativeSignOut(): Promise<void> {
 }
 
 /** Clears mirrored JWT in the WebView and notifies the shell auth hook (sign-out). */
-export function clearShellAuthStorageAndNotify(): void {
+function clearShellAuthStorageAndNotify(): void {
   clearShellAuthMirror();
 }

@@ -10,11 +10,14 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import * as Notebooks from "../_model/notebooks";
 import { deleteAllChunksForDocument } from "../documents/index";
+import { EVAL_PACK_FOLDER_NAME } from "./_packFolder";
 
-/** Keep in sync with EVAL_PACK_FOLDER_NAME in evals/rag/usecases/types.ts. */
-export const EVAL_PACK_FOLDER_NAME = "Test";
+export { EVAL_PACK_FOLDER_NAME };
 
 const SOURCE_TEXT_MAX_CHARS = 50_000;
+
+/** Read caps: a pack notebook holds a handful of sources, the owner a few folders. */
+const MAX_PACK_NOTEBOOK_DOCS = 200;
 
 /** A pack upload must be adopted soon after getEvalUploadUrl handed out the URL. */
 const FRESH_UPLOAD_MAX_AGE_MS = 60 * 60 * 1000;
@@ -55,11 +58,13 @@ async function ownerIdByEmail(db: DbReader, email: string): Promise<Id<"users">>
 }
 
 async function findEvalFolder(db: DbReader, userId: Id<"users">): Promise<Doc<"folders"> | null> {
-  const folders = await db
+  // Async iteration stops at the first (oldest) match instead of reading every folder.
+  for await (const folder of db
     .query("folders")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
-  return folders.find((f) => f.name === EVAL_PACK_FOLDER_NAME) ?? null;
+    .withIndex("by_user", (q) => q.eq("userId", userId))) {
+    if (folder.name === EVAL_PACK_FOLDER_NAME) return folder;
+  }
+  return null;
 }
 
 async function findNotebookInFolder(
@@ -68,12 +73,13 @@ async function findNotebookInFolder(
   folderId: Id<"folders">,
   title: string
 ): Promise<Doc<"notebooks"> | null> {
-  const notebooks = await db
-    .query("notebooks")
-    .withIndex("by_folder", (q) => q.eq("folderId", folderId))
-    .collect();
   const wanted = title.trim(); // createNotebook trims titles
-  return notebooks.find((n) => n.userId === userId && n.title === wanted) ?? null;
+  for await (const notebook of db
+    .query("notebooks")
+    .withIndex("by_folder", (q) => q.eq("folderId", folderId))) {
+    if (notebook.userId === userId && notebook.title === wanted) return notebook;
+  }
+  return null;
 }
 
 /**
@@ -114,7 +120,7 @@ export const findPackNotebook = internalQuery({
     const documents = await ctx.db
       .query("documents")
       .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
-      .collect();
+      .take(MAX_PACK_NOTEBOOK_DOCS);
     return {
       notebookId: notebook._id,
       docs: documents.map((d) => ({
@@ -228,6 +234,10 @@ export const deletePackDocument = internalMutation({
   },
 });
 
+/**
+ * Reading a document reads its whole extractedMarkdown (up to ~800K chars), so
+ * getPackSourceText calls this once per document to keep each read small.
+ */
 export const packSourceText = internalQuery({
   args: { ownerEmail: v.string(), documentIds: v.array(v.id("documents")) },
   returns: packSourceTextValidator,

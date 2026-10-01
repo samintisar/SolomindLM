@@ -154,12 +154,12 @@ Bun workspaces monorepo:
 
 **Convex directory layout** (`_` prefix = excluded from generated API):
 
-- `_agents/` — LangGraph agents (`chat/`, `report/`, `flashcard/`, `quiz/`, `mindmap/`, `spreadsheet/`, `written_questions/`, `audio_overview/`, `research/`, `literature_review/`); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization
+- `_agents/` — per-feature agent logic: prompts, state types, routing, heuristics, LLM helpers (`chat/`, `report/`, `flashcard/`, `quiz/`, `mindmap/`, `spreadsheet/`, `written_questions/`, `audio_overview/`, `research/`, `literature_review/`); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization. Not where jobs run — see **Agent execution** below
 - `_lib/` — errors, limits, env helpers
 - `_model/` — data models
 - `_services/` — `ai/`, `search/`, `extraction/`, `processing/`, `grading/`, `cache/`
 - `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/`, `literatureReview/`, `research/`, `onboarding/`, `push/`, `userPreferences/` — domain functions
-- `studio/` — content generation per type (audio, flashcards, infographic, literature_tables, mindmaps, quizzes, reports, spreadsheets, writtenQuestions)
+- `studio/` — content generation per type (audio, flashcards, infographic, literature_tables, mindmaps, quizzes, reports, spreadsheets, writtenQuestions); `studio/_job/` shared job helpers, `studio/jobMutations/` status writes + stuck-job sweep, `studio/scheduling/` job entry points
 - `storage/` — vector store, chat history
 - root `auth.ts`, `schema.ts`, `http.ts` — auth config (must be at root), schema, HTTP actions
 
@@ -168,7 +168,14 @@ Bun workspaces monorepo:
 **Pipelines:**
 
 - _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1024-dim) → ZeroEntropy rerank
-- _Generation:_ user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
+- _Generation:_ how a request starts depends on the execution model below. Studio: the entry mutation/action writes the row and schedules the first phase via `ctx.scheduler.runAfter()` (no jobs table). Deep research and literature review: `workflow.start` launches a durable workflow. Chat: the `/chat/stream` HTTP action. Results are written to the type's table and delivered by reactive queries (chat and deep research also stream tokens via `@convex-dev/persistent-text-streaming`)
+
+**Agent execution** (none of these run a LangGraph graph):
+
+- _Studio_ (reports, flashcards, quizzes, mind maps, spreadsheets, written questions, audio overviews) — phased Convex actions. `studio/<type>/job.ts` registers the `internalAction`s; the logic lives in `studio/<type>/*JobPhases.ts`. The first phase fetches chunks and picks a mode (`_agents/_shared/studioExecutionMode.ts`): small inputs run single-pass; otherwise it fans out one map-chunk action per chunk via `ctx.scheduler.runAfter(0, …)`, then a finalize phase reduces/collapses and saves. LLM calls go straight through LangChain (`ChatTogetherAI`) using prompts, routing, heuristics and state types from `_agents/<type>/`. Every action must finish inside Convex's 600s limit (`studio/_job/jobDeadline.ts`); a cron (`studio/jobMutations/stuckJobs.ts`) fails rows whose action was killed. Audio TTS runs after the script phase as up to six parallel chunk actions (`studio/audio/synthesisChunks.ts`), then an assemble phase joins the audio. Infographics are a single action (`studio/infographic/generate.ts`).
+- _Deep research & literature review_ — `@convex-dev/workflow` durable workflows in `_agents/research/DeepResearchGraph.ts` and `_agents/literature_review/LiteratureReviewGraph.ts` (despite the names, not LangGraph). They pause for user approval (research plan / table columns) via workflow events.
+- _Chat_ — `ChatAgent` (`_agents/chat/ChatAgent.ts`), a plain class that retrieves, reranks, grounds and generates; `chat/_streamChatResponse.ts` drives it and streams the reply.
+- _Legacy LangGraph_ — the seven `StateGraph` classes in `_agents/<type>/*Graph.ts` (report, flashcard, quiz, mindmap, spreadsheet, written_questions, audio_overview) are no longer on any production path; only tests (`_agents/agentGraphs.smoke.test.ts`, per-graph tests) run them. Change the `*JobPhases.ts` path, not the graph. The top-level `_agents/*Graph.ts` files are re-export barrels that some phases still import helpers through (e.g. `packChunks` via `_agents/FlashcardGraph.ts`), and `@langchain/langgraph` is still imported by `_agents/*/state.ts` and routing helpers.
 
 ---
 
@@ -214,7 +221,9 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
   5. `bun run eval:rag --case=… / --runner=…` or `eval:studio` / `eval:literature-review` — agent or prompt changes (do NOT unit-test prompt outputs)
 - **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves — no new `any` in files you're already editing; ratchet per-directory (see `docs/engineering/code-quality.md`).
-- **Pre-push hook:** `.githooks/pre-push` (auto-enabled by `bun install`) runs typecheck + lint. Bypass a WIP push with `git push --no-verify`.
+- **Pre-push hook:** `.githooks/pre-push` (auto-enabled by `bun install`) runs typecheck + lint + design-lint. Bypass a WIP push with `git push --no-verify`.
+- **Design system (shadcn):** UI primitives live in `apps/web/src/shared/components/ui` — add with `bunx --bun shadcn@latest add <name>` from `apps/web`. After every `add`, the CLI writes `import { cn } from "cn"` (rewrite to `@/shared/utils/cn`) and may add bogus `cn` / `next-themes` deps (remove them). Pages place components (layout classes only); a new look is a new `cva` variant. Use semantic tokens (`bg-success-muted`, `text-info`, `border-destructive-border`), never palette colors or `--vintage-*` (those are persisted cover swatches only — see `apps/web/src/shared/notebook/coverColor.ts`). Motion: `tw-animate-css` utilities with the house `ease-out` curve, or `m.*` primitives from `@/shared/components/motion` (never `motion.*` — `LazyMotion strict`). Toasts: `useToast()` (sonner underneath). Rules: `.agents/skills/shadcn/SKILL.md`.
+- **Design lint ratchet:** `bun run lint:design` runs `@shadcn/lint` (ESLint, `apps/web/eslint.config.mjs`) and fails if any count in `apps/web/design-lint-baseline.json` goes up; after a cleanup run `bun run lint:design:update` to lock in the drop. Dirs listed in `MIGRATED` are errors. A new CLI-generated shadcn component that trips `no-arbitrary-values` on upstream idioms goes in `UPSTREAM_ARBITRARY` — never add authored components there.
 - **Code-quality cadence & ADRs:** [`docs/engineering/code-quality.md`](docs/engineering/code-quality.md) (weekly/monthly passes, metrics) and [`docs/adr/`](docs/adr/) (architecture decisions — write one in the PR that makes a hard-to-reverse or contested change).
 - **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
 - **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.
@@ -252,7 +261,7 @@ Skill descriptions are loaded automatically; below are _project_ triggers, not g
 - Read amplification, OCC conflicts, `npx convex insights` warnings → `convex-performance-audit`
 - New isolated table-owning module → `convex-create-component`
 
-**LangChain / LangGraph** (`langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`): touching anything under `convex/_agents/`, especially RAG retrieval, graph state, or new agent types.
+**LangChain / LangGraph** (`langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`): touching anything under `convex/_agents/` or a `studio/*/*JobPhases.ts`, especially RAG retrieval, agent state/routing, or new agent types. Production jobs are Convex phases/workflows, not LangGraph graphs (see **Agent execution**), so `langgraph-fundamentals` applies only to the shared state types and the legacy graph classes.
 
 **Together AI** (`together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`): when modifying `convex/_services/ai/` or `convex/studio/audio/`.
 

@@ -59,6 +59,7 @@ import type * as _agents_audio_overview_nodeExtractBeats from "../_agents/audio_
 import type * as _agents_audio_overview_nodeSynthesizeAudio from "../_agents/audio_overview/nodeSynthesizeAudio.js";
 import type * as _agents_audio_overview_nodeWriteScript from "../_agents/audio_overview/nodeWriteScript.js";
 import type * as _agents_audio_overview_prompts from "../_agents/audio_overview/prompts.js";
+import type * as _agents_audio_overview_scriptContinuation from "../_agents/audio_overview/scriptContinuation.js";
 import type * as _agents_audio_overview_scriptParsing from "../_agents/audio_overview/scriptParsing.js";
 import type * as _agents_audio_overview_state from "../_agents/audio_overview/state.js";
 import type * as _agents_audio_overview_voices from "../_agents/audio_overview/voices.js";
@@ -243,6 +244,9 @@ import type * as _services_search_DiscoveryService from "../_services/search/Dis
 import type * as _services_search_TavilySearchService from "../_services/search/TavilySearchService.js";
 import type * as _shared_mathMarkdown from "../_shared/mathMarkdown.js";
 import type * as _utils_CitationEngine from "../_utils/CitationEngine.js";
+import type * as account__purge from "../account/_purge.js";
+import type * as account_actions from "../account/actions.js";
+import type * as account_deletion from "../account/deletion.js";
 import type * as auth from "../auth.js";
 import type * as billing_actions from "../billing/actions.js";
 import type * as billing_index from "../billing/index.js";
@@ -280,6 +284,7 @@ import type * as e2e_seedFlashcards from "../e2e/seedFlashcards.js";
 import type * as e2e_seedWrittenQuestions from "../e2e/seedWrittenQuestions.js";
 import type * as eval__discoverResult from "../eval/_discoverResult.js";
 import type * as eval__gate from "../eval/_gate.js";
+import type * as eval__packFolder from "../eval/_packFolder.js";
 import type * as eval__seedPack from "../eval/_seedPack.js";
 import type * as eval__studioRowCreators from "../eval/_studioRowCreators.js";
 import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
@@ -335,6 +340,7 @@ import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhase
 import type * as studio_audio_fixAudioUrl from "../studio/audio/fixAudioUrl.js";
 import type * as studio_audio_index from "../studio/audio/index.js";
 import type * as studio_audio_job from "../studio/audio/job.js";
+import type * as studio_audio_synthesisChunks from "../studio/audio/synthesisChunks.js";
 import type * as studio_flashcards_flashcardJobPhases from "../studio/flashcards/flashcardJobPhases.js";
 import type * as studio_flashcards_index from "../studio/flashcards/index.js";
 import type * as studio_flashcards_job from "../studio/flashcards/job.js";
@@ -438,6 +444,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/audio_overview/nodeSynthesizeAudio": typeof _agents_audio_overview_nodeSynthesizeAudio;
   "_agents/audio_overview/nodeWriteScript": typeof _agents_audio_overview_nodeWriteScript;
   "_agents/audio_overview/prompts": typeof _agents_audio_overview_prompts;
+  "_agents/audio_overview/scriptContinuation": typeof _agents_audio_overview_scriptContinuation;
   "_agents/audio_overview/scriptParsing": typeof _agents_audio_overview_scriptParsing;
   "_agents/audio_overview/state": typeof _agents_audio_overview_state;
   "_agents/audio_overview/voices": typeof _agents_audio_overview_voices;
@@ -622,6 +629,9 @@ declare const fullApi: ApiFromModules<{
   "_services/search/TavilySearchService": typeof _services_search_TavilySearchService;
   "_shared/mathMarkdown": typeof _shared_mathMarkdown;
   "_utils/CitationEngine": typeof _utils_CitationEngine;
+  "account/_purge": typeof account__purge;
+  "account/actions": typeof account_actions;
+  "account/deletion": typeof account_deletion;
   auth: typeof auth;
   "billing/actions": typeof billing_actions;
   "billing/index": typeof billing_index;
@@ -659,6 +669,7 @@ declare const fullApi: ApiFromModules<{
   "e2e/seedWrittenQuestions": typeof e2e_seedWrittenQuestions;
   "eval/_discoverResult": typeof eval__discoverResult;
   "eval/_gate": typeof eval__gate;
+  "eval/_packFolder": typeof eval__packFolder;
   "eval/_seedPack": typeof eval__seedPack;
   "eval/_studioRowCreators": typeof eval__studioRowCreators;
   "eval/chatEvalAction": typeof eval_chatEvalAction;
@@ -714,6 +725,7 @@ declare const fullApi: ApiFromModules<{
   "studio/audio/fixAudioUrl": typeof studio_audio_fixAudioUrl;
   "studio/audio/index": typeof studio_audio_index;
   "studio/audio/job": typeof studio_audio_job;
+  "studio/audio/synthesisChunks": typeof studio_audio_synthesisChunks;
   "studio/flashcards/flashcardJobPhases": typeof studio_flashcards_flashcardJobPhases;
   "studio/flashcards/index": typeof studio_flashcards_index;
   "studio/flashcards/job": typeof studio_flashcards_job;

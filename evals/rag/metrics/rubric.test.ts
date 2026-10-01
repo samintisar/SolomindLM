@@ -66,6 +66,20 @@ describe("rubric prompts", () => {
     expect(text).toBe(`[a.pdf]\n${"x".repeat(10)}\n\n---\n\n[b.pdf]\n${"y".repeat(10)}`);
   });
 
+  it("gives budget a short document leaves unused to the longer ones", () => {
+    const text = formatSourceTexts(
+      [
+        { fileName: "a.pdf", text: "x".repeat(100) },
+        { fileName: "b.pdf", text: "y".repeat(4) },
+        { fileName: "c.pdf", text: "z".repeat(100) },
+      ],
+      30
+    );
+    expect(text).toBe(
+      `[a.pdf]\n${"x".repeat(13)}\n\n---\n\n[b.pdf]\nyyyy\n\n---\n\n[c.pdf]\n${"z".repeat(13)}`
+    );
+  });
+
   it("includes source text only for evidence: sources, preferring retrieved chunks", () => {
     const sources = [{ fileName: "q3.pdf", text: "Revenue grew 12% in Q3." }];
     const withSources = buildRubricPrompt(pack, pack.rubric[0], fixture, artifact(), sources);
@@ -146,7 +160,7 @@ describe("scoreRubricMetrics", () => {
         model: "judge-model",
       }
     );
-    expect(result.status).toBe("fail");
+    expect(result.status).toBe("warn");
     expect(result.detail).toMatch(/^Rubric judge failed:/);
     expect(result.breakdown).toMatchObject({ judgeError: true });
   });

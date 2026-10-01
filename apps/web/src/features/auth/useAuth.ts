@@ -4,6 +4,8 @@ export interface User {
   id: string;
   email?: string;
   name?: string;
+  /** Profile photo URL (e.g. the Google account picture). */
+  image?: string;
 }
 
 export interface AuthContextType {
@@ -12,6 +14,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   clearAuthError: () => void;
 }

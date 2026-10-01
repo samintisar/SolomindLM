@@ -2,8 +2,8 @@ import { getIndexablePublicSeoPages } from "./publicSeoPages";
 import { SEO_BASE_URL } from "./seoConstants";
 import { canonicalUrl } from "./seoHtml";
 
-export const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
-export const INDEXNOW_MAX_URLS_PER_REQUEST = 10_000;
+const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
+const INDEXNOW_MAX_URLS_PER_REQUEST = 10_000;
 
 const INDEXNOW_KEY_PATTERN = /^[a-zA-Z0-9-]{8,128}$/;
 

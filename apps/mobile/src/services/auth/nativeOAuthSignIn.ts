@@ -19,7 +19,7 @@ type SignInFn = (
  * which is unnecessary risk in an OAuth round trip that already goes through
  * Convex Auth's server-side redirect allowlist.
  */
-export function getNativeOAuthRedirectUri(): string {
+function getNativeOAuthRedirectUri(): string {
   return "solomindlm://";
 }
 
@@ -28,7 +28,7 @@ export function getNativeOAuthRedirectUri(): string {
  * @see https://labs.convex.dev/auth/api_reference/react
  */
 export async function completeNativeOAuthSignIn(
-  provider: "google",
+  provider: "google" | "apple",
   signIn: SignInFn
 ): Promise<void> {
   if (Platform.OS === "web") {

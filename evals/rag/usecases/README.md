@@ -45,7 +45,7 @@ Pack notebooks live in the eval owner's `Test` folder. The eval owner is the acc
 
 `literatureReview` fixtures take only a `notebookId` (the eval action has no `documentIds` input), so they use the whole pack notebook. Don't hand-add documents to a pack notebook that has `literatureReview` fixtures; other runners are restricted to the pack's source documents.
 
-Pack fixtures only run when selected explicitly (`--use-case`, `--prefix <pack-id>/…` or `--case <id>`). Plain `eval:rag`, `eval:studio` and `--runner` runs skip them. Dry runs pin them to a placeholder notebook and validate the packs they select.
+Pack fixtures only run when selected explicitly (`--use-case`, `--prefix <pack-id>/…` or `--case <id>`). Plain `eval:rag`, `eval:studio` and `--runner` runs skip them. Every run validates the packs it selects; dry runs also pin pack fixtures to a placeholder notebook.
 
 ## Running
 
@@ -59,8 +59,9 @@ bun run eval:usecases:dry                   # offline dry run of pack fixtures (
 
 - `eval:seed` rejects unknown options and stray arguments instead of ignoring them.
 - A `--use-case` run exits 2 if `--split`, `--runner` or `--prefix` leave no pack fixtures (dry runs too). `--case` overrides `--use-case`.
+- Live pack runs exit 2 without `TOGETHER_AI_API_KEY`: rubric judges score the packs. Rubric judge errors are reported as warnings, not failures.
 - `eval:compare` groups its results by use case (`byUseCase`) in addition to by runner.
 
 Deployment env (dev only): `RAG_EVALS_ENABLED=true`, `RAG_EVAL_SECRET`, `RAG_EVAL_OWNER_EMAIL`. Set the owner with `npx convex env set RAG_EVAL_OWNER_EMAIL you@example.com`. The bootstrap script only pushes it if `RAG_EVAL_OWNER_EMAIL` is exported in your shell; otherwise run `npx convex env set RAG_EVAL_OWNER_EMAIL <email>` against the dev deployment.
 
-Pack consistency (sources, licences, fixtures, rubric) is validated by `bun run test:convex` (`evals/rag/usecases/registry.test.ts`) and by `eval:seed`.
+Pack consistency (sources, licences, fixtures, rubric) is validated by `bun run test:convex` (`evals/rag/usecases/registry.test.ts`), by `eval:seed`, by every `eval:rag` run that selects a pack, and in CI by `eval:usecases:dry`.

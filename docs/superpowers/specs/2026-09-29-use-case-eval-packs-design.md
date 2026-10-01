@@ -31,7 +31,8 @@ Score every agent against content and requests typical of each advertised use ca
 evals/rag/usecases/
   index.ts                  # USE_CASE_PACKS registry; pack fixtures merged into FIXTURES
   types.ts                  # UseCasePack, RubricCheck
-  usecases.test.ts          # pack validation
+  registry.test.ts          # every registered pack validates
+  validate.test.ts          # validatePack unit tests
   <pack-id>/
     manifest.ts
     fixtures.ts
@@ -54,7 +55,7 @@ evals/rag/usecases/
 
 **Fixtures:** `EvalFixture` gains optional `useCase?: string`. Pack fixtures set `useCase` and leave `notebookId`/`documentIds` unset; section 3 fills them at run time. Fixture ids are namespaced: `<pack-id>/<slug>`. Splits per pack: 1–2 `smoke`, about 6–8 `train`, 2 `holdout`. Holdout fixtures are never used while tuning.
 
-**Validation (`validatePack`):** every listed source is a plain file name that exists (exact case) and has an entry in `LICENSES.md`; fixture ids are unique and prefixed with the pack id; every fixture sets `split`; every fixture runner is in `features`; every rubric check applies to at least one listed feature. It runs in `registry.test.ts` (part of `test:convex` in CI), in `eval:seed`, and in dry runs that select pack fixtures (`eval:usecases:dry`). Plain `eval:rag:dry` skips pack fixtures, so adding `eval:usecases:dry` to CI belongs in the first pack PR.
+**Validation (`validatePack`):** every listed source is a plain file name that exists (exact case) and has an entry in `LICENSES.md`; fixture ids are unique and prefixed with the pack id; every fixture sets `split`; every fixture runner is in `features`; every rubric check applies to at least one listed feature. It runs in `registry.test.ts` (part of `test:convex` in CI), in `eval:seed`, and in every `eval:rag` run, live or dry, that selects pack fixtures (e.g. `eval:usecases:dry`). Plain `eval:rag:dry` skips pack fixtures, so adding `eval:usecases:dry` to CI belongs in the first pack PR.
 
 ## 2. Seeding
 
@@ -62,7 +63,7 @@ evals/rag/usecases/
 
 **Owner and location:** pack notebooks live in the account named by a new env var, `RAG_EVAL_OWNER_EMAIL`. It's set on the dev deployment, is the maintainer's own account, and gets added to `evals/rag/env.eval.example` and `scripts/bootstrap-rag-eval-env.js`. Notebooks sit in that account's `Test` folder, matched by `notebookTitle`. The folder and the four notebooks already exist on dev (created 2026-09-29). If either is missing, the seeder creates it, so a fresh deployment can be rebuilt.
 
-**Source sync:** each committed file maps to one document, matched by `fileName`. The seeder stores the file's sha256 in the document's existing `metadata` field (`v.any()`; ingestion doesn't write to it). No schema change. The pure function `planPackSync(manifestFiles, remoteDocs)` returns one action per file:
+**Source sync:** each committed file maps to one document, matched by `fileName`. The seeder stores the file's sha256 in the document's existing `metadata` field (`v.any()`; successful ingestion leaves it alone, and a failed ingestion overwrites it with the error, after which the seeder replaces the document). No schema change. The pure function `planPackSync(manifestFiles, remoteDocs)` returns one action per file:
 
 | Remote state | Action |
 |---|---|
@@ -121,13 +122,13 @@ interface RubricCheck {
 
 **Scoring:** `scoreRubricMetrics(fixture, artifact, pack)` in `evals/rag/metrics/rubric.ts` runs each check that applies to `artifact.runner`. It uses the existing binary-judge invoker (`createTogetherJudgeInvoker`) and one generic prompt template: check question, formatted output, and source excerpts when `evidence: "sources"`. It emits one `MetricResult` per check, named `rubric:<pack-id>:<check-id>`, scored pass/fail with the judge's reason.
 
-**Source evidence for studio runners:** studio artifacts carry no retrieved chunks (`selectedChunks: []`). When a check needs sources and the artifact has no chunks, the judge gets the pack's extracted source text instead. A gated action `getPackSourceText({ evalSecret, documentIds })` returns each document's `extractedMarkdown`, capped at 50k chars per document. The CLI fetches it once per pack after resolution, and the prompt splits its source budget (12k chars) evenly across documents. On long sources the judge only sees the start of each document. That limitation is accepted here; exhaustive answer-key grounding is piece 2.
+**Source evidence for studio runners:** studio artifacts carry no retrieved chunks (`selectedChunks: []`). When a check needs sources and the artifact has no chunks, the judge gets the pack's extracted source text instead. A gated action `getPackSourceText({ evalSecret, documentIds })` returns each document's `extractedMarkdown`, capped at 50k chars per document. The CLI fetches it once per pack after resolution, and the prompt splits a 48k-char source budget across documents, passing budget a short document leaves unused to the longer ones (retrieved chunks, when present, keep a 12k-char budget). On long sources the judge only sees the start of each document. That limitation is accepted here; exhaustive answer-key grounding is piece 2.
 
 **Rubric wording rule:** a check describes the quality a user in that audience expects from any output, for example "Does every figure match the source?". It never refers to specific fixture contents or expected items.
 
 **Scorecard:** a new report section with one row per pack and one column per feature. Each cell shows the pass rate across the generic metrics for that runner plus the pack's rubric checks, and lists the checks that failed. The same data goes into the JSON report. `eval:compare` groups deltas by `useCase`.
 
-**Judge errors:** when a judge fails to produce a verdict (parse failure, truncation, HTTP error), the metric is tagged `judgeError: true` in `breakdown`. The scorecard counts these as `judge-error`, separate from failed checks.
+**Judge errors:** when a judge fails to produce a verdict (parse failure, truncation, HTTP error), the metric gets `status: "warn"` and is tagged `judgeError: true` in `breakdown`, so it does not fail the run. The scorecard counts these as `judge-error`, separate from failed checks.
 
 **Promotion:** rubric metrics don't block promotion at first. Rubric verdicts go into the existing judge queue for human labelling. A check becomes blocking once the judge-queue scorer reports enough agreement with those labels.
 
@@ -141,13 +142,13 @@ interface RubricCheck {
 | Document fails ingestion during seeding | Reported with its ingestion error; seeder exits non-zero |
 | `RAG_EVAL_OWNER_EMAIL` missing, or no user with that email | Hard stop in seeder and resolver |
 | `RAG_EVAL_CONVEX_URL` is prod | Seeder refuses to run |
-| Judge returns no verdict | Metric fails with `judgeError: true`; counted separately on the scorecard |
+| Judge returns no verdict | Metric is a warning with `judgeError: true`; counted separately on the scorecard |
 
 ## 6. Testing
 
 TDD with vitest (`*.test.ts` next to source):
 
-- `evals/rag/usecases/usecases.test.ts`: pack validation (section 1).
+- `evals/rag/usecases/validate.test.ts` and `registry.test.ts`: pack validation (section 1).
 - `planPackSync`: upload, replace, skip, and failed-document cases; unrelated documents left alone.
 - Fixture resolution: fills `notebookId`/`documentIds`, restricts to pack documents, aborts when a pack isn't ready.
 - `scoreRubricMetrics`: applicability filtering, prompt includes sources only for `evidence: "sources"`, metric naming, `judgeError` tagging (stub invoker).

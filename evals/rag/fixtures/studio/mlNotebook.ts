@@ -4,7 +4,7 @@
  */
 import type { EvalFixture } from "../../types";
 
-export const ML_NOTEBOOK_ID = "jd72h9qsq5zap11ede5k8rqkx585djmc";
+const ML_NOTEBOOK_ID = "jd72h9qsq5zap11ede5k8rqkx585djmc";
 
 const mlTags = (kind: string, split?: EvalFixture["split"]): string[] => {
   const tags = ["studio", kind, "ml-notebook"];
@@ -12,7 +12,7 @@ const mlTags = (kind: string, split?: EvalFixture["split"]): string[] => {
   return tags;
 };
 
-export const studioMlReportTrain: EvalFixture = {
+const studioMlReportTrain: EvalFixture = {
   schemaVersion: 1,
   id: "studio-ml-report-train",
   split: "train",
@@ -36,7 +36,7 @@ export const studioMlReportTrain: EvalFixture = {
   scenarioCategory: "summarization",
 };
 
-export const studioMlFlashcardsTrain: EvalFixture = {
+const studioMlFlashcardsTrain: EvalFixture = {
   schemaVersion: 1,
   id: "studio-ml-flashcards-train",
   split: "train",
@@ -51,7 +51,7 @@ export const studioMlFlashcardsTrain: EvalFixture = {
   tags: mlTags("flashcards"),
 };
 
-export const studioMlQuizTrain: EvalFixture = {
+const studioMlQuizTrain: EvalFixture = {
   schemaVersion: 1,
   id: "studio-ml-quiz-train",
   split: "train",
@@ -66,7 +66,7 @@ export const studioMlQuizTrain: EvalFixture = {
   scenarioCategory: "comparison",
 };
 
-export const studioMlMindmapHoldout: EvalFixture = {
+const studioMlMindmapHoldout: EvalFixture = {
   schemaVersion: 1,
   id: "studio-ml-mindmap-holdout",
   split: "holdout",

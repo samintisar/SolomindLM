@@ -92,4 +92,15 @@ describe("ChecklistCard", () => {
     );
     expect(screen.getByText(/Get started/i)).toBeInTheDocument();
   });
+
+  test("header actions are labelled icon buttons and collapse toggles the list", async () => {
+    mockState.tourStatus = "active";
+    window.localStorage.removeItem("onboardingChecklistCollapsed");
+    renderAt("/home");
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Collapse" }));
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    await userEvent.click(screen.getByRole("button", { name: "Expand" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+  });
 });

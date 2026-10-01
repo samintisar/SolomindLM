@@ -321,7 +321,7 @@ export async function scoreStudioMetrics(
     case "quiz": {
       results.push(quizCountMatch(fixture, artifact));
       const qs = (artifact.studioOutput.raw as ItemArrayPayload | undefined)?.questions ?? [];
-      for (const check of quizInvariantChecks(qs as object[])) {
+      for (const check of quizInvariantChecks(qs as object[], fixture.studioParams?.difficulty)) {
         results.push(fromInvariant(check, fixture, artifact));
       }
       break;

@@ -8,15 +8,7 @@ export type ShellAuthTokenPayload = {
   jwt: string | null;
 };
 
-export type ShellAuthInjectAck = {
-  type: "native-auth:inject-ack";
-  deploymentUrl: string;
-  jwtKey: string;
-  hasStoredJwt: boolean;
-  hasMemoryJwt: boolean;
-};
-
-export type ShellWebErrorPayload = {
+type ShellWebErrorPayload = {
   type: "shell-web:error";
   message: string;
   source?: string;
@@ -24,10 +16,6 @@ export type ShellWebErrorPayload = {
 
 export function getShellConvexDeploymentUrl(): string {
   return CONVEX_URL;
-}
-
-export function getShellAuthStorageKeys(deploymentUrl = CONVEX_URL) {
-  return convexAuthStorageKeys(deploymentUrl);
 }
 
 /** Read mirrored JWT for the web app's Convex deployment. */
