@@ -9,6 +9,7 @@ const MIGRATED = [
   "src/shared/components/motion/**/*.tsx",
   "src/features/auth/**/*.tsx",
   "src/features/onboarding/**/*.tsx",
+  "src/features/notebooks/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
