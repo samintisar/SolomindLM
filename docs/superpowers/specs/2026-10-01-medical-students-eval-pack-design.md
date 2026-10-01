@@ -47,13 +47,13 @@ How we got here (2026-10-01, user decisions):
 - **The OpenStax 1st edition** carries CC BY 4.0 metadata, but its pages restrict reuse to non-commercial purposes. They also state the book "may not be used in the training of large language models or otherwise be ingested into large language models or generative AI offerings without OpenStax's prior written permission". That is our use.
 - **NIH/NCI SEER Training** (US government) is too shallow: no cranial-nerve table, a three-sentence cardiac cycle, and no GFR material.
 
-Each article is printed to PDF from its pinned revision URL (`https://en.wikipedia.org/w/index.php?title=<Title>&oldid=<revid>`) with headless Chrome (Playwright) and Wikipedia's own print stylesheet. Figures wider than 1,200 px are downscaled to 1,200 px (JPEG) to keep files small. Text, tables and captions are not altered. The file still goes through OCR like an uploaded lecture PDF, with figures and tables. The trade-off is encyclopedic rather than lecture-style prose, including reference lists.
+Each article is printed to PDF from its pinned revision URL (`https://en.wikipedia.org/w/index.php?title=<Title>&oldid=<revid>`) with headless Chrome (Playwright) and Wikipedia's own print stylesheet. Raster figures wider than 1,200 px are downscaled to 1,200 px (JPEG) to keep files small; SVG images (e.g. math formulas) pass through untouched. Text, tables and captions are not altered. The file still goes through OCR like an uploaded lecture PDF, with figures and tables. The trade-off is encyclopedic rather than lecture-style prose, including reference lists.
 
 | File | Article (revision checked 2026-10-01) | What it stresses |
 |---|---|---|
 | `heart-anatomy.pdf` | [Heart](https://en.wikipedia.org/w/index.php?title=Heart&oldid=1375195018) | structure names in labelled figures |
 | `cardiac-cycle.pdf` | [Cardiac cycle](https://en.wikipedia.org/w/index.php?title=Cardiac_cycle&oldid=1376968670) | phase order, valve timing, pressures and volumes |
-| `cranial-nerves.pdf` | [Cranial nerves](https://en.wikipedia.org/w/index.php?title=Cranial_nerves&oldid=1357482168) | the nerve/function table into one-fact items |
+| `cranial-nerves.pdf` | [Cranial nerves](https://en.wikipedia.org/w/index.php?title=Cranial_nerves&oldid=1357482168) | per-nerve function sections and the skull-exit table into one-fact items (the article has no nerve→function table) |
 | `glomerular-filtration.pdf` | [Glomerular filtration rate](https://en.wikipedia.org/w/index.php?title=Glomerular_filtration_rate&oldid=1372412934) | mechanism, normal values, pressure balance |
 
 The revision ids above are pinned; re-printing uses the same `oldid`, so the sources never drift. Target under 5 MB per file and under 15 MB for the pack. "Heart" is long (about 12,500 words), so it is the likeliest to exceed that; if it does, keep it and note the size.
@@ -75,15 +75,15 @@ Requests are worded the way a medical student asks. `studioParams.topic` carries
 | Split | Slug | Runner | Params | What it stresses |
 |---|---|---|---|---|
 | smoke | `flashcards-heart-anatomy` | flashcards | 15 cards, medium | structure names from labelled figures |
-| smoke | `quiz-cranial-nerves-easy` | quiz | 10 questions, easy | one fact per question from the table |
-| train | `flashcards-cranial-nerve-table` | flashcards | 12 cards, medium | table rows → name ↔ function cards |
+| smoke | `quiz-cranial-nerves-easy` | quiz | 10 questions, easy | one fact per question about a single nerve |
+| train | `flashcards-cranial-nerve-functions` | flashcards | 12 cards, medium | one card per nerve: name ↔ function |
 | train | `quiz-cardiac-cycle` | quiz | 10 questions, medium | phase order, valve timing, pressures |
 | train | `quiz-cardiovascular-mixed` | quiz | 10 questions, medium | spans heart anatomy and cardiac cycle |
 | train | `written-questions-filtration` | writtenQuestions | 5 questions, medium | exam-style explanation of net filtration pressure |
 | train | `chat-av-valve-closure` | chat | — | mechanism: why the AV valves close at the start of ventricular systole |
 | train | `chat-normal-gfr` | chat | — | values: normal GFR and what determines it, with citations |
 | holdout | `quiz-filtration-hard` | quiz | 8 questions, hard | Starling forces, autoregulation |
-| holdout | `chat-lateral-gaze-nerve` | chat | — | applied: which nerve is affected if the eye cannot move laterally (answerable from the table) |
+| holdout | `chat-lateral-gaze-nerve` | chat | — | applied: which nerve is affected if the eye cannot move laterally (answerable from the source) |
 
 Holdout fixtures are never looked at while tuning.
 
@@ -114,7 +114,7 @@ The first two mirror the Language Learners checks, so answer leaks (#218) compar
 
 **Live check (after user go-ahead; best effort):** the dev deployment is shared with other sessions and the Together key is credit-limited.
 
-1. `bun run eval:seed -- --use-case medical-students` confirms all four PDFs reach `completed` through OCR. Then confirm the cranial-nerve table survives as readable text, and that every `expectedItems` term appears in the extracted text (via `getPackSourceText`).
+1. `bun run eval:seed -- --use-case medical-students` confirms all four PDFs reach `completed` through OCR. Then confirm the cranial-nerve tables and the GFR formulas survive as readable text, and that every `expectedItems` term appears in the extracted text (via `getPackSourceText`).
 2. `bun run eval:rag -- --use-case medical-students --split smoke` runs 2 fixtures and shows the scorecard row.
 
 These need, on this machine, a repo-root `.env` with `RAG_EVAL_CONVEX_URL`, `RAG_EVAL_SECRET` and `TOGETHER_AI_API_KEY`, and on dev, `RAG_EVALS_ENABLED`, `RAG_EVAL_SECRET` and `RAG_EVAL_OWNER_EMAIL`. If dev isn't ready, the PR ships on the offline checks and says the live run is pending.

@@ -69,6 +69,9 @@ const page = await browser.newPage({ userAgent: "SolomindLM-eval-pack/1.0 (samin
 await page.route("**/*", async (route) => {
   if (route.request().resourceType() !== "image") return route.continue();
   const response = await route.fetch();
+  // Only raster figures are resized; SVG (e.g. Wikipedia math formulas) would render blank through the canvas.
+  const type = (response.headers()["content-type"] || "").toLowerCase();
+  if (!/^image\/(png|jpe?g|webp|gif)/.test(type)) return route.fulfill({ response });
   const body = await response.body();
   try {
     const img = await loadImage(body);
@@ -81,7 +84,7 @@ await page.route("**/*", async (route) => {
     ctx.drawImage(img, 0, 0, MAX_WIDTH, height);
     return route.fulfill({ response, body: canvas.toBuffer("image/jpeg", 85), headers: { ...response.headers(), "content-type": "image/jpeg" } });
   } catch {
-    return route.fulfill({ response, body }); // not decodable (e.g. svg): pass through
+    return route.fulfill({ response, body }); // not decodable: pass through
   }
 });
 const url = `https://en.wikipedia.org/w/index.php?title=${encodeURIComponent(title)}&oldid=${oldid}`;
@@ -147,7 +150,7 @@ Expected: the article title is near the top of page 1; no fundraising or old-rev
 pdfimages -list $D/heart-anatomy.pdf | head -8     # figures present, max width 1200
 ```
 
-Render one figure page (`pdftoppm -f 2 -l 2 -png -r 100 $D/heart-anatomy.pdf .cache/openstax/check`) and look at it: labels legible. Then confirm every image is freely licensed (Commons), with no non-free/fair-use files:
+Render one figure page (`pdftoppm -f 2 -l 2 -png -r 100 $D/heart-anatomy.pdf .cache/openstax/check`) and look at it: labels legible. Also render a page of `glomerular-filtration.pdf` with formulas (the Calculation section, around page 4) and confirm the formulas print (not blank boxes), and confirm `pdfimages -list` shows no all-white 1,200 px JPEGs. Then confirm every image is freely licensed (Commons), with no non-free/fair-use files:
 
 ```bash
 for t in Heart "Cardiac cycle" "Cranial nerves" "Glomerular filtration rate"; do
@@ -409,17 +412,17 @@ export const medicalStudentsFixtures: EvalFixture[] = [
       "Short questions matching a cranial nerve to its main function or type, e.g. the optic nerve carries vision, " +
       "the hypoglossal nerve moves the tongue.",
     expectedBehavior:
-      "Beginner questions, each testing one nerve's name, number, function or sensory/motor type from the table. " +
+      "Beginner questions, each testing one nerve's name, number, function or sensory/motor type from the source. " +
       "Exactly one option is correct and it matches the source.",
     studioParams: { questionCount: 10, difficulty: "easy", topic: "cranial nerve names and functions" },
     expectedStructure: { minItems: 8 },
-    tags: tags("quiz", "nervous-system", "table"),
+    tags: tags("quiz", "nervous-system"),
   },
 
   // ─── train ────────────────────────────────────────────────
   {
     ...base,
-    id: "medical-students/flashcards-cranial-nerve-table",
+    id: "medical-students/flashcards-cranial-nerve-functions",
     split: "train",
     runner: "flashcards",
     question: "Make one flashcard per cranial nerve: nerve on the front, what it does on the back.",
@@ -438,14 +441,14 @@ export const medicalStudentsFixtures: EvalFixture[] = [
       "hypoglossal",
     ],
     expectedAnswer:
-      "Twelve cards, one per cranial nerve, each giving that nerve's function from the table " +
+      "Twelve cards, one per cranial nerve, each giving that nerve's function from the source " +
       "(e.g. abducens: lateral eye movement; vagus: visceral control of thoracic and abdominal organs).",
     expectedBehavior:
-      "One card for each of the twelve cranial nerves, built from the reference table. Functions match the table; " +
+      "One card for each of the twelve cranial nerves, built from the source's per-nerve descriptions. Functions match the source; " +
       "no card mixes two nerves.",
     studioParams: { cardCount: 12, difficulty: "medium", topic: "the twelve cranial nerves and their functions" },
     expectedStructure: { minItems: 12 },
-    tags: tags("flashcards", "nervous-system", "table"),
+    tags: tags("flashcards", "nervous-system"),
   },
   {
     ...base,
@@ -616,7 +619,7 @@ print("\n".join(missing) if missing else "all terms present")
 python .cache/openstax/check_terms.py
 ```
 
-Expected: `all terms present`. For any missing term, read the excerpt (`pdftotext -layout <file> - | less`) and change the fixture's `expectedItems` (and `expectedAnswer`) to the source's own wording or value. Drop the term only if the source doesn't cover it. If "lateral rectus" is absent from `cranial-nerves.pdf`, remove it from `chat-lateral-gaze-nerve.expectedItems`.
+Expected: `all terms present`. `pdftotext` can scramble reading order around inline formulas and figures (e.g. "net filtration pressure" in the GFR article sits beside a formula). Before changing a fixture, check the term against the pinned article text (`curl -s "https://en.wikipedia.org/w/index.php?oldid=<revid>&action=raw" | grep -i "<term>"`); if it is in the article, keep it and let Task 12 confirm it in the OCR'd text. For any term missing from the article too, read the excerpt (`pdftotext -layout <file> - | less`) and change the fixture's `expectedItems` (and `expectedAnswer`) to the source's own wording or value. Drop the term only if the source doesn't cover it. If "lateral rectus" is absent from `cranial-nerves.pdf`, remove it from `chat-lateral-gaze-nerve.expectedItems`.
 
 - [ ] **Step 3: Check the values in `expectedAnswer`**
 
