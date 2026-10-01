@@ -47,14 +47,14 @@ import { useChatStreamingContext } from "../useChatStreaming";
 import { exportAsMarkdown } from "../utils/exportChat";
 import { RefHandlers, stripReferencesSection } from "../utils/messageRendering.utils";
 import { ChatEmptyState } from "./ChatEmptyState";
+import { ChatInput } from "./ChatInput";
+import { ConfigureChatModal } from "./ConfigureChatModal";
+import { ConversationList } from "./ConversationList";
 import {
   CHAT_DEFAULT_SOURCE_FILTERS,
   type ChatComposerMode,
-  ChatInput,
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
-} from "./ChatInput";
-import { ConfigureChatModal } from "./ConfigureChatModal";
-import { ConversationList } from "./ConversationList";
+} from "./composer/constants";
 import { type ExternalSource, ExternalSourcesModal } from "./ExternalSourcesModal";
 import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
 import { MessageBubble } from "./MessageBubble";
