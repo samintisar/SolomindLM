@@ -16,7 +16,7 @@ export const QuoteBlocks: React.FC = () => {
           <div key={quote.id} className="group relative w-36 shrink-0">
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               size="icon-sm"
               onClick={() => removeQuote(quote.id)}
               className="absolute top-0 left-0 z-10 size-5 -translate-x-1/2 -translate-y-1/2"
