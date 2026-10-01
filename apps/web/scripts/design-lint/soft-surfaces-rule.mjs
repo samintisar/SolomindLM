@@ -5,7 +5,15 @@
 const CLASS_FUNCTIONS = new Set(["cn", "cva", "clsx", "twMerge"]);
 const THICK_BORDER = /^border(?:-[xytrbse])?-(?:2|4|8)$/;
 const LOUD_BORDER = /^border(?:-[xytrbse])?-(?:input|foreground|black|primary)(?:\/\d+)?$/;
-const ANY_BORDER = /^border(?:-[xytrbse])?(?:-(?!0$|none$|transparent$)[\w/[\].-]+)?$/;
+// The side is only a side when followed by "-" or the end, so "border-t-0" is side t + value 0, never value "t-0".
+const BORDER_PARTS = /^border(?:-([xytrbse])(?=-|$))?(?:-(.+))?$/;
+const NO_BORDER = /^(?:0|none|transparent)$/;
+
+/** Any border utility (width, color, style, with or without a side) except the 0/none/transparent ones. */
+function isVisibleBorder(utility) {
+  const match = BORDER_PARTS.exec(utility);
+  return match !== null && !(match[2] !== undefined && NO_BORDER.test(match[2]));
+}
 const STATE_PREFIX =
   /^(?:focus|focus-visible|focus-within|aria-invalid|data-\[state|has-data-\[state|group-data-\[state|peer-data-\[state|group-focus|peer-focus)/;
 
@@ -32,7 +40,7 @@ function violation(token, onButton) {
   if (/^bg-(?:black|white)\/\d+$/.test(utility)) return true;
   const stateOnly = variants.some((v) => STATE_PREFIX.test(v));
   if (LOUD_BORDER.test(utility) && !stateOnly) return true;
-  if (onButton && !stateOnly && ANY_BORDER.test(utility)) return true;
+  if (onButton && !stateOnly && isVisibleBorder(utility)) return true;
   return false;
 }
 
