@@ -100,7 +100,10 @@ await page.evaluate(async () => {
 await page.waitForLoadState("networkidle");
 // Hide site notices (fundraising/CentralNotice banners) and the old-revision warning; not article content.
 await page.addStyleTag({
-  content: `#siteNotice, #centralNotice, .cn-fundraising, .frb, #mw-revision-info, .mw-revision, #contentSub { display: none !important; }`,
+  content: `#siteNotice, #centralNotice, .cn-fundraising, .frb, #mw-revision-info, .mw-revision, #contentSub { display: none !important; }
+    /* Wide display formulas would be clipped at the page margin; scale them to the column. */
+    .mwe-math-fallback-image-display, .mwe-math-fallback-image-inline { max-width: 100% !important; height: auto !important; }
+    .mwe-math-element { max-width: 100%; overflow: visible !important; }`,
 });
 await page.emulateMedia({ media: "print" });
 await page.pdf({ path: out, format: "Letter", printBackground: true, margin: { top: "0.5in", bottom: "0.5in", left: "0.5in", right: "0.5in" } });
