@@ -10,6 +10,8 @@ const cardVariants = cva(
         default: "shadow-sm",
         elevated:
           "rounded-2xl border-border/90 bg-card/90 shadow-lg shadow-primary/5 backdrop-blur-sm",
+        // Edge-to-edge content (lists, disclosures): no padding or gap, the children own their spacing.
+        flush: "gap-0 overflow-hidden py-0 shadow-sm",
         // Clickable cards: the inner <button> carries the focus ring; the card lifts on hover.
         interactive:
           "relative gap-0 overflow-hidden py-0 shadow-sm transition duration-200 ease-out motion-safe:hover:-translate-y-0.5 hover:shadow-md motion-safe:active:scale-99",
