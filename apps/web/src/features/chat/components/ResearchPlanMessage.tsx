@@ -47,8 +47,8 @@ interface ResearchPlanMessageProps {
   planId: string;
   /** Populated while streaming before the plan row exists in the DB; after load, Convex query wins. */
   subQuestions: SubQuestion[];
-  onApprove: (planId: string) => void;
-  onReject: (planId: string) => void;
+  onApprove: (planId: string) => void | Promise<void>;
+  onReject: (planId: string) => void | Promise<void>;
   /** @deprecated Legacy runs only — new deep research does not create table/report artifacts */
   onOpenTable?: (tableId: Id<"literatureTables">) => void;
   /** @deprecated Legacy runs only */
@@ -117,6 +117,15 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
     setSubmitting(true);
     try {
       await onApprove(planId);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setSubmitting(true);
+    try {
+      await onReject(planId);
     } finally {
       setSubmitting(false);
     }
@@ -246,7 +255,7 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                   <Button
                     variant="outline"
-                    onClick={() => onReject(planId)}
+                    onClick={handleReject}
                     disabled={submitting}
                     className="w-full sm:w-auto"
                   >

@@ -15,7 +15,11 @@ describe("ResultCard", () => {
         onOpen={onOpen}
       />
     );
-    await userEvent.click(screen.getByRole("button", { name: /Literature table/ }));
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName(/Literature table/);
+    expect(buttons[0]).toHaveAccessibleName(/24 papers/);
+    await userEvent.click(buttons[0]);
     expect(onOpen).toHaveBeenCalled();
   });
 

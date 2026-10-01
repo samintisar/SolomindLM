@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
@@ -64,6 +64,40 @@ describe("ResearchPlanMessage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(props.onReject).toHaveBeenCalledWith("plan1");
     expect(props.onApprove).not.toHaveBeenCalled();
+  });
+
+  test("cancel and approve are both disabled while approve is pending", async () => {
+    let finishApprove: () => void = () => {};
+    const onApprove = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishApprove = resolve;
+        })
+    );
+    const props = renderPlan({ onApprove });
+    await userEvent.click(screen.getByRole("button", { name: /Approve & Research/ }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Starting/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(props.onReject).not.toHaveBeenCalled();
+    finishApprove();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled());
+  });
+
+  test("approve is disabled while cancel is pending", async () => {
+    let finishReject: () => void = () => {};
+    const onReject = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishReject = resolve;
+        })
+    );
+    renderPlan({ onReject });
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Approve & Research|Starting/ })).toBeDisabled();
+    finishReject();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled());
   });
 
   test("shows a loading state until the plan arrives", () => {

@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/shared/components/u
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Input } from "@/shared/components/ui/input";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import type { Message } from "@/shared/types/index";
 import {
   useConfirmLiteratureReviewColumns,
@@ -115,6 +116,7 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
 
   const report = useLiteratureReport(reportId ?? null);
 
+  const { error: toastError } = useToast();
   const confirmColumnsMutation = useConfirmLiteratureReviewColumns();
   const retryMutation = useRetryLiteratureReview();
 
@@ -220,21 +222,26 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
         confirmedColumns: suggestedColumns,
       });
       setEditingColumns(null);
-    } catch {
-      // error handled by caller
+    } catch (err) {
+      // Keep the edited columns so the user can retry.
+      console.error("[LiteratureReview] Confirm columns failed:", err);
+      toastError("Couldn't confirm the columns. Please try again.");
     } finally {
       setIsConfirmingColumns(false);
     }
-  }, [confirmColumnsMutation, sessionId, suggestedColumns]);
+  }, [confirmColumnsMutation, sessionId, suggestedColumns, toastError]);
 
   const handleRetry = useCallback(async () => {
     setIsRetrying(true);
     try {
       await retryMutation({ sessionId: sessionId! });
+    } catch (err) {
+      console.error("[LiteratureReview] Retry failed:", err);
+      toastError("Couldn't retry the literature review. Please try again.");
     } finally {
       setIsRetrying(false);
     }
-  }, [retryMutation, sessionId]);
+  }, [retryMutation, sessionId, toastError]);
 
   if (!lr) return null;
 
@@ -444,7 +451,7 @@ const ColumnConfirmationCard: React.FC<ColumnConfirmationCardProps> = ({
               onPatch((prev) => [
                 ...prev,
                 {
-                  id: `custom-${Date.now()}`,
+                  id: `custom-${crypto.randomUUID()}`,
                   name: "New column",
                   instructions: "",
                   isVisible: true,
