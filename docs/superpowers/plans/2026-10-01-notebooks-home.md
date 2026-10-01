@@ -605,8 +605,16 @@ export function CardGrid({ viewMode, children }: { viewMode: ViewMode; children:
   );
 }
 
+/**
+ * The CSS entrance sits on an inner element: CSS animations override inline styles, so on the
+ * same node they would mask motion's layout transform for the first ~760ms.
+ */
 export function CardGridItem({ index, children }: { index: number; children: ReactNode }) {
-  return <LayoutItem className={cn("h-full", ENTER, STAGGER[index])}>{children}</LayoutItem>;
+  return (
+    <LayoutItem className="h-full">
+      <div className={cn("h-full", ENTER, STAGGER[index])}>{children}</div>
+    </LayoutItem>
+  );
 }
 ```
 
@@ -755,7 +763,7 @@ import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import type { NotebookItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { cn } from "@/shared/utils/cn";
-import { notebookIcon } from "../../notebookIcons";
+import { notebookIcon } from "@/shared/notebook/notebookIcons";
 import { notebookMeta } from "../../notebookMeta";
 import { type CardAction, CardActionsMenu } from "./CardActionsMenu";
 
@@ -939,7 +947,7 @@ import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import type { FolderItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { cn } from "@/shared/utils/cn";
-import { folderIcon } from "../../notebookIcons";
+import { folderIcon } from "@/shared/notebook/notebookIcons";
 import { folderMeta } from "../../notebookMeta";
 import { CardActionsMenu } from "./CardActionsMenu";
 
@@ -1685,7 +1693,7 @@ import {
   folderIconName,
   NOTEBOOK_ICON_NAMES,
   notebookIconName,
-} from "../../notebookIcons";
+} from "@/shared/notebook/notebookIcons";
 
 export interface CoverValues {
   name: string;
@@ -1895,7 +1903,7 @@ import {
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import type { FolderItem } from "@/shared/types/index";
 import { cn } from "@/shared/utils/cn";
-import { folderIcon } from "../../notebookIcons";
+import { folderIcon } from "@/shared/notebook/notebookIcons";
 import { folderMeta } from "../../notebookMeta";
 
 interface MoveToFolderModalProps {
