@@ -61,6 +61,8 @@ function ChipHarness({ onAddToNotebook }: { onAddToNotebook?: () => void }) {
             <p key={version}>
               <CitationChip refId={1} messageId="m1" handlers={handlers} />
               <CitationChip refId={2} messageId="m1" handlers={handlers} />
+              {/* No reference 9 exists (e.g. a marker beyond the reference list). */}
+              <CitationChip refId={9} messageId="m1" handlers={handlers} />
             </p>
           )}
         </div>
@@ -293,6 +295,35 @@ describe("CitationPopover: click, keyboard and focus", () => {
     await u.click(chip(1));
     const dialog = await screen.findByRole("dialog");
     act(() => dialog.focus());
+    await u.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(chip(1)).toHaveFocus();
+  });
+
+  test("an unresolvable reference never opens and leaves no stale focus state", async () => {
+    const u = user();
+    render(<ChipHarness />);
+    fireEvent.click(chip(9));
+    hoverIn(chip(9));
+    await act(async () => vi.advanceTimersByTime(200));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(chip(9)).not.toHaveAttribute("aria-expanded", "true");
+
+    // With chip 9 out of its scroller's view, a scroll would quietly close a stale target and
+    // could leave "don't restore focus" set for the next open.
+    const scroller = screen.getByTestId("scroller");
+    vi.spyOn(scroller, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 100, width: 500, height: 400 })
+    );
+    vi.spyOn(chip(9), "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 10, y: 50, width: 20, height: 20 })
+    );
+    fireEvent.scroll(scroller);
+
+    act(() => chip(1).focus());
+    await u.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog", { name: "Reference 1" })).toHaveFocus();
+    expect(chip(1)).toHaveAttribute("aria-expanded", "true");
     await u.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(chip(1)).toHaveFocus();
