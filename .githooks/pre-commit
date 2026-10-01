@@ -2,55 +2,11 @@
 # Pre-commit: Biome format + safe lint fixes on the staged files only, then re-stage them.
 # Catches formatting drift (e.g. CRLF from editor/agent tools) at commit time instead of
 # at pre-push or in CI. Full-repo typecheck + lint stay in pre-push.
+# Logic lives in scripts/pre-commit.mjs (NUL-safe path handling, partially staged files).
 #
 # Bypass for a work-in-progress commit:  git commit --no-verify
 #
 # Enabled by `core.hooksPath=.githooks`, set on `bun install` via the root
 # `prepare` script (scripts/setup-git-hooks.mjs).
 
-set -e
-
-# Split file lists on newlines only — some tracked paths contain spaces.
-nl='
-'
-IFS=$nl
-
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
-[ -z "$staged" ] && exit 0
-
-# A file with unstaged changes can't be fixed safely: --write rewrites the working tree,
-# and re-staging it would sweep the unstaged hunks into this commit. Check those read-only.
-unstaged=$(git diff --name-only)
-fixable=""
-checkonly=""
-for f in $staged; do
-  [ -e "$f" ] || continue # staged, then deleted from the working tree
-  if printf '%s\n' "$unstaged" | grep -qxF -- "$f"; then
-    checkonly="$checkonly$f$nl"
-  else
-    fixable="$fixable$f$nl"
-  fi
-done
-
-status=0
-
-# shellcheck disable=SC2086  # unquoted lists split on IFS (newline) by design
-if [ -n "$fixable" ]; then
-  bun x biome check --write --files-ignore-unknown=true --no-errors-on-unmatched \
-    --diagnostic-level=error --colors=off $fixable || status=1
-  git add -- $fixable
-fi
-
-# shellcheck disable=SC2086
-if [ -n "$checkonly" ]; then
-  if ! bun x biome check --files-ignore-unknown=true --no-errors-on-unmatched \
-    --diagnostic-level=error --colors=off $checkonly; then
-    echo "pre-commit: partially staged files have Biome errors; stage the whole file or run 'bun run lint:fix'" >&2
-    status=1
-  fi
-fi
-
-if [ "$status" -ne 0 ]; then
-  echo "pre-commit: Biome errors remain after auto-fix (bypass: git commit --no-verify)" >&2
-fi
-exit "$status"
+exec node "$(git rev-parse --show-toplevel)/scripts/pre-commit.mjs"

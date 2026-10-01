@@ -53,15 +53,16 @@ function editedPath(input) {
   return rel;
 }
 
-function run(command) {
-  const result = spawnSync(command, {
+/** No shell: the edited path goes in as a plain argv entry, never interpreted. */
+function run(cmd, args) {
+  const result = spawnSync(cmd, args, {
     cwd: projectDir,
-    shell: true,
     encoding: "utf8",
     windowsHide: true,
     maxBuffer: 16 * 1024 * 1024,
   });
-  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
+  const output =
+    `${result.error ? `${result.error.message}\n` : ""}${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
   return { ok: result.status === 0, output };
 }
 
@@ -75,10 +76,19 @@ function truncate(output) {
 }
 
 function format(rel) {
-  const { ok, output } = run(
-    `bun x biome check --write --files-ignore-unknown=true --no-errors-on-unmatched ` +
-      `--diagnostic-level=error --colors=off --max-diagnostics=20 "${rel}"`
-  );
+  const { ok, output } = run("bun", [
+    "x",
+    "biome",
+    "check",
+    "--write",
+    "--files-ignore-unknown=true",
+    "--no-errors-on-unmatched",
+    "--diagnostic-level=error",
+    "--colors=off",
+    "--max-diagnostics=20",
+    "--",
+    rel,
+  ]);
   if (ok) return 0;
   process.stderr.write(`Biome errors remain in ${rel} after auto-fix:\n${truncate(output)}\n`);
   return 2;
@@ -123,7 +133,7 @@ function typecheck(target) {
     try {
       while (existsSync(dirtyPath)) {
         rmSync(dirtyPath, { force: true });
-        result = run(`bun run typecheck:${target}`);
+        result = run("bun", ["run", `typecheck:${target}`]);
       }
     } finally {
       rmSync(lockPath, { force: true });
