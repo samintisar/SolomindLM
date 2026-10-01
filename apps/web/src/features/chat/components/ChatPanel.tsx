@@ -19,10 +19,20 @@ import {
   type DiscoveryAcademicFilterState,
 } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
+import { Button } from "@/shared/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { ScrollArea } from "@/shared/components/ui/scroll-area";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { useToast } from "@/shared/contexts/useToast";
 import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
-import { DropdownMenu } from "@/shared/ui/DropdownMenu";
-import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
@@ -36,7 +46,7 @@ import { useApproveResearchPlan, useRejectResearchPlan } from "../services/resea
 import { useSaveChat } from "../services/userNotesApi";
 import { useChatStreamingContext } from "../useChatStreaming";
 import { exportAsMarkdown } from "../utils/exportChat";
-import { RefHandlers } from "../utils/messageRendering.utils";
+import { RefHandlers, stripReferencesSection } from "../utils/messageRendering.utils";
 import { ChatEmptyState } from "./ChatEmptyState";
 import {
   CHAT_DEFAULT_SOURCE_FILTERS,
@@ -62,6 +72,20 @@ const MessageListFooter = () => (
   />
 );
 const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
+
+/** Hover/focus label for a header icon button. `children` is the trigger (a Button, or a Popover/DropdownMenu trigger around one). */
+function HeaderTooltip({ label, children }: { label: string; children: React.ReactElement }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** The history popover must stay open while the delete confirm (portaled to body) is up, or the list unmounts mid-confirm. */
+const isInsideConfirmDialog = (target: EventTarget | null) =>
+  !!(target as Element | null)?.closest?.('[role="alertdialog"],[data-confirm-dialog-root]');
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -183,41 +207,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return policy;
   }, [channelsForChatSend, chatAcademicFilters, composerMode, researchDatabase]);
 
-  const historyContainerRef = useRef<HTMLDivElement>(null);
-
-  const { ConfirmDialogComponent } = useConfirmDialog();
   const { success, error: toastError } = useToast();
   const saveChat = useSaveChat();
 
   const authToken = useHttpAuthToken();
-
-  useEffect(() => {
-    if (!historyOpen) return;
-    const handler = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent) {
-        if (e.key === "Escape") setHistoryOpen(false);
-        return;
-      }
-      const t = e.target as Node;
-      // Thread options menu is portaled to document.body; must not close history on those clicks
-      if ((e.target as Element | null)?.closest?.("[data-thread-submenu-root]")) {
-        return;
-      }
-      // Delete / rename useConfirmDialog is portaled to body; closing history would unmount the dialog
-      if ((e.target as Element | null)?.closest?.("[data-confirm-dialog-root]")) {
-        return;
-      }
-      if (historyContainerRef.current && !historyContainerRef.current.contains(t)) {
-        setHistoryOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("keydown", handler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("keydown", handler);
-    };
-  }, [historyOpen]);
 
   const handleTogglePin = useCallback((convId: string) => {
     const id = String(convId);
@@ -324,7 +317,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const placeholderNote: Note = {
       id: `pending-save-${Date.now()}`,
       title: "Saved chat",
-      preview: "Note Â· Saved Chat",
+      preview: "Note · Saved Chat",
       type: "note",
       noteType: "chat",
       status: "generating",
@@ -448,7 +441,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleNewConversation = useCallback(async () => {
     if (!onCreateConversation) return;
 
-    // Already on an empty thread â€” avoid creating duplicate blank conversations.
+    // Already on an empty thread — avoid creating duplicate blank conversations.
     if (messages.length === 0) {
       setActiveLiteratureSessionId(null);
       setComposerMode("chat");
@@ -491,13 +484,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // --- Message handlers ---
 
   const copyMessageAsMarkdown = useCallback(async (message: Message) => {
-    const stripRefs = (c: string) => {
-      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s.,\-:â€“â€”]*$/i);
-      return m ? c.substring(0, m.index).trim() : c;
-    };
     try {
       await navigator.clipboard.writeText(
-        message.role === "assistant" ? stripRefs(message.content) : message.content
+        message.role === "assistant" ? stripReferencesSection(message.content) : message.content
       );
       setCopiedMessageId(message.id);
       setTimeout(() => setCopiedMessageId(null), 2000);
@@ -692,51 +681,81 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const isInputDisabled =
     chatInputDisabled || isLiteratureReviewActive || isStartingLiteratureReview;
 
+  const newChatLabel = isCreatingConversation
+    ? "Creating…"
+    : messages.length === 0
+      ? "Already in a new chat"
+      : "New chat";
+
   const chatHeaderToolbar = (
-    <div className="flex items-center gap-2 shrink-0">
-      <div className="hidden md:flex items-center gap-2">
+    <div className="flex shrink-0 items-center gap-2">
+      <div className="hidden items-center gap-2 md:flex">
         {!isLeftOpen && (
-          <button
-            onClick={toggleLeft}
-            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-            title="Open Sources"
-          >
-            <PanelLeftOpen className="w-4 h-4" />
-          </button>
+          <HeaderTooltip label="Open Sources">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={toggleLeft}
+              title="Open Sources"
+              aria-label="Open Sources"
+            >
+              <PanelLeftOpen />
+            </Button>
+          </HeaderTooltip>
         )}
         {!isRightOpen && (
-          <button
-            data-onboarding="studio-panel-toggle"
-            onClick={toggleRight}
-            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-            title="Open Studio"
-          >
-            <PanelRightOpen className="w-4 h-4" />
-          </button>
+          <HeaderTooltip label="Open Studio">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              data-onboarding="studio-panel-toggle"
+              onClick={toggleRight}
+              title="Open Studio"
+              aria-label="Open Studio"
+            >
+              <PanelRightOpen />
+            </Button>
+          </HeaderTooltip>
         )}
       </div>
-      <div ref={historyContainerRef} className="relative">
-        <button
-          type="button"
-          onClick={() => setHistoryOpen((o) => !o)}
-          className={`p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 ${
-            historyOpen ? "ring-1 ring-border bg-accent" : ""
-          }`}
-          title="Thread history"
+      <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+        <HeaderTooltip label="Thread history">
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              title="Thread history"
+              aria-label="Thread history"
+            >
+              <History />
+            </Button>
+          </PopoverTrigger>
+        </HeaderTooltip>
+        <PopoverContent
+          align="end"
+          collisionPadding={16}
           aria-label="Thread history"
-          aria-expanded={historyOpen}
+          onInteractOutside={(e) => {
+            if (isInsideConfirmDialog(e.target)) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            // Escape in the rename input cancels only the rename (ConversationList handles it).
+            if ((e.target as HTMLElement | null)?.closest?.("[data-rename-input]")) {
+              e.preventDefault();
+              return;
+            }
+            // The delete confirm has no Escape handling of its own; closing here would unmount it mid-confirm.
+            if (document.querySelector("[data-confirm-dialog-root]")) e.preventDefault();
+          }}
+          padding="none"
+          className="flex max-h-(--radix-popover-content-available-height) w-80 flex-col"
         >
-          <History className="w-4 h-4" />
-        </button>
-
-        {historyOpen && (
-          <div
-            role="dialog"
-            aria-label="Thread history"
-            className="absolute top-full right-0 mt-1.5 z-50 w-80 max-w-[calc(100vw-2rem)] bg-card font-sans text-sm antialiased border border-border/80 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
-            style={{ maxHeight: "min(480px, calc(100vh - 100px))" }}
-          >
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
+          {/* flex-col lets the scroll area's viewport shrink to the max height and scroll (a plain max-h does not). */}
+          <ScrollArea className="flex max-h-120 min-h-0 flex-col">
+            <div className="p-1.5">
               <ConversationList
                 conversations={conversations}
                 activeConversationId={activeConversationId}
@@ -750,76 +769,57 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 onTogglePin={handleTogglePin}
               />
             </div>
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={handleNewConversation}
-        disabled={isCreatingConversation}
-        className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 disabled:opacity-50 disabled:pointer-events-none"
-        title={messages.length === 0 ? "Already in a new chat" : "New chat"}
-        aria-label={
-          isCreatingConversation
-            ? "Creatingâ€¦"
-            : messages.length === 0
-              ? "Already in a new chat"
-              : "New chat"
-        }
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-      <DropdownMenu
-        align="right"
-        trigger={
-          <button
-            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-            title="Chat options"
-            type="button"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
-        }
-      >
-        <div className="py-1">
-          <button
-            onClick={() => setIsConfigModalOpen(true)}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Configure chat</span>
-          </button>
-          <button
-            onClick={handleExportChat}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <Download className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Export chat</span>
-          </button>
-          <button
-            onClick={handleSaveToNote}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Save to note</span>
-          </button>
-          <div className="my-1 border-t border-border" />
-          <button
-            onClick={handlePinActiveChat}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <Pin className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>
-              {activeConversationId && pinnedIds.has(activeConversationId)
-                ? "Unpin chat"
-                : "Pin chat"}
-            </span>
-          </button>
-        </div>
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+      <HeaderTooltip label={newChatLabel}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={handleNewConversation}
+          disabled={isCreatingConversation}
+          title={messages.length === 0 ? "Already in a new chat" : "New chat"}
+          aria-label={newChatLabel}
+        >
+          {isCreatingConversation ? <Spinner aria-hidden /> : <Plus />}
+        </Button>
+      </HeaderTooltip>
+      <DropdownMenu modal={false}>
+        <HeaderTooltip label="Chat options">
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              title="Chat options"
+              aria-label="Chat options"
+            >
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+        </HeaderTooltip>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setIsConfigModalOpen(true)}>
+            <Settings2 />
+            Configure chat
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleExportChat}>
+            <Download />
+            Export chat
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void handleSaveToNote()}>
+            <FileText />
+            Save to note
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={handlePinActiveChat}>
+            <Pin />
+            {activeConversationId && pinnedIds.has(activeConversationId)
+              ? "Unpin chat"
+              : "Pin chat"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
@@ -831,9 +831,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div className="flex items-center justify-between gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0 md:z-10">
           <div className="flex min-w-0 items-center gap-2 text-foreground">
             <MessageCircle className="h-4 w-4 shrink-0" />
-            <span className="truncate font-display text-sm font-bold uppercase tracking-wide">
-              Chat
-            </span>
+            <span className="truncate font-sans text-sm font-semibold">Chat</span>
           </div>
           {chatHeaderToolbar}
         </div>
@@ -989,7 +987,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         </div>
 
-        {/* Input Area â€” wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
+        {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
         <div
           ref={composerRef}
           className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex min-w-0 justify-center px-3 pb-3 sm:px-4"
@@ -1046,7 +1044,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           />
         </div>
       </div>
-      <ConfirmDialogComponent />
       <ConfigureChatModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
