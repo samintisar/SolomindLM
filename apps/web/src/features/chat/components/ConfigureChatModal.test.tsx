@@ -24,6 +24,12 @@ describe("ConfigureChatModal", () => {
     );
   });
 
+  test("mode radios are named by title and described by their description", () => {
+    render(<ConfigureChatModal isOpen onClose={vi.fn()} onSave={vi.fn()} />);
+    const radio = within(modeGroup()).getByRole("radio", { name: "Learning Guide" });
+    expect(radio).toHaveAccessibleDescription("Step-by-step teaching style");
+  });
+
   test("locked instruction mode disables the options and explains why", () => {
     render(<ConfigureChatModal isOpen onClose={vi.fn()} onSave={vi.fn()} instructionModeLocked />);
     const radios = within(modeGroup()).getAllByRole("radio");

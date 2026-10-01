@@ -105,6 +105,7 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
     chatSettings?.responseLength ?? "default"
   );
   const customInstructionsId = useId();
+  const modeIdBase = useId();
 
   // Sync when external settings change (e.g. after save)
   useEffect(() => {
@@ -145,7 +146,7 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
         <FieldSet>
           <FieldLegend variant="label">Instruction mode</FieldLegend>
           {instructionModeLocked && (
-            <p role="status" className="text-xs text-muted-foreground">
+            <p role="status" className="font-sans text-xs text-muted-foreground">
               Start a new chat to use a different mode.
             </p>
           )}
@@ -157,16 +158,29 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
           >
             {INSTRUCTION_MODES.map((mode) => {
               const Icon = mode.icon;
+              const titleId = `${modeIdBase}-${mode.value}-title`;
+              const descId = `${modeIdBase}-${mode.value}-desc`;
               return (
                 <label
                   key={mode.value}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 font-sans transition-colors has-disabled:cursor-not-allowed has-disabled:opacity-60 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5"
+                  className="group/mode flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 font-sans transition-colors has-disabled:cursor-not-allowed has-focus-visible:ring-3 has-focus-visible:ring-ring/50 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5"
                 >
-                  <RadioGroupItem value={mode.value} />
-                  <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="text-sm font-semibold text-foreground">{mode.label}</span>
-                    <span className="text-xs text-muted-foreground">{mode.description}</span>
+                  <RadioGroupItem
+                    value={mode.value}
+                    aria-labelledby={titleId}
+                    aria-describedby={descId}
+                  />
+                  <Icon
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground group-has-disabled/mode:opacity-60"
+                  />
+                  <span className="flex min-w-0 flex-col group-has-disabled/mode:opacity-60">
+                    <span id={titleId} className="text-sm font-semibold text-foreground">
+                      {mode.label}
+                    </span>
+                    <span id={descId} className="text-xs text-muted-foreground">
+                      {mode.description}
+                    </span>
                   </span>
                 </label>
               );
@@ -218,7 +232,7 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
-            {saving && <Spinner />}
+            {saving && <Spinner aria-hidden />}
             {saving ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
