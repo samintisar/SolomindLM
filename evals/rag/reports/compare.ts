@@ -3,6 +3,7 @@
  */
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
+import { caseFileStem } from "../caseFile";
 import { getFixture } from "../fixtures";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "../metrics/togetherLlmJudge";
 import type {
@@ -20,7 +21,7 @@ export interface CompareArtifactsOptions {
 }
 
 function artifactFileName(artifact: EvalRunArtifact): string {
-  return `${artifact.caseId}__${artifact.runner}.json`;
+  return `${caseFileStem(artifact.caseId)}__${artifact.runner}.json`;
 }
 
 /** Write per-case JSON files that `loadArtifactsFromDir` / `--compare` can read. */
