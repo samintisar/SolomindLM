@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatComposerMode, ResearchDatabaseOption } from "../components/ChatInput";
+import type { ChatComposerMode, ResearchDatabaseOption } from "../components/composer/constants";
 import {
   defaultComposerPrefsForMode,
   type PersistedComposerPrefs,

@@ -2,24 +2,14 @@ import type { Id } from "@convex/_generated/dataModel";
 import { resolveSmartModel } from "@convex/_lib/resolveSmartModel";
 import {
   ArrowUp,
-  Atom,
-  BookOpen,
-  BriefcaseMedical,
   Check,
   ChevronDown,
-  FileText,
-  Globe,
-  GraduationCap,
   ListFilter,
   Loader2,
-  MessageCircle,
   Mic,
   Monitor,
-  Newspaper,
   Search,
   Square,
-  Telescope,
-  TrendingUp,
 } from "lucide-react";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -34,60 +24,15 @@ import type { ChatSettings } from "@/shared/types";
 import { useAnchoredPosition } from "@/shared/ui/anchoredPosition";
 import { cn } from "@/shared/utils/cn";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
-
-const SOURCE_FILTERS = [
-  { id: "notebook", label: "Notebook sources", icon: BookOpen },
-  { id: "academic", label: "Academic", icon: GraduationCap },
-  { id: "web", label: "Web", icon: Globe },
-  { id: "news", label: "News", icon: Newspaper },
-  { id: "finance", label: "Finance", icon: TrendingUp },
-] as const;
-
-/** Default source channels when the composer is in Chat mode. */
-export const CHAT_DEFAULT_SOURCE_FILTERS = ["notebook"] as const;
-
-/** Default source channels when the composer is in Deep Research mode. */
-export const DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS = ["notebook", "web", "academic"] as const;
-
-export type ChatComposerMode = "chat" | "deepResearch" | "literatureReview";
-
-export type ResearchDatabaseOption = "all" | "pubmed" | "arxiv";
-
-const COMPOSER_MODES: {
-  id: ChatComposerMode;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { id: "chat", label: "Chat", icon: MessageCircle },
-  { id: "deepResearch", label: "Deep Research", icon: Telescope },
-  { id: "literatureReview", label: "Literature Review", icon: FileText },
-];
-
-const RESEARCH_DATABASES: {
-  id: ResearchDatabaseOption;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    id: "all",
-    title: "All Papers",
-    description: "Search from 200M+ research papers",
-    icon: BookOpen,
-  },
-  {
-    id: "pubmed",
-    title: "PubMed",
-    description: "39M+ biomedical and life-science literature",
-    icon: BriefcaseMedical,
-  },
-  {
-    id: "arxiv",
-    title: "ArXiv",
-    description: "Explore research preprints from arXiv",
-    icon: Atom,
-  },
-];
+import {
+  CHAT_DEFAULT_SOURCE_FILTERS,
+  type ChatComposerMode,
+  COMPOSER_MODES,
+  DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
+  RESEARCH_DATABASES,
+  type ResearchDatabaseOption,
+  SOURCE_FILTERS,
+} from "./composer/constants";
 
 interface ChatInputProps {
   value: string;

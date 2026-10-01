@@ -1,8 +1,9 @@
-import type { ChatComposerMode, ResearchDatabaseOption } from "../components/ChatInput";
 import {
   CHAT_DEFAULT_SOURCE_FILTERS,
+  type ChatComposerMode,
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
-} from "../components/ChatInput";
+  type ResearchDatabaseOption,
+} from "../components/composer/constants";
 
 const COMPOSER_PREFS_STORAGE_KEY_PREFIX = "solomind:chat-composer:v1:";
 

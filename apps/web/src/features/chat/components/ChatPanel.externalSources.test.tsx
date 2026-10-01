@@ -71,8 +71,6 @@ vi.mock("../services/researchApi", () => ({
 }));
 vi.mock("../services/userNotesApi", () => ({ useSaveChat: () => vi.fn() }));
 vi.mock("./ChatInput", () => ({
-  CHAT_DEFAULT_SOURCE_FILTERS: ["notebook"],
-  DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS: ["notebook", "web"],
   ChatInput: () => <div data-onboarding="chat-input" />,
 }));
 vi.mock("./ChatEmptyState", () => ({ ChatEmptyState: () => null }));
