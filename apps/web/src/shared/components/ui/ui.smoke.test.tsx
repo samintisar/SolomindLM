@@ -353,31 +353,52 @@ describe("shadcn ui components render", () => {
     expect(className).not.toContain("[&_svg:not([class*='size-'])]:size-4");
   });
 
-  it("soft layered controls", () => {
-    render(
-      <>
-        <Button variant="outline">o</Button>
+  describe("soft layered controls", () => {
+    it("Button outline is a token-driven raised chip", () => {
+      render(<Button variant="outline">o</Button>);
+      const outline = screen.getByRole("button", { name: "o" });
+      expect(outline).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline", "shadow-xs");
+      expect(outline).not.toHaveClass("border-2");
+      expect(outline.className).not.toContain("dark:");
+    });
+
+    it("ButtonGroup tray is a tinted pill that raises the open segment", () => {
+      render(
         <ButtonGroup variant="tray" aria-label="tray">
           <Button variant="ghost" size="icon-sm" aria-label="a" aria-expanded="true" />
         </ButtonGroup>
-        <Toggle variant="outline" aria-label="t" />
-        <Badge variant="outline">b</Badge>
+      );
+      const tray = screen.getByRole("group", { name: "tray" });
+      expect(tray).toHaveClass("bg-secondary", "rounded-xl");
+      expect(tray).toHaveAttribute("data-variant", "tray");
+      expect(tray.className).toContain("[&>*]:rounded-lg");
+      expect(tray.className).toContain("[&>[aria-expanded=true]]:bg-surface-raised");
+      expect(tray.className).not.toContain("bg-card");
+      expect(tray.className).not.toContain("rounded-l-none");
+    });
+
+    it("ButtonGroup default keeps the joined-segment classes", () => {
+      render(
         <ButtonGroup aria-label="plain">
           <Button>1</Button>
           <Button>2</Button>
         </ButtonGroup>
-      </>
-    );
-    const outline = screen.getByRole("button", { name: "o" });
-    expect(outline).toHaveClass("ring-1", "shadow-xs", "bg-card");
-    expect(outline).not.toHaveClass("border-2");
-    const tray = screen.getByRole("group", { name: "tray" });
-    expect(tray).toHaveClass("bg-secondary", "rounded-xl");
-    expect(tray).toHaveAttribute("data-variant", "tray");
-    expect(screen.getByRole("button", { name: "t" })).not.toHaveClass("border");
-    expect(screen.getByText("b")).toHaveClass("ring-1");
-    const plain = screen.getByRole("group", { name: "plain" });
-    expect(plain.className).toContain("[&>*:not(:first-child)]:rounded-l-none");
-    expect(tray.className).not.toContain("rounded-l-none");
+      );
+      const plain = screen.getByRole("group", { name: "plain" });
+      expect(plain).toHaveAttribute("data-variant", "default");
+      expect(plain.className).toContain("[&>*:not(:first-child)]:rounded-l-none");
+    });
+
+    it("Toggle outline is a token-driven raised chip", () => {
+      render(<Toggle variant="outline" aria-label="t" />);
+      const toggle = screen.getByRole("button", { name: "t" });
+      expect(toggle).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");
+      expect(toggle).not.toHaveClass("border");
+    });
+
+    it("Badge outline uses the hairline ring", () => {
+      render(<Badge variant="outline">b</Badge>);
+      expect(screen.getByText("b")).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");
+    });
   });
 });

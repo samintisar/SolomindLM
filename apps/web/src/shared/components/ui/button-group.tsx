@@ -11,7 +11,7 @@ const buttonGroupVariants = cva(
       variant: {
         default: "",
         // Icon-action tray: a tinted pill; the open/pressed segment is raised onto a card chip.
-        tray: "items-center gap-0.5 rounded-xl bg-secondary p-0.5 [&>*]:rounded-lg [&>[aria-expanded=true]]:bg-card [&>[aria-expanded=true]]:shadow-xs [&>[aria-pressed=true]]:bg-card [&>[aria-pressed=true]]:shadow-xs",
+        tray: "items-center gap-0.5 rounded-xl bg-secondary p-0.5 [&>*]:rounded-lg [&>[aria-expanded=true]]:bg-surface-raised [&>[aria-expanded=true]]:shadow-xs [&>[aria-pressed=true]:not([data-variant=ghost-toggle-destructive])]:bg-surface-raised [&>[aria-pressed=true]:not([data-variant=ghost-toggle-destructive])]:shadow-xs",
       },
     },
     compoundVariants: [
@@ -62,7 +62,7 @@ function ButtonGroupText({
   return (
     <Comp
       className={cn(
-        "flex items-center gap-2 rounded-lg bg-muted px-4 text-sm font-medium ring-1 ring-border/50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+        "flex items-center gap-2 rounded-lg bg-muted px-4 text-sm font-medium ring-1 ring-hairline [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
