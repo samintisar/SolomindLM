@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, test, vi } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import { renderMessageWithReferences } from "./messageRendering";
 import type { RefHandlers } from "./messageRendering.utils";
 
@@ -16,13 +16,19 @@ function Message({ content, streaming }: { content: string; streaming: boolean }
 }
 
 describe("renderMessageWithReferences", () => {
+  // The first render waits on the lazy Streamdown/Shiki/KaTeX chunk, which is slow under a
+  // parallel run; load it up front so the assertions below aren't racing the import.
+  beforeAll(async () => {
+    await import("@/shared/components/MarkdownRenderer");
+  }, 20_000);
+
   test.each([false, true])(
     "keeps the citation chip's DOM node across re-renders (streaming=%s)",
     async (streaming) => {
       const { container, rerender } = render(
         <Message content="Alpha claim [1]." streaming={streaming} />
       );
-      const chip = await screen.findByRole("button", { name: "Reference 1" });
+      const chip = await screen.findByRole("button", { name: "Reference 1" }, { timeout: 10_000 });
       expect(chip).toHaveAttribute("data-cite-message-id", "m1");
       expect(chip).toHaveAttribute("data-ref-id", "1");
 
@@ -30,7 +36,9 @@ describe("renderMessageWithReferences", () => {
       rerender(<Message content="Alpha claim [1]." streaming={streaming} />);
       expect(screen.getByRole("button", { name: "Reference 1" })).toBe(chip);
       rerender(<Message content="Alpha claim [1]. More streamed text" streaming={streaming} />);
-      await waitFor(() => expect(container.textContent).toContain("More streamed text"));
+      await waitFor(() => expect(container.textContent).toContain("More streamed text"), {
+        timeout: 10_000,
+      });
       expect(screen.getByRole("button", { name: "Reference 1" })).toBe(chip);
       expect(chip.isConnected).toBe(true);
     }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/shared/components/ui/popover";
 import type { ReferenceChunk } from "@/shared/types/index";
 import type { RefHandlers, RefToggleSource } from "../utils/messageRendering.utils";
@@ -120,10 +120,28 @@ export function useCitationPopover({
 
   useEffect(() => clearTimers, [clearTimers]);
 
+  // Latest resolver for the stable handlers: a chip whose reference doesn't resolve (e.g. [7] with
+  // five refs, or refs not loaded yet) never becomes the target.
+  const resolveRef = useRef(resolveReference);
+  useLayoutEffect(() => {
+    resolveRef.current = resolveReference;
+  });
+  const resolves = useCallback(
+    (messageId: string, refId: number) => resolveRef.current(messageId, refId) !== null,
+    []
+  );
+
+  /** Focus bookkeeping belongs to one open/close cycle; start each open clean. */
+  const resetFocusFlags = useCallback(() => {
+    focusWasInside.current = false;
+    suppressFocusRestore.current = false;
+  }, []);
+
   const handlers = useMemo<RefHandlers>(
     () => ({
       onRefEnter: (refId, messageId, el) => {
         clearTimers();
+        if (!resolves(messageId, refId)) return;
         openTimer.current = setTimeout(
           () =>
             setTarget((t) =>
@@ -137,6 +155,8 @@ export function useCitationPopover({
       onRefLeave: scheduleClose,
       onRefToggle: (refId, messageId, el, source: RefToggleSource = "pointer") => {
         clearTimers();
+        if (!resolves(messageId, refId)) return;
+        resetFocusFlags();
         const viaKeyboard = source === "keyboard";
         setTarget((t) => {
           if (t && resolveChip(t) === el) {
@@ -147,13 +167,16 @@ export function useCitationPopover({
         });
       },
     }),
-    [clearTimers, scheduleClose]
+    [clearTimers, scheduleClose, resetFocusFlags, resolves]
   );
+
+  const reference = shown ? resolveReference(shown.messageId, shown.refId) : null;
+  const isOpen = !!(target && reference);
 
   // Every render (ChatPanel re-renders as messages change): close if the chip is gone, and keep
   // aria-expanded on the live chip, which may have been re-rendered.
   useEffect(() => {
-    if (!target) return;
+    if (!target || !isOpen) return;
     const el = resolveChip(target);
     if (!el) {
       closeQuietly();
@@ -163,15 +186,15 @@ export function useCitationPopover({
   });
 
   useEffect(() => {
-    if (!target) return;
+    if (!target || !isOpen) return;
     return () => resolveChip(target)?.setAttribute("aria-expanded", "false");
-  }, [target]);
+  }, [target, isOpen]);
 
   // Close when the chip scrolls out of its scroller or Virtuoso unmounts its row, rather than
   // leaving the popover floating at stale coordinates. Scrolls elsewhere (e.g. inside the card)
   // are ignored.
   useEffect(() => {
-    if (!target) return;
+    if (!target || !isOpen) return;
     const onScroll = (e: Event) => {
       const el = resolveChip(target);
       if (!el) {
@@ -186,7 +209,7 @@ export function useCitationPopover({
     };
     document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => document.removeEventListener("scroll", onScroll, { capture: true });
-  }, [target, closeQuietly]);
+  }, [target, isOpen, closeQuietly]);
 
   // A virtual anchor that measures the live chip, so a re-rendered chip doesn't leave the popover
   // measuring a detached node (which reports a 0x0 rect at the viewport origin).
@@ -208,12 +231,11 @@ export function useCitationPopover({
     };
   }, [shown]);
 
-  const reference = shown ? resolveReference(shown.messageId, shown.refId) : null;
   const openInSources = reference ? onOpenInSources?.(reference) : undefined;
   const addToNotebook = reference ? onAddToNotebook?.(reference) : undefined;
 
   const popover = (
-    <Popover open={!!(target && reference)} onOpenChange={(open) => !open && close()}>
+    <Popover open={isOpen} onOpenChange={(open) => !open && close()}>
       <PopoverAnchor virtualRef={anchorRef} />
       {shown && reference && (
         <PopoverContent
@@ -231,6 +253,7 @@ export function useCitationPopover({
             // Focus the card itself, not its first control: a held Enter must not activate
             // "Add to notebook", and the dialog's label is announced. Tab then reaches the actions.
             e.preventDefault();
+            resetFocusFlags();
             if (shown.viaKeyboard) contentRef.current?.focus();
           }}
           onCloseAutoFocus={(e) => {
