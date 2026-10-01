@@ -17,8 +17,8 @@ interface ActionBarProps {
 }
 
 /**
- * Icon actions under a message. Hidden until the message is hovered or the bar holds focus on
- * fine pointers; always visible on touch, where there is no hover. A plain labelled group, not a
+ * Icon actions under a message. Hidden (and not tappable) until the message is hovered or the bar
+ * holds focus on fine pointers; always visible on coarse pointers, where there is no hover. A plain labelled group, not a
  * `role="toolbar"`: there is no arrow-key roving, so Tab moves through the buttons.
  */
 export function ActionBar({
@@ -35,7 +35,10 @@ export function ActionBar({
       role="group"
       aria-label="Message actions"
       className={cn(
-        "flex items-center gap-0.5 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover/message:opacity-100 pointer-coarse:opacity-100",
+        // Hidden actions must not take taps (a touch laptop has a fine pointer and no hover). Focus
+        // is unaffected by pointer-events, so keyboard users still reach them via focus-within.
+        "pointer-events-none flex items-center gap-0.5 opacity-0 transition-opacity duration-200 ease-out",
+        "focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
         className
       )}
     >

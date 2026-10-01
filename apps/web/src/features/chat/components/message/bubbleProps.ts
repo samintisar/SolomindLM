@@ -9,7 +9,8 @@ export interface MessageBubbleProps {
   isAssistantStreamActive?: boolean;
   refHandlers: RefHandlers;
   onCopyMessage: (message: Message) => void;
-  copiedMessageId: string | null;
+  /** This message was just copied (ChatPanel passes `copiedMessageId === message.id`, so a copy re-renders one row). */
+  isCopied: boolean;
   onSetFeedback?: (messageId: string, feedback: MessageFeedback | null) => void;
   onSendFollowUp?: (text: string) => void;
   onRetry?: (messageId: string) => void;
@@ -27,7 +28,8 @@ export interface MessageBubbleProps {
 /**
  * Memo comparator. Callbacks are compared by identity, so ChatPanel must pass stable ones
  * (otherwise every bubble re-renders whenever the panel does). `agentTrace` and
- * `externalSources` are rebuilt on each stream update, so they compare by value.
+ * `externalSources` are rebuilt on each stream update: identity first, then by value, and
+ * last so the cheap checks short-circuit before any JSON work.
  */
 export function areMessageBubblePropsEqual(
   prev: MessageBubbleProps,
@@ -48,9 +50,7 @@ export function areMessageBubblePropsEqual(
     a.groundingChecks === b.groundingChecks &&
     a.clarificationQuestion === b.clarificationQuestion &&
     a.deepResearch?.researchRunId === b.deepResearch?.researchRunId &&
-    JSON.stringify(a.agentTrace) === JSON.stringify(b.agentTrace) &&
-    JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources) &&
-    prev.copiedMessageId === next.copiedMessageId &&
+    prev.isCopied === next.isCopied &&
     prev.isAssistantStreamActive === next.isAssistantStreamActive &&
     prev.showSourcesButton === next.showSourcesButton &&
     prev.notebookId === next.notebookId &&
@@ -61,6 +61,10 @@ export function areMessageBubblePropsEqual(
     prev.onSendFollowUp === next.onSendFollowUp &&
     prev.onRetry === next.onRetry &&
     prev.onOpenExternalSources === next.onOpenExternalSources &&
-    prev.onOpenNotebookSource === next.onOpenNotebookSource
+    prev.onOpenNotebookSource === next.onOpenNotebookSource &&
+    (a.agentTrace === b.agentTrace ||
+      JSON.stringify(a.agentTrace) === JSON.stringify(b.agentTrace)) &&
+    (prev.externalSources === next.externalSources ||
+      JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources))
   );
 }

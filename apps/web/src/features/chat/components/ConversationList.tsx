@@ -205,8 +205,9 @@ export function ConversationList({
         >
           <div
             className={cn(
-              "shrink-0 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover:opacity-100",
-              isActive || openMenuId === conv._id ? "opacity-100" : "opacity-0"
+              "shrink-0 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100",
+              // Hidden: not tappable either (touch laptops have a fine pointer and no hover).
+              isActive || openMenuId === conv._id ? "opacity-100" : "pointer-events-none opacity-0"
             )}
           >
             <DropdownMenuTrigger asChild>

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/shared/components/ui/popover";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import type { ReferenceChunk } from "@/shared/types/index";
 import type { RefHandlers, RefToggleSource } from "../utils/messageRendering.utils";
 import { CitationCard } from "./CitationCard";
@@ -122,13 +123,10 @@ export function useCitationPopover({
 
   // Latest resolver for the stable handlers: a chip whose reference doesn't resolve (e.g. [7] with
   // five refs, or refs not loaded yet) never becomes the target.
-  const resolveRef = useRef(resolveReference);
-  useLayoutEffect(() => {
-    resolveRef.current = resolveReference;
-  });
+  const resolveLatest = useStableCallback(resolveReference);
   const resolves = useCallback(
-    (messageId: string, refId: number) => resolveRef.current(messageId, refId) !== null,
-    []
+    (messageId: string, refId: number) => resolveLatest(messageId, refId) !== null,
+    [resolveLatest]
   );
 
   /** Focus bookkeeping belongs to one open/close cycle; start each open clean. */

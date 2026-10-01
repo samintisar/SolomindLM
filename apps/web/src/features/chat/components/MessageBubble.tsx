@@ -8,7 +8,6 @@ import { ActionBar } from "./message/ActionBar";
 import { areMessageBubblePropsEqual, type MessageBubbleProps } from "./message/bubbleProps";
 import { FollowUpChips } from "./message/FollowUpChips";
 import { SourcesPill } from "./message/SourcesPill";
-import { ThinkingIndicator } from "./message/ThinkingIndicator";
 
 /** Synthetic rows the chat stream adds while an answer is pending (see `useChatStream`). */
 const PENDING_ROW_IDS = new Set(["__streaming__", "__remote_generating__"]);
@@ -37,7 +36,7 @@ function MessageBubbleImpl({
   isAssistantStreamActive = false,
   refHandlers,
   onCopyMessage,
-  copiedMessageId,
+  isCopied,
   onSetFeedback,
   onSendFollowUp,
   onRetry,
@@ -49,7 +48,6 @@ function MessageBubbleImpl({
   notebookDocumentIds,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
-  const isCopied = copiedMessageId === message.id;
   const handleCopy = () => onCopyMessage(message);
   const entrance = playsEntrance(message) && ENTRANCE;
 
@@ -140,9 +138,6 @@ function MessageBubbleImpl({
             !!message.clarificationQuestion || !!message.agentTrace?.clarification
           }
         />
-      )}
-      {message.status && !message.content && !showAgentPanel && (
-        <ThinkingIndicator status={message.status} />
       )}
       {message.content && (
         <div

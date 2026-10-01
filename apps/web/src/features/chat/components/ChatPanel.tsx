@@ -30,6 +30,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
@@ -37,7 +38,6 @@ import { useSourcesContext } from "../../sources/useSourcesContext";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 import { useComposerClearance } from "../hooks/useComposerClearance";
 import { usePersistedComposerPrefs } from "../hooks/usePersistedComposerPrefs";
-import { useStableCallback } from "../hooks/useStableCallback";
 import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useLiteratureReviewSession } from "../services/literatureReviewApi";
@@ -501,17 +501,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   // --- Message handlers ---
 
-  const copyMessageAsMarkdown = useCallback(async (message: Message) => {
-    try {
-      await navigator.clipboard.writeText(
-        message.role === "assistant" ? stripReferencesSection(message.content) : message.content
-      );
-      setCopiedMessageId(message.id);
-      setTimeout(() => setCopiedMessageId(null), 2000);
-    } catch {
-      /* clipboard API not available */
-    }
-  }, []);
+  const copyMessageAsMarkdown = useCallback(
+    async (message: Message) => {
+      try {
+        await navigator.clipboard.writeText(
+          message.role === "assistant" ? stripReferencesSection(message.content) : message.content
+        );
+        setCopiedMessageId(message.id);
+        // Only clear this copy; a newer copy of another message keeps its "Copied" state.
+        setTimeout(() => setCopiedMessageId((id) => (id === message.id ? null : id)), 2000);
+      } catch {
+        toastError("Couldn't copy message");
+      }
+    },
+    [toastError]
+  );
 
   const validateNotebookSourcesForSend = useCallback(() => {
     if (composerMode === "literatureReview") return true;
@@ -842,7 +846,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                           }
                           refHandlers={citation.handlers}
                           onCopyMessage={copyMessageAsMarkdown}
-                          copiedMessageId={copiedMessageId}
+                          isCopied={copiedMessageId === message.id}
                           onSetFeedback={onSetFeedback}
                           onSendFollowUp={handleSendFollowUp}
                           onRetry={handleRetryStable}

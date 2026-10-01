@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Message } from "@/shared/types/index";
 import type { ExternalSource } from "./ExternalSourcesModal";
 import { MessageBubble } from "./MessageBubble";
@@ -26,12 +26,7 @@ type BubbleProps = React.ComponentProps<typeof MessageBubble>;
 
 function renderBubble(props: Partial<BubbleProps> & Pick<BubbleProps, "message">) {
   return render(
-    <MessageBubble
-      refHandlers={handlers}
-      onCopyMessage={vi.fn()}
-      copiedMessageId={null}
-      {...props}
-    />
+    <MessageBubble refHandlers={handlers} onCopyMessage={vi.fn()} isCopied={false} {...props} />
   );
 }
 
@@ -68,9 +63,23 @@ describe("MessageBubble", () => {
 
   test("actions sit in a labelled group; copied state relabels the button", async () => {
     const message = msg({ id: "a1", role: "assistant", content: "Body" });
-    renderBubble({ message, copiedMessageId: "a1" });
+    renderBubble({ message, isCopied: true });
     expect(screen.getByRole("group", { name: "Message actions" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+
+  test("hidden actions stay reachable by keyboard (focus-within reveals them)", async () => {
+    renderBubble({
+      message: msg({ id: "a1", role: "assistant", content: "Body" }),
+      onRetry: vi.fn(),
+    });
+    const group = screen.getByRole("group", { name: "Message actions" });
+    expect(group.className).toContain("pointer-events-none");
+    expect(group.className).toContain("focus-within:pointer-events-auto");
+    await userEvent.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Copy" }));
+    await userEvent.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Retry" }));
   });
 
   test("active feedback is aria-pressed and clicking it again clears it", async () => {
@@ -126,12 +135,13 @@ describe("MessageBubble", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
-  test("an empty pending row shows its status and no actions", () => {
-    renderBubble({
+  test("an empty pending row renders AgentActivityPanel's status and no actions", () => {
+    const { container } = renderBubble({
       message: msg({ id: "__streaming__", role: "assistant", status: "thinking" }),
       isAssistantStreamActive: true,
     });
-    expect(screen.getByText("Thinking")).toBeTruthy();
+    const panel = container.querySelector("[data-agent-activity-panel]");
+    expect(panel?.textContent).toContain("Thinking");
     expect(screen.queryByRole("group", { name: "Message actions" })).toBeNull();
   });
 
@@ -189,18 +199,45 @@ describe("MessageBubble", () => {
       false
     );
   });
+
+  describe("fresh user message entrance", () => {
+    const NOW = new Date("2026-10-01T12:00:00Z");
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test.each([
+      [9_000, true],
+      [11_000, false],
+    ])("a user message sent %ims ago animates: %s", (ageMs, animates) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+      const { container } = renderBubble({
+        message: msg({
+          id: "u1",
+          role: "user",
+          content: "Hi",
+          timestamp: new Date(NOW.getTime() - ageMs),
+        }),
+      });
+      expect(container.querySelector("[data-message-id]")?.classList.contains("animate-in")).toBe(
+        animates
+      );
+    });
+  });
 });
 
 describe("ThinkingIndicator", () => {
-  test("is a labelled status with the thinking label", () => {
+  test("is a live status whose visible text is the thinking label", () => {
     render(<ThinkingIndicator />);
-    expect(screen.getByRole("status", { name: "Thinking" })).toBeTruthy();
-    expect(screen.getByText("Thinking…")).toBeTruthy();
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("aria-label")).toBeNull();
+    expect(status.textContent).toBe("Thinking…");
   });
 
   test("uses the phase label when a status is given", () => {
     render(<ThinkingIndicator status="searching" />);
-    expect(screen.getByRole("status", { name: "Searching sources" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Searching sources…");
   });
 });
 
@@ -209,7 +246,7 @@ describe("areMessageBubblePropsEqual", () => {
     message: msg({ id: "a1", role: "assistant", content: "Body" }),
     refHandlers: handlers,
     onCopyMessage: vi.fn(),
-    copiedMessageId: null,
+    isCopied: false,
     onSetFeedback: vi.fn(),
     onSendFollowUp: vi.fn(),
     onRetry: vi.fn(),
@@ -236,6 +273,77 @@ describe("areMessageBubblePropsEqual", () => {
       [key]: key === "refHandlers" ? { ...handlers } : vi.fn(),
     } as BubbleProps;
     expect(areMessageBubblePropsEqual(base, next)).toBe(false);
+  });
+
+  test.each([
+    ["isCopied", { isCopied: true }],
+    ["isAssistantStreamActive", { isAssistantStreamActive: true }],
+  ] as const)("a %s change re-renders", (_name, patch) => {
+    expect(areMessageBubblePropsEqual(base, { ...base, ...patch })).toBe(false);
+  });
+
+  test("a role change re-renders", () => {
+    expect(
+      areMessageBubblePropsEqual(base, { ...base, message: { ...base.message, role: "user" } })
+    ).toBe(false);
+  });
+
+  describe("agentTrace and externalSources", () => {
+    const trace = () => ({
+      phases: [{ status: "searching", message: "x" }],
+      toolCalls: [],
+      grounding: [],
+    });
+    const sources = (): ExternalSource[] => [
+      { title: "A", url: "https://a.example.com", snippet: "", sourceType: "web" },
+    ];
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    test("the same objects pass on identity without serialising", () => {
+      const t = trace();
+      const src = sources();
+      const prev = { ...base, message: { ...base.message, agentTrace: t }, externalSources: src };
+      const spy = vi.spyOn(JSON, "stringify");
+      expect(
+        areMessageBubblePropsEqual(prev, {
+          ...prev,
+          message: { ...prev.message, agentTrace: t },
+          externalSources: src,
+        })
+      ).toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    test("value-equal copies are equal; different values are not", () => {
+      const prev = {
+        ...base,
+        message: { ...base.message, agentTrace: trace() },
+        externalSources: sources(),
+      };
+      const spy = vi.spyOn(JSON, "stringify");
+      const copy = {
+        ...prev,
+        message: { ...prev.message, agentTrace: trace() },
+        externalSources: sources(),
+      };
+      expect(areMessageBubblePropsEqual(prev, copy)).toBe(true);
+      expect(spy).toHaveBeenCalled();
+      expect(
+        areMessageBubblePropsEqual(prev, {
+          ...copy,
+          externalSources: [{ ...sources()[0], title: "B" }],
+        })
+      ).toBe(false);
+      expect(
+        areMessageBubblePropsEqual(prev, {
+          ...copy,
+          message: { ...copy.message, agentTrace: { phases: [], toolCalls: [], grounding: [] } },
+        })
+      ).toBe(false);
+    });
   });
 
   test("a new notebookDocumentIds set re-renders", () => {
