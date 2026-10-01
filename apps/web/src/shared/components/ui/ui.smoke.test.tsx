@@ -26,6 +26,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemDescription,
+  DropdownMenuItemIcon,
+  DropdownMenuItemText,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./empty";
@@ -399,6 +405,66 @@ describe("shadcn ui components render", () => {
     it("Badge outline uses the hairline ring", () => {
       render(<Badge variant="outline">b</Badge>);
       expect(screen.getByText("b")).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");
+    });
+  });
+
+  describe("soft floating layer", () => {
+    it("menus float softly and support rich items", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuLabel>Mode</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value="a">
+              <DropdownMenuRadioItem value="a">
+                <DropdownMenuItemIcon>
+                  <svg aria-hidden />
+                </DropdownMenuItemIcon>
+                <DropdownMenuItemText>
+                  Alpha
+                  <DropdownMenuItemDescription>First</DropdownMenuItemDescription>
+                </DropdownMenuItemText>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      const menu = await screen.findByRole("menu");
+      expect(menu).toHaveClass("rounded-xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(menu).not.toHaveClass("border");
+      const item = screen.getByRole("menuitemradio", { name: /Alpha/ });
+      expect(item).toHaveClass("rounded-lg", "min-h-9");
+      expect(item).toHaveAttribute("data-state", "checked");
+      expect(screen.getByText("First")).toHaveClass("text-xs", "text-muted-foreground");
+    });
+
+    it("Select content floats softly", async () => {
+      render(
+        <Select defaultOpen value="a">
+          <SelectTrigger>
+            <SelectValue placeholder="Pick one" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="a">Option A</SelectItem>
+          </SelectContent>
+        </Select>
+      );
+      const listbox = await screen.findByRole("listbox");
+      expect(listbox).toHaveClass("rounded-xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(listbox).not.toHaveClass("border");
+      expect(screen.getByRole("option", { name: "Option A" })).toHaveClass("rounded-lg", "min-h-9");
+    });
+
+    it("PopoverContent floats softly", () => {
+      render(
+        <Popover defaultOpen>
+          <PopoverTrigger>p</PopoverTrigger>
+          <PopoverContent>Popover body</PopoverContent>
+        </Popover>
+      );
+      const content = screen.getByText("Popover body");
+      expect(content).toHaveClass("rounded-2xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(content).not.toHaveClass("border");
     });
   });
 });
