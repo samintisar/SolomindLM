@@ -42,3 +42,8 @@ export function readPackSources({ pack, dir }: RegisteredPack): LocalSourceFile[
     };
   });
 }
+
+/** Same match as the eval actions' `documentTitleHint`: case-insensitive substring of the file name. */
+export function matchesTitleHint(fileName: string, hint: string): boolean {
+  return fileName.toLowerCase().includes(hint.trim().toLowerCase());
+}
