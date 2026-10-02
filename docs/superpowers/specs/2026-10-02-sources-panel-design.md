@@ -55,7 +55,7 @@ Add a smoke test and a gallery entry (when #285 lands, add an Item section to `/
 **Rows:** an `ItemGroup variant="grouped"`, with one `Item` per source.
 - `ItemMedia`: the file-type icon tile, or the favicon for web sources (`Favicon`).
 - `ItemContent`:
-  - `ItemTitle` is the source title, truncated, with the paper hint as a `Tooltip` (it replaces `title`).
+  - `ItemTitle` is the source title, truncated. The paper hint stays visible in the meta line, so the old `title` tooltip is dropped.
   - `ItemDescription` is the meta line.
   - Status `Badge` with semantic tokens: Processing (`secondary`, with `Spinner`, text "Processing") or Failed (`destructive`, text "Failed").
 - `ItemActions`:
