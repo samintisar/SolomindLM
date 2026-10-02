@@ -70,6 +70,7 @@ describe("checkPackReady", () => {
       useCase: "p",
       notebookId: null,
       documentIds: [],
+      documentFileNames: {},
       problems: ['notebook "P" not found in the Test folder'],
     });
   });
@@ -78,6 +79,7 @@ describe("checkPackReady", () => {
     const result = checkPackReady(pack, local, { notebookId: "nb", docs: remote });
     expect(result.notebookId).toBe("nb");
     expect(result.documentIds).toEqual(["doc-b", "doc-c", "doc-d"]);
+    expect(result.documentFileNames).toEqual({ "doc-b": "b.md", "doc-c": "c.md", "doc-d": "d.md" });
     expect(result.problems).toEqual([
       "a.pdf: not uploaded",
       "b.md: out of date",
