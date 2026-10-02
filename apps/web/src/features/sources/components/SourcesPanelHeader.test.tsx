@@ -224,7 +224,7 @@ describe("SourcesPanelHeader list mode", () => {
     const p = renderHeader({ viewingSource: null, selectedCount: 3 });
 
     expect(screen.getByText("Sources")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("3")).toHaveAttribute("aria-label", "3 selected");
     await userEvent.click(screen.getByRole("button", { name: "Close sources panel" }));
     expect(p.onClose).toHaveBeenCalledTimes(1);
   });

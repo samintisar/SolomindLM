@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentProps, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -179,8 +179,35 @@ describe("SourceList actions, search and empty states", () => {
     const p = props({ sources: [], filteredSources: [] });
     render(<SourceList {...p} />);
     expect(screen.getByText("Add your first source")).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole("button", { name: /Add source/i }).at(-1)!);
-    expect(p.onAddSource).toHaveBeenCalled();
+    const add = screen.getByRole("button", { name: /Add source/i });
+    expect(add).toHaveAttribute("data-onboarding", "add-source-button");
+    expect(add).toHaveAttribute("title", "Add Source");
+    expect(screen.queryByRole("searchbox", { name: "Search sources" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Source actions" })).not.toBeInTheDocument();
+    await userEvent.click(add);
+    expect(p.onAddSource).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the count but hides select all when a search matches nothing", () => {
+    render(<SourceList {...props({ sources: three, filteredSources: [], searchQuery: "zzz" })} />);
+    expect(screen.getByText("0 of 3 selected")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /select all/i })).not.toBeInTheDocument();
+  });
+
+  it("calls the discover and refresh handlers", async () => {
+    const p = props({ canRefreshAll: true });
+    render(<SourceList {...p} />);
+    await userEvent.click(screen.getByRole("button", { name: "Discover sources" }));
+    expect(p.onDiscoverClick).toHaveBeenCalledOnce();
+    await userEvent.click(screen.getByRole("button", { name: "Refresh all" }));
+    expect(p.onRefreshAll).toHaveBeenCalledOnce();
+  });
+
+  it("disables refresh and shows a spinner while refreshing", () => {
+    render(<SourceList {...props({ canRefreshAll: true, isRefreshing: true })} />);
+    const refresh = screen.getByRole("button", { name: "Refresh all" });
+    expect(refresh).toBeDisabled();
+    expect(within(refresh).getByRole("status")).toBeInTheDocument();
   });
 
   it("explains when a search matches nothing", () => {

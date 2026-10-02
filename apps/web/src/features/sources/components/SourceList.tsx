@@ -80,86 +80,92 @@ export const SourceList: React.FC<SourceListProps> = ({
 
   return (
     <div className="flex flex-col gap-3 p-3">
-      <div className="flex items-center gap-2">
-        <Button
-          className="flex-1"
-          onClick={onAddSource}
-          title="Add Source"
-          data-onboarding="add-source-button"
-        >
-          <Plus />
-          Add source
-        </Button>
-        <ButtonGroup variant="tray" aria-label="Source actions">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Discover sources"
-                onClick={onDiscoverClick}
-              >
-                <Search />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Discover sources</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Refresh all"
-                  onClick={onRefreshAll}
-                  disabled={!canRefreshAll || isRefreshing}
-                >
-                  {isRefreshing ? <Spinner /> : <RefreshCw />}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Re-fetch web pages and Google Drive imports</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Delete selected"
-                  onClick={onDeleteSelected}
-                  disabled={selectedCount === 0}
-                >
-                  <Trash2 />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Delete selected</TooltipContent>
-          </Tooltip>
-        </ButtonGroup>
-      </div>
+      {sources.length > 0 && (
+        <>
+          <div className="flex items-center gap-2">
+            <Button
+              className="flex-1"
+              onClick={onAddSource}
+              title="Add Source"
+              data-onboarding="add-source-button"
+            >
+              <Plus />
+              Add source
+            </Button>
+            <ButtonGroup variant="tray" aria-label="Source actions">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Discover sources"
+                    onClick={onDiscoverClick}
+                  >
+                    <Search />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Discover sources</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Refresh all"
+                      onClick={onRefreshAll}
+                      disabled={!canRefreshAll || isRefreshing}
+                    >
+                      {isRefreshing ? <Spinner /> : <RefreshCw />}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Re-fetch web pages and Google Drive imports</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete selected"
+                      onClick={onDeleteSelected}
+                      disabled={selectedCount === 0}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Delete selected</TooltipContent>
+              </Tooltip>
+            </ButtonGroup>
+          </div>
 
-      <InputGroup>
-        <InputGroupAddon>
-          <Search />
-        </InputGroupAddon>
-        <InputGroupInput
-          type="search"
-          aria-label="Search sources"
-          placeholder="Search sources..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </InputGroup>
+          <InputGroup>
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="search"
+              aria-label="Search sources"
+              placeholder="Search sources..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </InputGroup>
+        </>
+      )}
 
       {sources.length > 0 && (
         <div className="flex items-center justify-between font-sans text-xs text-muted-foreground">
           <span>
             {selectedCount} of {sources.length} selected
           </span>
-          <Button variant="ghost" size="xs" onClick={onToggleAll}>
-            {allSelected ? "Deselect all" : "Select all"}
-          </Button>
+          {filteredSources.length > 0 && (
+            <Button variant="ghost" size="xs" onClick={onToggleAll}>
+              {allSelected ? "Deselect all" : "Select all"}
+            </Button>
+          )}
         </div>
       )}
 
@@ -175,7 +181,7 @@ export const SourceList: React.FC<SourceListProps> = ({
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={onAddSource}>
+            <Button onClick={onAddSource} title="Add Source" data-onboarding="add-source-button">
               <Plus />
               Add source
             </Button>

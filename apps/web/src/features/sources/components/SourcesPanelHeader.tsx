@@ -61,7 +61,9 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
     return (
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-4">
         <h2 className="font-display text-sm font-bold tracking-wide uppercase">Sources</h2>
-        <Badge variant="secondary">{selectedCount}</Badge>
+        <Badge variant="secondary" aria-label={`${selectedCount} selected`}>
+          {selectedCount}
+        </Badge>
         <Button
           type="button"
           variant="ghost"
