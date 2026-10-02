@@ -503,7 +503,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
         className="relative w-full max-w-5xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col max-h-[90vh] min-h-0 font-sans"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header — matches AddSourceModal */}
+        {/* Header — matches the add-source dialog */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center">
