@@ -47,8 +47,7 @@ Move the dialog into a new folder, `components/add-source/`:
 |---|---|
 | `AddSourceDialog.tsx` | The shadcn `Dialog` shell. Holds the `step` state, the step header, close rules and the limit footer. |
 | `AddSourceMenu.tsx` | The menu step: drop zone, option groups, warnings. |
-| `UrlForm.tsx` | Website URLs (was `UrlInputModal`). |
-| `VideoForm.tsx` | Video and social URLs (was `SocialMediaInputModal`). |
+| `LinkForm.tsx` | Website URLs (was `UrlInputModal`) and video/social URLs (was `SocialMediaInputModal`). One form, picked by `kind: "website" \| "video"`. |
 | `TextForm.tsx` | Pasted text (was `TextInputModal`). |
 | `DoiForm.tsx` | Resolve and add by DOI (was `DoiInputModal`). |
 | `ManualPaperForm.tsx` | Manual paper entry (was `ManualPaperModal`). |
@@ -58,7 +57,7 @@ Move the dialog into a new folder, `components/add-source/`:
 
 The nine old `*Modal.tsx` files are deleted.
 
-**Step state:** `type AddSourceStep = "menu" | "url" | "video" | "text" | "doi" | "bibtex" | "zotero" | "mendeley" | "manual"`.
+**Step state:** `type AddSourceStep = "menu" | "website" | "video" | "text" | "doi" | "bibtex" | "zotero" | "mendeley" | "manual"`.
 - `AddSourceDialog` owns it.
 - It resets to `"menu"` whenever the dialog closes.
 - Each form unmounts when you leave its step, so a reopened form always starts empty. This fixes today's stale DOI and Manual state on the success path.
@@ -158,15 +157,15 @@ The hints:
 ## 3. Form steps
 
 **Shared layout for every form:**
-- A `<form>` with `onSubmit`.
+- A `<form>` with `onSubmit` for the single-submit forms (Website/Transcripts, Text, Manual). Manual sets `noValidate`, so the `type="url"` PDF field never blocks a submit (the old field had no validation). The DOI step and the two import steps are not wrapped in a `<form>`: they have several independent actions, so Enter in the DOI field is handled explicitly (it resolves).
 - `FieldGroup`, `Field` and `FieldLabel` with `htmlFor`/`id` on every control.
 - A footer row (`flex justify-end gap-2`) with the primary submit `Button`. Back sits in the step header, so there is no Cancel.
-- Busy submit buttons show `Spinner` plus the busy label.
+- Busy submit buttons show `<Spinner aria-hidden />` plus the busy label. `Spinner` carries `role="status"` and `aria-label="Loading"`, so inside a button it is hidden from assistive tech; the button's accessible name is just its text. A standalone status row (for example "Parsing bibliography...") puts `role="status"` on the row and hides its spinner instead.
 - Inline errors use `Alert variant="destructive"` with `role="alert"`, which Alert already sets.
 
-**Website (`UrlForm`), Transcripts (`VideoForm`), Text (`TextForm`):**
+**Website and Transcripts (`LinkForm kind`), Text (`TextForm`):**
 - One labelled `Textarea`, `autoFocus`. Labels: "Website URLs", "Video URLs", "Text".
-- Placeholders unchanged: the e2e tests use `Paste your text here...` and the `https://example.com` pattern.
+- Placeholders unchanged: the e2e tests use `Paste your text here...` and the `https://example.com` pattern. The video placeholder keeps the old modal's "Separate multiple URLs with spaces or new lines" tail.
 - Kept as is:
   - Cmd/Ctrl+Enter submits;
   - URLs are split on whitespace, and only http(s) is kept;
@@ -176,10 +175,10 @@ The hints:
 - Submit is disabled while `!input.trim()` or uploading. Busy is reported while uploading.
 
 **DOI (`DoiForm`):**
-- A labelled `InputGroup` ("DOI"): the input, plus an `InputGroupButton` "Resolve" (Search icon, or Spinner while resolving). Enter resolves.
+- A labelled `InputGroup` ("DOI"): the input, plus an `InputGroupButton` "Resolve" (Search icon, or an `aria-hidden` Spinner while resolving). Enter resolves (handled in `onKeyDown`, since there is no `<form>`).
 - A failed or empty resolve shows today's "Could not resolve DOI…" message in an `Alert`.
 - The preview is a `Card` containing:
-  - the title in `font-display`;
+  - the title in `font-display`, falling back to "Untitled Paper";
   - the authors;
   - the abstract, `line-clamp-4`;
   - a meta row (venue · year · DOI, as text).
@@ -202,29 +201,31 @@ The hints:
   - **Paste text:** a labelled mono `Textarea` (rows 8) and a "Parse bibliography" button.
 - **Format fix:** detect the format from the content actually being parsed (the new file's text, or the textarea's text), not from stale `fileContent` state: `"ris"` if it starts with `TY  -`, otherwise `"auto"`.
 - **Results:**
-  - Stats `Badge`s: N found (`secondary`), N with DOI, and N missing DOI (`warning`/`destructive` style tokens).
+  - Stats `Badge`s: N found (`secondary`), N with DOI, N missing DOI and N skipped (`outline`).
   - Parse warnings in an `Alert variant="warning"`, as a list.
   - A "Select all" / "Deselect all" ghost `Button size="sm"`.
-  - An `ItemGroup variant="grouped"` (scroll body `max-h-64 overflow-y-auto`) with one `Item` per paper. Each row has a `Checkbox` labelled "Include ⟨title⟩", and an `ItemContent` with the title, plus authors and year in an `ItemDescription`. Every paper is selected after a parse, as today.
-- Submit "Import N selected paper(s)" calls `useBulkUpload`, as today, with `sourceType: p.sourceType || "bibtex"`.
+  - An `ItemGroup variant="grouped"` (scroll body `max-h-64 overflow-y-auto`) with one `Item` per paper. Each row is an `Item asChild` rendering a `<label htmlFor>` (inside a `div role="listitem"`), so the whole row toggles, as in the old modal. It holds a `Checkbox` labelled "Include ⟨title⟩" and an `ItemContent` with the title, authors and year in an `ItemDescription`, and a "No DOI" `Badge` when the paper has none. Every paper is selected after a parse, as today.
+- Submit "Import N selected paper(s)" calls `useBulkUpload`, as today, with `sourceType: p.sourceType || "bibtex"`. Papers are imported in their parsed order, not in the order they were ticked. A file that cannot be read shows its error in the `Alert`.
 
 **Zotero and Mendeley (`LibraryImportForm source`):**
 - A short help line: "Export your ⟨Zotero|Mendeley⟩ library as BibTeX (.bib), then choose the file."
 - `PaperFileDrop` with `accept=".bib"`; parsing starts as soon as a file is chosen (`format: "auto"`).
-- Parsing shows `Spinner` plus "Parsing bibliography...".
+- Parsing shows an `aria-hidden` `Spinner` plus "Parsing bibliography..." in a `role="status"` row.
+- While the existing-papers query is still loading, a "Checking your notebook..." status row replaces the stats and Import is disabled, so a fast click cannot import duplicates.
 - Stats `Badge`s: found, already in notebook, new.
+- A file with no papers shows `Empty` "No papers found in this file".
 - The new papers are listed in a read-only grouped list (no checkboxes, as today).
 - When every paper is already present, `Empty` shows "All papers from this file are already in your notebook."
 - Submit "Import N paper(s)" bulk-uploads only the new papers, with `sourceType` `"zotero"` or `"mendeley"`.
 - **Dedupe** moves to `features/sources/lib/paperDedupe.ts`, with TDD:
-  - `paperKey(paper)`: the lowercased DOI if present, otherwise `title|firstAuthorSurname`, normalised as today.
-  - `splitNewPapers(parsed, existing)` returns `{ fresh, duplicates }`.
+  - `paperKeys(paper)` returns `{ doi, titleHash }`: the trimmed, lowercased DOI if present, and `title|firstAuthorSurname` (lowercased) when both exist. These are the same keys `convex/documents/getExistingPapers.ts` returns as `{ dois, titleHashes }`.
+  - `splitNewPapers(parsed, existing)` returns `{ fresh, duplicates }`, treating a paper as a duplicate when either key is already present. With `existing === undefined` (query loading) everything is "fresh", which is why the form waits for the query.
 
 ## 4. Primitives
 
 - **`Progress`:** add it with `bunx --bun shadcn@latest add progress`, then apply the usual post-add fixes (the `cn` import, bogus deps). Track `bg-muted`, indicator `bg-primary`.
   - Add a destructive state: a `variant` on the indicator through cva, or a `data-*` hook the page sets.
-  - The indicator's `transform` inline style lives in `ui/**`, which is lint-exempt.
+  - The indicator's offset is not an inline `transform`: `shared shadcn/no-inline-styles` counts those. The primitive sets only a custom property, `style={{ "--progress-offset": ... }}`, and the indicator class `translate-x-(--progress-offset)` applies it.
   - Add it to the ui smoke test.
 - **No other new primitives:** Dialog, Field, InputGroup, Tabs, Item, Checkbox, Badge, Alert, Empty, Spinner and Card cover everything else.
 
@@ -238,17 +239,22 @@ The hints:
   - every option is disabled when signed out or at the limit;
   - Escape is blocked while a form reports busy;
   - the footer shows `N / M` and "…" while limits load.
-- **`UrlForm`:**
+- **`LinkForm`:**
   - invalid input toasts the exact message;
   - Cmd/Ctrl+Enter submits;
   - success calls `onDone`;
-  - a rejected upload keeps the form.
-- **`TextForm`:** submit is disabled when the input is blank.
+  - a rejected upload keeps the form;
+  - `kind="video"` uses the "Video URLs" field;
+  - busy is reported while uploading and cleared on unmount.
+- **`TextForm`:** submit is disabled when the input is blank, and Ctrl+Enter submits.
 - **`ManualPaperForm`:** the fields are reachable by label, submit is disabled until Title and Authors are filled, and the payload is right.
 - **`BibtexImportForm`:**
   - parse results render checkboxes, all checked;
   - deselecting updates the submit count;
-  - RIS content is detected.
+  - RIS content is detected;
+  - clicking a row's title toggles its checkbox;
+  - a parse failure shows in `role="alert"`, and warnings render.
+- **`LibraryImportForm`:** duplicates are skipped, Import waits for the notebook check, and an empty file shows "No papers found in this file".
 - **`paperDedupe.test.ts`:** matches by DOI case-insensitively, falls back to the title and author surname, and splits fresh from duplicates.
 
 Mock the Convex hooks (`documentsApi`) as the existing panel tests do.
