@@ -145,7 +145,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             <CollapsibleContent>
               <div className="flex flex-col gap-4 px-4 pb-4 pt-1">
                 <div data-testid="source-guide-summary">
-                  <div className="prose max-w-none font-serif text-sm text-foreground">
+                  <div className="prose max-w-none font-serif text-foreground">
                     <MarkdownRenderer>{source.sourceGuide.summary}</MarkdownRenderer>
                   </div>
                 </div>
@@ -214,7 +214,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-3">
-            <Spinner className="size-6" />
+            <Spinner className="size-6" aria-hidden />
             <p className="text-sm text-muted-foreground">Loading content...</p>
           </div>
         </div>
@@ -262,7 +262,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           {canShowPdf && viewMode === "pdf" ? (
             pdfUrlLoading ? (
               <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-                <Spinner className="size-6" />
+                <Spinner className="size-6" aria-hidden />
                 Loading PDF…
               </div>
             ) : pdfUrl ? (
@@ -284,20 +284,20 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                     audio: () => null,
                     iframe: () => null,
                     table: ({ children }) => (
-                      <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
+                      <table className="w-full border-separate border-spacing-0 overflow-hidden rounded-xl ring-1 ring-hairline">
                         {children}
                       </table>
                     ),
                     thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
                     tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                    tr: ({ children }) => <tr>{children}</tr>,
                     th: ({ children }) => (
-                      <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
+                      <th className="px-4 py-2 text-left font-semibold text-foreground border-b border-r border-border/60 last:border-r-0">
                         {children}
                       </th>
                     ),
                     td: ({ children }) => (
-                      <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
+                      <td className="px-4 py-2 text-foreground border-b border-r border-border/60 last:border-r-0">
                         {children}
                       </td>
                     ),

@@ -456,8 +456,9 @@
   scrollbar-gutter: stable;
 }
 
-@utility scrollbar-thin {
-  scrollbar-width: thin;
+/* Sticky document outline: never taller than the viewport on short screens. */
+@utility max-h-outline {
+  max-height: min(85dvh, 42rem);
 }
 
 /* "Thinking..." label shimmer; static under reduced motion (global rule zeroes animation-duration). */

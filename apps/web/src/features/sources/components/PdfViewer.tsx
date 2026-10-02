@@ -300,6 +300,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
               className="mb-3 shrink-0 self-start"
             >
               <Tooltip>
+                {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
                 <TooltipTrigger asChild>
                   <Toggle
                     size="sm"
@@ -349,7 +350,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
-                    className="w-12 text-center"
+                    className="w-14 text-center"
                   />
                 </TooltipTrigger>
                 <TooltipContent>Type a page number and press Enter</TooltipContent>
@@ -412,8 +413,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
                 <aside
                   className={cn(
                     "sticky top-0 z-10 w-72 max-w-full shrink-0",
-                    "max-h-168 overflow-y-auto overscroll-contain scrollbar-stable scrollbar-thin",
-                    "rounded-xl border-r border-border/60 bg-card px-3 py-3",
+                    "max-h-outline overflow-y-auto overscroll-contain scrollbar-stable scrollbar-thin",
+                    "rounded-xl bg-card px-3 py-3 shadow-xs ring-1 ring-hairline",
                     "font-sans text-sm text-foreground",
                     "[&_.react-pdf__Outline]:m-0 [&_.react-pdf__Outline]:text-inherit",
                     "[&_ul]:m-0 [&_ul]:list-none [&_ul]:p-0",
@@ -436,7 +437,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
               {/* Page container */}
               <div
                 ref={containerRef}
-                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-lg border border-border bg-muted/20 py-2 scrollbar-stable"
+                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-lg bg-muted/20 py-2 ring-1 ring-hairline scrollbar-stable"
               >
                 {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
                   <div
