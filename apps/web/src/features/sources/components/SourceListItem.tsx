@@ -191,8 +191,8 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                   }
                 >
                   {source.type === "YOUTUBE" ? "YouTube" : source.type}
-                </span>
-                <span> • {source.date}</span>
+                </span>{" "}
+                <span>• {source.date}</span>
                 {paperHint && status === "completed" && (
                   <span className="font-normal normal-case tracking-normal"> · {paperHint}</span>
                 )}

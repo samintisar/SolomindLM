@@ -338,7 +338,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     <>
       <div
         className={`
-          relative h-full w-full min-w-0 bg-sidebar border-r-2 border-border flex flex-col
+          relative h-full w-full min-w-0 bg-sidebar flex flex-col
           overflow-hidden
           ${isOpen ? "opacity-100" : "opacity-0"}
         `}

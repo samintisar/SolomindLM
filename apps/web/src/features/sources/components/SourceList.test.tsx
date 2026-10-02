@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Source } from "@/shared/types";
 import { SourceList } from "./SourceList";
@@ -104,5 +104,95 @@ describe("SourceList rename and menu flow", () => {
     expect(screen.queryByRole("menuitem", { name: "Rename" })).not.toBeInTheDocument();
     await userEvent.click(trigger);
     expect(await screen.findByRole("menuitem", { name: "Rename" })).toBeInTheDocument();
+  });
+});
+
+const three: Source[] = ["a", "b", "c"].map((id) => ({
+  ...source,
+  id,
+  title: `Source ${id}`,
+}));
+
+type ListProps = ComponentProps<typeof SourceList>;
+
+function props(overrides: Partial<ListProps> = {}): ListProps {
+  return {
+    sources: three,
+    filteredSources: three,
+    searchQuery: "",
+    onSearchChange: vi.fn(),
+    onToggleAll: vi.fn(),
+    onToggleSource: vi.fn(),
+    onViewSource: vi.fn(),
+    onDeleteSource: vi.fn(),
+    onRefreshSource: vi.fn(),
+    onRenameSource: vi.fn(),
+    allSelected: false,
+    renamingId: null,
+    renameValue: "",
+    onRenameChange: vi.fn(),
+    openMenuId: null,
+    onMenuOpenChange: vi.fn(),
+    onRenameCancel: vi.fn(),
+    onStartRename: vi.fn(),
+    onAddSource: vi.fn(),
+    onDiscoverClick: vi.fn(),
+    selectedCount: 0,
+    onDeleteSelected: vi.fn(),
+    onRefreshAll: vi.fn(),
+    canRefreshAll: true,
+    isRefreshing: false,
+    ...overrides,
+  };
+}
+
+describe("SourceList actions, search and empty states", () => {
+  it("disables bulk actions when they can't run", () => {
+    render(<SourceList {...props({ selectedCount: 0, canRefreshAll: false })} />);
+    expect(screen.getByRole("button", { name: /Delete selected/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Refresh all/ })).toBeDisabled();
+    const add = screen.getByRole("button", { name: /Add source/i });
+    expect(add).toHaveAttribute("data-onboarding", "add-source-button");
+    expect(add).toHaveAttribute("title", "Add Source");
+  });
+
+  it("shows the selection count and toggles all", async () => {
+    const p = props({
+      selectedCount: 2,
+      sources: three,
+      filteredSources: three,
+      allSelected: false,
+    });
+    render(<SourceList {...p} />);
+    expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(p.onToggleAll).toHaveBeenCalled();
+  });
+
+  it("renders rows in one grouped list", () => {
+    render(<SourceList {...props({ sources: three, filteredSources: three })} />);
+    expect(screen.getByRole("list")).toHaveAttribute("data-variant", "grouped");
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+  });
+
+  it("invites adding a first source when empty", async () => {
+    const p = props({ sources: [], filteredSources: [] });
+    render(<SourceList {...p} />);
+    expect(screen.getByText("Add your first source")).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: /Add source/i }).at(-1)!);
+    expect(p.onAddSource).toHaveBeenCalled();
+  });
+
+  it("explains when a search matches nothing", () => {
+    render(<SourceList {...props({ sources: three, filteredSources: [], searchQuery: "zzz" })} />);
+    expect(screen.getByText("No sources match your search.")).toBeInTheDocument();
+    expect(screen.queryByText("Add your first source")).not.toBeInTheDocument();
+  });
+
+  it("reports search input changes", async () => {
+    const p = props({ sources: three, filteredSources: three });
+    render(<SourceList {...p} />);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search sources" }), "q");
+    expect(p.onSearchChange).toHaveBeenCalledWith("q");
   });
 });

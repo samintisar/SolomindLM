@@ -100,7 +100,7 @@ describe("SourceListItem", () => {
   it("names the open button by title and status, with the meta line as its description", () => {
     setup({}, { status: "failed" });
     const open = screen.getByRole("button", { name: "SQL cheatsheet Failed" });
-    expect(open).toHaveAccessibleDescription(/MDs*• Jan 30/);
+    expect(open).toHaveAccessibleDescription(/MD\s*•\s*Jan 30/);
   });
 
   it("treats an unchanged rename as a cancel", async () => {
