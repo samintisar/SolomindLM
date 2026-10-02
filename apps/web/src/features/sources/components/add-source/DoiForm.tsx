@@ -119,7 +119,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
               onClick={() => void handleResolve()}
               disabled={!doi.trim() || isResolving || isUploading}
             >
-              {isResolving ? <Spinner /> : <Search />} Resolve
+              {isResolving ? <Spinner aria-hidden /> : <Search />} Resolve
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
@@ -133,7 +133,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
       {preview && (
         <Card>
           <CardHeader>
-            <CardTitle>{preview.title}</CardTitle>
+            <CardTitle>{preview.title || "Untitled Paper"}</CardTitle>
             {preview.authors.length > 0 && (
               <CardDescription>{preview.authors.join(", ")}</CardDescription>
             )}
@@ -155,7 +155,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
           <Button onClick={() => void handleAddToNotebook()} disabled={isUploading}>
             {isUploading ? (
               <>
-                <Spinner /> Adding...
+                <Spinner aria-hidden /> Adding...
               </>
             ) : (
               "Add to notebook"

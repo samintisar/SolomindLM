@@ -55,6 +55,56 @@ describe("LinkForm", () => {
     expect(field).toBeInTheDocument();
   });
 
+  it("submits video URLs through the Video URLs field", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    const onDone = vi.fn();
+    render(
+      <LinkForm
+        kind="video"
+        onUpload={onUpload}
+        isUploading={false}
+        onDone={onDone}
+        onBusyChange={vi.fn()}
+      />
+    );
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Video URLs" }),
+      "https://youtu.be/abc"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Add Sources" }));
+    expect(onUpload).toHaveBeenCalledWith(["https://youtu.be/abc"]);
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it("reports busy while uploading and clears it on unmount", () => {
+    const onBusyChange = vi.fn();
+    const view = render(
+      <LinkForm
+        kind="website"
+        onUpload={vi.fn()}
+        isUploading
+        onDone={vi.fn()}
+        onBusyChange={onBusyChange}
+      />
+    );
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    view.unmount();
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("names the busy button by its text only", () => {
+    render(
+      <LinkForm
+        kind="website"
+        onUpload={vi.fn()}
+        isUploading
+        onDone={vi.fn()}
+        onBusyChange={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Adding..." })).toBeDisabled();
+  });
+
   it("disables submit while the input is blank", () => {
     setup();
     expect(screen.getByRole("button", { name: "Add Sources" })).toBeDisabled();

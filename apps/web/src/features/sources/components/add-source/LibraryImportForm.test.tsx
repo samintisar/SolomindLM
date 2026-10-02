@@ -64,7 +64,7 @@ describe("LibraryImportForm", () => {
   });
 
   it("uses mendeley copy and source type", async () => {
-    existing = undefined;
+    existing = { dois: [], titleHashes: [] };
     bulkUpload.mockResolvedValue({ documentIds: [] });
     const { container } = setup("mendeley");
     expect(
@@ -88,6 +88,24 @@ describe("LibraryImportForm", () => {
     expect(
       await screen.findByText("All papers from this file are already in your notebook.")
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Import/ })).not.toBeInTheDocument();
+  });
+
+  it("holds the import back until the notebook check has loaded", async () => {
+    existing = undefined;
+    const { container } = setup();
+    await chooseFile(container);
+    expect(await screen.findByText("Checking your notebook...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import 2 papers" })).toBeDisabled();
+    expect(screen.queryByText(/already in notebook/)).not.toBeInTheDocument();
+    expect(screen.queryByText("2 new")).not.toBeInTheDocument();
+  });
+
+  it("says so when the file holds no papers", async () => {
+    parse.mockResolvedValue({ papers: [], stats: parsed.stats, warnings: [] });
+    const { container } = setup();
+    await chooseFile(container);
+    expect(await screen.findByText("No papers found in this file")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Import/ })).not.toBeInTheDocument();
   });
 

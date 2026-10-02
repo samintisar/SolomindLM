@@ -61,6 +61,7 @@ export function LibraryImportForm({
   const [isParsing, setIsParsing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [papers, setPapers] = useState<ParsedPaper[]>([]);
+  const [hasParsed, setHasParsed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const parseBibliography = useParseBibliography();
@@ -77,13 +78,15 @@ export function LibraryImportForm({
     async (file: File) => {
       setError(null);
       setPapers([]);
+      setHasParsed(false);
       setFileName(file.name);
 
-      const text = await file.text();
       setIsParsing(true);
       try {
+        const text = await file.text();
         const result = await parseBibliography({ content: text, format: "auto" });
         setPapers(result.papers);
+        setHasParsed(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to parse file");
       } finally {
@@ -119,7 +122,10 @@ export function LibraryImportForm({
     }
   }, [fresh, source, notebookId, bulkUpload, onDone]);
 
+  // `existing` is undefined while the dedupe query loads; importing then would skip the dedupe.
+  const checking = existing === undefined;
   const showResults = papers.length > 0 && !isParsing;
+  const showEmpty = hasParsed && papers.length === 0 && !isParsing && !error;
 
   return (
     <div className="flex flex-col gap-6">
@@ -135,8 +141,20 @@ export function LibraryImportForm({
       />
 
       {isParsing && (
-        <p className="flex items-center gap-2 font-sans text-sm text-muted-foreground">
-          <Spinner /> Parsing bibliography...
+        <p
+          role="status"
+          className="flex items-center gap-2 font-sans text-sm text-muted-foreground"
+        >
+          <Spinner aria-hidden /> Parsing bibliography...
+        </p>
+      )}
+
+      {showResults && checking && (
+        <p
+          role="status"
+          className="flex items-center gap-2 font-sans text-sm text-muted-foreground"
+        >
+          <Spinner aria-hidden /> Checking your notebook...
         </p>
       )}
 
@@ -147,7 +165,21 @@ export function LibraryImportForm({
         </Alert>
       )}
 
-      {showResults && (
+      {showEmpty && (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icon />
+            </EmptyMedia>
+            <EmptyTitle>No papers found in this file</EmptyTitle>
+            <EmptyDescription>
+              Check that it is a BibTeX (.bib) export from {name}, then choose it again.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+
+      {showResults && !checking && (
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">{papers.length} found</Badge>
           {duplicates.length > 0 && (
@@ -157,7 +189,7 @@ export function LibraryImportForm({
         </div>
       )}
 
-      {showResults && fresh.length === 0 && (
+      {showResults && !checking && fresh.length === 0 && (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -195,10 +227,14 @@ export function LibraryImportForm({
             </ItemGroup>
           </div>
           <div className="flex justify-end">
-            <Button type="button" onClick={() => void handleImport()} disabled={isImporting}>
+            <Button
+              type="button"
+              onClick={() => void handleImport()}
+              disabled={isImporting || checking}
+            >
               {isImporting ? (
                 <>
-                  <Spinner /> Importing...
+                  <Spinner aria-hidden /> Importing...
                 </>
               ) : (
                 `Import ${fresh.length} paper${fresh.length === 1 ? "" : "s"}`

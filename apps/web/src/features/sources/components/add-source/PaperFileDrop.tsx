@@ -15,7 +15,7 @@ interface PaperFileDropProps {
 export function PaperFileDrop({ accept, hint, fileName, disabled, onFile }: PaperFileDropProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-8 text-center">
       <input
         ref={inputRef}
         type="file"
@@ -37,7 +37,9 @@ export function PaperFileDrop({ accept, hint, fileName, disabled, onFile }: Pape
       >
         <FileUp /> {fileName ? "Choose another file" : "Choose file"}
       </Button>
-      <p className="font-sans text-sm text-muted-foreground">{fileName ?? hint}</p>
+      <p aria-live="polite" className="font-sans text-sm text-muted-foreground">
+        {fileName ?? hint}
+      </p>
     </div>
   );
 }

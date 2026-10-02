@@ -82,6 +82,40 @@ describe("BibtexImportForm", () => {
     expect(screen.getByRole("button", { name: "Import 0 selected papers" })).toBeDisabled();
   });
 
+  it("toggles a paper when its row is clicked", async () => {
+    setup();
+    await pasteAndParse("@article{a, title={Alpha}}");
+    const checkbox = await screen.findByRole("checkbox", { name: "Include Alpha" });
+    expect(checkbox).toBeChecked();
+    await userEvent.click(screen.getByText("Alpha"));
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(screen.getByText("Alpha"));
+    expect(checkbox).toBeChecked();
+  });
+
+  it("flags papers without a DOI", async () => {
+    setup();
+    await pasteAndParse("@article{a, title={Alpha}}");
+    expect(await screen.findByText("1 missing DOI")).toBeInTheDocument();
+    expect(screen.getAllByText("No DOI")).toHaveLength(1);
+  });
+
+  it("shows a parse failure in an alert", async () => {
+    parse.mockRejectedValue(new Error("Unreadable bibliography"));
+    setup();
+    await pasteAndParse("@article{a, title={Alpha}}");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unreadable bibliography");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("lists the parser warnings", async () => {
+    parse.mockResolvedValue({ ...result, warnings: ["Entry 3 has no title"] });
+    setup();
+    await pasteAndParse("@article{a, title={Alpha}}");
+    expect(await screen.findByText("Some entries had problems")).toBeInTheDocument();
+    expect(screen.getByText("Entry 3 has no title")).toBeInTheDocument();
+  });
+
   it("parses a chosen RIS file as ris", async () => {
     const { container } = setup();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;

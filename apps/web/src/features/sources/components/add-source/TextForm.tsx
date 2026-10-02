@@ -60,7 +60,7 @@ export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFo
         <Button type="submit" disabled={!value.trim() || isUploading}>
           {isUploading ? (
             <>
-              <Spinner /> Adding...
+              <Spinner aria-hidden /> Adding...
             </>
           ) : (
             "Add Source"

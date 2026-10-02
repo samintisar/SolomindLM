@@ -89,9 +89,13 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
 
   const handleFile = useCallback(
     async (file: File) => {
-      const text = await file.text();
-      setFileName(file.name);
-      void handleParse(text);
+      try {
+        const text = await file.text();
+        setFileName(file.name);
+        void handleParse(text);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to read file");
+      }
     },
     [handleParse]
   );
@@ -102,7 +106,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
     setError(null);
 
     try {
-      const chosen = Array.from(selected).map((i) => papers[i]);
+      const chosen = papers.filter((_, i) => selected.has(i));
       const papersWithTitle = chosen.map((p) => ({
         title: p.title || "Untitled",
         abstract: p.abstract || "",
@@ -179,7 +183,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
                 onClick={() => void handleParse(pasteContent)}
                 disabled={!pasteContent.trim() || busy}
               >
-                {isParsing && <Spinner />} Parse bibliography
+                {isParsing && <Spinner aria-hidden />} Parse bibliography
               </Button>
             </div>
           </div>
@@ -187,8 +191,11 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
       </Tabs>
 
       {isParsing && (
-        <p className="flex items-center gap-2 font-sans text-sm text-muted-foreground">
-          <Spinner /> Parsing bibliography...
+        <p
+          role="status"
+          className="flex items-center gap-2 font-sans text-sm text-muted-foreground"
+        >
+          <Spinner aria-hidden /> Parsing bibliography...
         </p>
       )}
 
@@ -217,6 +224,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">{stats.total} found</Badge>
           <Badge variant="outline">{stats.withDoi} with DOI</Badge>
+          {stats.withoutDoi > 0 && <Badge variant="outline">{stats.withoutDoi} missing DOI</Badge>}
           {stats.malformed > 0 && <Badge variant="outline">{stats.malformed} skipped</Badge>}
         </div>
       )}
@@ -244,26 +252,35 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
           <div className="max-h-64 overflow-y-auto">
             <ItemGroup variant="grouped">
               {papers.map((p, i) => (
-                <Item key={i} size="sm" role="listitem">
-                  <ItemMedia>
-                    <Checkbox
-                      id={`${baseId}-${i}`}
-                      checked={selected.has(i)}
-                      onCheckedChange={() => togglePaper(i)}
-                      aria-label={`Include ${p.title || "Untitled"}`}
-                    />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>
-                      <span className="line-clamp-2">{p.title || "Untitled"}</span>
-                    </ItemTitle>
-                    <ItemDescription>
-                      {[p.authors?.slice(0, 3).join(", "), p.publicationYear]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </ItemDescription>
-                  </ItemContent>
-                </Item>
+                <div key={i} role="listitem">
+                  <Item asChild size="sm">
+                    <label htmlFor={`${baseId}-${i}`} className="cursor-pointer">
+                      <ItemMedia>
+                        <Checkbox
+                          id={`${baseId}-${i}`}
+                          checked={selected.has(i)}
+                          onCheckedChange={() => togglePaper(i)}
+                          aria-label={`Include ${p.title || "Untitled"}`}
+                        />
+                      </ItemMedia>
+                      <ItemContent>
+                        <ItemTitle>
+                          <span className="line-clamp-2">{p.title || "Untitled"}</span>
+                        </ItemTitle>
+                        <ItemDescription>
+                          {[p.authors?.slice(0, 3).join(", "), p.publicationYear]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </ItemDescription>
+                        {!p.doi && (
+                          <div>
+                            <Badge variant="outline">No DOI</Badge>
+                          </div>
+                        )}
+                      </ItemContent>
+                    </label>
+                  </Item>
+                </div>
               ))}
             </ItemGroup>
           </div>
@@ -275,7 +292,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
             >
               {isImporting ? (
                 <>
-                  <Spinner /> Importing...
+                  <Spinner aria-hidden /> Importing...
                 </>
               ) : (
                 `Import ${selected.size} selected paper${selected.size === 1 ? "" : "s"}`

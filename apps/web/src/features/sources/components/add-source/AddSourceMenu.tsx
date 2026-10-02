@@ -184,7 +184,7 @@ export function AddSourceMenu({
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/60 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/60 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       >
         <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Upload className="size-6" />

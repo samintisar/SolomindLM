@@ -19,4 +19,16 @@ describe("TextForm", () => {
     expect(onUpload).toHaveBeenCalledWith("   notes");
     expect(onDone).toHaveBeenCalled();
   });
+
+  it("submits on Ctrl+Enter", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    const onDone = vi.fn();
+    render(
+      <TextForm onUpload={onUpload} isUploading={false} onDone={onDone} onBusyChange={vi.fn()} />
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "notes");
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(onUpload).toHaveBeenCalledWith("notes");
+    expect(onDone).toHaveBeenCalled();
+  });
 });

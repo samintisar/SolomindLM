@@ -16,7 +16,8 @@ const COPY = {
   },
   video: {
     label: "Video URLs",
-    placeholder: "Paste URL from YouTube, TikTok, Instagram, or X...",
+    placeholder:
+      "Paste URL from YouTube, TikTok, Instagram, or X...\n\nSeparate multiple URLs with spaces or new lines",
     hint: "Transcripts are extracted from YouTube, TikTok, Instagram and X. Separate multiple URLs with spaces or new lines.",
   },
 } as const;
@@ -87,7 +88,7 @@ export function LinkForm({ kind, onUpload, isUploading, onDone, onBusyChange }: 
         <Button type="submit" disabled={!value.trim() || isUploading}>
           {isUploading ? (
             <>
-              <Spinner /> Adding...
+              <Spinner aria-hidden /> Adding...
             </>
           ) : (
             "Add Sources"

@@ -69,6 +69,7 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
 
   return (
     <form
+      noValidate
       className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
@@ -176,7 +177,7 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
         <Button type="submit" disabled={!isValid || isUploading}>
           {isUploading ? (
             <>
-              <Spinner /> Adding...
+              <Spinner aria-hidden /> Adding...
             </>
           ) : (
             "Add Paper"
