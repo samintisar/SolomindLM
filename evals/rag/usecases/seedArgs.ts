@@ -1,18 +1,28 @@
 import { resolveUseCaseIds } from "./ids";
 
-const USAGE = "bun run eval:seed [-- --use-case <ids|all>]";
+const USAGE = "bun run eval:seed [-- --use-case <ids|all>] [--reingest]";
+
+export interface SeedArgs {
+  packIds: string[];
+  /** Re-process sources whose content is unchanged (after an ingestion fix) */
+  reingest: boolean;
+}
 
 /**
- * Parse `eval:seed` arguments into the pack ids to seed. Throws an Error whose
- * message is ready to print. No arguments (or `all`) selects every known pack;
- * ids themselves are validated by the caller against the registry.
+ * Parse `eval:seed` arguments into the pack ids to seed and the reingest flag.
+ * Throws an Error whose message is ready to print. No `--use-case` (or `all`)
+ * selects every known pack; ids themselves are validated by the caller against
+ * the registry.
  */
-export function parseSeedArgs(argv: string[], knownIds: string[]): string[] {
+export function parseSeedArgs(argv: string[], knownIds: string[]): SeedArgs {
   let value: string | undefined;
   let sawUseCase = false;
+  let reingest = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--use-case") {
+    if (arg === "--reingest") {
+      reingest = true;
+    } else if (arg === "--use-case") {
       sawUseCase = true;
       value = argv[i + 1];
       i++;
@@ -25,7 +35,6 @@ export function parseSeedArgs(argv: string[], knownIds: string[]): string[] {
       throw new Error(`Unexpected argument ${arg}. Usage: ${USAGE}`);
     }
   }
-  if (!sawUseCase) return [...knownIds];
-
-  return resolveUseCaseIds(value, knownIds);
+  const packIds = sawUseCase ? resolveUseCaseIds(value, knownIds) : [...knownIds];
+  return { packIds, reingest };
 }

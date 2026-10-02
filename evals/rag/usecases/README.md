@@ -52,6 +52,7 @@ Pack fixtures only run when selected explicitly (`--use-case`, `--prefix <pack-i
 ```bash
 bun run eval:seed                           # seed every registered pack
 bun run eval:seed -- --use-case <ids|all>   # comma-separated ids, or "all"; also --use-case=<ids>
+bun run eval:seed -- --use-case <ids> --reingest   # re-process unchanged sources (after an ingestion fix)
 bun run eval:usecases                       # smoke split of every pack, with per-pack scorecard
 bun run eval:rag -- --use-case <id> --split train --export-artifacts --artifacts-dir evals/rag/generated/<run>
 bun run eval:usecases:dry                   # offline dry run of pack fixtures (no Convex)
