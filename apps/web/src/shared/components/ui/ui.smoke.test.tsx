@@ -48,6 +48,7 @@ import {
 } from "./input-group";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./item";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { Progress } from "./progress";
 import { RadioGroup, RadioGroupItem } from "./radio-group";
 import { ScrollArea } from "./scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
@@ -714,5 +715,14 @@ describe("item rows", () => {
     expect(group).toHaveClass("divide-y");
     // Rows must not zero their own border: the group's divide-y draws the row hairlines with it.
     expect(screen.getByTestId("row").className).not.toMatch(/border-0/);
+  });
+
+  it("Progress exposes a progressbar with its value and a destructive tone", () => {
+    render(<Progress value={40} tone="destructive" aria-label="Source limit" />);
+    const bar = screen.getByRole("progressbar", { name: "Source limit" });
+    expect(bar).toHaveAttribute("aria-valuenow", "40");
+    expect(bar.querySelector("[data-slot=progress-indicator]")?.className).toContain(
+      "bg-destructive"
+    );
   });
 });
