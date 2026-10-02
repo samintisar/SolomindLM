@@ -46,6 +46,7 @@ import {
   InputGroupInput,
   InputGroupTextarea,
 } from "./input-group";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./item";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { RadioGroup, RadioGroupItem } from "./radio-group";
 import { ScrollArea } from "./scroll-area";
@@ -683,5 +684,32 @@ describe("shadcn ui components render", () => {
       const overlay = document.body.querySelector("[data-slot=sheet-overlay]");
       expect(overlay).toHaveClass("bg-overlay");
     });
+  });
+});
+
+describe("item rows", () => {
+  it("groups rows on one soft surface", () => {
+    render(
+      <ItemGroup variant="grouped" data-testid="group">
+        <Item data-testid="row">
+          <ItemContent>
+            <ItemTitle>Row</ItemTitle>
+            <ItemDescription>Meta</ItemDescription>
+          </ItemContent>
+        </Item>
+      </ItemGroup>
+    );
+    const group = screen.getByTestId("group");
+    expect(group).toHaveAttribute("data-variant", "grouped");
+    expect(group).toHaveClass(
+      "rounded-2xl",
+      "bg-card",
+      "ring-1",
+      "ring-hairline",
+      "overflow-hidden"
+    );
+    expect(group.className).not.toMatch(/(^|\s)border(\s|$)/);
+    expect(group.className).not.toContain("dark:");
+    expect(screen.getByTestId("row")).toHaveAttribute("data-slot", "item");
   });
 });
