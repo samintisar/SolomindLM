@@ -2,35 +2,34 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures/notebook.fixture";
 import { openAddSourceModal } from "../helpers/navigation";
 
-/**
- * The modal has no dialog role and the sources panel stays mounted behind it, so a bare
- * "Discover sources" locator also matches the panel's tray button. Scope to the heading's row.
- */
+/** The add-source dialog; Radix hides the panel behind it from role queries. */
+function addSourcesDialog(page: Page) {
+  return page.getByRole("dialog", { name: "Add sources" });
+}
+
 function modalDiscoverButton(page: Page) {
-  return page
-    .getByRole("heading", { name: "Add sources" })
-    .locator("..")
-    .getByRole("button", { name: /Discover sources/ });
+  return addSourcesDialog(page).getByRole("button", { name: "Discover sources" });
 }
 
 test.describe("Add Source Modal", () => {
   test("opens with all source type options", async ({ notebookPage }) => {
     const page = notebookPage;
 
-    // Open the add source modal (handles panel width variations)
+    // Open the add-source dialog (handles panel width variations)
     await openAddSourceModal(page);
+    const dialog = addSourcesDialog(page);
 
-    // Modal header
-    await expect(page.getByText("Add sources")).toBeVisible();
+    // Dialog title
+    await expect(dialog).toBeVisible();
 
     // Upload area
-    await expect(page.getByText("Upload sources")).toBeVisible();
+    await expect(dialog.getByText("Upload sources")).toBeVisible();
 
     // Source type buttons
-    await expect(page.getByRole("button", { name: "Website" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Transcripts" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Copied text" })).toBeVisible();
-    const googleDriveButton = page.getByRole("button", { name: /Choose from Google Drive/ });
+    await expect(dialog.getByRole("button", { name: "Website", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Transcripts", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Copied text", exact: true })).toBeVisible();
+    const googleDriveButton = dialog.getByRole("button", { name: /Choose from Google Drive/ });
     if (await googleDriveButton.isVisible()) {
       await expect(googleDriveButton).toBeVisible();
     }
@@ -45,8 +44,9 @@ test.describe("Add Source Modal", () => {
     await openAddSourceModal(page);
 
     // Footer should show 0 / 100 for a new notebook
-    await expect(page.getByText("0 / 100")).toBeVisible();
-    await expect(page.getByText("Source limit")).toBeVisible();
+    const dialog = addSourcesDialog(page);
+    await expect(dialog.getByText("0 / 100")).toBeVisible();
+    await expect(dialog.getByText("Source limit")).toBeVisible();
   });
 
   test("discover sources button opens discover modal", async ({ notebookPage }) => {
