@@ -8,11 +8,20 @@ interface PaperFileDropProps {
   hint: string;
   fileName: string | null;
   disabled?: boolean;
+  /** Focus the Choose file button on mount (when the drop is a step's first control). */
+  autoFocus?: boolean;
   onFile: (file: File) => void;
 }
 
 /** A keyboard-reachable file picker on a quiet dashed panel (no drag and drop, as before). */
-export function PaperFileDrop({ accept, hint, fileName, disabled, onFile }: PaperFileDropProps) {
+export function PaperFileDrop({
+  accept,
+  hint,
+  fileName,
+  disabled,
+  autoFocus,
+  onFile,
+}: PaperFileDropProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-8 text-center">
@@ -33,6 +42,7 @@ export function PaperFileDrop({ accept, hint, fileName, disabled, onFile }: Pape
         type="button"
         variant="outline"
         disabled={disabled}
+        autoFocus={autoFocus}
         onClick={() => inputRef.current?.click()}
       >
         <FileUp /> {fileName ? "Choose another file" : "Choose file"}

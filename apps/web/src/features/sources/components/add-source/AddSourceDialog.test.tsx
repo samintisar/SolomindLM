@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AddSourceDialog } from "./AddSourceDialog";
 
 const limits = { sourceLimit: 100, isLoading: false };
@@ -73,6 +73,9 @@ describe("AddSourceDialog", () => {
     limits.sourceLimit = 100;
     limits.isLoading = false;
   });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("opens on the menu with every option, the count and the limit bar", () => {
     renderDialog();
@@ -92,6 +95,26 @@ describe("AddSourceDialog", () => {
     expect(dialogNamed("Add sources")).toBeInTheDocument();
   });
 
+  it("returns focus to the option that opened the step", async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Import from Zotero" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to add sources" }));
+    expect(screen.getByRole("button", { name: "Import from Zotero" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to add sources" }));
+    expect(screen.getByRole("button", { name: "Copied text" })).toHaveFocus();
+  });
+
+  it("focuses the first control of the file-import steps", async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Import BibTeX or RIS" }));
+    expect(screen.getByRole("tab", { name: "Upload file" })).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Back to add sources" }));
+    await userEvent.click(screen.getByRole("button", { name: "Import from Mendeley" }));
+    expect(screen.getByRole("button", { name: "Choose file" })).toHaveFocus();
+  });
+
   it("reopens on the menu after closing from a step", async () => {
     const { rerenderWith } = renderDialog();
     await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
@@ -99,6 +122,20 @@ describe("AddSourceDialog", () => {
     rerenderWith({ open: false });
     rerenderWith({ open: true });
     expect(dialogNamed("Add sources")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back to add sources" })).not.toBeInTheDocument();
+  });
+
+  it("reopens unblocked after closing mid-submit", async () => {
+    const onTextUpload = vi.fn(() => new Promise<void>(() => undefined));
+    const { rerenderWith } = renderDialog({ onTextUpload });
+    await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "Some notes");
+    await userEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+    rerenderWith({ onTextUpload, open: false });
+    rerenderWith({ onTextUpload, open: true });
+    expect(dialogNamed("Add sources")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
   });
 
   it("disables every option and warns when signed out", () => {
@@ -128,14 +165,67 @@ describe("AddSourceDialog", () => {
 
   it("closes before opening Discover or Google Drive", async () => {
     const { props } = renderDialog();
+    const onOpenChange = vi.mocked(props.onOpenChange);
+    const onDiscoverClick = vi.mocked(props.onDiscoverClick);
+    const onGoogleDriveClick = vi.mocked(props.onGoogleDriveClick);
     await userEvent.click(screen.getByRole("button", { name: "Discover sources" }));
-    expect(props.onOpenChange).toHaveBeenCalledWith(false);
-    expect(props.onDiscoverClick).toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onDiscoverClick).toHaveBeenCalled();
+    expect(onOpenChange.mock.invocationCallOrder[0]).toBeLessThan(
+      onDiscoverClick.mock.invocationCallOrder[0]
+    );
 
-    vi.mocked(props.onOpenChange).mockClear();
+    onOpenChange.mockClear();
     await userEvent.click(screen.getByRole("button", { name: "Choose from Google Drive" }));
-    expect(props.onOpenChange).toHaveBeenCalledWith(false);
-    expect(props.onGoogleDriveClick).toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onGoogleDriveClick).toHaveBeenCalled();
+    expect(onOpenChange.mock.invocationCallOrder[0]).toBeLessThan(
+      onGoogleDriveClick.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("opens the file picker from Choose files and from the drop zone", async () => {
+    const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+    renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Choose files" }));
+    expect(click).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByTestId("source-dropzone"));
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not open the file picker from a disabled drop zone", async () => {
+    const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+    renderDialog({ userId: null });
+    await userEvent.click(screen.getByTestId("source-dropzone"));
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("blocks outside clicks while busy, then Escape closes once the submit settles", async () => {
+    let resolve: () => void = () => undefined;
+    const onTextUpload = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          resolve = r;
+        })
+    );
+    const { props } = renderDialog({ onTextUpload });
+    const onOpenChange = vi.mocked(props.onOpenChange);
+    await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "Some notes");
+    await userEvent.click(screen.getByRole("button", { name: "Add Source" }));
+
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]') as HTMLElement;
+    await userEvent.click(overlay);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(dialogNamed("Paste text")).toBeInTheDocument();
+
+    // Settling calls onDone, which asks to close; the parent keeps `open`, so the dialog stays.
+    await act(async () => resolve());
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    onOpenChange.mockClear();
+    expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
+    await userEvent.keyboard("{Escape}");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("blocks Escape while a form is busy", async () => {

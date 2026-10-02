@@ -14,15 +14,22 @@ interface TextFormProps extends StepFormProps {
 export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFormProps) {
   const [value, setValue] = useState("");
   const id = useId();
-  useReportBusy(isUploading, onBusyChange);
+  // Busy blocks closing, so report only this form's own submit: `isUploading` is shared with file
+  // uploads started from the menu, which must not trap the user in this step.
+  const [submitting, setSubmitting] = useState(false);
+  const pending = isUploading || submitting;
+  useReportBusy(submitting, onBusyChange);
 
   const submit = async () => {
-    if (!value.trim() || isUploading) return;
+    if (!value.trim() || pending) return;
+    setSubmitting(true);
     try {
       await onUpload(value);
       onDone();
     } catch {
       // useSourceUpload already toasted; keep the step open so the text is not lost.
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -50,15 +57,15 @@ export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFo
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Paste your text here..."
-            disabled={isUploading}
+            disabled={pending}
             autoFocus
             className="h-48 resize-none"
           />
         </Field>
       </FieldGroup>
       <div className="flex justify-end">
-        <Button type="submit" disabled={!value.trim() || isUploading}>
-          {isUploading ? (
+        <Button type="submit" disabled={!value.trim() || pending}>
+          {pending ? (
             <>
               <Spinner aria-hidden /> Adding...
             </>

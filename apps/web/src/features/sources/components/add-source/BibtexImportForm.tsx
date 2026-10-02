@@ -151,7 +151,9 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
     <div className="flex flex-col gap-6">
       <Tabs defaultValue="file">
         <TabsList>
-          <TabsTrigger value="file">Upload file</TabsTrigger>
+          <TabsTrigger value="file" autoFocus>
+            Upload file
+          </TabsTrigger>
           <TabsTrigger value="paste">Paste text</TabsTrigger>
         </TabsList>
         <TabsContent value="file">

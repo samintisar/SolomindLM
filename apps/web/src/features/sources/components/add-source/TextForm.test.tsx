@@ -31,4 +31,32 @@ describe("TextForm", () => {
     expect(onUpload).toHaveBeenCalledWith("notes");
     expect(onDone).toHaveBeenCalled();
   });
+
+  it("reports busy only for its own submit, not a shared upload", async () => {
+    const onBusyChange = vi.fn();
+    const { rerender } = render(
+      <TextForm
+        onUpload={vi.fn(() => new Promise<void>(() => undefined))}
+        isUploading
+        onDone={vi.fn()}
+        onBusyChange={onBusyChange}
+      />
+    );
+    expect(screen.getByRole("textbox", { name: "Text" })).toBeDisabled();
+    expect(onBusyChange).not.toHaveBeenCalledWith(true);
+
+    const onUpload = vi.fn(() => new Promise<void>(() => undefined));
+    rerender(
+      <TextForm
+        onUpload={onUpload}
+        isUploading={false}
+        onDone={vi.fn()}
+        onBusyChange={onBusyChange}
+      />
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "notes");
+    await userEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole("button", { name: "Adding..." })).toBeDisabled();
+  });
 });

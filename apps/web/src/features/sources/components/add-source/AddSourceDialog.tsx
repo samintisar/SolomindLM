@@ -93,8 +93,25 @@ export function AddSourceDialog({
   onGoogleDriveClick,
 }: AddSourceDialogProps) {
   const [step, setStep] = useState<AddSourceStep>("menu");
+  // The menu option that opened the current step, so Back can return focus to it.
+  const [originKey, setOriginKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { sourceLimit: maxSources, isLoading: limitsLoading } = useUserLimits();
+  // Set when closing to hand off to Discover or Google Drive, so the dialog does not pull focus
+  // back to its trigger after the next surface has focused itself.
+  const handoffRef = useRef(false);
+
+  // Reset to the menu when the dialog opens, not when it closes: resetting on close would flash
+  // the menu during the close animation.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setStep("menu");
+      setOriginKey(null);
+      setBusy(false);
+    }
+  }
 
   // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
   // onDragLeave is recreated each render, so [open, onDragLeave] would retrigger after setState).
@@ -102,7 +119,7 @@ export function AddSourceDialog({
   onDragLeaveRef.current = onDragLeave;
 
   // Reset dragging state when the dialog closes (run only when open changes, not when callback
-  // identity changes). Closing also returns to the menu, so a reopened dialog starts fresh.
+  // identity changes).
   useEffect(() => {
     if (!open) {
       const syntheticEvent = {
@@ -112,8 +129,6 @@ export function AddSourceDialog({
         relatedTarget: null,
       } as unknown as React.DragEvent<HTMLDivElement>;
       onDragLeaveRef.current(syntheticEvent);
-      setStep("menu");
-      setBusy(false);
     }
   }, [open]);
 
@@ -124,8 +139,12 @@ export function AddSourceDialog({
   const canUpload = Boolean(userId && noteId && !limitReached);
   const showAuthWarning = !userId || !noteId;
 
-  const close = () => onOpenChange(false);
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const done = close;
+  const selectStep = useCallback((next: AddSourceStep) => {
+    setOriginKey(next);
+    setStep(next);
+  }, []);
   // Stable identity: useReportBusy lists it as an effect dependency.
   const onBusyChange = useCallback((next: boolean) => setBusy(next), []);
 
@@ -148,12 +167,15 @@ export function AddSourceDialog({
             onDrop={onDrop}
             fileInputRef={fileInputRef}
             onFileSelect={onFileSelect}
-            onSelect={setStep}
+            focusKey={originKey}
+            onSelect={selectStep}
             onDiscover={() => {
+              handoffRef.current = true;
               close();
               onDiscoverClick();
             }}
             onGoogleDrive={() => {
+              handoffRef.current = true;
               close();
               onGoogleDriveClick();
             }}
@@ -220,6 +242,12 @@ export function AddSourceDialog({
         showCloseButton={false}
         onEscapeKeyDown={(e) => busy && e.preventDefault()}
         onInteractOutside={(e) => busy && e.preventDefault()}
+        onCloseAutoFocus={(e) => {
+          if (handoffRef.current) {
+            e.preventDefault();
+            handoffRef.current = false;
+          }
+        }}
       >
         <div className="flex items-center gap-2 px-6 pt-6 pb-4">
           {step !== "menu" && (

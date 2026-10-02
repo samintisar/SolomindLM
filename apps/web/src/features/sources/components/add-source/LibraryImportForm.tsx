@@ -137,6 +137,7 @@ export function LibraryImportForm({
         hint={`A .bib file exported from ${name}`}
         fileName={fileName}
         disabled={isParsing || isImporting}
+        autoFocus
         onFile={(file) => void handleFile(file)}
       />
 

@@ -33,10 +33,14 @@ export function LinkForm({ kind, onUpload, isUploading, onDone, onBusyChange }: 
   const [value, setValue] = useState("");
   const id = useId();
   const copy = COPY[kind];
-  useReportBusy(isUploading, onBusyChange);
+  // Busy blocks closing, so report only this form's own submit: `isUploading` is shared with file
+  // uploads started from the menu, which must not trap the user in this step.
+  const [submitting, setSubmitting] = useState(false);
+  const pending = isUploading || submitting;
+  useReportBusy(submitting, onBusyChange);
 
   const submit = async () => {
-    if (!value.trim() || isUploading) return;
+    if (!value.trim() || pending) return;
     const urls = value
       .split(/\s+/)
       .map((url) => url.trim())
@@ -45,11 +49,14 @@ export function LinkForm({ kind, onUpload, isUploading, onDone, onBusyChange }: 
       showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;
     }
+    setSubmitting(true);
     try {
       await onUpload(urls);
       onDone();
     } catch {
       // useSourceUpload already toasted; keep the step open so the user can fix the input.
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -77,7 +84,7 @@ export function LinkForm({ kind, onUpload, isUploading, onDone, onBusyChange }: 
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder={copy.placeholder}
-            disabled={isUploading}
+            disabled={pending}
             autoFocus
             className="h-32 resize-none"
           />
@@ -85,8 +92,8 @@ export function LinkForm({ kind, onUpload, isUploading, onDone, onBusyChange }: 
         </Field>
       </FieldGroup>
       <div className="flex justify-end">
-        <Button type="submit" disabled={!value.trim() || isUploading}>
-          {isUploading ? (
+        <Button type="submit" disabled={!value.trim() || pending}>
+          {pending ? (
             <>
               <Spinner aria-hidden /> Adding...
             </>

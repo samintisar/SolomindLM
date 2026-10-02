@@ -51,6 +51,8 @@ interface AddSourceMenuProps {
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
   fileInputRef?: React.RefObject<HTMLInputElement | null>;
   onFileSelect?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Key of the option to focus when the menu mounts (the one that opened the previous step). */
+  focusKey?: string | null;
   onSelect: (step: AddSourceStep) => void;
   onDiscover: () => void;
   onGoogleDrive: () => void;
@@ -68,6 +70,7 @@ export function AddSourceMenu({
   onDrop,
   fileInputRef,
   onFileSelect,
+  focusKey,
   onSelect,
   onDiscover,
   onGoogleDrive,
@@ -184,7 +187,7 @@ export function AddSourceMenu({
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/60 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/60 aria-disabled:hover:bg-muted/40 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       >
         <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Upload className="size-6" />
@@ -211,8 +214,18 @@ export function AddSourceMenu({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <OptionGroup heading="Links and text" options={linkOptions} disabled={!canUpload} />
-        <OptionGroup heading="Research papers" options={paperOptions} disabled={!canUpload} />
+        <OptionGroup
+          heading="Links and text"
+          options={linkOptions}
+          disabled={!canUpload}
+          focusKey={focusKey}
+        />
+        <OptionGroup
+          heading="Research papers"
+          options={paperOptions}
+          disabled={!canUpload}
+          focusKey={focusKey}
+        />
       </div>
 
       {showAuthWarning && (
@@ -241,10 +254,12 @@ function OptionGroup({
   heading,
   options,
   disabled,
+  focusKey,
 }: {
   heading: string;
   options: MenuOption[];
   disabled: boolean;
+  focusKey?: string | null;
 }) {
   const baseId = useId();
   const headingId = `${baseId}-heading`;
@@ -263,6 +278,7 @@ function OptionGroup({
                   type="button"
                   className="hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-50"
                   disabled={disabled}
+                  autoFocus={o.key === focusKey}
                   onClick={o.onClick}
                   aria-label={o.label}
                   aria-describedby={hintId}

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { LinkForm } from "./LinkForm";
@@ -76,9 +76,36 @@ describe("LinkForm", () => {
     expect(onDone).toHaveBeenCalled();
   });
 
-  it("reports busy while uploading and clears it on unmount", () => {
+  it("reports busy while its own submit runs and clears it on unmount", async () => {
+    const { field, onBusyChange } = setup(vi.fn(() => new Promise<void>(() => undefined)));
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+    await userEvent.type(field, "https://a.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add Sources" }));
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole("button", { name: "Adding..." })).toBeDisabled();
+    cleanup();
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("clears busy when the upload settles", async () => {
+    let resolve: () => void = () => undefined;
+    const onUpload = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          resolve = r;
+        })
+    );
+    const { field, onBusyChange } = setup(onUpload);
+    await userEvent.type(field, "https://a.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add Sources" }));
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    await act(async () => resolve());
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("disables but does not report busy while another upload runs", () => {
     const onBusyChange = vi.fn();
-    const view = render(
+    render(
       <LinkForm
         kind="website"
         onUpload={vi.fn()}
@@ -87,9 +114,8 @@ describe("LinkForm", () => {
         onBusyChange={onBusyChange}
       />
     );
-    expect(onBusyChange).toHaveBeenLastCalledWith(true);
-    view.unmount();
-    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+    expect(screen.getByRole("textbox", { name: "Website URLs" })).toBeDisabled();
+    expect(onBusyChange).not.toHaveBeenCalledWith(true);
   });
 
   it("names the busy button by its text only", () => {
