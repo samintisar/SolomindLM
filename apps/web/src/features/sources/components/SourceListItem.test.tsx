@@ -28,7 +28,7 @@ function setup(
     onView: vi.fn(),
     onDelete: vi.fn(),
     onRefreshSource: vi.fn(),
-    onMenuOpen: vi.fn(),
+    onMenuOpenChange: vi.fn(),
     onStartRename: vi.fn(),
     isMenuOpen: false,
     ...overrides,
@@ -94,7 +94,20 @@ describe("SourceListItem", () => {
   it("asks to open its menu from the trigger", async () => {
     const p = setup();
     await userEvent.click(screen.getByRole("button", { name: "More options" }));
-    expect(p.onMenuOpen).toHaveBeenCalledWith("s1");
+    expect(p.onMenuOpenChange).toHaveBeenCalledWith("s1", true);
+  });
+
+  it("names the open button by title and status, with the meta line as its description", () => {
+    setup({}, { status: "failed" });
+    const open = screen.getByRole("button", { name: "SQL cheatsheet Failed" });
+    expect(open).toHaveAccessibleDescription(/MDs*• Jan 30/);
+  });
+
+  it("treats an unchanged rename as a cancel", async () => {
+    const p = setup({ isRenaming: true, renameValue: " SQL cheatsheet " });
+    await userEvent.type(screen.getByRole("textbox", { name: "Rename source" }), "{Enter}");
+    expect(p.onRenameSubmit).not.toHaveBeenCalled();
+    expect(p.onRenameCancel).toHaveBeenCalledOnce();
   });
 
   it("renames inline: Enter submits trimmed, Escape cancels", async () => {

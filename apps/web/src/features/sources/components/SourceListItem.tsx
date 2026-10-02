@@ -44,7 +44,7 @@ interface SourceListItemProps {
   onView: (id: string) => void;
   onDelete: (id: string, title: string) => void;
   onRefreshSource: (id: string) => void;
-  onMenuOpen: (id: string) => void;
+  onMenuOpenChange: (id: string, open: boolean) => void;
   onStartRename: (sourceId: string) => void;
   isMenuOpen: boolean;
 }
@@ -60,26 +60,49 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   onView,
   onDelete,
   onRefreshSource,
-  onMenuOpen,
+  onMenuOpenChange,
   onStartRename,
   isMenuOpen,
 }) => {
   const status = source.status || "completed";
   const canRemoteRefresh = Boolean(source.remoteRefreshKind);
 
+  const metaId = React.useId();
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   // Enter/Escape already settle the rename; the blur that follows the input
   // unmounting must not submit it a second time (or submit after Escape).
   const renameSettledRef = React.useRef(false);
+  // Set when a keystroke ends the rename, so focus returns to the row's menu
+  // trigger (not when the rename ended by clicking elsewhere).
+  const returnFocusRef = React.useRef(false);
+  // Set when "Rename" was picked, so the menu's close doesn't steal focus
+  // back from the input that is about to autofocus.
+  const renameRequestedRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (isRenaming) renameSettledRef.current = false;
+    if (isRenaming) {
+      renameSettledRef.current = false;
+      returnFocusRef.current = false;
+    } else if (returnFocusRef.current) {
+      returnFocusRef.current = false;
+      triggerRef.current?.focus();
+    }
   }, [isRenaming]);
+
+  const submitRename = () => {
+    const next = renameValue.trim();
+    if (next === source.title) onRenameCancel();
+    else onRenameSubmit(source.id, next);
+  };
 
   const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && renameValue.trim()) {
       renameSettledRef.current = true;
-      onRenameSubmit(source.id, renameValue.trim());
+      returnFocusRef.current = true;
+      submitRename();
     } else if (e.key === "Escape") {
       renameSettledRef.current = true;
+      returnFocusRef.current = true;
       onRenameCancel();
     }
   };
@@ -87,7 +110,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   const handleRenameBlur = () => {
     if (renameSettledRef.current) return;
     renameSettledRef.current = true;
-    if (renameValue.trim()) onRenameSubmit(source.id, renameValue.trim());
+    if (renameValue.trim()) submitRename();
     else onRenameCancel();
   };
 
@@ -145,12 +168,13 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
           type="button"
           onClick={() => onView(source.id)}
           disabled={status === "processing"}
+          aria-describedby={metaId}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-left outline-hidden hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-default disabled:hover:bg-transparent"
         >
           <ItemMedia variant="icon">{getIcon()}</ItemMedia>
           <ItemContent className="min-w-0">
             <ItemTitle className="w-full">
-              <span className="truncate">{source.title}</span>
+              <span className="truncate">{source.title}</span>{" "}
               {status === "processing" && (
                 <Badge variant="secondary">
                   <Spinner aria-hidden />
@@ -160,7 +184,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               {status === "failed" && <Badge variant="destructive">Failed</Badge>}
             </ItemTitle>
             <ItemDescription>
-              <span className="block truncate font-sans text-xs">
+              <span id={metaId} aria-hidden className="block truncate font-sans text-xs">
                 <span
                   className={
                     source.type === "YOUTUBE" ? "tracking-wide" : "uppercase tracking-wide"
@@ -186,12 +210,11 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
         <DropdownMenu
           modal={false}
           open={isMenuOpen}
-          onOpenChange={(open) => {
-            if (open !== isMenuOpen) onMenuOpen(source.id);
-          }}
+          onOpenChange={(open) => onMenuOpenChange(source.id, open)}
         >
           <DropdownMenuTrigger asChild>
             <Button
+              ref={triggerRef}
               type="button"
               variant="ghost"
               size="icon-sm"
@@ -201,14 +224,27 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               <MoreVertical />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent
+            align="end"
+            onCloseAutoFocus={(e) => {
+              if (renameRequestedRef.current) {
+                renameRequestedRef.current = false;
+                e.preventDefault();
+              }
+            }}
+          >
             {canRemoteRefresh && (
               <DropdownMenuItem onSelect={() => onRefreshSource(source.id)}>
                 <RefreshCw />
                 Refresh
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onSelect={() => onStartRename(source.id)}>
+            <DropdownMenuItem
+              onSelect={() => {
+                renameRequestedRef.current = true;
+                onStartRename(source.id);
+              }}
+            >
               <Pencil />
               Rename
             </DropdownMenuItem>

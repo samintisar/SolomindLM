@@ -19,7 +19,8 @@ interface SourceListProps {
   renameValue: string;
   onRenameChange: (value: string) => void;
   openMenuId: string | null;
-  onMenuOpen: (id: string) => void;
+  onMenuOpenChange: (id: string, open: boolean) => void;
+  onRenameCancel: () => void;
   onStartRename: (sourceId: string) => void;
   onAddSource: () => void;
   onDiscoverClick: () => void;
@@ -46,7 +47,8 @@ export const SourceList: React.FC<SourceListProps> = ({
   renameValue,
   onRenameChange,
   openMenuId,
-  onMenuOpen,
+  onMenuOpenChange,
+  onRenameCancel,
   onStartRename,
   onAddSource,
   onDiscoverClick,
@@ -60,10 +62,6 @@ export const SourceList: React.FC<SourceListProps> = ({
     if (newTitle.trim()) {
       onRenameSource(id, newTitle.trim());
     }
-  };
-
-  const handleRenameCancel = () => {
-    onMenuOpen("");
   };
 
   return (
@@ -170,11 +168,11 @@ export const SourceList: React.FC<SourceListProps> = ({
                 renameValue={renameValue}
                 onRenameChange={onRenameChange}
                 onRenameSubmit={handleRenameSubmit}
-                onRenameCancel={handleRenameCancel}
+                onRenameCancel={onRenameCancel}
                 onToggle={onToggleSource}
                 onView={onViewSource}
                 onDelete={onDeleteSource}
-                onMenuOpen={onMenuOpen}
+                onMenuOpenChange={onMenuOpenChange}
                 onStartRename={onStartRename}
                 isMenuOpen={openMenuId === source.id}
                 onRefreshSource={onRefreshSource}
