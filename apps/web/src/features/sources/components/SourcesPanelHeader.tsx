@@ -1,5 +1,10 @@
-import { ChevronLeft, Copy, Download, ExternalLink, FileStack } from "lucide-react";
+import { ArrowLeft, ChevronLeft, Copy, Download, ExternalLink } from "lucide-react";
 import React from "react";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
+import { Input } from "@/shared/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Source } from "@/shared/types";
 import { hasExternalSourceUrl } from "../utils/sourceTypes";
 
@@ -34,239 +39,166 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
   onRenameChange,
   onRenameSubmit,
 }) => {
-  return (
-    <>
-      {/* Mobile Header */}
-      <div className="flex md:hidden flex-col border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20 shrink-0 h-14">
-        {viewingSource ? (
-          <>
-            <div className="flex h-14 items-center gap-2 px-4 shrink-0 min-h-0">
-              <div className="flex items-center gap-3 text-foreground overflow-hidden min-w-0 flex-1">
-                <button
-                  onClick={onBackToList}
-                  className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
-                  aria-label="Back to sources"
-                >
-                  <ChevronLeft className="w-5 h-5 shrink-0" />
-                </button>
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  {isRenaming ? (
-                    <input
-                      type="text"
-                      value={renameValue}
-                      spellCheck={false}
-                      onChange={(e) => onRenameChange(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && renameValue.trim()) {
-                          onRenameSubmit(viewingSource.id, renameValue.trim());
-                        } else if (e.key === "Escape") {
-                          onRenameChange(viewingSource.title);
-                          onExitRename();
-                        }
-                      }}
-                      onBlur={() => {
-                        if (renameValue.trim()) {
-                          onRenameSubmit(viewingSource.id, renameValue.trim());
-                        } else {
-                          onRenameChange(viewingSource.title);
-                        }
-                        onExitRename();
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                      autoFocus
-                      aria-label="Rename source"
-                    />
-                  ) : (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        onRenameChange(viewingSource.title);
-                        onEnterRename();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onRenameChange(viewingSource.title);
-                          onEnterRename();
-                        }
-                      }}
-                      className="font-display font-bold text-sm tracking-wide truncate text-foreground cursor-text hover:opacity-80"
-                      title="Click to rename"
-                    >
-                      {viewingSource.title}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {hasExternalSourceUrl(viewingSource) && (
-                  <a
-                    href={viewingSource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-md text-foreground/70 hover:text-foreground hover:bg-secondary transition-colors touch-manipulation"
-                    title="Open in new tab"
-                    aria-label="Open source in new tab"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={onCopy}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-transform text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-                  title="Copy content as Markdown"
-                  aria-label="Copy content as Markdown"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onDownload}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-transform text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-                  title="Download as Markdown file"
-                  aria-label="Download as Markdown file"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex h-14 items-center gap-2 px-4 text-foreground">
-            <FileStack className="w-4 h-4" />
-            <span className="font-display font-bold text-sm tracking-wide uppercase">Sources</span>
-            <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-xl font-mono">
-              {selectedCount}
-            </span>
-          </div>
-        )}
-      </div>
+  const titleRef = React.useRef<HTMLButtonElement>(null);
+  // Enter/Escape already settle the rename; the blur that follows the input
+  // unmounting must not submit it a second time (or submit after Escape).
+  const renameSettledRef = React.useRef(false);
+  // Set when a keystroke ends the rename, so focus returns to the title button
+  // (not when the rename ended by clicking elsewhere).
+  const returnFocusRef = React.useRef(false);
 
-      {/* Desktop Header */}
-      <div className="hidden md:flex flex-col border-b border-border bg-sidebar/50 backdrop-blur-sm sticky top-0 z-10">
-        {viewingSource ? (
-          <>
-            <div className="flex h-14 shrink-0 items-center gap-2 px-4 min-h-0">
-              <div className="flex items-center gap-3 text-sidebar-foreground overflow-hidden min-w-0 flex-1">
-                <button
-                  onClick={onBackToList}
-                  className="p-1 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground shrink-0 touch-manipulation"
-                >
-                  <ChevronLeft className="w-5 h-5 shrink-0" />
-                </button>
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  {isRenaming ? (
-                    <input
-                      type="text"
-                      value={renameValue}
-                      spellCheck={false}
-                      onChange={(e) => onRenameChange(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && renameValue.trim()) {
-                          onRenameSubmit(viewingSource.id, renameValue.trim());
-                        } else if (e.key === "Escape") {
-                          onRenameChange(viewingSource.title);
-                          onExitRename();
-                        }
-                      }}
-                      onBlur={() => {
-                        if (renameValue.trim()) {
-                          onRenameSubmit(viewingSource.id, renameValue.trim());
-                        } else {
-                          onRenameChange(viewingSource.title);
-                        }
-                        onExitRename();
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                      autoFocus
-                      aria-label="Rename source"
-                    />
-                  ) : (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        onRenameChange(viewingSource.title);
-                        onEnterRename();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onRenameChange(viewingSource.title);
-                          onEnterRename();
-                        }
-                      }}
-                      className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
-                      title="Click to rename"
-                    >
-                      {viewingSource.title}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {hasExternalSourceUrl(viewingSource) && (
-                  <a
-                    href={viewingSource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors touch-manipulation"
-                    title="Open in new tab"
-                    aria-label="Open source in new tab"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={onCopy}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-                  title="Copy content as Markdown"
-                  aria-label="Copy content as Markdown"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onDownload}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-                  title="Download as Markdown file"
-                  aria-label="Download as Markdown file"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex h-14 items-center justify-between px-4">
-            <div className="flex items-center gap-2 text-sidebar-foreground">
-              <FileStack className="w-4 h-4 shrink-0" />
-              <span className="font-display font-bold text-sm tracking-wide uppercase">
-                Sources
-              </span>
-              <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-xl font-mono">
-                {selectedCount}
-              </span>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0 touch-manipulation"
-              aria-label="Close Sources panel"
-            >
-              <ChevronLeft className="w-5 h-5 shrink-0" />
-            </button>
-          </div>
-        )}
+  React.useEffect(() => {
+    if (isRenaming) {
+      renameSettledRef.current = false;
+      returnFocusRef.current = false;
+    } else if (returnFocusRef.current) {
+      returnFocusRef.current = false;
+      titleRef.current?.focus();
+    }
+  }, [isRenaming]);
+
+  if (!viewingSource) {
+    return (
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-4">
+        <h2 className="font-display text-sm font-bold tracking-wide uppercase">Sources</h2>
+        <Badge variant="secondary">{selectedCount}</Badge>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="ml-auto hidden md:inline-flex"
+          aria-label="Close sources panel"
+          onClick={onClose}
+        >
+          <ChevronLeft />
+        </Button>
       </div>
-    </>
+    );
+  }
+
+  const submitRename = () => {
+    const next = renameValue.trim();
+    if (next === viewingSource.title) onExitRename();
+    else onRenameSubmit(viewingSource.id, next);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && renameValue.trim()) {
+      // Focus moves to the title button during this keydown; without this the Enter's
+      // default action would "click" that button and reopen the rename.
+      e.preventDefault();
+      renameSettledRef.current = true;
+      returnFocusRef.current = true;
+      submitRename();
+    } else if (e.key === "Escape") {
+      renameSettledRef.current = true;
+      returnFocusRef.current = true;
+      onExitRename();
+    }
+  };
+
+  const handleRenameBlur = () => {
+    if (renameSettledRef.current) return;
+    renameSettledRef.current = true;
+    if (renameValue.trim()) submitRename();
+    else onExitRename();
+  };
+
+  const startRename = () => {
+    onRenameChange(viewingSource.title);
+    onEnterRename();
+  };
+
+  return (
+    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-4">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Back to sources"
+        onClick={onBackToList}
+      >
+        <ArrowLeft />
+      </Button>
+      {isRenaming ? (
+        <Input
+          autoFocus
+          aria-label="Rename source"
+          spellCheck={false}
+          className="min-w-0 flex-1"
+          value={renameValue}
+          onChange={(e) => onRenameChange(e.target.value)}
+          onKeyDown={handleRenameKeyDown}
+          onBlur={handleRenameBlur}
+        />
+      ) : (
+        <Button
+          ref={titleRef}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="min-w-0 flex-1 justify-start"
+          aria-label={`Rename ${viewingSource.title}`}
+          onClick={startRename}
+        >
+          <span className="truncate font-display text-sm font-bold tracking-wide">
+            {viewingSource.title}
+          </span>
+        </Button>
+      )}
+      <ButtonGroup variant="tray" aria-label="Source actions" className="shrink-0">
+        {hasExternalSourceUrl(viewingSource) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button asChild variant="ghost" size="icon-sm">
+                <a
+                  href={viewingSource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open source in new tab"
+                >
+                  <ExternalLink />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open in new tab</TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Copy content as Markdown"
+                onClick={onCopy}
+                disabled={!canCopyOrDownload}
+              >
+                <Copy />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Copy as Markdown</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Download as Markdown file"
+                onClick={onDownload}
+                disabled={!canCopyOrDownload}
+              >
+                <Download />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Download as Markdown</TooltipContent>
+        </Tooltip>
+      </ButtonGroup>
+    </div>
   );
 };
