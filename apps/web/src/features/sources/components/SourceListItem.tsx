@@ -1,20 +1,36 @@
 import {
-  CheckSquare,
-  Edit2,
   File,
   FileText,
   Globe,
   GraduationCap,
-  Loader2,
   MoreVertical,
+  Pencil,
   RefreshCw,
-  Square,
   Trash2,
-  XCircle,
   Youtube,
 } from "lucide-react";
 import React from "react";
 import { Favicon } from "@/shared/components/Favicon";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { Input } from "@/shared/components/ui/input";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/shared/components/ui/item";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { Source } from "@/shared/types";
 
 interface SourceListItemProps {
@@ -49,19 +65,35 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   isMenuOpen,
 }) => {
   const status = source.status || "completed";
-  const canClick = !isRenaming && status !== "processing";
+  const canRemoteRefresh = Boolean(source.remoteRefreshKind);
+
+  // Enter/Escape already settle the rename; the blur that follows the input
+  // unmounting must not submit it a second time (or submit after Escape).
+  const renameSettledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (isRenaming) renameSettledRef.current = false;
+  }, [isRenaming]);
 
   const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && renameValue.trim()) {
+      renameSettledRef.current = true;
       onRenameSubmit(source.id, renameValue.trim());
     } else if (e.key === "Escape") {
+      renameSettledRef.current = true;
       onRenameCancel();
     }
   };
 
+  const handleRenameBlur = () => {
+    if (renameSettledRef.current) return;
+    renameSettledRef.current = true;
+    if (renameValue.trim()) onRenameSubmit(source.id, renameValue.trim());
+    else onRenameCancel();
+  };
+
   const getIcon = () => {
     if (source.type === "YOUTUBE") {
-      return <Youtube className="w-5 h-5 text-destructive" aria-hidden />;
+      return <Youtube className="size-5 text-destructive" aria-hidden />;
     }
     if (source.type === "WEB") {
       return (
@@ -69,13 +101,13 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
           url={source.url}
           size={20}
           className="rounded-sm"
-          fallback={<Globe className="w-5 h-5" />}
+          fallback={<Globe className="size-5" />}
         />
       );
     }
-    if (source.type === "PAPER") return <GraduationCap className="w-5 h-5" />;
-    if (source.type === "IMG") return <File className="w-5 h-5" />;
-    return <FileText className="w-5 h-5" />;
+    if (source.type === "PAPER") return <GraduationCap className="size-5" />;
+    if (source.type === "IMG") return <File className="size-5" />;
+    return <FileText className="size-5" />;
   };
 
   /** Short subtitle for papers — sentence case, no badge (see meta row below title). */
@@ -95,146 +127,102 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   const paperHint = paperMetaHint();
 
   return (
-    <div
-      className={`group flex flex-col bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer overflow-visible relative ${isMenuOpen ? "z-[200]" : ""}`}
-      onClick={() => canClick && onView(source.id)}
-    >
-      <div className="flex items-center gap-2 py-2.5 px-2.5">
-        <div className="text-muted-foreground shrink-0 flex items-center justify-center">
-          {getIcon()}
+    <Item data-source-id={source.id} size="sm">
+      {isRenaming ? (
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <ItemMedia variant="icon">{getIcon()}</ItemMedia>
+          <Input
+            autoFocus
+            aria-label="Rename source"
+            value={renameValue}
+            onChange={(e) => onRenameChange(e.target.value)}
+            onKeyDown={handleRenameKeyDown}
+            onBlur={handleRenameBlur}
+          />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            {isRenaming ? (
-              <input
-                type="text"
-                value={renameValue}
-                onChange={(e) => onRenameChange(e.target.value)}
-                onKeyDown={handleRenameKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                className="flex-1 px-2 py-1 text-sm bg-background border border-primary rounded font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                autoFocus
-              />
-            ) : (
-              <h4 className="text-sm font-medium text-foreground truncate leading-tight">
-                {source.title}
-              </h4>
-            )}
-            {/* Status badge */}
-            {status === "processing" && (
-              <div className="flex items-center gap-1 text-xs font-medium text-warning-muted-foreground font-sans shrink-0">
-                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                <span>Processing</span>
-              </div>
-            )}
-            {status === "failed" && (
-              <div className="flex items-center gap-1 text-xs font-medium text-destructive font-sans shrink-0">
-                <XCircle className="w-3 h-3 shrink-0" />
-                <span>Failed</span>
-              </div>
-            )}
-          </div>
-          <p
-            className="text-xs text-muted-foreground font-sans leading-snug truncate"
-            title={paperHint ?? undefined}
-          >
-            <span
-              className={source.type === "YOUTUBE" ? "tracking-wide" : "uppercase tracking-wide"}
-            >
-              {source.type === "YOUTUBE" ? "YouTube" : source.type}
-            </span>
-            <span> • {source.date}</span>
-            {paperHint && status === "completed" && (
-              <span className="font-normal normal-case tracking-normal text-muted-foreground/85">
-                {" "}
-                · {paperHint}
+      ) : (
+        <button
+          type="button"
+          onClick={() => onView(source.id)}
+          disabled={status === "processing"}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-left outline-hidden hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-default disabled:hover:bg-transparent"
+        >
+          <ItemMedia variant="icon">{getIcon()}</ItemMedia>
+          <ItemContent className="min-w-0">
+            <ItemTitle className="w-full">
+              <span className="truncate">{source.title}</span>
+              {status === "processing" && (
+                <Badge variant="secondary">
+                  <Spinner aria-hidden />
+                  Processing
+                </Badge>
+              )}
+              {status === "failed" && <Badge variant="destructive">Failed</Badge>}
+            </ItemTitle>
+            <ItemDescription>
+              <span className="block truncate font-sans text-xs">
+                <span
+                  className={
+                    source.type === "YOUTUBE" ? "tracking-wide" : "uppercase tracking-wide"
+                  }
+                >
+                  {source.type === "YOUTUBE" ? "YouTube" : source.type}
+                </span>
+                <span> • {source.date}</span>
+                {paperHint && status === "completed" && (
+                  <span className="font-normal normal-case tracking-normal"> · {paperHint}</span>
+                )}
               </span>
-            )}
-          </p>
-        </div>
-        {!isRenaming && (
-          <div className="flex items-center gap-2 shrink-0">
-            <div
-              className="text-primary p-1 hover:bg-secondary rounded-xl transition-colors flex items-center justify-center"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle(source.id);
-              }}
+            </ItemDescription>
+          </ItemContent>
+        </button>
+      )}
+      <ItemActions>
+        <Checkbox
+          checked={source.selected}
+          onCheckedChange={() => onToggle(source.id)}
+          aria-label={`Include ${source.title} in chat`}
+        />
+        <DropdownMenu
+          modal={false}
+          open={isMenuOpen}
+          onOpenChange={(open) => {
+            if (open !== isMenuOpen) onMenuOpen(source.id);
+          }}
+        >
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="More options"
+              title="More options"
             >
-              {source.selected ? (
-                <CheckSquare className="w-4 h-4" />
-              ) : (
-                <Square className="w-4 h-4 opacity-50 group-hover:opacity-100" />
-              )}
-            </div>
-            <div className="relative z-50">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMenuOpen(source.id);
-                }}
-                className={`p-1 hover:bg-secondary rounded-xl transition-colors flex items-center justify-center ${
-                  isMenuOpen ? "text-foreground bg-secondary" : "text-muted-foreground"
-                }`}
-                title="More options"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-              {isMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onMenuOpen("");
-                    }}
-                  />
-                  <div className="absolute right-0 top-full mt-1 z-110 min-w-[140px] rounded-lg border border-border bg-card shadow-xl overflow-hidden">
-                    {source.remoteRefreshKind && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRefreshSource(source.id);
-                          onMenuOpen("");
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Refresh
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStartRename(source.id);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(source.id, source.title);
-                        onMenuOpen("");
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {canRemoteRefresh && (
+              <DropdownMenuItem onSelect={() => onRefreshSource(source.id)}>
+                <RefreshCw />
+                Refresh
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => onStartRename(source.id)}>
+              <Pencil />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => onDelete(source.id, source.title)}
+            >
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ItemActions>
+    </Item>
   );
 };
