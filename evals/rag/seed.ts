@@ -36,12 +36,14 @@ async function main(): Promise<void> {
 
   // Resolve every requested pack up front so a typo fails before anything is seeded.
   const packs: RegisteredPack[] = [];
+  let reingest = false;
   try {
-    const packIds = parseSeedArgs(
+    const args = parseSeedArgs(
       process.argv.slice(2),
       USE_CASE_PACKS.map((p) => p.pack.id)
     );
-    for (const id of packIds) packs.push(getPack(id));
+    reingest = args.reingest;
+    for (const id of args.packIds) packs.push(getPack(id));
   } catch (err) {
     fatal(err instanceof Error ? err.message : String(err));
   }
@@ -65,6 +67,7 @@ async function main(): Promise<void> {
     try {
       const result = await seedPack(pack, readPackSources(registered), api, {
         log: (line) => console.log(line),
+        reingest,
       });
       const changed = result.actions.filter((a) => a.kind !== "skip").length;
       console.log(

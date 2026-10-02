@@ -18,11 +18,24 @@ export interface RemotePackNotebook {
 
 export type SyncAction =
   | { kind: "upload"; fileName: string }
-  | { kind: "replace"; fileName: string; documentId: string; reason: "changed" | "failed" }
+  | {
+      kind: "replace";
+      fileName: string;
+      documentId: string;
+      reason: "changed" | "failed" | "reingest";
+    }
   | { kind: "skip"; fileName: string; documentId: string };
 
-/** Decide what the seeder does for each committed source. Unrelated notebook docs are left alone. */
-export function planPackSync(local: SourceDigest[], remote: RemotePackDoc[]): SyncAction[] {
+/**
+ * Decide what the seeder does for each committed source. Unrelated notebook docs
+ * are left alone. With `reingest`, up-to-date documents are replaced too, so they
+ * go through the current ingestion pipeline again.
+ */
+export function planPackSync(
+  local: SourceDigest[],
+  remote: RemotePackDoc[],
+  options: { reingest?: boolean } = {}
+): SyncAction[] {
   for (const file of local) {
     const count = remote.filter((d) => d.fileName === file.fileName).length;
     if (count > 1) {
@@ -31,6 +44,12 @@ export function planPackSync(local: SourceDigest[], remote: RemotePackDoc[]): Sy
       );
     }
     const doc = remote.find((d) => d.fileName === file.fileName);
+    const inFlight = doc && (doc.status === "pending" || doc.status === "processing");
+    if (inFlight && options.reingest) {
+      throw new Error(
+        `"${file.fileName}" is still ingesting; wait for it to finish, then re-run eval:seed --reingest.`
+      );
+    }
     if (
       doc &&
       (doc.status === "pending" || doc.status === "processing") &&
@@ -58,6 +77,14 @@ export function planPackSync(local: SourceDigest[], remote: RemotePackDoc[]): Sy
         fileName: file.fileName,
         documentId: doc.documentId,
         reason: "changed",
+      };
+    }
+    if (options.reingest) {
+      return {
+        kind: "replace",
+        fileName: file.fileName,
+        documentId: doc.documentId,
+        reason: "reingest",
       };
     }
     return { kind: "skip", fileName: file.fileName, documentId: doc.documentId };
