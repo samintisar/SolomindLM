@@ -226,7 +226,8 @@ export const professionalsFixtures: EvalFixture[] = [
     split: "holdout",
     runner: "mindmap",
     question: "Map the key risks and pressures across all my reports.",
-    expectedItems: [],
+    // One term found in only one report each: Beige Book, STEO, Feed Outlook, FTC.
+    expectedItems: ["tariff", "distillate", "corn", "switching"],
     expectedAnswer:
       "Branches per report: Beige Book (input costs and tariffs, weak consumer demand, uncertainty about energy and " +
       "policy), STEO (constrained Middle East exports, low distillate inventories, high diesel prices), Feed Outlook " +
