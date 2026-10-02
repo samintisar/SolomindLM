@@ -141,6 +141,21 @@ describe("seedPack", () => {
     expect(api.calls).toEqual(["resolve", "resolve"]);
   });
 
+  it("re-ingests a current source with reingest (upload, remove, add)", async () => {
+    const api = new FakeSeedApi({
+      notebookId: "nb",
+      docs: [{ documentId: "d1", fileName: "a.md", status: "completed", sha256: "1" }],
+    });
+    const lines: string[] = [];
+    await seedPack(pack, [file("a.md", "1")], api, {
+      ...fast,
+      reingest: true,
+      log: (l) => lines.push(l),
+    });
+    expect(api.calls).toEqual(["resolve", "upload:a.md", "remove:d1", "add:a.md", "resolve"]);
+    expect(lines).toContain("  replace a.md (reingest)");
+  });
+
   it("uploads new bytes before removing the old document when replacing a changed source", async () => {
     const api = new FakeSeedApi({
       notebookId: "nb",

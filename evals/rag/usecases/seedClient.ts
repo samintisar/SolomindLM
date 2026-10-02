@@ -25,6 +25,8 @@ export interface SeedPackOptions {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   log?: (line: string) => void;
+  /** Replace up-to-date sources too, so they are ingested again */
+  reingest?: boolean;
 }
 
 export interface SeedPackResult {
@@ -55,7 +57,7 @@ export async function seedPack(
 
   const existing = await api.resolve(pack.notebookTitle);
   // Plan before mutating anything: planPackSync throws on states it cannot reconcile.
-  const actions = planPackSync(local, existing?.docs ?? []);
+  const actions = planPackSync(local, existing?.docs ?? [], { reingest: options.reingest });
   const notebookId = existing?.notebookId ?? (await api.create(pack.notebookTitle));
 
   for (const action of actions) {

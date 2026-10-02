@@ -38,6 +38,26 @@ describe("planPackSync", () => {
   });
 });
 
+describe("planPackSync with reingest", () => {
+  it("replaces up-to-date documents too; uploads, changes and failures are unchanged", () => {
+    expect(planPackSync(local, remote, { reingest: true })).toEqual([
+      { kind: "upload", fileName: "a.pdf" },
+      { kind: "replace", fileName: "b.md", documentId: "doc-b", reason: "changed" },
+      { kind: "replace", fileName: "c.md", documentId: "doc-c", reason: "failed" },
+      { kind: "replace", fileName: "d.md", documentId: "doc-d", reason: "reingest" },
+    ]);
+  });
+
+  it("refuses while a matching document is still ingesting", () => {
+    const processing = [
+      { documentId: "d1", fileName: "a.pdf", status: "processing", sha256: "aaa" },
+    ];
+    expect(() => planPackSync([local[0]], processing, { reingest: true })).toThrow(
+      '"a.pdf" is still ingesting; wait for it to finish, then re-run eval:seed --reingest.'
+    );
+  });
+});
+
 describe("planPackSync duplicates", () => {
   it("throws before planning when a source name matches several remote documents", () => {
     const dupes: RemotePackDoc[] = [
