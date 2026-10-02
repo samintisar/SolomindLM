@@ -10,14 +10,13 @@ import { type StepFormProps, useReportBusy } from "./types";
 const COPY = {
   website: {
     label: "Website URLs",
-    placeholder:
-      "https://example.com\nhttps://another-example.com\n\nSeparate multiple URLs with spaces or new lines",
+    // The hint below the field says how to separate URLs, so the placeholder stays an example.
+    placeholder: "https://example.com\nhttps://another-example.com",
     hint: "Separate multiple URLs with spaces or new lines.",
   },
   video: {
     label: "Video URLs",
-    placeholder:
-      "Paste URL from YouTube, TikTok, Instagram, or X...\n\nSeparate multiple URLs with spaces or new lines",
+    placeholder: "Paste URL from YouTube, TikTok, Instagram, or X...",
     hint: "Transcripts are extracted from YouTube, TikTok, Instagram and X. Separate multiple URLs with spaces or new lines.",
   },
 } as const;

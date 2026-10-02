@@ -187,14 +187,17 @@ export function AddSourceMenu({
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/60 aria-disabled:hover:bg-muted/40 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-hairline bg-muted/40 px-4 py-6 text-center sm:px-6 sm:py-10 transition-colors hover:bg-muted/60 aria-disabled:hover:bg-muted/40 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       >
         <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Upload className="size-6" />
         </span>
         <div className="flex flex-col gap-1">
           <h3 className="font-display text-lg">Upload sources</h3>
-          <p className="font-sans text-sm text-muted-foreground">Drag and drop files here, or</p>
+          {/* Drag and drop needs a pointer; phones just get the button. */}
+          <p className="hidden font-sans text-sm text-muted-foreground sm:block">
+            Drag and drop files here, or
+          </p>
         </div>
         <Button
           type="button"

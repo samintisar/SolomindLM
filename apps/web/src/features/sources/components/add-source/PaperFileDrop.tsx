@@ -24,7 +24,7 @@ export function PaperFileDrop({
 }: PaperFileDropProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/50 bg-muted/40 px-6 py-8 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-hairline bg-muted/40 px-6 py-8 text-center">
       <input
         ref={inputRef}
         type="file"

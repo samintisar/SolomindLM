@@ -122,7 +122,7 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
             disabled={isUploading}
           />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-x-4 gap-y-7 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor={`${baseId}-doi`}>DOI</FieldLabel>
             <Input
