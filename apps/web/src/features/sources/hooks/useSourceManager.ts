@@ -77,13 +77,20 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
 
   const handleDeleteSource = useCallback(
     async (sourceId: string) => {
-      const snapshot = sourcesRef.current;
+      const index = sourcesRef.current.findIndex((s) => s.id === sourceId);
+      const removed = index >= 0 ? sourcesRef.current[index] : undefined;
       setSources((prev) => prev.filter((s) => s.id !== sourceId));
       try {
         await deleteDocumentMutation(sourceId);
       } catch (error) {
         console.error("Failed to delete source:", error);
-        setSources(snapshot);
+        if (removed) {
+          setSources((prev) => {
+            if (prev.some((s) => s.id === sourceId)) return prev;
+            const at = Math.min(index, prev.length);
+            return [...prev.slice(0, at), removed, ...prev.slice(at)];
+          });
+        }
         showError(error instanceof Error ? error.message : "Failed to delete source");
       }
     },

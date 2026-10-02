@@ -45,6 +45,20 @@ describe("useSourceManager", () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it("restores only the failed row when two deletes overlap", async () => {
+    deleteDocument.mockRejectedValueOnce(new Error("nope")).mockResolvedValueOnce(undefined);
+    const documents = [doc("a", "A.md"), doc("b", "B.md"), doc("c", "C.md")];
+    const { result } = renderHook(() => useSourceManager({ documents, notebookId: "n" }));
+    await waitFor(() => expect(result.current.sources).toHaveLength(3));
+    await act(async () => {
+      await Promise.all([
+        result.current.handleDeleteSource("a"),
+        result.current.handleDeleteSource("b"),
+      ]);
+    });
+    expect(result.current.sources.map((s) => s.id)).toEqual(["a", "c"]);
+  });
+
   it("restores the old title when rename fails", async () => {
     updateDocument.mockRejectedValueOnce(new Error("denied"));
     const documents = [doc("a", "A.md")];
