@@ -711,5 +711,8 @@ describe("item rows", () => {
     expect(group.className).not.toMatch(/(^|\s)border(\s|$)/);
     expect(group.className).not.toContain("dark:");
     expect(screen.getByTestId("row")).toHaveAttribute("data-slot", "item");
+    expect(group).toHaveClass("divide-y");
+    // Rows must not zero their own border: the group's divide-y draws the row hairlines with it.
+    expect(screen.getByTestId("row").className).not.toMatch(/border-0/);
   });
 });
