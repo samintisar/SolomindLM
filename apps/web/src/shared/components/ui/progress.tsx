@@ -3,12 +3,15 @@ import { Progress as ProgressPrimitive } from "radix-ui";
 import type * as React from "react";
 import { cn } from "@/shared/utils/cn";
 
-const progressIndicatorVariants = cva("h-full w-full flex-1 rounded-full transition-all", {
-  variants: {
-    tone: { default: "bg-primary", destructive: "bg-destructive" },
-  },
-  defaultVariants: { tone: "default" },
-});
+const progressIndicatorVariants = cva(
+  "h-full w-full flex-1 translate-x-(--progress-offset) rounded-full transition-all",
+  {
+    variants: {
+      tone: { default: "bg-primary", destructive: "bg-destructive" },
+    },
+    defaultVariants: { tone: "default" },
+  }
+);
 
 function Progress({
   className,
@@ -27,7 +30,7 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className={progressIndicatorVariants({ tone })}
-        style={{ transform: `translateX(-${100 - (value ?? 0)}%)` }}
+        style={{ "--progress-offset": `${(value ?? 0) - 100}%` } as React.CSSProperties}
       />
     </ProgressPrimitive.Root>
   );

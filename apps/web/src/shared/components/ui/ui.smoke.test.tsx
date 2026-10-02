@@ -725,4 +725,13 @@ describe("item rows", () => {
       "bg-destructive"
     );
   });
+
+  it("Progress drives the indicator offset through a custom property", () => {
+    render(<Progress value={40} aria-label="Source limit" />);
+    const indicator = screen
+      .getByRole("progressbar", { name: "Source limit" })
+      .querySelector<HTMLElement>("[data-slot=progress-indicator]");
+    expect(indicator?.style.getPropertyValue("--progress-offset")).toBe("-60%");
+    expect(indicator?.className).toContain("translate-x-(--progress-offset)");
+  });
 });
