@@ -4,8 +4,9 @@ import {
   addPasteTextSource,
   deleteSource,
   getSourceCard,
-  openSourceKebab,
+  getSourceCheckbox,
   PASTED_TEXT_TITLE,
+  renameSource,
   selectSource,
   waitForSourceStatus,
 } from "../helpers/source-assertions";
@@ -21,20 +22,16 @@ test.describe("Source List", () => {
     await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 120_000);
 
     // Sources are selected by default — verify initial selected state
-    const card = getSourceCard(page, PASTED_TEXT_TITLE);
-    await expect(card.locator("svg[class*='check']")).toBeVisible();
+    const checkbox = getSourceCheckbox(page, PASTED_TEXT_TITLE);
+    await expect(checkbox).toBeChecked();
 
     // Deselect by clicking the checkbox
     await selectSource(page, PASTED_TEXT_TITLE);
-
-    // Checked icon should be gone
-    await expect(card.locator("svg[class*='check']")).not.toBeVisible();
+    await expect(checkbox).not.toBeChecked();
 
     // Re-select by clicking again
     await selectSource(page, PASTED_TEXT_TITLE);
-
-    // Checked icon should be back
-    await expect(card.locator("svg[class*='check']")).toBeVisible();
+    await expect(checkbox).toBeChecked();
   });
 
   test("source can be deleted", async ({ notebookPage }) => {
@@ -67,22 +64,9 @@ test.describe("Source List", () => {
     await addPasteTextSource(page, sourceText);
     await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 120_000);
 
-    // Open kebab menu via evaluate (bypasses ChatEmptyState overlay)
-    await openSourceKebab(page, PASTED_TEXT_TITLE);
-
-    // Click Rename (evaluate bypasses ChatEmptyState overlay)
-    await page
-      .getByText("Rename")
-      .first()
-      .evaluate((el) => (el as HTMLElement).click());
-
-    // The rename input appears inline with border-primary class and autoFocus.
-    // Can't use getSourceCard because the h4 text changes to an input.
-    const renameInput = page.locator("input.border-primary").first();
-    await expect(renameInput).toBeVisible({ timeout: 5_000 });
-    await renameInput.clear();
-    await renameInput.fill(newName);
-    await renameInput.press("Enter");
+    // Menu -> Rename -> inline "Rename source" textbox -> Enter. The row's title
+    // becomes an input while renaming, so the helper finds it by role, not by card.
+    await renameSource(page, PASTED_TEXT_TITLE, newName);
 
     // Verify new name is visible in source card
     await expect(getSourceCard(page, newName)).toBeVisible({ timeout: 5_000 });
