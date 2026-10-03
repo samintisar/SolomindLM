@@ -1,6 +1,6 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { AlertCircle, Library } from "lucide-react";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -75,8 +75,12 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
   const existing = useGetExistingPapers(notebookId);
   useReportBusy(isParsing || isImporting, onBusyChange);
 
+  // Each file choice or paste parse takes a new number; only the latest may write results, so a
+  // slow earlier read or parse can't land on top of a newer one.
+  const requestRef = useRef(0);
+
   const handleParse = useCallback(
-    async (content: string) => {
+    async (content: string, request = ++requestRef.current) => {
       if (!content.trim()) return;
       setIsParsing(true);
       setError(null);
@@ -87,14 +91,16 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
 
       try {
         const result = await parseBibliography({ content, format: detectFormat(content) });
+        if (request !== requestRef.current) return;
         setPapers(result.papers);
         setStats(result.stats);
         setWarnings(result.warnings || []);
         setSelected(new Set(result.papers.map((_paper: ParsedPaper, i: number) => i)));
       } catch (err) {
+        if (request !== requestRef.current) return;
         setError(err instanceof Error ? err.message : "Failed to parse bibliography");
       } finally {
-        setIsParsing(false);
+        if (request === requestRef.current) setIsParsing(false);
       }
     },
     [parseBibliography]
@@ -102,6 +108,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
 
   const handleFile = useCallback(
     async (file: File) => {
+      const request = ++requestRef.current;
       // Drop the previous file's results first: a failed read (or an empty file, which
       // handleParse skips) must not leave the old papers importable under the new file's error.
       setFileName(null);
@@ -112,9 +119,11 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
       setError(null);
       try {
         const text = await file.text();
+        if (request !== requestRef.current) return;
         setFileName(file.name);
-        void handleParse(text);
+        void handleParse(text, request);
       } catch (err) {
+        if (request !== requestRef.current) return;
         setError(err instanceof Error ? err.message : "Failed to read file");
       }
     },
