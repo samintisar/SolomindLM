@@ -27,11 +27,15 @@ function PopoverContent({
   align = "center",
   sideOffset = 4,
   padding,
+  container,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content> &
-  VariantProps<typeof popoverContentVariants>) {
+  VariantProps<typeof popoverContentVariants> & {
+    /** Portal target; defaults to `document.body`. The design gallery pins layers inside a frame. */
+    container?: HTMLElement | null;
+  }) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}

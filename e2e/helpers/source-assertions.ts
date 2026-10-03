@@ -6,15 +6,20 @@ import { openAddSourceModal } from "./navigation";
 export const PASTED_TEXT_TITLE = "Pasted Text";
 
 /**
- * Get the root source card element by title.
- * Navigates from the source title text up to the nearest ancestor div with
- * the 'rounded-lg' class, which is the SourceListItem root element.
+ * Get the source row (shadcn `Item`, `data-slot="item"`) whose text contains the title.
+ * While a row is being renamed its title becomes an input, so it no longer matches
+ * by text — use the "Rename source" textbox for that window.
  */
 export function getSourceCard(page: Page, sourceTitle: string | RegExp) {
-  return page
-    .getByText(sourceTitle, { exact: typeof sourceTitle === "string" })
-    .locator("xpath=ancestor::div[contains(@class,'rounded-lg')][1]")
-    .first();
+  return page.locator('[data-slot="item"]', { hasText: sourceTitle }).first();
+}
+
+/**
+ * The "Include <title> in chat" checkbox (Radix: role="checkbox" + aria-checked)
+ * inside a source row. Assert with toBeChecked() / not.toBeChecked().
+ */
+export function getSourceCheckbox(page: Page, sourceTitle: string | RegExp) {
+  return getSourceCard(page, sourceTitle).getByRole("checkbox");
 }
 
 /**
@@ -102,13 +107,11 @@ export async function waitForSourceStatus(
 }
 
 /**
- * Select a source by clicking its checkbox area (Square/CheckSquare icon).
+ * Toggle a source's "Include in chat" checkbox.
  * Uses dispatchEvent to bypass ChatEmptyState overlay.
  */
 export async function selectSource(page: Page, sourceTitle: string | RegExp) {
-  const sourceCard = getSourceCard(page, sourceTitle);
-  const checkbox = sourceCard.locator("div.text-primary").first();
-  await checkbox.dispatchEvent("click");
+  await getSourceCheckbox(page, sourceTitle).dispatchEvent("click");
 }
 
 /**
@@ -116,11 +119,8 @@ export async function selectSource(page: Page, sourceTitle: string | RegExp) {
  */
 export async function deleteSource(page: Page, sourceTitle: string | RegExp) {
   await openSourceKebab(page, sourceTitle);
-  // Click "Delete" in the kebab dropdown (evaluate bypasses ChatEmptyState overlay)
-  await page
-    .getByText("Delete")
-    .first()
-    .evaluate((el) => (el as HTMLElement).click());
+  // The menu content portals to the body, so look it up on the page, not the card
+  await page.getByRole("menuitem", { name: "Delete" }).click();
 
   // Confirmation dialog appears — click the dialog's "Delete" button
   const dialog = page.getByRole("alertdialog");
@@ -129,9 +129,23 @@ export async function deleteSource(page: Page, sourceTitle: string | RegExp) {
 }
 
 /**
- * Click the kebab (More options) menu on a source card.
+ * Open the "More options" menu on a source card. Radix opens the menu on
+ * pointerdown, so this needs a real click (a synthetic `click` event is ignored).
  */
 export async function openSourceKebab(page: Page, sourceTitle: string | RegExp) {
   const sourceCard = getSourceCard(page, sourceTitle);
-  await sourceCard.locator('[title="More options"]').evaluate((el) => (el as HTMLElement).click());
+  await sourceCard.getByRole("button", { name: "More options" }).click();
+}
+
+/**
+ * Rename a source through its menu: open the menu, pick Rename, type the new
+ * name into the inline "Rename source" textbox and press Enter.
+ */
+export async function renameSource(page: Page, sourceTitle: string | RegExp, newName: string) {
+  await openSourceKebab(page, sourceTitle);
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  const renameInput = page.getByRole("textbox", { name: "Rename source" });
+  await expect(renameInput).toBeVisible({ timeout: 5_000 });
+  await renameInput.fill(newName);
+  await renameInput.press("Enter");
 }

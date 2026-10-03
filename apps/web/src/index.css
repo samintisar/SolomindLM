@@ -451,6 +451,16 @@
   padding-bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* Scroll container that reserves its scrollbar track so content does not shift when it overflows. */
+@utility scrollbar-stable {
+  scrollbar-gutter: stable;
+}
+
+/* Sticky document outline: never taller than the viewport on short screens. */
+@utility max-h-outline {
+  max-height: min(85dvh, 42rem);
+}
+
 /* "Thinking..." label shimmer; static under reduced motion (global rule zeroes animation-duration). */
 @utility text-shimmer {
   background-image: linear-gradient(
