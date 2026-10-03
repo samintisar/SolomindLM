@@ -131,10 +131,10 @@ export function NotebookCard(props: NotebookCardProps) {
           onClick={open}
           className={cn(CARD_OPEN_BUTTON_CLASS, "flex h-full flex-col text-left")}
         >
-          <span className={cn("flex h-20 w-full items-end p-3", fill)}>
+          <span className={cn("flex h-24 w-full items-end p-4", fill)}>
             <Icon aria-hidden className={cn("size-8", COVER_ICON_CLASS)} />
           </span>
-          <span className="flex flex-1 flex-col gap-1 p-3">
+          <span className="flex flex-1 flex-col gap-1.5 p-4">
             <span className="line-clamp-2 text-base font-semibold leading-snug text-card-foreground">
               {notebook.title}
             </span>
