@@ -7,6 +7,8 @@ import { medicalStudentsFixtures } from "./medical-students/fixtures";
 import { medicalStudentsPack } from "./medical-students/manifest";
 import { professionalsFixtures } from "./professionals/fixtures";
 import { professionalsPack } from "./professionals/manifest";
+import { researchersFixtures } from "./researchers/fixtures";
+import { researchersPack } from "./researchers/manifest";
 import type { RegisteredPack, UseCasePack } from "./types";
 
 const USECASES_DIR = dirname(fileURLToPath(import.meta.url));
@@ -27,6 +29,7 @@ export const USE_CASE_PACKS: RegisteredPack[] = [
   registerPack(languageLearnersPack, languageLearnersFixtures),
   registerPack(medicalStudentsPack, medicalStudentsFixtures),
   registerPack(professionalsPack, professionalsFixtures),
+  registerPack(researchersPack, researchersFixtures),
 ];
 
 export function getPack(id: string): RegisteredPack {
