@@ -419,7 +419,8 @@ export function DiscoverSourcesDialog({
           </DialogClose>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
+        {/* Pinned above the scrolling results so the search stays reachable. */}
+        <div className="px-6 pb-4">
           <DiscoveryToolbar
             query={query}
             onQueryChange={setQuery}
@@ -430,6 +431,9 @@ export function DiscoverSourcesDialog({
             onFiltersChange={(patch) => setFilters((prev) => applyFilterPatch(prev, patch))}
             onFiltersReset={() => setFilters(DEFAULT_FILTERS)}
           />
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
           {renderResults()}
           {/* Mounted for the dialog's lifetime so changes to its text are announced. */}
           <p aria-live="polite" className="sr-only">
