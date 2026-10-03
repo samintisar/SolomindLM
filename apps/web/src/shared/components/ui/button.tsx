@@ -25,6 +25,12 @@ const buttonVariants = cva(
           "rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/70 active:scale-98 aria-expanded:bg-secondary/70",
         ghost:
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-expanded:bg-accent aria-expanded:text-accent-foreground",
+        /**
+         * Collapsible header (`CollapsibleTrigger asChild`): a light hover and no fill while open.
+         * `ghost` fills on `aria-expanded`, which suits an open menu but leaves an expanded
+         * section looking pressed.
+         */
+        disclosure: "rounded-lg hover:bg-muted active:bg-muted/80",
         "ghost-destructive":
           "rounded-lg text-destructive hover:bg-destructive-muted hover:text-destructive-muted-foreground active:bg-destructive-muted",
         /**
