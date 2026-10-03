@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit: Biome format + safe lint fixes on the staged files only, then re-stage them.
+# Catches formatting drift (e.g. CRLF from editor/agent tools) at commit time instead of
+# at pre-push or in CI. Full-repo typecheck + lint stay in pre-push.
+# Logic lives in scripts/pre-commit.mjs (NUL-safe path handling, partially staged files).
+#
+# Bypass for a work-in-progress commit:  git commit --no-verify
+#
+# Enabled by `core.hooksPath=.githooks`, set on `bun install` via the root
+# `prepare` script (scripts/setup-git-hooks.mjs).
+
+exec node "$(git rev-parse --show-toplevel)/scripts/pre-commit.mjs"

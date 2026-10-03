@@ -238,9 +238,9 @@ which metrics to watch — live in
 [`docs/engineering/code-quality.md`](../docs/engineering/code-quality.md).
 Architecture decisions go in [`docs/adr/`](../docs/adr/).
 
-A **pre-push hook** (`.githooks/pre-push`, enabled automatically by `bun install`)
-runs typecheck + lint before every push. Bypass a WIP push with
-`git push --no-verify`.
+Git hooks in `.githooks/` are enabled automatically by `bun install`: **pre-commit**
+Biome-fixes and re-stages the staged files, **pre-push** runs typecheck + lint before
+every push. Bypass a WIP commit or push with `--no-verify`.
 
 ## Best Practices
 

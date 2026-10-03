@@ -28,7 +28,7 @@ function getNativeOAuthRedirectUri(): string {
  * @see https://labs.convex.dev/auth/api_reference/react
  */
 export async function completeNativeOAuthSignIn(
-  provider: "google",
+  provider: "google" | "apple",
   signIn: SignInFn
 ): Promise<void> {
   if (Platform.OS === "web") {

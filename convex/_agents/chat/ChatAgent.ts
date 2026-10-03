@@ -16,6 +16,7 @@ import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
+  GLOBAL_RERANK_TIMEOUT_MS,
   LIST_QUERY_CONTEXT_TOKEN_BUDGET,
   LIST_QUERY_MAX_SELECTED_CHUNKS,
   MAX_CHUNKS_HARD_LIMIT,
@@ -338,7 +339,11 @@ export class ChatAgent {
 
     const rerankStart = Date.now();
     try {
-      const reranked = await this.globalRerankFn(rerankQueryForCache, docs);
+      const reranked = await withTimeout(
+        this.globalRerankFn(rerankQueryForCache, docs),
+        GLOBAL_RERANK_TIMEOUT_MS,
+        "global_rerank"
+      );
       const order = new Map(reranked.map((d, i) => [d.id, i]));
       const scoreMap = new Map(reranked.map((d) => [d.id, d.score]));
 
