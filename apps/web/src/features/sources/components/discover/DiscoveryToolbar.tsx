@@ -93,7 +93,8 @@ export function DiscoveryToolbar({
             return (
               <ToggleGroupItem key={type} value={type}>
                 <Icon aria-hidden />
-                {label}
+                {/* Four labelled segments overflow a phone; keep the names for screen readers. */}
+                <span className="max-sm:sr-only">{label}</span>
               </ToggleGroupItem>
             );
           })}
