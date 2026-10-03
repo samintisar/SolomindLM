@@ -196,7 +196,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
           <Button
             id={`${triggerId}-trigger`}
             type="button"
-            variant="ghost"
+            variant="disclosure"
             size="chip"
             aria-label={headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary}
             className="group/trigger -ml-4 max-w-full justify-start"

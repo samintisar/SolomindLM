@@ -126,7 +126,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
               <CollapsibleTrigger asChild>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="disclosure"
                   className="group/trigger w-full justify-between"
                   title={sourceGuideExpanded ? "Hide source guide" : "Show source guide"}
                 >
