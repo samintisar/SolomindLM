@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FIXTURES } from "../fixtures";
+import { getFixture } from "../fixtures";
 import { getPack, listPackFixtures, USE_CASE_PACKS } from "./index";
 import { validatePack } from "./validate";
 
@@ -21,9 +21,9 @@ describe("use-case pack registry", () => {
     expect(new Set(titles).size).toBe(titles.length);
   });
 
-  it("pack fixtures are registered in FIXTURES", () => {
+  it("pack fixtures are resolvable through getFixture", () => {
     for (const fixture of listPackFixtures()) {
-      expect(FIXTURES[fixture.id]).toBe(fixture);
+      expect(getFixture(fixture.id)).toBe(fixture);
     }
   });
 

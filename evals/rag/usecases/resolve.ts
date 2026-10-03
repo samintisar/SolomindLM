@@ -1,9 +1,19 @@
 import type { EvalFixture } from "../types";
 import { getPack, USE_CASE_PACKS } from "./index";
 import type { PackSeedApi } from "./seedClient";
-import { readPackSources, type SourceDigest } from "./sources";
+import { matchesTitleHint, readPackSources, type SourceDigest } from "./sources";
 import { checkPackReady, type PackReadiness } from "./sync";
 import type { SourceText, UseCasePack } from "./types";
+
+/** Judge evidence for a pack fixture: only the sources its `documentTitleHint` selects, if set. */
+export function packSourceTextsFor(
+  fixture: EvalFixture,
+  texts: SourceText[] | undefined
+): SourceText[] | undefined {
+  const hint = fixture.studioParams?.documentTitleHint;
+  if (!texts || !hint) return texts;
+  return texts.filter((t) => matchesTitleHint(t.fileName, hint));
+}
 
 export class PackNotReadyError extends Error {
   constructor(readonly packs: PackReadiness[]) {
@@ -48,7 +58,16 @@ export function applyPackResolution(
     if (!resolved?.notebookId) {
       throw new Error(`No resolved notebook for use case "${fixture.useCase}" (${fixture.id})`);
     }
-    return { ...fixture, notebookId: resolved.notebookId, documentIds: resolved.documentIds };
+    const hint = fixture.studioParams?.documentTitleHint;
+    const documentIds = hint
+      ? resolved.documentIds.filter((id) =>
+          matchesTitleHint(resolved.documentFileNames[id] ?? "", hint)
+        )
+      : resolved.documentIds;
+    if (documentIds.length === 0) {
+      throw new Error(`${fixture.id}: documentTitleHint "${hint}" matches no pack source`);
+    }
+    return { ...fixture, notebookId: resolved.notebookId, documentIds };
   });
 }
 

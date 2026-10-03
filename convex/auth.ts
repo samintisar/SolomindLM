@@ -1,3 +1,4 @@
+import Apple from "@auth/core/providers/apple";
 import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
@@ -97,12 +98,35 @@ function withKnownErrorsAsConvexErrors<T>(provider: T): T {
   return provider;
 }
 
+/**
+ * Sign in with Apple needs an Apple Services ID and a client-secret JWT (valid for at
+ * most 6 months). Until both are set it stays off, and the sign-in UI hides its button.
+ */
+function isAppleSignInConfigured(): boolean {
+  return Boolean(process.env.AUTH_APPLE_ID && process.env.AUTH_APPLE_SECRET);
+}
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
     }),
+    ...(isAppleSignInConfigured()
+      ? [
+          Apple({
+            clientId: process.env.AUTH_APPLE_ID,
+            clientSecret: process.env.AUTH_APPLE_SECRET,
+            // Apple sends the name only on the first sign-in, and never an image.
+            profile: (appleInfo) => {
+              const name = appleInfo.user
+                ? `${appleInfo.user.name.firstName} ${appleInfo.user.name.lastName}`.trim()
+                : undefined;
+              return { id: appleInfo.sub, name: name || undefined, email: appleInfo.email };
+            },
+          }),
+        ]
+      : []),
     withKnownErrorsAsConvexErrors(Password({ verify: ResendOTP, reset: ResendOTPPasswordReset })),
   ],
   callbacks: {
@@ -120,6 +144,13 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       return redirectTo;
     },
   },
+});
+
+/** Which optional sign-in methods the sign-in screen should offer. */
+export const getSignInOptions = query({
+  args: {},
+  returns: v.object({ apple: v.boolean() }),
+  handler: async () => ({ apple: isAppleSignInConfigured() }),
 });
 
 /**

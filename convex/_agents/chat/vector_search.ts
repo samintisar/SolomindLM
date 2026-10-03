@@ -11,6 +11,7 @@ import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import type { EmbeddingService } from "../../_services/ai/embeddingClient";
 import type { ChunkMetadata, ReferenceChunk } from "../../storage/ChatHistoryService";
+import { createZeroEntropyClient } from "./zeroEntropyClient";
 
 // Re-export ReferenceChunk for other modules
 export type { ReferenceChunk };
@@ -371,8 +372,7 @@ export class VectorSearchHandler {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const { ZeroEntropy } = await import("zeroentropy");
-        const zclient = new ZeroEntropy({ apiKey: key });
+        const zclient = await createZeroEntropyClient(key);
         const documents = results.map((r) => r.content);
 
         const response = await zclient.models.rerank({

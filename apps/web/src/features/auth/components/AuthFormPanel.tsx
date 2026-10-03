@@ -1,4 +1,6 @@
+import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
 import { AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
@@ -20,6 +22,7 @@ import { Separator } from "@/shared/components/ui/separator";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { cn } from "@/shared/utils/cn";
 import { isNativeShell } from "@/utils/platformDetection";
+import { AppleIcon } from "./AppleIcon";
 import { GoogleIcon } from "./GoogleIcon";
 
 export type AuthFormInitialMode = "signIn" | "signUp";
@@ -86,7 +89,7 @@ function PasswordField(props: {
   );
 }
 
-/** Spinner shows only for the password action; `disabled` also covers an in-flight Google sign-in. */
+/** Spinner shows only for the password action; `disabled` also covers an in-flight OAuth sign-in. */
 function SubmitButton(props: {
   loading: boolean;
   disabled: boolean;
@@ -110,10 +113,12 @@ function AuthFormPanelContent({
   signInPassword,
 }: AuthFormPanelContentProps) {
   const id = useId();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInWithApple } = useAuth();
+  // Sign in with Apple appears only once it's configured on the backend.
+  const appleEnabled = useQuery(api.auth.getSignInOptions)?.apple ?? false;
   const [step, setStep] = useState<AuthStep>(initialMode);
   const [error, setError] = useState("");
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -124,16 +129,21 @@ function AuthFormPanelContent({
     }
   }, [authError]);
 
-  const handleGoogleSignIn = async () => {
+  const handleOAuthSignIn = async (provider: "google" | "apple") => {
     try {
-      setGoogleLoading(true);
+      setOauthLoading(provider);
       setError("");
-      await signInWithGoogle();
+      await (provider === "apple" ? signInWithApple() : signInWithGoogle());
       onAuthenticated();
     } catch (err) {
-      setError(getConvexAuthUserMessage(err, "Google sign-in failed"));
+      setError(
+        getConvexAuthUserMessage(
+          err,
+          provider === "apple" ? "Apple sign-in failed" : "Google sign-in failed"
+        )
+      );
     } finally {
-      setGoogleLoading(false);
+      setOauthLoading(null);
     }
   };
 
@@ -223,7 +233,7 @@ function AuthFormPanelContent({
     return "Sign in";
   })();
 
-  const disableAll = googleLoading || passwordLoading;
+  const disableAll = oauthLoading !== null || passwordLoading;
 
   const content = (
     <div className="flex flex-col gap-6">
@@ -244,12 +254,32 @@ function AuthFormPanelContent({
             type="button"
             variant="outline"
             className="w-full"
-            onClick={handleGoogleSignIn}
+            onClick={() => handleOAuthSignIn("google")}
             disabled={disableAll}
           >
-            {googleLoading ? <Spinner aria-hidden /> : <GoogleIcon className="size-5" />}
-            {googleLoading ? "Connecting…" : "Continue with Google"}
+            {oauthLoading === "google" ? (
+              <Spinner aria-hidden />
+            ) : (
+              <GoogleIcon className="size-5" />
+            )}
+            {oauthLoading === "google" ? "Connecting…" : "Continue with Google"}
           </Button>
+          {appleEnabled ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => handleOAuthSignIn("apple")}
+              disabled={disableAll}
+            >
+              {oauthLoading === "apple" ? (
+                <Spinner aria-hidden />
+              ) : (
+                <AppleIcon className="size-5" />
+              )}
+              {oauthLoading === "apple" ? "Connecting…" : "Continue with Apple"}
+            </Button>
+          ) : null}
 
           <div className="flex items-center gap-3">
             <Separator className="flex-1" />
