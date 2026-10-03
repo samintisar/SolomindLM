@@ -159,16 +159,6 @@ export default defineConfig(({ mode }) => {
               return "react-vendor";
             }
 
-            // LangChain AI libraries (very large)
-            if (id.includes("node_modules/@langchain")) {
-              return "langchain";
-            }
-
-            // Supabase & Authentication
-            if (id.includes("node_modules/@supabase")) {
-              return "supabase";
-            }
-
             // Do NOT put streamdown / markdown-related deps in a manual chunk without
             // testing — similar circular-init issues have occurred with markdown stacks
             // when split (see https://github.com/vitejs/vite/issues/3592)
@@ -176,16 +166,6 @@ export default defineConfig(({ mode }) => {
             // Mind mapping
             if (id.includes("node_modules/mind-elixir")) {
               return "mindmap";
-            }
-
-            // Stripe
-            if (id.includes("node_modules/@stripe")) {
-              return "stripe";
-            }
-
-            // Google Generative AI
-            if (id.includes("node_modules/@google/generative-ai")) {
-              return "ai-vendor";
             }
 
             // Virtual DOM diffing
@@ -201,11 +181,6 @@ export default defineConfig(({ mode }) => {
             // Math/KaTeX
             if (id.includes("node_modules/katex")) {
               return "katex";
-            }
-
-            // HTML parsing
-            if (id.includes("node_modules/cheerio")) {
-              return "cheerio";
             }
 
             // Don't put zod in its own chunk - it can become empty (tree-shaken) and trigger useless requests
