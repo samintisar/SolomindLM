@@ -29,7 +29,7 @@ export const COVER_ICONS = {
 export type CoverIconName = keyof typeof COVER_ICONS;
 
 export const DEFAULT_NOTEBOOK_ICON: CoverIconName = "Book";
-export const DEFAULT_FOLDER_ICON: CoverIconName = "Folder";
+const DEFAULT_FOLDER_ICON: CoverIconName = "Folder";
 
 /** The notebook picker never offers "Folder", so notebooks can't be mistaken for folders (#226). */
 export const NOTEBOOK_ICON_NAMES = [
