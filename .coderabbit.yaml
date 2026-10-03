@@ -24,6 +24,11 @@ reviews:
     # Drafts are WIP (BRANCHING.md) — reviewed once marked ready. Comment
     # "@coderabbitai review" on a draft to review it early.
     drafts: false
+    # Also review stacked PRs whose base is another PR's branch. Entries are
+    # regexes added to the default branch; agent branches (claude/, copilot/,
+    # opencode/) don't follow the BRANCHING.md prefixes, so match any base.
+    base_branches:
+      - ".*"
     ignore_title_keywords:
       - WIP
 
