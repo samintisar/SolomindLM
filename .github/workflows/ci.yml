@@ -413,3 +413,67 @@ jobs:
           path: |
             playwright-report/
             test-results/
+
+  design-changes:
+    name: Detect design-system changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # paths-filter lists a PR's changed files through the API.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      design: ${{ steps.filter.outputs.design }}
+    steps:
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            design:
+              - 'apps/web/src/shared/components/ui/**'
+              - 'apps/web/src/index.css'
+              - 'apps/web/src/dev/**'
+              - 'e2e/design/**'
+              - 'playwright.design.config.ts'
+              - 'scripts/design-snapshots.sh'
+
+  # Screenshot baselines for every ui primitive (/dev/design gallery). Runs in the same
+  # Playwright image as `bun run test:design`, so renders match the committed Linux PNGs.
+  # Keep the image tag equal to the @playwright/test version in bun.lock.
+  design-snapshots:
+    name: Design snapshots
+    needs: design-changes
+    if: needs.design-changes.outputs.design == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # setup-bun extracts a zip; the Playwright image ships without unzip.
+      - name: Install unzip
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends unzip
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Screenshot tests
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+        run: |
+          if [ -z "${VITE_CONVEX_URL}" ]; then
+            echo "::error::Set repository variable VITE_CONVEX_URL; the gallery build needs it."
+            exit 1
+          fi
+          bunx playwright test -c playwright.design.config.ts
+
+      - name: Upload diffs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: design-snapshots-diffs
+          path: test-results/

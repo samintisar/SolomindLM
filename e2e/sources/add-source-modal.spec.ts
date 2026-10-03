@@ -1,5 +1,17 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures/notebook.fixture";
 import { openAddSourceModal } from "../helpers/navigation";
+
+/**
+ * The modal has no dialog role and the sources panel stays mounted behind it, so a bare
+ * "Discover sources" locator also matches the panel's tray button. Scope to the heading's row.
+ */
+function modalDiscoverButton(page: Page) {
+  return page
+    .getByRole("heading", { name: "Add sources" })
+    .locator("..")
+    .getByRole("button", { name: /Discover sources/ });
+}
 
 test.describe("Add Source Modal", () => {
   test("opens with all source type options", async ({ notebookPage }) => {
@@ -24,7 +36,7 @@ test.describe("Add Source Modal", () => {
     }
 
     // Discover sources button (in header)
-    await expect(page.getByRole("button", { name: /Discover sources/ })).toBeVisible();
+    await expect(modalDiscoverButton(page)).toBeVisible();
   });
 
   test("source limit bar shows count", async ({ notebookPage }) => {
@@ -43,7 +55,7 @@ test.describe("Add Source Modal", () => {
     await openAddSourceModal(page);
 
     // Click Discover sources
-    await page.getByRole("button", { name: /Discover sources/ }).click();
+    await modalDiscoverButton(page).click();
 
     // Should show discover modal with search input
     await expect(page.getByPlaceholder("Search for articles, papers, or websites...")).toBeVisible({

@@ -3,7 +3,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useQuery } from "convex/react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { NotebookItem } from "@/shared/types/index";
 import { isNativeShell } from "@/utils/platformDetection";
@@ -59,6 +59,12 @@ import { ThemeProvider } from "./shared/contexts/ThemeContext";
 import { ToastProvider } from "./shared/contexts/ToastContext";
 import { Header } from "./shared/ui/Header";
 import "mind-elixir/style.css";
+
+/** Dev-only ui gallery (/dev/design). Gated on a build-time constant so production builds drop the chunk. */
+const DesignGallery =
+  import.meta.env.DEV || import.meta.env.VITE_DESIGN_GALLERY === "1"
+    ? lazy(() => import("./dev/DesignGallery"))
+    : null;
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -170,6 +176,7 @@ const AppContent: React.FC = () => {
     location.pathname === "/terms" ||
     location.pathname === "/sign-in" ||
     location.pathname === "/faq" ||
+    (DesignGallery !== null && location.pathname === "/dev/design") ||
     isIntentLandingPath(location.pathname) ||
     isClusterHubPath(location.pathname) ||
     isSeoContentPath(location.pathname);
@@ -409,6 +416,16 @@ const AppContent: React.FC = () => {
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/faq" element={<FaqPage />} />
+              {DesignGallery && (
+                <Route
+                  path="/dev/design"
+                  element={
+                    <Suspense fallback={null}>
+                      <DesignGallery />
+                    </Suspense>
+                  }
+                />
+              )}
 
               {CLUSTER_HUB_PAGES.map((page) => (
                 <Route
