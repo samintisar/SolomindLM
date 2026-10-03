@@ -76,7 +76,7 @@ function normalizeForComparison(value: string): string {
 }
 
 /** Drops the excerpt's first line when it only repeats the source title shown in the header. */
-export function stripLeadingDuplicateTitle(content: string, sourceTitle: string): string {
+function stripLeadingDuplicateTitle(content: string, sourceTitle: string): string {
   const normalizedSourceTitle = normalizeForComparison(sourceTitle);
   if (!normalizedSourceTitle) return content.trim();
 
@@ -113,7 +113,7 @@ export function getSourceHost(url?: string): string | null {
 }
 
 /** Removes non-renderable image placeholders that some extracted sources carry in markdown. */
-export function stripImageArtifacts(content: string): string {
+function stripImageArtifacts(content: string): string {
   const cleaned = content
     .split("\n")
     .filter((line) => {
