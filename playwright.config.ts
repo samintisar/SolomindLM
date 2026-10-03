@@ -46,8 +46,9 @@ export default defineConfig({
   reporter: process.env.CI ? "html" : "line",
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  // CI without secrets: ignore all spec files
-  testIgnore: skipE2EInCI ? "**/*.ts" : undefined,
+  // CI without secrets: ignore all spec files. e2e/csp has its own config
+  // (playwright.csp.config.ts) and needs no login, so it never runs here.
+  testIgnore: skipE2EInCI ? "**/*.ts" : "**/csp/**",
 
   globalSetup: skipE2EInCI ? undefined : "./e2e/global-setup.ts",
 

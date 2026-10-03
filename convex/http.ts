@@ -3,6 +3,8 @@ import { httpRouter } from "convex/server";
 import { components, internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { allowedOrigins } from "./_lib/allowedOrigins";
+import { MAX_CSP_REPORT_BYTES, parseCspReport } from "./_lib/cspReport";
+import { createServiceLogger } from "./_lib/logging/serviceLogger";
 import { auth } from "./auth";
 
 const http = httpRouter();
@@ -27,6 +29,42 @@ const getCorsHeaders = (origin?: string | null): Record<string, string> => {
     Vary: "origin",
   };
 };
+
+// ============================================================
+// CSP violation reports
+// ============================================================
+
+// Target of `report-uri` in the Content-Security-Policy header (apps/web/vercel.json). Lives under
+// /api/ so Vercel proxies it same-origin to Convex — browsers send reports without CORS.
+// Unauthenticated by design (browsers attach no credentials): the body is size-capped, validated
+// and stripped of query strings by parseCspReport, then logged for the Log Stream. No DB writes.
+// Filter log exports with: topic:service service:csp
+http.route({
+  path: "/api/csp-report",
+  method: "POST",
+  handler: httpAction(async (_ctx, request) => {
+    const declaredBytes = Number(request.headers.get("content-length") ?? 0);
+    if (declaredBytes > MAX_CSP_REPORT_BYTES) return new Response(null, { status: 413 });
+
+    // content-length can be absent or wrong (chunked), so cap the actual body too.
+    const text = await request.text();
+    if (text.length > MAX_CSP_REPORT_BYTES) return new Response(null, { status: 413 });
+
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return new Response(null, { status: 400 });
+    }
+
+    const violation = parseCspReport(body);
+    if (violation) {
+      createServiceLogger("csp", "report").warn("csp_violation", { ...violation });
+    }
+    // 204 even for dropped/noise reports: the browser should not retry or surface an error.
+    return new Response(null, { status: 204 });
+  }),
+});
 
 // ============================================================
 // Stripe Webhook (Forward to Node Action)
