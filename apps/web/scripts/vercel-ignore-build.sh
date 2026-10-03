@@ -57,10 +57,13 @@ else
     build "git log failed"
   # --cc hides a merge that resolves a conflict by keeping the branch side,
   # which silently undoes main's change. Also list where each merge result
-  # differs from its other parents (normally main); a clean merge adds nothing.
+  # differs from its main-side parents: every parent that isn't one of the
+  # branch's own commits, in either position. Branch-side parents are already
+  # covered by the log above; a clean merge of main adds nothing.
   merges=$(git rev-list --merges "${main_sha}..${head_sha}" 2>/dev/null) || build "git rev-list --merges failed"
   for merge in $merges; do
-    for parent in $(git rev-list --parents -n 1 "$merge" | cut -d' ' -f3-); do
+    for parent in $(git rev-list --parents -n 1 "$merge" | cut -d' ' -f2-); do
+      printf '%s\n' "$branch_commits" | grep -qxF "$parent" && continue
       merge_out=$(git diff --no-renames --name-only "$parent" "$merge" 2>/dev/null) ||
         build "git diff of merge ${merge:0:8} failed"
       log_out="${log_out}"$'\n'"${merge_out}"
