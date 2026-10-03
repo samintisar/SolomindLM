@@ -55,6 +55,17 @@ else
   # sort's exit status and leave an empty list (-> a wrong skip).
   log_out=$(git log --no-renames --cc --name-only --format= "${main_sha}..${head_sha}" 2>/dev/null) ||
     build "git log failed"
+  # --cc hides a merge that resolves a conflict by keeping the branch side,
+  # which silently undoes main's change. Also list where each merge result
+  # differs from its other parents (normally main); a clean merge adds nothing.
+  merges=$(git rev-list --merges "${main_sha}..${head_sha}" 2>/dev/null) || build "git rev-list --merges failed"
+  for merge in $merges; do
+    for parent in $(git rev-list --parents -n 1 "$merge" | cut -d' ' -f3-); do
+      merge_out=$(git diff --no-renames --name-only "$parent" "$merge" 2>/dev/null) ||
+        build "git diff of merge ${merge:0:8} failed"
+      log_out="${log_out}"$'\n'"${merge_out}"
+    done
+  done
   changed=$(printf '%s\n' "$log_out" | sed '/^$/d' | sort -u)
 fi
 [ -n "$changed" ] || skip "no file changes since $since"
