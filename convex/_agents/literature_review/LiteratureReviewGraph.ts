@@ -7,7 +7,7 @@
  * 1. Plan review (LLM suggests columns + search queries)
  * 2. Checkpoint: await user column confirmation via event
  * 3. Search papers (parallel across sources)
- * 4. Rank papers (ZeroEntropy; search step already dedupes)
+ * 4. Rank papers (Voyage; search step already dedupes)
  * 5. Screen papers (top 30, batch 5)
  * 6. Extract data (batch 5, write to literatureTableDrafts)
  * 7. Generate table
@@ -223,7 +223,7 @@ export const literatureReviewWorkflow = workflow
         `${searchResults.recordsAfterDedupe} unique papers after deduplication (from ${searchResults.recordsIdentified} identified)`
       );
 
-      // Step 3: Rank (ZeroEntropy)
+      // Step 3: Rank (Voyage)
       await trackStep(
         step,
         args.sessionId,

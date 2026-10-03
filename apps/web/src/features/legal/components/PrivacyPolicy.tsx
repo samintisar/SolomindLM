@@ -117,7 +117,7 @@ export const PrivacyPolicy: React.FC = () => {
             generation for infographics (via hosted models on Together&apos;s platform).
           </li>
           <li>
-            <span className="text-foreground">ZeroEntropy</span> — reranking retrieved passages for
+            <span className="text-foreground">Voyage AI</span> — reranking retrieved passages for
             relevance in search and chat.
           </li>
           <li>
