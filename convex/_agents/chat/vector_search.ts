@@ -1,9 +1,8 @@
 "use node";
-/// <reference path="./zeroentropy.d.ts" />
 /**
  * Vector search for chat agent.
  *
- * Handles vector search with Convex + ZeroEntropy reranking.
+ * Handles vector search with Convex + Voyage reranking.
  * ChatAgent calls search(userId, noteId, query, documentIds).
  */
 
@@ -79,7 +78,7 @@ const DEFAULT_CONFIG: Required<VectorSearchConfig> = {
 // ============================================================
 
 /**
- * Handles vector search for the chat agent: embed query → Convex search → optional ZeroEntropy rerank.
+ * Handles vector search for the chat agent: embed query → Convex search → optional Voyage rerank.
  */
 export class VectorSearchHandler {
   protected config: Required<VectorSearchConfig>;
@@ -101,7 +100,7 @@ export class VectorSearchHandler {
 
   /**
    * Same signature as legacy API: search(userId, noteId, query, documentIds).
-   * Flow: embed query → runner (Convex vector search) → threshold filter → dedupe → ZeroEntropy rerank → slice(maxResults).
+   * Flow: embed query → runner (Convex vector search) → threshold filter → dedupe → Voyage rerank → slice(maxResults).
    */
   async search(
     userId: string,
@@ -306,128 +305,60 @@ export class VectorSearchHandler {
     results: (VectorSearchRawResult & { similarity?: number })[],
     quiet?: boolean
   ): Promise<(VectorSearchRawResult & { similarity?: number })[]> {
-    const key = env.ZEROENTROPY_API_KEY;
-    if (!key || results.length <= this.config.rerankThreshold) {
+    const hasKey = !!env.VOYAGE_API_KEY;
+    if (!this.rerankFn || !hasKey || results.length <= this.config.rerankThreshold) {
       if (!quiet) {
         const log = createServiceLogger("vectorSearch", "rerank");
-        log.debug("skip_rerank", { hasKey: !!key, results: results.length });
+        log.debug("skip_rerank", {
+          hasRerankFn: !!this.rerankFn,
+          hasKey,
+          results: results.length,
+        });
       }
       return results;
     }
 
-    // If a cached reranking function is provided, use it
-    if (this.rerankFn) {
+    try {
+      const documents = results.map((r) => ({
+        id: r._id,
+        content: r.content,
+      }));
+
+      const rerankedDocs = await this.rerankFn(query, documents);
+
+      const reranked: (VectorSearchRawResult & { similarity?: number })[] = [];
+      const seen = new Set<string>();
+
+      // Add reranked results in order
+      for (const doc of rerankedDocs) {
+        const original = results.find((r) => r._id === doc.id);
+        if (original && !seen.has(original._id)) {
+          reranked.push({
+            ...original,
+            similarity: doc.score ?? original.similarity,
+          });
+          seen.add(original._id);
+        }
+      }
+
+      // Add any documents not in reranked results (preserving original order)
+      for (const r of results) {
+        if (!seen.has(r._id)) {
+          reranked.push(r);
+          seen.add(r._id);
+        }
+      }
+
       if (!quiet) {
         const log = createServiceLogger("vectorSearch", "rerank");
-        log.debug("rerank_path", { source: "cached_fn" });
+        log.debug("rerank_complete", { count: reranked.length });
       }
-      try {
-        const documents = results.map((r) => ({
-          id: r._id,
-          content: r.content,
-        }));
-
-        const rerankedDocs = await this.rerankFn(query, documents);
-
-        const reranked: (VectorSearchRawResult & { similarity?: number })[] = [];
-        const seen = new Set<string>();
-
-        // Add reranked results in order
-        for (const doc of rerankedDocs) {
-          const original = results.find((r) => r._id === doc.id);
-          if (original && !seen.has(original._id)) {
-            reranked.push({
-              ...original,
-              similarity: doc.score ?? original.similarity,
-            });
-            seen.add(original._id);
-          }
-        }
-
-        // Add any documents not in reranked results (preserving original order)
-        for (const r of results) {
-          if (!seen.has(r._id)) {
-            reranked.push(r);
-            seen.add(r._id);
-          }
-        }
-
-        if (!quiet) {
-          const log = createServiceLogger("vectorSearch", "rerank");
-          log.debug("rerank_complete", { count: reranked.length, path: "cached" });
-        }
-        return reranked;
-      } catch (err: any) {
-        const log = createServiceLogger("vectorSearch", "rerank");
-        log.error("cached_rerank_failed", err, { message: err?.message });
-        // Fall through to direct API call
-      }
+      return reranked;
+    } catch (err: any) {
+      // Reranking only refines order; fall back to the un-reranked results.
+      const log = createServiceLogger("vectorSearch", "rerank");
+      log.error("rerank_failed", err, { message: err?.message });
+      return results;
     }
-
-    // Direct API call (original implementation)
-    const model = env.ZEROENTROPY_RERANK_MODEL || "zerank-2";
-    const maxRetries = 3;
-    const baseDelay = 1000;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const { ZeroEntropy } = await import("zeroentropy");
-        const zclient = new ZeroEntropy({ apiKey: key });
-        const documents = results.map((r) => r.content);
-
-        const response = await zclient.models.rerank({
-          model,
-          query,
-          documents,
-          top_n: this.config.rerankTopN,
-        });
-
-        const reranked: (VectorSearchRawResult & { similarity?: number })[] = [];
-        const seen = new Set<string>();
-
-        if (response.results && Array.isArray(response.results)) {
-          for (const item of response.results) {
-            const idx = item.index;
-            if (typeof idx !== "number" || idx < 0 || idx >= results.length) continue;
-            const original = results[idx];
-            if (!original) continue;
-            const k = `${original._id}-${original.chunkIndex}`;
-            if (seen.has(k)) continue;
-            seen.add(k);
-            reranked.push({
-              ...original,
-              similarity: item.relevance_score ?? original.similarity,
-            });
-          }
-        }
-
-        for (const r of results) {
-          const k = `${r._id}-${r.chunkIndex}`;
-          if (!seen.has(k)) {
-            reranked.push(r);
-            seen.add(k);
-          }
-        }
-
-        if (!quiet) {
-          const log = createServiceLogger("vectorSearch", "rerank");
-          log.debug("rerank_complete", { count: reranked.length, path: "zeroentropy" });
-        }
-        return reranked;
-      } catch (err: any) {
-        const log = createServiceLogger("vectorSearch", "rerank");
-        const is429 = err?.statusCode === 429 || err?.status === 429;
-        const last = attempt === maxRetries - 1;
-        if (is429 && !last) {
-          const delay = baseDelay * Math.pow(2, attempt);
-          log.warn("rate_limit_retry", { delayMs: delay, attempt: attempt + 1, maxRetries });
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
-        }
-        log.error("rerank_failed", err, { message: err?.message });
-        return results;
-      }
-    }
-    return results;
   }
 }

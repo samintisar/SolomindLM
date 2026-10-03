@@ -400,7 +400,7 @@ describe("deduplicatePapersHandler", () => {
 });
 
 describe("rankPapersHandler", () => {
-  it("reranks using ZeroEntropy", async () => {
+  it("reranks using Voyage", async () => {
     (cachedRerank as any).mockResolvedValue([
       { id: "1", score: 0.95 },
       { id: "0", score: 0.85 },
@@ -414,13 +414,7 @@ describe("rankPapersHandler", () => {
       query: "test query",
     });
 
-    expect(cachedRerank).toHaveBeenCalledWith(
-      mockCtx,
-      "test query",
-      expect.any(Array),
-      "zerank-2",
-      30
-    );
+    expect(cachedRerank).toHaveBeenCalledWith(mockCtx, "test query", expect.any(Array), 30);
     expect(result.papers[0].score).toBe(0.95);
     expect(result.papers[1].score).toBe(0.85);
   });
