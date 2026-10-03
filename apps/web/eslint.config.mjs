@@ -15,6 +15,7 @@ const MIGRATED = [
   "src/features/notebooks/**/*.tsx",
   "src/features/chat/**/*.tsx",
   "src/features/sources/**/*.tsx",
+  "src/dev/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [

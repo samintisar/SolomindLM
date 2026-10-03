@@ -49,6 +49,7 @@ export default function MobileShellScreen() {
         path={path}
         onUrlChange={!isAuthenticated ? onSignInWebUrlChange : undefined}
         onThemeChange={setWebTheme}
+        theme={webTheme}
       />
       {notebookIdForUpload ? <FileUploadButton notebookId={notebookIdForUpload} /> : null}
     </SafeAreaView>

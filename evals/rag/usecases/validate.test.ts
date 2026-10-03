@@ -1,0 +1,237 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { EvalFixture } from "../types";
+import { readPackSources } from "./sources";
+import type { RegisteredPack, UseCasePack } from "./types";
+import { formatPackProblems, packsToValidate, validatePack } from "./validate";
+
+let dir: string;
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), "pack-"));
+  mkdirSync(join(dir, "sources"));
+  writeFileSync(join(dir, "sources", "unit-1.md"), "# Unit 1\nBonjour means hello.");
+  writeFileSync(join(dir, "sources", "LICENSES.md"), "- unit-1.md: CC BY 4.0, Example Author");
+});
+
+afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+function pack(overrides: Partial<UseCasePack> = {}): UseCasePack {
+  return {
+    id: "language-learners",
+    title: "Language Learners",
+    notebookTitle: "Language Learners",
+    advertisedClaim: "Create vocabulary lists and grammar exercises from any content.",
+    features: ["flashcards", "quiz"],
+    sources: ["unit-1.md"],
+    rubric: [
+      {
+        id: "one-item-per-card",
+        question: "Does each card test exactly one item?",
+        appliesTo: ["flashcards"],
+        evidence: "output",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function fixture(overrides: Partial<EvalFixture> = {}): EvalFixture {
+  return {
+    schemaVersion: 1,
+    id: "language-learners/flashcards-vocab-01",
+    question: "Make flashcards for the vocabulary in unit 1",
+    expectedItems: [],
+    expectedBehavior: "Cards cover unit 1 vocabulary",
+    runner: "flashcards",
+    tags: ["use-case"],
+    useCase: "language-learners",
+    split: "smoke",
+    ...overrides,
+  };
+}
+
+function registered(p: UseCasePack, fixtures: EvalFixture[] = [fixture()]): RegisteredPack {
+  return { pack: p, fixtures, dir };
+}
+
+describe("validatePack", () => {
+  it("accepts a consistent pack", () => {
+    expect(validatePack(registered(pack()))).toEqual([]);
+  });
+
+  it("flags a missing source file and a source without a licence entry", () => {
+    const problems = validatePack(registered(pack({ sources: ["unit-1.md", "unit-2.md"] })));
+    expect(problems).toContain('language-learners: source "unit-2.md" not found in sources/');
+    expect(problems).toContain('language-learners: source "unit-2.md" has no entry in LICENSES.md');
+  });
+
+  it("flags an unsupported source extension", () => {
+    writeFileSync(join(dir, "sources", "clip.mp4"), "x");
+    writeFileSync(join(dir, "sources", "LICENSES.md"), "- unit-1.md: x\n- clip.mp4: x");
+    const problems = validatePack(registered(pack({ sources: ["clip.mp4"] })));
+    expect(problems).toContain(
+      'language-learners: source "clip.mp4" has unsupported extension ".mp4"'
+    );
+  });
+
+  it("does not accept a licence entry for a different file whose name contains the source name", () => {
+    writeFileSync(
+      join(dir, "sources", "LICENSES.md"),
+      "- unit-10.md: CC BY 4.0, Example Author\n- old-unit-1.md: x"
+    );
+    const problems = validatePack(registered(pack()));
+    expect(problems).toContain('language-learners: source "unit-1.md" has no entry in LICENSES.md');
+  });
+
+  it("rejects source names that are not plain file names", () => {
+    const problems = validatePack(registered(pack({ sources: ["../secret.md", "sub/unit-1.md"] })));
+    expect(problems).toContain(
+      'language-learners: source "../secret.md" must be a plain file name'
+    );
+    expect(problems).toContain(
+      'language-learners: source "sub/unit-1.md" must be a plain file name'
+    );
+  });
+
+  it("matches source file names case-sensitively against the sources folder", () => {
+    writeFileSync(join(dir, "sources", "LICENSES.md"), "- Unit-1.md: x");
+    const problems = validatePack(registered(pack({ sources: ["Unit-1.md"] })));
+    expect(problems).toContain('language-learners: source "Unit-1.md" not found in sources/');
+  });
+
+  it("flags source names that differ only by case as duplicates", () => {
+    const problems = validatePack(registered(pack({ sources: ["unit-1.md", "Unit-1.md"] })));
+    expect(problems).toContain("language-learners: duplicate source file names");
+  });
+
+  it("flags fixture id prefix, useCase, pinned notebook and runner problems", () => {
+    const problems = validatePack(
+      registered(pack(), [
+        fixture({ id: "flashcards-vocab-01" }),
+        fixture({ id: "language-learners/x", useCase: "medical-students" }),
+        fixture({ id: "language-learners/y", notebookId: "nb" }),
+        fixture({ id: "language-learners/z", runner: "report" }),
+      ])
+    );
+    expect(problems).toContain('flashcards-vocab-01: id must start with "language-learners/"');
+    expect(problems).toContain('language-learners/x: useCase must be "language-learners"');
+    expect(problems).toContain(
+      "language-learners/y: pack fixtures must not set notebookId or documentIds"
+    );
+    expect(problems).toContain('language-learners/z: runner "report" is not in pack features');
+  });
+
+  it("requires pack fixtures to set split explicitly", () => {
+    const problems = validatePack(
+      registered(pack(), [
+        fixture({ id: "language-learners/no-split", split: undefined }),
+        fixture({ id: "language-learners/bad-split", split: "dev" as never }),
+      ])
+    );
+    const message = "pack fixtures must set split (smoke, train or holdout)";
+    expect(problems).toContain(`language-learners/no-split: ${message}`);
+    expect(problems).toContain(`language-learners/bad-split: ${message}`);
+  });
+
+  it("requires research fixtures to set sourcePolicy.channels", () => {
+    const researchPack = pack({ features: ["research"] });
+    const problems = validatePack(
+      registered(researchPack, [
+        fixture({ id: "language-learners/r-none", runner: "research" }),
+        fixture({
+          id: "language-learners/r-empty",
+          runner: "research",
+          sourcePolicy: { channels: [] },
+        }),
+        fixture({
+          id: "language-learners/r-ok",
+          runner: "research",
+          sourcePolicy: { channels: ["notebook"] },
+        }),
+      ])
+    );
+    const message = "research fixtures must set sourcePolicy.channels";
+    expect(problems).toContain(`language-learners/r-none: ${message}`);
+    expect(problems).toContain(`language-learners/r-empty: ${message}`);
+    expect(problems.filter((p) => p.includes("r-ok"))).toEqual([]);
+  });
+
+  it("flags a documentTitleHint that matches no pack source, and one on literatureReview", () => {
+    const p = pack({ features: ["flashcards", "literatureReview"] });
+    const fixtures = [
+      fixture({ studioParams: { documentTitleHint: "UNIT-1" } }),
+      fixture({ id: "language-learners/typo", studioParams: { documentTitleHint: "unit-2" } }),
+      fixture({
+        id: "language-learners/lit",
+        runner: "literatureReview",
+        studioParams: { documentTitleHint: "unit-1" },
+      }),
+    ];
+    expect(validatePack(registered(p, fixtures))).toEqual([
+      'language-learners/typo: documentTitleHint "unit-2" matches no pack source',
+      "language-learners/lit: literatureReview fixtures cannot set documentTitleHint (they use the whole notebook)",
+    ]);
+  });
+
+  it("flags duplicate fixture ids and rubric checks that apply to no feature", () => {
+    const problems = validatePack(
+      registered(
+        pack({
+          rubric: [
+            { id: "a", question: "?", appliesTo: ["report"], evidence: "output" },
+            { id: "a", question: "?", appliesTo: ["quiz"], evidence: "output" },
+          ],
+        }),
+        [fixture(), fixture()]
+      )
+    );
+    expect(problems).toContain("language-learners/flashcards-vocab-01: duplicate fixture id");
+    expect(problems).toContain('language-learners: rubric check "a" applies to no listed feature');
+    expect(problems).toContain('language-learners: duplicate rubric check "a"');
+  });
+});
+
+describe("readPackSources", () => {
+  it("hashes each listed source and infers its content type", () => {
+    const [file] = readPackSources(registered(pack()));
+    expect(file.fileName).toBe("unit-1.md");
+    expect(file.contentType).toBe("text/markdown");
+    expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(new TextDecoder().decode(file.bytes)).toContain("Bonjour");
+  });
+});
+
+describe("packsToValidate / formatPackProblems", () => {
+  // Built per test: `dir` is only set by the top-level beforeEach.
+  const twoPacks = () => ({
+    a: registered(pack()),
+    b: registered(pack({ id: "medical-students" }), [
+      fixture({ id: "medical-students/x", useCase: "medical-students" }),
+    ]),
+  });
+
+  it("validates every registered pack when --use-case is set", () => {
+    const { a, b } = twoPacks();
+    expect(packsToValidate([a, b], [], true)).toEqual([a, b]);
+  });
+
+  it("validates only packs that have a selected fixture otherwise", () => {
+    const { a, b } = twoPacks();
+    const selected = [fixture({ id: "medical-students/x", useCase: "medical-students" })];
+    expect(packsToValidate([a, b], selected, false)).toEqual([b]);
+    expect(packsToValidate([a, b], [fixture({ useCase: undefined })], false)).toEqual([]);
+  });
+
+  it("formats problems as INVALID PACK blocks and nothing for valid packs", () => {
+    const { a } = twoPacks();
+    expect(formatPackProblems([a])).toEqual([]);
+    const bad = registered(pack({ sources: [] }));
+    expect(formatPackProblems([a, bad])).toEqual([
+      "INVALID PACK language-learners:",
+      "  - language-learners: no sources listed",
+    ]);
+  });
+});

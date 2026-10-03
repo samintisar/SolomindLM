@@ -6,6 +6,7 @@
  */
 
 import type { SourceChannel } from "../../convex/_agents/research/types";
+import type { Scorecard } from "./reports/scorecard";
 
 // ─── Fixtures ────────────────────────────────────────────────
 
@@ -125,6 +126,11 @@ export interface EvalFixture {
   sourcePolicy?: SourcePolicyConfig;
   /** Dataset split; when omitted, resolved by evals/rag/splits.ts */
   split?: EvalSplit;
+  /**
+   * Use-case pack id (evals/rag/usecases/<id>). Pack fixtures leave
+   * notebookId/documentIds unset; the CLI fills them from the seeded notebook.
+   */
+  useCase?: string;
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -216,6 +222,8 @@ export interface EvalRunArtifact {
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: TokenUsageSource;
   stageSpans?: AgentStageSpan[];
+  /** Use-case pack id copied from the fixture (for scorecards and compare) */
+  useCase?: string;
   /** Timestamp */
   timestamp: string;
 }
@@ -285,6 +293,8 @@ export interface EvalReport {
   metrics: MetricResult[];
   /** Grouped failures for coding agent consumption */
   failureGroups: FailureGroup[];
+  /** Per use-case pack × runner pass rates (only when pack fixtures ran) */
+  scorecard?: Scorecard;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
@@ -294,6 +304,7 @@ export interface CompareCaseResult {
   /** A wins | B wins | tie */
   winner: "a" | "b" | "tie";
   reason: string;
+  useCase?: string;
 }
 
 export interface CompareReport {
@@ -309,6 +320,8 @@ export interface CompareReport {
   /** Win rate for B vs A (ties count half toward each) */
   winRateB: number;
   byRunner: Record<string, { winsA: number; winsB: number; ties: number; winRateB: number }>;
+  /** Same tally grouped by use-case pack (pack fixtures only) */
+  byUseCase: Record<string, { winsA: number; winsB: number; ties: number; winRateB: number }>;
   cases: CompareCaseResult[];
 }
 

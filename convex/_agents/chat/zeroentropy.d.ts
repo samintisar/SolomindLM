@@ -30,6 +30,11 @@ declare module "zeroentropy" {
 
   export interface ZeroEntropyConstructorOptions {
     apiKey: string;
+    baseURL?: string;
+    /** Per-request timeout in ms (SDK default 60000). */
+    timeout?: number;
+    /** SDK retries (default 2); retries sleep for the server's Retry-After, uncapped. */
+    maxRetries?: number;
   }
 
   export class ZeroEntropy implements ZeroEntropyClient {

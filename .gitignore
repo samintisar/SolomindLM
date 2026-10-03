@@ -158,8 +158,11 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# Claude
-.claude/
+# Claude — local state (worktrees, skills junction, settings.local.json, launch.json) stays
+# ignored; the shared project settings and their hook scripts are tracked.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 
 # Convex debug bundle (local only)
 debug-bundle/
