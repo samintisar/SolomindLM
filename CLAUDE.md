@@ -150,9 +150,9 @@ Bun workspaces monorepo:
 
 **Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workflow`.
 
-**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors, OpenAI `text-embedding-3-small`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripeWebhookEvents`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
+**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors, OpenAI `text-embedding-3-small`; see `_lib/embeddingConfig.ts`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripeWebhookEvents`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
 
-**Convex directory layout** (`_` prefix = excluded from generated API):
+**Convex directory layout** (every module under `convex/` except `_generated/` is in the generated API; a leading `_` is a naming convention for helpers, not an exclusion — see Gotchas):
 
 - `_agents/` — per-feature agent logic: prompts, state types, routing, heuristics, LLM helpers (`chat/`, `report/`, `flashcard/`, `quiz/`, `mindmap/`, `spreadsheet/`, `written_questions/`, `audio_overview/`, `research/`, `literature_review/`); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization. Not where jobs run — see **Agent execution** below
 - `_lib/` — errors, limits, env helpers
@@ -163,11 +163,11 @@ Bun workspaces monorepo:
 - `storage/` — vector store, chat history
 - root `auth.ts`, `schema.ts`, `http.ts` — auth config (must be at root), schema, HTTP actions
 
-**AI services:** LLMs `deepseek-ai/DeepSeek-V4.1-Flash` (smart) / `Qwen/Qwen3.5-9B` (fast). Embeddings: OpenAI `text-embedding-3-small` (1536-dim). Reranking: Voyage AI `rerank-3`. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
+**AI services:** LLMs `deepseek-ai/DeepSeek-V4.1-Flash` (smart) / `Qwen/Qwen3.5-9B` (fast). Embeddings: OpenAI `text-embedding-3-small` (`_services/ai/embeddingClient.ts`, `OPENAI_API_KEY`). Reranking: Voyage AI `rerank-3`. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
 
 **Pipelines:**
 
-- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → Voyage rerank
+- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim, `text-embedding-3-small`) → Voyage rerank
 - _Generation:_ how a request starts depends on the execution model below. Studio: the entry mutation/action writes the row and schedules the first phase via `ctx.scheduler.runAfter()` (no jobs table). Deep research and literature review: `workflow.start` launches a durable workflow. Chat: the `/chat/stream` HTTP action. Results are written to the type's table and delivered by reactive queries (chat and deep research also stream tokens via `@convex-dev/persistent-text-streaming`)
 
 **Agent execution** (none of these run a LangGraph graph):
@@ -216,7 +216,7 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
 
 ## Gotchas
 
-- **`_` prefix excludes from API.** Functions in `convex/notebooks/index.ts` become `api.notebooks.index.*` (no `convex/domain/` module).
+- **File path = API path; `_` does not hide a module.** Functions in `convex/notebooks/index.ts` become `api.notebooks.index.*` (no `convex/domain/` module). Underscore paths are registered too: `api._services.search.DiscoveryService.discover`, `internal._migration.*`, `internal._agents._shared.cachedLlm.llmInternal`, `chat/_researchPlan.ts`. Only `_generated/` is excluded. Keep a function off the public API with `internalQuery`/`internalMutation`/`internalAction`, not with a `_` name.
 - **Auth file location.** `@convex-dev/auth` requires `convex/auth.ts` at root, not in a subdirectory.
 - **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
 - **Validation gates** (in order):
