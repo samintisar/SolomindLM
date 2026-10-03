@@ -5,10 +5,12 @@ import {
   MessageSquarePlus,
   Moon,
   Sun,
+  Trash2,
   User as UserIcon,
   Wrench,
 } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
@@ -25,6 +27,7 @@ import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import { LanguageSelector } from "./LanguageSelector";
 
 interface AvatarDropdownProps {
@@ -63,69 +66,83 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   const isFeedbackAdmin = useIsFeedbackAdmin(isAuthenticated);
   const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? "Signed in" : null);
   const initial = isAuthenticated ? userInitial(user) : null;
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="avatar" aria-label="Account menu">
-          <Avatar>
-            {isAuthenticated && user?.image ? (
-              // Google photo URLs can 403 when a referrer is sent.
-              <AvatarImage src={user.image} alt="" referrerPolicy="no-referrer" />
+    <>
+      {/* modal={false}: "Delete account" opens a dialog; a modal menu would leave pointer-events stuck on body. */}
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="avatar" aria-label="Account menu">
+            <Avatar>
+              {isAuthenticated && user?.image ? (
+                // Google photo URLs can 403 when a referrer is sent.
+                <AvatarImage src={user.image} alt="" referrerPolicy="no-referrer" />
+              ) : null}
+              <AvatarFallback>{initial ?? <UserIcon />}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          {isAuthenticated && displayLabel ? (
+            <>
+              <DropdownMenuLabel title={displayLabel}>
+                <span className="block truncate">{displayLabel}</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <DropdownMenuGroup>
+            <DropdownMenuItem onSelect={toggleTheme}>
+              {theme === "dark" ? <Sun /> : <Moon />}
+              {theme === "light" ? "Dark mode" : "Light mode"}
+            </DropdownMenuItem>
+            <LanguageSelector isAuthenticated={isAuthenticated} />
+            {isAuthenticated && showChecklistDismissed && onShowChecklist ? (
+              <DropdownMenuItem onSelect={onShowChecklist}>
+                <ListChecks />
+                Show getting-started checklist
+              </DropdownMenuItem>
             ) : null}
-            <AvatarFallback>{initial ?? <UserIcon />}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        {isAuthenticated && displayLabel ? (
-          <>
-            <DropdownMenuLabel title={displayLabel}>
-              <span className="block truncate">{displayLabel}</span>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        <DropdownMenuGroup>
-          <DropdownMenuItem onSelect={toggleTheme}>
-            {theme === "dark" ? <Sun /> : <Moon />}
-            {theme === "light" ? "Dark mode" : "Light mode"}
+            {isAuthenticated ? (
+              <DropdownMenuItem onSelect={() => openFeedback("bug")}>
+                <MessageSquarePlus />
+                Send feedback
+              </DropdownMenuItem>
+            ) : null}
+            {isAuthenticated && isFeedbackAdmin ? (
+              <DropdownMenuItem onSelect={() => navigate("/admin/feedback")}>
+                <Wrench />
+                Feedback triage
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              if (!isAuthenticated) {
+                onLogin();
+                return;
+              }
+              // Promise.resolve also wraps a sync onLogout; a sync throw still propagates to Radix.
+              Promise.resolve(onLogout()).catch(showError);
+            }}
+          >
+            {isAuthenticated ? <LogOut /> : <LogIn />}
+            {isAuthenticated ? "Logout" : "Login"}
           </DropdownMenuItem>
-          <LanguageSelector isAuthenticated={isAuthenticated} />
-          {isAuthenticated && showChecklistDismissed && onShowChecklist ? (
-            <DropdownMenuItem onSelect={onShowChecklist}>
-              <ListChecks />
-              Show getting-started checklist
-            </DropdownMenuItem>
-          ) : null}
           {isAuthenticated ? (
-            <DropdownMenuItem onSelect={() => openFeedback("bug")}>
-              <MessageSquarePlus />
-              Send feedback
+            <DropdownMenuItem variant="destructive" onSelect={() => setDeleteAccountOpen(true)}>
+              <Trash2 />
+              Delete account
             </DropdownMenuItem>
           ) : null}
-          {isAuthenticated && isFeedbackAdmin ? (
-            <DropdownMenuItem onSelect={() => navigate("/admin/feedback")}>
-              <Wrench />
-              Feedback triage
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            if (!isAuthenticated) {
-              onLogin();
-              return;
-            }
-            // Promise.resolve also wraps a sync onLogout; a sync throw still propagates to Radix.
-            Promise.resolve(onLogout()).catch(showError);
-          }}
-        >
-          {isAuthenticated ? <LogOut /> : <LogIn />}
-          {isAuthenticated ? "Logout" : "Login"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {/* Mounted only while open so the menu doesn't subscribe to billing status. */}
+      {isAuthenticated && deleteAccountOpen ? (
+        <DeleteAccountDialog open onOpenChange={setDeleteAccountOpen} />
+      ) : null}
+    </>
   );
 };

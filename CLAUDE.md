@@ -132,7 +132,7 @@ bun run convex:env:push:prod   # Push .env → Convex prod
 bun run convex:env:push:dry    # Dry run
 ```
 
-**RAG eval (`bun run eval:rag`):** One-shot bootstrap: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). Push script does NOT upload `RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case` / `--runner` for scoped runs; `eval:studio` is for cross-cutting work.
+**RAG eval (`bun run eval:rag`):** One-shot bootstrap: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). Push script does NOT upload `RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case` / `--runner` for scoped runs; `eval:studio` is for cross-cutting work. Use-case packs (`evals/rag/usecases/`): `bun run eval:seed` then `bun run eval:usecases` (needs `RAG_EVAL_OWNER_EMAIL` on the dev deployment).
 
 ---
 

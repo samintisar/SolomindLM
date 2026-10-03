@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST } from "../_lib/queryCaps";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
@@ -309,6 +310,31 @@ describe("documents.list", () => {
 
     const docs = await t.query(api.documents.index.list, { notebookId });
     expect(docs).toEqual([]);
+  });
+
+  test("bounds a notebook-scoped list to MAX_DOCUMENTS_PER_NOTEBOOK_LIST, newest first", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const total = MAX_DOCUMENTS_PER_NOTEBOOK_LIST + 5;
+
+    await t.run(async (ctx) => {
+      for (let i = 0; i < total; i++) {
+        await ctx.db.insert("documents", {
+          userId,
+          notebookId,
+          fileName: `doc-${i}`,
+          fileType: "text",
+          status: "completed",
+          createdAt: i,
+          updatedAt: i,
+        });
+      }
+    });
+
+    const docs = await withAuth(t, userId).query(api.documents.index.list, { notebookId });
+    expect(docs).toHaveLength(MAX_DOCUMENTS_PER_NOTEBOOK_LIST);
+    expect(docs[0].fileName).toBe(`doc-${total - 1}`);
   });
 });
 

@@ -14,6 +14,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   clearAuthError: () => void;
 }
