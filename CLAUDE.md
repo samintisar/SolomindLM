@@ -203,7 +203,12 @@ CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `
 
 ## Claude Code Hooks
 
-Auto-typecheck runs after edits in `apps/web/` (web typecheck) and `convex/` (convex typecheck). Config: `.claude/settings.json`.
+`.claude/settings.json` (tracked — personal overrides go in the ignored `.claude/settings.local.json`) runs [`.claude/hooks/on-edit.mjs`](.claude/hooks/on-edit.mjs) after every single-file edit, built-in `Edit`/`Write` and Serena's edit tools alike:
+
+- **format** (sync) — `biome check --write` on the edited file only. Errors Biome can't auto-fix are fed back to the agent immediately.
+- **typecheck** (async) — `typecheck:web` / `typecheck:convex` / `typecheck:mobile` for the edited file's workspace. A burst of edits coalesces into one run; failures (and the later recovery) reach the agent on its next turn.
+
+Multi-file Serena tools (`rename_symbol`, `replace_in_files`) aren't formatted per edit — the `.githooks/pre-commit` hook (Biome-fixes and re-stages staged files) is the backstop.
 
 Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.cmd` on Windows). Ensure `Bash(bun run typecheck:*)` is in `permissions.allow`. Restart Cursor after hook changes; check **Settings → Hooks** and the **Hooks** output channel. Disable `security-guidance` on Windows if `python3` is missing.
 
@@ -221,7 +226,7 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
   5. `bun run eval:rag --case=… / --runner=…` or `eval:studio` / `eval:literature-review` — agent or prompt changes (do NOT unit-test prompt outputs)
 - **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves — no new `any` in files you're already editing; ratchet per-directory (see `docs/engineering/code-quality.md`).
-- **Pre-push hook:** `.githooks/pre-push` (auto-enabled by `bun install`) runs typecheck + lint + design-lint. Bypass a WIP push with `git push --no-verify`.
+- **Git hooks** (auto-enabled by `bun install`): `.githooks/pre-commit` Biome-fixes and re-stages the staged files; `.githooks/pre-push` runs typecheck + lint + design-lint. Bypass a WIP commit/push with `--no-verify`.
 - **Design system (shadcn):** UI primitives live in `apps/web/src/shared/components/ui` — add with `bunx --bun shadcn@latest add <name>` from `apps/web`. After every `add`, the CLI writes `import { cn } from "cn"` (rewrite to `@/shared/utils/cn`) and may add bogus `cn` / `next-themes` deps (remove them). Pages place components (layout classes only); a new look is a new `cva` variant. Use semantic tokens (`bg-success-muted`, `text-info`, `border-destructive-border`), never palette colors or `--vintage-*` (those are persisted cover swatches only — see `apps/web/src/shared/notebook/coverColor.ts`). Motion: `tw-animate-css` utilities with the house `ease-out` curve, or `m.*` primitives from `@/shared/components/motion` (never `motion.*` — `LazyMotion strict`). Toasts: `useToast()` (sonner underneath). Type: content in the serif body face (Lora; headings `font-display`), controls in sans (buttons, tabs, selects, toggles and menus already carry `font-sans`). Layers: ui portal primitives sit at `z-100`, above the `z-70` app header. Rules: `.agents/skills/shadcn/SKILL.md`.
 - **Design lint ratchet:** `bun run lint:design` runs `@shadcn/lint` (ESLint, `apps/web/eslint.config.mjs`) and fails if any count in `apps/web/design-lint-baseline.json` goes up; after a cleanup run `bun run lint:design:update` to lock in the drop. Dirs listed in `MIGRATED` are errors. A new CLI-generated shadcn component that trips `no-arbitrary-values` on upstream idioms goes in `UPSTREAM_ARBITRARY` — never add authored components there.
 - **Code-quality cadence & ADRs:** [`docs/engineering/code-quality.md`](docs/engineering/code-quality.md) (weekly/monthly passes, metrics) and [`docs/adr/`](docs/adr/) (architecture decisions — write one in the PR that makes a hard-to-reverse or contested change).
