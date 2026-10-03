@@ -205,7 +205,7 @@ export const runChatEval = action({
     const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
     const rerankFn = async (query: string, documents: Array<{ id: string; content: string }>) => {
-      return cachedRerank(ctx, query, documents as RerankDocument[], "zerank-2", 15);
+      return cachedRerank(ctx, query, documents as RerankDocument[], 15);
     };
 
     // ── Spy wrapper for globalRerankFn ──

@@ -29,7 +29,7 @@ import {
 } from "@/shared/notebook/notebookIcons";
 import { cn } from "@/shared/utils/cn";
 
-export interface CoverValues {
+interface CoverValues {
   name: string;
   color: string;
   icon: string;

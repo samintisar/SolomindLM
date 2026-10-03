@@ -365,12 +365,12 @@ export async function rankPapersHandler(ctx: ActionCtx, args: { papers: any[]; q
       content: `${p.title}\n\n${p.abstract}`,
     }));
 
-    logger.info("Starting ZeroEntropy reranking", {
+    logger.info("Starting Voyage reranking", {
       paperCount: args.papers.length,
       query: args.query.slice(0, 100),
     });
 
-    const reranked = await cachedRerank(ctx, args.query, documents, "zerank-2", 30);
+    const reranked = await cachedRerank(ctx, args.query, documents, 30);
 
     const scoreMap = new Map(
       reranked.map((r, i) => [r.id, { score: r.score ?? 30 - i, index: i }])

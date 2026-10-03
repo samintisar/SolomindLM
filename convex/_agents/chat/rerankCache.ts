@@ -1,9 +1,9 @@
 "use node";
 
 /**
- * Cached ZeroEntropy Reranking Service
+ * Cached Voyage AI Reranking Service
  *
- * Provides a cached wrapper around ZeroEntropy reranking API.
+ * Provides a cached wrapper around the Voyage rerank API.
  * @convex-dev/action-cache hashes the full `query` string and all `documents` bodies — cache invalidates when content changes.
  */
 
@@ -11,10 +11,11 @@ import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { RERANK_ACTION_BACKSTOP_MS, RERANK_MODEL } from "../../_lib/rerankConfig";
+import { callVoyageRerank } from "../../_services/ai/voyageRerank";
 import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
-import { hashInput } from "../../_services/cache/cacheCrypto";
 import { createCachedAction } from "../../_services/cache/cachedAgent";
-import { createZeroEntropyClient } from "./zeroEntropyClient";
+import { withTimeout } from "./withTimeout.js";
 
 // ============================================================
 // Types
@@ -39,42 +40,23 @@ export const rerankInternal = internalAction({
   args: {
     query: v.string(),
     documents: v.array(v.string()),
-    model: v.string(),
     topN: v.number(),
   },
-  handler: async (_, { query, documents, model, topN }) => {
-    console.log("[RerankInternal] Starting reranking...");
+  handler: async (_, { query, documents, topN }) => {
     console.log(
-      `[RerankInternal] query="${query.slice(0, 50)}...", docs=${documents.length}, model=${model}, topN=${topN}`
+      `[RerankInternal] query="${query.slice(0, 50)}...", docs=${documents.length}, model=${RERANK_MODEL}, topN=${topN}`
     );
 
-    const apiKey = env.ZEROENTROPY_API_KEY;
+    const apiKey = env.VOYAGE_API_KEY;
     if (!apiKey) {
-      console.error("[RerankInternal] ZEROENTROPY_API_KEY is not configured");
-      throw new Error("ZEROENTROPY_API_KEY is not configured");
+      console.error("[RerankInternal] VOYAGE_API_KEY is not configured");
+      throw new Error("VOYAGE_API_KEY is not configured");
     }
 
     try {
-      const zclient = await createZeroEntropyClient(apiKey);
-
-      const response = await zclient.models.rerank({
-        model,
-        query,
-        documents,
-        top_n: topN,
-      });
-
-      console.log("[RerankInternal] ZeroEntropy response:", JSON.stringify(response).slice(0, 500));
-      console.log("[RerankInternal] Results count:", response.results?.length ?? 0);
-
-      // Return results with indices for mapping back to original documents
-      const results = (response.results || []).map((item: any) => ({
-        index: item.index ?? item.document_index ?? 0,
-        text: item.text ?? item.document,
-        relevance_score: item.relevance_score,
-      }));
-
-      console.log("[RerankInternal] Mapped results:", results.length);
+      // Hits carry the index into `documents` so callers can map back to their own ids.
+      const results = await callVoyageRerank(query, documents, apiKey, topN);
+      console.log("[RerankInternal] Results count:", results.length);
       return results;
     } catch (error) {
       console.error("[RerankInternal] Error:", error);
@@ -89,7 +71,9 @@ export const rerankInternal = internalAction({
 
 const rerankCache = createCachedAction(internal._agents.chat.rerankCache.rerankInternal, {
   ttl: withJitter(CACHE_TTL.rerank, 0.2),
-  name: "rerank-v2",
+  // Bumped from "rerank-v2" (ZeroEntropy) so no entry scored by the old model is served
+  // after the switch to Voyage.
+  name: "rerank-v3-voyage",
 });
 
 // ============================================================
@@ -110,7 +94,6 @@ function normalizeQuery(query: string): string {
  * @param ctx - Convex context
  * @param query - Search query
  * @param documents - Documents to rerank (with id and content)
- * @param model - ZeroEntropy model to use
  * @param topN - Number of top results to return
  * @returns Reranked results with original document IDs preserved
  */
@@ -118,7 +101,6 @@ export async function cachedRerank(
   ctx: any,
   query: string,
   documents: RerankDocument[],
-  model: string = "zerank-2",
   topN: number = 15
 ): Promise<RerankResult[]> {
   if (documents.length === 0) {
@@ -139,19 +121,19 @@ export async function cachedRerank(
 
   // Build cache key components (for logging/debugging)
   const docIds = sortedDocs.map((d) => d.id).join(",");
-  const _contentHash = await hashInput(sortedDocs.map((d) => d.content).join("|"));
-  const queryHash = await hashInput(normalizedQuery);
-  console.log(
-    `[RerankCache] key: model=${model}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`
-  );
+  console.log(`[RerankCache] key: model=${RERANK_MODEL}, docs=${docIds.slice(0, 50)}...`);
 
-  // Call cached action with NORMALIZED query and documents content
-  const results = await rerankCache.fetch(ctx, {
-    query: normalizedQuery,
-    documents: sortedDocs.map((d) => d.content),
-    model,
-    topN,
-  });
+  // Call cached action with NORMALIZED query and documents content. The extra second lets the
+  // action's own client timeout surface its error first; this is the backstop for a stalled action.
+  const results = await withTimeout(
+    rerankCache.fetch(ctx, {
+      query: normalizedQuery,
+      documents: sortedDocs.map((d) => d.content),
+      topN,
+    }),
+    RERANK_ACTION_BACKSTOP_MS,
+    "rerank"
+  );
 
   // Handle null/undefined results
   if (!results || !Array.isArray(results)) {
@@ -188,11 +170,4 @@ export async function cachedRerank(
   }
 
   return reranked;
-}
-
-/**
- * Check if reranking is available (API key configured)
- */
-export function isRerankingAvailable(): boolean {
-  return !!env.ZEROENTROPY_API_KEY;
 }

@@ -76,9 +76,8 @@ export const env = {
   CHAT_RRF_K: "60",
   CHAT_HYBRID_THRESHOLD: "0.012",
 
-  // ZeroEntropy (reranking)
-  ZEROENTROPY_API_KEY: process.env.ZEROENTROPY_API_KEY || "",
-  ZEROENTROPY_RERANK_MODEL: process.env.ZEROENTROPY_RERANK_MODEL || "zerank-2",
+  // Voyage AI (reranking); model is fixed in rerankConfig.ts
+  VOYAGE_API_KEY: process.env.VOYAGE_API_KEY || "",
 
   // In-app feedback → GitHub Issues sync (staff-triggered)
   FEEDBACK_GITHUB_TOKEN: process.env.FEEDBACK_GITHUB_TOKEN || "",
