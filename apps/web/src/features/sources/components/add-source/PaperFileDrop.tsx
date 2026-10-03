@@ -4,7 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 
 interface PaperFileDropProps {
   accept: string;
-  /** Visible description, e.g. "A .bib file exported from Zotero". */
+  /** Visible description, e.g. "A BibTeX (.bib) or RIS (.ris) file". */
   hint: string;
   fileName: string | null;
   disabled?: boolean;

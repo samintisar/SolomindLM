@@ -17,7 +17,6 @@ import { cn } from "@/shared/utils/cn";
 import { AddSourceMenu } from "./AddSourceMenu";
 import { BibtexImportForm } from "./BibtexImportForm";
 import { DoiForm } from "./DoiForm";
-import { LibraryImportForm } from "./LibraryImportForm";
 import { LinkForm } from "./LinkForm";
 import { ManualPaperForm } from "./ManualPaperForm";
 import { TextForm } from "./TextForm";
@@ -58,16 +57,8 @@ const STEP_COPY: Record<Exclude<AddSourceStep, "menu">, { title: string; descrip
   text: { title: "Paste text", description: "Add copied text as a source." },
   doi: { title: "Import from DOI", description: "Look up a paper and add its record." },
   bibtex: {
-    title: "Import BibTeX or RIS",
-    description: "Upload or paste a bibliography, then pick papers.",
-  },
-  zotero: {
-    title: "Import from Zotero",
-    description: "Import papers from a Zotero BibTeX export.",
-  },
-  mendeley: {
-    title: "Import from Mendeley",
-    description: "Import papers from a Mendeley BibTeX export.",
+    title: "Import bibliography",
+    description: "Upload or paste a BibTeX or RIS file. Zotero and Mendeley exports work too.",
   },
   manual: { title: "Add paper manually", description: "Enter the details of a paper." },
 };
@@ -213,17 +204,6 @@ export function AddSourceDialog({
       case "manual":
         return notebookId ? (
           <ManualPaperForm notebookId={notebookId} onDone={done} onBusyChange={onBusyChange} />
-        ) : null;
-      case "zotero":
-      case "mendeley":
-        return notebookId ? (
-          <LibraryImportForm
-            key={step}
-            source={step}
-            notebookId={notebookId}
-            onDone={done}
-            onBusyChange={onBusyChange}
-          />
         ) : null;
     }
   };

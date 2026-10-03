@@ -1,10 +1,17 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { AlertCircle } from "lucide-react";
-import { useCallback, useId, useState } from "react";
+import { AlertCircle, Library } from "lucide-react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
 import { Field, FieldLabel } from "@/shared/components/ui/field";
 import {
   Item,
@@ -17,7 +24,12 @@ import {
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { useBulkUpload, useParseBibliography } from "../../services/documentsApi";
+import { splitNewPapers } from "../../lib/paperDedupe";
+import {
+  useBulkUpload,
+  useGetExistingPapers,
+  useParseBibliography,
+} from "../../services/documentsApi";
 import { PaperFileDrop } from "./PaperFileDrop";
 import { type StepFormProps, useReportBusy } from "./types";
 
@@ -60,6 +72,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
 
   const parseBibliography = useParseBibliography();
   const bulkUpload = useBulkUpload();
+  const existing = useGetExistingPapers(notebookId);
   useReportBusy(isParsing || isImporting, onBusyChange);
 
   const handleParse = useCallback(
@@ -100,23 +113,39 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
     [handleParse]
   );
 
+  // `existing` is undefined while the dedupe query loads; importing then could add duplicates.
+  const checking = existing === undefined;
+  // Indices into `papers` of entries already in the notebook: shown, but never selectable.
+  const duplicates = useMemo(() => {
+    const indexed = papers.map((p, index) => ({ ...p, index }));
+    return new Set(splitNewPapers(indexed, existing ?? undefined).duplicates.map((p) => p.index));
+  }, [papers, existing]);
+  const freshIndices = useMemo(
+    () => papers.map((_, i) => i).filter((i) => !duplicates.has(i)),
+    [papers, duplicates]
+  );
+  const chosenIndices = freshIndices.filter((i) => selected.has(i));
+
   const handleImport = useCallback(async () => {
-    if (selected.size === 0) return;
+    if (chosenIndices.length === 0 || checking) return;
     setIsImporting(true);
     setError(null);
 
     try {
-      const chosen = papers.filter((_, i) => selected.has(i));
-      const papersWithTitle = chosen.map((p) => ({
-        title: p.title || "Untitled",
-        abstract: p.abstract || "",
-        authors: p.authors || [],
-        doi: p.doi,
-        venue: p.venue,
-        publicationYear: p.publicationYear,
-        isOa: p.isOa ?? false,
-        sourceType: p.sourceType || "bibtex",
-      }));
+      // Indices follow the parsed list, so papers import in their parsed order.
+      const papersWithTitle = chosenIndices.map((i) => {
+        const p = papers[i];
+        return {
+          title: p.title || "Untitled",
+          abstract: p.abstract || "",
+          authors: p.authors || [],
+          doi: p.doi,
+          venue: p.venue,
+          publicationYear: p.publicationYear,
+          isOa: p.isOa ?? false,
+          sourceType: p.sourceType || "bibtex",
+        };
+      });
 
       await bulkUpload({ notebookId, papers: papersWithTitle });
       onDone();
@@ -125,7 +154,7 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
     } finally {
       setIsImporting(false);
     }
-  }, [selected, papers, notebookId, bulkUpload, onDone]);
+  }, [chosenIndices, checking, papers, notebookId, bulkUpload, onDone]);
 
   const togglePaper = useCallback((index: number) => {
     setSelected((prev) => {
@@ -139,16 +168,19 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
     });
   }, []);
 
-  const allSelected = papers.length > 0 && selected.size === papers.length;
+  const allSelected = freshIndices.length > 0 && chosenIndices.length === freshIndices.length;
   const toggleAll = useCallback(() => {
-    setSelected(allSelected ? new Set() : new Set(papers.map((_, i) => i)));
-  }, [allSelected, papers]);
+    setSelected(allSelected ? new Set() : new Set(freshIndices));
+  }, [allSelected, freshIndices]);
 
   const withoutDoiCount = papers.filter((p) => !p.doi).length;
   const busy = isParsing || isImporting;
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-sm text-muted-foreground">
+        In Zotero or Mendeley, export your library as BibTeX (.bib), then upload it here.
+      </p>
       <Tabs defaultValue="file">
         <TabsList>
           <TabsTrigger value="file" autoFocus>
@@ -201,6 +233,15 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
         </p>
       )}
 
+      {papers.length > 0 && checking && (
+        <p
+          role="status"
+          className="flex items-center gap-2 font-sans text-sm text-muted-foreground"
+        >
+          <Spinner aria-hidden /> Checking your notebook...
+        </p>
+      )}
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle />
@@ -228,6 +269,9 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
           <Badge variant="outline">{stats.withDoi} with DOI</Badge>
           {stats.withoutDoi > 0 && <Badge variant="outline">{stats.withoutDoi} missing DOI</Badge>}
           {stats.malformed > 0 && <Badge variant="outline">{stats.malformed} skipped</Badge>}
+          {duplicates.size > 0 && (
+            <Badge variant="outline">{duplicates.size} already in notebook</Badge>
+          )}
         </div>
       )}
 
@@ -241,11 +285,25 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
         </Alert>
       )}
 
-      {papers.length > 0 && (
+      {papers.length > 0 && !checking && freshIndices.length === 0 && (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Library />
+            </EmptyMedia>
+            <EmptyTitle>Nothing new to import</EmptyTitle>
+            <EmptyDescription>
+              All papers from this file are already in your notebook.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+
+      {papers.length > 0 && (checking || freshIndices.length > 0) && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between font-sans text-sm text-muted-foreground">
             <span>
-              {selected.size} of {papers.length} selected
+              {chosenIndices.length} of {freshIndices.length} selected
             </span>
             <Button type="button" variant="ghost" size="sm" onClick={toggleAll}>
               {allSelected ? "Deselect all" : "Select all"}
@@ -253,51 +311,62 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
           </div>
           <div className="max-h-64 overflow-y-auto">
             <ItemGroup variant="grouped">
-              {papers.map((p, i) => (
-                <div key={i} role="listitem">
-                  <Item asChild size="sm">
-                    <label htmlFor={`${baseId}-${i}`} className="cursor-pointer">
-                      <ItemMedia>
-                        <Checkbox
-                          id={`${baseId}-${i}`}
-                          checked={selected.has(i)}
-                          onCheckedChange={() => togglePaper(i)}
-                          aria-label={`Include ${p.title || "Untitled"}`}
-                        />
-                      </ItemMedia>
-                      <ItemContent>
-                        <ItemTitle>
-                          <span className="line-clamp-2">{p.title || "Untitled"}</span>
-                        </ItemTitle>
-                        <ItemDescription>
-                          {[p.authors?.slice(0, 3).join(", "), p.publicationYear]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </ItemDescription>
-                        {!p.doi && (
-                          <div>
-                            <Badge variant="outline">No DOI</Badge>
-                          </div>
-                        )}
-                      </ItemContent>
-                    </label>
-                  </Item>
-                </div>
-              ))}
+              {papers.map((p, i) => {
+                const title = p.title || "Untitled";
+                const inNotebook = duplicates.has(i);
+                return (
+                  <div key={i} role="listitem">
+                    <Item asChild size="sm">
+                      <label
+                        htmlFor={`${baseId}-${i}`}
+                        className={inNotebook ? "cursor-default" : "cursor-pointer"}
+                      >
+                        <ItemMedia>
+                          <Checkbox
+                            id={`${baseId}-${i}`}
+                            checked={inNotebook || selected.has(i)}
+                            disabled={inNotebook}
+                            onCheckedChange={() => togglePaper(i)}
+                            aria-label={
+                              inNotebook ? `${title}, already in notebook` : `Include ${title}`
+                            }
+                          />
+                        </ItemMedia>
+                        <ItemContent>
+                          <ItemTitle>
+                            <span className="line-clamp-2">{title}</span>
+                          </ItemTitle>
+                          <ItemDescription>
+                            {[p.authors?.slice(0, 3).join(", "), p.publicationYear]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </ItemDescription>
+                          {(inNotebook || !p.doi) && (
+                            <div className="flex flex-wrap gap-1">
+                              {inNotebook && <Badge variant="outline">In notebook</Badge>}
+                              {!p.doi && <Badge variant="outline">No DOI</Badge>}
+                            </div>
+                          )}
+                        </ItemContent>
+                      </label>
+                    </Item>
+                  </div>
+                );
+              })}
             </ItemGroup>
           </div>
           <div className="flex justify-end">
             <Button
               type="button"
               onClick={() => void handleImport()}
-              disabled={selected.size === 0 || isImporting}
+              disabled={chosenIndices.length === 0 || isImporting || checking}
             >
               {isImporting ? (
                 <>
                   <Spinner aria-hidden /> Importing...
                 </>
               ) : (
-                `Import ${selected.size} selected paper${selected.size === 1 ? "" : "s"}`
+                `Import ${chosenIndices.length} selected paper${chosenIndices.length === 1 ? "" : "s"}`
               )}
             </Button>
           </div>

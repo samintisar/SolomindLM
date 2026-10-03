@@ -1,15 +1,6 @@
 import { useEffect } from "react";
 
-export type AddSourceStep =
-  | "menu"
-  | "website"
-  | "video"
-  | "text"
-  | "doi"
-  | "bibtex"
-  | "zotero"
-  | "mendeley"
-  | "manual";
+export type AddSourceStep = "menu" | "website" | "video" | "text" | "doi" | "bibtex" | "manual";
 
 /** Contract between AddSourceDialog and each step's form. */
 export interface StepFormProps {

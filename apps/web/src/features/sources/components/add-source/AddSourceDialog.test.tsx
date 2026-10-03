@@ -28,9 +28,7 @@ const OPTION_NAMES = [
   "Copied text",
   "Choose from Google Drive",
   "Import from DOI",
-  "Import BibTeX or RIS",
-  "Import from Zotero",
-  "Import from Mendeley",
+  "Import bibliography",
   "Add manually",
 ];
 
@@ -97,22 +95,22 @@ describe("AddSourceDialog", () => {
 
   it("returns focus to the option that opened the step", async () => {
     renderDialog();
-    await userEvent.click(screen.getByRole("button", { name: "Import from Zotero" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add manually" }));
     await userEvent.click(screen.getByRole("button", { name: "Back to add sources" }));
-    expect(screen.getByRole("button", { name: "Import from Zotero" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Add manually" })).toHaveFocus();
 
     await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
     await userEvent.click(screen.getByRole("button", { name: "Back to add sources" }));
     expect(screen.getByRole("button", { name: "Copied text" })).toHaveFocus();
   });
 
-  it("focuses the first control of the file-import steps", async () => {
+  it("opens the bibliography import on its first control", async () => {
     renderDialog();
-    await userEvent.click(screen.getByRole("button", { name: "Import BibTeX or RIS" }));
+    await userEvent.click(screen.getByRole("button", { name: "Import bibliography" }));
+    expect(dialogNamed("Import bibliography")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Upload file" })).toHaveFocus();
     await userEvent.click(screen.getByRole("button", { name: "Back to add sources" }));
-    await userEvent.click(screen.getByRole("button", { name: "Import from Mendeley" }));
-    expect(screen.getByRole("button", { name: "Choose file" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Import bibliography" })).toHaveFocus();
   });
 
   it("reopens on the menu after closing from a step", async () => {

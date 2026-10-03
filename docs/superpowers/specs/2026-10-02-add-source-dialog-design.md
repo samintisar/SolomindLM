@@ -4,6 +4,8 @@
 - Part 1 (the panel, #298) is done.
 - Part 3 (`DiscoverSourcesModal` + `AcademicDiscoveryFiltersSection`) is a separate PR.
 
+**Update (user decision, 2026-10-03):** Zotero and Mendeley exports are just `.bib` files, so their separate steps are folded into one "Import bibliography" step (BibTeX or RIS, with the library form's duplicate check). "Research papers" now has three options. The sections below describe the folded design.
+
 **Branch:** `feature/ds-migrate-sources-dialogs`, stacked on `feature/ds-migrate-sources-panel` (#298).
 **House style:** `docs/design/principles.md` (soft layered).
 
@@ -51,13 +53,12 @@ Move the dialog into a new folder, `components/add-source/`:
 | `TextForm.tsx` | Pasted text (was `TextInputModal`). |
 | `DoiForm.tsx` | Resolve and add by DOI (was `DoiInputModal`). |
 | `ManualPaperForm.tsx` | Manual paper entry (was `ManualPaperModal`). |
-| `BibtexImportForm.tsx` | BibTeX/RIS file or paste (was `BibtexImportModal`). |
-| `LibraryImportForm.tsx` | Zotero and Mendeley `.bib` export import. `source: "zotero" \| "mendeley"` picks the icon, the copy and the `sourceType`. |
-| `PaperFileDrop.tsx` | Shared "choose a .bib file" control used by the BibTeX and library forms. |
+| `BibtexImportForm.tsx` | BibTeX/RIS file or paste, including Zotero and Mendeley exports (was `BibtexImportModal`, `ZoteroImportModal` and `MendeleyImportModal`). |
+| `PaperFileDrop.tsx` | The "choose a file" control used by the bibliography form. |
 
 The nine old `*Modal.tsx` files are deleted.
 
-**Step state:** `type AddSourceStep = "menu" | "website" | "video" | "text" | "doi" | "bibtex" | "zotero" | "mendeley" | "manual"`.
+**Step state:** `type AddSourceStep = "menu" | "website" | "video" | "text" | "doi" | "bibtex" | "manual"`.
 - `AddSourceDialog` owns it.
 - It resets to `"menu"` whenever the dialog closes.
 - Each form unmounts when you leave its step, so a reopened form always starts empty. This fixes today's stale DOI and Manual state on the success path.
@@ -65,6 +66,7 @@ The nine old `*Modal.tsx` files are deleted.
 **Step header:**
 - Every non-menu step renders a ghost `icon-sm` Back button (`aria-label="Back to add sources"`) beside its `DialogTitle`. The dialog's accessible name follows the step.
 - The menu's title is "Add sources", with a `DialogDescription`.
+- The bibliography step's title is "Import bibliography", described as "Upload or paste a BibTeX or RIS file. Zotero and Mendeley exports work too."
 - Each form step has a one-line `DialogDescription` (the old intro copy, where one existed).
 
 **Width:** one width for every step: `DialogContent size="wide"` (`sm:max-w-3xl`, a flex column capped at `max-h-svh`), so the dialog doesn't jump in size between steps.
@@ -118,9 +120,7 @@ The nine old `*Modal.tsx` files are deleted.
   - Choose from Google Drive (HardDrive), only when `isGoogleDrivePickerConfigured`
 - **"Research papers":**
   - Import from DOI
-  - Import BibTeX or RIS
-  - Import from Zotero
-  - Import from Mendeley
+  - Import bibliography
   - Add manually
 
 **Option rows:** each option is an `Item asChild` over a `<button type="button">`, containing:
@@ -139,9 +139,7 @@ The hints:
 | Copied text | Paste notes or any text |
 | Google Drive | Pick files from your Drive |
 | DOI | Look up a paper by its DOI |
-| BibTeX/RIS | Upload or paste a bibliography |
-| Zotero | Import a Zotero BibTeX export |
-| Mendeley | Import a Mendeley BibTeX export |
+| Import bibliography | BibTeX or RIS, including Zotero and Mendeley exports |
 | Add manually | Enter a paper's details yourself |
 
 **Warnings** (`Alert`, after the options):
@@ -195,31 +193,24 @@ The hints:
 - Validity and payload are unchanged: `isOa: false`, `sourceType: "manual"`, and empty optional fields become `undefined`.
 - Submit "Add Paper".
 
-**BibTeX/RIS (`BibtexImportForm`):**
+**Bibliography (`BibtexImportForm`):** BibTeX or RIS, which covers Zotero and Mendeley exports.
+- A muted help line above the tabs: "In Zotero or Mendeley, export your library as BibTeX (.bib), then upload it here."
 - `Tabs` with "Upload file" and "Paste text":
-  - **Upload file:** `PaperFileDrop` (`accept=".bib,.ris"`), a real `Button` plus a hidden input. It shows the chosen file name once loaded.
-  - **Paste text:** a labelled mono `Textarea` (rows 8) and a "Parse bibliography" button.
-- **Format fix:** detect the format from the content actually being parsed (the new file's text, or the textarea's text), not from stale `fileContent` state: `"ris"` if it starts with `TY  -`, otherwise `"auto"`.
+  - **Upload file:** `PaperFileDrop` (`accept=".bib,.ris"`, hint "A BibTeX (.bib) or RIS (.ris) file"), a real `Button` plus a hidden input. It shows the chosen file name once loaded.
+  - **Paste text:** a labelled `Textarea` (rows 8) and a "Parse bibliography" button.
+- **Format:** detected from the content being parsed: `"ris"` if it starts with `TY  -`, otherwise `"auto"`.
 - **Results:**
-  - Stats `Badge`s: N found (`secondary`), N with DOI, N missing DOI and N skipped (`outline`).
+  - Stats `Badge`s: N found (`secondary`), N with DOI, N missing DOI, N skipped and N already in notebook (`outline`).
   - Parse warnings in an `Alert variant="warning"`, as a list.
-  - A "Select all" / "Deselect all" ghost `Button size="sm"`.
-  - An `ItemGroup variant="grouped"` (scroll body `max-h-64 overflow-y-auto`) with one `Item` per paper. Each row is an `Item asChild` rendering a `<label htmlFor>` (inside a `div role="listitem"`), so the whole row toggles, as in the old modal. It holds a `Checkbox` labelled "Include ⟨title⟩" and an `ItemContent` with the title, authors and year in an `ItemDescription`, and a "No DOI" `Badge` when the paper has none. Every paper is selected after a parse, as today.
-- Submit "Import N selected paper(s)" calls `useBulkUpload`, as today, with `sourceType: p.sourceType || "bibtex"`. Papers are imported in their parsed order, not in the order they were ticked. A file that cannot be read shows its error in the `Alert`.
-
-**Zotero and Mendeley (`LibraryImportForm source`):**
-- A short help line: "Export your ⟨Zotero|Mendeley⟩ library as BibTeX (.bib), then choose the file."
-- `PaperFileDrop` with `accept=".bib"`; parsing starts as soon as a file is chosen (`format: "auto"`).
-- Parsing shows an `aria-hidden` `Spinner` plus "Parsing bibliography..." in a `role="status"` row.
-- While the existing-papers query is still loading, a "Checking your notebook..." status row replaces the stats and Import is disabled, so a fast click cannot import duplicates.
-- Stats `Badge`s: found, already in notebook, new.
-- A file with no papers shows `Empty` "No papers found in this file".
-- The new papers are listed in a read-only grouped list (no checkboxes, as today).
-- When every paper is already present, `Empty` shows "All papers from this file are already in your notebook."
-- Submit "Import N paper(s)" bulk-uploads only the new papers, with `sourceType` `"zotero"` or `"mendeley"`.
-- **Dedupe** moves to `features/sources/lib/paperDedupe.ts`, with TDD:
-  - `paperKeys(paper)` returns `{ doi, titleHash }`: the trimmed, lowercased DOI if present, and `title|firstAuthorSurname` (lowercased) when both exist. These are the same keys `convex/documents/getExistingPapers.ts` returns as `{ dois, titleHashes }`.
-  - `splitNewPapers(parsed, existing)` returns `{ fresh, duplicates }`, treating a paper as a duplicate when either key is already present. With `existing === undefined` (query loading) everything is "fresh", which is why the form waits for the query.
+  - A "Select all" / "Deselect all" ghost `Button size="sm"` over the new papers.
+  - An `ItemGroup variant="grouped"` (scroll body `max-h-64 overflow-y-auto`) with one row per parsed paper. Each row is an `Item asChild` rendering a `<label htmlFor>` (inside a `div role="listitem"`), so the whole row toggles. It holds a `Checkbox` labelled "Include ⟨title⟩", the title, authors and year, and a "No DOI" `Badge` when the paper has none. Every new paper is selected after a parse.
+- **Dedupe** (`useGetExistingPapers` + `features/sources/lib/paperDedupe.ts`):
+  - `paperKeys(paper)` returns `{ doi, titleHash }`: the trimmed, lowercased DOI, and `title|firstAuthorSurname` (lowercased) when both exist. These match the keys `convex/documents/getExistingPapers.ts` returns.
+  - `splitNewPapers(parsed, existing)` treats a paper as a duplicate when either key is present. With `existing === undefined` (query loading) everything is fresh.
+  - A paper already in the notebook stays in the list but cannot be picked: a disabled, checked `Checkbox` labelled "⟨title⟩, already in notebook" and an outline `Badge` "In notebook". It is left out of the selection, select-all and the import.
+  - While the query loads, a "Checking your notebook..." `role="status"` row shows and Import is disabled, so a fast click cannot import duplicates.
+  - When every paper is already present, `Empty` shows "Nothing new to import" / "All papers from this file are already in your notebook." and there is no Import button.
+- Submit "Import N selected paper(s)" calls `useBulkUpload` with `sourceType: p.sourceType || "bibtex"`. Selection is by index into the parsed list, so papers import in their parsed order. A file that cannot be read shows its error in the `Alert`.
 
 ## 4. Primitives
 
@@ -253,8 +244,9 @@ The hints:
   - deselecting updates the submit count;
   - RIS content is detected;
   - clicking a row's title toggles its checkbox;
-  - a parse failure shows in `role="alert"`, and warnings render.
-- **`LibraryImportForm`:** duplicates are skipped, Import waits for the notebook check, and an empty file shows "No papers found in this file".
+  - a parse failure shows in `role="alert"`, and warnings render;
+  - a duplicate (by DOI, any case, or by title and first author) is disabled and left out of the import;
+  - Import waits for the notebook check, and an all-duplicates file shows "Nothing new to import".
 - **`paperDedupe.test.ts`:** matches by DOI case-insensitively, falls back to the title and author surname, and splits fresh from duplicates.
 
 Mock the Convex hooks (`documentsApi`) as the existing panel tests do.
@@ -284,5 +276,4 @@ Mock the Convex hooks (`documentsApi`) as the existing panel tests do.
   - the menu: idle, dragging, disabled at the limit and signed out;
   - each form step;
   - a DOI preview;
-  - BibTeX results;
-  - library results and the empty state.
+  - bibliography results, including duplicates and the empty state.
