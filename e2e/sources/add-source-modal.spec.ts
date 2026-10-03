@@ -49,7 +49,7 @@ test.describe("Add Source Modal", () => {
     await expect(dialog.getByText("Source limit")).toBeVisible();
   });
 
-  test("discover sources button opens discover modal", async ({ notebookPage }) => {
+  test("discover sources button opens the discover dialog", async ({ notebookPage }) => {
     const page = notebookPage;
 
     await openAddSourceModal(page);
@@ -57,9 +57,11 @@ test.describe("Add Source Modal", () => {
     // Click Discover sources
     await modalDiscoverButton(page).click();
 
-    // Should show discover modal with search input
-    await expect(page.getByPlaceholder("Search for articles, papers, or websites...")).toBeVisible({
-      timeout: 5_000,
-    });
+    // Should show the discover dialog with its search input
+    const discoverDialog = page.getByRole("dialog", { name: "Discover sources" });
+    await expect(discoverDialog).toBeVisible({ timeout: 5_000 });
+    await expect(
+      discoverDialog.getByPlaceholder("Search for articles, papers, or websites...")
+    ).toBeVisible();
   });
 });
