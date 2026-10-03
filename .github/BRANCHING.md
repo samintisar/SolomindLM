@@ -75,7 +75,8 @@ the failure is the Convex quota, not the code. In the Convex dashboard, delete
 the preview deployments of merged or closed branches (the `convex` CLI can't
 delete deployments), then redeploy the failed previews from Vercel
 (Deployments → ⋯ → Redeploy). Convex also removes previews by itself after 5
-days (14 on paid plans).
+days on the Free and Starter plans, or 14 days on Professional, Business and
+Enterprise.
 
 ## Issues
 
