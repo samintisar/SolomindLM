@@ -5,6 +5,8 @@ import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItemIcon,
+  DropdownMenuItemText,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -61,8 +63,10 @@ export function ModelMenu({ value, onModelChange, disabled, hideLabel = false }:
         <DropdownMenuRadioGroup value={selectedId} onValueChange={onModelChange}>
           {AVAILABLE_SMART_MODELS.map((model) => (
             <DropdownMenuRadioItem key={model.id} value={model.id}>
-              <ModelBrandIcon brand={model.brand} />
-              {model.name}
+              <DropdownMenuItemIcon>
+                <ModelBrandIcon brand={model.brand} />
+              </DropdownMenuItemIcon>
+              <DropdownMenuItemText>{model.name}</DropdownMenuItemText>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

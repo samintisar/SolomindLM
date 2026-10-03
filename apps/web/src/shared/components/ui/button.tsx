@@ -20,9 +20,9 @@ const buttonVariants = cva(
         destructive:
           "rounded-xl bg-destructive text-destructive-foreground shadow-md shadow-destructive/25 dark:shadow-destructive/35 hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35 active:translate-y-0 active:scale-98",
         outline:
-          "rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:bg-accent/60 hover:text-accent-foreground active:scale-98 aria-expanded:bg-accent aria-expanded:text-accent-foreground",
+          "rounded-xl bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground active:scale-98 aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-invalid:ring-destructive",
         secondary:
-          "rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-98",
+          "rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/70 active:scale-98 aria-expanded:bg-secondary/70",
         ghost:
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         "ghost-destructive":
@@ -33,10 +33,12 @@ const buttonVariants = cva(
          */
         "ghost-toggle-destructive":
           "rounded-lg hover:bg-accent hover:text-accent-foreground active:bg-accent/80 aria-pressed:bg-destructive-muted aria-pressed:text-destructive-muted-foreground aria-pressed:hover:bg-destructive-muted aria-pressed:hover:text-destructive-muted-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-link underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-6",
+        /** Compact inline action inside a dense row (e.g. per-source "Open" / "Add to notebook"). */
+        xs: "h-7 gap-1 rounded-lg px-2.5 text-xs",
         sm: "h-9 px-4 text-xs",
         /** `sm` whose side padding tightens when its nearest `@container` is narrow (toolbars); no-op outside any @container. */
         "sm-adaptive": "h-9 px-4 text-xs @max-md:px-2.5",

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   areaOf,
+  blockedIncreases,
   compareCounts,
   countViolations,
   isDegradedRun,
   type LintResult,
+  rulesInBaseline,
   sortCounts,
 } from "./baseline";
 
@@ -52,6 +54,18 @@ describe("countViolations", () => {
   });
 });
 
+describe("countViolations prefixes", () => {
+  it("counts solomind/ rules alongside shadcn/", () => {
+    const { counts } = countViolations([
+      {
+        filePath: "/r/src/features/chat/A.tsx",
+        messages: [msg("solomind/soft-surfaces"), msg("other/rule")],
+      },
+    ]);
+    expect(counts).toEqual({ "features/chat": { "solomind/soft-surfaces": 1 } });
+  });
+});
+
 describe("compareCounts", () => {
   const baseline = { "features/chat": { "shadcn/no-raw-colors": 5, "shadcn/no-inline-styles": 1 } };
 
@@ -74,6 +88,54 @@ describe("compareCounts", () => {
       { area: "features/chat", rule: "shadcn/no-inline-styles", baseline: 1, current: 0 },
       { area: "features/chat", rule: "shadcn/no-raw-colors", baseline: 5, current: 3 },
     ]);
+  });
+});
+
+describe("blockedIncreases", () => {
+  const baseline = { "features/chat": { "shadcn/no-raw-colors": 5 } };
+  const fresh = {
+    "features/chat": { "shadcn/no-raw-colors": 5, "solomind/soft-surfaces": 3 },
+    shared: { "solomind/soft-surfaces": 2 },
+  };
+  const blocked = (
+    current: typeof fresh | Record<string, Record<string, number>>,
+    opts: { update: boolean; newRules?: string[] }
+  ) =>
+    blockedIncreases(compareCounts(current, baseline).increases, baseline, {
+      update: opts.update,
+      newRules: opts.newRules ?? [],
+    });
+
+  it("blocks a new rule when it was not named with --new-rule", () => {
+    expect(blocked(fresh, { update: true })).toHaveLength(2);
+  });
+
+  it("allows a new rule that was named with --new-rule", () => {
+    expect(blocked(fresh, { update: true, newRules: ["solomind/soft-surfaces"] })).toEqual([]);
+  });
+
+  it("blocks a flagged rule that is already in the baseline", () => {
+    const current = { "features/chat": { "shadcn/no-raw-colors": 6 } };
+    expect(blocked(current, { update: true, newRules: ["shadcn/no-raw-colors"] })).toHaveLength(1);
+  });
+
+  it("blocks a rule that was fixed to zero, dropped from the baseline and came back", () => {
+    // sortCounts drops zero counts, so the regressed rule is absent from the baseline like a new one.
+    const current = {
+      "features/chat": { "shadcn/no-raw-colors": 5, "shadcn/no-inline-styles": 1 },
+    };
+    expect(blocked(current, { update: true })).toHaveLength(1);
+  });
+
+  it("blocks every increase outside update mode, flagged or not", () => {
+    expect(blocked(fresh, { update: false, newRules: ["solomind/soft-surfaces"] })).toHaveLength(2);
+  });
+});
+
+describe("rulesInBaseline", () => {
+  it("returns the requested rules that the baseline already tracks", () => {
+    const baseline = { a: { "r/x": 1 }, b: { "r/y": 2 } };
+    expect(rulesInBaseline(["r/y", "r/z"], baseline)).toEqual(["r/y"]);
   });
 });
 

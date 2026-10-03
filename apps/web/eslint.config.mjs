@@ -2,6 +2,9 @@
 import { plugin as shadcn } from "@shadcn/lint";
 import tsParser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
+import softSurfaces from "./scripts/design-lint/soft-surfaces-rule.mjs";
+
+const solomind = { meta: { name: "solomind" }, rules: { "soft-surfaces": softSurfaces } };
 
 /** Migrated to the design system: violations are errors. Add a feature dir when its PR lands. */
 const MIGRATED = [
@@ -38,6 +41,8 @@ const rules = (level) => ({
   "shadcn/no-inline-styles": level,
   "shadcn/no-unknown-classes": level,
   "shadcn/require-static-classes": level,
+  // Soft layered look (docs/design/principles.md): warn in general, error in MIGRATED like the shadcn rules.
+  "solomind/soft-surfaces": level,
 });
 
 export default defineConfig([
@@ -48,7 +53,7 @@ export default defineConfig([
       parser: tsParser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    plugins: { shadcn },
+    plugins: { shadcn, solomind },
     settings: {
       shadcn: {
         ui: "@/shared/components/ui",
@@ -72,4 +77,6 @@ export default defineConfig([
     files: ["src/shared/components/ui/field.tsx", "src/shared/components/ui/input-group.tsx"],
     rules: { "shadcn/no-restyle": "warn", "shadcn/require-static-classes": "warn" },
   },
+  // Primitives own the look; outline exceptions there are reviewed variants (docs/design/principles.md).
+  { files: ["src/shared/components/ui/**/*.tsx"], rules: { "solomind/soft-surfaces": "off" } },
 ]);
