@@ -1,4 +1,5 @@
 import type { MetricResult, MetricStatus } from "../types";
+import { isJudgeError } from "./scorecard";
 
 export interface JudgeCalibrationItem {
   id: number;
@@ -17,7 +18,12 @@ export function buildJudgeCalibrationQueue(
   options?: { limit?: number }
 ): JudgeCalibrationItem[] {
   const limit = options?.limit ?? 20;
-  const judges = metrics.filter((row) => row.metric.startsWith("binary_judge_"));
+  // Judge errors (truncation, parse, HTTP) carry no verdict, so a human cannot calibrate them.
+  const judges = metrics.filter(
+    (row) =>
+      (row.metric.startsWith("binary_judge_") || row.metric.startsWith("rubric:")) &&
+      !isJudgeError(row)
+  );
   const fails = judges.filter((row) => row.status === "fail" || row.status === "warn");
   const passes = judges.filter((row) => row.status === "pass");
 

@@ -7,6 +7,7 @@ import {
   assertCanEditNotebook,
   assertCanReadNotebook,
   assertNotebookOwner,
+  canReadNotebook,
   getNotebookAccess,
   getNotebookMember,
   isNotebookOwner,
@@ -171,6 +172,45 @@ describe("assertCanReadNotebook", () => {
     await expect(
       t.run(async (ctx) => assertCanReadNotebook(ctx, "non-existent" as Id<"notebooks">, userId))
     ).rejects.toThrow("Notebook not found");
+  });
+});
+
+describe("canReadNotebook", () => {
+  test("returns true for owner and editor member", async () => {
+    const t = convexTest(schema, modules);
+    const ownerId = await seedUser(t);
+    const editorId = await seedUser(t);
+    const notebookId = await seedNotebook(t, ownerId);
+    await seedNotebookMember(t, notebookId, editorId, "editor");
+
+    await expect(t.run(async (ctx) => canReadNotebook(ctx, notebookId, ownerId))).resolves.toBe(
+      true
+    );
+    await expect(t.run(async (ctx) => canReadNotebook(ctx, notebookId, editorId))).resolves.toBe(
+      true
+    );
+  });
+
+  test("returns false for non-member instead of throwing", async () => {
+    const t = convexTest(schema, modules);
+    const ownerId = await seedUser(t);
+    const otherId = await seedUser(t);
+    const notebookId = await seedNotebook(t, ownerId);
+
+    await expect(t.run(async (ctx) => canReadNotebook(ctx, notebookId, otherId))).resolves.toBe(
+      false
+    );
+  });
+
+  test("returns false for a deleted notebook instead of throwing", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    await t.run(async (ctx) => ctx.db.delete(notebookId));
+
+    await expect(t.run(async (ctx) => canReadNotebook(ctx, notebookId, userId))).resolves.toBe(
+      false
+    );
   });
 });
 

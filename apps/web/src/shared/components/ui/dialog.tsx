@@ -59,13 +59,16 @@ function DialogContent({
   theme,
   size,
   padding,
+  container,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof dialogContentVariants> & {
     showCloseButton?: boolean;
+    /** Portal target; defaults to `document.body`. The design gallery pins layers inside a frame. */
+    container?: HTMLElement | null;
   }) {
   return (
-    <DialogPortal data-slot="dialog-portal">
+    <DialogPortal data-slot="dialog-portal" container={container}>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"

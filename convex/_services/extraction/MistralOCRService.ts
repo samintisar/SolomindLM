@@ -4,18 +4,39 @@ import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 
+type MistralOcrTable = { id?: string; content?: string; format?: string };
+
+/**
+ * With `table_format` set, OCR returns each table in `tables` and leaves a link
+ * placeholder (`[tbl-0.md](tbl-0.md)`) in the page markdown. Put the table back
+ * where its placeholder is; a table without a placeholder goes at the page end.
+ */
+function inlineOcrTables(markdown: string, tables: MistralOcrTable[] | undefined): string {
+  let md = markdown;
+  for (const table of tables ?? []) {
+    if (!table.id || !table.content) continue;
+    const placeholder = `[${table.id}](${table.id})`;
+    const content = table.content.trim();
+    // Function replacer: table text often contains "$" (prices), which a string replacement would interpret.
+    md = md.includes(placeholder)
+      ? md.replace(placeholder, () => content)
+      : `${md.trimEnd()}\n\n${content}`;
+  }
+  return md;
+}
+
 /**
  * Stitch OCR pages into one markdown string with visible page labels (HTML comments are hidden when rendered).
  */
 export function markdownFromMistralOcrResponse(data: {
-  pages?: Array<{ markdown?: string }>;
+  pages?: Array<{ markdown?: string; tables?: MistralOcrTable[] }>;
   markdown?: string;
   text?: string;
 }): string {
   if (data?.pages && Array.isArray(data.pages) && data.pages.length > 0) {
     return data.pages
       .map((page, index) => {
-        const md = page.markdown || "";
+        const md = inlineOcrTables(page.markdown || "", page.tables);
         const label = `**Page ${index + 1}**`;
         return index === 0 ? `${label}\n\n${md}` : `---\n\n${label}\n\n${md}`;
       })

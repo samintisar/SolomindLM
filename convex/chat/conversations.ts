@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery, query } from "../_generated/server";
 import { assertCanReadConversation } from "../_lib/conversationAccess";
-import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { assertCanReadNotebook, canReadNotebook } from "../_lib/notebookAccess";
 import * as Conversations from "../_model/conversations";
 import { getAuthUserId } from "../auth";
 
@@ -67,7 +67,7 @@ export const listForNotebook = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
 
     const conversations = await Conversations.listConversationsInNotebook(ctx, args.notebookId);
 

@@ -16,6 +16,7 @@ const MIGRATED = [
   "src/features/chat/**/*.tsx",
   "src/features/sources/components/{SourcesPanel,SourcesPanelHeader,SourceList,SourceListItem,SourceViewer,PdfViewer,YouTubeVideoPreview}.tsx",
   "src/features/sources/components/add-source/**/*.tsx",
+  "src/dev/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [

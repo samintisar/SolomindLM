@@ -14,9 +14,10 @@ import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
+  canReadNotebook,
   getNotebookAccess,
 } from "../_lib/notebookAccess";
-import { MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
+import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { getAuthUserId } from "../auth";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
@@ -39,7 +40,7 @@ export const userCanAccessStorage = internalQuery({
   },
 });
 
-async function deleteAllChunksForDocument(
+export async function deleteAllChunksForDocument(
   ctx: MutationCtx,
   documentId: Id<"documents">
 ): Promise<void> {
@@ -211,13 +212,14 @@ export const list = query({
     if (!userId) return [];
 
     if (args.notebookId) {
-      await assertCanReadNotebook(ctx, args.notebookId, userId);
+      const notebookId = args.notebookId;
+      if (!(await canReadNotebook(ctx, notebookId, userId))) return [];
 
       return await ctx.db
         .query("documents")
-        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId!))
+        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
         .order("desc")
-        .collect();
+        .take(MAX_DOCUMENTS_PER_NOTEBOOK_LIST);
     }
 
     // User-wide list: cap to keep reads bounded (use notebook-scoped list for full set per notebook)

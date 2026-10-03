@@ -4,8 +4,9 @@ import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
+import { getLoadErrorCopy, type WebViewLoadError } from "./webViewLoadError";
 import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
 
 export type WebViewScreenProps = {
@@ -13,6 +14,8 @@ export type WebViewScreenProps = {
   onUrlChange?: (url: string) => void;
   /** Called when the web app reports its active theme (`shell-web:theme`). */
   onThemeChange?: (theme: "light" | "dark") => void;
+  /** Active web theme, so native-only screens (load error) stay readable on the shell background. */
+  theme?: "light" | "dark";
 };
 
 function getWebBaseUrl(): string | null {
@@ -21,7 +24,12 @@ function getWebBaseUrl(): string | null {
   return url.replace(/\/+$/, "");
 }
 
-export function WebViewScreen({ path, onUrlChange, onThemeChange }: WebViewScreenProps) {
+export function WebViewScreen({
+  path,
+  onUrlChange,
+  onThemeChange,
+  theme = "light",
+}: WebViewScreenProps) {
   const base = useMemo(() => getWebBaseUrl(), []);
   const {
     onWebViewMessage: onAuthBridgeMessage,
@@ -46,7 +54,10 @@ export function WebViewScreen({ path, onUrlChange, onThemeChange }: WebViewScree
     [onAuthBridgeMessage, onThemeChange]
   );
   const webViewRef = useRef<WebView>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<WebViewLoadError | null>(null);
+  // Bumped to remount the WebView after the OS kills its content/render process.
+  const [webViewKey, setWebViewKey] = useState(0);
+  const remountWebView = useCallback(() => setWebViewKey((key) => key + 1), []);
 
   const assignWebViewRef = useCallback(
     (ref: WebView | null) => {
@@ -85,15 +96,25 @@ export function WebViewScreen({ path, onUrlChange, onThemeChange }: WebViewScree
   const uri = `${base}${path.startsWith("/") ? path : `/${path}`}`;
 
   if (loadError) {
+    const copy = getLoadErrorCopy(loadError, uri, __DEV__);
+    const textColor = theme === "dark" ? TEXT_DARK : TEXT_LIGHT;
     return (
       <View style={[styles.loading, { padding: 24, gap: 12 }]}>
-        <Text style={{ textAlign: "center", fontWeight: "600" }}>Could not load the web app</Text>
-        <Text style={{ textAlign: "center" }}>{loadError}</Text>
-        <Text style={{ textAlign: "center", opacity: 0.7 }}>{uri}</Text>
-        <Text style={{ textAlign: "center", opacity: 0.7 }}>
-          Run `bun run dev:web` on your PC. Emulator uses http://10.0.2.2:5173; physical devices
-          need your LAN IP in EXPO_PUBLIC_WEB_URL.
-        </Text>
+        <Text style={[styles.errorTitle, { color: textColor }]}>{copy.title}</Text>
+        <Text style={{ textAlign: "center", color: textColor }}>{copy.message}</Text>
+        {/* Clearing the error renders a fresh WebView, which retries the load. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setLoadError(null)}
+          style={[styles.retryButton, { borderColor: textColor }]}
+        >
+          <Text style={{ color: textColor, fontWeight: "600" }}>Try again</Text>
+        </Pressable>
+        {copy.devDetails ? (
+          <Text style={{ textAlign: "center", color: textColor, opacity: 0.7 }}>
+            {copy.devDetails}
+          </Text>
+        ) : null}
       </View>
     );
   }
@@ -108,6 +129,7 @@ export function WebViewScreen({ path, onUrlChange, onThemeChange }: WebViewScree
 
   return (
     <WebView
+      key={webViewKey}
       ref={assignWebViewRef}
       source={{ uri }}
       style={styles.webview}
@@ -130,13 +152,17 @@ export function WebViewScreen({ path, onUrlChange, onThemeChange }: WebViewScree
         if (nav.url) onUrlChange?.(nav.url);
       }}
       onError={() => {
-        setLoadError("Network error reaching the dev server.");
+        setLoadError({ kind: "network" });
       }}
       onHttpError={(event) => {
         if (event.nativeEvent.statusCode >= 400) {
-          setLoadError(`HTTP ${event.nativeEvent.statusCode} from the dev server.`);
+          setLoadError({ kind: "http", status: event.nativeEvent.statusCode });
         }
       }}
+      // iOS kills WebView content processes under memory pressure (blank page); an
+      // unhandled Android render-process crash takes the whole app down.
+      onContentProcessDidTerminate={remountWebView}
+      onRenderProcessGone={remountWebView}
       onShouldStartLoadWithRequest={(req) => {
         // Allow scripts, stylesheets, fonts, etc. — only intercept top-level navigations.
         if (!req.isTopFrame) {
@@ -183,11 +209,23 @@ function WebShellIframe({ uri, onUrlChange, onMessage }: WebShellIframeProps) {
   });
 }
 
+/** Error-screen text, readable on the shell's light/dark backgrounds (app/index.tsx). */
+const TEXT_LIGHT = "#161311";
+const TEXT_DARK = "#F5F1E6";
+
 const styles = StyleSheet.create({
   webview: { flex: 1 },
   loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  errorTitle: { textAlign: "center", fontWeight: "600", fontSize: 17 },
+  retryButton: {
+    marginTop: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 8,
   },
 });

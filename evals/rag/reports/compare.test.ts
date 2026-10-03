@@ -3,7 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import type { EvalRunArtifact } from "../types";
-import { exportEvalRunArtifacts, loadArtifactsFromDir } from "./compare";
+import { exportEvalRunArtifacts, loadArtifactsFromDir, tallyWins } from "./compare";
 
 function stubArtifact(caseId: string, runner: EvalRunArtifact["runner"] = "chat"): EvalRunArtifact {
   return {
@@ -55,6 +55,19 @@ describe("eval artifact dump for pairwise compare", () => {
     }
   });
 
+  it("exports namespaced use-case pack ids as flat files that load back", () => {
+    const dir = mkdtempSync(join(tmpdir(), "eval-art-"));
+    try {
+      exportEvalRunArtifacts(dir, [
+        stubArtifact("medical-students/flashcards-heart-anatomy", "flashcards"),
+      ]);
+      const loaded = loadArtifactsFromDir(dir);
+      expect(loaded.map((a) => a.caseId)).toEqual(["medical-students/flashcards-heart-anatomy"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("skips ragas.jsonl and files without caseId/runner", () => {
     const dir = mkdtempSync(join(tmpdir(), "eval-art-"));
     try {
@@ -67,5 +80,22 @@ describe("eval artifact dump for pairwise compare", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("tallyWins", () => {
+  it("groups wins by key with ties counting half", () => {
+    const cases = [
+      { caseId: "a", runner: "quiz", winner: "b", reason: "", useCase: "medical-students" },
+      { caseId: "b", runner: "quiz", winner: "tie", reason: "", useCase: "medical-students" },
+      { caseId: "c", runner: "chat", winner: "a", reason: "" },
+    ] as const;
+    expect(tallyWins([...cases], (c) => c.useCase)).toEqual({
+      "medical-students": { winsA: 0, winsB: 1, ties: 1, winRateB: 0.75 },
+    });
+    expect(tallyWins([...cases], (c) => c.runner)).toEqual({
+      quiz: { winsA: 0, winsB: 1, ties: 1, winRateB: 0.75 },
+      chat: { winsA: 1, winsB: 0, ties: 0, winRateB: 0 },
+    });
   });
 });

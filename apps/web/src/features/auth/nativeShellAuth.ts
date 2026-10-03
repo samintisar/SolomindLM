@@ -74,6 +74,7 @@ type NativeAuthRequest =
   | { type: "native-auth:webview-ready"; requestId: string; convexDeploymentUrl: string }
   | { type: "native-auth:token-sync"; requestId: string }
   | { type: "native-auth:google-sign-in"; requestId: string }
+  | { type: "native-auth:apple-sign-in"; requestId: string }
   | {
       type: "native-auth:password-sign-in";
       requestId: string;
@@ -85,6 +86,7 @@ type NativeAuthRequestWithoutId =
   | { type: "native-auth:webview-ready"; convexDeploymentUrl: string }
   | { type: "native-auth:token-sync" }
   | { type: "native-auth:google-sign-in" }
+  | { type: "native-auth:apple-sign-in" }
   | {
       type: "native-auth:password-sign-in";
       params: Record<string, string>;
@@ -164,6 +166,11 @@ function waitForNativeAuthSync(timeoutMs = TOKEN_SYNC_TIMEOUT_MS): Promise<void>
 
 export async function requestNativeGoogleSignIn(): Promise<boolean> {
   const response = await requestNativeAuth({ type: "native-auth:google-sign-in" });
+  return response.authenticated ?? false;
+}
+
+export async function requestNativeAppleSignIn(): Promise<boolean> {
+  const response = await requestNativeAuth({ type: "native-auth:apple-sign-in" });
   return response.authenticated ?? false;
 }
 

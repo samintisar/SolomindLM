@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_STRIPE_PUBLISHABLE_KEY?: string;
   readonly VITE_CONVEX_URL?: string;
   readonly VITE_CONVEX_SITE_URL?: string;
+  /** "1" bundles the dev-only /dev/design gallery into a production build. */
+  readonly VITE_DESIGN_GALLERY?: string;
 }
 
 interface ImportMeta {
