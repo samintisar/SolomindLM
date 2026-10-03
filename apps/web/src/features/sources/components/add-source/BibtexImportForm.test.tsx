@@ -128,6 +128,28 @@ describe("BibtexImportForm", () => {
     );
   });
 
+  it("ignores an earlier file whose read finishes after a newer file was chosen", async () => {
+    const { container } = setup();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    let finishSlowRead: (text: string) => void = () => {};
+    const slow = new File(["ignored"], "slow.bib");
+    Object.defineProperty(slow, "text", {
+      value: () =>
+        new Promise<string>((resolve) => {
+          finishSlowRead = resolve;
+        }),
+    });
+    await userEvent.upload(input, slow);
+    await userEvent.upload(input, new File(["@article{b}"], "fast.bib"));
+    await waitFor(() => expect(parse).toHaveBeenCalledTimes(1));
+    finishSlowRead("@article{a}");
+    await screen.findByText("fast.bib");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse).toHaveBeenCalledWith({ content: "@article{b}", format: "auto" });
+    expect(screen.queryByText("slow.bib")).not.toBeInTheDocument();
+  });
+
   it("shows a DOI duplicate as already in the notebook and leaves it out of the import", async () => {
     existing = { dois: ["10.1/a"], titleHashes: [] };
     parse.mockResolvedValue({
