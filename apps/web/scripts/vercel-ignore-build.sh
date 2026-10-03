@@ -19,30 +19,42 @@ skip() { echo "vercel-ignore-build: skipping — $1"; exit 0; }
 cd "$(git rev-parse --show-toplevel 2>/dev/null)" || build "not a git checkout"
 head_sha=$(git rev-parse HEAD 2>/dev/null) || build "no HEAD"
 
-# Diff base: the branch's last successful deployment, else its merge base with main.
-base=""
+# Changed files, two ways:
+# - Previous deployment known: compare its snapshot with HEAD. If nothing
+#   app-relevant differs from what is already deployed, the preview is current.
+# - First deployment of the branch: list every file the branch's own commits
+#   (main..HEAD) touched. A snapshot diff against a merge base isn't safe here:
+#   in a shallow clone merge-base can return an older ancestor, and a branch
+#   that reverts a later main change would then show no diff at all.
 prev="${VERCEL_GIT_PREVIOUS_SHA:-}"
 if [ -n "$prev" ] && git cat-file -e "${prev}^{commit}" 2>/dev/null; then
-  base="$prev"
+  since="${prev:0:8}"
+  changed=$(git diff --name-only "$prev" "$head_sha" 2>/dev/null) || build "git diff failed"
 else
   owner="${VERCEL_GIT_REPO_OWNER:-}"
   slug="${VERCEL_GIT_REPO_SLUG:-}"
   [ -n "$owner" ] && [ -n "$slug" ] || build "no previous deployment and no VERCEL_GIT_REPO_OWNER/SLUG to find main"
   url="https://github.com/${owner}/${slug}.git"
-  # Vercel clones shallowly; deepen this commit's history and fetch main so a
-  # merge base exists. The repo is public, so no credentials are needed.
-  # If the true merge base is beyond the shallow cut, merge-base finds no
-  # base (-> build) or an older common ancestor, whose diff is a superset
-  # of the branch's changes (-> builds at least as often).
+  # Vercel clones shallowly: deepen this commit's history and fetch main. The
+  # repo is public, so no credentials are needed.
   git fetch --quiet --deepen=200 "$url" "$head_sha" 2>/dev/null || true
-  if git fetch --quiet --depth=200 "$url" main 2>/dev/null; then
-    base=$(git merge-base FETCH_HEAD "$head_sha" 2>/dev/null) || base=""
+  git fetch --quiet --depth=200 "$url" main 2>/dev/null || build "could not fetch main"
+  main_sha=$(git rev-parse FETCH_HEAD 2>/dev/null) || build "could not resolve main"
+  branch_commits=$(git rev-list "${main_sha}..${head_sha}" 2>/dev/null) || build "git rev-list failed"
+  # A branch commit at the shallow boundary means some of the branch's history
+  # wasn't fetched, so its file list could be incomplete.
+  shallow_file=$(git rev-parse --git-path shallow)
+  if [ -n "$branch_commits" ] && [ -s "$shallow_file" ] &&
+    printf '%s\n' "$branch_commits" | grep -qxFf "$shallow_file"; then
+    build "branch history extends past the fetched window"
   fi
+  since="main (${main_sha:0:8})"
+  # --cc: a merge commit (e.g. "Update branch") only counts files whose
+  # merged content differs from every parent, i.e. conflict resolutions.
+  changed=$(git log --no-renames --cc --name-only --format= "${main_sha}..${head_sha}" 2>/dev/null |
+    sed '/^$/d' | sort -u) || build "git log failed"
 fi
-[ -n "$base" ] || build "no diff base (previous deployment or merge base with main)"
-
-changed=$(git diff --name-only "$base" "$head_sha" 2>/dev/null) || build "git diff failed"
-[ -n "$changed" ] || skip "no file changes since ${base:0:8}"
+[ -n "$changed" ] || skip "no file changes since $since"
 
 # Paths that never reach the web build or `convex deploy`. Keep this list
 # conservative: a path missing here only costs a build.
@@ -50,6 +62,6 @@ skippable='^(docs/|\.github/|\.claude/|\.agents/|\.cursor/|\.vscode/|\.serena/|\
 
 relevant=$(printf '%s\n' "$changed" | grep -Ev "$skippable" || true)
 if [ -n "$relevant" ]; then
-  build "app-affecting changes since ${base:0:8}: $(printf '%s\n' "$relevant" | head -5 | tr '\n' ' ')"
+  build "app-affecting changes since $since: $(printf '%s\n' "$relevant" | head -5 | tr '\n' ' ')"
 fi
-skip "only docs/CI/mobile/eval changes since ${base:0:8}"
+skip "only docs/CI/mobile/eval changes since $since"
