@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-03
 - **Deciders:** @samintisar
-- **PR:** #<!-- the PR that carries this ADR -->
+- **PR:** #307
 
 ## Context
 

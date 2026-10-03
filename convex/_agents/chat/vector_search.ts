@@ -6,7 +6,6 @@
  * ChatAgent calls search(userId, noteId, query, documentIds).
  */
 
-import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import type { EmbeddingService } from "../../_services/ai/embeddingClient";
 import type { ChunkMetadata, ReferenceChunk } from "../../storage/ChatHistoryService";
@@ -305,15 +304,12 @@ export class VectorSearchHandler {
     results: (VectorSearchRawResult & { similarity?: number })[],
     quiet?: boolean
   ): Promise<(VectorSearchRawResult & { similarity?: number })[]> {
-    const hasKey = !!env.VOYAGE_API_KEY;
-    if (!this.rerankFn || !hasKey || results.length <= this.config.rerankThreshold) {
+    // A missing VOYAGE_API_KEY needs no gate here: rerankInternal throws and the catch
+    // below falls back to the un-reranked results.
+    if (!this.rerankFn || results.length <= this.config.rerankThreshold) {
       if (!quiet) {
         const log = createServiceLogger("vectorSearch", "rerank");
-        log.debug("skip_rerank", {
-          hasRerankFn: !!this.rerankFn,
-          hasKey,
-          results: results.length,
-        });
+        log.debug("skip_rerank", { hasRerankFn: !!this.rerankFn, results: results.length });
       }
       return results;
     }

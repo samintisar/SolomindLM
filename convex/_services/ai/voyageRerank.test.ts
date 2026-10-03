@@ -64,6 +64,45 @@ describe("callVoyageRerank", () => {
     await expect(callVoyageRerank("q", ["d"], "pa-key", 5)).rejects.toThrow(/malformed/);
   });
 
+  it("retries once after a 429 when Retry-After is short", async () => {
+    let calls = 0;
+    stubFetch(async () =>
+      ++calls === 1
+        ? new Response("rate limited", { status: 429, headers: { "Retry-After": "0" } })
+        : Response.json({ data: [{ index: 0, relevance_score: 0.9 }] })
+    );
+
+    const hits = await callVoyageRerank("q", ["d"], "pa-key", 5);
+
+    expect(hits).toEqual([{ index: 0, relevance_score: 0.9 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after the single retry if Voyage keeps answering 429", async () => {
+    stubFetch(
+      async () => new Response("rate limited", { status: 429, headers: { "Retry-After": "0" } })
+    );
+
+    await expect(callVoyageRerank("q", ["d"], "pa-key", 5)).rejects.toThrow(/voyage HTTP 429/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not wait out a long Retry-After, it fails straight away", async () => {
+    stubFetch(
+      async () => new Response("rate limited", { status: 429, headers: { "Retry-After": "86400" } })
+    );
+
+    await expect(callVoyageRerank("q", ["d"], "pa-key", 5)).rejects.toThrow(/voyage HTTP 429/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry other failures such as a 503", async () => {
+    stubFetch(async () => new Response("down", { status: 503 }));
+
+    await expect(callVoyageRerank("q", ["d"], "pa-key", 5)).rejects.toThrow(/voyage HTTP 503/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("bounds the request with an abort signal so an outage cannot stall chat", async () => {
     stubFetch(async () => Response.json({ data: [] }));
 

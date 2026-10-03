@@ -11,7 +11,7 @@ import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { RERANK_MODEL, RERANK_TIMEOUT_MS } from "../../_lib/rerankConfig";
+import { RERANK_ACTION_BACKSTOP_MS, RERANK_MODEL } from "../../_lib/rerankConfig";
 import { callVoyageRerank } from "../../_services/ai/voyageRerank";
 import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
 import { hashInput } from "../../_services/cache/cacheCrypto";
@@ -122,7 +122,6 @@ export async function cachedRerank(
 
   // Build cache key components (for logging/debugging)
   const docIds = sortedDocs.map((d) => d.id).join(",");
-  const _contentHash = await hashInput(sortedDocs.map((d) => d.content).join("|"));
   const queryHash = await hashInput(normalizedQuery);
   console.log(
     `[RerankCache] key: model=${RERANK_MODEL}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`
@@ -136,7 +135,7 @@ export async function cachedRerank(
       documents: sortedDocs.map((d) => d.content),
       topN,
     }),
-    RERANK_TIMEOUT_MS + 1000,
+    RERANK_ACTION_BACKSTOP_MS,
     "rerank"
   );
 
@@ -175,11 +174,4 @@ export async function cachedRerank(
   }
 
   return reranked;
-}
-
-/**
- * Check if reranking is available (API key configured)
- */
-export function isRerankingAvailable(): boolean {
-  return !!env.VOYAGE_API_KEY;
 }
