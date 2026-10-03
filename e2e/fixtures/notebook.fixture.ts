@@ -23,7 +23,7 @@ export const test = authTest.extend<NotebookFixtures>({
     const title = `e2e-${randomUUID().slice(0, 8)}`;
 
     // Open create notebook modal
-    await page.getByText("Create new notebook").first().click();
+    await page.getByRole("button", { name: "New notebook" }).first().click();
 
     // Wait for modal to open and input to be visible
     const titleInput = page.getByPlaceholder("Notebook title");

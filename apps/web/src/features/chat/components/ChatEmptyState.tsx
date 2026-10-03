@@ -1,7 +1,11 @@
 import React, { useMemo } from "react";
 
+import { Button } from "@/shared/components/ui/button";
+import { Separator } from "@/shared/components/ui/separator";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
-import { getNotebookLucideIcon } from "@/shared/notebook/notebookLucideIcon";
+import { notebookIcon as resolveNotebookIcon } from "@/shared/notebook/notebookIcons";
+import { cn } from "@/shared/utils/cn";
 
 const STARTER_PROMPTS = [
   "Summarize the key concepts",
@@ -9,9 +13,6 @@ const STARTER_PROMPTS = [
   "Quiz me on this material",
   "Explain the most important topic simply",
 ];
-
-/** Clears the absolute composer (input shell + disclaimer + bottom offset). */
-const COMPOSER_SCROLL_PADDING = "pb-[calc(12.5rem+env(safe-area-inset-bottom,0px))]";
 
 interface ChatEmptyStateProps {
   onSendMessage: (text: string) => void;
@@ -49,24 +50,27 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
       return true;
     });
   }, [hasSources, suggestions]);
-  const notebookGlyph = getNotebookLucideIcon(notebookIcon);
+  const notebookGlyph = resolveNotebookIcon(notebookIcon);
   const iconBgClass = coverFillClass(notebookCoverColor);
   const heading =
     notebookTitle?.trim() ||
     (hasSources ? "What would you like to know?" : "Ask anything about your sources");
 
   return (
-    <div className={`box-border w-full min-h-full px-6 pt-6 sm:pt-10 ${COMPOSER_SCROLL_PADDING}`}>
+    <div className="box-border min-h-full w-full px-6 pt-6 pb-composer-safe sm:pt-10">
       <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-8 sm:gap-10">
         {/* Header */}
         <div className="flex w-full flex-col items-center gap-5 text-center">
           {/* Icon */}
           <div
-            className={`flex size-16 items-center justify-center rounded-2xl ${iconBgClass} ring-1 ring-border shadow-sm`}
+            className={cn(
+              "flex size-16 items-center justify-center rounded-2xl shadow-sm ring-1 ring-border",
+              iconBgClass
+            )}
             aria-hidden
           >
             {React.createElement(notebookGlyph, {
-              className: `size-8 ${COVER_ICON_CLASS}`,
+              className: cn("size-8", COVER_ICON_CLASS),
               strokeWidth: 1.6,
             })}
           </div>
@@ -90,36 +94,34 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
 
         {/* Divider */}
         <div className="flex w-full items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="shrink-0 text-xs font-medium tracking-widest text-muted-foreground uppercase">
+          <Separator className="flex-1" />
+          <span className="shrink-0 font-sans text-xs font-medium tracking-widest text-muted-foreground uppercase">
             Try asking
           </span>
-          <div className="h-px flex-1 bg-border" />
+          <Separator className="flex-1" />
         </div>
 
         {/* Suggestion chips */}
         <div className="flex w-full flex-wrap justify-center gap-2.5">
           {isLoadingSuggestions ? (
             <>
-              {[38, 52, 44, 48].map((w, i) => (
-                <div
-                  key={i}
-                  className="h-10 animate-pulse rounded-xl border border-border bg-muted/70"
-                  style={{ width: `${w}%` }}
-                />
-              ))}
+              <Skeleton className="h-10 w-2/5" />
+              <Skeleton className="h-10 w-1/2" />
+              <Skeleton className="h-10 w-5/12" />
+              <Skeleton className="h-10 w-1/2" />
             </>
           ) : (
             displaySuggestions.map((prompt, index) => (
-              <button
+              <Button
                 key={`suggestion-${index}`}
                 type="button"
+                variant="outline"
+                size="chip"
                 disabled={disabled}
                 onClick={() => onSendMessage(prompt)}
-                className="inline-flex items-center rounded-xl border border-border bg-card px-4 py-2 font-serif text-sm leading-relaxed text-foreground shadow-sm transition-colors hover:bg-accent hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50"
               >
                 {prompt}
-              </button>
+              </Button>
             ))
           )}
         </div>

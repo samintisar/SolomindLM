@@ -1,18 +1,27 @@
+/**
+ * Design-lint ratchet. `--update` locks in lower counts and refuses any increase; the one exception is
+ * `--update --new-rule=<id>` (repeatable), which records first counts for a rule absent from the baseline.
+ */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  blockedIncreases,
   type CountChange,
   type Counts,
   compareCounts,
   countViolations,
   isDegradedRun,
   type LintResult,
+  rulesInBaseline,
   sortCounts,
 } from "./design-lint/baseline";
 
 const webRoot = path.resolve(import.meta.dir, "..");
 const baselinePath = path.join(webRoot, "design-lint-baseline.json");
 const update = process.argv.includes("--update");
+const newRules = process.argv
+  .filter((arg) => arg.startsWith("--new-rule="))
+  .map((arg) => arg.slice("--new-rule=".length));
 
 const proc = Bun.spawnSync(["bun", "x", "eslint", "src", "--format", "json"], {
   cwd: webRoot,
@@ -58,16 +67,34 @@ const hasBaseline = existsSync(baselinePath);
 const baseline: Counts = hasBaseline ? JSON.parse(readFileSync(baselinePath, "utf8")) : {};
 const { increases, decreases } = compareCounts(counts, baseline);
 
-if (hasBaseline && increases.length > 0) {
-  console.error("design-lint: design-system violations increased (fix them, don't add new ones):");
-  for (const change of increases) console.error(format(change));
-  if (update) console.error("design-lint: refusing to update a baseline that would go up.");
+const alreadyTracked = rulesInBaseline(newRules, baseline);
+if (alreadyTracked.length > 0) {
+  console.error(
+    `design-lint: --new-rule only applies to rules absent from the baseline; already tracked: ${alreadyTracked.join(", ")}`
+  );
   process.exit(1);
 }
 
+const blocked = hasBaseline ? blockedIncreases(increases, baseline, { update, newRules }) : [];
+if (blocked.length > 0) {
+  console.error("design-lint: design-system violations increased (fix them, don't add new ones):");
+  for (const change of blocked) console.error(format(change));
+  if (update) console.error("design-lint: refusing to update a baseline that would go up.");
+  process.exit(1);
+}
+const firstCounts = [
+  ...new Set(increases.filter((change) => !blocked.includes(change)).map((change) => change.rule)),
+];
+
 if (update) {
   writeFileSync(baselinePath, `${JSON.stringify(sortCounts(counts), null, 2)}\n`);
-  console.log(`design-lint: baseline ${hasBaseline ? "lowered" : "created"} at ${baselinePath}`);
+  const outcome =
+    hasBaseline && firstCounts.length > 0
+      ? `updated (recorded first counts for: ${firstCounts.join(", ")})`
+      : hasBaseline
+        ? "lowered"
+        : "created";
+  console.log(`design-lint: baseline ${outcome} at ${baselinePath}`);
 } else if (decreases.length > 0) {
   // In CI an un-lowered baseline is an error: otherwise fixing N violations and adding N new
   // ones in the same area would pass unnoticed.

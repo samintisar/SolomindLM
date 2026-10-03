@@ -1,6 +1,13 @@
-import { ChevronLeft, ChevronRight, Loader2, Minus, PanelLeft, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, PanelLeft, Plus } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Outline, Page, pdfjs } from "react-pdf";
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
+import { Input } from "@/shared/components/ui/input";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { Toggle } from "@/shared/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/utils/cn";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -31,7 +38,13 @@ interface VirtualizedPageProps {
 function VirtualizedPage({ pageNumber, pageWidth, isVisible }: VirtualizedPageProps) {
   const placeholderHeight = pageWidth * PAGE_ASPECT;
   if (!isVisible) {
-    return <div style={{ height: placeholderHeight, minHeight: placeholderHeight }} aria-hidden />;
+    return (
+      <div
+        className="h-(--pdf-page-h) min-h-(--pdf-page-h)"
+        style={{ "--pdf-page-h": `${placeholderHeight}px` } as React.CSSProperties}
+        aria-hidden
+      />
+    );
   }
 
   // Cap effective DPR so we don't render enormous canvases on high-DPI screens.
@@ -259,9 +272,9 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
 
   if (error) {
     return (
-      <div className={cn("rounded-lg border border-border bg-muted/30 p-4", className)}>
-        <p className="text-sm text-destructive">{error}</p>
-      </div>
+      <Alert variant="destructive" className={className}>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     );
   }
 
@@ -273,47 +286,56 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
         onLoadSuccess={onDocumentLoadSuccess}
         onLoadError={onDocumentLoadError}
         loading={
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex items-center justify-center py-12 text-primary">
+            <Spinner className="size-8" />
           </div>
         }
       >
         {!loading && numPages > 0 && (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* Toolbar */}
-            <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowOutline((s) => !s)}
-                  className={cn(
-                    "inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors",
-                    showOutline
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background text-foreground hover:bg-muted"
-                  )}
-                  aria-label="Toggle outline"
-                  title="Toggle outline"
-                >
-                  <PanelLeft className="h-3.5 w-3.5" />
-                </button>
-              </div>
+            <ButtonGroup
+              variant="tray"
+              aria-label="PDF controls"
+              className="mb-3 shrink-0 self-start"
+            >
+              <Tooltip>
+                {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
+                <TooltipTrigger asChild>
+                  <Toggle
+                    size="sm"
+                    pressed={showOutline}
+                    onPressedChange={setShowOutline}
+                    aria-label="Toggle outline"
+                  >
+                    <PanelLeft />
+                  </Toggle>
+                </TooltipTrigger>
+                <TooltipContent>Toggle outline</TooltipContent>
+              </Tooltip>
 
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage <= 1}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <div className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
-                  <input
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Previous page</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Input
                     type="text"
                     inputMode="numeric"
                     autoComplete="off"
                     aria-label="Go to page"
-                    title="Type a page number and press Enter"
                     value={pageInput}
                     onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ""))}
                     onFocus={() => {
@@ -328,62 +350,76 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
-                    className={cn(
-                      "h-7 w-11 shrink-0 select-text rounded-md border border-border bg-background px-1 text-center text-xs font-medium tabular-nums text-foreground",
-                      "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    )}
+                    className="w-14 text-center"
                   />
-                  <span className="select-none" aria-hidden>
-                    /
-                  </span>
-                  <span className="min-w-[2ch] select-none text-center">{numPages}</span>
-                </div>
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage >= numPages}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                  aria-label="Next page"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+                </TooltipTrigger>
+                <TooltipContent>Type a page number and press Enter</TooltipContent>
+              </Tooltip>
+              <span className="min-w-6 select-none text-xs tabular-nums text-muted-foreground">
+                / {numPages}
+              </span>
 
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={handleZoomOut}
-                  disabled={zoom <= ZOOM_MIN}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                  aria-label="Zoom out"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </button>
-                <span className="min-w-[3rem] select-none text-center text-xs tabular-nums text-muted-foreground">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <button
-                  onClick={handleZoomIn}
-                  disabled={zoom >= ZOOM_MAX}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                  aria-label="Zoom in"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= numPages}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Next page</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleZoomOut}
+                    disabled={zoom <= ZOOM_MIN}
+                    aria-label="Zoom out"
+                  >
+                    <Minus />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Zoom out</TooltipContent>
+              </Tooltip>
+              <span className="min-w-12 select-none text-center text-xs tabular-nums text-muted-foreground">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleZoomIn}
+                    disabled={zoom >= ZOOM_MAX}
+                    aria-label="Zoom in"
+                  >
+                    <Plus />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Zoom in</TooltipContent>
+              </Tooltip>
+            </ButtonGroup>
 
             <div className="relative z-0 flex min-h-0 flex-1 gap-4">
               {/* Outline sidebar */}
               {showOutline && (
                 <aside
                   className={cn(
-                    "sticky top-0 z-10 w-[min(18rem,calc(100vw-3rem))] shrink-0",
-                    "max-h-[min(85dvh,42rem)] overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:thin]",
-                    "rounded-xl border border-border bg-card/80 px-3 py-3 shadow-sm backdrop-blur-sm",
+                    "sticky top-0 z-10 w-72 max-w-full shrink-0",
+                    "max-h-outline overflow-y-auto overscroll-contain scrollbar-stable scrollbar-thin",
+                    "rounded-xl bg-card px-3 py-3 shadow-xs ring-1 ring-hairline",
                     "font-sans text-sm text-foreground",
                     "[&_.react-pdf__Outline]:m-0 [&_.react-pdf__Outline]:text-inherit",
                     "[&_ul]:m-0 [&_ul]:list-none [&_ul]:p-0",
                     "[&_ul>li+li]:mt-1",
-                    "[&_ul_ul]:mt-2 [&_ul_ul]:space-y-1 [&_ul_ul]:border-l-2 [&_ul_ul]:border-border/50 [&_ul_ul]:pl-3 [&_ul_ul]:ml-1",
+                    "[&_ul_ul]:mt-2 [&_ul_ul]:space-y-1 [&_ul_ul]:border-l [&_ul_ul]:border-border/60 [&_ul_ul]:pl-3 [&_ul_ul]:ml-1",
                     "[&_a]:block [&_a]:wrap-break-word [&_a]:rounded-md [&_a]:px-2.5 [&_a]:py-2 [&_a]:leading-snug",
                     "[&_a]:text-foreground/90 [&_a]:no-underline [&_a]:transition-colors",
                     "[&_a:hover]:bg-muted/80 [&_a:active]:bg-muted",
@@ -391,17 +427,17 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
                   )}
                   aria-label="Document outline"
                 >
-                  <h3 className="mb-3 border-b border-border/60 pb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <h3 className="mb-3 border-b border-border/60 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Contents
                   </h3>
-                  <Outline onItemClick={handleOutlineItemClick} className="react-pdf__Outline" />
+                  <Outline onItemClick={handleOutlineItemClick} />
                 </aside>
               )}
 
               {/* Page container */}
               <div
                 ref={containerRef}
-                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-lg border border-border bg-muted/20 py-2 [scrollbar-gutter:stable]"
+                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-lg bg-muted/20 py-2 ring-1 ring-hairline scrollbar-stable"
               >
                 {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
                   <div

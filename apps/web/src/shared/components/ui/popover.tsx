@@ -1,3 +1,4 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import { Popover as PopoverPrimitive } from "radix-ui";
 import * as React from "react";
 import { cn } from "@/shared/utils/cn";
@@ -10,22 +11,36 @@ function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimiti
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
+const popoverContentVariants = cva(
+  "z-100 w-72 origin-(--radix-popover-content-transform-origin) rounded-2xl bg-popover text-popover-foreground shadow-xl ring-1 ring-hairline outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+  {
+    variants: {
+      /** `none`: content that brings its own inset, e.g. a full-bleed list or scroll area. */
+      padding: { default: "p-4", none: "p-0" },
+    },
+    defaultVariants: { padding: "default" },
+  }
+);
+
 function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  padding,
+  container,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> &
+  VariantProps<typeof popoverContentVariants> & {
+    /** Portal target; defaults to `document.body`. The design gallery pins layers inside a frame. */
+    container?: HTMLElement | null;
+  }) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
-        className={cn(
-          "z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          className
-        )}
+        className={cn(popoverContentVariants({ padding }), className)}
         {...props}
       />
     </PopoverPrimitive.Portal>

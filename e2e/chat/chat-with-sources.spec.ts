@@ -39,7 +39,14 @@ test.describe("Chat With Sources", () => {
     await waitForChatInputReEnabled(page, 300_000);
     const content = await getLastAssistantMessageProse(page);
     expect(content.length).toBeGreaterThan(10);
-    // Citation pills use title="Reference N" (see messageRendering inlineCode)
-    await expect(page.getByTitle(/^Reference \d+$/).first()).toBeVisible({ timeout: 30_000 });
+    // Citation chips keep title="Reference N" (see CitationChip)
+    const chip = page.getByTitle(/^Reference \d+$/).first();
+    await expect(chip).toBeVisible({ timeout: 30_000 });
+
+    // Clicking a chip pins the citation popover (Radix Popover, role="dialog" labelled "Reference N")
+    await chip.click();
+    await expect(page.getByRole("dialog", { name: /^Reference \d+$/ })).toBeVisible({
+      timeout: 5_000,
+    });
   });
 });

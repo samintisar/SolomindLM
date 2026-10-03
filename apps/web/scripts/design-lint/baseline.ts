@@ -21,7 +21,7 @@ export interface CountChange {
   current: number;
 }
 
-const RULE_PREFIX = "shadcn/";
+const RULE_PREFIXES = ["shadcn/", "solomind/"];
 
 export function areaOf(filePath: string): string {
   const normalized = filePath.replaceAll("\\", "/");
@@ -41,10 +41,11 @@ export function countViolations(results: LintResult[]): { counts: Counts; fatal:
         fatal.push(`${result.filePath}: ${message.message}`);
         continue;
       }
-      if (!message.ruleId?.startsWith(RULE_PREFIX)) continue;
+      const ruleId = message.ruleId;
+      if (!ruleId || !RULE_PREFIXES.some((p) => ruleId.startsWith(p))) continue;
       const area = areaOf(result.filePath);
       counts[area] ??= {};
-      counts[area][message.ruleId] = (counts[area][message.ruleId] ?? 0) + 1;
+      counts[area][ruleId] = (counts[area][ruleId] ?? 0) + 1;
     }
   }
   return { counts, fatal };
@@ -69,6 +70,29 @@ export function compareCounts(
     }
   }
   return { increases, decreases };
+}
+
+/** The requested rule IDs that already appear anywhere in the baseline. */
+export function rulesInBaseline(rules: string[], baseline: Counts): string[] {
+  const known = new Set(Object.values(baseline).flatMap((byRule) => Object.keys(byRule)));
+  return rules.filter((rule) => known.has(rule));
+}
+
+/**
+ * The increases that must fail the run. Nothing may go up, except that when updating, a rule
+ * explicitly named with `--new-rule` and absent from the baseline may record its first counts.
+ * (sortCounts drops zero counts, so "absent" alone is not enough: a rule that was fixed and then
+ * regressed looks new, which is why the exemption has to be asked for by name.)
+ */
+export function blockedIncreases(
+  increases: CountChange[],
+  baseline: Counts,
+  options: { update: boolean; newRules: string[] }
+): CountChange[] {
+  if (!options.update) return increases;
+  const tracked = new Set(rulesInBaseline(options.newRules, baseline));
+  const allowed = new Set(options.newRules.filter((rule) => !tracked.has(rule)));
+  return increases.filter((change) => !allowed.has(change.rule));
 }
 
 export function sortCounts(counts: Counts): Counts {

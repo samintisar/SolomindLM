@@ -3,13 +3,19 @@ import * as React from "react";
 import { cn } from "@/shared/utils/cn";
 
 const cardVariants = cva(
-  "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground",
+  "flex flex-col gap-6 rounded-2xl bg-card py-6 text-card-foreground ring-1 ring-hairline",
   {
     variants: {
       variant: {
-        default: "shadow-sm",
-        elevated:
-          "rounded-2xl border-border/90 bg-card/90 shadow-lg shadow-primary/5 backdrop-blur-sm",
+        default: "shadow-xs",
+        elevated: "bg-card/90 shadow-lg shadow-primary/5 backdrop-blur-sm",
+        // Edge-to-edge content (lists, disclosures): no padding or gap, the children own their spacing.
+        // overflow-hidden would clip an outer focus ring, so a collapsible trigger inside draws it inset.
+        flush:
+          "gap-0 overflow-hidden py-0 shadow-xs [&_[data-slot=collapsible-trigger]]:focus-visible:ring-inset [&_[data-slot=collapsible-trigger]]:focus-visible:ring-offset-0",
+        // Clickable cards: the inner <button> carries the focus ring; the card lifts on hover.
+        interactive:
+          "relative gap-0 overflow-hidden py-0 shadow-xs transition duration-200 ease-out motion-safe:hover:-translate-y-0.5 hover:shadow-md motion-safe:active:scale-99",
       },
     },
     defaultVariants: { variant: "default" },

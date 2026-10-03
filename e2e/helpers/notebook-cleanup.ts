@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 /**
- * Delete a notebook from the home "My Notebooks" grid/list via the card kebab menu
+ * Delete a notebook from the home "My Notebooks" grid/list via the card actions menu
  * and the confirmation dialog. Idempotent: no-op if the title is not visible.
  * Designed for e2e teardown; failures are swallowed by the caller.
  *
@@ -11,7 +11,7 @@ import type { Page } from "@playwright/test";
 export async function deleteNotebookByTitleFromHome(page: Page, title: string): Promise<void> {
   await page.goto("/home", { waitUntil: "load" });
   await page
-    .getByRole("button", { name: "All" })
+    .getByRole("tab", { name: "All" })
     .click()
     .catch(() => undefined);
 
@@ -27,17 +27,11 @@ export async function deleteNotebookByTitleFromHome(page: Page, title: string): 
 
   await titleEl.scrollIntoViewIfNeeded();
 
-  const card = page
-    .locator("div.group")
-    .filter({ has: page.getByText(title, { exact: true }) })
-    .first();
-  await card.locator(".kebab-menu button").first().click();
+  const card = page.locator('[data-slot="card"]', { hasText: title }).first();
+  await card.getByRole("button", { name: "Notebook actions" }).click();
 
   // Dropdown item (not the alert dialog yet)
-  await page
-    .locator("div.bg-popover")
-    .getByRole("button", { name: "Delete" })
-    .click({ timeout: 5_000 });
+  await page.getByRole("menuitem", { name: "Delete" }).click({ timeout: 5_000 });
 
   // Confirm dialog (title is "Delete Notebook" from the app)
   await page

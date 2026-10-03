@@ -29,7 +29,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-100 bg-overlay backdrop-blur-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -37,15 +37,18 @@ function DialogOverlay({
   );
 }
 
+// Portal layers sit at z-100, above the z-70 app header and z-60 sticky bars.
 // `light` pins the light-theme tokens (the `.auth-form-light` class in index.css) for
 // always-light surfaces rendered in a portal.
 const dialogContentVariants = cva(
-  "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+  "fixed top-[50%] left-[50%] z-100 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl bg-card p-6 shadow-xl ring-1 ring-hairline duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
   {
     variants: {
       theme: { default: "", light: "auth-form-light" },
+      size: { default: "", wide: "flex max-h-svh flex-col overflow-hidden sm:max-w-3xl" },
+      padding: { default: "", none: "gap-0 p-0" },
     },
-    defaultVariants: { theme: "default" },
+    defaultVariants: { theme: "default", size: "default", padding: "default" },
   }
 );
 
@@ -54,17 +57,22 @@ function DialogContent({
   children,
   showCloseButton = true,
   theme,
+  size,
+  padding,
+  container,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof dialogContentVariants> & {
     showCloseButton?: boolean;
+    /** Portal target; defaults to `document.body`. The design gallery pins layers inside a frame. */
+    container?: HTMLElement | null;
   }) {
   return (
-    <DialogPortal data-slot="dialog-portal">
+    <DialogPortal data-slot="dialog-portal" container={container}>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        className={cn(dialogContentVariants({ theme }), className)}
+        className={cn(dialogContentVariants({ theme, size, padding }), className)}
         {...props}
       >
         {children}

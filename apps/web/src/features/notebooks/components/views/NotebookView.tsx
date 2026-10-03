@@ -388,13 +388,13 @@ export function NotebookView() {
     <AudioPlayerProvider value={audioPlayerContextValue}>
       <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
         {/* Mobile panel tabs (below app header on all viewports) */}
-        <div className="md:hidden sticky top-0 z-60 flex h-12 items-center justify-around border-b border-border bg-background">
+        <div className="md:hidden sticky top-0 z-60 flex h-12 items-center justify-around gap-1 border-b border-border bg-background px-2">
           <button
             onClick={() => setMobileActiveTab("sources")}
-            className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
+            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
               mobileActiveTab === "sources"
-                ? "text-primary border-b-2 border-primary bg-primary/5"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
             Sources
@@ -404,10 +404,10 @@ export function NotebookView() {
 
           <button
             onClick={() => setMobileActiveTab("chat")}
-            className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
+            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
               mobileActiveTab === "chat"
-                ? "text-primary border-b-2 border-primary bg-primary/5"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
             Chat
@@ -418,10 +418,10 @@ export function NotebookView() {
           <button
             data-onboarding="studio-panel-toggle"
             onClick={() => setMobileActiveTab("studio")}
-            className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
+            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
               mobileActiveTab === "studio"
-                ? "text-primary border-b-2 border-primary bg-primary/5"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
             Studio

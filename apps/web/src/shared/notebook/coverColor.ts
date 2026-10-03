@@ -24,6 +24,22 @@ export const COVER_COLORS = [
   "bg-vintage-orange-200",
 ] as const;
 
+const SHADE_LABELS: Record<string, string> = {
+  "200": "Pale",
+  "300": "Light",
+  "400": "",
+  "500": "Deep",
+};
+
+/** Friendly swatch name for accessible labels, e.g. "bg-vintage-blue-500" -> "Deep blue". */
+export function coverColorLabel(coverColor: string): string {
+  const match = /^bg-vintage-([a-z]+)-(\d+)$/.exec(coverColor);
+  if (!match) return coverColor;
+  const [, hue, shade] = match;
+  const prefix = SHADE_LABELS[shade] ?? "";
+  return prefix ? `${prefix} ${hue}` : `${hue.charAt(0).toUpperCase()}${hue.slice(1)}`;
+}
+
 export const DEFAULT_COVER_COLOR = "bg-vintage-brown-300";
 export const COVER_ICON_CLASS = "text-foreground";
 
