@@ -150,7 +150,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   const paperHint = paperMetaHint();
 
   return (
-    <Item data-source-id={source.id} size="sm">
+    <Item role="listitem" data-source-id={source.id} size="sm">
       {isRenaming ? (
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <ItemMedia variant="icon">{getIcon()}</ItemMedia>

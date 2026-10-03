@@ -43,8 +43,10 @@ function ItemSeparator({ className, ...props }: React.ComponentProps<typeof Sepa
   );
 }
 
+// Rows in a grouped ItemGroup draw an inset focus ring: the group clips overflow for its rounded
+// corners, which would cut off an outer ring.
 const itemVariants = cva(
-  "group/item flex flex-wrap items-center rounded-md text-sm transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[variant=grouped]/item-group:rounded-none [a]:transition-colors [a]:hover:bg-accent/50",
+  "group/item flex flex-wrap items-center rounded-md text-sm transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[variant=grouped]/item-group:rounded-none group-data-[variant=grouped]/item-group:focus-visible:ring-inset [a]:transition-colors [a]:hover:bg-accent/50",
   {
     variants: {
       variant: {

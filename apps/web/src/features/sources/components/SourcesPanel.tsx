@@ -13,16 +13,13 @@ import {
 } from "../services/documentsApi";
 import { useSourcesContext } from "../useSourcesContext";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
-import { AddSourceModal } from "./AddSourceModal";
+import { AddSourceDialog } from "./add-source/AddSourceDialog";
 import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
 import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
 import { GoogleDrivePicker, isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
-import { SocialMediaInputModal } from "./SocialMediaInputModal";
 import { SourceList } from "./SourceList";
 import { SourcesPanelHeader } from "./SourcesPanelHeader";
 import { SourceViewer } from "./SourceViewer";
-import { TextInputModal } from "./TextInputModal";
-import { UrlInputModal } from "./UrlInputModal";
 
 export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
@@ -68,9 +65,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [showSocialMediaInput, setShowSocialMediaInput] = useState(false);
-  const [showTextInput, setShowTextInput] = useState(false);
 
   const googleDriveRef = useRef<GoogleDrivePickerHandle>(null);
   const ingestFromDrive = useIngestFromGoogleDrive();
@@ -404,62 +398,25 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       </div>
 
       {/* Modals */}
-      <AddSourceModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onFileUpload={sourceUpload.processFiles}
-        onUrlClick={() => {
-          setIsAddModalOpen(false);
-          setShowUrlInput(true);
-        }}
-        onSocialMediaClick={() => {
-          setIsAddModalOpen(false);
-          setShowSocialMediaInput(true);
-        }}
-        onTextClick={() => {
-          setIsAddModalOpen(false);
-          setShowTextInput(true);
-        }}
-        onDiscoverClick={() => {
-          setIsAddModalOpen(false);
-          setIsDiscoverOpen(true);
-        }}
-        onGoogleDriveClick={() => {
-          setIsAddModalOpen(false);
-          googleDriveRef.current?.open();
-        }}
+      <AddSourceDialog
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        sourcesCount={sources.length}
+        userId={userId}
+        noteId={noteId}
+        isUploading={sourceUpload.isUploading}
         isDragging={sourceUpload.isDragging}
         onDragEnter={sourceUpload.handleDragEnter}
         onDragLeave={sourceUpload.handleDragLeave}
         onDragOver={sourceUpload.handleDragOver}
         onDrop={sourceUpload.handleDrop}
-        sourcesCount={sources.length}
-        userId={userId}
-        noteId={noteId}
-        isUploading={sourceUpload.isUploading}
         fileInputRef={sourceUpload.fileInputRef}
         onFileSelect={sourceUpload.handleFileSelect}
-      />
-
-      <UrlInputModal
-        isOpen={showUrlInput}
-        onClose={() => setShowUrlInput(false)}
-        onUpload={sourceUpload.handleUrlUpload}
-        isUploading={sourceUpload.isUploading}
-      />
-
-      <SocialMediaInputModal
-        isOpen={showSocialMediaInput}
-        onClose={() => setShowSocialMediaInput(false)}
-        onUpload={sourceUpload.handleSocialMediaUpload}
-        isUploading={sourceUpload.isUploading}
-      />
-
-      <TextInputModal
-        isOpen={showTextInput}
-        onClose={() => setShowTextInput(false)}
-        onUpload={sourceUpload.handleTextUpload}
-        isUploading={sourceUpload.isUploading}
+        onUrlUpload={sourceUpload.handleUrlUpload}
+        onVideoUpload={sourceUpload.handleSocialMediaUpload}
+        onTextUpload={sourceUpload.handleTextUpload}
+        onDiscoverClick={() => setIsDiscoverOpen(true)}
+        onGoogleDriveClick={() => googleDriveRef.current?.open()}
       />
 
       <DiscoverSourcesModal
