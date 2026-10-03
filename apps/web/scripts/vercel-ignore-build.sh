@@ -51,8 +51,11 @@ else
   since="main (${main_sha:0:8})"
   # --cc: a merge commit (e.g. "Update branch") only counts files whose
   # merged content differs from every parent, i.e. conflict resolutions.
-  changed=$(git log --no-renames --cc --name-only --format= "${main_sha}..${head_sha}" 2>/dev/null |
-    sed '/^$/d' | sort -u) || build "git log failed"
+  # Capture git log on its own: in a pipeline its failure would be masked by
+  # sort's exit status and leave an empty list (-> a wrong skip).
+  log_out=$(git log --no-renames --cc --name-only --format= "${main_sha}..${head_sha}" 2>/dev/null) ||
+    build "git log failed"
+  changed=$(printf '%s\n' "$log_out" | sed '/^$/d' | sort -u)
 fi
 [ -n "$changed" ] || skip "no file changes since $since"
 
