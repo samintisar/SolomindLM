@@ -178,7 +178,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         </Card>
       ) : generatingGuide ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner aria-hidden />
             Generating source guide...
           </div>
@@ -213,7 +213,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       {/* Loading State */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <div className="flex flex-col items-center gap-3">
+          <div role="status" className="flex flex-col items-center gap-3">
             <Spinner className="size-6" aria-hidden />
             <p className="text-sm text-muted-foreground">Loading content...</p>
           </div>
@@ -261,7 +261,10 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         <>
           {canShowPdf && viewMode === "pdf" ? (
             pdfUrlLoading ? (
-              <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <div
+                role="status"
+                className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"
+              >
                 <Spinner className="size-6" aria-hidden />
                 Loading PDF…
               </div>
