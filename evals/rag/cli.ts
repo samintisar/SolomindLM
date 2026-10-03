@@ -10,6 +10,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { caseFileStem } from "./caseFile";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
@@ -43,6 +44,20 @@ import type {
   SourcePolicyConfig,
   StudioRunnerKind,
 } from "./types";
+import { USE_CASE_PACKS } from "./usecases";
+import { createConvexSeedApi } from "./usecases/convexSeedApi";
+import { resolveUseCaseIds } from "./usecases/ids";
+import {
+  excludeUnselectedPackFixtures,
+  formatPlannedJobs,
+  PackNotReadyError,
+  packSourceTextsFor,
+  pinForDryRun,
+  prepareUseCaseRun,
+} from "./usecases/resolve";
+import type { PackSeedApi } from "./usecases/seedClient";
+import type { SourceText } from "./usecases/types";
+import { formatPackProblems, packsToValidate } from "./usecases/validate";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -54,6 +69,8 @@ interface CliOptions {
   runners?: RunnerKind[];
   /** Dataset split filter (default smoke for live runs) */
   split?: EvalSplit;
+  /** Restrict to use-case pack fixtures (ids from evals/rag/usecases) */
+  useCases?: string[];
   dryRun: boolean;
   full: boolean;
   verbose: boolean;
@@ -109,6 +126,17 @@ function parseRunners(value: string): RunnerKind[] {
   return parts as RunnerKind[];
 }
 
+function parseUseCases(value: string | undefined): string[] {
+  const known = USE_CASE_PACKS.map((p) => p.pack.id);
+  const ids = resolveUseCaseIds(value, known);
+  for (const id of ids) {
+    if (!known.includes(id)) {
+      throw new Error(`Unknown use case "${id}". Registered: ${known.join(", ") || "(none)"}`);
+    }
+  }
+  return ids;
+}
+
 function parseArgs(args: string[]): CliOptions {
   const opts: CliOptions = {
     dryRun: false,
@@ -137,6 +165,9 @@ function parseArgs(args: string[]): CliOptions {
         opts.split = split;
         break;
       }
+      case "--use-case":
+        opts.useCases = parseUseCases(args[++i]);
+        break;
       case "--dry-run":
         opts.dryRun = true;
         break;
@@ -201,6 +232,7 @@ Options:
   --prefix <str>           Run fixtures whose id starts with prefix (e.g. ml-)
   --runner <kinds>         Comma-separated runner filter (chat,research,literatureReview,…)
   --split <smoke|train|holdout>  Filter fixtures by dataset split (live default: smoke)
+  --use-case <ids|all>     Use-case pack fixtures only (seed first: bun run eval:seed)
   --dry-run                Validate fixtures without running agents
   --full                   Run all fixtures with verbose output
   --verbose, -v            Show detailed metric output
@@ -229,7 +261,7 @@ Available fixtures:
 // ─── Baseline Loading ────────────────────────────────────────
 
 function loadBaseline(caseId: string, runner: string): EvalBaseline | undefined {
-  const path = join("evals/rag/baselines", `${caseId}.json`);
+  const path = join("evals/rag/baselines", `${caseFileStem(caseId)}.json`);
   try {
     const raw = JSON.parse(readFileSync(path, "utf-8"));
     // Baselines are per-case; match the runner if multiple exist
@@ -339,7 +371,7 @@ async function main(): Promise<void> {
   if (opts.caseId) {
     fixtureIds = [opts.caseId];
   } else {
-    fixtureIds = listFixtureIds();
+    fixtureIds = excludeUnselectedPackFixtures(listFixtureIds(), getFixture, opts);
     if (opts.idPrefix) {
       fixtureIds = fixtureIds.filter((id) => id.startsWith(opts.idPrefix!));
     }
@@ -350,12 +382,47 @@ async function main(): Promise<void> {
     if (opts.split) {
       fixtureIds = filterFixtureIdsBySplit(fixtureIds, opts.split);
     }
+    if (opts.useCases) {
+      const allowed = new Set(opts.useCases);
+      fixtureIds = fixtureIds.filter((id) => {
+        const useCase = getFixture(id).useCase;
+        return useCase !== undefined && allowed.has(useCase);
+      });
+    }
+  }
+  if (opts.useCases && !opts.caseId) {
+    if (USE_CASE_PACKS.length === 0) {
+      console.log("No use-case packs registered (evals/rag/usecases/index.ts).");
+      process.exit(0);
+    }
+    if (fixtureIds.length === 0) {
+      const filters = [
+        `use cases: ${opts.useCases.join(", ") || "(none)"}`,
+        opts.split && `split: ${opts.split}`,
+        opts.runners?.length && `runner: ${opts.runners.join(", ")}`,
+        opts.idPrefix && `prefix: ${opts.idPrefix}`,
+      ].filter(Boolean);
+      console.error(`No fixtures matched the filters (${filters.join("; ")}).`);
+      process.exit(2);
+    }
+  }
+  // Validate selected packs on live runs too, so a missing source fails with
+  // "INVALID PACK" instead of a raw ENOENT when the run reads pack sources.
+  const packProblems = formatPackProblems(
+    packsToValidate(USE_CASE_PACKS, fixtureIds.map(getFixture), opts.useCases !== undefined)
+  );
+  if (packProblems.length > 0) {
+    console.error(packProblems.join("\n"));
+    process.exit(2);
   }
   if (opts.caseId && opts.idPrefix) {
     console.warn("Warning: --prefix is ignored when --case is set.");
   }
   if (opts.caseId && opts.runners) {
     console.warn("Warning: --runner is ignored when --case is set.");
+  }
+  if (opts.caseId && opts.useCases) {
+    console.warn("Warning: --use-case is ignored when --case is set.");
   }
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}\n`
@@ -366,6 +433,7 @@ async function main(): Promise<void> {
   let researchInvoker: ResearchAgentInvoker | undefined;
   let literatureReviewInvoker: LiteratureReviewInvoker | undefined;
   let studioInvokers: Partial<Record<StudioRunnerKind, StudioInvoker>> | undefined;
+  let seedApi: PackSeedApi | undefined;
   if (!opts.dryRun) {
     const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
     const evalSecret = process.env.RAG_EVAL_SECRET?.trim();
@@ -391,6 +459,7 @@ async function main(): Promise<void> {
     researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
     literatureReviewInvoker = createConvexLiteratureReviewInvoker(convexUrl, { evalSecret });
     studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
+    seedApi = createConvexSeedApi(convexUrl, evalSecret);
   }
 
   const allMetrics: MetricResult[] = [];
@@ -419,7 +488,35 @@ async function main(): Promise<void> {
     }
   }
 
-  for (const fixture of expandedFixtures) {
+  // Use-case packs: resolve seeded notebooks before any job runs, so an
+  // unseeded pack costs nothing (spec §3).
+  let fixturesToRun = opts.dryRun ? pinForDryRun(expandedFixtures) : expandedFixtures;
+  let packSourceTexts = new Map<string, SourceText[]>();
+  if (expandedFixtures.some((f) => f.useCase)) {
+    console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
+    if (!opts.dryRun && !process.env.TOGETHER_AI_API_KEY?.trim()) {
+      console.error(
+        "Use-case packs are scored by rubric judges: set TOGETHER_AI_API_KEY (repo-root .env)."
+      );
+      process.exit(2);
+    }
+    if (seedApi) {
+      try {
+        ({ fixtures: fixturesToRun, sourceTexts: packSourceTexts } = await prepareUseCaseRun(
+          expandedFixtures,
+          seedApi
+        ));
+      } catch (err) {
+        if (err instanceof PackNotReadyError) {
+          console.error(err.message);
+          process.exit(2);
+        }
+        throw err;
+      }
+    }
+  }
+
+  for (const fixture of fixturesToRun) {
     fixtureMeta.set(fixture.id, {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
@@ -444,6 +541,7 @@ async function main(): Promise<void> {
     }
 
     for (const { artifact, errors } of results) {
+      artifact.useCase = fixture.useCase;
       if (errors.length > 0) {
         console.log(`  Errors: ${errors.join("; ")}`);
         runtimeErrorCount += errors.length;
@@ -453,7 +551,7 @@ async function main(): Promise<void> {
 
       // Save studio output for manual inspection
       if (artifact.studioOutput) {
-        const outputFile = `evals/rag/generated/${artifact.caseId}-${artifact.runner}-${Date.now()}.json`;
+        const outputFile = `evals/rag/generated/${caseFileStem(artifact.caseId)}-${artifact.runner}-${Date.now()}.json`;
         mkdirSync("evals/rag/generated", { recursive: true });
         writeFileSync(
           outputFile,
@@ -485,6 +583,9 @@ async function main(): Promise<void> {
         likertJudges: opts.likertJudges,
         dryRun: opts.dryRun,
         judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+        packSourceTexts: fixture.useCase
+          ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
+          : undefined,
       });
       allMetrics.push(...metrics);
 
@@ -510,6 +611,9 @@ async function main(): Promise<void> {
     includeWarnings: true,
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
+    useCaseByCase: new Map(
+      fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
+    ),
   });
 
   console.log(formatReport(report));
@@ -543,7 +647,7 @@ async function main(): Promise<void> {
         console.log("Ready for human labeling — fill humanAgree on each item.");
       } else {
         console.log(
-          `Need ${20 - queue.length} more binary-judge rows before a 20-verdict calibration.`
+          `Need ${20 - queue.length} more judge verdicts before a 20-verdict calibration.`
         );
       }
     }

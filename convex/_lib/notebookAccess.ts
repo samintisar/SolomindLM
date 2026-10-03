@@ -32,6 +32,20 @@ export async function getNotebookAccess(
   return null;
 }
 
+/**
+ * Non-throwing read check for reactive queries. The web app passes the notebook id straight from
+ * the URL, so a deleted or unshared notebook is an expected state, not an error: a plain `Error`
+ * is redacted to "Server Error" in production and `useQuery` rethrows it during render.
+ * List queries should `return` their empty shape when this is false.
+ */
+export async function canReadNotebook(
+  ctx: DbCtx,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">
+): Promise<boolean> {
+  return (await getNotebookAccess(ctx, notebookId, userId)) !== null;
+}
+
 export async function assertCanReadNotebook(
   ctx: DbCtx,
   notebookId: Id<"notebooks">,

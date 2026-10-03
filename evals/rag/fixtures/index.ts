@@ -1,4 +1,5 @@
 import type { EvalFixture } from "../types";
+import { listPackFixtures } from "../usecases";
 import { agenticPatterns20 } from "./agentic-patterns-20";
 import { literatureReviewFixtures } from "./literatureReview";
 import { mlAmbiguousFixtures } from "./ml/ambiguous";
@@ -39,6 +40,8 @@ const FIXTURES: Record<string, EvalFixture> = {
   ...Object.fromEntries(researchFixtures.map((f) => [f.id, f])),
   // Literature review fixtures
   ...Object.fromEntries(literatureReviewFixtures.map((f) => [f.id, f])),
+  // Use-case pack fixtures (evals/rag/usecases/<pack>/fixtures.ts)
+  ...Object.fromEntries(listPackFixtures().map((f) => [f.id, f])),
 };
 
 /** Get a fixture by id, throws if not found */
