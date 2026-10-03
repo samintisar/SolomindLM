@@ -5,11 +5,6 @@
   "features/billing": {
     "shadcn/no-raw-colors": 1
   },
-  "features/chat": {
-    "shadcn/no-arbitrary-values": 79,
-    "shadcn/no-inline-styles": 23,
-    "shadcn/no-raw-colors": 14
-  },
   "features/feedback": {
     "shadcn/no-arbitrary-values": 1,
     "shadcn/no-restyle": 3
@@ -22,13 +17,6 @@
   },
   "features/legal": {
     "shadcn/no-arbitrary-values": 1
-  },
-  "features/notebooks": {
-    "shadcn/no-arbitrary-values": 24,
-    "shadcn/no-inline-styles": 1,
-    "shadcn/no-raw-colors": 10,
-    "shadcn/no-restyle": 14,
-    "shadcn/no-unknown-classes": 5
   },
   "features/sources": {
     "shadcn/no-arbitrary-values": 57,

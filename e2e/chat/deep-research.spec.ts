@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
-import { enableWebOnlyFilter, openComposerModeMenu, sendMessage } from "../helpers/chat-assertions";
+import { enableWebOnlyFilter, selectComposerMode, sendMessage } from "../helpers/chat-assertions";
 
 test.describe("Deep Research", () => {
   // Menu + LLM plan generation can exceed 2m on a cold Convex + model round-trip
@@ -11,14 +11,11 @@ test.describe("Deep Research", () => {
 
     const page = notebookPage;
 
-    // Switch to Web-only filter
+    // Enable deep research first: entering the mode re-adds its default source channels
+    await selectComposerMode(page, "Deep Research");
+
+    // Then narrow to Web-only
     await enableWebOnlyFilter(page);
-
-    // Enable deep research — open composer mode menu and choose "Deep Research"
-    await openComposerModeMenu(page);
-    await page.getByRole("option", { name: "Deep Research", exact: true }).click();
-
-    // Menu closes after selecting a mode.
 
     // Send a research query
     await sendMessage(page, "What are the latest developments in quantum computing?");

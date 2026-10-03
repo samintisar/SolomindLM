@@ -13,16 +13,26 @@ const inputGroupVariants = cva("", {
       default: "h-9",
       /** Pair with `<InputGroupInput size="lg">`; matches the default `Button` height (h-11). */
       lg: "h-11",
+      auto: "h-auto",
+    },
+    variant: {
+      default: "",
+      // Chat composer: a raised card that stacks the textarea over a toolbar row.
+      // The textarea gets roomier side and top padding than a plain input group's.
+      composer:
+        "h-auto flex-col items-stretch rounded-2xl bg-card shadow-lg dark:bg-card *:data-[slot=input-group-control]:px-4 *:data-[slot=input-group-control]:pt-3.5",
     },
   },
   defaultVariants: {
     size: "default",
+    variant: "default",
   },
 });
 
 function InputGroup({
   className,
   size,
+  variant,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupVariants>) {
   return (
@@ -32,7 +42,7 @@ function InputGroup({
       role="group"
       className={cn(
         "group/input-group relative flex w-full items-center rounded-md border border-input shadow-xs transition-[color,box-shadow] outline-none dark:bg-input/30",
-        inputGroupVariants({ size }),
+        inputGroupVariants({ size, variant }),
         "min-w-0 has-[>textarea]:h-auto",
 
         // Variants based on alignment.
@@ -55,7 +65,7 @@ function InputGroup({
 }
 
 const inputGroupAddonVariants = cva(
-  "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-[calc(var(--radius)-5px)] [&>svg:not([class*='size-'])]:size-4",
+  "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-[disabled=true]/input-group:opacity-50 [&_button]:cursor-default [&>kbd]:rounded-[calc(var(--radius)-5px)] [&>svg:not([class*='size-'])]:size-4",
   {
     variants: {
       align: {
@@ -85,10 +95,17 @@ function InputGroupAddon({
       data-align={align}
       className={cn(inputGroupAddonVariants({ align }), className)}
       onClick={(e) => {
+        // React bubbles clicks from portalled content (popovers opened from the addon) through
+        // here; only clicks on the addon's own DOM should move focus.
+        if (!e.currentTarget.contains(e.target as Node)) {
+          return;
+        }
         if ((e.target as HTMLElement).closest("button")) {
           return;
         }
-        e.currentTarget.parentElement?.querySelector("input")?.focus();
+        e.currentTarget.parentElement
+          ?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea")
+          ?.focus();
       }}
       {...props}
     />

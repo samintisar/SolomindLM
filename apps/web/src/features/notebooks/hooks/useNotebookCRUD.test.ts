@@ -78,7 +78,7 @@ describe("useNotebookCRUD", () => {
     expect(mockCreateNotebook).toHaveBeenCalledWith({
       title: "Untitled Notebook",
       coverColor: DEFAULT_COVER_COLOR,
-      icon: "Folder",
+      icon: "Book",
     });
     expect(mockNavigate).toHaveBeenCalledWith("/notebook/nb-new");
   });

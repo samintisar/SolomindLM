@@ -8,6 +8,8 @@ export interface NotebookContextType {
   featuredNotebooks: NotebookItem[];
   recentNotebooks: NotebookItem[];
   activeNotebook: NotebookItem | undefined;
+  /** True until the notebooks and folders queries have returned. */
+  notebooksLoading: boolean;
 
   // URL helpers
   urlNotebookId: string | null;

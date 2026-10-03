@@ -1,33 +1,16 @@
+import { FolderOpen } from "lucide-react";
 import {
-  BarChart3,
-  Book,
-  Brain,
-  FileText,
-  Folder,
-  FolderOpen,
-  Globe,
-  GraduationCap,
-  Lightbulb,
-  Monitor,
-  Search,
-  X,
-} from "lucide-react";
-import React from "react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
-import { FolderItem } from "@/shared/types/index";
-
-const IconMap: Record<string, React.FC<any>> = {
-  Folder,
-  Book,
-  BarChart: BarChart3,
-  Monitor,
-  Search,
-  Brain,
-  Globe,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-};
+import { folderIcon } from "@/shared/notebook/notebookIcons";
+import type { FolderItem } from "@/shared/types/index";
+import { cn } from "@/shared/utils/cn";
+import { folderMeta } from "../../notebookMeta";
 
 interface MoveToFolderModalProps {
   notebookId: string;
@@ -36,72 +19,62 @@ interface MoveToFolderModalProps {
   onMove: (notebookId: string, folderId: string | null) => void;
 }
 
-export const MoveToFolderModal: React.FC<MoveToFolderModalProps> = ({
+const ROW =
+  "flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+
+export function MoveToFolderModal({
   notebookId,
   folders,
   onClose,
   onMove,
-}) => {
+}: MoveToFolderModalProps) {
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="text-lg font-bold font-sans">Move to folder</h3>
-          <button onClick={onClose} className="p-1 hover:bg-secondary rounded-xl transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-sm" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>Move to folder</DialogTitle>
+          <DialogDescription>Choose where this notebook lives.</DialogDescription>
+        </DialogHeader>
+        <div className="-mx-2 flex max-h-96 flex-col gap-1 overflow-y-auto">
+          <button type="button" className={ROW} onClick={() => onMove(notebookId, null)}>
+            <span className="flex size-10 items-center justify-center rounded-lg bg-secondary">
+              <FolderOpen aria-hidden className="size-5 text-muted-foreground" />
+            </span>
+            <span>
+              <span className="block font-sans text-sm font-semibold text-foreground">
+                No folder
+              </span>
+              <span className="block text-xs text-muted-foreground">Show on the home page</span>
+            </span>
           </button>
-        </div>
-
-        {/* Folder List */}
-        <div className="p-2 max-h-[60vh] overflow-y-auto">
-          <button
-            onClick={() => onMove(notebookId, null)}
-            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-              <FolderOpen className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <div className="font-bold text-foreground">No Folder</div>
-              <div className="text-xs text-muted-foreground">Remove from folder</div>
-            </div>
-          </button>
-
           {folders.map((folder) => {
-            const FolderIcon = folder.icon ? IconMap[folder.icon] : Folder;
+            const Icon = folderIcon(folder.icon);
             return (
               <button
                 key={folder.id}
+                type="button"
+                className={ROW}
                 onClick={() => onMove(notebookId, folder.id)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left"
               >
-                <div
-                  className={`w-10 h-10 rounded-lg ${coverFillClass(folder.color)} flex items-center justify-center`}
+                <span
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-lg",
+                    coverFillClass(folder.color)
+                  )}
                 >
-                  <FolderIcon className={`w-5 h-5 ${COVER_ICON_CLASS}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-foreground truncate">{folder.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {folder.notebookCount} notebooks
-                  </div>
-                </div>
+                  <Icon aria-hidden className={cn("size-5", COVER_ICON_CLASS)} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-sans text-sm font-semibold text-foreground">
+                    {folder.name}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">{folderMeta(folder)}</span>
+                </span>
               </button>
             );
           })}
         </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-border bg-secondary/10 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-};
+}

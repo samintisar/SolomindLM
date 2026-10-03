@@ -9,7 +9,6 @@ export interface UseNotebookHandlersProps {
 
 export interface UseNotebookHandlersReturn {
   // State
-  activeMenuId: string | null;
   customizingId: string | null;
   movingNotebookId: string | null;
   isCreatingNotebook: boolean;
@@ -19,21 +18,18 @@ export interface UseNotebookHandlersReturn {
   openMoveToFolder: (notebookId: string) => void;
   closeMoveToFolder: () => void;
   openCreateNotebook: () => void;
-  setActiveMenuId: (id: string | null) => void;
 }
 
 export function useNotebookHandlers({
   onUpdateNotebook: _onUpdateNotebook,
   onDeleteNotebook: _onDeleteNotebook,
 }: UseNotebookHandlersProps): UseNotebookHandlersReturn {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [customizingId, setCustomizingId] = useState<string | null>(null);
   const [movingNotebookId, setMovingNotebookId] = useState<string | null>(null);
   const [isCreatingNotebook, setIsCreatingNotebook] = useState(false);
 
   const openCustomize = useCallback((id: string) => {
     setCustomizingId(id);
-    setActiveMenuId(null);
   }, []);
 
   const closeCustomize = useCallback(() => {
@@ -47,7 +43,6 @@ export function useNotebookHandlers({
 
   const openMoveToFolder = useCallback((notebookId: string) => {
     setMovingNotebookId(notebookId);
-    setActiveMenuId(null);
   }, []);
 
   const closeMoveToFolder = useCallback(() => {
@@ -55,8 +50,6 @@ export function useNotebookHandlers({
   }, []);
 
   return {
-    activeMenuId,
-    setActiveMenuId,
     customizingId,
     movingNotebookId,
     isCreatingNotebook,

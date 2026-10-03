@@ -1,181 +1,25 @@
-import {
-  BarChart3,
-  Book,
-  Brain,
-  FileText,
-  Folder,
-  Globe,
-  GraduationCap,
-  Lightbulb,
-  Monitor,
-  Palette,
-  Search,
-  Settings2,
-  Type,
-  X,
-} from "lucide-react";
-import React, { useEffect, useState } from "react";
-import { COVER_COLORS, COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
-import { NotebookItem } from "@/shared/types/index";
-
-const IconMap: Record<string, React.FC<any>> = {
-  Folder,
-  Book,
-  BarChart: BarChart3,
-  Monitor,
-  Search,
-  Brain,
-  Globe,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-};
-
-const AVAILABLE_ICONS = [
-  "Folder",
-  "Book",
-  "BarChart",
-  "Monitor",
-  "Search",
-  "Brain",
-  "Globe",
-  "FileText",
-  "GraduationCap",
-  "Lightbulb",
-];
+import type { NotebookItem } from "@/shared/types/index";
+import { CoverCustomizeDialog } from "./CoverCustomizeDialog";
 
 interface CustomizeNotebookModalProps {
   notebook?: NotebookItem;
   onClose: () => void;
-  onSave: (data: { title: string; coverColor: string; icon: string }) => void;
+  onSave: (data: { title: string; coverColor: string; icon: string }) => void | Promise<void>;
 }
 
-export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
-  notebook,
-  onClose,
-  onSave,
-}) => {
-  const isCreateMode = !notebook;
-  const [title, setTitle] = useState(notebook?.title || "");
-  const [selectedColor, setSelectedColor] = useState(coverFillClass(notebook?.coverColor));
-  const [selectedIcon, setSelectedIcon] = useState(notebook?.icon || "Folder");
-
-  // Update state when notebook prop changes (when data is updated in parent)
-  useEffect(() => {
-    if (notebook) {
-      setTitle(notebook.title);
-      setSelectedColor(coverFillClass(notebook.coverColor));
-      setSelectedIcon(notebook.icon || "Folder");
-    }
-  }, [notebook?.id]); // Only update when notebook ID changes (different notebook selected)
-
-  const CurrentIcon = IconMap[selectedIcon] || Folder;
-
-  const handleSave = () => {
-    onSave({ title: title.trim(), coverColor: selectedColor, icon: selectedIcon });
-  };
-
+export function CustomizeNotebookModal({ notebook, onClose, onSave }: CustomizeNotebookModalProps) {
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="text-lg font-bold font-sans">
-            {isCreateMode ? "Create notebook" : "Customize notebook"}
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-secondary rounded-xl transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Preview */}
-        <div className="p-6 flex justify-center bg-secondary/10">
-          <div className="w-48 aspect-16/10 rounded-xl bg-card border border-border shadow-md flex flex-col ring-1 ring-border/50 overflow-hidden">
-            <div
-              className={`h-[55%] ${coverFillClass(selectedColor)} flex items-center justify-center`}
-            >
-              <CurrentIcon className={`w-10 h-10 ${COVER_ICON_CLASS}`} />
-            </div>
-            <div className="h-[45%] p-3 bg-card">
-              <div className="h-2 w-2/3 bg-muted rounded-full mb-2" />
-              <div className="h-2 w-1/3 bg-muted/50 rounded-full" />
-            </div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="p-6 space-y-5">
-          {/* Title Input */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <Type className="w-3.5 h-3.5" /> Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Notebook title"
-              className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-serif"
-              autoFocus
-            />
-          </div>
-
-          {/* Color Picker */}
-          <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <Palette className="w-3.5 h-3.5" /> Color
-            </label>
-            <div className="grid grid-cols-9 gap-2">
-              {COVER_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setSelectedColor(color)}
-                  className={`w-6 h-6 rounded-xl ${color} ring-2 ring-offset-2 ring-offset-card transition-all hover:scale-110 ${selectedColor === color ? "ring-primary" : "ring-transparent"}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Icon Picker */}
-          <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <Settings2 className="w-3.5 h-3.5 shrink-0" /> Icon
-            </label>
-            <div className="grid grid-cols-5 gap-3">
-              {AVAILABLE_ICONS.map((iconName) => {
-                const Icon = IconMap[iconName] || Folder;
-                const isSelected = selectedIcon === iconName;
-                return (
-                  <button
-                    key={iconName}
-                    onClick={() => setSelectedIcon(iconName)}
-                    className={`flex items-center justify-center p-2 rounded-lg border transition-all ${isSelected ? "bg-primary/10 border-primary text-primary" : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-border bg-secondary/10 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!title.trim()}
-            className="px-6 py-2 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isCreateMode ? "Create" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <CoverCustomizeDialog
+      kind="notebook"
+      initial={
+        notebook && {
+          name: notebook.title,
+          color: notebook.coverColor ?? "",
+          icon: notebook.icon ?? "",
+        }
+      }
+      onClose={onClose}
+      onSave={({ name, color, icon }) => onSave({ title: name, coverColor: color, icon })}
+    />
   );
-};
+}

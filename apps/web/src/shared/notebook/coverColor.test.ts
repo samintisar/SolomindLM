@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { COVER_COLORS, COVER_ICON_CLASS, coverFillClass, DEFAULT_COVER_COLOR } from "./coverColor";
+import {
+  COVER_COLORS,
+  COVER_ICON_CLASS,
+  coverColorLabel,
+  coverFillClass,
+  DEFAULT_COVER_COLOR,
+} from "./coverColor";
 
 describe("coverFillClass", () => {
   it("returns the stored bg- class unchanged", () => {
@@ -56,5 +62,19 @@ describe("DEFAULT_COVER_COLOR", () => {
   it("pins the persisted default", () => {
     // The Convex backend hardcodes this literal.
     expect(DEFAULT_COVER_COLOR).toBe("bg-vintage-brown-300");
+  });
+});
+
+describe("coverColorLabel", () => {
+  it("maps shade to an adjective and hue to a name", () => {
+    expect(coverColorLabel("bg-vintage-brown-300")).toBe("Light brown");
+    expect(coverColorLabel("bg-vintage-amber-400")).toBe("Amber");
+    expect(coverColorLabel("bg-vintage-blue-500")).toBe("Deep blue");
+    expect(coverColorLabel("bg-vintage-red-200")).toBe("Pale red");
+  });
+
+  it("gives every swatch a distinct label", () => {
+    const labels = COVER_COLORS.map(coverColorLabel);
+    expect(new Set(labels).size).toBe(COVER_COLORS.length);
   });
 });

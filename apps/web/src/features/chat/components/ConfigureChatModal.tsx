@@ -1,6 +1,20 @@
 import { resolveSmartModel } from "@convex/_lib/resolveSmartModel";
-import { Check, GraduationCap, MessageSquare, PenLine, X } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import { GraduationCap, MessageSquare, PenLine } from "lucide-react";
+import React, { useCallback, useEffect, useId, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/shared/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { Textarea } from "@/shared/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import type { ChatSettings } from "@/shared/types";
 
 const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 10000;
@@ -90,8 +104,8 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
   const [responseLength, setResponseLength] = useState<ChatSettings["responseLength"]>(
     chatSettings?.responseLength ?? "default"
   );
-  /** Shown after the user taps another instruction mode once the chat already has messages. */
-  const [showMidChatSwitchWarning, setShowMidChatSwitchWarning] = useState(false);
+  const customInstructionsId = useId();
+  const modeIdBase = useId();
 
   // Sync when external settings change (e.g. after save)
   useEffect(() => {
@@ -100,10 +114,6 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
     setCustomInstructions(chatSettings?.customInstructions ?? "");
     setResponseLength(chatSettings?.responseLength ?? "default");
   }, [isOpen, chatSettings]);
-
-  useEffect(() => {
-    if (isOpen) setShowMidChatSwitchWarning(false);
-  }, [isOpen]);
 
   const savedBaseline = normalizeSavedSettings(chatSettings);
 
@@ -116,8 +126,6 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
     });
   }, [instructionMode, customInstructions, responseLength, savedBaseline.smartModel, onSave]);
 
-  if (!isOpen) return null;
-
   const pendingSave: ChatSettings = {
     instructionMode,
     customInstructions: instructionMode === "custom" ? customInstructions.trim() : undefined,
@@ -128,175 +136,107 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
   const hasUnsavedChanges = !settingsMatchSaved(pendingSave, savedBaseline);
 
   return (
-    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-svh overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Configure chat</DialogTitle>
+          <DialogDescription>Choose how the assistant responds in this notebook.</DialogDescription>
+        </DialogHeader>
 
-      <div
-        className="relative flex max-h-[90vh] min-h-0 w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border/50 bg-card p-6">
-          <div className="flex items-center gap-3">
-            <MessageSquare className="h-5 w-5 shrink-0 text-primary" />
-            <h2 className="font-sans text-xl font-bold tracking-tight">Configure chat</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-2 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-8 overflow-y-auto bg-card/50 p-6 md:p-8">
-          {/* Instruction mode */}
-          <div className="space-y-4">
-            <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground/70">
-              Instruction mode
-            </h3>
-            {instructionModeLocked && showMidChatSwitchWarning && (
-              <p
-                role="status"
-                aria-live="polite"
-                className="rounded-lg border border-border/60 bg-muted/35 px-3 py-2 font-sans text-xs text-muted-foreground"
-              >
-                Start a new chat to use a different mode.
-              </p>
-            )}
-            <div className="flex flex-col gap-2">
-              {INSTRUCTION_MODES.map((mode) => {
-                const Icon = mode.icon;
-                const selected = instructionMode === mode.value;
-                const lockedNonSelectable = instructionModeLocked && !selected;
-                return (
-                  <button
-                    key={mode.value}
-                    type="button"
-                    aria-disabled={lockedNonSelectable || undefined}
-                    onClick={() => {
-                      if (instructionModeLocked) {
-                        if (!selected) setShowMidChatSwitchWarning(true);
-                        return;
-                      }
-                      setInstructionMode(mode.value);
-                    }}
-                    className={[
-                      "group relative flex w-full items-center gap-3.5 rounded-xl border py-3.5 pl-3.5 pr-4 text-left transition-[border-color,background-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      lockedNonSelectable
-                        ? "cursor-not-allowed border-border/35 bg-muted/15 opacity-50"
-                        : selected
-                          ? "border-border/55 bg-secondary/30 shadow-sm"
-                          : "border-border/45 bg-card/90 hover:border-border/65 hover:bg-secondary/15",
-                    ].join(" ")}
-                  >
-                    <div
-                      className={[
-                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors",
-                        selected
-                          ? "border-primary/20 bg-primary/9 text-primary shadow-[inset_0_1px_0_0_oklch(1_0_0_/0.45)]"
-                          : "border-border/50 bg-background/70 text-muted-foreground group-hover:border-primary/25 group-hover:bg-secondary/25 group-hover:text-primary",
-                      ].join(" ")}
-                    >
-                      <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={1.85} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-serif text-[0.9375rem] font-semibold leading-snug tracking-tight text-foreground">
-                        {mode.label}
-                      </p>
-                      <p className="mt-0.5 font-serif text-[13px] leading-relaxed text-muted-foreground/92">
-                        {mode.description}
-                      </p>
-                    </div>
-                    {selected && (
-                      <div className="flex shrink-0 items-center self-center pl-1">
-                        <span
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary"
-                          aria-hidden
-                        >
-                          <Check className="h-3.5 w-3.5" strokeWidth={2.75} />
-                        </span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Custom instructions */}
-          {instructionMode === "custom" && (
-            <div className="space-y-4">
-              <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground/70">
-                Custom instructions
-              </h3>
-              <textarea
-                value={customInstructions}
-                readOnly={instructionModeLocked}
-                onChange={(e) =>
-                  setCustomInstructions(e.target.value.slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH))
-                }
-                placeholder="Tell the assistant how to behave when responding in this notebook..."
-                className={[
-                  "h-36 w-full resize-none rounded-lg border border-border bg-background p-5 font-serif text-base leading-relaxed transition-all placeholder:text-muted-foreground/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-ring",
-                  instructionModeLocked ? "cursor-default opacity-90" : "",
-                ].join(" ")}
-              />
-              <p className="text-right font-sans text-xs text-muted-foreground">
-                {customInstructions.length} / {CUSTOM_INSTRUCTIONS_MAX_LENGTH}
-              </p>
-            </div>
+        <FieldSet>
+          <FieldLegend variant="label">Instruction mode</FieldLegend>
+          {instructionModeLocked && (
+            <p role="status" className="font-sans text-xs text-muted-foreground">
+              Start a new chat to use a different mode.
+            </p>
           )}
-
-          {/* Response length */}
-          <div className="space-y-4">
-            <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground/70">
-              Response length
-            </h3>
-            <div className="flex w-full rounded-xl border border-border/50 bg-background p-1 shadow-inner">
-              {RESPONSE_LENGTHS.map((opt) => {
-                const active = responseLength === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setResponseLength(opt.value)}
-                    className={[
-                      "min-w-0 flex-1 rounded-lg px-3 py-2.5 text-center font-sans text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                      active
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    ].join(" ")}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex shrink-0 justify-end gap-3 border-t border-border bg-secondary/10 p-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          <RadioGroup
+            aria-label="Instruction mode"
+            value={instructionMode}
+            onValueChange={(value) => setInstructionMode(value as ChatSettings["instructionMode"])}
+            disabled={instructionModeLocked}
           >
+            {INSTRUCTION_MODES.map((mode) => {
+              const Icon = mode.icon;
+              const titleId = `${modeIdBase}-${mode.value}-title`;
+              const descId = `${modeIdBase}-${mode.value}-desc`;
+              return (
+                <label
+                  key={mode.value}
+                  className="group/mode flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 font-sans transition-colors has-disabled:cursor-not-allowed has-focus-visible:ring-3 has-focus-visible:ring-ring/50 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5"
+                >
+                  <RadioGroupItem
+                    value={mode.value}
+                    aria-labelledby={titleId}
+                    aria-describedby={descId}
+                  />
+                  <Icon
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground group-has-disabled/mode:opacity-60"
+                  />
+                  <span className="flex min-w-0 flex-col group-has-disabled/mode:opacity-60">
+                    <span id={titleId} className="text-sm font-semibold text-foreground">
+                      {mode.label}
+                    </span>
+                    <span id={descId} className="text-xs text-muted-foreground">
+                      {mode.description}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </RadioGroup>
+        </FieldSet>
+
+        {instructionMode === "custom" && (
+          <Field>
+            <FieldLabel htmlFor={customInstructionsId}>Custom instructions</FieldLabel>
+            <Textarea
+              id={customInstructionsId}
+              value={customInstructions}
+              readOnly={instructionModeLocked}
+              onChange={(e) =>
+                setCustomInstructions(e.target.value.slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH))
+              }
+              placeholder="Tell the assistant how to behave when responding in this notebook..."
+              className="h-36 resize-none"
+            />
+            <p className="text-right font-sans text-xs text-muted-foreground">
+              {customInstructions.length} / {CUSTOM_INSTRUCTIONS_MAX_LENGTH}
+            </p>
+          </Field>
+        )}
+
+        <FieldSet>
+          <FieldLegend variant="label">Response length</FieldLegend>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            aria-label="Response length"
+            value={responseLength}
+            onValueChange={(value) => {
+              if (value) setResponseLength(value as ChatSettings["responseLength"]);
+            }}
+            className="w-full"
+          >
+            {RESPONSE_LENGTHS.map((opt) => (
+              <ToggleGroupItem key={opt.value} value={opt.value} className="flex-1">
+                {opt.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </FieldSet>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !hasUnsavedChanges}
-            className="rounded-xl px-6 py-2 text-sm font-bold bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
+            {saving && <Spinner aria-hidden />}
             {saving ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

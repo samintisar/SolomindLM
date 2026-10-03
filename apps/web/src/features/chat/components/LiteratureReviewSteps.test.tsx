@@ -107,3 +107,19 @@ describe("LiteratureReviewSteps drill-down pills", () => {
     expect(screen.getByText(/Screened 30 papers: 15 included, 15 excluded/i)).toBeTruthy();
   });
 });
+
+describe("LiteratureReviewSteps disclosure", () => {
+  it("flips aria-expanded when a step toggle is clicked", async () => {
+    const user = userEvent.setup();
+    render(<LiteratureReviewSteps steps={baseSteps.slice(0, 1)} />);
+
+    const toggle = screen.getByRole("button", { name: /Searching relevant studies/i });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+});

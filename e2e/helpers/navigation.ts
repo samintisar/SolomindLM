@@ -51,7 +51,8 @@ export async function openStudioPanel(page: Page) {
       continue;
     }
 
-    const openDesktop = page.locator('button[title="Open Studio"]');
+    // Not [data-onboarding="studio-panel-toggle"]: the mobile "Studio" tab carries that hook too.
+    const openDesktop = page.locator('button[aria-label="Open Studio"]');
     if ((await openDesktop.count()) > 0) {
       await openDesktop.first().click();
     } else {
