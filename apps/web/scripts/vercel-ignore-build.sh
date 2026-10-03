@@ -25,11 +25,15 @@ prev="${VERCEL_GIT_PREVIOUS_SHA:-}"
 if [ -n "$prev" ] && git cat-file -e "${prev}^{commit}" 2>/dev/null; then
   base="$prev"
 else
-  owner="${VERCEL_GIT_REPO_OWNER:-samintisar}"
-  slug="${VERCEL_GIT_REPO_SLUG:-SolomindLM}"
+  owner="${VERCEL_GIT_REPO_OWNER:-}"
+  slug="${VERCEL_GIT_REPO_SLUG:-}"
+  [ -n "$owner" ] && [ -n "$slug" ] || build "no previous deployment and no VERCEL_GIT_REPO_OWNER/SLUG to find main"
   url="https://github.com/${owner}/${slug}.git"
   # Vercel clones shallowly; deepen this commit's history and fetch main so a
   # merge base exists. The repo is public, so no credentials are needed.
+  # If the true merge base is beyond the shallow cut, merge-base finds no
+  # base (-> build) or an older common ancestor, whose diff is a superset
+  # of the branch's changes (-> builds at least as often).
   git fetch --quiet --deepen=200 "$url" "$head_sha" 2>/dev/null || true
   if git fetch --quiet --depth=200 "$url" main 2>/dev/null; then
     base=$(git merge-base FETCH_HEAD "$head_sha" 2>/dev/null) || base=""
