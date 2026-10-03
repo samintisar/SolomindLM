@@ -102,6 +102,14 @@ export function BibtexImportForm({ notebookId, onDone, onBusyChange }: BibtexImp
 
   const handleFile = useCallback(
     async (file: File) => {
+      // Drop the previous file's results first: a failed read (or an empty file, which
+      // handleParse skips) must not leave the old papers importable under the new file's error.
+      setFileName(null);
+      setPapers([]);
+      setSelected(new Set());
+      setStats(null);
+      setWarnings([]);
+      setError(null);
       try {
         const text = await file.text();
         setFileName(file.name);
