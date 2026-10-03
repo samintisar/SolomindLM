@@ -14,6 +14,7 @@ import { env } from "../../_lib/env";
 import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
 import { hashInput } from "../../_services/cache/cacheCrypto";
 import { createCachedAction } from "../../_services/cache/cachedAgent";
+import { createZeroEntropyClient } from "./zeroEntropyClient";
 
 // ============================================================
 // Types
@@ -54,8 +55,7 @@ export const rerankInternal = internalAction({
     }
 
     try {
-      const { ZeroEntropy } = await import("zeroentropy");
-      const zclient = new ZeroEntropy({ apiKey });
+      const zclient = await createZeroEntropyClient(apiKey);
 
       const response = await zclient.models.rerank({
         model,
