@@ -73,10 +73,12 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
     return (
       <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 sm:px-6 md:px-10 md:pt-10">
         <div className="mx-auto flex max-w-400 flex-col gap-6">
-          <Button variant="ghost" size="sm" onClick={onBack} className="self-start">
-            <ArrowLeft />
-            Back
-          </Button>
+          <div className="-ml-2.5 self-start">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft />
+              Back
+            </Button>
+          </div>
           <GridSkeleton />
         </div>
       </div>
@@ -88,10 +90,12 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
     return (
       <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 sm:px-6 md:px-10 md:pt-10">
         <div className="mx-auto flex max-w-400 flex-col gap-6">
-          <Button variant="ghost" size="sm" onClick={onBack} className="self-start">
-            <ArrowLeft />
-            Back
-          </Button>
+          <div className="-ml-2.5 self-start">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft />
+              Back
+            </Button>
+          </div>
           <Alert variant="destructive">
             <AlertDescription>Folder not found</AlertDescription>
           </Alert>
@@ -103,29 +107,33 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   return (
     <div className="flex-1 overflow-y-auto bg-background px-4 pt-6 pb-20 sm:px-6 md:px-10 md:pt-10">
       <div className="mx-auto flex max-w-400 flex-col gap-6">
-        <header className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={onBack}>
-                <ArrowLeft />
-                Back
-              </Button>
-              <h1 className="truncate font-display text-2xl font-bold text-foreground">
-                {folder.name}
-              </h1>
+        <header className="flex flex-col gap-2">
+          {/* Back sits above the title like a breadcrumb; the negative margin lines its arrow up
+              with the title's left edge. */}
+          <div className="-ml-2.5 self-start">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft />
+              Back
+            </Button>
+          </div>
+          {/* One row on wider screens: title, then view controls and New notebook on the right.
+              On phones the view controls wrap onto their own row below. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="min-w-0 flex-1 truncate font-display text-xl font-bold text-foreground sm:text-3xl">
+              {folder.name}
+            </h1>
+            <div className="order-last w-full sm:order-none sm:w-auto">
+              <ViewControls
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                sortOption={sortOption}
+                onSortChange={setSortOption}
+              />
             </div>
             <Button onClick={notebookHandlers.openCreateNotebook}>
               <Plus />
               New notebook
             </Button>
-          </div>
-          <div className="flex justify-end">
-            <ViewControls
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              sortOption={sortOption}
-              onSortChange={setSortOption}
-            />
           </div>
         </header>
 
