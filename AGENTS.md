@@ -203,7 +203,12 @@ CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `
 
 ## Claude Code Hooks
 
-Auto-typecheck runs after edits in `apps/web/` (web typecheck) and `convex/` (convex typecheck). Config: `.claude/settings.json`.
+`.claude/settings.json` (tracked — personal overrides go in the ignored `.claude/settings.local.json`) runs [`.claude/hooks/on-edit.mjs`](.claude/hooks/on-edit.mjs) after every single-file edit, built-in `Edit`/`Write` and Serena's edit tools alike:
+
+- **format** (sync) — `biome check --write` on the edited file only. Errors Biome can't auto-fix are fed back to the agent immediately.
+- **typecheck** (async) — `typecheck:web` / `typecheck:convex` / `typecheck:mobile` for the edited file's workspace. A burst of edits coalesces into one run; failures (and the later recovery) reach the agent on its next turn.
+
+Multi-file Serena tools (`rename_symbol`, `replace_in_files`) aren't formatted per edit — the `.githooks/pre-commit` hook (Biome-fixes and re-stages staged files) is the backstop.
 
 Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.cmd` on Windows). Ensure `Bash(bun run typecheck:*)` is in `permissions.allow`. Restart Cursor after hook changes; check **Settings → Hooks** and the **Hooks** output channel. Disable `security-guidance` on Windows if `python3` is missing.
 
