@@ -37,7 +37,11 @@ const EMPTY_CHAT = { messages: [], chatGenerating: false, chatGenerationStartedA
 
 const NOTEBOOK_LIST_QUERIES = [
   { name: "documents.index.list", fn: api.documents.index.list, empty: [] },
-  { name: "chat.conversations.listForNotebook", fn: api.chat.conversations.listForNotebook, empty: [] },
+  {
+    name: "chat.conversations.listForNotebook",
+    fn: api.chat.conversations.listForNotebook,
+    empty: [],
+  },
   { name: "chat.messages.listByNotebook", fn: api.chat.messages.listByNotebook, empty: EMPTY_CHAT },
   { name: "notes.userNotes.list", fn: api.notes.userNotes.list, empty: [] },
   { name: "studio.quizzes.index.list", fn: api.studio.quizzes.index.list, empty: [] },
@@ -88,7 +92,10 @@ async function callList(
   notebookId: Id<"notebooks">
 ): Promise<unknown> {
   return (
-    client.query as unknown as (ref: unknown, args: { notebookId: Id<"notebooks"> }) => Promise<unknown>
+    client.query as unknown as (
+      ref: unknown,
+      args: { notebookId: Id<"notebooks"> }
+    ) => Promise<unknown>
   )(fn, { notebookId });
 }
 
