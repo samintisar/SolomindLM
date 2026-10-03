@@ -23,13 +23,6 @@
   "features/legal": {
     "shadcn/no-arbitrary-values": 1
   },
-  "features/notebooks": {
-    "shadcn/no-arbitrary-values": 24,
-    "shadcn/no-inline-styles": 1,
-    "shadcn/no-raw-colors": 10,
-    "shadcn/no-restyle": 14,
-    "shadcn/no-unknown-classes": 5
-  },
   "features/sources": {
     "shadcn/no-arbitrary-values": 57,
     "shadcn/no-inline-styles": 3,

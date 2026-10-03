@@ -55,6 +55,19 @@ describe("eval artifact dump for pairwise compare", () => {
     }
   });
 
+  it("exports namespaced use-case pack ids as flat files that load back", () => {
+    const dir = mkdtempSync(join(tmpdir(), "eval-art-"));
+    try {
+      exportEvalRunArtifacts(dir, [
+        stubArtifact("medical-students/flashcards-heart-anatomy", "flashcards"),
+      ]);
+      const loaded = loadArtifactsFromDir(dir);
+      expect(loaded.map((a) => a.caseId)).toEqual(["medical-students/flashcards-heart-anatomy"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("skips ragas.jsonl and files without caseId/runner", () => {
     const dir = mkdtempSync(join(tmpdir(), "eval-art-"));
     try {

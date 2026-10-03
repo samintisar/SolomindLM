@@ -38,6 +38,26 @@ describe("planPackSync", () => {
   });
 });
 
+describe("planPackSync with reingest", () => {
+  it("replaces up-to-date documents too; uploads, changes and failures are unchanged", () => {
+    expect(planPackSync(local, remote, { reingest: true })).toEqual([
+      { kind: "upload", fileName: "a.pdf" },
+      { kind: "replace", fileName: "b.md", documentId: "doc-b", reason: "changed" },
+      { kind: "replace", fileName: "c.md", documentId: "doc-c", reason: "failed" },
+      { kind: "replace", fileName: "d.md", documentId: "doc-d", reason: "reingest" },
+    ]);
+  });
+
+  it("refuses while a matching document is still ingesting", () => {
+    const processing = [
+      { documentId: "d1", fileName: "a.pdf", status: "processing", sha256: "aaa" },
+    ];
+    expect(() => planPackSync([local[0]], processing, { reingest: true })).toThrow(
+      '"a.pdf" is still ingesting; wait for it to finish, then re-run eval:seed --reingest.'
+    );
+  });
+});
+
 describe("planPackSync duplicates", () => {
   it("throws before planning when a source name matches several remote documents", () => {
     const dupes: RemotePackDoc[] = [
@@ -70,6 +90,7 @@ describe("checkPackReady", () => {
       useCase: "p",
       notebookId: null,
       documentIds: [],
+      documentFileNames: {},
       problems: ['notebook "P" not found in the Test folder'],
     });
   });
@@ -78,6 +99,7 @@ describe("checkPackReady", () => {
     const result = checkPackReady(pack, local, { notebookId: "nb", docs: remote });
     expect(result.notebookId).toBe("nb");
     expect(result.documentIds).toEqual(["doc-b", "doc-c", "doc-d"]);
+    expect(result.documentFileNames).toEqual({ "doc-b": "b.md", "doc-c": "c.md", "doc-d": "d.md" });
     expect(result.problems).toEqual([
       "a.pdf: not uploaded",
       "b.md: out of date",

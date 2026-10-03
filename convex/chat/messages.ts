@@ -3,7 +3,11 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, mutation, query } from "../_generated/server";
 import { assertCanEditConversation, getConversationIfReadable } from "../_lib/conversationAccess";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
+import {
+  assertCanEditNotebook,
+  assertCanReadNotebook,
+  canReadNotebook,
+} from "../_lib/notebookAccess";
 import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
 import * as ConvModel from "../_model/conversations";
 import { getAuthUserId } from "../auth";
@@ -33,7 +37,9 @@ export const listByNotebook = query({
       };
     }
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    if (!(await canReadNotebook(ctx, args.notebookId, userId))) {
+      return { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
+    }
 
     let conversation;
     if (args.conversationId) {

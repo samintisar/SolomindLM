@@ -8,24 +8,20 @@ export interface UseFolderHandlersProps {
 
 export interface UseFolderHandlersReturn {
   // State
-  folderActiveMenuId: string | null;
   folderCustomizingId: string | null;
   isCreatingFolder: boolean;
   // Handlers
   openFolderCustomize: (id: string) => void;
   closeFolderCustomize: () => void;
   openCreateFolder: () => void;
-  setFolderActiveMenuId: (id: string | null) => void;
 }
 
 export function useFolderHandlers(_props: UseFolderHandlersProps = {}): UseFolderHandlersReturn {
-  const [folderActiveMenuId, setFolderActiveMenuId] = useState<string | null>(null);
   const [folderCustomizingId, setFolderCustomizingId] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const openFolderCustomize = useCallback((id: string) => {
     setFolderCustomizingId(id);
-    setFolderActiveMenuId(null);
   }, []);
 
   const closeFolderCustomize = useCallback(() => {
@@ -38,8 +34,6 @@ export function useFolderHandlers(_props: UseFolderHandlersProps = {}): UseFolde
   }, []);
 
   return {
-    folderActiveMenuId,
-    setFolderActiveMenuId,
     folderCustomizingId,
     isCreatingFolder,
     openFolderCustomize,

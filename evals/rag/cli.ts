@@ -10,6 +10,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { caseFileStem } from "./caseFile";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
@@ -50,6 +51,7 @@ import {
   excludeUnselectedPackFixtures,
   formatPlannedJobs,
   PackNotReadyError,
+  packSourceTextsFor,
   pinForDryRun,
   prepareUseCaseRun,
 } from "./usecases/resolve";
@@ -259,7 +261,7 @@ Available fixtures:
 // ─── Baseline Loading ────────────────────────────────────────
 
 function loadBaseline(caseId: string, runner: string): EvalBaseline | undefined {
-  const path = join("evals/rag/baselines", `${caseId}.json`);
+  const path = join("evals/rag/baselines", `${caseFileStem(caseId)}.json`);
   try {
     const raw = JSON.parse(readFileSync(path, "utf-8"));
     // Baselines are per-case; match the runner if multiple exist
@@ -549,7 +551,7 @@ async function main(): Promise<void> {
 
       // Save studio output for manual inspection
       if (artifact.studioOutput) {
-        const outputFile = `evals/rag/generated/${artifact.caseId}-${artifact.runner}-${Date.now()}.json`;
+        const outputFile = `evals/rag/generated/${caseFileStem(artifact.caseId)}-${artifact.runner}-${Date.now()}.json`;
         mkdirSync("evals/rag/generated", { recursive: true });
         writeFileSync(
           outputFile,
@@ -581,7 +583,9 @@ async function main(): Promise<void> {
         likertJudges: opts.likertJudges,
         dryRun: opts.dryRun,
         judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
-        packSourceTexts: fixture.useCase ? packSourceTexts.get(fixture.useCase) : undefined,
+        packSourceTexts: fixture.useCase
+          ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
+          : undefined,
       });
       allMetrics.push(...metrics);
 

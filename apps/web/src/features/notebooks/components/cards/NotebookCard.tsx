@@ -1,399 +1,151 @@
-import {
-  BarChart3,
-  Book,
-  Brain,
-  FileText,
-  Folder,
-  FolderOpen,
-  Globe,
-  GraduationCap,
-  Lightbulb,
-  Monitor,
-  MoreVertical,
-  Search,
-  Settings2,
-  Trash2,
-  Users,
-} from "lucide-react";
-import React from "react";
+import { FolderOpen, Settings2, Trash2, Users } from "lucide-react";
+import { Badge } from "@/shared/components/ui/badge";
+import { Card } from "@/shared/components/ui/card";
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
-import { NotebookItem } from "@/shared/types/index";
+import { notebookIcon } from "@/shared/notebook/notebookIcons";
+import type { NotebookItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-
-const IconMap: Record<string, React.FC<{ className?: string }>> = {
-  Folder,
-  Book,
-  BarChart: BarChart3,
-  Monitor,
-  Search,
-  Brain,
-  Globe,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-};
-
-/** Shared props for all notebook card variants */
-interface SharedNotebookCardProps {
-  notebook: NotebookItem;
-  isMenuOpen: boolean;
-  onSelectNotebook: (notebook: NotebookItem) => void;
-  onOpenCustomize: () => void;
-  onOpenMoveToFolder: () => void;
-  onDeleteNotebook: (id: string) => void;
-  onToggleMenu: () => void;
-  onCloseMenu: () => void;
-}
-
-/** Shared context used by the kebab menu in every variant */
-function useNotebookCardActions({
-  notebook,
-  isMenuOpen,
-  onDeleteNotebook,
-  onOpenCustomize,
-  onOpenMoveToFolder,
-  onCloseMenu,
-  onToggleMenu,
-}: SharedNotebookCardProps) {
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-
-  const handleDeleteWithConfirmation = async () => {
-    const confirmed = await confirm(
-      "Delete Notebook",
-      `Are you sure you want to delete "${notebook.title}"? This action cannot be undone.`,
-      { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
-    );
-    if (confirmed) {
-      onDeleteNotebook(notebook.id);
-    }
-  };
-
-  return {
-    isMenuOpen,
-    onOpenCustomize,
-    onOpenMoveToFolder,
-    onCloseMenu,
-    onToggleMenu,
-    handleDeleteWithConfirmation,
-    ConfirmDialogComponent,
-  };
-}
-
-/** Kebab dropdown menu — shared across all variants */
-function NotebookMenuDropdown({
-  onOpenCustomize,
-  onOpenMoveToFolder,
-  onDelete,
-  onCloseMenu,
-}: {
-  onOpenCustomize: () => void;
-  onOpenMoveToFolder: () => void;
-  onDelete: () => void;
-  onCloseMenu: () => void;
-}) {
-  return (
-    <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-border shadow-xl rounded-md z-30 py-1 animate-in fade-in zoom-in-95 duration-150">
-      <button
-        onClick={onOpenCustomize}
-        className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-accent flex items-center gap-2 text-popover-foreground"
-      >
-        <Settings2 className="w-3.5 h-3.5" /> Customize
-      </button>
-      <button
-        onClick={onOpenMoveToFolder}
-        className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-accent flex items-center gap-2 text-popover-foreground"
-      >
-        <FolderOpen className="w-3.5 h-3.5" /> Move to folder
-      </button>
-      <button
-        onClick={() => {
-          onDelete();
-          onCloseMenu();
-        }}
-        className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2"
-      >
-        <Trash2 className="w-3.5 h-3.5" /> Delete
-      </button>
-    </div>
-  );
-}
-
-/** Shared badge for shared notebooks */
-function SharedBadge({ size = "sm" }: { size?: "sm" | "md" }) {
-  const sizeClasses = size === "sm" ? "gap-0.5 px-2 py-0.5 text-[9px]" : "gap-1 px-2 py-1 text-xs";
-  return (
-    <span
-      className={`inline-flex items-center rounded-xl bg-primary/10 font-semibold uppercase tracking-wide text-primary ${sizeClasses}`}
-      title="Shared with you"
-    >
-      <Users className={size === "sm" ? "w-3 h-3 shrink-0" : "w-3.5 h-3.5"} />
-      Shared
-    </span>
-  );
-}
-
-// ─── Grid Variant ──────────────────────────────────────────────────────────────
-
-function NotebookCardGrid(props: SharedNotebookCardProps) {
-  const { notebook, onSelectNotebook } = props;
-  const {
-    isMenuOpen,
-    onOpenCustomize,
-    onOpenMoveToFolder,
-    onCloseMenu,
-    onToggleMenu,
-    handleDeleteWithConfirmation,
-    ConfirmDialogComponent,
-  } = useNotebookCardActions(props);
-
-  const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
-
-  return (
-    <>
-      <div className="group relative aspect-16/10 rounded-2xl bg-card border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col ring-1 ring-border/50">
-        {/* Top Decorative Half */}
-        <div
-          onClick={() => onSelectNotebook(notebook)}
-          className={`h-[55%] ${coverFillClass(notebook.coverColor)} transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
-        >
-          <Icon
-            className={`w-10 h-10 ${COVER_ICON_CLASS} group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`}
-          />
-
-          {!notebook.isSharedNotebook ? (
-            <div className="relative kebab-menu z-20" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => (isMenuOpen ? onCloseMenu() : onToggleMenu())}
-                className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-xl text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-              {isMenuOpen && (
-                <NotebookMenuDropdown
-                  onOpenCustomize={onOpenCustomize}
-                  onOpenMoveToFolder={onOpenMoveToFolder}
-                  onDelete={handleDeleteWithConfirmation}
-                  onCloseMenu={onCloseMenu}
-                />
-              )}
-            </div>
-          ) : (
-            <SharedBadge size="md" />
-          )}
-        </div>
-
-        {/* Bottom Info Half */}
-        <div
-          onClick={() => onSelectNotebook(notebook)}
-          className="h-[45%] p-5 flex flex-col justify-end bg-card relative rounded-b-2xl"
-        >
-          <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-border to-transparent opacity-50" />
-          <div className="flex items-end justify-between gap-2">
-            <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 font-sans flex-1 min-w-0">
-              {notebook.title}
-            </h3>
-            <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-0.5 rounded-xl text-sm text-muted-foreground font-medium uppercase tracking-wider shrink-0">
-              <FileText className="w-3 h-3" />
-              <span>{notebook.sourceCount}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <ConfirmDialogComponent />
-    </>
-  );
-}
-
-// ─── List-in-Folder Variant ────────────────────────────────────────────────────
-
-function NotebookCardListInFolder(props: SharedNotebookCardProps) {
-  const { notebook, onSelectNotebook } = props;
-  const {
-    isMenuOpen,
-    onOpenCustomize,
-    onOpenMoveToFolder,
-    onCloseMenu,
-    onToggleMenu,
-    handleDeleteWithConfirmation,
-    ConfirmDialogComponent,
-  } = useNotebookCardActions(props);
-
-  const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
-
-  return (
-    <>
-      <div className="group flex items-center justify-between gap-2 bg-card border border-border/50 hover:border-primary/30 hover:shadow-sm cursor-pointer transition-all relative p-2.5 rounded-lg">
-        <div
-          onClick={() => onSelectNotebook(notebook)}
-          className="absolute inset-0 z-0 rounded-lg"
-        />
-
-        {/* Left: Icon + Title */}
-        <div className="flex items-center gap-2 min-w-0 flex-1 z-10 pointer-events-none">
-          <div
-            className={`rounded ${coverFillClass(notebook.coverColor)} flex items-center justify-center shrink-0 w-7 h-7`}
-          >
-            <Icon className={`${COVER_ICON_CLASS} w-3.5 h-3.5`} />
-          </div>
-          <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-sm">
-            {notebook.title}
-          </span>
-        </div>
-
-        {/* Right: Sources + Menu */}
-        <div className="flex items-center gap-2 shrink-0 z-10">
-          <div className="inline-flex items-center gap-1 bg-secondary/40 px-1.5 py-0.5 rounded text-xs font-medium text-muted-foreground pointer-events-none">
-            <FileText className="w-3 h-3 shrink-0" />
-            <span>{notebook.sourceCount}</span>
-          </div>
-
-          {!notebook.isSharedNotebook ? (
-            <div className="kebab-menu relative pointer-events-auto">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isMenuOpen) onCloseMenu();
-                  else onToggleMenu();
-                }}
-                className={`p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? "bg-secondary" : ""}`}
-              >
-                <MoreVertical className="w-3.5 h-3.5 shrink-0" />
-              </button>
-              {isMenuOpen && (
-                <NotebookMenuDropdown
-                  onOpenCustomize={onOpenCustomize}
-                  onOpenMoveToFolder={onOpenMoveToFolder}
-                  onDelete={handleDeleteWithConfirmation}
-                  onCloseMenu={onCloseMenu}
-                />
-              )}
-            </div>
-          ) : (
-            <SharedBadge size="sm" />
-          )}
-        </div>
-      </div>
-      <ConfirmDialogComponent />
-    </>
-  );
-}
-
-// ─── List (Main View) Variant ──────────────────────────────────────────────────
-
-interface NotebookCardListProps extends SharedNotebookCardProps {
-  showAuthor?: boolean;
-}
-
-function NotebookCardList({ showAuthor = false, ...props }: NotebookCardListProps) {
-  const { notebook, onSelectNotebook } = props;
-  const {
-    isMenuOpen,
-    onOpenCustomize,
-    onOpenMoveToFolder,
-    onCloseMenu,
-    onToggleMenu,
-    handleDeleteWithConfirmation,
-    ConfirmDialogComponent,
-  } = useNotebookCardActions(props);
-
-  const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
-
-  return (
-    <>
-      <div className="group grid grid-cols-[minmax(200px,1fr)_100px_48px] items-center gap-4 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-4 rounded-xl">
-        <div
-          onClick={() => onSelectNotebook(notebook)}
-          className="absolute inset-0 z-0 rounded-xl"
-        />
-
-        {/* Title Column */}
-        <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">
-          <div
-            className={`rounded-md ${coverFillClass(notebook.coverColor)} flex items-center justify-center shrink-0 w-9 h-9`}
-          >
-            <Icon className={`${COVER_ICON_CLASS} w-4 h-4`} />
-          </div>
-          <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-base">
-            {notebook.title}
-          </span>
-        </div>
-
-        {/* Sources Column */}
-        <div className="text-right z-10 pointer-events-none">
-          <div className="inline-flex items-center gap-1.5 bg-secondary/40 hover:bg-secondary/60 px-2.5 py-1 rounded text-xs font-medium text-muted-foreground transition-colors">
-            {showAuthor ? (
-              <Globe className="w-3 h-3 shrink-0" />
-            ) : (
-              <FileText className="w-3 h-3 shrink-0" />
-            )}
-            <span>{notebook.sourceCount}</span>
-          </div>
-        </div>
-
-        {/* Action Column */}
-        <div className="flex justify-end z-20 pointer-events-auto kebab-menu relative">
-          {!notebook.isSharedNotebook ? (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isMenuOpen) onCloseMenu();
-                  else onToggleMenu();
-                }}
-                className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? "bg-secondary" : ""}`}
-              >
-                <MoreVertical className="w-4 h-4 shrink-0" />
-              </button>
-              {isMenuOpen && (
-                <NotebookMenuDropdown
-                  onOpenCustomize={onOpenCustomize}
-                  onOpenMoveToFolder={onOpenMoveToFolder}
-                  onDelete={handleDeleteWithConfirmation}
-                  onCloseMenu={onCloseMenu}
-                />
-              )}
-            </>
-          ) : (
-            <SharedBadge size="md" />
-          )}
-        </div>
-      </div>
-      <ConfirmDialogComponent />
-    </>
-  );
-}
-
-// ─── Backwards-compatible re-export ────────────────────────────────────────────
+import { cn } from "@/shared/utils/cn";
+import { notebookMeta } from "../../notebookMeta";
+import { type CardAction, CardActionsMenu } from "./CardActionsMenu";
+import { CARD_OPEN_BUTTON_CLASS } from "./cardClasses";
 
 interface NotebookCardProps {
   notebook: NotebookItem;
   viewMode: "grid" | "list";
-  isMenuOpen: boolean;
   onSelectNotebook: (notebook: NotebookItem) => void;
-  onOpenCustomize: () => void;
-  onOpenMoveToFolder: () => void;
-  onDeleteNotebook: (id: string) => void;
-  onToggleMenu: () => void;
-  onCloseMenu: () => void;
-  showAuthor?: boolean;
-  isInFolder?: boolean;
+  onOpenCustomize?: () => void;
+  onOpenMoveToFolder?: () => void;
+  onDeleteNotebook?: (id: string) => void;
+  /** Featured/demo notebooks: "Featured" badge, no actions. */
+  featured?: boolean;
 }
 
-/**
- * Backwards-compatible wrapper that delegates to the appropriate variant.
- * Prefer importing the specific variant component directly.
- */
-export const NotebookCard: React.FC<NotebookCardProps> = ({
-  viewMode,
-  isInFolder = false,
-  showAuthor = false,
-  ...rest
-}) => {
-  if (viewMode === "grid") {
-    return <NotebookCardGrid {...rest} />;
+function useNotebookActions({
+  notebook,
+  onOpenCustomize,
+  onOpenMoveToFolder,
+  onDeleteNotebook,
+}: NotebookCardProps) {
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+  const actions: CardAction[] = [];
+  if (onOpenCustomize)
+    actions.push({ label: "Customize", icon: Settings2, onSelect: onOpenCustomize });
+  if (onOpenMoveToFolder)
+    actions.push({ label: "Move to folder", icon: FolderOpen, onSelect: onOpenMoveToFolder });
+  if (onDeleteNotebook)
+    actions.push({
+      label: "Delete",
+      icon: Trash2,
+      destructive: true,
+      onSelect: async () => {
+        const ok = await confirm(
+          "Delete Notebook",
+          `Are you sure you want to delete "${notebook.title}"? This action cannot be undone.`,
+          { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
+        );
+        if (ok) onDeleteNotebook(notebook.id);
+      },
+    });
+  return { actions, ConfirmDialogComponent };
+}
+
+function StatusBadge({ props }: { props: NotebookCardProps }) {
+  if (props.featured)
+    return (
+      <Badge variant="secondary" className="shrink-0">
+        Featured
+      </Badge>
+    );
+  if (props.notebook.isSharedNotebook)
+    return (
+      <Badge variant="secondary" className="shrink-0">
+        <Users aria-hidden />
+        Shared
+      </Badge>
+    );
+  return null;
+}
+
+/** Grid corner: a status badge, or the actions menu when the card has actions. */
+function CornerSlot({ props, actions }: { props: NotebookCardProps; actions: CardAction[] }) {
+  if (props.featured || props.notebook.isSharedNotebook) return <StatusBadge props={props} />;
+  if (actions.length === 0) return null;
+  return <CardActionsMenu label="Notebook actions" actions={actions} />;
+}
+
+export function NotebookCard(props: NotebookCardProps) {
+  const { notebook, viewMode, onSelectNotebook } = props;
+  const { actions, ConfirmDialogComponent } = useNotebookActions(props);
+  const Icon = notebookIcon(notebook.icon);
+  const fill = coverFillClass(notebook.coverColor);
+  const meta = notebookMeta(notebook);
+  const open = () => onSelectNotebook(notebook);
+
+  if (viewMode === "list") {
+    return (
+      <>
+        <Card variant="interactive" className="flex-row items-center">
+          <button
+            type="button"
+            onClick={open}
+            className={cn(
+              CARD_OPEN_BUTTON_CLASS,
+              "flex min-w-0 flex-1 items-center gap-3 p-3 text-left"
+            )}
+          >
+            <span
+              className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", fill)}
+            >
+              <Icon aria-hidden className={cn("size-4", COVER_ICON_CLASS)} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-semibold text-card-foreground">
+                  {notebook.title}
+                </span>
+                <StatusBadge props={props} />
+              </span>
+              <span className="block truncate text-xs text-muted-foreground sm:hidden">{meta}</span>
+            </span>
+            <span className="hidden w-40 shrink-0 text-right text-xs text-muted-foreground sm:block">
+              {meta}
+            </span>
+          </button>
+          <div className="mr-2 flex w-8 shrink-0 justify-center">
+            {actions.length > 0 && !props.featured && !notebook.isSharedNotebook && (
+              <CardActionsMenu label="Notebook actions" actions={actions} />
+            )}
+          </div>
+        </Card>
+        <ConfirmDialogComponent />
+      </>
+    );
   }
-  if (isInFolder) {
-    return <NotebookCardListInFolder {...rest} />;
-  }
-  return <NotebookCardList {...rest} showAuthor={showAuthor} />;
-};
+
+  return (
+    <>
+      <Card variant="interactive" className="h-full">
+        <button
+          type="button"
+          onClick={open}
+          className={cn(CARD_OPEN_BUTTON_CLASS, "flex h-full flex-col text-left")}
+        >
+          <span className={cn("flex h-20 w-full items-end p-3", fill)}>
+            <Icon aria-hidden className={cn("size-8", COVER_ICON_CLASS)} />
+          </span>
+          <span className="flex flex-1 flex-col gap-1 p-3">
+            <span className="line-clamp-2 text-base font-semibold leading-snug text-card-foreground">
+              {notebook.title}
+            </span>
+            <span className="text-xs text-muted-foreground">{meta}</span>
+          </span>
+        </button>
+        <div className="absolute top-2 right-2">
+          <CornerSlot props={props} actions={actions} />
+        </div>
+      </Card>
+      <ConfirmDialogComponent />
+    </>
+  );
+}

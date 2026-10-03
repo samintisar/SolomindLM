@@ -18,7 +18,7 @@ export const STEP_DEFINITIONS: readonly StepDefinition[] = [
     route: "home",
     targetSelector: '[data-onboarding="create-notebook-button"]',
     copy: "Notebooks are where your sources, chats, and study tools live. Create your first one.",
-    side: "right",
+    side: "bottom",
   },
   {
     id: "addSource",
