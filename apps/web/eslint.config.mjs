@@ -10,6 +10,7 @@ const MIGRATED = [
   "src/features/auth/**/*.tsx",
   "src/features/onboarding/**/*.tsx",
   "src/features/notebooks/**/*.tsx",
+  "src/features/chat/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [

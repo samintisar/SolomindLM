@@ -1,6 +1,13 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { ArrowRight, Check, FileSpreadsheet, FileText, Loader2, Plus, X } from "lucide-react";
+import { Check, FileSpreadsheet, FileText, Plus, X } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import { Button } from "@/shared/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "@/shared/components/ui/card";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import { Input } from "@/shared/components/ui/input";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import type { Message } from "@/shared/types/index";
 import {
   useConfirmLiteratureReviewColumns,
@@ -11,7 +18,9 @@ import {
 } from "../services/literatureReviewApi";
 import { useResearchSteps } from "../services/researchApi";
 import { buildLiteratureReportChatPreview } from "../utils/literatureReportPreview";
+import { ControlTooltip } from "./ControlTooltip";
 import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
+import { ResultCard } from "./ResultCard";
 import {
   extractSearchQueriesFromDetails,
   parseResearchStepMetadata,
@@ -107,6 +116,7 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
 
   const report = useLiteratureReport(reportId ?? null);
 
+  const { error: toastError } = useToast();
   const confirmColumnsMutation = useConfirmLiteratureReviewColumns();
   const retryMutation = useRetryLiteratureReview();
 
@@ -212,21 +222,26 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
         confirmedColumns: suggestedColumns,
       });
       setEditingColumns(null);
-    } catch {
-      // error handled by caller
+    } catch (err) {
+      // Keep the edited columns so the user can retry.
+      console.error("[LiteratureReview] Confirm columns failed:", err);
+      toastError("Couldn't confirm the columns. Please try again.");
     } finally {
       setIsConfirmingColumns(false);
     }
-  }, [confirmColumnsMutation, sessionId, suggestedColumns]);
+  }, [confirmColumnsMutation, sessionId, suggestedColumns, toastError]);
 
   const handleRetry = useCallback(async () => {
     setIsRetrying(true);
     try {
       await retryMutation({ sessionId: sessionId! });
+    } catch (err) {
+      console.error("[LiteratureReview] Retry failed:", err);
+      toastError("Couldn't retry the literature review. Please try again.");
     } finally {
       setIsRetrying(false);
     }
-  }, [retryMutation, sessionId]);
+  }, [retryMutation, sessionId, toastError]);
 
   if (!lr) return null;
 
@@ -278,18 +293,18 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
           {tableIdResolved && notebookId && (
             <ResultCard
-              icon={<FileSpreadsheet className="h-6 w-6 shrink-0 text-primary" />}
+              icon={FileSpreadsheet}
               title={table?.title ?? "Literature Table"}
-              typeLabel="Table"
-              onClick={() => onOpenTable?.(tableIdResolved)}
+              description="Table"
+              onOpen={() => onOpenTable?.(tableIdResolved)}
             />
           )}
           {reportIdResolved && notebookId && (
             <ResultCard
-              icon={<FileText className="h-6 w-6 shrink-0 text-primary" />}
+              icon={FileText}
               title={report?.title ?? "Literature Report"}
-              typeLabel="Document"
-              onClick={() => onOpenReport?.(reportIdResolved)}
+              description="Document"
+              onOpen={() => onOpenReport?.(reportIdResolved)}
             />
           )}
         </div>
@@ -307,35 +322,35 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
               : ". Open the table above to review and edit the extracted data."}
           </p>
           {reportPreview && (
-            <p className="mt-4 text-[15px] leading-relaxed text-foreground">{reportPreview}</p>
+            <p className="mt-4 text-base leading-relaxed text-foreground">{reportPreview}</p>
           )}
         </div>
       )}
 
       {/* Failed state */}
       {isFailed && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-          <div className="text-sm font-medium text-destructive">Literature Review Failed</div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {error || "Something went wrong during the research process."}
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <button
+        <Alert variant="destructive">
+          <AlertTitle>Literature Review Failed</AlertTitle>
+          <AlertDescription>
+            <p>{error || "Something went wrong during the research process."}</p>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleRetry}
               disabled={isRetrying}
-              className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
+              className="mt-2"
             >
               {isRetrying ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <>
+                  <Spinner aria-hidden />
                   Retrying...
-                </span>
+                </>
               ) : (
                 "Retry from last step"
               )}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
@@ -367,146 +382,115 @@ const ColumnConfirmationCard: React.FC<ColumnConfirmationCardProps> = ({
   const canConfirm = visibleCount > 0;
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-border bg-card font-sans">
-      <div className="border-b border-border px-4 py-3.5 sm:px-5">
-        <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+    <Card className="mb-6">
+      <CardHeader>
+        <h3 className="font-sans text-base font-semibold tracking-tight text-foreground">
           Extraction columns
         </h3>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+        <p className="font-sans text-sm leading-relaxed text-muted-foreground">
           Check the fields to include, rename as needed, then continue.
         </p>
-      </div>
+      </CardHeader>
 
-      <ul className="divide-y divide-border">
-        {columns.map((col, idx) => (
-          <li key={col.id} className={col.isVisible ? "bg-card" : "bg-muted"}>
-            <div className="flex items-start gap-3 px-4 py-3 sm:px-5">
-              <input
-                type="checkbox"
-                checked={col.isVisible}
-                onChange={(e) =>
-                  onPatch((prev) =>
-                    prev.map((c, i) => (i === idx ? { ...c, isVisible: e.target.checked } : c))
-                  )
-                }
-                className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-                aria-label={`Include ${col.name}`}
-              />
-
-              <div className="min-w-0 flex-1">
-                <input
-                  type="text"
-                  value={col.name}
-                  disabled={!col.isVisible}
-                  onChange={(e) =>
+      <CardContent>
+        <ul className="divide-y divide-border font-sans">
+          {columns.map((col, idx) => (
+            <li key={col.id}>
+              <div className="flex items-start gap-3 py-3">
+                <Checkbox
+                  checked={col.isVisible}
+                  onCheckedChange={(checked) =>
                     onPatch((prev) =>
-                      prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c))
+                      prev.map((c, i) => (i === idx ? { ...c, isVisible: checked === true } : c))
                     )
                   }
-                  className={`w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium leading-snug focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm disabled:cursor-not-allowed ${
-                    col.isVisible
-                      ? "text-foreground"
-                      : "text-muted-foreground line-through decoration-muted-foreground/50"
-                  }`}
-                  aria-label={`Column name ${idx + 1}`}
+                  className="mt-2.5"
+                  aria-label={`Include ${col.name}`}
                 />
-                {col.isVisible && col.instructions?.trim() ? (
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                    {col.instructions}
-                  </p>
-                ) : null}
+
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="text"
+                    value={col.name}
+                    disabled={!col.isVisible}
+                    onChange={(e) =>
+                      onPatch((prev) =>
+                        prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c))
+                      )
+                    }
+                    aria-label={`Column name ${idx + 1}`}
+                  />
+                  {col.isVisible && col.instructions?.trim() ? (
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      {col.instructions}
+                    </p>
+                  ) : null}
+                </div>
+
+                <ControlTooltip label="Remove column">
+                  <Button
+                    variant="ghost-destructive"
+                    size="icon-sm"
+                    onClick={() => onPatch((prev) => prev.filter((_, i) => i !== idx))}
+                    aria-label={`Remove ${col.name}`}
+                    className="mt-0.5"
+                  >
+                    <X aria-hidden strokeWidth={2.25} />
+                  </Button>
+                </ControlTooltip>
               </div>
+            </li>
+          ))}
+        </ul>
 
-              <button
-                type="button"
-                onClick={() => onPatch((prev) => prev.filter((_, i) => i !== idx))}
-                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                title="Remove column"
-                aria-label={`Remove ${col.name}`}
-              >
-                <X className="size-3.5" strokeWidth={2.25} />
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <div className="border-t border-border px-4 py-2 sm:px-5">
-        <button
-          type="button"
-          onClick={() =>
-            onPatch((prev) => [
-              ...prev,
-              {
-                id: `custom-${Date.now()}`,
-                name: "New column",
-                instructions: "",
-                isVisible: true,
-              },
-            ])
-          }
-          className="inline-flex items-center gap-1.5 rounded-md px-1 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-        >
-          <Plus className="size-4" strokeWidth={2} />
-          Add column
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-3 border-t border-border bg-muted px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium tabular-nums text-foreground">{visibleCount}</span>
-          {" of "}
-          <span className="tabular-nums">{columns.length}</span> selected
-        </p>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={!canConfirm || isConfirming}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
-        >
-          {isConfirming ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Continuing…
-            </>
-          ) : (
-            <>
-              <Check className="size-4" strokeWidth={2.5} />
-              Continue
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ── Result Card ────────────────────────────────────────────────────────────
-
-interface ResultCardProps {
-  icon: React.ReactNode;
-  title: string;
-  typeLabel: string;
-  onClick?: () => void;
-}
-
-const ResultCard: React.FC<ResultCardProps> = ({ icon, title, typeLabel, onClick }) => {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-start gap-4 rounded-2xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:border-border hover:bg-accent/25"
-    >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1 pt-0.5">
-        <div className="text-[15px] font-semibold leading-snug tracking-tight text-foreground line-clamp-2">
-          {title}
+        <div className="pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              onPatch((prev) => [
+                ...prev,
+                {
+                  id: `custom-${crypto.randomUUID()}`,
+                  name: "New column",
+                  instructions: "",
+                  isVisible: true,
+                },
+              ])
+            }
+          >
+            <Plus aria-hidden strokeWidth={2} />
+            Add column
+          </Button>
         </div>
-        <div className="mt-1 text-sm text-muted-foreground">{typeLabel}</div>
-      </div>
-      <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/50 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
-    </button>
+      </CardContent>
+
+      <CardFooter>
+        <div className="flex w-full flex-col gap-3 font-sans sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium tabular-nums text-foreground">{visibleCount}</span>
+            {" of "}
+            <span className="tabular-nums">{columns.length}</span> selected
+          </p>
+          <Button
+            onClick={onConfirm}
+            disabled={!canConfirm || isConfirming}
+            className="w-full sm:w-auto"
+          >
+            {isConfirming ? (
+              <>
+                <Spinner aria-hidden />
+                Continuing…
+              </>
+            ) : (
+              <>
+                <Check aria-hidden strokeWidth={2.5} />
+                Continue
+              </>
+            )}
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
   );
 };

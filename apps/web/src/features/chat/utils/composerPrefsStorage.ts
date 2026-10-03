@@ -1,19 +1,19 @@
-import type { ChatComposerMode, ResearchDatabaseOption } from "../components/ChatInput";
 import {
   CHAT_DEFAULT_SOURCE_FILTERS,
+  type ChatComposerMode,
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
-} from "../components/ChatInput";
+  isComposerMode,
+  isResearchDatabase,
+  isSourceFilterId,
+  type ResearchDatabaseOption,
+  type SourceFilterId,
+} from "../components/composer/constants";
 
 const COMPOSER_PREFS_STORAGE_KEY_PREFIX = "solomind:chat-composer:v1:";
 
-const SOURCE_CHANNEL_IDS = ["notebook", "academic", "web", "news", "finance"] as const;
-
-const COMPOSER_MODES: ChatComposerMode[] = ["chat", "deepResearch", "literatureReview"];
-const RESEARCH_DATABASES: ResearchDatabaseOption[] = ["all", "pubmed", "arxiv"];
-
 export type PersistedComposerPrefs = {
   mode: ChatComposerMode;
-  sourceFilters: string[];
+  sourceFilters: SourceFilterId[];
   researchDatabase: ResearchDatabaseOption;
 };
 
@@ -49,14 +49,7 @@ export function parseStoredComposerPrefs(raw: string | null): PersistedComposerP
   const researchDatabase = record.researchDatabase;
   const sourceFilters = record.sourceFilters;
 
-  if (typeof mode !== "string" || !COMPOSER_MODES.includes(mode as ChatComposerMode)) {
-    return null;
-  }
-
-  if (
-    typeof researchDatabase !== "string" ||
-    !RESEARCH_DATABASES.includes(researchDatabase as ResearchDatabaseOption)
-  ) {
+  if (!isComposerMode(mode) || !isResearchDatabase(researchDatabase)) {
     return null;
   }
 
@@ -64,10 +57,9 @@ export function parseStoredComposerPrefs(raw: string | null): PersistedComposerP
     return null;
   }
 
-  const allowed = new Set<string>(SOURCE_CHANNEL_IDS);
-  const filters: string[] = [];
+  const filters: SourceFilterId[] = [];
   for (const item of sourceFilters) {
-    if (typeof item !== "string" || !allowed.has(item)) {
+    if (!isSourceFilterId(item)) {
       return null;
     }
     if (!filters.includes(item)) {
@@ -78,9 +70,9 @@ export function parseStoredComposerPrefs(raw: string | null): PersistedComposerP
   if (filters.length === 0) return null;
 
   return {
-    mode: mode as ChatComposerMode,
+    mode,
     sourceFilters: filters,
-    researchDatabase: researchDatabase as ResearchDatabaseOption,
+    researchDatabase,
   };
 }
 

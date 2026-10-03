@@ -7,12 +7,14 @@ import {
   FileText,
   LayoutGrid,
   ListFilter,
-  Loader2,
   Search,
   Table2,
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { cn } from "@/shared/utils/cn";
 import {
   canOpenRankedPapersDrilldown,
   canOpenScreeningDrilldown,
@@ -36,11 +38,12 @@ const STEP_ICONS: Record<string, React.ElementType> = {
   awaiting_columns: Circle,
 };
 
+/** Soft fill, no outline: read-only query and detail pills (clickable ones are outline Buttons). */
 const QUERY_PILL_CLASS =
-  "flex w-full min-w-0 items-center gap-2 rounded-lg border border-border/70 bg-muted/50 px-3 py-2.5 text-xs font-normal text-foreground/90";
+  "flex w-full min-w-0 items-center gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs font-normal text-foreground/90";
 
 const PILL_CLASS =
-  "inline-flex max-w-full items-center gap-2 rounded-lg border border-border/70 bg-muted/50 px-3 py-2 text-xs font-normal text-foreground/90";
+  "inline-flex max-w-full items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs font-normal text-foreground/90";
 
 interface LiteratureReviewStepsProps {
   steps: ResearchStep[];
@@ -103,7 +106,7 @@ export const LiteratureReviewSteps: React.FC<LiteratureReviewStepsProps> = ({
   if (steps.length === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        <Spinner />
         <span>Starting research...</span>
       </div>
     );
@@ -121,8 +124,7 @@ export const LiteratureReviewSteps: React.FC<LiteratureReviewStepsProps> = ({
             <div className="relative flex w-6 shrink-0 flex-col items-center pt-0.5">
               {!isLast && (
                 <div
-                  className="pointer-events-none absolute top-7 bottom-0 w-px bg-border/70"
-                  style={{ left: "50%", transform: "translateX(-50%)" }}
+                  className="pointer-events-none absolute top-7 bottom-0 left-1/2 w-px -translate-x-1/2 bg-border/70"
                   aria-hidden
                 />
               )}
@@ -130,19 +132,21 @@ export const LiteratureReviewSteps: React.FC<LiteratureReviewStepsProps> = ({
             </div>
 
             {/* Content */}
-            <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-7"}`}>
+            <div className={cn("min-w-0 flex-1", !isLast && "pb-7")}>
               <button
                 type="button"
                 onClick={() => toggleStep(index)}
-                className="group flex w-full items-start gap-1.5 text-left"
+                aria-expanded={isExpanded}
+                className="group flex w-full items-start gap-1.5 text-left font-sans"
               >
-                <span className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
+                <span className="text-base font-semibold leading-snug tracking-tight text-foreground">
                   {step.title}
                 </span>
                 <ChevronDown
-                  className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:text-foreground ${
-                    isExpanded ? "rotate-180" : ""
-                  }`}
+                  className={cn(
+                    "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:text-foreground",
+                    isExpanded && "rotate-180"
+                  )}
                   strokeWidth={2}
                   aria-hidden
                 />
@@ -175,34 +179,31 @@ export const LiteratureReviewSteps: React.FC<LiteratureReviewStepsProps> = ({
   );
 };
 
-function StepStatusIcon({ status }: { status: ResearchStep["status"] }) {
-  const ring =
-    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-border bg-background";
+const STATUS_CIRCLE_CLASS = "flex size-6 shrink-0 items-center justify-center rounded-full";
 
+function StepStatusIcon({ status }: { status: ResearchStep["status"] }) {
   if (status === "completed") {
     return (
-      <div className={ring}>
-        <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-500" strokeWidth={2.5} />
+      <div className={cn(STATUS_CIRCLE_CLASS, "bg-background ring-1 ring-border")}>
+        <Check className="h-3.5 w-3.5 text-success" strokeWidth={2.5} />
       </div>
     );
   }
   if (status === "in_progress") {
     return (
-      <div className={ring}>
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" strokeWidth={2} />
+      <div className={cn(STATUS_CIRCLE_CLASS, "bg-background text-primary ring-1 ring-border")}>
+        <Spinner className="size-3.5" strokeWidth={2} />
       </div>
     );
   }
   if (status === "failed") {
     return (
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-destructive/30 bg-destructive/10">
+      <div className={cn(STATUS_CIRCLE_CLASS, "bg-destructive/10 ring-1 ring-destructive/30")}>
         <X className="h-3.5 w-3.5 text-destructive" strokeWidth={2.5} />
       </div>
     );
   }
-  return (
-    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-border/60 bg-muted/40" />
-  );
+  return <div className={cn(STATUS_CIRCLE_CLASS, "bg-muted/40 ring-1 ring-border/60")} />;
 }
 
 // ── Step Details ───────────────────────────────────────────────────────────
@@ -306,17 +307,19 @@ function StepDetails({
       <div className="flex flex-col gap-2">
         {details ? (
           openRanked || openScreening ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="chip"
               onClick={
                 openRanked
                   ? () => onOpenRankedPapers!(sessionId!)
                   : () => onOpenScreeningDecisions!(sessionId!)
               }
-              className={`${PILL_CLASS} cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/5`}
+              className="max-w-full justify-start"
             >
               {pillContent}
-            </button>
+            </Button>
           ) : (
             <span className={PILL_CLASS}>{pillContent}</span>
           )
@@ -353,14 +356,16 @@ function StepDetails({
         : () => onOpenScreeningDecisions!(sessionId!);
 
       return (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="chip"
           onClick={onClick}
-          className={`${PILL_CLASS} cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/5`}
+          className="max-w-full justify-start"
         >
           <StepIconForType stepType={stepType} />
           <span className="min-w-0">{details}</span>
-        </button>
+        </Button>
       );
     }
 

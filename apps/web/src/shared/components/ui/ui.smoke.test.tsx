@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { SearchIcon } from "lucide-react";
 import type { ReactElement } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -18,6 +19,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
+import { Checkbox } from "./checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,8 +30,15 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "./field";
 import { Input } from "./input";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupTextarea,
+} from "./input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { RadioGroup, RadioGroupItem } from "./radio-group";
 import { ScrollArea } from "./scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { Separator } from "./separator";
@@ -227,18 +237,42 @@ describe("shadcn ui components render", () => {
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   });
 
-  it("design-system variants render: Card interactive, Button ghost-destructive, ToggleGroup swatch", () => {
+  it("design-system variants render: Card flush + interactive, Button ghost-destructive, ToggleGroup swatch", () => {
     const { container } = render(
       <>
         <Card variant="interactive" />
+        <Card variant="flush" data-testid="flush-card">
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button>toggle</Button>
+            </CollapsibleTrigger>
+          </Collapsible>
+        </Card>
         <Button variant="ghost-destructive">x</Button>
+        <Button variant="ghost-toggle-destructive" size="icon-md" aria-pressed>
+          rec
+        </Button>
         <ToggleGroup type="single" variant="swatch" size="sm">
           <ToggleGroupItem value="a" aria-label="a" />
         </ToggleGroup>
       </>
     );
     expect(container.querySelector('[data-variant="interactive"]')).not.toBeNull();
+    const flush = screen.getByTestId("flush-card");
+    expect(flush).toHaveAttribute("data-variant", "flush");
+    expect(flush).toHaveClass("overflow-hidden", "gap-0", "py-0");
+    // The trigger must keep the slot the flush variant targets, so its focus ring can go inset.
+    expect(screen.getByRole("button", { name: "toggle" })).toHaveAttribute(
+      "data-slot",
+      "collapsible-trigger"
+    );
+    expect(flush.className).toContain(
+      "[&_[data-slot=collapsible-trigger]]:focus-visible:ring-inset"
+    );
     expect(screen.getByRole("button", { name: "x" })).toHaveClass("text-destructive");
+    const toggle = screen.getByRole("button", { name: "rec", pressed: true });
+    expect(toggle).toHaveAttribute("data-variant", "ghost-toggle-destructive");
+    expect(toggle).toHaveClass("aria-pressed:bg-destructive-muted", "size-9");
     const swatch = screen.getByRole("radio", { name: "a" });
     expect(swatch).toHaveClass("rounded-full", "size-8", "p-1");
     for (const sizeClass of ["px-1.5", "px-2", "h-8", "h-9"]) {
@@ -246,6 +280,55 @@ describe("shadcn ui components render", () => {
     }
     expect(swatch).not.toHaveClass("px-3");
     expect(swatch).not.toHaveClass("rounded-none");
+  });
+
+  it("chat foundations render: Checkbox, RadioGroup, Collapsible, Alert warning, InputGroup composer", async () => {
+    render(
+      <>
+        <Checkbox aria-label="c" />
+        <RadioGroup>
+          <RadioGroupItem value="a" aria-label="a" />
+        </RadioGroup>
+        <RadioGroup density="compact" data-testid="compact-radios" />
+        <Collapsible>
+          <CollapsibleTrigger>t</CollapsibleTrigger>
+          <CollapsibleContent>x</CollapsibleContent>
+        </Collapsible>
+        <Alert variant="warning">w</Alert>
+        <InputGroup variant="composer" size="auto" data-testid="ig" />
+      </>
+    );
+    expect(screen.getByRole("checkbox", { name: "c" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "a" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "a" }).closest("[role=radiogroup]")).toHaveClass(
+      "gap-3"
+    );
+    expect(screen.getByTestId("compact-radios")).toHaveClass("gap-0.5");
+    expect(screen.getByRole("button", { name: "t" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveClass("bg-warning-muted");
+    const composer = screen.getByTestId("ig");
+    expect(composer).toHaveClass("rounded-2xl", "h-auto");
+    for (const dropped of ["h-9", "rounded-md", "shadow-xs", "dark:bg-input/30"]) {
+      expect(composer).not.toHaveClass(dropped);
+    }
+
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: "t" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("x")).toBeVisible();
+  });
+
+  it("clicking blank space in an InputGroupAddon focuses the group's textarea", async () => {
+    render(
+      <InputGroup variant="composer" size="auto">
+        <InputGroupTextarea aria-label="message" />
+        <InputGroupAddon align="block-end" data-testid="addon" />
+      </InputGroup>
+    );
+    await userEvent.setup().click(screen.getByTestId("addon"));
+    expect(screen.getByRole("textbox", { name: "message" })).toHaveFocus();
   });
 
   it("Toaster renders inside the app ThemeContext", () => {
