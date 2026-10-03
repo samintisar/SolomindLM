@@ -117,7 +117,7 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
       <div className="font-sans">
         <Collapsible open={expanded} onOpenChange={setExpanded}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="chip" className="group/trigger w-full justify-start">
+            <Button variant="disclosure" size="chip" className="group/trigger w-full justify-start">
               <ChevronRight
                 className="text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/trigger:rotate-90"
                 aria-hidden
