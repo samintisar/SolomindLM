@@ -32,7 +32,7 @@ Closes #<!-- issue -->
 
 ## Screenshots
 
-<!-- Before/after for any UI change. Delete if n/a. -->
+<!-- UI changes: light, dark, and 390px-wide screenshots. Delete if n/a. -->
 
 ---
 
@@ -41,5 +41,6 @@ Closes #<!-- issue -->
 - [ ] `test:convex` / `test:web` pass (or explain why not applicable)
 - [ ] Tests added/updated for the change (regression test for a bugfix; `*.test.ts` for new queries/mutations)
 - [ ] Errors surface to the user — no silent catches or fallbacks
+- [ ] UI follows docs/design/principles.md; `bun run lint:design` passes with no new `solomind/soft-surfaces` findings
 - [ ] Convex functions validate all args and have indexes for new query patterns
 - [ ] No prompt text tuned to eval fixtures (see CLAUDE.md → Prompt authoring)

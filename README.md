@@ -125,10 +125,10 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 │ (LLMs, Embeddings,  │ │Search │ │ OCR   │ │Billing│
 │  TTS, Images)       │ │       │ │       │ │       │
 └─────────────────────┘ └───────┘ └───────┘ └──────┘
-┌──────────────────┐  ┌──────────┐  ┌──────────────────────┐
-│   Supadata       │  │ZeroEntropy│  │      Resend          │
+┌──────────────────┐  ┌───────────┐  ┌──────────────────────┐
+│   Supadata       │  │ Voyage AI │  │      Resend          │
 │ (Extraction)     │  │(Reranking)│  │    (Email OTP)       │
-└──────────────────┘  └──────────┘  └──────────────────────┘
+└──────────────────┘  └───────────┘  └──────────────────────┘
 ```
 
 ### Data Flow
@@ -150,7 +150,7 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 | **Auth**       | @convex-dev/auth (Google OAuth + Password/OTP)            |
 | **Payments**   | Stripe                                                    |
 | **Database**   | Convex (Document + Vector search)                         |
-| **Search**     | Tavily, ZeroEntropy reranking                             |
+| **Search**     | Tavily, Voyage AI reranking                               |
 | **OCR**        | Mistral                                                   |
 | **Extraction** | Supadata                                                  |
 | **Audio**      | Together AI TTS                                           |
@@ -297,8 +297,7 @@ Create `.env.local` in the project root for dev (prod uses `.env`). See `.env.ex
 | `TAVILY_API_KEY`      | Tavily search API key         | [Tavily](https://tavily.com)            |
 | `MISTRAL_API_KEY`     | Mistral OCR API key           | [Mistral](https://mistral.ai)           |
 | `SUPADATA_API_KEY`    | Supadata extraction API key   | [Supadata](https://supadata.ai)         |
-| `ZEROENTROPY_API_KEY`     | ZeroEntropy reranking API key | [ZeroEntropy](https://zeroentropy.dev)  |
-| `ZEROENTROPY_RERANK_MODEL`| Rerank model (default `zerank-2`) | ZeroEntropy dashboard              |
+| `VOYAGE_API_KEY`          | Voyage AI reranking API key (`rerank-3`) | [Voyage AI](https://www.voyageai.com) |
 | `SEMANTIC_SCHOLAR_API_KEY`| Semantic Scholar (optional)   | [Semantic Scholar](https://www.semanticscholar.org/product/api) |
 | `PUBMED_EMAIL`            | PubMed API contact (optional) | Your team email                           |
 
@@ -703,7 +702,7 @@ Contact: [samintisardev@gmail.com](mailto:samintisardev@gmail.com) for commercia
 - AI powered by [Together AI](https://together.ai) (LLMs, embeddings, TTS, infographics)
 - Search powered by [Tavily](https://tavily.com)
 - OCR powered by [Mistral](https://mistral.ai)
-- Reranking powered by [ZeroEntropy](https://zeroentropy.dev)
+- Reranking powered by [Voyage AI](https://www.voyageai.com)
 
 ---
 

@@ -144,13 +144,12 @@ jobs:
           fi
 
   knip:
-    name: Knip (unused code, advisory)
+    name: Knip (unused code)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Advisory until the baseline is clean: findings go to the job summary and
-    # never fail the PR (--no-exit-code); continue-on-error keeps a Knip crash
-    # or config error from blocking either.
-    continue-on-error: true
+    # Blocking: the default-mode baseline is clean (#236), so any new unused
+    # file, export or dependency fails the PR. Fix it, or add an ignore with a
+    # reason in knip.json (see BRANCHING.md).
     permissions:
       contents: read
     env:
@@ -170,19 +169,44 @@ jobs:
 
       # Default mode includes tests: covers devDependencies and test helpers.
       # convex-test's import.meta.glob("/convex/**/*.ts") marks every Convex
-      # module as used here, so Convex dead code only shows in the next step.
+      # module as used here, so Convex dead code only shows in production mode.
+      # The report goes to the job summary either way; Knip's exit code
+      # (1 = findings, 2 = error) fails the job.
       - name: Knip (default mode)
-        continue-on-error: true
         run: |
+          set +e
+          bun run knip --reporter markdown > knip-report.md
+          status=$?
           {
             echo "## Knip — default mode"
-            bun run knip --no-exit-code --reporter markdown
+            cat knip-report.md
           } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  knip-production:
+    name: Knip production (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory until the test-only code it reports is resolved (#249-#253):
+    # findings go to the job summary and never fail the PR (--no-exit-code);
+    # continue-on-error keeps a Knip crash or config error from blocking either.
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      DOTENV_CONFIG_QUIET: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
 
       # Production mode skips tests (and the glob above): finds dead Convex
       # code and code only reachable from tests.
       - name: Knip (production mode)
-        continue-on-error: true
         run: |
           {
             echo "## Knip — production mode"
@@ -215,6 +239,11 @@ jobs:
 
       - name: Use-case eval packs dry-run
         run: bun run eval:usecases:dry
+
+      # Nothing typechecks evals/ (#311); bundling every module catches broken
+      # relative imports and missing named exports the dry-runs don't reach.
+      - name: Evals bundle check
+        run: bun run check:evals
 
   # Runs the web suite a second time (also in test-unit) to produce the coverage
   # floor. Fold the web run out of test-unit once "Coverage Report" is a required
@@ -352,6 +381,51 @@ jobs:
           fi
           bun run build:prod
 
+  # Loads the built app in Chromium, served with the headers from apps/web/vercel.json, and
+  # fails on any CSP violation. Needs no secrets or backend, so unlike test-e2e it always runs.
+  test-csp:
+    name: CSP smoke test
+    needs: [typecheck-web]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Build web
+        env:
+          VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud"
+        run: bun run --filter @solomindlm/web build
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright OS deps (cache hit)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      - name: Run CSP smoke test
+        run: bun run test:csp
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: csp-results
+          path: |
+            playwright-report/
+            test-results/
+
   test-e2e:
     name: E2E Tests (${{ matrix.shard }}/${{ strategy.matrix.total }})
     if: github.event_name == 'pull_request'
@@ -413,3 +487,67 @@ jobs:
           path: |
             playwright-report/
             test-results/
+
+  design-changes:
+    name: Detect design-system changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # paths-filter lists a PR's changed files through the API.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      design: ${{ steps.filter.outputs.design }}
+    steps:
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            design:
+              - 'apps/web/src/shared/components/ui/**'
+              - 'apps/web/src/index.css'
+              - 'apps/web/src/dev/**'
+              - 'e2e/design/**'
+              - 'playwright.design.config.ts'
+              - 'scripts/design-snapshots.sh'
+
+  # Screenshot baselines for every ui primitive (/dev/design gallery). Runs in the same
+  # Playwright image as `bun run test:design`, so renders match the committed Linux PNGs.
+  # Keep the image tag equal to the @playwright/test version in bun.lock.
+  design-snapshots:
+    name: Design snapshots
+    needs: design-changes
+    if: needs.design-changes.outputs.design == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # setup-bun extracts a zip; the Playwright image ships without unzip.
+      - name: Install unzip
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends unzip
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Screenshot tests
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+        run: |
+          if [ -z "${VITE_CONVEX_URL}" ]; then
+            echo "::error::Set repository variable VITE_CONVEX_URL; the gallery build needs it."
+            exit 1
+          fi
+          bunx playwright test -c playwright.design.config.ts
+
+      - name: Upload diffs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: design-snapshots-diffs
+          path: test-results/

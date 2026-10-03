@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatComposerMode, ResearchDatabaseOption } from "../components/ChatInput";
+import type {
+  ChatComposerMode,
+  ResearchDatabaseOption,
+  SourceFilterId,
+} from "../components/composer/constants";
 import {
   defaultComposerPrefsForMode,
   type PersistedComposerPrefs,
@@ -26,7 +30,7 @@ export function usePersistedComposerPrefs(notebookId: string | null | undefined)
     }
     return initialPrefsRef.current.mode;
   });
-  const [sourceFilters, setSourceFilters] = useState<string[]>(() => {
+  const [sourceFilters, setSourceFilters] = useState<SourceFilterId[]>(() => {
     if (!initialPrefsRef.current) {
       initialPrefsRef.current = loadPrefsForNotebook(notebookKey);
     }

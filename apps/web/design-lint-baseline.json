@@ -1,44 +1,45 @@
 {
   "features/audio": {
-    "shadcn/no-inline-styles": 2
+    "shadcn/no-inline-styles": 2,
+    "solomind/soft-surfaces": 4
   },
   "features/billing": {
-    "shadcn/no-raw-colors": 1
-  },
-  "features/chat": {
-    "shadcn/no-arbitrary-values": 79,
-    "shadcn/no-inline-styles": 23,
-    "shadcn/no-raw-colors": 14
+    "shadcn/no-raw-colors": 1,
+    "solomind/soft-surfaces": 11
   },
   "features/feedback": {
     "shadcn/no-arbitrary-values": 1,
-    "shadcn/no-restyle": 3
+    "shadcn/no-restyle": 3,
+    "solomind/soft-surfaces": 2
   },
   "features/landing": {
     "shadcn/no-arbitrary-values": 66,
     "shadcn/no-inline-styles": 16,
     "shadcn/no-raw-colors": 15,
-    "shadcn/no-restyle": 59
+    "shadcn/no-restyle": 59,
+    "solomind/soft-surfaces": 18
   },
   "features/legal": {
     "shadcn/no-arbitrary-values": 1
   },
   "features/sources": {
-    "shadcn/no-arbitrary-values": 57,
-    "shadcn/no-inline-styles": 3,
-    "shadcn/no-unknown-classes": 13
+    "shadcn/no-arbitrary-values": 26,
+    "shadcn/no-inline-styles": 1,
+    "solomind/soft-surfaces": 61
   },
   "features/studio": {
     "shadcn/no-arbitrary-values": 133,
     "shadcn/no-inline-styles": 15,
     "shadcn/no-raw-colors": 63,
-    "shadcn/no-unknown-classes": 67
+    "shadcn/no-unknown-classes": 67,
+    "solomind/soft-surfaces": 102
   },
   "shared": {
-    "shadcn/no-arbitrary-values": 54,
-    "shadcn/no-inline-styles": 8,
+    "shadcn/no-arbitrary-values": 49,
+    "shadcn/no-inline-styles": 6,
     "shadcn/no-raw-colors": 20,
     "shadcn/no-restyle": 22,
-    "shadcn/require-static-classes": 1
+    "shadcn/require-static-classes": 1,
+    "solomind/soft-surfaces": 10
   }
 }

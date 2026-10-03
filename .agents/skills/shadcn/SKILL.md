@@ -7,6 +7,10 @@ allowed-tools: Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(b
 
 # shadcn/ui
 
+> **House style (SolomindLM):** soft layered, fill and shadow, not borders. Read `docs/design/principles.md`
+> before styling anything. Feature code never restyles ui components; new looks are `cva` variants.
+> `solomind/soft-surfaces` (design lint) flags outline borders and hand-rolled shadows.
+
 A framework for building ui, components and design systems. Components are added as source code to the user's project via the CLI.
 
 > **IMPORTANT:** Run all CLI commands using the project's package runner: `npx shadcn@latest`, `pnpm dlx shadcn@latest`, or `bunx --bun shadcn@latest` — based on the project's `packageManager`. Examples below use `npx shadcn@latest` but substitute the correct runner for the project.

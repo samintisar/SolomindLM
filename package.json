@@ -52,8 +52,12 @@
     "test:integration": "vitest run --config vitest.convex.config.ts --include 'convex/**/*.integration.test.ts'",
     "test:e2e": "bunx playwright test",
     "test:e2e:ui": "bunx playwright test --ui",
+    "test:csp": "bunx playwright test --config playwright.csp.config.ts",
+    "test:design": "bash scripts/design-snapshots.sh",
+    "test:design:update": "bash scripts/design-snapshots.sh --update-snapshots",
     "eval:rag": "bun --env-file=.env run evals/rag/cli.ts",
     "eval:rag:dry": "bun run evals/rag/cli.ts --dry-run",
+    "check:evals": "bun run scripts/check-evals-bundle.ts",
     "eval:rag:smoke": "bun --env-file=.env run evals/rag/cli.ts --split smoke",
     "eval:rag:train": "bun --env-file=.env run evals/rag/cli.ts --split train",
     "eval:rag:train:snapshot": "bun --env-file=.env run evals/rag/cli.ts --split train --export-artifacts --artifacts-dir evals/rag/generated/train-snapshot",
@@ -112,7 +116,6 @@
     "resend": "^4.8.0",
     "stripe": "^20.4.1",
     "together-ai": "^0.39.0",
-    "zeroentropy": "^0.1.0-alpha.10",
     "zod": "^4.5.4"
   }
 }

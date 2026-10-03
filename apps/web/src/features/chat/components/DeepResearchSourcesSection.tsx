@@ -1,17 +1,25 @@
 import type { Id } from "@convex/_generated/dataModel";
 import {
   BookOpen,
-  ChevronDown,
   ChevronRight,
   ExternalLink,
   Globe,
   GraduationCap,
-  Loader2,
   Newspaper,
   Plus,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { Favicon } from "@/shared/components/Favicon";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Card } from "@/shared/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/shared/components/ui/collapsible";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useResearchRunEvidence } from "../services/researchApi";
 import {
@@ -31,9 +39,9 @@ const STATUS_LABEL = {
   searchedOnly: "Searched only",
 } as const;
 
-const STATUS_CLASS = {
-  usedInAnswer: "border-primary/30 bg-primary/10 text-primary",
-  searchedOnly: "border-border/60 bg-muted/40 text-muted-foreground",
+const STATUS_VARIANT = {
+  usedInAnswer: "default",
+  searchedOnly: "secondary",
 } as const;
 
 interface DeepResearchSourcesSectionProps {
@@ -53,6 +61,7 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [addingKey, setAddingKey] = useState<string | null>(null);
+  const { success, error: toastError } = useToast();
 
   const evidence = useResearchRunEvidence(researchRunId);
 
@@ -68,7 +77,7 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
   if (evidence === undefined) {
     return (
       <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
+        <Spinner />
         Loading sources…
       </div>
     );
@@ -82,7 +91,7 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
     if (!notebookId || !source.sourceUrl) return;
     setAddingKey(source.key);
     try {
-      await addExternalSources({
+      const ids = await addExternalSources({
         notebookId: notebookId as Id<"notebooks">,
         sources: [
           {
@@ -93,121 +102,117 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
           },
         ],
       });
+      // The mutation skips URLs already in the notebook, so ids can be shorter than the input.
+      success(ids.length === 0 ? "Already in this notebook" : "Added to sources");
+    } catch (e) {
+      console.error("Failed to add research source:", e);
+      toastError("Couldn't add this source. Please try again.");
     } finally {
       setAddingKey(null);
     }
   };
 
   return (
-    <div className="mt-4 rounded-xl border border-border/60 bg-card/50 font-sans">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/30"
-        aria-expanded={expanded}
-      >
-        {expanded ? (
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-        )}
-        <span className="text-sm font-semibold text-foreground">Sources searched</span>
-        <span className="text-xs text-muted-foreground">
-          {sources.length} total · {usedCount} used in answer
-        </span>
-      </button>
+    <Card variant="flush" className="mt-4">
+      <div className="font-sans">
+        <Collapsible open={expanded} onOpenChange={setExpanded}>
+          <CollapsibleTrigger asChild>
+            <Button variant="disclosure" size="chip" className="group/trigger w-full justify-start">
+              <ChevronRight
+                className="text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/trigger:rotate-90"
+                aria-hidden
+              />
+              <span>Sources searched</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {sources.length} total · {usedCount} used in answer
+              </span>
+            </Button>
+          </CollapsibleTrigger>
 
-      {expanded ? (
-        <ul className="divide-y divide-border border-t border-border/60">
-          {sources.map((source) => {
-            const Icon = SOURCE_TYPE_ICON[source.sourceType] ?? Globe;
-            const isNotebook = source.sourceType === "notebook" && !!source.documentId;
-            const canOpenInNotebook =
-              isNotebook &&
-              source.documentId &&
-              onOpenNotebookSource &&
-              notebookDocumentIds?.has(source.documentId);
-            const isExternal = !source.documentId && !!source.sourceUrl;
+          <CollapsibleContent>
+            <ul className="divide-y divide-border border-t border-border">
+              {sources.map((source) => {
+                const Icon = SOURCE_TYPE_ICON[source.sourceType] ?? Globe;
+                const isNotebook = source.sourceType === "notebook" && !!source.documentId;
+                const canOpenInNotebook =
+                  isNotebook &&
+                  source.documentId &&
+                  onOpenNotebookSource &&
+                  notebookDocumentIds?.has(source.documentId);
+                const isExternal = !source.documentId && !!source.sourceUrl;
 
-            return (
-              <li key={source.key} className="flex gap-3 px-4 py-3">
-                <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/60">
-                  {source.sourceUrl ? (
-                    <Favicon
-                      url={source.sourceUrl}
-                      size={20}
-                      fit="cover"
-                      className="size-full min-h-full min-w-full rounded-md"
-                    />
-                  ) : (
-                    <Icon className="size-3 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_CLASS[source.status]}`}
-                    >
-                      {STATUS_LABEL[source.status]}
-                    </span>
-                    <span className="rounded-md border border-border/50 bg-background/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                      {source.sourceType}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm font-medium leading-snug text-foreground line-clamp-2">
-                    {source.sourceTitle}
-                  </p>
-                  {source.contentSnippet ? (
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                      {source.contentSnippet}
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {isExternal ? (
-                      <>
-                        <a
-                          href={source.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary"
-                        >
-                          <ExternalLink className="size-3" />
-                          Open
-                        </a>
-                        {notebookId ? (
-                          <button
-                            type="button"
-                            disabled={addingKey === source.key}
-                            onClick={() => void handleAddToNotebook(source)}
-                            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:opacity-50"
-                          >
-                            {addingKey === source.key ? (
-                              <Loader2 className="size-3 animate-spin" />
-                            ) : (
-                              <Plus className="size-3" />
-                            )}
-                            Add to notebook
-                          </button>
+                return (
+                  <li key={source.key} className="flex gap-3 px-4 py-3">
+                    <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                      {source.sourceUrl ? (
+                        <Favicon
+                          url={source.sourceUrl}
+                          size={20}
+                          fit="cover"
+                          className="size-full min-h-full min-w-full rounded-md"
+                        />
+                      ) : (
+                        <Icon className="size-3 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={STATUS_VARIANT[source.status]}>
+                          {STATUS_LABEL[source.status]}
+                        </Badge>
+                        <Badge variant="outline">{source.sourceType}</Badge>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm font-medium leading-snug text-foreground">
+                        {source.sourceTitle}
+                      </p>
+                      {source.contentSnippet ? (
+                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                          {source.contentSnippet}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {isExternal ? (
+                          <>
+                            <Button asChild variant="outline" size="sm">
+                              <a href={source.sourceUrl} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink aria-hidden />
+                                Open
+                              </a>
+                            </Button>
+                            {notebookId ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={addingKey === source.key}
+                                onClick={() => void handleAddToNotebook(source)}
+                              >
+                                {addingKey === source.key ? <Spinner /> : <Plus aria-hidden />}
+                                Add to notebook
+                              </Button>
+                            ) : null}
+                          </>
                         ) : null}
-                      </>
-                    ) : null}
-                    {canOpenInNotebook ? (
-                      <button
-                        type="button"
-                        onClick={() => onOpenNotebookSource!(source.documentId!)}
-                        className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:text-primary"
-                      >
-                        <BookOpen className="size-3" />
-                        Open in sources
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
+                        {canOpenInNotebook ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onOpenNotebookSource!(source.documentId!)}
+                          >
+                            <BookOpen aria-hidden />
+                            Open in sources
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    </Card>
   );
 };

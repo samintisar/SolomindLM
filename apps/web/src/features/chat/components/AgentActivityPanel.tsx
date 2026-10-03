@@ -1,5 +1,13 @@
 import { AlertTriangle, ChevronRight, CircleCheck, FileBox } from "lucide-react";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/shared/components/ui/collapsible";
 import type {
   AgentGroundingCheck,
   ChatActivityPhase,
@@ -10,11 +18,6 @@ import { aggregateRetrievalSources } from "../utils/aggregateRetrievalSources";
 import { getStatusMessage } from "../utils/messageStatus";
 
 const STORAGE_KEY = "solomind-chat-activity-open";
-
-const SOURCE_BADGE_CLASS =
-  "shrink-0 justify-self-end rounded border border-border/60 bg-muted/25 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-foreground/65 dark:border-border/55 dark:bg-muted/20 dark:text-foreground/60";
-
-const SOURCE_BADGE_LINK_CLASS = `${SOURCE_BADGE_CLASS} cursor-pointer no-underline transition-colors hover:bg-muted/45 hover:text-foreground/85 dark:hover:bg-muted/35 dark:hover:text-foreground/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-card`;
 
 export interface AgentActivityPanelProps {
   isStreaming: boolean;
@@ -46,7 +49,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
     references,
     clarificationResponse,
   }) => {
-    const panelId = useId();
+    const triggerId = useId();
     const hardGroundingChecks = useMemo(
       () => groundingChecks.filter((g) => !g.soft),
       [groundingChecks]
@@ -95,15 +98,15 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       prevStreamingRef.current = isStreaming;
     }, [isStreaming, showGroundingCallout, softGroundingChecks.length]);
 
-    const togglePanel = useCallback(() => {
-      setExpanded((prev) => {
-        const next = !prev;
+    const handleOpenChange = useCallback(
+      (next: boolean) => {
+        setExpanded(next);
         if (!isStreaming && typeof sessionStorage !== "undefined") {
           sessionStorage.setItem(STORAGE_KEY, next ? "1" : "0");
         }
-        return next;
-      });
-    }, [isStreaming]);
+      },
+      [isStreaming]
+    );
 
     const { headerPrimary, headerMeta } = useMemo(() => {
       const currentPhase = (activityPhase ?? historicalPhase ?? undefined) as string | undefined;
@@ -183,49 +186,49 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       useClaudeLayout && turnComplete && (searchFullyDone || aggregatedSources.length > 0);
 
     return (
-      <div className="mb-0 w-full min-w-0 max-w-4xl" data-agent-activity-panel>
-        <button
-          type="button"
-          id={`${panelId}-trigger`}
-          aria-expanded={expanded}
-          aria-controls={`${panelId}-region`}
-          aria-label={headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary}
-          onClick={togglePanel}
-          className="group/trigger block w-full max-w-full border-0 bg-transparent p-0 py-0.5 text-left font-sans text-sm font-normal leading-snug text-foreground/78 shadow-none outline-none ring-0 transition-[color,opacity] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-foreground/72 dark:hover:text-foreground"
-        >
-          <span className="wrap-break-word leading-snug">
-            <span className="text-foreground/82 dark:text-foreground/78">{headerPrimary}</span>
-            {headerMeta ? (
-              <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-                {" "}
-                {headerMeta}
-              </span>
-            ) : null}
-            <ChevronRight
-              className={`ml-0.5 inline-block h-3.5 w-3.5 align-middle text-muted-foreground/55 transition-[color,transform] duration-200 ease-out group-hover/trigger:text-muted-foreground/80 ${expanded ? "rotate-90" : ""}`}
-              strokeWidth={2}
-              aria-hidden
-            />
-          </span>
-        </button>
-
-        {expanded && (
-          <div
-            id={`${panelId}-region`}
-            role="region"
-            aria-labelledby={`${panelId}-trigger`}
-            className="mt-2 min-w-0 max-w-full font-sans text-[11px] text-foreground/75"
+      <Collapsible
+        open={expanded}
+        onOpenChange={handleOpenChange}
+        className="mb-0 w-full min-w-0 max-w-4xl"
+        data-agent-activity-panel
+      >
+        <CollapsibleTrigger asChild>
+          <Button
+            id={`${triggerId}-trigger`}
+            type="button"
+            variant="disclosure"
+            size="chip"
+            aria-label={headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary}
+            className="group/trigger -ml-4 max-w-full justify-start"
           >
+            <span className="min-w-0 wrap-break-word">
+              <span>{headerPrimary}</span>
+              {headerMeta ? (
+                <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+                  {" "}
+                  {headerMeta}
+                </span>
+              ) : null}
+              <ChevronRight
+                className="ml-0.5 inline-block align-middle text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/trigger:rotate-90"
+                aria-hidden
+              />
+            </span>
+          </Button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent
+          role="region"
+          aria-labelledby={`${triggerId}-trigger`}
+          className="mt-2 min-w-0 max-w-full"
+        >
+          <div className="min-w-0 max-w-full font-sans text-xs text-foreground/75">
             {useClaudeLayout && (
               <div className="flex min-w-0 max-w-full items-start gap-2">
-                <FileBox
-                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/80"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1 border-l border-border/60 pl-2.5 dark:border-border/50">
+                <FileBox className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <div className="min-w-0 flex-1 border-l border-border pl-2.5">
                   <div className="mb-2 flex min-w-0 items-baseline justify-between gap-3">
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-foreground/65 dark:text-foreground/60">
+                    <span className="min-w-0 flex-1 truncate text-foreground/65">
                       {headerPrimary}
                     </span>
                     {aggregatedSources.length > 0 ? (
@@ -236,41 +239,42 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                     ) : null}
                   </div>
 
-                  <div className="box-border min-w-0 max-w-full overflow-hidden rounded-md border border-border/55 bg-card px-3 py-2 shadow-none dark:border-border/50">
+                  <div className="box-border min-w-0 max-w-full overflow-hidden rounded-lg bg-muted/40 px-3 py-2">
                     {aggregatedSources.length === 0 ? (
-                      <p className="m-0 min-w-0 text-[11px] leading-snug text-muted-foreground">
+                      <p className="m-0 min-w-0 leading-snug text-muted-foreground">
                         {isStreaming && !searchFullyDone
                           ? "Searching your materials…"
                           : "No matching sections found in your sources."}
                       </p>
                     ) : (
-                      <ul className="m-0 min-w-0 list-none divide-y divide-border/35 p-0 dark:divide-border/40">
+                      <ul className="m-0 min-w-0 list-none divide-y divide-border/50 p-0">
                         {aggregatedSources.map((src) => (
                           <li
                             key={src.sourceId}
-                            className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 py-2 first:pt-0 last:pb-0"
+                            className="flex min-w-0 items-center gap-x-2 py-2 first:pt-0 last:pb-0"
                           >
-                            <span className="min-w-0 truncate text-[12px] leading-snug text-foreground/85 dark:text-foreground/80">
+                            <span className="min-w-0 flex-1 truncate leading-snug text-foreground/85">
                               {src.title}
                             </span>
-                            <span className="shrink-0 whitespace-nowrap text-right text-[11px] text-muted-foreground">
+                            <span className="shrink-0 whitespace-nowrap text-right text-muted-foreground">
                               {src.isFullDocument
                                 ? null
                                 : `${src.sectionCount} relevant section${src.sectionCount === 1 ? "" : "s"}`}
                             </span>
                             {src.openUrl ? (
-                              <a
-                                href={src.openUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={SOURCE_BADGE_LINK_CLASS}
-                                aria-label={`Open ${src.title} in a new tab`}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {src.badgeLabel}
-                              </a>
+                              <Badge variant="outline" asChild>
+                                <a
+                                  href={src.openUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Open ${src.title} in a new tab`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {src.badgeLabel}
+                                </a>
+                              </Badge>
                             ) : (
-                              <span className={SOURCE_BADGE_CLASS}>{src.badgeLabel}</span>
+                              <Badge variant="outline">{src.badgeLabel}</Badge>
                             )}
                           </li>
                         ))}
@@ -280,12 +284,8 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
                   {showClaudeDone ? (
                     <div className="mt-2 flex items-center gap-1.5 text-muted-foreground">
-                      <CircleCheck
-                        className="h-3.5 w-3.5 shrink-0 text-success"
-                        strokeWidth={2}
-                        aria-hidden
-                      />
-                      <span className="text-[11px] font-medium text-foreground/70">Done</span>
+                      <CircleCheck className="size-3.5 shrink-0 text-success" aria-hidden />
+                      <span className="font-medium text-foreground/70">Done</span>
                     </div>
                   ) : null}
                 </div>
@@ -293,38 +293,30 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
             )}
 
             {showGroundingCallout && (
-              <div
-                className={`border-l-2 border-amber-600/45 bg-amber-50/90 py-2 pl-3 pr-2 dark:border-amber-400/50 dark:bg-amber-950/45 ${useClaudeLayout ? "mt-3" : "mt-2"}`}
-              >
-                <div className="flex items-start gap-2 text-amber-950 dark:text-amber-50">
-                  <AlertTriangle
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-800 dark:text-amber-300"
-                    aria-hidden
-                  />
-                  <div className="min-w-0 space-y-1">
-                    {hardGroundingChecks.map((g, gi) => (
-                      <div key={gi}>
-                        <p className="text-[11px] font-medium leading-snug text-amber-950 dark:text-amber-50">
-                          {g.message}
-                        </p>
-                        {g.issues.length > 0 && (
-                          <ul className="mt-1 list-disc pl-3.5 text-[11px] leading-snug text-amber-900 dark:text-amber-100/95">
-                            {g.issues.map((issue, ii) => (
-                              <li key={ii}>{issue}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <Alert variant="warning" role="status" className={useClaudeLayout ? "mt-3" : "mt-2"}>
+                <AlertTriangle aria-hidden />
+                <AlertTitle>Grounding check</AlertTitle>
+                <AlertDescription>
+                  {hardGroundingChecks.map((g, gi) => (
+                    <div key={gi}>
+                      <p className="font-medium leading-snug">{g.message}</p>
+                      {g.issues.length > 0 && (
+                        <ul className="mt-1 list-disc pl-3.5 leading-snug">
+                          {g.issues.map((issue, ii) => (
+                            <li key={ii}>{issue}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </AlertDescription>
+              </Alert>
             )}
 
             {softGroundingChecks.length > 0 && (
-              <div className="mt-2 border-l border-border/30 py-1 pl-3 text-muted-foreground/85">
+              <div className="mt-2 border-l border-border py-1 pl-3 text-muted-foreground">
                 {softGroundingChecks.map((g, gi) => (
-                  <p key={gi} className="text-[11px] leading-snug">
+                  <p key={gi} className="leading-snug">
                     {g.message}
                     {g.issues.length > 0 ? ` (${g.issues.join("; ")})` : ""}
                   </p>
@@ -332,8 +324,8 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
               </div>
             )}
           </div>
-        )}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
     );
   }
 );

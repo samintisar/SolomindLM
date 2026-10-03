@@ -150,9 +150,9 @@ Bun workspaces monorepo:
 
 **Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workflow`.
 
-**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1024-dim vectors, `intfloat/multilingual-e5-large-instruct`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripeWebhookEvents`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
+**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors, OpenAI `text-embedding-3-small`; see `_lib/embeddingConfig.ts`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripeWebhookEvents`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
 
-**Convex directory layout** (`_` prefix = excluded from generated API):
+**Convex directory layout** (every module under `convex/` except `_generated/` is in the generated API; a leading `_` is a naming convention for helpers, not an exclusion — see Gotchas):
 
 - `_agents/` — per-feature agent logic: prompts, state types, routing, heuristics, LLM helpers (`chat/`, `report/`, `flashcard/`, `quiz/`, `mindmap/`, `spreadsheet/`, `written_questions/`, `audio_overview/`, `research/`, `literature_review/`); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization. Not where jobs run — see **Agent execution** below
 - `_lib/` — errors, limits, env helpers
@@ -163,11 +163,11 @@ Bun workspaces monorepo:
 - `storage/` — vector store, chat history
 - root `auth.ts`, `schema.ts`, `http.ts` — auth config (must be at root), schema, HTTP actions
 
-**AI services:** LLMs `deepseek-ai/DeepSeek-V4.1-Flash` (smart) / `Qwen/Qwen3.5-9B` (fast). Embeddings via LangChain (Together AI compatible). Reranking: ZeroEntropy. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
+**AI services:** LLMs `deepseek-ai/DeepSeek-V4.1-Flash` (smart) / `Qwen/Qwen3.5-9B` (fast). Embeddings: OpenAI `text-embedding-3-small` (`_services/ai/embeddingClient.ts`, `OPENAI_API_KEY`). Reranking: Voyage AI `rerank-3`. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
 
 **Pipelines:**
 
-- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1024-dim) → ZeroEntropy rerank
+- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim, `text-embedding-3-small`) → Voyage rerank
 - _Generation:_ how a request starts depends on the execution model below. Studio: the entry mutation/action writes the row and schedules the first phase via `ctx.scheduler.runAfter()` (no jobs table). Deep research and literature review: `workflow.start` launches a durable workflow. Chat: the `/chat/stream` HTTP action. Results are written to the type's table and delivered by reactive queries (chat and deep research also stream tokens via `@convex-dev/persistent-text-streaming`)
 
 **Agent execution** (none of these run a LangGraph graph):
@@ -189,7 +189,7 @@ Bun workspaces monorepo:
 
 ## Environment
 
-Bun 1.2+ required. Required env vars: `CONVEX_DEPLOYMENT` plus AI service keys (Together AI, Mistral, Tavily, Supadata, ZeroEntropy, …). Dev backend env lives in `.env.local`; prod in `.env`.
+Bun 1.2+ required. Required env vars: `CONVEX_DEPLOYMENT` plus AI service keys (Together AI, Mistral, Tavily, Supadata, Voyage AI, …). Dev backend env lives in `.env.local`; prod in `.env`.
 
 **Dev vs prod Convex URLs differ.** Local `apps/web/.env.local` uses dev URL; production hosting (Vercel) uses prod URL.
 
@@ -216,7 +216,7 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
 
 ## Gotchas
 
-- **`_` prefix excludes from API.** Functions in `convex/notebooks/index.ts` become `api.notebooks.index.*` (no `convex/domain/` module).
+- **File path = API path; `_` does not hide a module.** Functions in `convex/notebooks/index.ts` become `api.notebooks.index.*` (no `convex/domain/` module). Underscore paths are registered too: `api._services.search.DiscoveryService.discover`, `internal._migration.*`, `internal._agents._shared.cachedLlm.llmInternal`, `chat/_researchPlan.ts`. Only `_generated/` is excluded. Keep a function off the public API with `internalQuery`/`internalMutation`/`internalAction`, not with a `_` name.
 - **Auth file location.** `@convex-dev/auth` requires `convex/auth.ts` at root, not in a subdirectory.
 - **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
 - **Validation gates** (in order):
@@ -227,13 +227,15 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
   5. `bun run eval:rag --case=… / --runner=…` or `eval:studio` / `eval:literature-review` — agent or prompt changes (do NOT unit-test prompt outputs)
 - **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves — no new `any` in files you're already editing; ratchet per-directory (see `docs/engineering/code-quality.md`).
 - **Git hooks** (auto-enabled by `bun install`): `.githooks/pre-commit` Biome-fixes and re-stages the staged files; `.githooks/pre-push` runs typecheck + lint + design-lint. Bypass a WIP commit/push with `--no-verify`.
-- **Design system (shadcn):** UI primitives live in `apps/web/src/shared/components/ui` — add with `bunx --bun shadcn@latest add <name>` from `apps/web`. After every `add`, the CLI writes `import { cn } from "cn"` (rewrite to `@/shared/utils/cn`) and may add bogus `cn` / `next-themes` deps (remove them). Pages place components (layout classes only); a new look is a new `cva` variant. Use semantic tokens (`bg-success-muted`, `text-info`, `border-destructive-border`), never palette colors or `--vintage-*` (those are persisted cover swatches only — see `apps/web/src/shared/notebook/coverColor.ts`). Motion: `tw-animate-css` utilities with the house `ease-out` curve, or `m.*` primitives from `@/shared/components/motion` (never `motion.*` — `LazyMotion strict`). Toasts: `useToast()` (sonner underneath). Type: content in the serif body face (Lora; headings `font-display`), controls in sans (buttons, tabs, selects, toggles and menus already carry `font-sans`). Layers: ui portal primitives sit at `z-100`, above the `z-70` app header. Rules: `.agents/skills/shadcn/SKILL.md`.
+- **Design system (shadcn):** UI primitives live in `apps/web/src/shared/components/ui` — add with `bunx --bun shadcn@latest add <name>` from `apps/web`. After every `add`, the CLI writes `import { cn } from "cn"` (rewrite to `@/shared/utils/cn`) and may add bogus `cn` / `next-themes` deps (remove them). Pages place components (layout classes only); a new look is a new `cva` variant. Look: **soft layered**, fill and shadow, not outlines (no thick or loud borders, no hand-rolled shadows, theme differences via tokens like `ring-hairline` / `bg-surface-raised`, not `dark:`), per docs/design/principles.md and enforced by `solomind/soft-surfaces`. Use semantic tokens (`bg-success-muted`, `text-info`, `border-destructive-border`), never palette colors or `--vintage-*` (those are persisted cover swatches only — see `apps/web/src/shared/notebook/coverColor.ts`). Motion: `tw-animate-css` utilities with the house `ease-out` curve, or `m.*` primitives from `@/shared/components/motion` (never `motion.*` — `LazyMotion strict`). Toasts: `useToast()` (sonner underneath). Type: content in the serif body face (Lora; headings `font-display`), controls in sans (buttons, tabs, selects, toggles and menus already carry `font-sans`). Layers: ui portal primitives sit at `z-100`, above the `z-70` app header. Rules: `.agents/skills/shadcn/SKILL.md`.
 - **Design lint ratchet:** `bun run lint:design` runs `@shadcn/lint` (ESLint, `apps/web/eslint.config.mjs`) and fails if any count in `apps/web/design-lint-baseline.json` goes up; after a cleanup run `bun run lint:design:update` to lock in the drop. Dirs listed in `MIGRATED` are errors. A new CLI-generated shadcn component that trips `no-arbitrary-values` on upstream idioms goes in `UPSTREAM_ARBITRARY` — never add authored components there.
+- **Design snapshots:** primitive changes: `bun run test:design` (Docker screenshot baselines in `e2e/design/__screenshots__`); `bun run test:design:update` to accept an intended change.
 - **Code-quality cadence & ADRs:** [`docs/engineering/code-quality.md`](docs/engineering/code-quality.md) (weekly/monthly passes, metrics) and [`docs/adr/`](docs/adr/) (architecture decisions — write one in the PR that makes a hard-to-reverse or contested change).
 - **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
 - **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.
 - **Port management:** `bun run dev:web` kills stale :5173 via `kill-port`.
 - **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
+- **Reranking is best-effort.** `cachedRerank` (`convex/_agents/chat/rerankCache.ts`) calls Voyage through `callVoyageRerank` with one hard `RERANK_TIMEOUT_MS` deadline and no retries except a single one after a 429 with a short `Retry-After`; on any failure chat and literature review fall back to the un-reranked order instead of stalling (a provider outage answering `Retry-After: 86400` once hung every chat reply). Change the model in `convex/_lib/rerankConfig.ts` and bump the cache `name` in `rerankCache.ts` so old-model scores are not served. Voyage scores are not calibrated like the previous reranker's (unrelated passages still score ~0.3), so `CHAT_MIN_RELEVANCE_THRESHOLD` filters less aggressively than it did; re-tune it against `eval:rag` before relying on it as a quality floor.
 - **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.
 
 ## Process Skills (superpowers)

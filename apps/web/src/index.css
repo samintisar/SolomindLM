@@ -12,6 +12,11 @@
     --background: oklch(0.9582 0.0152 90.2357);
     --foreground: oklch(0.21 0.01 0);
     --card: oklch(0.9914 0.0098 87.4695);
+    /* Soft-layered surfaces: a raised chip/segment and a faint ring that stands in for a border. */
+    --surface-raised: var(--card);
+    --hairline: color-mix(in oklab, var(--border) 50%, transparent);
+    --overlay: color-mix(in oklab, var(--foreground) 25%, transparent);
+    --link: var(--primary);
     --card-foreground: oklch(0.21 0.01 0);
     --popover: oklch(0.9914 0.0098 87.4695);
     --popover-foreground: oklch(0.21 0.01 0);
@@ -111,6 +116,10 @@
        Think 'dark slate' texture.
     */
     --card: oklch(0.22 0.008 65);
+    --surface-raised: oklch(0.32 0.008 65);
+    --hairline: color-mix(in oklab, var(--foreground) 8%, transparent);
+    --overlay: color-mix(in oklab, var(--background) 70%, transparent);
+    --link: oklch(0.82 0.07 70);
     --card-foreground: oklch(0.97 0.004 85);
 
     --popover: oklch(0.22 0.008 65);
@@ -229,6 +238,10 @@
     --background: oklch(0.9582 0.0152 90.2357);
     --foreground: oklch(0.21 0.01 0);
     --card: oklch(0.9914 0.0098 87.4695);
+    --surface-raised: var(--card);
+    --hairline: color-mix(in oklab, var(--border) 50%, transparent);
+    --overlay: color-mix(in oklab, var(--foreground) 25%, transparent);
+    --link: var(--primary);
     --card-foreground: oklch(0.21 0.01 0);
     --primary: oklch(0.38 0.05 65.5444);
     --primary-foreground: oklch(1 0 0);
@@ -312,6 +325,10 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-surface-raised: var(--surface-raised);
+  --color-hairline: var(--hairline);
+  --color-overlay: var(--overlay);
+  --color-link: var(--link);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
@@ -419,6 +436,52 @@
       color-mix(in oklch, var(--success) 8%, transparent),
       transparent
     );
+}
+
+/* Chat: spacer height that keeps the last message clear of the floating composer (set by useComposerClearance). */
+@utility composer-clearance {
+  height: var(--chat-composer-clearance, 18rem);
+  @media (width >= 48rem) {
+    height: var(--chat-composer-clearance, 14rem);
+  }
+}
+
+/* Chat empty state: room for the floating composer plus the iOS home indicator. */
+@utility pb-composer-safe {
+  padding-bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Scroll container that reserves its scrollbar track so content does not shift when it overflows. */
+@utility scrollbar-stable {
+  scrollbar-gutter: stable;
+}
+
+/* Sticky document outline: never taller than the viewport on short screens. */
+@utility max-h-outline {
+  max-height: min(85dvh, 42rem);
+}
+
+/* "Thinking..." label shimmer; static under reduced motion (global rule zeroes animation-duration). */
+@utility text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-muted-foreground) 0%,
+    var(--color-foreground) 50%,
+    var(--color-muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 1.6s linear infinite;
+}
+
+@keyframes text-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 
 /* Sonner reads these; the :root prefix outranks its [data-sonner-toaster][data-sonner-theme] rules. */
