@@ -1,8 +1,19 @@
-import { Check, ChevronDown, ChevronRight, Search } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { ChevronDown, Search } from "lucide-react";
+import { type FC, useId, useMemo, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/shared/components/ui/collapsible";
+import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/shared/components/ui/field";
+import { Input } from "@/shared/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shared/components/ui/input-group";
+import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
+import { Separator } from "@/shared/components/ui/separator";
 import {
   ACADEMIC_FIELD_GROUPS,
-  ACADEMIC_SJR_TIERS,
   type AcademicSjrWorstAllowed,
   collectFieldSearchTerms,
 } from "../constants/academicFieldTaxonomy";
@@ -22,6 +33,23 @@ export interface DiscoveryAcademicFilterState {
   worstAllowedJournalQuartile?: AcademicSjrWorstAllowed;
 }
 
+const LAST_N_YEARS_MIN = 1;
+const LAST_N_YEARS_MAX = 80;
+const LAST_N_YEARS_DEFAULT = 2;
+
+function clampLastNYears(n: number): number {
+  return Math.max(LAST_N_YEARS_MIN, Math.min(LAST_N_YEARS_MAX, n));
+}
+
+/** A custom range is invalid only when both ends are set and From is after To. */
+function isCustomRangeInvalid(academic: DiscoveryAcademicFilterState): boolean {
+  return (
+    academic.customYearFrom != null &&
+    academic.customYearTo != null &&
+    academic.customYearFrom > academic.customYearTo
+  );
+}
+
 export function buildAcademicDiscoveryApiFilters(academic: DiscoveryAcademicFilterState): {
   publicationYearFrom?: number;
   publicationYearTo?: number;
@@ -35,13 +63,22 @@ export function buildAcademicDiscoveryApiFilters(academic: DiscoveryAcademicFilt
   let publicationYearFrom: number | undefined;
   let publicationYearTo: number | undefined;
   if (mode === "lastN") {
-    const n = Math.max(1, Math.min(80, academic.lastNYears ?? 2));
+    const n = clampLastNYears(academic.lastNYears ?? LAST_N_YEARS_DEFAULT);
     publicationYearFrom = cy - n + 1;
     publicationYearTo = cy;
   } else if (mode === "custom") {
     if (academic.customYearFrom != null) publicationYearFrom = academic.customYearFrom;
     if (academic.customYearTo != null) publicationYearTo = academic.customYearTo;
     else if (academic.customYearFrom != null) publicationYearTo = cy;
+    // An inverted range matches nothing; send no year filter rather than an empty search.
+    if (
+      publicationYearFrom != null &&
+      publicationYearTo != null &&
+      publicationYearFrom > publicationYearTo
+    ) {
+      publicationYearFrom = undefined;
+      publicationYearTo = undefined;
+    }
   }
 
   const ids = academic.fieldOfStudyIds ?? [];
@@ -60,37 +97,10 @@ export function buildAcademicDiscoveryApiFilters(academic: DiscoveryAcademicFilt
   };
 }
 
-function FilterToggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (next: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2">
-      <span className="text-sm text-foreground">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={[
-          "relative h-7 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-          checked ? "bg-primary" : "bg-muted-foreground/25",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-card shadow transition-transform",
-            checked ? "translate-x-4" : "translate-x-0",
-          ].join(" ")}
-        />
-      </button>
-    </div>
-  );
+function parseOptionalInt(raw: string): number | undefined {
+  if (!raw) return undefined;
+  const n = Number.parseInt(raw, 10);
+  return Number.isNaN(n) ? undefined : n;
 }
 
 interface AcademicDiscoveryFiltersSectionProps {
@@ -100,181 +110,218 @@ interface AcademicDiscoveryFiltersSectionProps {
   showTopDivider?: boolean;
 }
 
-export const AcademicDiscoveryFiltersSection: React.FC<AcademicDiscoveryFiltersSectionProps> = ({
+export const AcademicDiscoveryFiltersSection: FC<AcademicDiscoveryFiltersSectionProps> = ({
   academic,
   setAcademic,
   showTopDivider = true,
 }) => {
-  const [expanded, setExpanded] = useState<null | "field" | "sjr">(null);
+  const id = useId();
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   const [fieldQuery, setFieldQuery] = useState("");
   const [moreOpenByGroup, setMoreOpenByGroup] = useState<Record<string, boolean>>({});
 
   const yearMode = academic.publicationYearMode ?? "all";
+  const rangeInvalid = yearMode === "custom" && isCustomRangeInvalid(academic);
   const selectedFields = useMemo(
     () => new Set(academic.fieldOfStudyIds ?? []),
     [academic.fieldOfStudyIds]
   );
-  const worstQ = academic.worstAllowedJournalQuartile ?? 4;
 
-  const toggleField = (id: string) => {
+  const ids = {
+    legend: `${id}-year-legend`,
+    all: `${id}-year-all`,
+    lastN: `${id}-year-last-n`,
+    custom: `${id}-year-custom`,
+    years: `${id}-years`,
+    from: `${id}-year-from`,
+    to: `${id}-year-to`,
+    rangeError: `${id}-year-range-error`,
+    pdf: `${id}-has-pdf`,
+    openAccess: `${id}-open-access`,
+    minCitations: `${id}-min-citations`,
+  };
+
+  const setYearMode = (mode: string) => {
+    if (mode === "lastN") {
+      setAcademic({
+        publicationYearMode: "lastN",
+        lastNYears: academic.lastNYears ?? LAST_N_YEARS_DEFAULT,
+      });
+    } else if (mode === "custom" || mode === "all") {
+      setAcademic({ publicationYearMode: mode });
+    }
+  };
+
+  const toggleField = (fieldId: string) => {
     const next = new Set(selectedFields);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(fieldId)) next.delete(fieldId);
+    else next.add(fieldId);
     setAcademic({ fieldOfStudyIds: [...next] });
   };
 
   const qnorm = fieldQuery.trim().toLowerCase();
   const matchesField = (label: string) => !qnorm || label.toLowerCase().includes(qnorm);
+  const selectedCount = selectedFields.size;
 
   return (
-    <div
-      className={["space-y-1", showTopDivider ? "mt-1 border-t border-border/50 pt-3" : ""]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <div className="flex flex-col gap-4 font-sans">
+      {showTopDivider ? <Separator /> : null}
       <p className="text-xs font-semibold text-foreground">Academic papers</p>
 
-      <div className="space-y-2 pt-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <FieldSet>
+        <FieldLegend id={ids.legend} variant="label">
           Publication year
-        </p>
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg py-1 text-sm">
-          <input
-            type="radio"
-            name="pub-year-mode"
-            className="mt-1"
-            checked={yearMode === "all"}
-            onChange={() => setAcademic({ publicationYearMode: "all" })}
+        </FieldLegend>
+        <RadioGroup aria-labelledby={ids.legend} value={yearMode} onValueChange={setYearMode}>
+          <Field orientation="horizontal">
+            <RadioGroupItem value="all" id={ids.all} />
+            <FieldLabel htmlFor={ids.all}>All years</FieldLabel>
+          </Field>
+
+          <div className="flex flex-col gap-2">
+            <Field orientation="horizontal">
+              <RadioGroupItem value="lastN" id={ids.lastN} />
+              <FieldLabel htmlFor={ids.lastN}>Last N years</FieldLabel>
+            </Field>
+            <div className="pl-7">
+              <Field orientation="horizontal" data-disabled={yearMode !== "lastN"}>
+                <FieldLabel htmlFor={ids.years}>Years</FieldLabel>
+                <Input
+                  id={ids.years}
+                  type="number"
+                  inputMode="numeric"
+                  min={LAST_N_YEARS_MIN}
+                  max={LAST_N_YEARS_MAX}
+                  disabled={yearMode !== "lastN"}
+                  value={academic.lastNYears ?? LAST_N_YEARS_DEFAULT}
+                  onChange={(e) =>
+                    setAcademic({
+                      lastNYears: clampLastNYears(
+                        Number.parseInt(e.target.value, 10) || LAST_N_YEARS_MIN
+                      ),
+                    })
+                  }
+                  className="w-20"
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Field orientation="horizontal">
+              <RadioGroupItem value="custom" id={ids.custom} />
+              <FieldLabel htmlFor={ids.custom}>Custom range</FieldLabel>
+            </Field>
+            <div className="flex flex-col gap-2 pl-7">
+              <div className="grid grid-cols-2 gap-2">
+                <Field data-disabled={yearMode !== "custom"} data-invalid={rangeInvalid}>
+                  <FieldLabel htmlFor={ids.from}>From</FieldLabel>
+                  <Input
+                    id={ids.from}
+                    type="number"
+                    inputMode="numeric"
+                    disabled={yearMode !== "custom"}
+                    aria-invalid={rangeInvalid || undefined}
+                    aria-describedby={rangeInvalid ? ids.rangeError : undefined}
+                    value={academic.customYearFrom ?? ""}
+                    onChange={(e) =>
+                      setAcademic({ customYearFrom: parseOptionalInt(e.target.value) })
+                    }
+                  />
+                </Field>
+                <Field data-disabled={yearMode !== "custom"} data-invalid={rangeInvalid}>
+                  <FieldLabel htmlFor={ids.to}>To</FieldLabel>
+                  <Input
+                    id={ids.to}
+                    type="number"
+                    inputMode="numeric"
+                    disabled={yearMode !== "custom"}
+                    aria-invalid={rangeInvalid || undefined}
+                    aria-describedby={rangeInvalid ? ids.rangeError : undefined}
+                    value={academic.customYearTo ?? ""}
+                    onChange={(e) =>
+                      setAcademic({ customYearTo: parseOptionalInt(e.target.value) })
+                    }
+                  />
+                </Field>
+              </div>
+              {rangeInvalid ? (
+                <FieldError id={ids.rangeError}>From must be before To</FieldError>
+              ) : null}
+            </div>
+          </div>
+        </RadioGroup>
+      </FieldSet>
+
+      <div className="flex flex-col gap-3">
+        <Field orientation="horizontal">
+          <Checkbox
+            id={ids.pdf}
+            checked={Boolean(academic.hasFullText)}
+            onCheckedChange={(v) => setAcademic({ hasFullText: v === true || undefined })}
           />
-          <span>All years</span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg py-1 text-sm">
-          <input
-            type="radio"
-            name="pub-year-mode"
-            className="mt-1"
-            checked={yearMode === "lastN"}
-            onChange={() =>
-              setAcademic({ publicationYearMode: "lastN", lastNYears: academic.lastNYears ?? 2 })
-            }
+          <FieldLabel htmlFor={ids.pdf}>Has PDF</FieldLabel>
+        </Field>
+        <Field orientation="horizontal">
+          <Checkbox
+            id={ids.openAccess}
+            checked={Boolean(academic.openAccessOnly)}
+            onCheckedChange={(v) => setAcademic({ openAccessOnly: v === true || undefined })}
           />
-          <span className="flex flex-1 flex-wrap items-center gap-2">
-            <span>Last</span>
-            <input
-              type="number"
-              min={1}
-              max={80}
-              disabled={yearMode !== "lastN"}
-              value={academic.lastNYears ?? 2}
-              onChange={(e) =>
-                setAcademic({
-                  lastNYears: Math.max(1, Math.min(80, parseInt(e.target.value, 10) || 1)),
-                })
-              }
-              className="w-14 rounded-md border border-border bg-background px-2 py-1 text-center text-sm disabled:opacity-50"
-            />
-            <span>years</span>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg py-1 text-sm">
-          <input
-            type="radio"
-            name="pub-year-mode"
-            className="mt-1"
-            checked={yearMode === "custom"}
-            onChange={() => setAcademic({ publicationYearMode: "custom" })}
-          />
-          <span className="grid flex-1 grid-cols-2 gap-2">
-            <span className="col-span-2">Custom</span>
-            <input
-              type="number"
-              placeholder="From"
-              disabled={yearMode !== "custom"}
-              value={academic.customYearFrom ?? ""}
-              onChange={(e) =>
-                setAcademic({
-                  customYearFrom: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                })
-              }
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:opacity-50"
-            />
-            <input
-              type="number"
-              placeholder="To"
-              disabled={yearMode !== "custom"}
-              value={academic.customYearTo ?? ""}
-              onChange={(e) =>
-                setAcademic({
-                  customYearTo: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                })
-              }
-              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:opacity-50"
-            />
-          </span>
-        </label>
+          <FieldLabel htmlFor={ids.openAccess}>Open access</FieldLabel>
+        </Field>
       </div>
 
-      <div className="border-t border-border/40 pt-1">
-        <FilterToggle
-          label="Has PDF"
-          checked={Boolean(academic.hasFullText)}
-          onChange={(v) => setAcademic({ hasFullText: v || undefined })}
-        />
-        <FilterToggle
-          label="Open access"
-          checked={Boolean(academic.openAccessOnly)}
-          onChange={(v) => setAcademic({ openAccessOnly: v || undefined })}
-        />
-      </div>
-
-      <div className="space-y-1.5 border-t border-border/40 pt-3">
-        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Citations ≥
-        </label>
-        <input
+      <Field>
+        <FieldLabel htmlFor={ids.minCitations}>Minimum citations</FieldLabel>
+        <Input
+          id={ids.minCitations}
           type="number"
+          inputMode="numeric"
           min={0}
-          placeholder="Min 1"
+          placeholder="Any"
           value={academic.minCitations ?? ""}
           onChange={(e) => {
-            const raw = e.target.value;
-            if (!raw) {
-              setAcademic({ minCitations: undefined });
-              return;
-            }
-            const n = parseInt(raw, 10);
-            setAcademic({ minCitations: Number.isNaN(n) ? undefined : Math.max(0, n) });
+            const n = parseOptionalInt(e.target.value);
+            setAcademic({ minCitations: n == null ? undefined : Math.max(0, n) });
           }}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
         />
-      </div>
+      </Field>
 
-      <div className="border-t border-border/40">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-2 py-3 text-left text-sm font-medium text-foreground"
-          onClick={() => setExpanded((e) => (e === "field" ? null : "field"))}
-        >
-          Field of Study
-          {expanded === "field" ? (
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          )}
-        </button>
-        {expanded === "field" && (
-          <div className="pb-3 animate-in fade-in slide-in-from-top-1 duration-150">
-            <div className="relative mb-2">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="search"
+      <Collapsible open={fieldsOpen} onOpenChange={setFieldsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="group/fields w-full justify-between"
+          >
+            <span>
+              Field of study
+              {selectedCount > 0 ? (
+                <span className="text-muted-foreground"> · {selectedCount} selected</span>
+              ) : null}
+            </span>
+            <ChevronDown
+              aria-hidden
+              className="text-muted-foreground transition-transform duration-200 ease-out group-data-[state=open]/fields:rotate-180"
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="flex flex-col gap-3 pt-2">
+            <InputGroup>
+              <InputGroupAddon>
+                <Search aria-hidden />
+              </InputGroupAddon>
+              <InputGroupInput
+                aria-label="Filter fields"
                 placeholder="Search fields"
                 value={fieldQuery}
                 onChange={(e) => setFieldQuery(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background py-2 pl-8 pr-3 text-sm focus:border-primary focus:outline-none"
               />
-            </div>
-            <div className="max-h-52 space-y-3 overflow-y-auto pr-0.5">
+            </InputGroup>
+            <div className="flex max-h-52 flex-col gap-4 overflow-y-auto p-1">
               {ACADEMIC_FIELD_GROUPS.map((group) => {
                 const more = group.moreItems ?? [];
                 const moreOpen = moreOpenByGroup[group.id] ?? false;
@@ -284,128 +331,47 @@ export const AcademicDiscoveryFiltersSection: React.FC<AcademicDiscoveryFiltersS
                   more.length > 0 &&
                   !moreOpen &&
                   (!qnorm || more.some((it) => matchesField(it.label)));
+                const showLess = more.length > 0 && moreOpen;
 
                 if (mainShown.length === 0 && extraShown.length === 0 && !showSeeMore) return null;
 
                 return (
-                  <div key={group.id}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {group.label}
-                    </p>
-                    <div className="mt-1 space-y-0.5">
-                      {mainShown.map((it) => (
-                        <label
-                          key={it.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1.5 text-sm hover:bg-muted/50"
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-3.5 rounded border-border"
+                  <div key={group.id} className="flex flex-col gap-2">
+                    <p className="text-xs font-medium text-muted-foreground">{group.label}</p>
+                    {[...mainShown, ...extraShown].map((it) => {
+                      const checkboxId = `${id}-field-${it.id}`;
+                      return (
+                        <Field key={it.id} orientation="horizontal">
+                          <Checkbox
+                            id={checkboxId}
                             checked={selectedFields.has(it.id)}
-                            onChange={() => toggleField(it.id)}
+                            onCheckedChange={() => toggleField(it.id)}
                           />
-                          <span className="leading-snug">{it.label}</span>
-                        </label>
-                      ))}
-                      {extraShown.map((it) => (
-                        <label
-                          key={it.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1.5 text-sm hover:bg-muted/50"
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-3.5 rounded border-border"
-                            checked={selectedFields.has(it.id)}
-                            onChange={() => toggleField(it.id)}
-                          />
-                          <span className="leading-snug">{it.label}</span>
-                        </label>
-                      ))}
-                      {showSeeMore && (
-                        <button
+                          <FieldLabel htmlFor={checkboxId}>{it.label}</FieldLabel>
+                        </Field>
+                      );
+                    })}
+                    {showSeeMore || showLess ? (
+                      <div>
+                        <Button
                           type="button"
-                          className="px-1 pt-0.5 text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          variant="ghost"
+                          size="xs"
                           onClick={() =>
-                            setMoreOpenByGroup((m) => ({
-                              ...m,
-                              [group.id]: true,
-                            }))
+                            setMoreOpenByGroup((m) => ({ ...m, [group.id]: !moreOpen }))
                           }
                         >
-                          See {more.length} more…
-                        </button>
-                      )}
-                    </div>
+                          {moreOpen ? "Show less" : `Show ${more.length} more`}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
             </div>
           </div>
-        )}
-      </div>
-
-      <div className="border-t border-border/40">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-2 py-3 text-left text-sm font-medium text-foreground"
-          onClick={() => setExpanded((e) => (e === "sjr" ? null : "sjr"))}
-        >
-          Journal Rating - SJR
-          {expanded === "sjr" ? (
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          )}
-        </button>
-        {expanded === "sjr" && (
-          <div className="space-y-2 pb-3 animate-in fade-in slide-in-from-top-1 duration-150">
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Tier preference is saved for this session. Journal-level filtering will apply when
-              venue metrics are available in discovery results.
-            </p>
-            {ACADEMIC_SJR_TIERS.map((tier) => {
-              const selected = worstQ === tier.id;
-              return (
-                <button
-                  key={tier.id}
-                  type="button"
-                  onClick={() => setAcademic({ worstAllowedJournalQuartile: tier.id })}
-                  className={[
-                    "flex w-full items-start gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors",
-                    selected
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-border/70 bg-card hover:bg-muted/40",
-                  ].join(" ")}
-                >
-                  <span
-                    className={[
-                      "flex size-6 shrink-0 items-center justify-center rounded-md border",
-                      selected
-                        ? "border-primary/50 bg-primary/15 text-primary"
-                        : "border-border/80 bg-muted/30",
-                    ].join(" ")}
-                  >
-                    {selected ? <Check className="size-3.5" strokeWidth={2.5} /> : null}
-                  </span>
-                  <span
-                    className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${tier.pillClass}`}
-                  >
-                    {tier.label}
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div
-                      className={`h-2 shrink-0 self-stretch rounded-full ${tier.barClass} ${tier.barWidth}`}
-                    />
-                    <span className="text-[10px] leading-tight text-muted-foreground">
-                      {tier.subtitle}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 };
