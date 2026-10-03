@@ -16,6 +16,10 @@ interface UseSourceManagerProps {
 
 export function useSourceManager({ documents, notebookId }: UseSourceManagerProps) {
   const [sources, setSources] = useState<Source[]>([]);
+  const sourcesRef = useRef<Source[]>([]);
+  useEffect(() => {
+    sourcesRef.current = sources;
+  }, [sources]);
   const prevDocumentsRef = useRef<any[]>([]);
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();
@@ -73,11 +77,20 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
 
   const handleDeleteSource = useCallback(
     async (sourceId: string) => {
+      const index = sourcesRef.current.findIndex((s) => s.id === sourceId);
+      const removed = index >= 0 ? sourcesRef.current[index] : undefined;
+      setSources((prev) => prev.filter((s) => s.id !== sourceId));
       try {
-        setSources((prev) => prev.filter((s) => s.id !== sourceId));
         await deleteDocumentMutation(sourceId);
       } catch (error) {
         console.error("Failed to delete source:", error);
+        if (removed) {
+          setSources((prev) => {
+            if (prev.some((s) => s.id === sourceId)) return prev;
+            const at = Math.min(index, prev.length);
+            return [...prev.slice(0, at), removed, ...prev.slice(at)];
+          });
+        }
         showError(error instanceof Error ? error.message : "Failed to delete source");
       }
     },
@@ -99,11 +112,17 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
 
   const handleRenameSource = useCallback(
     async (sourceId: string, newTitle: string) => {
+      const previousTitle = sourcesRef.current.find((s) => s.id === sourceId)?.title;
+      setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, title: newTitle } : s)));
       try {
-        setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, title: newTitle } : s)));
         await updateDocument(sourceId, { title: newTitle });
       } catch (error) {
         console.error("Failed to rename source:", error);
+        if (previousTitle !== undefined) {
+          setSources((prev) =>
+            prev.map((s) => (s.id === sourceId ? { ...s, title: previousTitle } : s))
+          );
+        }
         showError(error instanceof Error ? error.message : "Failed to rename source");
       }
     },

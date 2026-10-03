@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -20,7 +20,7 @@ vi.mock("@/shared/components/MarkdownRenderer", () => ({
   ),
 }));
 
-import { useGenerateSourceGuide } from "../services/documentsApi";
+import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
 
 function renderViewer(overrides: Partial<ComponentProps<typeof SourceViewer>> = {}) {
   const props: ComponentProps<typeof SourceViewer> = {
@@ -325,5 +325,65 @@ describe("SourceViewer source guide", () => {
 
     // Should still only be called once
     expect(mockGenerate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SourceViewer PDF view switch", () => {
+  const pdfSource = {
+    id: "doc-pdf",
+    title: "Paper",
+    type: "PDF" as const,
+    date: "2024-01-15",
+    selected: true,
+    status: "completed" as const,
+    sourceGuide: { summary: "Summary.", topics: [], generatedAt: Date.now() },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(vi.fn());
+  });
+
+  test("switches between the markdown and original PDF views", async () => {
+    const user = userEvent.setup();
+    (useGetSignedUrl as ReturnType<typeof vi.fn>).mockReturnValue(
+      vi.fn().mockResolvedValue("https://files.test/paper.pdf")
+    );
+    renderViewer({ source: pdfSource, pdfStorageId: "storage1" });
+
+    const group = screen.getByRole("radiogroup", { name: "Source view" });
+    expect(within(group).getByRole("radio", { name: "Markdown" })).toHaveAttribute(
+      "data-state",
+      "on"
+    );
+
+    await user.click(within(group).getByRole("radio", { name: "Original PDF" }));
+
+    expect(within(group).getByRole("radio", { name: "Original PDF" })).toHaveAttribute(
+      "data-state",
+      "on"
+    );
+    expect(within(group).getByRole("radio", { name: "Markdown" })).toHaveAttribute(
+      "data-state",
+      "off"
+    );
+    expect(await screen.findByTestId("pdf-viewer")).toHaveTextContent(
+      "https://files.test/paper.pdf"
+    );
+  });
+
+  test("shows a visible error and logs when the PDF link can't be fetched", async () => {
+    const user = userEvent.setup();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    (useGetSignedUrl as ReturnType<typeof vi.fn>).mockReturnValue(
+      vi.fn().mockRejectedValue(new Error("storage unavailable"))
+    );
+    renderViewer({ source: pdfSource, pdfStorageId: "storage1" });
+
+    await user.click(screen.getByRole("radio", { name: "Original PDF" }));
+
+    expect(await screen.findByText("Could not load PDF.")).toBeInTheDocument();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 });
