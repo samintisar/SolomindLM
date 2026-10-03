@@ -135,7 +135,7 @@ Then line by line:
 - **Correctness** — edge cases, `null`/`undefined` (web tsconfig is
   `strict: false`), races and OCC-conflict potential in Convex mutations
 - **Error handling** — no swallowed errors; failed external calls (Together AI,
-  Mistral, Tavily, ZeroEntropy) surface via `toConvexError` / `parseServiceError`
+  Mistral, Tavily, Voyage AI) surface via `toConvexError` / `parseServiceError`
 - **Tests** — new query/mutation has a `*.test.ts`; bugfix has a regression test
   that fails without the fix; agent/prompt change ran an eval, not a unit test
 - **Convex** — validators on all args, indexes for new query patterns, no

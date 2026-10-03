@@ -188,7 +188,7 @@ export interface EvalRunArtifact {
   citations: string[];
   /** Chunks as returned by vector/keyword search, before rerank */
   preRerankChunks: ChunkSnapshot[];
-  /** Chunks after rerank (ZeroEntropy or RRF-only) */
+  /** Chunks after rerank (Voyage or RRF-only) */
   postRerankChunks: ChunkSnapshot[];
   /** Chunks selected by token-budget context selection */
   selectedChunks: ChunkSnapshot[];

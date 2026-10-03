@@ -77,7 +77,7 @@ export function createKeywordSearchRunner(
 
 export function createRerankFn(ctx: ActionCtx): RerankFunction {
   return async (query, documents) => {
-    return cachedRerank(ctx, query, documents as RerankDocument[], "zerank-2", 15);
+    return cachedRerank(ctx, query, documents as RerankDocument[], 15);
   };
 }
 
