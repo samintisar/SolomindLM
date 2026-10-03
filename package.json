@@ -57,6 +57,7 @@
     "test:design:update": "bash scripts/design-snapshots.sh --update-snapshots",
     "eval:rag": "bun --env-file=.env run evals/rag/cli.ts",
     "eval:rag:dry": "bun run evals/rag/cli.ts --dry-run",
+    "check:evals": "bun run scripts/check-evals-bundle.ts",
     "eval:rag:smoke": "bun --env-file=.env run evals/rag/cli.ts --split smoke",
     "eval:rag:train": "bun --env-file=.env run evals/rag/cli.ts --split train",
     "eval:rag:train:snapshot": "bun --env-file=.env run evals/rag/cli.ts --split train --export-artifacts --artifacts-dir evals/rag/generated/train-snapshot",
