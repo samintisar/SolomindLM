@@ -62,6 +62,21 @@ checks must pass before merge; `Coverage Report`, `Dependency audit (baseline)`,
 - Web → Vercel
 - Backend → Convex
 
+**PR previews.** Each PR's Vercel preview runs `convex deploy`, which claims a
+Convex preview deployment for the branch. `apps/web/scripts/vercel-ignore-build.sh`
+(the `ignoreCommand` in `apps/web/vercel.json`) skips the preview when a PR only
+touches docs, CI config, `apps/mobile/`, `evals/` or `e2e/`. Those PRs get no
+preview, and their **Vercel** check reports the build as skipped. If the script
+can't tell what changed, it builds.
+
+**`DeploymentQuotaReached`.** If the Vercel check fails with
+`DeploymentQuotaReached: Your team's deployment quota of 40 has been reached`,
+the failure is the Convex quota, not the code. In the Convex dashboard, delete
+the preview deployments of merged or closed branches (the `convex` CLI can't
+delete deployments), then redeploy the failed previews from Vercel
+(Deployments → ⋯ → Redeploy). Convex also removes previews by itself after 5
+days (14 on paid plans).
+
 ## Issues
 
 Every change starts as an issue and ends as one squash-merged PR. One issue = one
