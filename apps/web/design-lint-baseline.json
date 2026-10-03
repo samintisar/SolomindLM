@@ -22,10 +22,6 @@
   "features/legal": {
     "shadcn/no-arbitrary-values": 1
   },
-  "features/sources": {
-    "shadcn/no-arbitrary-values": 19,
-    "solomind/soft-surfaces": 19
-  },
   "features/studio": {
     "shadcn/no-arbitrary-values": 133,
     "shadcn/no-inline-styles": 15,
