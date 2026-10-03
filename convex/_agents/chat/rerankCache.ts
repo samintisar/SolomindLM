@@ -14,7 +14,6 @@ import { env } from "../../_lib/env";
 import { RERANK_ACTION_BACKSTOP_MS, RERANK_MODEL } from "../../_lib/rerankConfig";
 import { callVoyageRerank } from "../../_services/ai/voyageRerank";
 import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
-import { hashInput } from "../../_services/cache/cacheCrypto";
 import { createCachedAction } from "../../_services/cache/cachedAgent";
 import { withTimeout } from "./withTimeout.js";
 
@@ -122,10 +121,7 @@ export async function cachedRerank(
 
   // Build cache key components (for logging/debugging)
   const docIds = sortedDocs.map((d) => d.id).join(",");
-  const queryHash = await hashInput(normalizedQuery);
-  console.log(
-    `[RerankCache] key: model=${RERANK_MODEL}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`
-  );
+  console.log(`[RerankCache] key: model=${RERANK_MODEL}, docs=${docIds.slice(0, 50)}...`);
 
   // Call cached action with NORMALIZED query and documents content. The extra second lets the
   // action's own client timeout surface its error first; this is the backstop for a stalled action.

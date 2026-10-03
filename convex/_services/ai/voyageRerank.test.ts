@@ -78,6 +78,28 @@ describe("callVoyageRerank", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("pauses before retrying a 429 that carries no Retry-After header", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      stubFetch(async () =>
+        ++calls === 1
+          ? new Response("rate limited", { status: 429 })
+          : Response.json({ data: [{ index: 0, relevance_score: 0.9 }] })
+      );
+
+      const pending = callVoyageRerank("q", ["d"], "pa-key", 5);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(await pending).toEqual([{ index: 0, relevance_score: 0.9 }]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("gives up after the single retry if Voyage keeps answering 429", async () => {
     stubFetch(
       async () => new Response("rate limited", { status: 429, headers: { "Retry-After": "0" } })

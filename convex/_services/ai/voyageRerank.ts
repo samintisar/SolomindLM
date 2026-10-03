@@ -14,7 +14,9 @@ const DEFAULT_RETRY_DELAY_MS = 500;
 
 /** Delay for the 429 retry, or null when `Retry-After` asks for longer than we will wait. */
 function retryDelayMs(response: Response): number | null {
-  const seconds = Number(response.headers.get("retry-after"));
+  const header = response.headers.get("retry-after")?.trim();
+  // Number(null) and Number("") are 0, so an absent header must be handled before parsing.
+  const seconds = header ? Number(header) : Number.NaN;
   if (!Number.isFinite(seconds) || seconds < 0) return DEFAULT_RETRY_DELAY_MS;
   const ms = seconds * 1000;
   return ms <= MAX_RETRY_AFTER_MS ? ms : null;
