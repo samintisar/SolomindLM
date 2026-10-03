@@ -24,6 +24,8 @@ interface DiscoveryResultItemProps {
   inNotebook: boolean;
   adding: boolean;
   limitReached: boolean;
+  /** Disables the row's Add for reasons other than the limit (no notebook, bulk add running). */
+  disabled?: boolean;
   onToggle: () => void;
   onAdd: () => void;
 }
@@ -34,6 +36,7 @@ export function DiscoveryResultItem({
   inNotebook,
   adding,
   limitReached,
+  disabled = false,
   onToggle,
   onAdd,
 }: DiscoveryResultItemProps) {
@@ -108,7 +111,7 @@ export function DiscoveryResultItem({
             type="button"
             variant="outline"
             size="sm"
-            disabled={inNotebook || adding || limitReached}
+            disabled={inNotebook || adding || limitReached || disabled}
             aria-label={!inNotebook && !adding && !limitReached ? `Add ${title}` : undefined}
             onClick={onAdd}
           >

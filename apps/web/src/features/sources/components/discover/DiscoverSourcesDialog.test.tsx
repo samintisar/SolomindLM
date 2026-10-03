@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Source, UnifiedDiscoveryResult } from "@/shared/types/index";
 import { DiscoverSourcesDialog } from "./DiscoverSourcesDialog";
 
@@ -90,10 +90,20 @@ function renderDialog(over: Partial<Props> = {}) {
 }
 
 const searchBox = () => screen.getByRole("textbox", { name: "Search sources" });
+const liveRegion = () => document.querySelector<HTMLElement>('p[aria-live="polite"]');
 
 async function search(text = "transformers") {
   await userEvent.type(searchBox(), `${text}{Enter}`);
-  await screen.findByText(/^\d+ results?$/);
+  await waitFor(() => expect(liveRegion()).toHaveTextContent(/^\d+ results?$/));
+}
+
+/** Radix dismisses on the click that follows a primary-button pointerdown outside. */
+function clickOverlay() {
+  const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+  expect(overlay).not.toBeNull();
+  fireEvent.pointerDown(overlay as Element);
+  fireEvent.pointerUp(overlay as Element);
+  fireEvent.click(overlay as Element);
 }
 
 const checkbox = (title: string) => screen.getByRole("checkbox", { name: `Include ${title}` });
@@ -106,9 +116,6 @@ describe("DiscoverSourcesDialog", () => {
     createDocument.mockReset().mockResolvedValue({ documentId: "doc1" });
     toast.error.mockReset();
     toast.success.mockReset();
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("opens as a named dialog on the empty state", () => {
@@ -130,7 +137,25 @@ describe("DiscoverSourcesDialog", () => {
     );
     expect(checkbox("Web page")).not.toBeChecked();
     expect(checkbox("A paper")).not.toBeChecked();
-    expect(screen.getByText("2 results")).toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent("2 results");
+  });
+
+  it("announces search progress in a live region that outlives the results", async () => {
+    let resolveSearch: (value: ReturnType<typeof response>) => void = () => undefined;
+    discover.mockReset().mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve;
+        })
+    );
+    renderDialog();
+    const region = liveRegion();
+    expect(region).toHaveTextContent(/^$/);
+    await userEvent.type(searchBox(), "transformers{Enter}");
+    expect(region).toHaveTextContent("Searching…");
+    await act(async () => resolveSearch(response([web, paper])));
+    expect(liveRegion()).toBe(region);
+    expect(region).toHaveTextContent("2 results");
   });
 
   it("toggles a row from its title, but not from its open link", async () => {
@@ -201,6 +226,28 @@ describe("DiscoverSourcesDialog", () => {
     expect(props.onDocumentUploaded).toHaveBeenCalledWith("doc1");
   });
 
+  it("adds a web page from its row as a url document", async () => {
+    const { props } = renderDialog();
+    await search();
+    await userEvent.click(screen.getByRole("button", { name: "Add Web page" }));
+    expect(createDocument).toHaveBeenCalledWith({
+      notebookId: "nb1",
+      type: "url",
+      source: "https://ex.com/a",
+      fileName: "Web page",
+    });
+    expect(props.onAddSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "doc1",
+        type: "WEB",
+        title: "Web page",
+        url: "https://ex.com/a",
+        status: "pending",
+      })
+    );
+    expect(props.onDocumentUploaded).toHaveBeenCalledWith("doc1");
+  });
+
   it("adds the selection, toasts once and clears it", async () => {
     renderDialog();
     await search();
@@ -236,7 +283,47 @@ describe("DiscoverSourcesDialog", () => {
     const limited = screen.getAllByRole("button", { name: "Limit reached" });
     expect(limited).toHaveLength(2);
     for (const button of limited) expect(button).toBeDisabled();
-    expect(screen.getByRole("button", { name: /^Add \d+ sources?$/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add selected" })).toBeDisabled();
+  });
+
+  it("labels the footer Add selected until something is selected", async () => {
+    renderDialog();
+    await search();
+    expect(screen.getByRole("button", { name: "Add selected" })).toBeDisabled();
+    await userEvent.click(checkbox("Web page"));
+    expect(screen.getByRole("button", { name: "Add 1 source" })).toBeEnabled();
+  });
+
+  it("applies no cap while the limits are loading", async () => {
+    limits.sourceLimit = 1;
+    limits.isLoading = true;
+    renderDialog({ notebookSources: [notebookSource(1), notebookSource(2)] });
+    await search();
+    expect(screen.queryByRole("button", { name: "Limit reached" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(screen.getByText("2 of 2 selected")).toBeInTheDocument();
+    expect(screen.queryByText(/fits? in this notebook/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add 2 sources" })).toBeEnabled();
+  });
+
+  it("disables every add without a notebook", async () => {
+    renderDialog({ noteId: null });
+    await search();
+    expect(screen.getByRole("button", { name: "Add Web page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add A paper" })).toBeDisabled();
+    await userEvent.click(checkbox("Web page"));
+    expect(screen.getByRole("button", { name: "Add 1 source" })).toBeDisabled();
+  });
+
+  it("locks row adds and search while a bulk add runs", async () => {
+    createDocument.mockReturnValue(new Promise(() => undefined));
+    renderDialog();
+    await search();
+    await userEvent.click(checkbox("Web page"));
+    await userEvent.click(screen.getByRole("button", { name: "Add 1 source" }));
+    expect(screen.getByRole("button", { name: "Add A paper" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+    expect(createDocument).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a stale search response", async () => {
@@ -256,18 +343,41 @@ describe("DiscoverSourcesDialog", () => {
     await userEvent.clear(searchBox());
     await userEvent.type(searchBox(), "second");
     fireEvent.submit(screen.getByRole("search"));
-    await screen.findByText("1 result");
+    await waitFor(() => expect(liveRegion()).toHaveTextContent("1 result"));
     await act(async () => resolveFirst(response([web])));
     expect(screen.getByRole("checkbox", { name: "Include A paper" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Include Web page" })).not.toBeInTheDocument();
-    expect(screen.getByText("1 result")).toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent("1 result");
+  });
+
+  it("ignores a stale search that fails after a newer one succeeded", async () => {
+    let rejectFirst: (reason: Error) => void = () => undefined;
+    discover
+      .mockReset()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectFirst = reject;
+          })
+      )
+      .mockResolvedValueOnce(response([paper]));
+    renderDialog();
+    await userEvent.type(searchBox(), "first{Enter}");
+    await userEvent.clear(searchBox());
+    await userEvent.type(searchBox(), "second");
+    fireEvent.submit(screen.getByRole("search"));
+    await waitFor(() => expect(liveRegion()).toHaveTextContent("1 result"));
+    await act(async () => rejectFirst(new Error("Old search failed")));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(checkbox("A paper")).toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent("1 result");
   });
 
   it("shows the empty result state with the first warning", async () => {
     discover.mockResolvedValue({ sources: [], warnings: ["Rate limited, try later"] });
     renderDialog();
     await userEvent.type(searchBox(), "transformers{Enter}");
-    expect(await screen.findByText("No sources found")).toBeInTheDocument();
+    await waitFor(() => expect(liveRegion()).toHaveTextContent("No sources found"));
     expect(screen.getByText("Rate limited, try later")).toBeInTheDocument();
   });
 
@@ -295,6 +405,37 @@ describe("DiscoverSourcesDialog", () => {
     await userEvent.keyboard("{Escape}");
     expect(props.onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByRole("dialog", { name: "Discover sources" })).toBeInTheDocument();
+  });
+
+  it("blocks outside clicks while an add is in flight", async () => {
+    createDocument.mockReturnValue(new Promise(() => undefined));
+    const { props } = renderDialog();
+    await search();
+    await userEvent.click(screen.getByRole("button", { name: "Add A paper" }));
+    clickOverlay();
+    expect(props.onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("closes on an outside click when idle", async () => {
+    const { props } = renderDialog();
+    // Radix attaches its outside-pointer listener on the next tick.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    clickOverlay();
+    expect(props.onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("keeps the query, results and selection across close and reopen", async () => {
+    const { props, rerender } = renderDialog();
+    await search();
+    await userEvent.click(checkbox("Web page"));
+    rerender(<DiscoverSourcesDialog {...props} open={false} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    rerender(<DiscoverSourcesDialog {...props} open />);
+    expect(searchBox()).toHaveValue("transformers");
+    expect(checkbox("Web page")).toBeChecked();
+    expect(checkbox("A paper")).not.toBeChecked();
+    expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
+    expect(discover).toHaveBeenCalledTimes(1);
   });
 
   it("closes before handing off to Add sources", async () => {

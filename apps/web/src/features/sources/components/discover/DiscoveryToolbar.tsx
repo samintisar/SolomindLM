@@ -20,6 +20,8 @@ interface DiscoveryToolbarProps {
   onQueryChange: (query: string) => void;
   onSearch: () => void;
   isLoading: boolean;
+  /** Blocks searching without the loading spinner, e.g. while sources are being added. */
+  disabled?: boolean;
   filters: FilterState;
   onFiltersChange: (patch: FilterPatch) => void;
   onFiltersReset: () => void;
@@ -30,6 +32,7 @@ export function DiscoveryToolbar({
   onQueryChange,
   onSearch,
   isLoading,
+  disabled = false,
   filters,
   onFiltersChange,
   onFiltersReset,
@@ -65,7 +68,7 @@ export function DiscoveryToolbar({
               type="submit"
               variant="default"
               size="sm"
-              disabled={!query.trim() || isLoading}
+              disabled={!query.trim() || isLoading || disabled}
             >
               {isLoading ? <Spinner aria-hidden /> : null}
               Search

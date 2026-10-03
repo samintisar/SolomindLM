@@ -79,6 +79,8 @@ export function DiscoverSourcesDialog({
   const [results, setResults] = useState<UnifiedDiscoveryResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [addingIds, setAddingIds] = useState<Set<string>>(() => new Set());
+  // True only while "Add selected" runs; row adds don't drive the footer spinner.
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -123,7 +125,7 @@ export function DiscoverSourcesDialog({
   const canAdd = Boolean(userId && noteId);
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    if (!query.trim() || busy) return;
     const id = ++requestRef.current;
 
     setIsLoading(true);
@@ -217,7 +219,7 @@ export function DiscoverSourcesDialog({
   };
 
   const handleAddSingle = async (result: UnifiedDiscoveryResult) => {
-    if (limitReached || !canAdd || inNotebook(result)) return;
+    if (limitReached || !canAdd || bulkAdding || inNotebook(result)) return;
 
     setAddingIds((prev) => withId(prev, result.id));
     try {
@@ -231,13 +233,14 @@ export function DiscoverSourcesDialog({
   };
 
   const handleAddSelected = async () => {
-    if (limitReached || !canAdd) return;
+    if (limitReached || !canAdd || bulkAdding) return;
 
     const toAdd = results
       .filter((r) => selectedIds.has(r.id) && !inNotebook(r) && !addingIds.has(r.id))
       .slice(0, remaining);
     if (toAdd.length === 0) return;
 
+    setBulkAdding(true);
     setAddingIds((prev) => {
       const next = new Set(prev);
       for (const r of toAdd) next.add(r.id);
@@ -245,21 +248,24 @@ export function DiscoverSourcesDialog({
     });
 
     const added: string[] = [];
-    for (const result of toAdd) {
-      try {
-        await addResult(result);
-        added.push(result.id);
-      } catch (err) {
-        showError(err instanceof Error ? err.message : "Failed to add source");
+    try {
+      for (const result of toAdd) {
+        try {
+          await addResult(result);
+          added.push(result.id);
+        } catch (err) {
+          showError(err instanceof Error ? err.message : "Failed to add source");
+        }
       }
+    } finally {
+      setBulkAdding(false);
+      setAddingIds((prev) =>
+        withoutIds(
+          prev,
+          toAdd.map((r) => r.id)
+        )
+      );
     }
-
-    setAddingIds((prev) =>
-      withoutIds(
-        prev,
-        toAdd.map((r) => r.id)
-      )
-    );
     if (added.length > 0) {
       success(added.length === 1 ? "Added 1 source" : `Added ${added.length} sources`);
       // Failures stay selected so they can be retried.
@@ -284,11 +290,19 @@ export function DiscoverSourcesDialog({
     setSelectedIds(new Set(selectable.slice(0, remaining).map((r) => r.id)));
   };
 
+  // Text for the persistent live region; empty until the first search.
+  const liveMessage = (() => {
+    if (isLoading) return "Searching…";
+    if (error) return error;
+    if (!hasSearched) return "";
+    if (results.length === 0) return "No sources found";
+    return plural(results.length, "result");
+  })();
+
   const renderResults = () => {
     if (isLoading) {
       return (
-        <div role="status" className="flex flex-col gap-3">
-          <span className="sr-only">Searching…</span>
+        <div aria-hidden className="flex flex-col gap-3">
           <Skeleton className="h-20" />
           <Skeleton className="h-20" />
           <Skeleton className="h-20" />
@@ -331,9 +345,7 @@ export function DiscoverSourcesDialog({
     }
     return (
       <div className="flex flex-col gap-2">
-        <p aria-live="polite" className="text-sm text-muted-foreground">
-          {plural(results.length, "result")}
-        </p>
+        <p className="text-sm text-muted-foreground">{plural(results.length, "result")}</p>
         <ItemGroup variant="grouped">
           {results.map((result) => (
             <DiscoveryResultItem
@@ -343,6 +355,7 @@ export function DiscoverSourcesDialog({
               inNotebook={inNotebook(result)}
               adding={addingIds.has(result.id)}
               limitReached={limitReached}
+              disabled={!canAdd || bulkAdding}
               onToggle={() => toggleSelect(result.id)}
               onAdd={() => void handleAddSingle(result)}
             />
@@ -412,11 +425,16 @@ export function DiscoverSourcesDialog({
             onQueryChange={setQuery}
             onSearch={() => void handleSearch()}
             isLoading={isLoading}
+            disabled={busy}
             filters={filters}
             onFiltersChange={(patch) => setFilters((prev) => applyFilterPatch(prev, patch))}
             onFiltersReset={() => setFilters(DEFAULT_FILTERS)}
           />
           {renderResults()}
+          {/* Mounted for the dialog's lifetime so changes to its text are announced. */}
+          <p aria-live="polite" className="sr-only">
+            {liveMessage}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 bg-muted/40 px-6 py-3 font-sans text-sm">
@@ -433,7 +451,9 @@ export function DiscoverSourcesDialog({
             {selectedCount > 0 ? "Clear" : "Select all"}
           </Button>
           {selectedCount > remaining && (
-            <span className="text-xs text-muted-foreground">{overflowNote(remaining)}</span>
+            <span className="order-last basis-full text-xs text-muted-foreground">
+              {overflowNote(remaining)}
+            </span>
           )}
           <Button
             type="button"
@@ -441,8 +461,8 @@ export function DiscoverSourcesDialog({
             disabled={addCount === 0 || busy || limitReached || !canAdd}
             onClick={() => void handleAddSelected()}
           >
-            {busy && <Spinner aria-hidden />}
-            Add {plural(addCount, "source")}
+            {bulkAdding && <Spinner aria-hidden />}
+            {addCount === 0 ? "Add selected" : `Add ${plural(addCount, "source")}`}
           </Button>
         </div>
       </DialogContent>
