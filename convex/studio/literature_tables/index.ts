@@ -6,7 +6,11 @@ import { components, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { internalMutation, mutation, query } from "../../_generated/server";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
+import {
+  assertCanEditNotebook,
+  assertCanReadNotebook,
+  canReadNotebook,
+} from "../../_lib/notebookAccess";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
@@ -1010,7 +1014,7 @@ export const getLiteratureTablesByNotebook = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
 
     const tables = await ctx.db
       .query("literatureTables")
@@ -1056,7 +1060,7 @@ export const getLiteratureReportsByNotebook = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
 
     const reports = await ctx.db
       .query("literatureReports")

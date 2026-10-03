@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
+import {
+  assertCanEditNotebook,
+  assertCanReadNotebook,
+  canReadNotebook,
+} from "../../_lib/notebookAccess";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 
@@ -12,7 +16,7 @@ export const list = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
     return await WrittenQuestions.listByNotebook(ctx, args.notebookId);
   },
 });
