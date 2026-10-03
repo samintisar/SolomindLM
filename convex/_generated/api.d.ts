@@ -83,6 +83,7 @@ import type * as _agents_chat_streamSlice from "../_agents/chat/streamSlice.js";
 import type * as _agents_chat_types from "../_agents/chat/types.js";
 import type * as _agents_chat_vector_search from "../_agents/chat/vector_search.js";
 import type * as _agents_chat_withTimeout from "../_agents/chat/withTimeout.js";
+import type * as _agents_chat_zeroEntropyClient from "../_agents/chat/zeroEntropyClient.js";
 import type * as _agents_flashcard_FlashcardGraph from "../_agents/flashcard/FlashcardGraph.js";
 import type * as _agents_flashcard_chunkHelpers from "../_agents/flashcard/chunkHelpers.js";
 import type * as _agents_flashcard_collapseReduceLlm from "../_agents/flashcard/collapseReduceLlm.js";
@@ -180,6 +181,7 @@ import type * as _agents_written_questions_structuredLlm from "../_agents/writte
 import type * as _lib_allowedOrigins from "../_lib/allowedOrigins.js";
 import type * as _lib_arxivThrottle from "../_lib/arxivThrottle.js";
 import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
+import type * as _lib_cspReport from "../_lib/cspReport.js";
 import type * as _lib_defaultSmartModel from "../_lib/defaultSmartModel.js";
 import type * as _lib_embeddingConfig from "../_lib/embeddingConfig.js";
 import type * as _lib_env from "../_lib/env.js";
@@ -468,6 +470,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/chat/types": typeof _agents_chat_types;
   "_agents/chat/vector_search": typeof _agents_chat_vector_search;
   "_agents/chat/withTimeout": typeof _agents_chat_withTimeout;
+  "_agents/chat/zeroEntropyClient": typeof _agents_chat_zeroEntropyClient;
   "_agents/flashcard/FlashcardGraph": typeof _agents_flashcard_FlashcardGraph;
   "_agents/flashcard/chunkHelpers": typeof _agents_flashcard_chunkHelpers;
   "_agents/flashcard/collapseReduceLlm": typeof _agents_flashcard_collapseReduceLlm;
@@ -565,6 +568,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/allowedOrigins": typeof _lib_allowedOrigins;
   "_lib/arxivThrottle": typeof _lib_arxivThrottle;
   "_lib/conversationAccess": typeof _lib_conversationAccess;
+  "_lib/cspReport": typeof _lib_cspReport;
   "_lib/defaultSmartModel": typeof _lib_defaultSmartModel;
   "_lib/embeddingConfig": typeof _lib_embeddingConfig;
   "_lib/env": typeof _lib_env;
