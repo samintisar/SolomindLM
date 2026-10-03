@@ -23,10 +23,9 @@
     "shadcn/no-arbitrary-values": 1
   },
   "features/sources": {
-    "shadcn/no-arbitrary-values": 57,
-    "shadcn/no-inline-styles": 3,
-    "shadcn/no-unknown-classes": 13,
-    "solomind/soft-surfaces": 97
+    "shadcn/no-arbitrary-values": 26,
+    "shadcn/no-inline-styles": 1,
+    "solomind/soft-surfaces": 61
   },
   "features/studio": {
     "shadcn/no-arbitrary-values": 133,
