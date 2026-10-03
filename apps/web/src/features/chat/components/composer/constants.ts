@@ -33,10 +33,25 @@ export const CHAT_DEFAULT_SOURCE_FILTERS = ["notebook"] as const;
 export const DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS = ["notebook", "web", "academic"] as const;
 
 export const COMPOSER_MODES = [
-  { id: "chat", label: "Chat", icon: MessageCircle },
-  { id: "deepResearch", label: "Deep Research", icon: Telescope },
-  { id: "literatureReview", label: "Literature Review", icon: FileText },
-] as const satisfies readonly { id: string; label: string; icon: LucideIcon }[];
+  { id: "chat", label: "Chat", icon: MessageCircle, description: "Answers from your sources" },
+  {
+    id: "deepResearch",
+    label: "Deep Research",
+    icon: Telescope,
+    description: "Multi-step web research",
+  },
+  {
+    id: "literatureReview",
+    label: "Literature Review",
+    icon: FileText,
+    description: "Find and screen papers",
+  },
+] as const satisfies readonly {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  description: string;
+}[];
 
 export type ChatComposerMode = (typeof COMPOSER_MODES)[number]["id"];
 

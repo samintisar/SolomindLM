@@ -104,8 +104,8 @@ const ExternalSourcesContent: React.FC<ExternalSourcesContentProps> = ({
               <li key={`${source.url}-${index}`}>
                 <label
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 font-sans transition-colors hover:bg-accent/40",
-                    isChecked && "border-primary/40 bg-primary/5"
+                    "flex cursor-pointer items-start gap-3 rounded-lg p-3 font-sans ring-1 ring-hairline transition-colors hover:bg-accent/40",
+                    isChecked && "bg-primary/5 ring-ring/40"
                   )}
                 >
                   <Checkbox

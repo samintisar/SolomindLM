@@ -109,6 +109,17 @@ describe("ChatPanel header", () => {
     expect(screen.getByRole("button", { name: "Already in a new chat" })).toBeInTheDocument();
   });
 
+  test("thread actions sit in one tray", () => {
+    setup();
+    const tray = screen.getByRole("group", { name: "Chat actions" });
+    for (const name of ["Thread history", /New chat|Already in a new chat/, "Chat options"]) {
+      expect(within(tray).getByRole("button", { name })).toBeInTheDocument();
+    }
+    // The tray styles its direct children, so no wrapper may sit between it and the buttons.
+    expect(tray.querySelectorAll(":scope > button")).toHaveLength(3);
+    expect(tray.children).toHaveLength(3);
+  });
+
   test("focus returning to a trigger after its menu closes does not open the tooltip", async () => {
     setup();
     const trigger = screen.getByRole("button", { name: "Chat options" });

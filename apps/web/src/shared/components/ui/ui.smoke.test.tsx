@@ -18,13 +18,22 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { ButtonGroup } from "./button-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
 import { Checkbox } from "./checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemDescription,
+  DropdownMenuItemIcon,
+  DropdownMenuItemText,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./empty";
@@ -46,6 +55,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet";
 import { Skeleton } from "./skeleton";
 import { Toaster } from "./sonner";
 import { Spinner } from "./spinner";
+import { Textarea } from "./textarea";
 import { Toggle } from "./toggle";
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
@@ -350,5 +360,328 @@ describe("shadcn ui components render", () => {
     const className = screen.getByRole("button", { name: "Go" }).className;
     expect(className).toContain("[&_svg:not([class*='size-'])]:size-3.5");
     expect(className).not.toContain("[&_svg:not([class*='size-'])]:size-4");
+  });
+
+  describe("soft layered controls", () => {
+    it("Button outline is a token-driven raised chip", () => {
+      render(<Button variant="outline">o</Button>);
+      const outline = screen.getByRole("button", { name: "o" });
+      expect(outline).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline", "shadow-xs");
+      expect(outline).not.toHaveClass("border-2");
+      expect(outline.className).not.toContain("dark:");
+    });
+
+    it("ButtonGroup tray is a tinted pill that raises the open segment", () => {
+      render(
+        <ButtonGroup variant="tray" aria-label="tray">
+          <Button variant="ghost" size="icon-sm" aria-label="a" aria-expanded="true" />
+        </ButtonGroup>
+      );
+      const tray = screen.getByRole("group", { name: "tray" });
+      expect(tray).toHaveClass("bg-secondary", "rounded-xl");
+      expect(tray).toHaveAttribute("data-variant", "tray");
+      expect(tray.className).toContain("[&>*]:rounded-lg");
+      expect(tray.className).toContain("[&>[aria-expanded=true]]:bg-surface-raised");
+      expect(tray.className).not.toContain("bg-card");
+      expect(tray.className).not.toContain("rounded-l-none");
+    });
+
+    it("ButtonGroup default keeps the joined-segment classes", () => {
+      render(
+        <ButtonGroup aria-label="plain">
+          <Button>1</Button>
+          <Button>2</Button>
+        </ButtonGroup>
+      );
+      const plain = screen.getByRole("group", { name: "plain" });
+      expect(plain).toHaveAttribute("data-variant", "default");
+      expect(plain.className).toContain("[&>*:not(:first-child)]:rounded-l-none");
+    });
+
+    it("Toggle outline is a token-driven raised chip", () => {
+      render(<Toggle variant="outline" aria-label="t" />);
+      const toggle = screen.getByRole("button", { name: "t" });
+      expect(toggle).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");
+      expect(toggle).not.toHaveClass("border");
+    });
+
+    it("Badge outline uses the hairline ring", () => {
+      render(<Badge variant="outline">b</Badge>);
+      expect(screen.getByText("b")).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");
+    });
+
+    it("fields are soft filled, the composer is borderless", () => {
+      render(
+        <>
+          <Input aria-label="i" />
+          <Textarea aria-label="ta" />
+          <InputGroup variant="composer" size="auto" data-testid="composer">
+            <InputGroupTextarea aria-label="c" />
+          </InputGroup>
+        </>
+      );
+      const input = screen.getByRole("textbox", { name: "i" });
+      expect(input).toHaveClass("bg-muted/40", "ring-1", "ring-hairline");
+      expect(input).not.toHaveClass("border");
+      const textarea = screen.getByRole("textbox", { name: "ta" });
+      expect(textarea).toHaveClass("bg-muted/40", "ring-1", "ring-hairline");
+      expect(textarea).not.toHaveClass("border");
+      const composer = screen.getByTestId("composer");
+      expect(composer).toHaveClass("shadow-lg", "bg-surface-raised", "rounded-2xl");
+      expect(composer).not.toHaveClass("border");
+      // The composer variant beats the plain group's soft well and focus lift.
+      expect(composer).not.toHaveClass("bg-muted/40");
+      expect(composer).toHaveClass(
+        "has-[[data-slot=input-group-control]:focus-visible]:bg-surface-raised",
+        "has-[[data-slot=input-group-control]:focus-visible]:ring-1"
+      );
+      expect(composer).not.toHaveClass(
+        "has-[[data-slot=input-group-control]:focus-visible]:bg-card",
+        "has-[[data-slot=input-group-control]:focus-visible]:ring-2"
+      );
+      // The inner control draws no second well or ring.
+      const inner = screen.getByRole("textbox", { name: "c" });
+      expect(inner).toHaveClass("ring-0", "bg-transparent", "shadow-none");
+      for (const dropped of [
+        "bg-muted/40",
+        "ring-1",
+        "focus-visible:bg-card",
+        "focus-visible:ring-2",
+      ]) {
+        expect(inner).not.toHaveClass(dropped);
+      }
+      for (const el of [input, textarea, composer, inner]) {
+        expect(el.className).not.toContain("dark:");
+      }
+    });
+
+    it("plain InputGroup and SelectTrigger are soft filled wells", () => {
+      render(
+        <>
+          <InputGroup data-testid="group">
+            <InputGroupInput aria-label="gi" />
+          </InputGroup>
+          <Select>
+            <SelectTrigger>
+              <SelectValue placeholder="pick" />
+            </SelectTrigger>
+          </Select>
+        </>
+      );
+      const group = screen.getByTestId("group");
+      expect(group).toHaveClass("bg-muted/40", "ring-1", "ring-hairline");
+      expect(group).not.toHaveClass("border");
+      expect(group.className).not.toContain("dark:");
+      const trigger = screen.getByRole("combobox");
+      expect(trigger).toHaveClass("bg-muted/40", "ring-1", "ring-hairline", "hover:bg-muted/60");
+      expect(trigger).not.toHaveClass("border");
+      expect(trigger.className).not.toContain("dark:");
+    });
+  });
+
+  describe("soft floating layer", () => {
+    it("menus float softly and support rich items", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuLabel>Mode</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value="a">
+              <DropdownMenuRadioItem value="a">
+                <DropdownMenuItemIcon>
+                  <svg aria-hidden />
+                </DropdownMenuItemIcon>
+                <DropdownMenuItemText>
+                  Alpha
+                  <DropdownMenuItemDescription>First</DropdownMenuItemDescription>
+                </DropdownMenuItemText>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      const menu = await screen.findByRole("menu");
+      expect(menu).toHaveClass("rounded-xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(menu).not.toHaveClass("border");
+      const item = screen.getByRole("menuitemradio", { name: /Alpha/ });
+      expect(item).toHaveClass("rounded-lg", "min-h-9");
+      expect(item).toHaveAttribute("data-state", "checked");
+      expect(screen.getByText("First")).toHaveClass("text-xs", "text-muted-foreground");
+    });
+
+    it("radio items show a trailing check only when checked, and keep focus visible", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuRadioGroup value="a">
+              <DropdownMenuRadioItem value="a">Alpha</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="b">Beta</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      const checked = await screen.findByRole("menuitemradio", { name: "Alpha" });
+      const indicator = checked.querySelector("span.absolute");
+      expect(indicator).not.toBeNull();
+      expect(indicator).toHaveClass("right-2.5");
+      expect(indicator?.querySelector("svg")).not.toBeNull();
+      expect(indicator?.querySelector("svg.lucide-check")).not.toBeNull();
+      expect(indicator?.querySelector("svg.lucide-circle")).toBeNull();
+      expect(checked).toHaveClass("data-[state=checked]:focus:bg-accent");
+
+      const unchecked = screen.getByRole("menuitemradio", { name: "Beta" });
+      expect(unchecked).toHaveAttribute("data-state", "unchecked");
+      expect(unchecked.querySelector("svg")).toBeNull();
+    });
+
+    it("checkbox items show a trailing check and keep focus visible", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuCheckboxItem checked>Gamma</DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      const item = await screen.findByRole("menuitemcheckbox", { name: "Gamma" });
+      expect(item).toHaveAttribute("data-state", "checked");
+      expect(item).toHaveClass("data-[state=checked]:focus:bg-accent");
+      expect(item.querySelector("span.absolute svg.lucide-check")).not.toBeNull();
+    });
+
+    it("rich item parts expose their data-slots", async () => {
+      render(
+        <DropdownMenu defaultOpen>
+          <DropdownMenuTrigger>m</DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem>
+              <DropdownMenuItemIcon data-testid="icon" />
+              <DropdownMenuItemText data-testid="text">
+                T<DropdownMenuItemDescription data-testid="desc">D</DropdownMenuItemDescription>
+              </DropdownMenuItemText>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+      expect(await screen.findByTestId("icon")).toHaveAttribute(
+        "data-slot",
+        "dropdown-menu-item-icon"
+      );
+      expect(screen.getByTestId("text")).toHaveAttribute("data-slot", "dropdown-menu-item-text");
+      expect(screen.getByTestId("desc")).toHaveAttribute(
+        "data-slot",
+        "dropdown-menu-item-description"
+      );
+    });
+
+    it("Select content floats softly", async () => {
+      render(
+        <Select defaultOpen value="a">
+          <SelectTrigger>
+            <SelectValue placeholder="Pick one" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="a">Option A</SelectItem>
+          </SelectContent>
+        </Select>
+      );
+      const listbox = await screen.findByRole("listbox");
+      expect(listbox).toHaveClass("rounded-xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(listbox).not.toHaveClass("border");
+      const option = screen.getByRole("option", { name: "Option A" });
+      expect(option).toHaveClass("rounded-lg", "min-h-9", "data-[state=checked]:focus:bg-accent");
+      expect(option.querySelector("svg.lucide-check")).toHaveClass("text-foreground");
+    });
+
+    it("PopoverContent floats softly", () => {
+      render(
+        <Popover defaultOpen>
+          <PopoverTrigger>p</PopoverTrigger>
+          <PopoverContent>Popover body</PopoverContent>
+        </Popover>
+      );
+      const content = screen.getByText("Popover body");
+      expect(content).toHaveClass("rounded-2xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(content).not.toHaveClass("border");
+    });
+  });
+
+  describe("soft modal and card surfaces", () => {
+    it("alerts separate with a hairline ring, not a border", () => {
+      render(
+        <>
+          <Alert data-testid="default-alert">a</Alert>
+          <Alert data-testid="warning-alert" variant="warning">
+            w
+          </Alert>
+        </>
+      );
+      const plain = screen.getByTestId("default-alert");
+      expect(plain).toHaveClass("ring-1", "ring-hairline", "shadow-xs");
+      expect(plain).not.toHaveClass("border");
+      const warning = screen.getByTestId("warning-alert");
+      expect(warning).toHaveClass("ring-warning-border", "bg-warning-muted");
+      expect(warning).not.toHaveClass("border", "border-warning-border");
+    });
+
+    it("modal and card surfaces are borderless", async () => {
+      render(
+        <>
+          <Card data-testid="card">c</Card>
+          <Dialog defaultOpen>
+            <DialogContent>
+              <DialogTitle>d</DialogTitle>
+              <DialogDescription>x</DialogDescription>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+      const card = screen.getByTestId("card");
+      expect(card).toHaveClass("ring-1", "ring-hairline", "rounded-2xl");
+      expect(card).not.toHaveClass("border");
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveClass("rounded-2xl", "shadow-xl", "ring-hairline");
+      expect(dialog).not.toHaveClass("border");
+      expect(dialog.className).not.toContain("dark:");
+      const overlay = document.body.querySelector("[data-slot=dialog-overlay]");
+      expect(overlay).toHaveClass("bg-overlay", "backdrop-blur-xs");
+      expect(overlay?.className).not.toContain("dark:");
+    });
+
+    it("AlertDialog is borderless over a soft overlay", async () => {
+      render(
+        <AlertDialog defaultOpen>
+          <AlertDialogContent>
+            <AlertDialogTitle>t</AlertDialogTitle>
+            <AlertDialogDescription>x</AlertDialogDescription>
+          </AlertDialogContent>
+        </AlertDialog>
+      );
+      const dialog = await screen.findByRole("alertdialog");
+      expect(dialog).toHaveClass("rounded-2xl", "shadow-xl", "ring-1", "ring-hairline");
+      expect(dialog).not.toHaveClass("border");
+      expect(dialog.className).not.toContain("dark:");
+      const overlay = document.body.querySelector("[data-slot=alert-dialog-overlay]");
+      expect(overlay).toHaveClass("bg-overlay", "backdrop-blur-xs");
+      expect(overlay?.className).not.toContain("dark:");
+    });
+
+    it("Sheet is separated by shadow, not a border", async () => {
+      render(
+        <Sheet defaultOpen>
+          <SheetContent side="right">
+            <SheetTitle>s</SheetTitle>
+            <SheetDescription>x</SheetDescription>
+          </SheetContent>
+        </Sheet>
+      );
+      const sheet = await screen.findByRole("dialog");
+      expect(sheet).toHaveClass("bg-card", "shadow-xl");
+      expect(sheet).not.toHaveClass("border-l");
+      expect(sheet.className).not.toContain("dark:");
+      const overlay = document.body.querySelector("[data-slot=sheet-overlay]");
+      expect(overlay).toHaveClass("bg-overlay");
+    });
   });
 });

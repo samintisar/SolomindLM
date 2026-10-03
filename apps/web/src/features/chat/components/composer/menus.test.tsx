@@ -21,14 +21,20 @@ describe("ModeMenu", () => {
   test("checks the current mode", async () => {
     render(<ModeMenu mode="literatureReview" onModeChange={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "Composer mode: Literature Review" }));
-    expect(await screen.findByRole("menuitemradio", { name: "Literature Review" })).toHaveAttribute(
-      "aria-checked",
-      "true"
-    );
-    expect(screen.getByRole("menuitemradio", { name: "Chat" })).toHaveAttribute(
+    expect(
+      await screen.findByRole("menuitemradio", { name: /^Literature Review/ })
+    ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: /^Chat/ })).toHaveAttribute(
       "aria-checked",
       "false"
     );
+  });
+
+  test("mode items carry a description", async () => {
+    render(<ModeMenu mode="chat" onModeChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Composer mode: Chat" }));
+    expect(await screen.findByText("Multi-step web research")).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /^Deep Research/ })).toBeInTheDocument();
   });
 
   test("a disabled trigger cannot be opened", async () => {

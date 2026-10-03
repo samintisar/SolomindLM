@@ -79,7 +79,7 @@ export function ResearchDatabaseMenu({ value, onChange, disabled }: ResearchData
             return (
               <label
                 key={id}
-                className="flex cursor-pointer items-start gap-3 rounded-lg p-2 font-sans text-sm hover:bg-accent has-data-[state=checked]:bg-primary/5"
+                className="flex cursor-pointer items-start gap-3 rounded-lg p-2 font-sans text-sm hover:bg-muted has-data-[state=checked]:bg-accent/60"
               >
                 <RadioGroupItem
                   value={id}
@@ -97,7 +97,9 @@ export function ResearchDatabaseMenu({ value, onChange, disabled }: ResearchData
                     setOpen(false);
                   }}
                 />
-                <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-foreground/85" />
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                  <Icon aria-hidden className="size-4" />
+                </span>
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span id={titleId} className="leading-tight font-semibold text-foreground">
                     {title}
