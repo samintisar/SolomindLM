@@ -40,6 +40,7 @@ export async function callVoyageRerank(
     return [];
   }
 
+  const startedAt = Date.now();
   const signal = AbortSignal.timeout(RERANK_TIMEOUT_MS);
   const request: RequestInit = {
     method: "POST",
@@ -55,7 +56,8 @@ export async function callVoyageRerank(
 
   if (response.status === 429) {
     const delay = retryDelayMs(response);
-    if (delay !== null) {
+    // The sleep is not abortable, so skip a retry that could not finish inside the deadline.
+    if (delay !== null && Date.now() - startedAt + delay < RERANK_TIMEOUT_MS) {
       await response.body?.cancel();
       await new Promise((resolve) => setTimeout(resolve, delay));
       response = await fetch("https://api.voyageai.com/v1/rerank", request);

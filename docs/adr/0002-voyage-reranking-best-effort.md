@@ -25,8 +25,10 @@ per account), called through a small fetch client
 (`convex/_services/ai/voyageRerank.ts`). The model lives in
 `convex/_lib/rerankConfig.ts`; the key is `VOYAGE_API_KEY`.
 
-Reranking is **best-effort**: one attempt, a hard `RERANK_TIMEOUT_MS` (8s), no
-retries. On any failure callers continue with the un-reranked order. The cache
+Reranking is **best-effort**: one hard `RERANK_TIMEOUT_MS` (8s) deadline covers
+the whole call, and the only retry is a single one after a 429 whose
+`Retry-After` is short and fits inside that deadline. On any failure callers
+continue with the un-reranked order. The cache
 name in `rerankCache.ts` is bumped on a provider or model change so old scores
 are never served.
 

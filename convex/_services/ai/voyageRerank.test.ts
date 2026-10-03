@@ -100,6 +100,22 @@ describe("callVoyageRerank", () => {
     }
   });
 
+  it("skips the retry when the wait would carry the call past the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch(async () => {
+        // The 429 only arrives after most of the budget is gone.
+        vi.setSystemTime(Date.now() + RERANK_TIMEOUT_MS - 500);
+        return new Response("rate limited", { status: 429, headers: { "Retry-After": "1" } });
+      });
+
+      await expect(callVoyageRerank("q", ["d"], "pa-key", 5)).rejects.toThrow(/voyage HTTP 429/);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("gives up after the single retry if Voyage keeps answering 429", async () => {
     stubFetch(
       async () => new Response("rate limited", { status: 429, headers: { "Retry-After": "0" } })
