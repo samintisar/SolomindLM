@@ -41,6 +41,20 @@ export const SORT_OPTIONS = [
 
 export const RESULT_COUNT_OPTIONS = [5, 10, 15, 20] as const;
 
+/** A partial update: `academic` is itself a partial, merged into the current academic state. */
+export type FilterPatch = Partial<Omit<FilterState, "academic">> & {
+  academic?: Partial<DiscoveryAcademicFilterState>;
+};
+
+/** Applies a patch to the latest state, merging (not replacing) the academic part. */
+export function applyFilterPatch(prev: FilterState, patch: FilterPatch): FilterState {
+  return {
+    ...prev,
+    ...patch,
+    academic: patch.academic ? { ...prev.academic, ...patch.academic } : prev.academic,
+  };
+}
+
 /** How many filters differ from the defaults; academic filters count only while Academic is on. */
 export function countActiveFilters(filters: FilterState): number {
   let count = 0;
@@ -48,18 +62,30 @@ export function countActiveFilters(filters: FilterState): number {
   if (filters.sortBy !== DEFAULT_FILTERS.sortBy) count += 1;
   if (filters.maxResults !== DEFAULT_FILTERS.maxResults) count += 1;
   if (filters.sourceTypes.includes("academic")) {
-    count += Object.keys(buildAcademicDiscoveryApiFilters(filters.academic)).length;
+    const api = buildAcademicDiscoveryApiFilters(filters.academic);
+    // Count concepts, not API keys: a year range (from and/or to) is one filter.
+    if (api.publicationYearFrom != null || api.publicationYearTo != null) count += 1;
+    if (api.minCitations != null) count += 1;
+    if (api.openAccessOnly) count += 1;
+    if (api.hasFullText) count += 1;
+    if (api.fieldOfStudyTerms) count += 1;
   }
   return count;
 }
 
+/**
+ * True when nothing differs from the defaults. The academic part is judged by what would actually
+ * be sent, so leftover no-op values (empty field list, "all" years) do not keep Reset enabled.
+ */
 export function isDefaultFilters(filters: FilterState): boolean {
+  const sameSourceTypes =
+    new Set(filters.sourceTypes).size === new Set(DEFAULT_FILTERS.sourceTypes).size &&
+    filters.sourceTypes.every((type) => DEFAULT_FILTERS.sourceTypes.includes(type));
   return (
-    filters.sourceTypes.length === 1 &&
-    filters.sourceTypes[0] === "web" &&
-    !filters.timeRange &&
+    sameSourceTypes &&
+    filters.timeRange === DEFAULT_FILTERS.timeRange &&
     filters.sortBy === DEFAULT_FILTERS.sortBy &&
     filters.maxResults === DEFAULT_FILTERS.maxResults &&
-    Object.values(filters.academic).every((value) => value === undefined)
+    Object.keys(buildAcademicDiscoveryApiFilters(filters.academic)).length === 0
   );
 }

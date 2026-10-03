@@ -51,6 +51,10 @@ describe("formatAcademicByline", () => {
     });
     expect(formatAcademicByline(r)).toBe("2017 · NeurIPS · Vaswani et al.");
   });
+  it("omits et al. for a single author", () => {
+    const r = result({ sourceType: "academic", metadata: { authors: ["Hinton"] } });
+    expect(formatAcademicByline(r)).toBe("Hinton");
+  });
   it("falls back to publishedDate's year and is null for non-academic", () => {
     expect(
       formatAcademicByline(result({ sourceType: "academic", publishedDate: "2020-05-01" }))
@@ -104,6 +108,40 @@ describe("notebook matching", () => {
     expect(
       isInNotebook(
         result({ sourceType: "academic", url: "https://z", metadata: { openAlexId: "w123" } }),
+        keys
+      )
+    ).toBe(true);
+  });
+  it("matches a DOI saved with the dx.doi.org prefix", () => {
+    const dxKeys = notebookDiscoveryKeys([
+      { id: "s4", paper: { doi: "https://dx.doi.org/10.2/XYZ" } },
+    ] as unknown as Source[]);
+    expect(
+      isInNotebook(
+        result({ sourceType: "academic", url: "https://z", metadata: { doi: "10.2/xyz" } }),
+        dxKeys
+      )
+    ).toBe(true);
+  });
+  it("ignores a whitespace-only DOI", () => {
+    const blankKeys = notebookDiscoveryKeys([
+      { id: "s5", paper: { doi: "   " } },
+    ] as unknown as Source[]);
+    expect(
+      isInNotebook(
+        result({ sourceType: "academic", url: "https://z", metadata: { doi: "  " } }),
+        blankKeys
+      )
+    ).toBe(false);
+  });
+  it("matches an openalex.org-prefixed id on the result side", () => {
+    expect(
+      isInNotebook(
+        result({
+          sourceType: "academic",
+          url: "https://z",
+          metadata: { openAlexId: "https://openalex.org/W123" },
+        }),
         keys
       )
     ).toBe(true);

@@ -11,7 +11,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { AcademicDiscoveryFiltersSection } from "../AcademicDiscoveryFiltersSection";
 import {
-  DEFAULT_FILTERS,
+  type FilterPatch,
   type FilterState,
   isDefaultFilters,
   RESULT_COUNT_OPTIONS,
@@ -21,12 +21,15 @@ import {
 
 interface DiscoveryFiltersProps {
   filters: FilterState;
-  onChange: (patch: Partial<FilterState>) => void;
+  /** Applied against the latest state; `academic` is a partial that is merged, not replaced. */
+  onChange: (patch: FilterPatch) => void;
+  onReset: () => void;
 }
 
-export function DiscoveryFilters({ filters, onChange }: DiscoveryFiltersProps) {
+export function DiscoveryFilters({ filters, onChange, onReset }: DiscoveryFiltersProps) {
   const timeRangeId = useId();
   const sortId = useId();
+  const resultsId = useId();
 
   return (
     <FieldGroup>
@@ -73,12 +76,12 @@ export function DiscoveryFilters({ filters, onChange }: DiscoveryFiltersProps) {
       </Field>
 
       <Field>
-        <FieldLabel>Results</FieldLabel>
+        <FieldLabel id={resultsId}>Results</FieldLabel>
         <ToggleGroup
           type="single"
           variant="outline"
           size="sm"
-          aria-label="Number of results"
+          aria-labelledby={resultsId}
           value={String(filters.maxResults)}
           onValueChange={(value) => {
             if (value) onChange({ maxResults: Number(value) });
@@ -95,7 +98,7 @@ export function DiscoveryFilters({ filters, onChange }: DiscoveryFiltersProps) {
       {filters.sourceTypes.includes("academic") && (
         <AcademicDiscoveryFiltersSection
           academic={filters.academic}
-          setAcademic={(patch) => onChange({ academic: { ...filters.academic, ...patch } })}
+          setAcademic={(patch) => onChange({ academic: patch })}
           showTopDivider
         />
       )}
@@ -105,7 +108,7 @@ export function DiscoveryFilters({ filters, onChange }: DiscoveryFiltersProps) {
         variant="ghost"
         size="sm"
         disabled={isDefaultFilters(filters)}
-        onClick={() => onChange(DEFAULT_FILTERS)}
+        onClick={onReset}
       >
         Reset filters
       </Button>

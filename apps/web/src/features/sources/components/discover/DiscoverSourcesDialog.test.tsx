@@ -140,9 +140,7 @@ describe("DiscoverSourcesDialog", () => {
     expect(checkbox("Web page")).toBeChecked();
     expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
 
-    // fireEvent, not userEvent: user-event emulates label activation for any non-control target,
-    // while browsers (and jsdom) skip it when the click lands on interactive content like a link.
-    fireEvent.click(screen.getByRole("link", { name: "Open Web page in new tab" }));
+    await userEvent.click(screen.getByRole("link", { name: "Open Web page in new tab" }));
     expect(checkbox("Web page")).toBeChecked();
     expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
   });
@@ -163,7 +161,7 @@ describe("DiscoverSourcesDialog", () => {
     await search();
     await userEvent.click(screen.getByRole("button", { name: "Select all" }));
     expect(checkbox("A paper")).toBeChecked();
-    expect(checkbox("Web page")).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Web page, already in notebook" })).toBeDisabled();
     expect(screen.getByText("1 of 1 selected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Added" })).toBeDisabled();
   });

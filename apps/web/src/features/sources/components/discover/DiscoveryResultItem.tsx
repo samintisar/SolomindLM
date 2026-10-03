@@ -47,10 +47,10 @@ export function DiscoveryResultItem({
 
   return (
     <div role="listitem">
-      <Item asChild size="sm">
+      <Item size="sm" className="items-start">
         <label
           htmlFor={checkboxId}
-          className="cursor-pointer items-start has-disabled:cursor-default"
+          className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 has-data-disabled:cursor-default"
         >
           <ItemMedia>
             <Checkbox
@@ -58,7 +58,7 @@ export function DiscoveryResultItem({
               checked={selected || inNotebook}
               disabled={inNotebook}
               onCheckedChange={onToggle}
-              aria-label={`Include ${title}`}
+              aria-label={inNotebook ? `${title}, already in notebook` : `Include ${title}`}
             />
           </ItemMedia>
           <ItemContent className="min-w-0">
@@ -92,49 +92,43 @@ export function DiscoveryResultItem({
               )}
             </div>
           </ItemContent>
-          {/* Controls here must not toggle the row's checkbox through the surrounding label. */}
-          <ItemActions onClick={(e) => e.preventDefault()}>
-            <Button variant="ghost" size="icon-sm" asChild>
-              <a
-                href={result.url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Open ${title} in new tab`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink aria-hidden />
-              </a>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={inNotebook || adding || limitReached}
-              aria-label={!inNotebook && !adding && !limitReached ? `Add ${title}` : undefined}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onAdd();
-              }}
-            >
-              {inNotebook ? (
-                <>
-                  <Check aria-hidden /> Added
-                </>
-              ) : adding ? (
-                <>
-                  <Spinner aria-hidden /> Adding…
-                </>
-              ) : limitReached ? (
-                "Limit reached"
-              ) : (
-                <>
-                  <Plus aria-hidden /> Add
-                </>
-              )}
-            </Button>
-          </ItemActions>
         </label>
+        <ItemActions>
+          <Button variant="ghost" size="icon-sm" asChild>
+            <a
+              href={result.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${title} in new tab`}
+            >
+              <ExternalLink aria-hidden />
+            </a>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={inNotebook || adding || limitReached}
+            aria-label={!inNotebook && !adding && !limitReached ? `Add ${title}` : undefined}
+            onClick={onAdd}
+          >
+            {inNotebook ? (
+              <>
+                <Check aria-hidden /> Added
+              </>
+            ) : adding ? (
+              <>
+                <Spinner aria-hidden /> Adding…
+              </>
+            ) : limitReached ? (
+              "Limit reached"
+            ) : (
+              <>
+                <Plus aria-hidden /> Add
+              </>
+            )}
+          </Button>
+        </ItemActions>
       </Item>
     </div>
   );

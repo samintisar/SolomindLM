@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/
 import { Spinner } from "@/shared/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { DiscoveryFilters } from "./DiscoveryFilters";
-import { countActiveFilters, type FilterState } from "./filterState";
+import { countActiveFilters, type FilterPatch, type FilterState } from "./filterState";
 import { SOURCE_TYPE_META, SOURCE_TYPES, type SourceType } from "./sourceTypes";
 
 interface DiscoveryToolbarProps {
@@ -21,7 +21,8 @@ interface DiscoveryToolbarProps {
   onSearch: () => void;
   isLoading: boolean;
   filters: FilterState;
-  onFiltersChange: (patch: Partial<FilterState>) => void;
+  onFiltersChange: (patch: FilterPatch) => void;
+  onFiltersReset: () => void;
 }
 
 export function DiscoveryToolbar({
@@ -31,6 +32,7 @@ export function DiscoveryToolbar({
   isLoading,
   filters,
   onFiltersChange,
+  onFiltersReset,
 }: DiscoveryToolbarProps) {
   const searchId = useId();
   const activeCount = countActiveFilters(filters);
@@ -111,7 +113,11 @@ export function DiscoveryToolbar({
             align="end"
             className="w-80 max-h-(--radix-popover-content-available-height) overflow-y-auto"
           >
-            <DiscoveryFilters filters={filters} onChange={onFiltersChange} />
+            <DiscoveryFilters
+              filters={filters}
+              onChange={onFiltersChange}
+              onReset={onFiltersReset}
+            />
           </PopoverContent>
         </Popover>
       </div>

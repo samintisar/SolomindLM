@@ -29,7 +29,12 @@ import { buildAcademicDiscoveryApiFilters } from "../AcademicDiscoveryFiltersSec
 import { DiscoveryResultItem } from "./DiscoveryResultItem";
 import { DiscoveryToolbar } from "./DiscoveryToolbar";
 import { isInNotebook, notebookDiscoveryKeys } from "./discoveryFormat";
-import { DEFAULT_FILTERS, type FilterState, MAX_DISCOVERY_TOTAL_RESULTS } from "./filterState";
+import {
+  applyFilterPatch,
+  DEFAULT_FILTERS,
+  type FilterState,
+  MAX_DISCOVERY_TOTAL_RESULTS,
+} from "./filterState";
 
 export interface DiscoverSourcesDialogProps {
   open: boolean;
@@ -408,7 +413,8 @@ export function DiscoverSourcesDialog({
             onSearch={() => void handleSearch()}
             isLoading={isLoading}
             filters={filters}
-            onFiltersChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+            onFiltersChange={(patch) => setFilters((prev) => applyFilterPatch(prev, patch))}
+            onFiltersReset={() => setFilters(DEFAULT_FILTERS)}
           />
           {renderResults()}
         </div>
