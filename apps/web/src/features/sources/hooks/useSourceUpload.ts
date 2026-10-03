@@ -176,6 +176,9 @@ export function useSourceUpload({
       return;
     }
 
+    // Set when every URL fails. The toast is already shown, so this rejects after the try block
+    // instead of throwing inside it, where the outer catch would toast a second time.
+    let allFailed = false;
     setIsUploading(true);
     try {
       const errors: string[] = [];
@@ -197,7 +200,7 @@ export function useSourceUpload({
 
       if (errors.length > 0 && errors.length === urls.length) {
         showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
-        return;
+        allFailed = true;
       } else if (errors.length > 0) {
         showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
       }
@@ -211,6 +214,8 @@ export function useSourceUpload({
     } finally {
       setIsUploading(false);
     }
+    // Rejecting lets the link form keep the user's input instead of closing.
+    if (allFailed) throw new Error("No URLs could be added");
   };
 
   // Social Media upload handler (YouTube, TikTok, Instagram, X)
@@ -230,6 +235,9 @@ export function useSourceUpload({
       return;
     }
 
+    // Set when every URL fails. The toast is already shown, so this rejects after the try block
+    // instead of throwing inside it, where the outer catch would toast a second time.
+    let allFailed = false;
     setIsUploading(true);
     try {
       const errors: string[] = [];
@@ -251,7 +259,7 @@ export function useSourceUpload({
 
       if (errors.length > 0 && errors.length === urls.length) {
         showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
-        return;
+        allFailed = true;
       } else if (errors.length > 0) {
         showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
       }
@@ -265,6 +273,8 @@ export function useSourceUpload({
     } finally {
       setIsUploading(false);
     }
+    // Rejecting lets the link form keep the user's input instead of closing.
+    if (allFailed) throw new Error("No URLs could be added");
   };
 
   // Text upload handler

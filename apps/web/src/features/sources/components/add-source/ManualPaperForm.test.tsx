@@ -50,7 +50,7 @@ describe("ManualPaperForm", () => {
     const { onDone } = setup();
     await userEvent.type(screen.getByRole("textbox", { name: "Title" }), "T");
     await userEvent.type(screen.getByRole("textbox", { name: "Authors" }), "Ann Lee, Bo Chen");
-    await userEvent.type(screen.getByRole("textbox", { name: "Year" }), "20x");
+    await userEvent.type(screen.getByRole("textbox", { name: "Year" }), "2021");
     await userEvent.click(screen.getByRole("button", { name: "Add Paper" }));
     expect(upload).toHaveBeenCalledWith({
       notebookId,
@@ -61,12 +61,26 @@ describe("ManualPaperForm", () => {
         authors: ["Ann Lee", "Bo Chen"],
         doi: undefined,
         venue: undefined,
-        publicationYear: 20,
+        publicationYear: 2021,
         isOa: false,
         pdfUrl: undefined,
         sourceType: "manual",
       },
     });
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it("leaves out a year that is not four digits", async () => {
+    upload.mockResolvedValue({ documentId: "d1" });
+    setup();
+    await userEvent.type(screen.getByRole("textbox", { name: "Title" }), "T");
+    await userEvent.type(screen.getByRole("textbox", { name: "Authors" }), "Ann Lee");
+    await userEvent.type(screen.getByRole("textbox", { name: "Year" }), "20x");
+    await userEvent.click(screen.getByRole("button", { name: "Add Paper" }));
+    expect(upload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paperRecord: expect.objectContaining({ publicationYear: undefined }),
+      })
+    );
   });
 });

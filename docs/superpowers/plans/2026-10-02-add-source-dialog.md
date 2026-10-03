@@ -18,11 +18,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-02-add-source-dialog-design.md`.
 
+> **Superseded on 2026-10-03:** Zotero and Mendeley no longer get their own step. They fold into the BibTeX/RIS step as one "Import bibliography" entry, which dedupes against the notebook (see the spec's 2026-10-03 decision). `LibraryImportForm` was built and then deleted. Skip Task 6, and the `zotero`/`mendeley` steps, menu entries and titles in Tasks 3 and 7. Extend `BibtexImportForm` instead.
+
 **Deviation from the spec:** Website and Transcripts share one `LinkForm` with `kind: "website" | "video"`. The two old modals differed only in copy and icon; this mirrors the Zotero/Mendeley decision.
 
 **Branch and worktree:** `feature/ds-migrate-sources-dialogs`, in the session worktree `C:/Users/samin/Documents/GitHub/SolomindLM/.claude/worktrees/premium-ui-shadcn-linter-74efdb`.
-- Work there with Read/Edit/Write/Bash.
-- **Do not use Serena**: it is bound to the main checkout and would edit the wrong tree.
+- Serena is bound to the main checkout, so its edits from here would land in the wrong tree. Activate Serena on this worktree before using it for `.ts`/`.tsx` work. If that isn't possible, use Read/Edit/Write and confirm with `git status` that only this worktree changed.
 - Run commands from the repo root unless noted.
 
 **Ground rules for every task:**
@@ -763,6 +764,8 @@ Message: `feat(sources): BibTeX/RIS import step with real tabs and checkboxes`.
 ---
 
 ### Task 6: LibraryImportForm (Zotero + Mendeley)
+
+> **Superseded (2026-10-03):** skip this task. Zotero and Mendeley exports go through the BibTeX/RIS step (`BibtexImportForm`), which now dedupes against the notebook. See the note at the top of this plan.
 
 **Files:**
 - Create: `add-source/LibraryImportForm.tsx`

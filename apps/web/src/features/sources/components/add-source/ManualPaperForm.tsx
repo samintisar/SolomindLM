@@ -41,7 +41,8 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
         .split(",")
         .map((a) => a.trim())
         .filter(Boolean);
-      const publicationYear = year.trim() ? parseInt(year.trim(), 10) : undefined;
+      // Only a whole 4-digit year counts: parseInt would read "20x" as year 20.
+      const publicationYear = /^\d{4}$/.test(year.trim()) ? Number(year.trim()) : undefined;
 
       await upload({
         notebookId,
@@ -52,8 +53,7 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
           authors: authorList,
           doi: doi.trim() || undefined,
           venue: venue.trim() || undefined,
-          publicationYear:
-            publicationYear && !Number.isNaN(publicationYear) ? publicationYear : undefined,
+          publicationYear,
           isOa: false,
           pdfUrl: pdfUrl.trim() || undefined,
           sourceType: "manual",

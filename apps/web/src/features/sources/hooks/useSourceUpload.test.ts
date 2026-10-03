@@ -2,6 +2,8 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockHandleLimitError = vi.fn();
+const mockShowError = vi.fn();
+const mockCreateDocument = vi.fn();
 let mockIsNativeShell = false;
 
 vi.mock("@/features/billing/services/subscriptionApi", () => ({
@@ -9,7 +11,7 @@ vi.mock("@/features/billing/services/subscriptionApi", () => ({
 }));
 
 vi.mock("@/shared/contexts/useToast", () => ({
-  useToast: () => ({ error: vi.fn(), info: vi.fn() }),
+  useToast: () => ({ error: mockShowError, info: vi.fn() }),
 }));
 
 vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
@@ -22,7 +24,7 @@ vi.mock("@/utils/platformDetection", () => ({
 
 vi.mock("../services/documentsApi", () => ({
   useUploadDocument: () => vi.fn(),
-  useCreateDocument: () => vi.fn(),
+  useCreateDocument: () => mockCreateDocument,
 }));
 
 const { useSourceUpload } = await import("./useSourceUpload");
@@ -59,5 +61,46 @@ describe("useSourceUpload source-limit toast", () => {
     expect(options).toEqual({
       errorMessage: "You've reached your source limit (20/20). Remove a source to add another.",
     });
+  });
+});
+
+describe("useSourceUpload URL upload", () => {
+  const urls = ["https://a.example", "https://b.example"];
+
+  function renderUpload() {
+    return renderHook(() =>
+      useSourceUpload({ sourcesCount: 0, userId: "user-1", noteId: "note-1" })
+    ).result;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHandleLimitError.mockResolvedValue({ isLimitError: false });
+  });
+
+  it("rejects after one toast when every URL fails, so the form can stay open", async () => {
+    mockCreateDocument.mockRejectedValue(new Error("unreachable"));
+    const result = renderUpload();
+
+    await act(async () => {
+      await expect(result.current.handleUrlUpload(urls)).rejects.toThrow();
+    });
+
+    expect(mockShowError).toHaveBeenCalledTimes(1);
+    expect(mockShowError.mock.calls[0][0]).toContain("Failed to upload all URLs");
+  });
+
+  it("resolves when at least one URL is added", async () => {
+    mockCreateDocument
+      .mockResolvedValueOnce({ documentId: "doc-1" })
+      .mockRejectedValueOnce(new Error("unreachable"));
+    const result = renderUpload();
+
+    await act(async () => {
+      await expect(result.current.handleUrlUpload(urls)).resolves.toBeUndefined();
+    });
+
+    expect(mockShowError).toHaveBeenCalledTimes(1);
+    expect(mockShowError.mock.calls[0][0]).toContain("Some URLs failed");
   });
 });

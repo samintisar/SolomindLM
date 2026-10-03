@@ -23,8 +23,8 @@ test.describe("URL Ingestion", () => {
     // Submit
     await dialog.getByRole("button", { name: "Add Sources", exact: true }).click();
 
-    // Should show validation error
-    await expect(dialog.getByText(/Please enter at least one valid URL/)).toBeVisible();
+    // The validation error is a toast, which renders outside the dialog
+    await expect(page.getByText(/Please enter at least one valid URL/)).toBeVisible();
   });
 
   test("URL source processes to completed", async ({ notebookPage }) => {
