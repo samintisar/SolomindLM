@@ -1,7 +1,16 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { Ban, Check, Copy, GitFork, Loader2, Lock, Share2, Users, X } from "lucide-react";
+import { Ban, Check, Copy, GitFork, Lock, Share2, Users } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
 import {
   useCreateShareLink,
@@ -59,15 +68,13 @@ function LinkUrlRow({
           className="min-w-0 flex-1 rounded-xl border border-border/70 bg-background/80 px-3 py-2.5 shadow-sm"
           title={url}
         >
-          <p className="truncate font-mono text-[11px] leading-normal text-foreground/90 sm:text-xs">
-            {url}
-          </p>
+          <p className="truncate font-mono text-xs leading-normal text-foreground/90">{url}</p>
         </div>
         <Button
           type="button"
           variant={done ? "outline" : "default"}
           size="sm"
-          className="h-9 w-full shrink-0 gap-1.5 px-4 sm:w-auto"
+          className="w-full shrink-0 sm:w-auto"
           onClick={() => void onCopy(copyKey, url)}
         >
           {done ? (
@@ -147,37 +154,20 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
   };
 
   return (
-    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        className="relative flex max-h-[90vh] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="share-notebook-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-center justify-between border-b border-border/50 bg-card p-6">
-          <div className="flex min-w-0 items-center gap-3 pr-2">
-            <Share2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <h2
-              id="share-notebook-title"
-              className="truncate text-xl font-bold tracking-tight text-foreground"
-            >
-              Share notebook
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-xl p-2 text-muted-foreground transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent size="wide" padding="none">
+        <div className="border-b border-border p-6">
+          <DialogHeader>
+            <DialogTitle>
+              <span className="flex items-center gap-3">
+                <Share2 aria-hidden className="size-5 text-primary" />
+                Share notebook
+              </span>
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Create cowork or duplicate links for this notebook.
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-card/50">
@@ -203,7 +193,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
               >
                 {busy === "collaborate" ? (
                   <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Spinner aria-hidden />
                     Creating link…
                   </span>
                 ) : (
@@ -233,13 +223,13 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-border/80 bg-background/50 font-medium hover:bg-secondary/80"
+                className="w-full"
                 disabled={busy !== null}
                 onClick={() => void handleCreate("fork")}
               >
                 {busy === "fork" ? (
                   <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Spinner aria-hidden />
                     Creating link…
                   </span>
                 ) : (
@@ -256,9 +246,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
             <div className="border-t border-border/80 bg-card px-6 py-5">
               <div className="mb-3 flex items-center gap-2">
                 <h4 className="font-sans text-sm font-semibold text-foreground">Active links</h4>
-                <span className="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                  {activeLinks.length}
-                </span>
+                <Badge variant="secondary">{activeLinks.length}</Badge>
               </div>
               <ul className="overflow-hidden rounded-xl border border-border/80 bg-muted/25 shadow-sm">
                 {activeLinks.map((l: ShareLinkRow, i: number) => (
@@ -270,15 +258,9 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span
-                          className={
-                            l.kind === "collaborate"
-                              ? "rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                              : "rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-foreground"
-                          }
-                        >
+                        <Badge variant={l.kind === "collaborate" ? "default" : "outline"}>
                           {l.kind === "collaborate" ? "Cowork" : "Duplicate"}
-                        </span>
+                        </Badge>
                         <time
                           className="text-xs text-muted-foreground"
                           dateTime={new Date(l.createdAt).toISOString()}
@@ -292,18 +274,18 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
                     </div>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="ghost-destructive"
                       size="sm"
                       disabled={revokingId === l.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRevoke(l.id as Id<"notebookShareLinks">);
                       }}
-                      className="w-full justify-center gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto sm:justify-end sm:shrink-0"
+                      className="w-full sm:w-auto sm:shrink-0"
                       title="Revoke this link"
                     >
                       {revokingId === l.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Spinner aria-hidden />
                       ) : (
                         <>
                           <Ban className="size-3.5" />
@@ -325,7 +307,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
             </p>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

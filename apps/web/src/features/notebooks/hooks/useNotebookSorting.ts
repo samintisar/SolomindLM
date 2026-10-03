@@ -1,24 +1,16 @@
 import { useCallback, useState } from "react";
 import { NotebookItem } from "@/shared/types/index";
 
-type SortOption = "date" | "title";
+export type SortOption = "date" | "title";
 
 export interface UseNotebookSortingReturn {
   sortOption: SortOption;
-  isSortMenuOpen: boolean;
   setSortOption: (option: SortOption) => void;
-  setIsSortMenuOpen: (open: boolean) => void;
   getSortedNotebooks: (items: NotebookItem[]) => NotebookItem[];
-  toggleSortMenu: () => void;
 }
 
 export function useNotebookSorting(): UseNotebookSortingReturn {
   const [sortOption, setSortOption] = useState<SortOption>("date");
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-
-  const toggleSortMenu = useCallback(() => {
-    setIsSortMenuOpen((prev) => !prev);
-  }, []);
 
   const getSortedNotebooks = useCallback(
     (items: NotebookItem[]) => {
@@ -34,10 +26,7 @@ export function useNotebookSorting(): UseNotebookSortingReturn {
 
   return {
     sortOption,
-    isSortMenuOpen,
     setSortOption,
-    setIsSortMenuOpen,
     getSortedNotebooks,
-    toggleSortMenu,
   };
 }

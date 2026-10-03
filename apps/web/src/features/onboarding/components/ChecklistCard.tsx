@@ -21,7 +21,7 @@ const ITEM_LABELS: Record<string, string> = {
 };
 
 const ITEM_HINTS: Record<string, string> = {
-  createNotebook: "Tap + Create new notebook",
+  createNotebook: "Tap New notebook",
   addSource: "Open the Sources tab, then tap Add",
   askQuestion: "Open the Chat tab and type a message",
   generateArtifact: "Open the Studio tab and pick a card type",
