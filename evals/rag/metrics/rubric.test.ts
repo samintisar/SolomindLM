@@ -55,19 +55,38 @@ describe("rubric prompts", () => {
     );
   });
 
-  it("splits the source budget evenly across documents", () => {
-    const text = formatSourceTexts(
+  it("shows documents that fit the budget in full, without a cut label", () => {
+    const result = formatSourceTexts(
+      [
+        { fileName: "a.pdf", text: "x".repeat(10) },
+        { fileName: "b.pdf", text: "y".repeat(10) },
+      ],
+      20
+    );
+    expect(result).toEqual({
+      text: `[a.pdf]\n${"x".repeat(10)}\n\n---\n\n[b.pdf]\n${"y".repeat(10)}`,
+      truncated: false,
+    });
+  });
+
+  it("splits the source budget evenly and labels each cut document", () => {
+    const result = formatSourceTexts(
       [
         { fileName: "a.pdf", text: "x".repeat(100) },
         { fileName: "b.pdf", text: "y".repeat(100) },
       ],
       20
     );
-    expect(text).toBe(`[a.pdf]\n${"x".repeat(10)}\n\n---\n\n[b.pdf]\n${"y".repeat(10)}`);
+    expect(result).toEqual({
+      text:
+        `[a.pdf] (first 10 of 100 characters shown)\n${"x".repeat(10)}\n\n---\n\n` +
+        `[b.pdf] (first 10 of 100 characters shown)\n${"y".repeat(10)}`,
+      truncated: true,
+    });
   });
 
   it("gives budget a short document leaves unused to the longer ones", () => {
-    const text = formatSourceTexts(
+    const { text } = formatSourceTexts(
       [
         { fileName: "a.pdf", text: "x".repeat(100) },
         { fileName: "b.pdf", text: "y".repeat(4) },
@@ -76,7 +95,9 @@ describe("rubric prompts", () => {
       30
     );
     expect(text).toBe(
-      `[a.pdf]\n${"x".repeat(13)}\n\n---\n\n[b.pdf]\nyyyy\n\n---\n\n[c.pdf]\n${"z".repeat(13)}`
+      `[a.pdf] (first 13 of 100 characters shown)\n${"x".repeat(13)}\n\n---\n\n` +
+        `[b.pdf]\nyyyy\n\n---\n\n` +
+        `[c.pdf] (first 13 of 100 characters shown)\n${"z".repeat(13)}`
     );
   });
 
@@ -100,9 +121,47 @@ describe("rubric prompts", () => {
     expect(withChunks).not.toContain("[q3.pdf]");
 
     const outputOnly = buildRubricPrompt(pack, pack.rubric[1], fixture, artifact(), sources);
-    expect(outputOnly).not.toContain("Source excerpts:");
-    expect(outputOnly).not.toContain("(Excerpts may be truncated.)");
-    expect(withSources).toContain("(Excerpts may be truncated.)");
+    expect(outputOnly).not.toContain("Source text");
+    expect(outputOnly).not.toContain("[q3.pdf]");
+  });
+
+  it("gives a multi-paper pack its whole source text and says it is complete", () => {
+    // Four papers the size of the Researchers pack (46K–78K characters each).
+    const sources = [46_000, 51_000, 50_000, 78_000].map((n, i) => ({
+      fileName: `paper-${i}.pdf`,
+      text: `${"p".repeat(n - 4)}END${i}`,
+    }));
+    const prompt = buildRubricPrompt(pack, pack.rubric[0], fixture, artifact(), sources);
+    for (let i = 0; i < 4; i++) expect(prompt).toContain(`END${i}`);
+    expect(prompt).toContain("Source text (complete):");
+    expect(prompt).not.toContain("characters shown");
+  });
+
+  it("tells the judge when documents were cut, so a missing value is not a failure on its own", () => {
+    const sources = [0, 1].map((i) => ({ fileName: `big-${i}.pdf`, text: "q".repeat(200_000) }));
+    const prompt = buildRubricPrompt(pack, pack.rubric[0], fixture, artifact(), sources);
+    expect(prompt).toContain("(first 120000 of 200000 characters shown)");
+    expect(prompt).toContain(
+      "Do not fail the check only because a value is missing from a document that was cut off."
+    );
+    expect(prompt).not.toContain("Source text (complete):");
+  });
+
+  it("shows every retrieved chunk of a typical chat answer", () => {
+    const selectedChunks = Array.from({ length: 30 }, (_, i) => ({
+      id: `c${i}`,
+      sourceTitle: "paper.pdf",
+      content: `${"c".repeat(990)}CHUNK${i}`,
+    }));
+    const prompt = buildRubricPrompt(
+      pack,
+      pack.rubric[0],
+      fixture,
+      artifact({ selectedChunks } as Partial<EvalRunArtifact>),
+      []
+    );
+    for (let i = 0; i < 30; i++) expect(prompt).toContain(`CHUNK${i}`);
+    expect(prompt).toContain("Source passages retrieved for this answer:");
   });
 
   it("marks an output that was cut for judging as truncated", () => {
@@ -110,19 +169,19 @@ describe("rubric prompts", () => {
       pack,
       pack.rubric[1],
       fixture,
-      artifact({ answer: "z".repeat(10_001) }),
+      artifact({ answer: "z".repeat(40_001) }),
       []
     );
     expect(long).toContain(
-      `${"z".repeat(10_000)}\n[… output truncated at 10000 chars for judging]`
+      `${"z".repeat(40_000)}\n[… output truncated at 40000 chars for judging]`
     );
-    expect(long).not.toContain("z".repeat(10_001));
+    expect(long).not.toContain("z".repeat(40_001));
 
     const short = buildRubricPrompt(
       pack,
       pack.rubric[1],
       fixture,
-      artifact({ answer: "z".repeat(10_000) }),
+      artifact({ answer: "z".repeat(40_000) }),
       []
     );
     expect(short).not.toContain("output truncated");

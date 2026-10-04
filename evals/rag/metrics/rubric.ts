@@ -7,10 +7,24 @@ import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 import type { RubricCheck, SourceText, UseCasePack } from "../usecases/types";
 import { parseBinaryResponse } from "./binaryJudges";
 
-const OUTPUT_LIMIT = 10_000;
-const SOURCES_LIMIT = 12_000;
-/** Whole-pack source text spans every document, so it gets a larger budget than retrieved chunks. */
-const SOURCE_TEXTS_LIMIT = 48_000;
+/** Long enough for a full report or a many-row spreadsheet, so the judge sees every row. */
+const OUTPUT_LIMIT = 40_000;
+/** A chat answer's retrieved chunks (typically ~30 chunks, under 20K characters) fit in full. */
+const CHUNKS_LIMIT = 48_000;
+/**
+ * Whole-pack source text: fits every current pack in full (the largest, Researchers, is about
+ * 226K characters, roughly 60K tokens). A judge that sees only part of a paper fails values that
+ * are in the part it never saw.
+ */
+const SOURCE_TEXTS_LIMIT = 240_000;
+const CUT_NOTE =
+  "Do not fail the check only because a value is missing from a document that was cut off.";
+
+interface Evidence {
+  header: string;
+  text: string;
+  truncated: boolean;
+}
 
 export interface RubricJudgeOptions {
   invoke: (prompt: string) => Promise<string>;
@@ -23,9 +37,15 @@ export function rubricMetricName(packId: string, checkId: string): string {
   return `rubric:${packId}:${checkId}`;
 }
 
-/** Split `limit` chars evenly across documents; budget a short document leaves unused goes to the rest. */
-export function formatSourceTexts(texts: SourceText[], limit: number): string {
-  if (texts.length === 0) return "";
+/**
+ * Split `limit` chars evenly across documents; budget a short document leaves unused goes to the
+ * rest. A document that is cut says how much of it is shown.
+ */
+export function formatSourceTexts(
+  texts: SourceText[],
+  limit: number
+): { text: string; truncated: boolean } {
+  if (texts.length === 0) return { text: "", truncated: false };
   const budgets = new Array<number>(texts.length);
   let remaining = limit;
   const shortestFirst = texts
@@ -35,7 +55,14 @@ export function formatSourceTexts(texts: SourceText[], limit: number): string {
     budgets[i] = Math.min(texts[i].text.length, Math.floor(remaining / (texts.length - done)));
     remaining -= budgets[i];
   });
-  return texts.map((t, i) => `[${t.fileName}]\n${t.text.slice(0, budgets[i])}`).join("\n\n---\n\n");
+  const text = texts
+    .map((t, i) => {
+      const cut = budgets[i] < t.text.length;
+      const label = cut ? ` (first ${budgets[i]} of ${t.text.length} characters shown)` : "";
+      return `[${t.fileName}]${label}\n${t.text.slice(0, budgets[i])}`;
+    })
+    .join("\n\n---\n\n");
+  return { text, truncated: budgets.some((b, i) => b < texts[i].text.length) };
 }
 
 function truncateOutput(output: string): string {
@@ -43,14 +70,39 @@ function truncateOutput(output: string): string {
   return `${output.slice(0, OUTPUT_LIMIT)}\n[… output truncated at ${OUTPUT_LIMIT} chars for judging]`;
 }
 
-function sourceEvidence(artifact: EvalRunArtifact, sourceTexts: SourceText[]): string {
-  if (artifact.selectedChunks.length > 0) {
-    return artifact.selectedChunks
-      .map((c) => `[${c.sourceTitle}]\n${c.content}`)
-      .join("\n\n---\n\n")
-      .slice(0, SOURCES_LIMIT);
+/** Whole chunks up to the budget, then a count of the chunks left out. */
+function formatChunks(chunks: EvalRunArtifact["selectedChunks"]): {
+  text: string;
+  truncated: boolean;
+} {
+  const parts: string[] = [];
+  let used = 0;
+  for (const c of chunks) {
+    const part = `[${c.sourceTitle}]\n${c.content}`;
+    if (parts.length > 0 && used + part.length > CHUNKS_LIMIT) break;
+    parts.push(part.slice(0, CHUNKS_LIMIT));
+    used += part.length;
   }
-  return formatSourceTexts(sourceTexts, SOURCE_TEXTS_LIMIT);
+  const omitted = chunks.length - parts.length;
+  if (omitted > 0) parts.push(`[… ${omitted} more passages not shown]`);
+  return { text: parts.join("\n\n---\n\n"), truncated: omitted > 0 };
+}
+
+function sourceEvidence(artifact: EvalRunArtifact, sourceTexts: SourceText[]): Evidence | null {
+  if (artifact.selectedChunks.length > 0) {
+    return {
+      header: "Source passages retrieved for this answer:",
+      ...formatChunks(artifact.selectedChunks),
+    };
+  }
+  if (sourceTexts.length === 0) return null;
+  const formatted = formatSourceTexts(sourceTexts, SOURCE_TEXTS_LIMIT);
+  return {
+    header: formatted.truncated
+      ? "Source text (some documents cut off):"
+      : "Source text (complete):",
+    ...formatted,
+  };
 }
 
 export function buildRubricPrompt(
@@ -69,12 +121,14 @@ export function buildRubricPrompt(
     "",
   ];
   if (check.evidence === "sources") {
-    lines.push(
-      "Source excerpts:",
-      "(Excerpts may be truncated.)",
-      sourceEvidence(artifact, sourceTexts) || "(no source excerpts recorded)",
-      ""
-    );
+    const evidence = sourceEvidence(artifact, sourceTexts);
+    if (!evidence) {
+      lines.push("Source text:", "(no source text recorded)", "");
+    } else {
+      lines.push(evidence.header);
+      if (evidence.truncated) lines.push(CUT_NOTE);
+      lines.push(evidence.text, "");
+    }
   }
   lines.push(
     "Output:",
