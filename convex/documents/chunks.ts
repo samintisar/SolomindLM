@@ -1,6 +1,18 @@
 import { v } from "convex/values";
+import {
+  cosineSimilarity,
+  documentTopicScores,
+  selectTopicDocuments,
+} from "../_agents/_shared/topicSourceFilter";
 import { internal } from "../_generated/api";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import {
+  type ActionCtx,
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from "../_generated/server";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 
 /**
  * Internal: List chunks by document
@@ -49,24 +61,75 @@ export const listChunksByNotebook = internalQuery({
 });
 
 /**
- * Internal: Fetch chunks for documents (for use in agents)
- * This combines vector search with full chunk retrieval
+ * Narrow chunks to the sources that match `topic` (#288). Best-effort: if the topic cannot be
+ * embedded, every source stays.
+ */
+async function filterChunksToTopic(
+  ctx: ActionCtx,
+  chunks: Doc<"documentChunks">[],
+  topic: string,
+  documentCount: number
+): Promise<Doc<"documentChunks">[]> {
+  const logger = createServiceLogger("documents", "fetchChunks.topicFilter");
+  let topicEmbedding: number[];
+  try {
+    topicEmbedding = await ctx.runAction(
+      internal._services.ai.embeddingClient.generateEmbeddingInternal,
+      { text: topic }
+    );
+  } catch (error) {
+    logger.warn("Topic embedding failed; keeping every source", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return chunks;
+  }
+  const scores = documentTopicScores(
+    chunks.flatMap((c) =>
+      c.embedding?.length
+        ? [{ documentId: c.documentId, similarity: cosineSimilarity(topicEmbedding, c.embedding) }]
+        : []
+    )
+  );
+  if (scores.size === 0) return chunks;
+  const { keep, dropped } = selectTopicDocuments(scores);
+  logger.info("Topic source selection", {
+    topic: topic.slice(0, 200),
+    documentCount,
+    kept: keep.length,
+    dropped: dropped.length,
+    scores: Object.fromEntries([...scores].map(([id, s]) => [id, Number(s.toFixed(3))])),
+  });
+  if (dropped.length === 0) return chunks;
+  // A source with no embedded chunks has no score; it stays.
+  const droppedIds = new Set(dropped);
+  return chunks.filter((c) => !droppedIds.has(c.documentId));
+}
+
+/**
+ * Internal: Fetch chunks for documents (for use in agents). With `topic`, sources that clearly do
+ * not match it are left out; each returned chunk carries its documentId so callers can count the
+ * sources that remain.
  */
 export const fetchChunks = internalAction({
   args: {
     documentIds: v.array(v.id("documents")),
+    /** The studio request's topic, focus or custom prompt. */
+    topic: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    "use node";
-
+  handler: async (ctx, args): Promise<Array<{ content: string; documentId: Id<"documents"> }>> => {
     // Get all chunks for the specified documents
-    const allChunks: any[] = [];
+    let allChunks: Doc<"documentChunks">[] = [];
 
     for (const documentId of args.documentIds) {
       const chunks = await ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
         documentId,
       });
       allChunks.push(...chunks);
+    }
+
+    const topic = args.topic?.trim();
+    if (topic && args.documentIds.length > 1) {
+      allChunks = await filterChunksToTopic(ctx, allChunks, topic, args.documentIds.length);
     }
 
     // Sort by document and chunk index
@@ -83,7 +146,7 @@ export const fetchChunks = internalAction({
     // returning keeps this action's serialized result well under Convex's
     // 16 MiB return-value limit for notebooks with many sources — the full
     // rows previously blew past that limit around ~30 sources.
-    return allChunks.map((chunk) => ({ content: chunk.content }));
+    return allChunks.map((chunk) => ({ content: chunk.content, documentId: chunk.documentId }));
   },
 });
 

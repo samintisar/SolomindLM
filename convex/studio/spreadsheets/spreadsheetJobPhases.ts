@@ -225,7 +225,10 @@ export async function runSpreadsheetGenerationPhase(
     // Get document chunks
     const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
+      topic: customPrompt,
     });
+    // Sources left after narrowing to the requested topic (#288).
+    const topicDocumentCount = new Set(chunkObjects.map((c) => c.documentId)).size;
 
     // Extract content from chunk objects
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
@@ -235,7 +238,7 @@ export async function runSpreadsheetGenerationPhase(
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
     const mapPlan = planStudioJobMapPhase({
-      documentCount: documentIds.length,
+      documentCount: topicDocumentCount,
       chunks: validatedChunks,
       estimateTokens: countTokens,
       pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),

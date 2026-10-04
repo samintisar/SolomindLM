@@ -177,10 +177,19 @@ export async function runAudioOverviewGenerationPhase(
       },
     });
 
+    // The focus is stored on the audio overview, not passed to this phase.
+    const audioOverview = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: audioOverviewId,
+    });
+    const focus = (audioOverview?.metadata as { focus?: string } | undefined)?.focus;
+
     // Get document chunks
     const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
+      topic: focus,
     });
+    // Sources left after narrowing to the requested topic (#288).
+    const topicDocumentCount = new Set(chunkObjects.map((c) => c.documentId)).size;
 
     // Extract content from chunk objects
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
@@ -195,7 +204,7 @@ export async function runAudioOverviewGenerationPhase(
       agentName: "AudioOverviewJob",
     });
     const mapPlan = planStudioJobMapPhase({
-      documentCount: documentIds.length,
+      documentCount: topicDocumentCount,
       chunks: validatedChunks,
       estimateTokens: countTokens,
       pack: (chunks) =>
