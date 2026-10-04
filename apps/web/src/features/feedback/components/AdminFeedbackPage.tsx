@@ -1,6 +1,8 @@
 import type { toAdminFeedbackRow } from "@convex/_model/feedback";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
+import { Button } from "@/shared/components/ui/button";
+import { Card } from "@/shared/components/ui/card";
 import { useToast } from "@/shared/contexts/useToast";
 import { useAllFeedback, useCreateGithubIssue, useIsFeedbackAdmin } from "../services/feedbackApi";
 
@@ -44,46 +46,50 @@ export function AdminFeedbackPage() {
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No feedback yet.</p>
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border">
-          {(rows as AdminFeedbackRow[]).map((r) => (
-            <li key={r.id} className="flex items-center gap-3 p-3 text-sm">
-              <span
-                className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                  r.type === "bug"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-primary/10 text-primary"
-                }`}
-              >
-                {r.type === "bug" ? "bug" : "idea"}
-              </span>
-              <span className="flex-1 truncate" title={r.body}>
-                {r.body.split("\n")[0]}
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {r.planTier} · {r.surface}
-              </span>
-              {r.githubIssueNumber ? (
-                <a
-                  href={r.githubIssueUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 text-xs text-primary hover:underline"
+        <Card variant="flush">
+          <ul className="divide-y divide-border/60">
+            {(rows as AdminFeedbackRow[]).map((r) => (
+              <li key={r.id} className="flex items-center gap-3 p-3 text-sm">
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                    r.type === "bug"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-primary/10 text-primary"
+                  }`}
                 >
-                  #{r.githubIssueNumber}
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busyId === r.id}
-                  onClick={() => onCreateIssue(r.id)}
-                  className="shrink-0 rounded-md border border-border px-2 py-1 text-xs hover:bg-secondary disabled:opacity-60"
-                >
-                  {busyId === r.id ? "Creating…" : "Open GitHub issue"}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+                  {r.type === "bug" ? "bug" : "idea"}
+                </span>
+                <span className="flex-1 truncate" title={r.body}>
+                  {r.body.split("\n")[0]}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {r.planTier} · {r.surface}
+                </span>
+                {r.githubIssueNumber ? (
+                  <a
+                    href={r.githubIssueUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-xs text-primary hover:underline"
+                  >
+                    #{r.githubIssueNumber}
+                  </a>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={busyId === r.id}
+                    onClick={() => onCreateIssue(r.id)}
+                    className="shrink-0"
+                  >
+                    {busyId === r.id ? "Creating…" : "Open GitHub issue"}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </main>
   );

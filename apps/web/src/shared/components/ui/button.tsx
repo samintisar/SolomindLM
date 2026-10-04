@@ -19,6 +19,9 @@ const buttonVariants = cva(
           "rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/25 dark:shadow-primary/30 hover:-translate-y-px hover:bg-primary/88 hover:shadow-lg hover:shadow-primary/35 dark:hover:shadow-primary/40 active:translate-y-0 active:scale-98 active:bg-primary/95 active:shadow-md",
         destructive:
           "rounded-xl bg-destructive text-destructive-foreground shadow-md shadow-destructive/25 dark:shadow-destructive/35 hover:-translate-y-px hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/35 active:translate-y-0 active:scale-98",
+        /** Proceed despite a caution (e.g. a confirm that a job may run long or cost credits). */
+        warning:
+          "rounded-xl bg-warning text-warning-foreground shadow-md shadow-warning/25 hover:-translate-y-px hover:bg-warning/90 hover:shadow-lg active:translate-y-0 active:scale-98",
         outline:
           "rounded-xl bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground active:scale-98 aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-invalid:ring-destructive",
         secondary:

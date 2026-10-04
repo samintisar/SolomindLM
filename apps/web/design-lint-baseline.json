@@ -1,26 +1,10 @@
 {
-  "features/audio": {
-    "shadcn/no-inline-styles": 2,
-    "solomind/soft-surfaces": 4
-  },
-  "features/billing": {
-    "shadcn/no-raw-colors": 1,
-    "solomind/soft-surfaces": 11
-  },
-  "features/feedback": {
-    "shadcn/no-arbitrary-values": 1,
-    "shadcn/no-restyle": 3,
-    "solomind/soft-surfaces": 2
-  },
   "features/landing": {
     "shadcn/no-arbitrary-values": 66,
     "shadcn/no-inline-styles": 16,
     "shadcn/no-raw-colors": 15,
     "shadcn/no-restyle": 59,
     "solomind/soft-surfaces": 18
-  },
-  "features/legal": {
-    "shadcn/no-arbitrary-values": 1
   },
   "features/studio": {
     "shadcn/no-arbitrary-values": 133,
@@ -30,11 +14,9 @@
     "solomind/soft-surfaces": 102
   },
   "shared": {
-    "shadcn/no-arbitrary-values": 49,
-    "shadcn/no-inline-styles": 6,
-    "shadcn/no-raw-colors": 20,
+    "shadcn/no-arbitrary-values": 48,
+    "shadcn/no-inline-styles": 1,
     "shadcn/no-restyle": 22,
-    "shadcn/require-static-classes": 1,
-    "solomind/soft-surfaces": 10
+    "shadcn/require-static-classes": 1
   }
 }

@@ -72,7 +72,7 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="font-display font-bold">Send feedback</DialogTitle>
+        <DialogTitle>Send feedback</DialogTitle>
         <DialogDescription>Tell us what's broken or what you'd like to see.</DialogDescription>
       </DialogHeader>
 
@@ -110,9 +110,9 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-detail" className="text-muted-foreground">
+          <Label htmlFor="feedback-detail">
             {isBug ? "Steps to reproduce" : "Why / what for?"}
-            <span className="font-normal">(optional)</span>
+            <span className="font-normal text-muted-foreground">(optional)</span>
           </Label>
           <Textarea
             id="feedback-detail"

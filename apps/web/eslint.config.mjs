@@ -16,6 +16,13 @@ const MIGRATED = [
   "src/features/chat/**/*.tsx",
   "src/features/sources/**/*.tsx",
   "src/dev/**/*.tsx",
+  "src/shared/ui/**/*.tsx",
+  "src/shared/components/*.tsx",
+  "src/shared/components/icons/**/*.tsx",
+  "src/features/billing/**/*.tsx",
+  "src/features/audio/**/*.tsx",
+  "src/features/feedback/**/*.tsx",
+  "src/features/legal/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
@@ -67,6 +74,9 @@ export default defineConfig([
     rules: rules("warn"),
   },
   { files: MIGRATED, rules: rules("error") },
+  // Legacy hand-rolled menu, used only by Studio literature views; #264 replaces it with the shadcn
+  // DropdownMenu and deletes it.
+  { files: ["src/shared/ui/DropdownMenu.tsx"], rules: rules("warn") },
   // Upstream shadcn CLI markup that predates the linter (arbitrary values like ring-[3px], top-[50%],
   // transition-[color,box-shadow]). Stays at warn until each file is regenerated/adapted; all other rules
   // remain errors for these files. Do not add authored components here.
@@ -78,6 +88,12 @@ export default defineConfig([
   {
     files: ["src/shared/components/ui/field.tsx", "src/shared/components/ui/input-group.tsx"],
     rules: { "shadcn/no-restyle": "warn", "shadcn/require-static-classes": "warn" },
+  },
+  // Company logos keep their real brand colours, as the persisted cover swatches do; every other
+  // rule still applies to this file.
+  {
+    files: ["src/shared/components/icons/ModelBrandIcon.tsx"],
+    rules: { "shadcn/no-raw-colors": "off" },
   },
   // Primitives own the look; outline exceptions there are reviewed variants (docs/design/principles.md).
   { files: ["src/shared/components/ui/**/*.tsx"], rules: { "solomind/soft-surfaces": "off" } },
