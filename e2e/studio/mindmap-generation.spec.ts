@@ -10,6 +10,10 @@ test.describe("Mind Map Generation", () => {
   async function createMindMap(page: import("@playwright/test").Page) {
     await seedPastedTextSourceForStudio(page);
     await openStudioTool(page, "Mind Map");
+    await expect(page.getByRole("heading", { name: /customize mind map/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole("button", { name: "Generate Mind Map" }).click();
 
     const card = firstStudioNoteCard(page);
     await expect(card).toHaveAttribute("aria-busy", "true", { timeout: 15_000 });
@@ -21,6 +25,10 @@ test.describe("Mind Map Generation", () => {
     const page = notebookPage;
 
     await openStudioTool(page, "Mind Map");
+    await expect(page.getByRole("heading", { name: /customize mind map/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole("button", { name: "Generate Mind Map" }).click();
 
     await expect(page.getByRole("alertdialog")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/no sources selected/i)).toBeVisible();

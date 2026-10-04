@@ -142,12 +142,15 @@ export const generateMindMap = mutation({
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
     title: v.optional(v.string()),
+    /** Steers which sources are read and how the map is organized. */
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const { notebookId, documentIds, title } = args;
+    const customPrompt = args.customPrompt?.trim() || undefined;
     if (documentIds.length === 0) {
       throw new Error(
         "Please select at least one source. Content generation uses only your selected sources."
@@ -172,6 +175,7 @@ export const generateMindMap = mutation({
       userId,
       notebookId,
       documentIds,
+      customPrompt,
     });
 
     return mindmapId;

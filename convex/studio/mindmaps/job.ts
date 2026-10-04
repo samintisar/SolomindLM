@@ -19,6 +19,7 @@ export const mindmapGeneration = internalAction({
     userId: v.string(),
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -34,6 +35,7 @@ export const processMindMapMapChunk = internalAction({
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -46,6 +48,7 @@ export const finalizeMindMapPhase = internalAction({
     mindmapId: v.id("mindmaps"),
     userId: v.string(),
     notebookId: v.id("notebooks"),
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";

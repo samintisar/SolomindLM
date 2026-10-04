@@ -200,6 +200,7 @@ export function createConvexMindmapInvoker(
         evalSecret: options.evalSecret,
         notebookId: context.notebookId as Id<"notebooks">,
         documentIds: context.documentIds as Id<"documents">[] | undefined,
+        customPrompt: context.studioParams?.customPrompt,
       });
       const populated = await pollStatus(
         () =>
