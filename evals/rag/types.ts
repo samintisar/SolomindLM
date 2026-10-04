@@ -64,8 +64,18 @@ interface StudioParams {
   documentTitleHint?: string;
 }
 
+/**
+ * Channels a fixture can request. Deep research takes `SourceChannel`; chat
+ * also accepts "finance" (Tavily finance search,
+ * convex/_services/search/DiscoveryService.ts).
+ */
+export type EvalSourceChannel = SourceChannel | "finance";
+
+/** Channel inferred from a retrieved chunk's URL (`inferSourceChannel`). */
+export type EvidenceChannel = EvalSourceChannel | "youtube" | "social";
+
 export interface SourcePolicyConfig {
-  channels: SourceChannel[];
+  channels: EvalSourceChannel[];
   maxResultsPerChannel?: number;
   domainAllowlist?: string[];
   recencyDays?: number;
@@ -212,7 +222,7 @@ export interface EvalRunArtifact {
   sourcePolicy?: SourcePolicyConfig;
   /** Per-source-type evidence found (research runner only) */
   sourceEvidence?: Array<{
-    channel: SourceChannel;
+    channel: EvidenceChannel;
     sourceCount: number;
     topDomains?: string[];
   }>;

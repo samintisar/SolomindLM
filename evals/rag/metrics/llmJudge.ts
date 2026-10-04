@@ -6,7 +6,7 @@
  * comparisons, multi-hop reasoning).
  */
 
-import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
+import type { EvalFixture, EvalRunArtifact, MetricResult, MetricStatus } from "../types";
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ function baseMetric(
   metric: string,
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  status: "pass" | "warn" | "fail",
+  status: MetricStatus,
   score: number,
   detail: string,
   breakdown?: Record<string, unknown>
@@ -483,6 +483,3 @@ export async function scoreAllLlmJudgeMetrics(
 
   return results;
 }
-
-// Re-export types
-export type { LlmJudgeOptions };

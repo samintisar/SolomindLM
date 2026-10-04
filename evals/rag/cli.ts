@@ -32,6 +32,7 @@ import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { LiteratureReviewInvoker } from "./runners/literatureReviewRunner";
 import type { ResearchAgentInvoker } from "./runners/researchRunner";
+import { parseEvalSourceChannels } from "./sourceChannels";
 import { filterFixtureIdsBySplit } from "./splits";
 import type {
   EvalBaseline,
@@ -480,7 +481,7 @@ async function main(): Promise<void> {
     if (opts.sourceMatrix) {
       const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
       const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
-        channels: combo.split("+"),
+        channels: parseEvalSourceChannels(combo.split("+")),
       }));
       expandedFixtures.push(...withSourceMatrix(fixture, matrix));
     } else {
