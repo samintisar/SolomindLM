@@ -54,8 +54,11 @@ are never served.
   `rerank-3`, and compare against off-topic questions run over the same pools.
   Off-topic chunks score 0.25-0.29 (p99 0.31); 0.35 drops all but 3 of 1,212 of
   them and keeps 100% of the 95 chunks containing an expected item (which score
-  0.50-0.94). 0.40 also keeps all of those but cuts into on-topic context
-  (5% of the top-15 chunks), so 0.35 leaves a margin on the safe side.
+  0.50-0.94). That 100% is not labeled recall across all 61 fixtures: only 26
+  had `expectedItems`, and a chunk counted as useful only if it contained one
+  verbatim, a lexical proxy rather than a human judgement. 0.40 also keeps all
+  of those but cuts into on-topic context (5% of the top-15 chunks), so 0.35
+  leaves a margin on the safe side.
   Chunks past the rerank top-N keep their vector similarity (~0.5) and pass the
   floor either way; unifying those scales is a separate change.
 - Voyage's higher rate-limit tier needs a payment method on the account.
