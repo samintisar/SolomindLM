@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  chunkTopicSimilarities,
   cosineSimilarity,
   documentTopicScores,
   selectTopicDocuments,
@@ -14,6 +15,20 @@ describe("cosineSimilarity", () => {
 
   it("is 0 for a zero vector instead of NaN", () => {
     expect(cosineSimilarity([0, 0], [1, 1])).toBe(0);
+  });
+});
+
+describe("chunkTopicSimilarities", () => {
+  it("scores chunks with a matching embedding size and skips the rest", () => {
+    const result = chunkTopicSimilarities(
+      [
+        { documentId: "new", embedding: [1, 0] },
+        { documentId: "legacy", embedding: [1, 0, 0] },
+        { documentId: "none", embedding: undefined },
+      ],
+      [1, 0]
+    );
+    expect(result).toEqual([{ documentId: "new", similarity: 1 }]);
   });
 });
 

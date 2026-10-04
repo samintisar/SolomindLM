@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import {
-  cosineSimilarity,
+  chunkTopicSimilarities,
   documentTopicScores,
   selectTopicDocuments,
 } from "../_agents/_shared/topicSourceFilter";
@@ -83,17 +83,12 @@ async function filterChunksToTopic(
     });
     return chunks;
   }
-  const scores = documentTopicScores(
-    chunks.flatMap((c) =>
-      c.embedding?.length
-        ? [{ documentId: c.documentId, similarity: cosineSimilarity(topicEmbedding, c.embedding) }]
-        : []
-    )
-  );
+  const scores = documentTopicScores(chunkTopicSimilarities(chunks, topicEmbedding));
   if (scores.size === 0) return chunks;
   const { keep, dropped } = selectTopicDocuments(scores);
+  // The request text is user content, so only its length is logged.
   logger.info("Topic source selection", {
-    topic: topic.slice(0, 200),
+    topicChars: topic.length,
     documentCount,
     kept: keep.length,
     dropped: dropped.length,

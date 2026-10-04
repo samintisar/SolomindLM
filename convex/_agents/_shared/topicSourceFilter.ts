@@ -29,6 +29,21 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+/**
+ * Similarity of each chunk to the topic. Chunks without an embedding, or embedded with a model of
+ * a different size (e.g. before a model change), are skipped; a source with no scored chunks stays.
+ */
+export function chunkTopicSimilarities(
+  chunks: Array<{ documentId: string; embedding?: number[] }>,
+  topicEmbedding: number[]
+): Array<{ documentId: string; similarity: number }> {
+  return chunks.flatMap((c) =>
+    c.embedding?.length === topicEmbedding.length
+      ? [{ documentId: c.documentId, similarity: cosineSimilarity(topicEmbedding, c.embedding) }]
+      : []
+  );
+}
+
 /** Each document's score: the mean similarity of its `topK` best-matching chunks. */
 export function documentTopicScores(
   chunks: Array<{ documentId: string; similarity: number }>,
