@@ -45,8 +45,15 @@ function excerptForJudge(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}\n[… output cut off here for judging; the full output is ${text.length} characters and continues. Do not treat this cut as the output ending early.]`;
 }
 
+/** Fits every chunk of a typical chat answer (~30 chunks, under 20K characters). */
+const CHUNK_CONTEXT_LIMIT = 48_000;
+
+/** Chat answers cite chunks by id ([7]), so each chunk carries its id. */
 function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
-  return chunks.map((c) => `[${c.sourceTitle}]\n${c.content}`).join("\n\n---\n\n");
+  return chunks
+    .map((c) => `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`)
+    .join("\n\n---\n\n")
+    .slice(0, CHUNK_CONTEXT_LIMIT);
 }
 
 function parseBinaryResponse(raw: string): BinaryJudgeResult {
@@ -92,7 +99,7 @@ function chatGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): s
 Question: ${fixture.question}
 
 Retrieved chunks:
-${context.slice(0, 12000)}
+${context}
 
 Answer:
 ${excerptForJudge(artifact.answer, 8000)}
@@ -102,11 +109,16 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
 function chatCitationPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
-  const chunkTitles = artifact.selectedChunks.map((c) => c.sourceTitle).join(", ");
+  const chunkIds = artifact.selectedChunks.map((c) => c.id).join(", ");
+  const chunkTitles = [
+    ...new Set(artifact.selectedChunks.map((c) => c.sourceTitle).filter(Boolean)),
+  ];
   return `You are a citation auditor. Pass if citations in the answer refer to real retrieved sources.
+Citation markers such as [7] refer to the retrieved chunk with that id.
 
 Citations in answer: ${artifact.citations.join(", ") || "(none)"}
-Available chunk source titles: ${chunkTitles || "(none)"}
+Retrieved chunk ids: ${chunkIds || "(none)"}
+Retrieved source titles: ${chunkTitles.join(", ") || "(none recorded)"}
 
 Answer excerpt:
 ${excerptForJudge(artifact.answer, 4000)}
@@ -182,7 +194,7 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 Question: ${fixture.question}
 
 Chunks:
-${context.slice(0, 12000)}
+${context}
 
 Output:
 ${excerptForJudge(artifact.answer, 8000)}

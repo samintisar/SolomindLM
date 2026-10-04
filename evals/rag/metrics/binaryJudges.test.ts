@@ -83,6 +83,54 @@ describe("formatResearchEvidence", () => {
   });
 });
 
+describe("chat judges", () => {
+  const fixture = {
+    schemaVersion: 1,
+    id: "chat-dose",
+    question: "How much activity lowered depression risk?",
+    runner: "chat",
+    notebookId: "nb",
+    expectedItems: [],
+  } as unknown as Parameters<typeof scoreBinaryJudgeMetrics>[0];
+
+  async function chatPrompts(overrides: Partial<EvalRunArtifact>): Promise<string[]> {
+    const prompts: string[] = [];
+    const invoke = vi.fn(async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"pass": true, "reason": "ok"}';
+    });
+    await scoreBinaryJudgeMetrics(
+      fixture,
+      stubResearchArtifact({ runner: "chat", ...overrides }),
+      undefined,
+      { invoke }
+    );
+    return prompts;
+  }
+
+  // ~30 chunks of a typical answer, untitled, cited by id.
+  const selectedChunks = Array.from({ length: 30 }, (_, i) => ({
+    id: String(i + 1),
+    sourceTitle: "",
+    content: `${"c".repeat(590)}FACT${i + 1}`,
+  }));
+
+  it("shows the grounding judge every retrieved chunk, numbered by id", async () => {
+    const [grounding] = await chatPrompts({ answer: "Risk fell 25% [23].", selectedChunks });
+    for (let i = 1; i <= 30; i++) expect(grounding).toContain(`[${i}]\n${"c".repeat(590)}FACT${i}`);
+  });
+
+  it("lets the citation judge map citation markers to chunk ids", async () => {
+    const [, citation] = await chatPrompts({
+      answer: "Risk fell 25% [7].",
+      citations: ["7"],
+      selectedChunks,
+    });
+    expect(citation).toContain("Retrieved chunk ids: 1, 2, 3");
+    expect(citation).toContain("30");
+  });
+});
+
 describe("judge excerpts", () => {
   const fixture = {
     schemaVersion: 1,
