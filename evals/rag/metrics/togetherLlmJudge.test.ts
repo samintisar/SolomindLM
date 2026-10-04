@@ -18,12 +18,13 @@ describe("createTogetherJudgeInvoker", () => {
     create.mockReset();
   });
 
-  it("gives reasoning judges enough output budget for long judge prompts", async () => {
+  it("gives reasoning judges enough output budget to check a whole-source prompt", async () => {
     create.mockResolvedValueOnce(choice({ content: '{"pass": true, "reason": "ok"}' }));
 
     await createTogetherJudgeInvoker({ apiKey: "k" })("prompt");
 
-    expect(create.mock.calls[0][0].max_tokens).toBeGreaterThanOrEqual(8192);
+    // 8192 ran out mid-reasoning when checking every number in a spreadsheet against four papers.
+    expect(create.mock.calls[0][0].max_tokens).toBeGreaterThanOrEqual(32_768);
   });
 
   it("returns the JSON content", async () => {
