@@ -138,7 +138,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                         </p>
                       )}
                       {status.cancelAtPeriodEnd && (
-                        <p className="text-sm text-warning font-medium mt-2">
+                        <p className="text-sm text-warning-muted-foreground font-medium mt-2">
                           ⚠️ Cancels at the end of your billing period
                         </p>
                       )}
