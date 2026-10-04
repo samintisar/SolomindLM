@@ -63,6 +63,14 @@ export const PrivacyPolicy: React.FC = () => {
               Notebook organization data (folders, titles, sharing or collaboration settings where
               available).
             </li>
+            <li>
+              Voice input you record in chat. The clip is sent for transcription and deleted once it
+              has been transcribed; the resulting text is handled like any other chat message.
+            </li>
+            <li>
+              Feedback and bug reports you send from the app, together with context such as the page
+              you were on, your plan, and the app version.
+            </li>
           </ul>
         </div>
 
@@ -80,6 +88,11 @@ export const PrivacyPolicy: React.FC = () => {
             <li>
               Subscription status and payment metadata from our payment processor; we do not store
               full card numbers on our servers.
+            </li>
+            <li>
+              In the mobile app: a push notification token if you allow notifications, and crash,
+              error, and performance reports (device model, operating system, app version, and
+              diagnostic details; these reports are not tied to your name or email).
             </li>
           </ul>
         </div>
@@ -112,9 +125,13 @@ export const PrivacyPolicy: React.FC = () => {
           </li>
           <li>
             <span className="text-foreground">Together AI</span> — large language model inference
-            for chat and generation flows; multilingual text embeddings for search and retrieval;
-            text-to-speech for audio overviews; speech-to-text for uploaded audio; and image
-            generation for infographics (via hosted models on Together&apos;s platform).
+            for chat and generation flows; text-to-speech for audio overviews; and speech-to-text
+            for uploaded audio and voice input in chat (via hosted models on Together&apos;s
+            platform).
+          </li>
+          <li>
+            <span className="text-foreground">OpenAI</span> — text embeddings of your sources and
+            questions for search and retrieval, and image generation for infographics.
           </li>
           <li>
             <span className="text-foreground">Voyage AI</span> — reranking retrieved passages for
@@ -151,8 +168,27 @@ export const PrivacyPolicy: React.FC = () => {
             use Google login or Drive import.
           </li>
           <li>
-            <span className="text-foreground">Vercel</span> — site hosting; the web app may load
-            Vercel Analytics to collect privacy-oriented usage metrics.
+            <span className="text-foreground">Vercel</span> — site hosting, plus Vercel Analytics
+            and Speed Insights for usage and performance metrics.
+          </li>
+          <li>
+            <span className="text-foreground">Google Analytics and Ahrefs Web Analytics</span> —
+            website usage measurement (pages visited, referrers, approximate location, device and
+            browser type).
+          </li>
+          <li>
+            <span className="text-foreground">Expo</span> — delivering push notifications to the
+            mobile app through Apple and Google push services.
+          </li>
+          <li>
+            <span className="text-foreground">Sentry</span> — crash, error, and performance
+            reporting for the mobile app.
+          </li>
+          <li>
+            <span className="text-foreground">GitHub</span> — our team may file in-app feedback as
+            an issue in our public GitHub repository. The issue contains the feedback text you wrote
+            and the context listed above, but not your name or email address, so do not put personal
+            information in feedback you do not want published.
           </li>
         </ul>
         <p className="text-muted-foreground">
@@ -193,9 +229,11 @@ export const PrivacyPolicy: React.FC = () => {
         </h2>
         <p className="text-muted-foreground">
           We use cookies and similar technologies needed for authentication, preferences (such as
-          theme), and basic app state. When enabled, Vercel Analytics may use cookies or local
-          storage to measure page views and performance in a privacy-oriented way. We do not use
-          third-party advertising cookies as part of this Policy&apos;s scope.
+          theme), and basic app state. Our websites also load Google Analytics, which sets cookies
+          to measure visits, and Ahrefs Web Analytics and Vercel Analytics, which measure page views
+          and performance. You can limit analytics cookies through your browser settings or by using
+          Google&apos;s Analytics opt-out browser add-on. We do not use third-party advertising
+          cookies as part of this Policy&apos;s scope.
         </p>
       </section>
 

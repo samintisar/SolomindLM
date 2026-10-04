@@ -9,7 +9,7 @@ import {
   SEO_CONTENT_LAST_UPDATED,
   SEO_CONTENT_PAGES,
 } from "@/features/landing/seoContentPages";
-import { LEGAL_LAST_UPDATED_ISO } from "@/features/legal/legalMeta";
+import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
 import {
   SEO_DEFAULT_DESCRIPTION,
   SEO_DEFAULT_KEYWORDS,
@@ -116,7 +116,7 @@ const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
       "How SolomindLM collects, uses, and shares information when you use our notebooks, sources, AI features, and billing.",
     changefreq: "monthly",
     priority: 0.3,
-    lastmod: LEGAL_LAST_UPDATED_ISO,
+    lastmod: LEGAL_LAST_UPDATED["/privacy"].iso,
   },
   {
     path: "/terms",
@@ -125,7 +125,7 @@ const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
       "Terms that apply when you use SolomindLM’s AI research notebooks, sources, chat, and study tools.",
     changefreq: "monthly",
     priority: 0.3,
-    lastmod: LEGAL_LAST_UPDATED_ISO,
+    lastmod: LEGAL_LAST_UPDATED["/terms"].iso,
   },
   {
     path: "/faq",

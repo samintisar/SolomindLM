@@ -1,5 +1,7 @@
 import { Check } from "lucide-react";
 import React from "react";
+import { Button } from "@/shared/components/ui/button";
+import { Card, CardContent } from "@/shared/components/ui/card";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { canOfferPurchases } from "@/utils/platformDetection";
 import {
@@ -8,6 +10,7 @@ import {
   useCreatePortalSession,
   useSubscriptionStatus,
 } from "../services/subscriptionApi";
+import { PlanCard } from "./PlanCard";
 
 interface BillingPageProps {
   onBack: () => void;
@@ -116,11 +119,11 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
           <div className="max-w-6xl mx-auto">
             {/* Current Plan Section */}
             {status?.hasSubscription && (
-              <div className="mb-12">
-                <div className="bg-card border-2 border-border rounded-xl p-8">
+              <Card className="mb-12">
+                <CardContent>
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-2xl font-serif font-bold mb-1 text-foreground">
+                      <h2 className="text-2xl font-display font-bold mb-1 text-foreground">
                         Pro Plan
                       </h2>
                       <p className="text-muted-foreground mb-1">
@@ -135,7 +138,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                         </p>
                       )}
                       {status.cancelAtPeriodEnd && (
-                        <p className="text-sm text-orange-500 font-medium mt-2">
+                        <p className="text-sm text-warning-muted-foreground font-medium mt-2">
                           ⚠️ Cancels at the end of your billing period
                         </p>
                       )}
@@ -144,7 +147,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                       {purchasable && (
                         <>
                           <div className="text-sm text-muted-foreground mb-2">Current Price</div>
-                          <p className="text-3xl font-serif font-bold mb-3">
+                          <p className="text-3xl font-display font-bold mb-3">
                             ${status.amount ? (status.amount / 100).toFixed(0) : 0}
                             <span className="text-lg font-normal text-muted-foreground">
                               /{status.interval}
@@ -160,183 +163,110 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                     </div>
                   </div>
                   {!status.cancelAtPeriodEnd && (
-                    <button
-                      onClick={handleCancel}
-                      className="mt-6 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 disabled:opacity-50 transition-colors"
-                    >
+                    <Button variant="outline" onClick={handleCancel} className="mt-6">
                       Cancel Subscription
-                    </button>
+                    </Button>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Native app: plan summary only — no prices or checkout (see canOfferPurchases) */}
             {!purchasable && !status?.hasSubscription && (
-              <div className="mb-12 max-w-md mx-auto bg-card border-2 border-border rounded-xl p-8">
-                <h2 className="text-2xl font-serif font-bold mb-1 text-foreground">Free Plan</h2>
-                <p className="text-sm text-muted-foreground mb-6">Your current plan</p>
-                <div className="space-y-3">
-                  {freeFeatures.map((feature) => (
-                    <div key={feature} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <Card className="mx-auto mb-12 max-w-md">
+                <CardContent>
+                  <h2 className="text-2xl font-display font-bold mb-1 text-foreground">
+                    Free Plan
+                  </h2>
+                  <p className="text-sm text-muted-foreground mb-6">Your current plan</p>
+                  <ul className="flex flex-col gap-3">
+                    {freeFeatures.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3">
+                        <Check
+                          aria-hidden
+                          className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                        />
+                        <span className="text-sm text-foreground">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
             )}
 
             {/* Pricing Cards Grid */}
             {purchasable && (
-              <div
-                className={`grid gap-8 mb-12 ${status?.hasSubscription ? "lg:grid-cols-3" : "lg:grid-cols-3"}`}
-              >
-                {/* Free Plan */}
-                <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg transition-all duration-300">
-                  <div className="mb-6">
-                    <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Free</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {status?.hasSubscription ? "Your previous plan" : "Get started today"}
-                    </p>
-                  </div>
-
-                  <div className="mb-6">
-                    <p className="text-5xl font-serif font-bold text-foreground">
-                      $0
-                      <span className="text-lg font-normal text-muted-foreground">/month</span>
-                    </p>
-                  </div>
-
-                  {status?.hasSubscription ? (
-                    <button
-                      onClick={onBack}
-                      className="w-full mb-8 py-3 border-2 border-border text-foreground font-medium rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      Downgrade
-                    </button>
-                  ) : (
-                    <div className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg text-center">
-                      Current Plan
-                    </div>
-                  )}
-
-                  <div className="space-y-3 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                      Included:
-                    </p>
-                    {freeFeatures.map((feature) => (
-                      <div key={feature} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                        <span className="text-sm text-foreground">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Yearly */}
-                <div className="relative">
-                  {/* Save Badge */}
-                  <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-10">
-                    <div className="bg-primary text-primary-foreground px-4 py-1 rounded-xl text-sm font-semibold whitespace-nowrap">
-                      Save 50%
-                    </div>
-                  </div>
-
-                  <div className="bg-card border-2 border-primary rounded-xl p-8 flex flex-col shadow-lg hover:shadow-xl transition-all duration-300">
-                    <div className="mb-6">
-                      <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Yearly</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Best value – billed once per year
-                      </p>
-                    </div>
-
-                    <div className="mb-6">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-5xl font-serif font-bold text-foreground">
-                          $7.50
-                          <span className="text-lg font-normal text-muted-foreground">/month</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground font-normal">($90/year)</p>
-                      </div>
-                    </div>
-
-                    {status?.hasSubscription && status.interval === "year" ? (
-                      <button
-                        disabled={true}
-                        className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
-                      >
-                        Current Plan
-                      </button>
+              <div className="mb-12 grid gap-8 lg:grid-cols-3">
+                <PlanCard
+                  title="Free"
+                  subtitle={status?.hasSubscription ? "Your previous plan" : "Get started today"}
+                  price="$0"
+                  featuresLabel="Included:"
+                  features={freeFeatures}
+                  action={
+                    status?.hasSubscription ? (
+                      <Button variant="outline" size="lg" onClick={onBack} className="w-full">
+                        Downgrade
+                      </Button>
                     ) : (
-                      <button
+                      <Button variant="secondary" size="lg" disabled className="w-full">
+                        Current Plan
+                      </Button>
+                    )
+                  }
+                />
+                <PlanCard
+                  title="Yearly"
+                  subtitle="Best value – billed once per year"
+                  price="$7.50"
+                  priceNote="($90/year)"
+                  badge="Save 50%"
+                  highlighted
+                  featuresLabel="Everything included:"
+                  features={proFeatures}
+                  action={
+                    status?.hasSubscription && status.interval === "year" ? (
+                      <Button variant="secondary" size="lg" disabled className="w-full">
+                        Current Plan
+                      </Button>
+                    ) : (
+                      <Button
+                        size="lg"
                         onClick={() =>
                           status?.hasSubscription ? handleManagePlan() : handleUpgrade("year")
                         }
-                        className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                        className="w-full"
                       >
                         {status?.hasSubscription ? "Switch to Yearly" : "Get Started"}
-                      </button>
-                    )}
-
-                    <div className="space-y-3 flex-1">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                        Everything included:
-                      </p>
-                      {proFeatures.map((feature) => (
-                        <div key={feature} className="flex items-start gap-3">
-                          <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                          <span className="text-sm text-foreground">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Monthly */}
-                <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg hover:border-primary/50 transition-all duration-300">
-                  <div className="mb-6">
-                    <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">Monthly</h3>
-                    <p className="text-sm text-muted-foreground">Billed every month</p>
-                  </div>
-
-                  <div className="mb-6">
-                    <p className="text-5xl font-serif font-bold text-foreground">
-                      $15
-                      <span className="text-lg font-normal text-muted-foreground">/month</span>
-                    </p>
-                  </div>
-
-                  {status?.hasSubscription && status.interval === "month" ? (
-                    <button
-                      disabled={true}
-                      className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
-                    >
-                      Current Plan
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        status?.hasSubscription ? handleManagePlan() : handleUpgrade("month")
-                      }
-                      className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                      {status?.hasSubscription ? "Switch to Monthly" : "Get Started"}
-                    </button>
-                  )}
-
-                  <div className="space-y-3 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                      Everything included:
-                    </p>
-                    {proFeatures.map((feature) => (
-                      <div key={feature} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                        <span className="text-sm text-foreground">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                      </Button>
+                    )
+                  }
+                />
+                <PlanCard
+                  title="Monthly"
+                  subtitle="Billed every month"
+                  price="$15"
+                  proChecks
+                  featuresLabel="Everything included:"
+                  features={proFeatures}
+                  action={
+                    status?.hasSubscription && status.interval === "month" ? (
+                      <Button variant="secondary" size="lg" disabled className="w-full">
+                        Current Plan
+                      </Button>
+                    ) : (
+                      <Button
+                        size="lg"
+                        onClick={() =>
+                          status?.hasSubscription ? handleManagePlan() : handleUpgrade("month")
+                        }
+                        className="w-full"
+                      >
+                        {status?.hasSubscription ? "Switch to Monthly" : "Get Started"}
+                      </Button>
+                    )
+                  }
+                />
               </div>
             )}
           </div>

@@ -1,68 +1,59 @@
 import React from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { type ConfirmStore, type ConfirmVariant, createConfirmStore } from "./confirmStore";
+
+function ConfirmDialogHost({ store }: { store: ConfirmStore }) {
+  const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot);
+  return (
+    <ConfirmDialog
+      isOpen={state.isOpen}
+      title={state.title}
+      message={state.message}
+      confirmText={state.confirmText}
+      cancelText={state.cancelText}
+      variant={state.variant}
+      returnFocusTo={state.returnFocusTo}
+      onConfirm={() => store.finish(true)}
+      onCancel={() => store.finish(false)}
+    />
+  );
+}
 
 export const useConfirmDialog = () => {
-  const [state, setState] = React.useState<{
-    isOpen: boolean;
-    title: string;
-    message: string | React.ReactNode;
-    confirmText?: string;
-    cancelText?: string;
-    variant?: "danger" | "warning" | "default";
-  }>({
-    isOpen: false,
-    title: "",
-    message: "",
-  });
-
-  const resolveRef = React.useRef<((value: boolean) => void) | null>(null);
-
-  const finish = React.useCallback((result: boolean) => {
-    setState((prev) => ({ ...prev, isOpen: false }));
-    const resolve = resolveRef.current;
-    resolveRef.current = null;
-    resolve?.(result);
-  }, []);
+  const [store] = React.useState(createConfirmStore);
 
   const confirm = React.useCallback(
     (
       title: string,
-      message: string | React.ReactNode,
-      options?: {
-        confirmText?: string;
-        cancelText?: string;
-        variant?: "danger" | "warning" | "default";
-      }
-    ): Promise<boolean> => {
-      return new Promise((resolve) => {
-        resolveRef.current = resolve;
-        setState({
-          isOpen: true,
-          title,
-          message,
-          confirmText: options?.confirmText,
-          cancelText: options?.cancelText,
-          variant: options?.variant || "default",
-        });
-      });
-    },
-    []
+      message: React.ReactNode,
+      options?: { confirmText?: string; cancelText?: string; variant?: ConfirmVariant }
+    ): Promise<boolean> =>
+      new Promise((resolve) => {
+        store.open(
+          {
+            title,
+            message,
+            confirmText: options?.confirmText,
+            cancelText: options?.cancelText,
+            variant: options?.variant ?? "default",
+            returnFocusTo:
+              document.activeElement instanceof HTMLElement ? document.activeElement : null,
+          },
+          resolve
+        );
+      }),
+    [store]
   );
 
-  const Dialog = React.useCallback(() => {
-    return (
-      <ConfirmDialog
-        isOpen={state.isOpen}
-        title={state.title}
-        message={state.message}
-        confirmText={state.confirmText}
-        cancelText={state.cancelText}
-        variant={state.variant}
-        onConfirm={() => finish(true)}
-        onCancel={() => finish(false)}
-      />
-    );
-  }, [state, finish]);
+  // A stable component type: the dialog stays mounted between confirms, so Radix animates the
+  // close and returns focus to the element that opened it.
+  const ConfirmDialogComponent = React.useMemo(
+    () =>
+      function ConfirmDialog() {
+        return <ConfirmDialogHost store={store} />;
+      },
+    [store]
+  );
 
-  return { confirm, ConfirmDialogComponent: Dialog };
+  return { confirm, ConfirmDialogComponent };
 };

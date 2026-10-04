@@ -43,8 +43,10 @@ export function LegalPageShell({ title, canonical, children }: LegalPageShellPro
             Legal
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
-          <p className="mt-3 text-sm text-muted-foreground">Last updated: {LEGAL_LAST_UPDATED}</p>
-          <div className="mt-10 space-y-10 text-sm leading-relaxed md:text-[15px]">{children}</div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Last updated: {LEGAL_LAST_UPDATED[canonical].label}
+          </p>
+          <div className="mt-10 space-y-10 text-sm leading-relaxed md:text-sm">{children}</div>
         </main>
       </div>
     </>

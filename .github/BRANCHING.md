@@ -44,8 +44,8 @@ git push -u origin feature/your-feature-name
 ### 4. CI Checks Run Automatically
 
 See [CI Pipeline Details](#ci-pipeline-details) below for the full list. Required
-checks must pass before merge; `Coverage Report`, `Dependency audit (baseline)`,
-`Lint (PR title)`, and `PR labeler` run but are not merge-blocking.
+checks must pass before merge; `Dependency audit (baseline)`, `Lint (PR title)`,
+`PR labeler` and `Knip production (advisory)` run but are not merge-blocking.
 
 ### 5. Review & Merge
 
@@ -209,7 +209,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Knip (unused code)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -229,10 +229,10 @@ The `.github/workflows/ci.yml` runs on:
 3. **Typecheck (Expo mobile)** - Validates mobile TypeScript
 4. **Lint (Biome)** - Biome lint + format check
 5. **Lint (Workflows)** - actionlint on GitHub workflow files
-6. **Unit Tests** - `test:convex` + `test:web` vitest suites, the RAG eval fixture and use-case pack dry-runs
+6. **Unit Tests** - `test:convex` vitest suite (Convex + `evals/` tests), the RAG eval fixture and use-case pack dry-runs
 7. **Test (Mobile)** - `jest-expo` suite for `apps/mobile`
 8. **Build (Web, PR parity)** - Builds the React frontend
-9. **Coverage Report** - web coverage floor
+9. **Coverage Report** - the `test:web` vitest suite with coverage (`test:web:coverage`): fails on a failing web test or a drop below the coverage floor
 10. **Knip (unused code)** - `bun run knip` (default mode) finds no unused files, exports, dependencies or duplicate exports. A finding fails the PR: delete the dead code, or if it's a false positive add an ignore with a reason to `knip.json` (`ignoreIssues` for a path, `ignoreDependencies`/`ignoreBinaries` for a package). Every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name. Add yours there, or Knip reports it as unused.
 
 **Advisory** (run on PRs, not merge-blocking):
