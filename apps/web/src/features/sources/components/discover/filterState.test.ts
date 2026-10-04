@@ -63,10 +63,10 @@ describe("countActiveFilters (academic concepts)", () => {
           minCitations: 10,
           openAccessOnly: true,
           hasFullText: true,
-          fieldOfStudyIds: ["computer-science"],
+          fieldOfStudyIds: ["cs"],
         })
       )
-    ).toBeGreaterThanOrEqual(3);
+    ).toBe(4);
   });
 
   it("ignores no-op academic values", () => {
