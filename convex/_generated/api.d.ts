@@ -48,6 +48,7 @@ import type * as _agents__shared_studioTextLlm from "../_agents/_shared/studioTe
 import type * as _agents__shared_timeout from "../_agents/_shared/timeout.js";
 import type * as _agents__shared_tokenUsageAccumulator from "../_agents/_shared/tokenUsageAccumulator.js";
 import type * as _agents__shared_tokenizer from "../_agents/_shared/tokenizer.js";
+import type * as _agents__shared_topicSourceFilter from "../_agents/_shared/topicSourceFilter.js";
 import type * as _agents__shared_topic_extraction from "../_agents/_shared/topic_extraction.js";
 import type * as _agents__shared_usageAggregate from "../_agents/_shared/usageAggregate.js";
 import type * as _agents__shared_validation from "../_agents/_shared/validation.js";
@@ -436,6 +437,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/timeout": typeof _agents__shared_timeout;
   "_agents/_shared/tokenUsageAccumulator": typeof _agents__shared_tokenUsageAccumulator;
   "_agents/_shared/tokenizer": typeof _agents__shared_tokenizer;
+  "_agents/_shared/topicSourceFilter": typeof _agents__shared_topicSourceFilter;
   "_agents/_shared/topic_extraction": typeof _agents__shared_topic_extraction;
   "_agents/_shared/usageAggregate": typeof _agents__shared_usageAggregate;
   "_agents/_shared/validation": typeof _agents__shared_validation;
