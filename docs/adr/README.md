@@ -34,6 +34,7 @@ description already covers.
 | ADR | Title | Status |
 | --- | ----- | ------ |
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+| [0002](0002-voyage-reranking-best-effort.md) | Switch reranking to Voyage AI and make it best-effort | Proposed |
 
 ## Worth backfilling
 
@@ -41,7 +42,7 @@ Decisions already made and described in `CLAUDE.md` that deserve a proper record
 
 - No `jobs` table — generation is scheduled with `ctx.scheduler.runAfter()`
 - Persistent text streaming for generation delivery (vs polling)
-- ZeroEntropy reranking layered on the vector search
+- Reranking (Voyage AI) layered on the vector search — see [0002](0002-voyage-reranking-best-effort.md)
 - `_`-prefix convention for API-excluded Convex modules
 - Squash-only merges with 0 required approvals (single maintainer; see
   `.github/CODEOWNERS`)

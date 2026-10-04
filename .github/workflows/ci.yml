@@ -144,13 +144,12 @@ jobs:
           fi
 
   knip:
-    name: Knip (unused code, advisory)
+    name: Knip (unused code)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Advisory until the baseline is clean: findings go to the job summary and
-    # never fail the PR (--no-exit-code); continue-on-error keeps a Knip crash
-    # or config error from blocking either.
-    continue-on-error: true
+    # Blocking: the default-mode baseline is clean (#236), so any new unused
+    # file, export or dependency fails the PR. Fix it, or add an ignore with a
+    # reason in knip.json (see BRANCHING.md).
     permissions:
       contents: read
     env:
@@ -170,19 +169,44 @@ jobs:
 
       # Default mode includes tests: covers devDependencies and test helpers.
       # convex-test's import.meta.glob("/convex/**/*.ts") marks every Convex
-      # module as used here, so Convex dead code only shows in the next step.
+      # module as used here, so Convex dead code only shows in production mode.
+      # The report goes to the job summary either way; Knip's exit code
+      # (1 = findings, 2 = error) fails the job.
       - name: Knip (default mode)
-        continue-on-error: true
         run: |
+          set +e
+          bun run knip --reporter markdown > knip-report.md
+          status=$?
           {
             echo "## Knip — default mode"
-            bun run knip --no-exit-code --reporter markdown
+            cat knip-report.md
           } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  knip-production:
+    name: Knip production (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory until the test-only code it reports is resolved (#249-#253):
+    # findings go to the job summary and never fail the PR (--no-exit-code);
+    # continue-on-error keeps a Knip crash or config error from blocking either.
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      DOTENV_CONFIG_QUIET: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
 
       # Production mode skips tests (and the glob above): finds dead Convex
       # code and code only reachable from tests.
       - name: Knip (production mode)
-        continue-on-error: true
         run: |
           {
             echo "## Knip — production mode"
@@ -215,6 +239,11 @@ jobs:
 
       - name: Use-case eval packs dry-run
         run: bun run eval:usecases:dry
+
+      # Nothing typechecks evals/ (#311); bundling every module catches broken
+      # relative imports and missing named exports the dry-runs don't reach.
+      - name: Evals bundle check
+        run: bun run check:evals
 
   # Runs the web suite a second time (also in test-unit) to produce the coverage
   # floor. Fold the web run out of test-unit once "Coverage Report" is a required

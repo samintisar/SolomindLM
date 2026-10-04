@@ -62,6 +62,22 @@ checks must pass before merge; `Coverage Report`, `Dependency audit (baseline)`,
 - Web → Vercel
 - Backend → Convex
 
+**PR previews.** Each PR's Vercel preview runs `convex deploy`, which claims a
+Convex preview deployment for the branch. `apps/web/scripts/vercel-ignore-build.sh`
+(the `ignoreCommand` in `apps/web/vercel.json`) skips the preview when a PR only
+touches docs, CI config, `apps/mobile/`, `evals/` or `e2e/`. Those PRs get no
+preview, and their **Vercel** check reports the build as skipped. If the script
+can't tell what changed, it builds.
+
+**`DeploymentQuotaReached`.** If the Vercel check fails with
+`DeploymentQuotaReached: Your team's deployment quota of 40 has been reached`,
+the failure is the Convex quota, not the code. In the Convex dashboard, delete
+the preview deployments of merged or closed branches (the `convex` CLI can't
+delete deployments), then redeploy the failed previews from Vercel
+(Deployments → ⋯ → Redeploy). Convex also removes previews by itself after 5
+days on the Free and Starter plans, or 14 days on Professional, Business and
+Enterprise.
+
 ## Issues
 
 Every change starts as an issue and ends as one squash-merged PR. One issue = one
@@ -135,7 +151,7 @@ Then line by line:
 - **Correctness** — edge cases, `null`/`undefined` (web tsconfig is
   `strict: false`), races and OCC-conflict potential in Convex mutations
 - **Error handling** — no swallowed errors; failed external calls (Together AI,
-  Mistral, Tavily, ZeroEntropy) surface via `toConvexError` / `parseServiceError`
+  Mistral, Tavily, Voyage AI) surface via `toConvexError` / `parseServiceError`
 - **Tests** — new query/mutation has a `*.test.ts`; bugfix has a regression test
   that fails without the fix; agent/prompt change ran an eval, not a unit test
 - **Convex** — validators on all args, indexes for new query patterns, no
@@ -193,7 +209,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Knip (unused code)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -213,15 +229,16 @@ The `.github/workflows/ci.yml` runs on:
 3. **Typecheck (Expo mobile)** - Validates mobile TypeScript
 4. **Lint (Biome)** - Biome lint + format check
 5. **Lint (Workflows)** - actionlint on GitHub workflow files
-6. **Unit Tests** - `test:convex` + `test:web` vitest suites, plus the RAG eval fixture dry-run
+6. **Unit Tests** - `test:convex` + `test:web` vitest suites, the RAG eval fixture and use-case pack dry-runs, and `check:evals` (bundles every `evals/` module, so a broken import or missing export fails here instead of at eval runtime)
 7. **Test (Mobile)** - `jest-expo` suite for `apps/mobile`
 8. **Build (Web, PR parity)** - Builds the React frontend
 9. **Coverage Report** - web coverage floor
+10. **Knip (unused code)** - `bun run knip` (default mode) finds no unused files, exports, dependencies or duplicate exports. A finding fails the PR: delete the dead code, or if it's a false positive add an ignore with a reason to `knip.json` (`ignoreIssues` for a path, `ignoreDependencies`/`ignoreBinaries` for a package). Every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name. Add yours there, or Knip reports it as unused.
 
 **Advisory** (run on PRs, not merge-blocking):
 
 - **Dependency audit (baseline)** - `bun audit`, non-blocking until the baseline is clean
-- **Knip (unused code, advisory)** - [Knip](https://knip.dev) reports unused files, exports and dependencies to the job summary, non-blocking until the baseline is clean. Run locally with `bun run knip` (includes tests) and `bun run knip:production` (shipped code only — the pass that finds dead Convex code, since convex-test's `import.meta.glob` marks every Convex module as used when tests are included). Config is `knip.json`: every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name — add yours there, or Knip reports it as unused.
+- **Knip production (advisory)** - `bun run knip:production` (shipped code only) reports to the job summary without failing. It's the pass that finds dead Convex code, because convex-test's `import.meta.glob` marks every Convex module as used when tests are included. It still lists the test-only code tracked in #249-#253, so it stays advisory until those are resolved.
 - **Lint (PR title)** - conventional-commit form on the PR title (becomes the squash commit)
 - **PR labeler** - applies `area:*` labels from changed paths (`.github/labeler.yml`)
 - **CodeRabbit** - AI review comments on ready (non-draft) PRs; config in .coderabbit.yaml. Advisory only.

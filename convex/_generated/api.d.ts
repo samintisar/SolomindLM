@@ -180,6 +180,7 @@ import type * as _agents_written_questions_structuredLlm from "../_agents/writte
 import type * as _lib_allowedOrigins from "../_lib/allowedOrigins.js";
 import type * as _lib_arxivThrottle from "../_lib/arxivThrottle.js";
 import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
+import type * as _lib_cspReport from "../_lib/cspReport.js";
 import type * as _lib_defaultSmartModel from "../_lib/defaultSmartModel.js";
 import type * as _lib_embeddingConfig from "../_lib/embeddingConfig.js";
 import type * as _lib_env from "../_lib/env.js";
@@ -192,6 +193,7 @@ import type * as _lib_logging_serviceLogger from "../_lib/logging/serviceLogger.
 import type * as _lib_notebookAccess from "../_lib/notebookAccess.js";
 import type * as _lib_queryCaps from "../_lib/queryCaps.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
+import type * as _lib_rerankConfig from "../_lib/rerankConfig.js";
 import type * as _lib_resendSendError from "../_lib/resendSendError.js";
 import type * as _lib_resolveSmartModel from "../_lib/resolveSmartModel.js";
 import type * as _lib_semanticScholarThrottle from "../_lib/semanticScholarThrottle.js";
@@ -223,6 +225,7 @@ import type * as _services_ai_mp3 from "../_services/ai/mp3.js";
 import type * as _services_ai_openaiImages from "../_services/ai/openaiImages.js";
 import type * as _services_ai_titleGenerator from "../_services/ai/titleGenerator.js";
 import type * as _services_ai_togetherTts from "../_services/ai/togetherTts.js";
+import type * as _services_ai_voyageRerank from "../_services/ai/voyageRerank.js";
 import type * as _services_ai_wav from "../_services/ai/wav.js";
 import type * as _services_cache_cache from "../_services/cache/cache.js";
 import type * as _services_cache_cacheCrypto from "../_services/cache/cacheCrypto.js";
@@ -565,6 +568,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/allowedOrigins": typeof _lib_allowedOrigins;
   "_lib/arxivThrottle": typeof _lib_arxivThrottle;
   "_lib/conversationAccess": typeof _lib_conversationAccess;
+  "_lib/cspReport": typeof _lib_cspReport;
   "_lib/defaultSmartModel": typeof _lib_defaultSmartModel;
   "_lib/embeddingConfig": typeof _lib_embeddingConfig;
   "_lib/env": typeof _lib_env;
@@ -577,6 +581,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/notebookAccess": typeof _lib_notebookAccess;
   "_lib/queryCaps": typeof _lib_queryCaps;
   "_lib/rateLimits": typeof _lib_rateLimits;
+  "_lib/rerankConfig": typeof _lib_rerankConfig;
   "_lib/resendSendError": typeof _lib_resendSendError;
   "_lib/resolveSmartModel": typeof _lib_resolveSmartModel;
   "_lib/semanticScholarThrottle": typeof _lib_semanticScholarThrottle;
@@ -608,6 +613,7 @@ declare const fullApi: ApiFromModules<{
   "_services/ai/openaiImages": typeof _services_ai_openaiImages;
   "_services/ai/titleGenerator": typeof _services_ai_titleGenerator;
   "_services/ai/togetherTts": typeof _services_ai_togetherTts;
+  "_services/ai/voyageRerank": typeof _services_ai_voyageRerank;
   "_services/ai/wav": typeof _services_ai_wav;
   "_services/cache/cache": typeof _services_cache_cache;
   "_services/cache/cacheCrypto": typeof _services_cache_cacheCrypto;
