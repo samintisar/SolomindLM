@@ -220,7 +220,7 @@ export interface EvalRunArtifact {
   studioOutput?: StudioOutput;
   /** Source policy used for this run */
   sourcePolicy?: SourcePolicyConfig;
-  /** Per-source-type evidence found (research runner only) */
+  /** Per-channel evidence found (chat and research runners) */
   sourceEvidence?: Array<{
     channel: EvidenceChannel;
     sourceCount: number;
