@@ -4,7 +4,8 @@ import { expect } from "@playwright/test";
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Open the Add Source modal by clicking the "Add Source" button in the source list.
+ * Open the add-source dialog by clicking the "Add Source" button in the source list,
+ * then wait for the menu step (the dialog is named by its title).
  */
 export async function openAddSourceModal(page: Page) {
   // On mobile, we may need to switch to sources tab first (exact: not "Open Sources" / close panel)
@@ -17,6 +18,7 @@ export async function openAddSourceModal(page: Page) {
   // Use evaluate to click via JS because the ChatEmptyState overlay can intercept pointer events.
   const addBtn = page.locator('[title="Add Source"]').first();
   await addBtn.evaluate((el) => (el as HTMLElement).click());
+  await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 }
 
 /**

@@ -45,7 +45,7 @@ const dialogContentVariants = cva(
   {
     variants: {
       theme: { default: "", light: "auth-form-light" },
-      size: { default: "", wide: "flex max-h-svh flex-col overflow-hidden sm:max-w-3xl" },
+      size: { default: "", wide: "flex max-h-9/10 flex-col overflow-hidden sm:max-w-3xl" },
       padding: { default: "", none: "gap-0 p-0" },
     },
     defaultVariants: { theme: "default", size: "default", padding: "default" },

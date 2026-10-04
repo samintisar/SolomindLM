@@ -7,17 +7,23 @@ test.describe("URL Ingestion", () => {
   test("URL modal validates input format", async ({ notebookPage }) => {
     const page = notebookPage;
 
-    // Open add source modal and click Website
+    // Open the add-source dialog and click Website
     await openAddSourceModal(page);
-    await page.getByRole("button", { name: "Website" }).click();
+    await page
+      .getByRole("dialog", { name: "Add sources" })
+      .getByRole("button", { name: "Website", exact: true })
+      .click();
+
+    // The website step replaces the menu inside the same (only) dialog
+    const dialog = page.getByRole("dialog");
 
     // Enter invalid URL
-    await page.getByPlaceholder(/https:\/\/example\.com/).fill("not-a-url");
+    await dialog.getByPlaceholder(/https:\/\/example\.com/).fill("not-a-url");
 
     // Submit
-    await page.getByRole("button", { name: "Add Sources" }).click();
+    await dialog.getByRole("button", { name: "Add Sources", exact: true }).click();
 
-    // Should show validation error
+    // The validation error is a toast, which renders outside the dialog
     await expect(page.getByText(/Please enter at least one valid URL/)).toBeVisible();
   });
 

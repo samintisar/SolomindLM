@@ -57,13 +57,13 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
-    // Set files on the hidden file input inside the modal
+    // Set files on the hidden file input inside the dialog
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(filePath);
 
-    // Modal should close after file selection (processFiles handles this via state changes)
+    // The dialog closes after file selection (processFiles handles this via state changes)
     // Wait for source to appear in the list (title has extension stripped)
     await expect(getSourceCard(page, displayTitle)).toBeVisible({ timeout: 15_000 });
 
@@ -83,7 +83,7 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath1, filePath2);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
     // Upload both files at once
     const fileInput = page.locator('input[type="file"]').first();
@@ -108,10 +108,10 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
-    // Find the drop zone (the upload area with dashed border)
-    const dropZone = page.locator("div[class*='border-dashed']").first();
+    // Find the drop zone
+    const dropZone = page.getByTestId("source-dropzone");
     await expect(dropZone).toBeVisible();
 
     // Use Playwright's built-in drag and drop with a file
@@ -161,7 +161,7 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(filePath);
@@ -178,10 +178,10 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
     // Find the drop zone
-    const dropZone = page.locator("div[class*='border-dashed']").first();
+    const dropZone = page.getByTestId("source-dropzone");
     await expect(dropZone).toBeVisible();
 
     // Try to drop an unsupported file using proper DataTransfer
@@ -231,7 +231,7 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(filePath);
@@ -256,7 +256,7 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(filePath);
@@ -275,7 +275,7 @@ test.describe("File Uploads", () => {
     tempFiles.push(filePath);
 
     await openAddSourceModal(page);
-    await expect(page.getByText("Add sources")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Add sources" })).toBeVisible();
 
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(filePath);

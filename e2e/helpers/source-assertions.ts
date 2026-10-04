@@ -23,58 +23,57 @@ export function getSourceCheckbox(page: Page, sourceTitle: string | RegExp) {
 }
 
 /**
- * Add a paste-text source: opens modal, clicks "Copied text", fills textarea, submits.
+ * Add a paste-text source: opens the dialog, clicks "Copied text", fills the textarea, submits.
  * After calling this, use waitForSourceStatus(page, PASTED_TEXT_TITLE, ...) to wait for completion.
  */
 export async function addPasteTextSource(page: Page, text: string) {
   await openAddSourceModal(page);
 
-  // Wait for modal to be interactable before clicking inside it
-  await expect(page.getByText("Add sources")).toBeVisible();
+  // The dialog is named by its title, which changes once a step is chosen
+  const menu = page.getByRole("dialog", { name: "Add sources" });
+  await expect(menu).toBeVisible();
 
   // Click the "Copied text" button
-  await page.getByRole("button", { name: "Copied text" }).click();
+  await menu.getByRole("button", { name: "Copied text", exact: true }).click();
 
-  // Wait for TextInputModal to open
-  await expect(page.getByPlaceholder("Paste your text here...")).toBeVisible();
+  // The text step replaces the menu inside the same (only) dialog
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByPlaceholder("Paste your text here...")).toBeVisible();
 
   // Fill the textarea using pressSequentially for reliable React state updates
-  const textarea = page.getByPlaceholder("Paste your text here...");
+  const textarea = dialog.getByPlaceholder("Paste your text here...");
   await textarea.click();
   await textarea.pressSequentially(text, { delay: 2 });
 
   // Submit
-  await page
-    .getByRole("button", { name: "Add Source" })
-    .last()
-    .evaluate((el) => (el as HTMLElement).click());
+  await dialog.getByRole("button", { name: "Add Source", exact: true }).click();
 
-  // Wait for modal to close (confirms submission succeeded)
-  await expect(page.getByPlaceholder("Paste your text here...")).not.toBeVisible({
-    timeout: 5_000,
-  });
+  // Wait for the dialog to close (confirms submission succeeded)
+  await expect(dialog).not.toBeVisible({ timeout: 5_000 });
 }
 
 /**
- * Add a URL source: opens modal, clicks "Website", fills URL input, submits.
+ * Add a URL source: opens the dialog, clicks "Website", fills the URL input, submits.
  */
 export async function addUrlSource(page: Page, url: string) {
   await openAddSourceModal(page);
 
-  // Wait for modal to be interactable
-  await expect(page.getByText("Add sources")).toBeVisible();
+  // The dialog is named by its title, which changes once a step is chosen
+  const menu = page.getByRole("dialog", { name: "Add sources" });
+  await expect(menu).toBeVisible();
 
   // Click the "Website" button
-  await page.getByRole("button", { name: "Website" }).click();
+  await menu.getByRole("button", { name: "Website", exact: true }).click();
 
-  // Wait for URL input modal
-  await expect(page.getByPlaceholder(/https:\/\/example\.com/)).toBeVisible();
+  // The website step replaces the menu inside the same (only) dialog
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByPlaceholder(/https:\/\/example\.com/)).toBeVisible();
 
   // Fill the URL textarea
-  await page.getByPlaceholder(/https:\/\/example\.com/).fill(url);
+  await dialog.getByPlaceholder(/https:\/\/example\.com/).fill(url);
 
   // Submit
-  await page.getByRole("button", { name: "Add Sources" }).click();
+  await dialog.getByRole("button", { name: "Add Sources", exact: true }).click();
 }
 
 /**
