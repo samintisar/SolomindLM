@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvalRunArtifact } from "../types";
 import {
+  formatChunks,
   formatResearchEvidence,
   parseBinaryResponse,
   scoreBinaryJudgeMetrics,
@@ -129,8 +130,21 @@ describe("chat judges", () => {
     const [grounding] = await chatPrompts({ answer: "x", selectedChunks: big });
     expect(grounding).toContain("END4");
     expect(grounding).not.toContain("END5");
-    expect(grounding).toContain("[… 2 more passages not shown]");
+    expect(grounding).toContain("[… 2 passages not shown: 5, 6]");
     expect(grounding).toContain("Some retrieved passages were cut off for judging");
+  });
+
+  it("skips a passage that does not fit and keeps later ones that do", () => {
+    const { text, truncated } = formatChunks([
+      { id: "1", sourceTitle: "", content: "a".repeat(24_000) },
+      { id: "2", sourceTitle: "", content: "b".repeat(30_000) },
+      { id: "3", sourceTitle: "", content: "small fact" },
+    ]);
+    expect(text).toContain("[3]\nsmall fact");
+    expect(text).not.toContain("b".repeat(100));
+    expect(text).toContain("[… 1 passages not shown: 2]");
+    expect(truncated).toBe(true);
+    expect(text.length).toBeLessThanOrEqual(48_000 + 100);
   });
 
   it("lets the citation judge map citation markers to chunk ids", async () => {
