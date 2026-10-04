@@ -65,7 +65,7 @@ function Harness({
   variant,
 }: {
   onResult: (v: boolean) => void;
-  variant?: "danger" | "default";
+  variant?: "danger" | "warning" | "default";
 }) {
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   return (
@@ -88,7 +88,7 @@ function Harness({
   );
 }
 
-async function open(variant?: "danger" | "default") {
+async function open(variant?: "danger" | "warning" | "default") {
   const onResult = vi.fn();
   const user = userEvent.setup();
   render(<Harness onResult={onResult} variant={variant} />);
@@ -141,7 +141,7 @@ describe("useConfirmDialog", () => {
 ```ts
 import type { ReactNode } from "react";
 
-export type ConfirmVariant = "danger" | "default";
+export type ConfirmVariant = "danger" | "warning" | "default";
 
 export interface ConfirmState {
   isOpen: boolean;
@@ -321,9 +321,13 @@ export const useConfirmDialog = () => {
 };
 ```
 
-- [ ] **Step 6: Check that no caller passes `variant: "warning"`.**
-  - Run: `grep -rn 'variant: "warning"' apps/web/src --include=*.tsx`
-  - Expected: no output.
+- [ ] **Step 6: Keep the `warning` variant.** (Corrected after implementation: the snippets above originally dropped it.)
+  - **Check:** `grep -rn 'variant: "warning"' apps/web/src --include=*.ts --include=*.tsx` lists the eight Studio create flows and `studioContextGuard.ts`, so `warning` stays.
+  - **`confirmStore.ts`:** `ConfirmVariant` is `"danger" | "warning" | "default"`.
+  - **`button.tsx`:** add a `warning` variant: `"rounded-xl bg-warning text-warning-foreground shadow-md shadow-warning/25 hover:-translate-y-px hover:bg-warning/90 hover:shadow-lg active:translate-y-0 active:scale-98"`.
+  - **`ConfirmDialog.tsx`:** map the variants with `const ACTION_VARIANT = { danger: "destructive", warning: "warning", default: "default" } as const satisfies Record<ConfirmVariant, string>;`. Then pass `variant={ACTION_VARIANT[variant]}` to `AlertDialogAction`.
+  - **Test:** widen the harness's `variant` type and add a case asserting `data-variant="warning"`.
+  - **Focus:** the dialog has no trigger, so `confirm()` records `document.activeElement` as `returnFocusTo`. `AlertDialogContent`'s `onCloseAutoFocus` then focuses it again if it's still connected.
 
 - [ ] **Step 7: Run the test and see it pass.**
   - Run: `bunx vitest run --root apps/web src/shared/ui/ConfirmDialog.test.tsx src/features/billing src/features/notebooks src/features/sources`

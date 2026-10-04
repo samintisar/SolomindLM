@@ -59,7 +59,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         {/* Loading state */}
         {isResolving && (
           <div className="flex items-center justify-center py-8">
-            <div className="text-center">
+            <div role="status" className="text-center">
               <span className="mb-2 inline-flex text-primary">
                 <Spinner className="size-8" aria-hidden />
               </span>

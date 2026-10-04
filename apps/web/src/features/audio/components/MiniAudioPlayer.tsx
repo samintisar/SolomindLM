@@ -65,7 +65,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
       {/* Loading state */}
       {isResolving && (
         <div className="flex items-center justify-center py-4">
-          <div className="text-center">
+          <div role="status" className="text-center">
             <span className="mb-1 inline-flex text-primary">
               <Spinner className="size-6" aria-hidden />
             </span>
