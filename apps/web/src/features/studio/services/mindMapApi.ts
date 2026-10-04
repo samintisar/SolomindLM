@@ -7,6 +7,8 @@ export interface CreateMindMapParams {
   notebookId: string;
   documentIds: string[];
   title?: string;
+  /** Steers which sources are read and how the map is organized. */
+  customPrompt?: string;
 }
 
 export interface CreateMindMapResponse {
@@ -86,6 +88,7 @@ export function useCreateMindMap() {
       notebookId: params.notebookId as Id<"notebooks">,
       documentIds: params.documentIds as Id<"documents">[],
       title: params.title,
+      customPrompt: params.customPrompt,
     });
 
     return {

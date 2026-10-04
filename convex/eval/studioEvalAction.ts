@@ -371,6 +371,7 @@ export const startMindmapEval = action({
     evalSecret: v.string(),
     notebookId: v.id("notebooks"),
     documentIds: v.optional(v.array(v.id("documents"))),
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<MindmapEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
@@ -391,6 +392,7 @@ export const startMindmapEval = action({
       userId: userId as string,
       notebookId: args.notebookId,
       documentIds,
+      customPrompt: args.customPrompt?.trim() || undefined,
     });
 
     return { mindmapId: mindmapId as string, startedAt: Date.now() };

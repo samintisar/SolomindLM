@@ -6,7 +6,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { validateWithPreset } from "../../_agents/_shared/index";
+import { sanitizeUserInput, validateWithPreset } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { fillTemplate } from "../../_agents/_shared/promptTemplate";
@@ -25,6 +25,7 @@ import {
   MAP_SYSTEM_PROMPT,
   REDUCE_PROMPT,
   REDUCE_SYSTEM_PROMPT,
+  withMindMapRequest,
 } from "../../_agents/mindmap/prompts";
 import type { ConceptExtraction, FinalMindMap, MindMapNode } from "../../_agents/mindmap/state";
 import { ConceptExtractionSchema } from "../../_agents/mindmap/structuredLlm";
@@ -50,6 +51,8 @@ export type MindmapGenerationPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   documentIds: Id<"documents">[];
+  /** The user's custom prompt for this mind map. */
+  customPrompt?: string;
 };
 
 export type ProcessMindMapMapChunkPhaseArgs = {
@@ -59,12 +62,14 @@ export type ProcessMindMapMapChunkPhaseArgs = {
   chunkIndex: number;
   totalChunks: number;
   chunk: string;
+  customPrompt?: string;
 };
 
 export type FinalizeMindMapPhaseArgs = {
   mindmapId: Id<"mindmaps">;
   userId: string;
   notebookId: Id<"notebooks">;
+  customPrompt?: string;
 };
 
 // ============================================================
@@ -140,7 +145,7 @@ export async function runMindmapGenerationPhase(
 ): Promise<void> {
   "use node";
 
-  const { mindmapId, userId, notebookId, documentIds } = args;
+  const { mindmapId, userId, notebookId, documentIds, customPrompt } = args;
 
   // Initialize structured logger
   const logger = createJobLogger({
@@ -183,7 +188,10 @@ export async function runMindmapGenerationPhase(
     // Get document chunks
     const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
+      topic: customPrompt,
     });
+    // Sources left after narrowing to the custom prompt (#288).
+    const topicDocumentCount = new Set(chunkObjects.map((c) => c.documentId)).size;
 
     // Extract content from chunk objects
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
@@ -193,7 +201,7 @@ export async function runMindmapGenerationPhase(
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
     const mapPlan = planStudioJobMapPhase({
-      documentCount: documentIds.length,
+      documentCount: topicDocumentCount,
       chunks: validatedChunks,
       estimateTokens: countTokens,
       pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
@@ -226,6 +234,7 @@ export async function runMindmapGenerationPhase(
         mindmapId,
         userId,
         notebookId,
+        customPrompt,
       });
 
       logger.info("Map phase skipped", {
@@ -254,6 +263,7 @@ export async function runMindmapGenerationPhase(
         chunkIndex: i,
         totalChunks: mapPlan.mapChunks.length,
         chunk: mapPlan.mapChunks[i],
+        customPrompt,
       });
       console.log(`[MindMapJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
     }
@@ -299,7 +309,7 @@ export async function runProcessMindMapMapChunkPhase(
 ): Promise<void> {
   "use node";
 
-  const { mindmapId, userId, notebookId, chunkIndex, totalChunks, chunk } = args;
+  const { mindmapId, userId, notebookId, chunkIndex, totalChunks, chunk, customPrompt } = args;
 
   const logger = createJobLogger({
     jobType: "mindmap",
@@ -334,7 +344,10 @@ export async function runProcessMindMapMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    const prompt = fillTemplate(MAP_PROMPT, { content: chunk });
+    const prompt = withMindMapRequest(
+      fillTemplate(MAP_PROMPT, { content: chunk }),
+      customPrompt ? sanitizeUserInput(customPrompt) : undefined
+    );
 
     console.log(`[MindMapJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
@@ -404,6 +417,7 @@ export async function runProcessMindMapMapChunkPhase(
         mindmapId,
         userId,
         notebookId,
+        customPrompt,
       });
     }
   } catch (error) {
@@ -458,6 +472,7 @@ export async function runProcessMindMapMapChunkPhase(
           mindmapId,
           userId,
           notebookId,
+          customPrompt,
         });
       } else {
         await ctx.runMutation(internal.studio.jobMutations.mindmaps.markMindMapFailed, {
@@ -485,7 +500,7 @@ export async function runFinalizeMindMapPhase(
 ): Promise<void> {
   "use node";
 
-  const { mindmapId, userId, notebookId } = args;
+  const { mindmapId, userId, notebookId, customPrompt } = args;
 
   const logger = createJobLogger({
     jobType: "mindmap",
@@ -580,7 +595,10 @@ export async function runFinalizeMindMapPhase(
         invoke: () =>
           invokeTogetherText({
             systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-            userPrompt: fillTemplate(REDUCE_PROMPT, { extractions: safeInput }),
+            userPrompt: withMindMapRequest(
+              fillTemplate(REDUCE_PROMPT, { extractions: safeInput }),
+              customPrompt ? sanitizeUserInput(customPrompt) : undefined
+            ),
             model: env.MINDMAP_LLM,
             maxTokens: 16_000,
             temperature: 0.3,

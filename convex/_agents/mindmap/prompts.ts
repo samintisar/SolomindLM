@@ -94,6 +94,19 @@ DATA (Themes and Concepts from documents):
 
 Generate the mind map now.`;
 
+/**
+ * Add the user's custom prompt (already sanitized) to a map or reduce prompt. Without one the
+ * prompt is unchanged.
+ */
+export function withMindMapRequest(prompt: string, request: string | undefined): string {
+  const trimmed = request?.trim();
+  if (!trimmed) return prompt;
+  return `${prompt}
+
+USER REQUEST (follow it for focus, emphasis and organization): "${trimmed}"
+Only use concepts from the source material above; if the source doesn't cover part of the request, leave that part out rather than inventing it.`;
+}
+
 // ============================================================
 // NODE NAMES
 // ============================================================
