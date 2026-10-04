@@ -103,7 +103,13 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
           <InputGroupInput
             id={id}
             value={doi}
-            onChange={(e) => setDoi(e.target.value)}
+            onChange={(e) => {
+              setDoi(e.target.value);
+              // The preview belongs to the DOI that was resolved; a new DOI must be resolved again
+              // before anything can be added.
+              setPreview(null);
+              setError(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

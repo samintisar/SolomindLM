@@ -44,6 +44,16 @@ describe("DoiForm", () => {
     expect(screen.getByText("Ann Lee")).toBeInTheDocument();
   });
 
+  it("drops the preview when the DOI is edited, so the old paper can't be added", async () => {
+    resolveDoi.mockResolvedValue(resolved);
+    setup();
+    await resolvePreview();
+    expect(await screen.findByRole("button", { name: "Add to notebook" })).toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: "DOI" }), "9");
+    expect(screen.queryByRole("button", { name: "Add to notebook" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Paper")).not.toBeInTheDocument();
+  });
+
   it("shows an alert when the DOI cannot be resolved", async () => {
     resolveDoi.mockResolvedValue(null);
     setup();
