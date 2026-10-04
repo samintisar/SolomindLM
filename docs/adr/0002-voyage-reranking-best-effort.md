@@ -47,10 +47,21 @@ are never served.
 
 - Chat survives a reranker outage with slightly lower retrieval quality instead
   of failing.
-- Voyage relevance scores are not calibrated like ZeroEntropy's (an unrelated
-  passage still scores about 0.3), so `CHAT_MIN_RELEVANCE_THRESHOLD` (0.20) now
-  filters less. Re-tune it against `eval:rag`.
+- Voyage relevance scores are not calibrated like ZeroEntropy's, so
+  `CHAT_MIN_RELEVANCE_THRESHOLD` was re-tuned from 0.20 to 0.35 on 2026-10-04.
+  Method: collect the 25-chunk candidate pool of 61 chat fixtures (`eval:rag
+  --runner chat`, train split plus use-case packs), score each pool with real
+  `rerank-3`, and compare against off-topic questions run over the same pools.
+  Off-topic chunks score 0.25-0.29 (p99 0.31); 0.35 drops all but 3 of 1,212 of
+  them and keeps 100% of the 95 chunks containing an expected item (which score
+  0.50-0.94). That 100% is not labeled recall across all 61 fixtures: only 26
+  had `expectedItems`, and a chunk counted as useful only if it contained one
+  verbatim, a lexical proxy rather than a human judgement. 0.40 also keeps all
+  of those but cuts into on-topic context (5% of the top-15 chunks), so 0.35
+  leaves a margin on the safe side.
+  Chunks past the rerank top-N keep their vector similarity (~0.5) and pass the
+  floor either way; unifying those scales is a separate change.
 - Voyage's higher rate-limit tier needs a payment method on the account.
 - Privacy policy subprocessor list now names Voyage AI instead of ZeroEntropy.
-- The unused `ZEROENTROPY_API_KEY` / `ZEROENTROPY_RERANK_MODEL` Convex env vars
-  can be deleted once the switch is deployed.
+- The unused `ZEROENTROPY_API_KEY` / `ZEROENTROPY_RERANK_MODEL` Convex env vars were
+  deleted from dev and prod after the switch was deployed.
