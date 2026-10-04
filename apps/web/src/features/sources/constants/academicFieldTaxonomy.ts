@@ -112,7 +112,10 @@ export const ACADEMIC_FIELD_GROUPS: AcademicFieldGroup[] = [
   },
 ];
 
-/** SJR journal tiers. Not shown in the UI until discovery results carry venue metrics. */
+/**
+ * SJR journal tiers. Not shown in the UI until discovery results carry venue metrics.
+ * @public Kept for that filter; tells Knip the unused export is intentional.
+ */
 export const ACADEMIC_SJR_TIERS = [
   { id: 1 as const, label: "Q1", subtitle: "Highest-ranked journals" },
   { id: 2 as const, label: "Q2 & Up", subtitle: "Q1–Q2 journals" },
