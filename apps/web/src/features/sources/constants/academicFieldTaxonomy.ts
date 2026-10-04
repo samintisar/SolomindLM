@@ -13,7 +13,7 @@ export interface AcademicFieldGroup {
   id: string;
   label: string;
   items: AcademicFieldItem[];
-  /** Extra items revealed behind “See N more…” */
+  /** Extra items revealed behind “Show N more” */
   moreItems?: AcademicFieldItem[];
 }
 
@@ -112,39 +112,12 @@ export const ACADEMIC_FIELD_GROUPS: AcademicFieldGroup[] = [
   },
 ];
 
+/** SJR journal tiers. Not shown in the UI until discovery results carry venue metrics. */
 export const ACADEMIC_SJR_TIERS = [
-  {
-    id: 1 as const,
-    label: "Q1",
-    subtitle: "Highest-ranked journals",
-    pillClass: "border-emerald-200/80 bg-emerald-50 text-emerald-950",
-    barClass: "bg-emerald-500/90",
-    barWidth: "w-[92%]",
-  },
-  {
-    id: 2 as const,
-    label: "Q2 & Up",
-    subtitle: "Q1–Q2 journals",
-    pillClass: "border-amber-200/80 bg-amber-50 text-amber-950",
-    barClass: "bg-amber-500/85",
-    barWidth: "w-[72%]",
-  },
-  {
-    id: 3 as const,
-    label: "Q3 & Up",
-    subtitle: "Q1–Q3 journals",
-    pillClass: "border-orange-200/70 bg-orange-50/90 text-orange-950",
-    barClass: "bg-orange-400/85",
-    barWidth: "w-[48%]",
-  },
-  {
-    id: 4 as const,
-    label: "Q4 & Up",
-    subtitle: "All ranked tiers",
-    pillClass: "border-rose-200/70 bg-rose-50/90 text-rose-950",
-    barClass: "bg-rose-500/80",
-    barWidth: "w-[28%]",
-  },
+  { id: 1 as const, label: "Q1", subtitle: "Highest-ranked journals" },
+  { id: 2 as const, label: "Q2 & Up", subtitle: "Q1–Q2 journals" },
+  { id: 3 as const, label: "Q3 & Up", subtitle: "Q1–Q3 journals" },
+  { id: 4 as const, label: "Q4 & Up", subtitle: "All ranked tiers" },
 ];
 
 export type AcademicSjrWorstAllowed = 1 | 2 | 3 | 4;
