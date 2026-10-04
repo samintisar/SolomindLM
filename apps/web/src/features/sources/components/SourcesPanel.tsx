@@ -14,7 +14,7 @@ import {
 import { useSourcesContext } from "../useSourcesContext";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { AddSourceDialog } from "./add-source/AddSourceDialog";
-import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
+import { DiscoverSourcesDialog } from "./discover/DiscoverSourcesDialog";
 import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
 import { GoogleDrivePicker, isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
 import { SourceList } from "./SourceList";
@@ -419,12 +419,11 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onGoogleDriveClick={() => googleDriveRef.current?.open()}
       />
 
-      <DiscoverSourcesModal
-        isOpen={isDiscoverOpen}
-        onClose={() => setIsDiscoverOpen(false)}
+      <DiscoverSourcesDialog
+        open={isDiscoverOpen}
+        onOpenChange={setIsDiscoverOpen}
         onAddSource={onAddSource}
         notebookSources={sources}
-        isAtLimit={sources.length >= 200}
         userId={userId}
         noteId={noteId}
         onDocumentUploaded={onDocumentUploaded}
