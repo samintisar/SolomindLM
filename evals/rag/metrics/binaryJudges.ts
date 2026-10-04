@@ -45,7 +45,11 @@ function excerptForJudge(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}\n[… output cut off here for judging; the full output is ${text.length} characters and continues. Do not treat this cut as the output ending early.]`;
 }
 
-/** Fits every chunk of a typical chat answer (~30 chunks, under 20K characters). */
+/**
+ * Passage budget for judge prompts; fits every chunk of a typical chat answer (~30 chunks, under
+ * 20K characters). It is a size guide, not a model limit: the cut and skipped-passage notes and the
+ * grounding warning are added on top (tens to a few hundred characters).
+ */
 export const CHUNK_CONTEXT_LIMIT = 48_000;
 const CHUNK_SEPARATOR = "\n\n---\n\n";
 
