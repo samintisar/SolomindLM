@@ -9,10 +9,12 @@
 export const TOPIC_SOURCE_TOP_K = 3;
 
 /**
- * A source is dropped when its score is more than this far below the best source's score
- * (cosine similarity, text-embedding-3-small).
+ * The smallest drop between neighbouring source scores (cosine similarity,
+ * text-embedding-3-small) that splits on-topic from off-topic sources. Calibrated on the use-case
+ * pack requests on dev (2026-10-04): requests that should keep every source had their largest drop
+ * at 0.065 or less; topic requests that should narrow had a drop of at least 0.104.
  */
-export const TOPIC_SOURCE_GAP = 0.1;
+export const TOPIC_SOURCE_GAP = 0.085;
 
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
@@ -46,16 +48,28 @@ export function documentTopicScores(
   return scores;
 }
 
-/** Keep the sources within `gap` of the best score; the best source always stays. */
+/**
+ * Sort sources by score and find the largest drop between neighbours. If it is at least `gap`,
+ * the sources below it are dropped; otherwise (no clear split, as for a generic request) every
+ * source stays. The best source always stays.
+ */
 export function selectTopicDocuments(
   scores: Map<string, number>,
   gap = TOPIC_SOURCE_GAP
 ): { keep: string[]; dropped: string[] } {
-  const best = Math.max(...scores.values());
-  const keep: string[] = [];
-  const dropped: string[] = [];
-  for (const [documentId, score] of scores) {
-    (score >= best - gap ? keep : dropped).push(documentId);
+  const ranked = [...scores].sort((a, b) => b[1] - a[1]);
+  let cutAfter = -1;
+  let largestDrop = 0;
+  for (let i = 0; i < ranked.length - 1; i++) {
+    const drop = ranked[i][1] - ranked[i + 1][1];
+    if (drop > largestDrop) {
+      largestDrop = drop;
+      cutAfter = i;
+    }
   }
-  return { keep, dropped };
+  const split = largestDrop >= gap ? cutAfter + 1 : ranked.length;
+  return {
+    keep: ranked.slice(0, split).map(([id]) => id),
+    dropped: ranked.slice(split).map(([id]) => id),
+  };
 }
