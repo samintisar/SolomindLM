@@ -32,29 +32,29 @@ export const transcribeChatAudio = action({
       throw new Error("Unauthenticated");
     }
 
-    // Rate limit: per-user, per-hour
-    await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
-      userId,
-      feature: "chat",
-    });
-
-    // Verify the user can read the notebook
+    // Verify the user can read the notebook. Kept outside the cleanup below so a caller
+    // without access cannot use this action to delete an arbitrary storage object.
     await ctx.runQuery(internal.chat.voiceTranscriptionAccess.assertCanReadNotebookForChatVoice, {
       notebookId: args.notebookId,
       userId,
     });
 
-    // Verify the storage blob exists
-    const url = await ctx.storage.getUrl(args.storageId);
-    if (!url) {
-      const err = new StorageError("getUrl", "Storage object not found or expired", {
-        storageId: args.storageId,
-      });
-      logger.operationError(err);
-      throw toConvexError(err);
-    }
-
+    // From here on the clip is deleted however the request ends (the privacy policy says so).
     try {
+      // Rate limit: per-user, per-hour
+      await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
+        userId,
+        feature: "chat",
+      });
+
+      // Verify the storage blob exists
+      const url = await ctx.storage.getUrl(args.storageId);
+      if (!url) {
+        throw new StorageError("getUrl", "Storage object not found or expired", {
+          storageId: args.storageId,
+        });
+      }
+
       const service = new AudioTranscriptionService(env.TOGETHER_AI_API_KEY);
       const text = await service.transcribe(url);
 
