@@ -1,5 +1,8 @@
-/** Bump when legal copy changes (shown on /terms and /privacy). */
-export const LEGAL_LAST_UPDATED = "October 3, 2026";
-
-/** ISO date for sitemap lastmod (keep in sync with LEGAL_LAST_UPDATED). */
-export const LEGAL_LAST_UPDATED_ISO = "2026-10-03";
+/**
+ * "Last updated" date per legal page (shown on the page, in the prerendered HTML and as the
+ * sitemap lastmod). Bump only the page whose copy changed.
+ */
+export const LEGAL_LAST_UPDATED = {
+  "/privacy": { label: "October 4, 2026", iso: "2026-10-04" },
+  "/terms": { label: "June 6, 2026", iso: "2026-06-06" },
+} as const;
