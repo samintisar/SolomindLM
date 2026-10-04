@@ -36,8 +36,9 @@ The 2 findings in `shared/ui/DropdownMenu.tsx` are out of scope, as listed below
 `shared/ui/ConfirmDialog.tsx` is a hand-rolled portal. It has no focus trap and no Escape handling, and its button styles are hand-written.
 - **Rebuild:** use the shadcn `AlertDialog` primitives: `AlertDialogContent`, `Header`, `Title`, `Description`, `Footer`, `Cancel` and `Action`.
 - **Behaviour:** Radix gives focus trapping, Escape to cancel, and focus returned to the element that opened the dialog.
-- **Buttons:** Cancel is `AlertDialogCancel`. Confirm is `AlertDialogAction`, using `variant="destructive"` for `danger` and `default` otherwise.
-- **Variants:** the unused `warning` variant is removed, leaving `"danger" | "default"`.
+- **Buttons:** Cancel is `AlertDialogCancel`. Confirm is `AlertDialogAction`, using `destructive` for `danger`, `warning` for `warning` and `default` otherwise.
+- **Variants:** all three stay: `"danger" | "warning" | "default"`. `warning` is used by the eight Studio create flows and the context guard. A new `warning` `Button` variant (`bg-warning`) replaces the hand-written warning button style.
+- **Focus:** the dialog has no trigger, so the element focused when `confirm()` was called gets focus back on close, if it is still in the document.
 - **Closing:** closing any other way (Escape, overlay, Cancel) resolves `false`. Confirm resolves `true`.
 - **`useConfirmDialog` API unchanged:** `confirm(title, message, options) => Promise<boolean>` and the rendered `<ConfirmDialogComponent />` stay the same. The five calling components (`BillingPage`, `FolderCard`, `NotebookCard`, `SourcesPanel` and `StudioPanel`) and `BillingPage.test.tsx` need no changes.
 - **E2E:** selectors keep working, since `AlertDialogContent` renders `role="alertdialog"`.

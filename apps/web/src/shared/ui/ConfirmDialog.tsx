@@ -1,85 +1,80 @@
-import React from "react";
-import { createPortal } from "react-dom";
+import type React from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
+import type { ConfirmVariant } from "./confirmStore";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
-  message: string | React.ReactNode;
+  message: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
-  variant?: "danger" | "warning" | "default";
+  variant?: ConfirmVariant;
+  /** Gets focus back on close; Radix would otherwise return it to a trigger this dialog lacks. */
+  returnFocusTo?: HTMLElement | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+const ACTION_VARIANT = {
+  danger: "destructive",
+  warning: "warning",
+  default: "default",
+} as const satisfies Record<ConfirmVariant, string>;
+
+export function ConfirmDialog({
   isOpen,
   title,
   message,
   confirmText = "Confirm",
   cancelText = "Cancel",
   variant = "default",
+  returnFocusTo,
   onConfirm,
   onCancel,
-}) => {
-  if (!isOpen) return null;
-
-  const confirmButtonStyles = {
-    danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-    warning: "bg-warning text-warning-foreground hover:bg-warning/90",
-    default: "bg-primary text-primary-foreground hover:bg-primary/90",
-  };
-
-  const content = (
-    <div
-      data-confirm-dialog-root
-      className="fixed inset-0 z-300 flex items-center justify-center p-4 font-sans antialiased"
-      role="presentation"
+}: ConfirmDialogProps) {
+  return (
+    <AlertDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // Escape and Cancel close through here; Confirm resolves first, so this is then a no-op.
+        if (!open) onCancel();
+      }}
     >
-      <div
-        className="absolute inset-0 bg-foreground/25 backdrop-blur-[1px] animate-in fade-in duration-150"
-        onClick={onCancel}
-        aria-hidden
-      />
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-desc"
-        className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-6 text-left shadow-lg animate-in fade-in zoom-in-95 duration-150"
+      <AlertDialogContent
+        onCloseAutoFocus={(e) => {
+          // The opener can be gone (e.g. a menu item); then keep Radix's default.
+          if (returnFocusTo?.isConnected) {
+            e.preventDefault();
+            returnFocusTo.focus();
+          }
+        }}
       >
-        <h2
-          id="confirm-dialog-title"
-          className="text-lg font-semibold leading-snug tracking-tight text-foreground"
-        >
-          {title}
-        </h2>
-        <div
-          id="confirm-dialog-desc"
-          className="mt-2 text-sm leading-relaxed text-muted-foreground"
-        >
-          {typeof message === "string" ? <p className="m-0">{message}</p> : message}
-        </div>
-
-        <div className="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row sm:gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex h-9 w-full items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted/80 sm:w-auto"
-          >
-            {cancelText}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className={`inline-flex h-9 w-full min-w-20 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors sm:w-auto ${confirmButtonStyles[variant]}`}
-          >
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {typeof message === "string" ? (
+            <AlertDialogDescription>{message}</AlertDialogDescription>
+          ) : (
+            <AlertDialogDescription asChild>
+              <div>{message}</div>
+            </AlertDialogDescription>
+          )}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
+          <AlertDialogAction variant={ACTION_VARIANT[variant]} onClick={onConfirm}>
             {confirmText}
-          </button>
-        </div>
-      </div>
-    </div>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
-
-  return createPortal(content, document.body);
-};
+}
