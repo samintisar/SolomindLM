@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 import { useAuth } from "../../features/auth/useAuth";
 import { canOfferPurchases } from "../../utils/platformDetection";
+import { Button } from "../components/ui/button";
 import { useTheme } from "../contexts/useTheme";
 import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
 
@@ -109,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b-2 border-border bg-background relative z-70 transition-all duration-300">
+    <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-border bg-background relative z-70 transition-all duration-300">
       {/* Hidden span for measuring text width */}
       <span
         ref={spanRef}
@@ -158,8 +159,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onBlur={handleSave}
-                style={{ width: Math.max(100, inputWidth) }}
-                className="text-lg font-display font-bold text-foreground bg-transparent border-b border-primary outline-none p-0 tracking-tight min-w-0"
+                style={{ "--title-width": `${Math.max(100, inputWidth)}px` } as React.CSSProperties}
+                className="w-(--title-width) min-w-0 border-b border-border bg-transparent p-0 font-display text-lg font-bold tracking-tight text-foreground outline-none focus:border-primary"
                 aria-label="Notebook name"
               />
             ) : notebookRenamable ? (
@@ -185,15 +186,17 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-4">
         {onShare && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={onShare}
-            className="px-3 py-1.5 text-sm font-medium border border-border rounded-md hover:bg-secondary transition-colors flex items-center gap-1.5 shrink-0"
             title="Share notebook"
+            className="shrink-0"
           >
-            <Share2 className="w-4 h-4" />
+            <Share2 aria-hidden />
             <span className="hidden sm:inline">Share</span>
-          </button>
+          </Button>
         )}
         {onBillingClick && !hasSubscription && canOfferPurchases() && (
           <button
