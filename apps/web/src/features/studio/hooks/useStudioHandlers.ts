@@ -5,6 +5,7 @@ import type { Note, Source } from "@/shared/types/index";
 import type { AudioConfig } from "../components/CustomizeAudioModal";
 import type { FlashcardConfig } from "../components/CustomizeFlashcardsModal";
 import type { InfographicConfig } from "../components/CustomizeInfographicModal";
+import type { MindMapConfig } from "../components/CustomizeMindMapModal";
 import type { QuizConfig } from "../components/CustomizeQuizModal";
 import type { SpreadsheetConfig } from "../components/CustomizeSpreadsheetsModal";
 import type { WrittenQuestionsConfig } from "../components/CustomizeWrittenQuestionsModal";
@@ -48,6 +49,7 @@ export interface UseStudioHandlersReturn {
   isWrittenQuestionsModalOpen: boolean;
   isInfographicModalOpen: boolean;
   isSpreadsheetsModalOpen: boolean;
+  isMindMapModalOpen: boolean;
   setIsReportModalOpen: (open: boolean) => void;
   setIsFlashcardModalOpen: (open: boolean) => void;
   setIsQuizModalOpen: (open: boolean) => void;
@@ -55,11 +57,12 @@ export interface UseStudioHandlersReturn {
   setIsWrittenQuestionsModalOpen: (open: boolean) => void;
   setIsInfographicModalOpen: (open: boolean) => void;
   setIsSpreadsheetsModalOpen: (open: boolean) => void;
+  setIsMindMapModalOpen: (open: boolean) => void;
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
   handleCreateFlashcards: (config: FlashcardConfig) => Promise<void>;
   handleCreateQuiz: (config: QuizConfig) => Promise<void>;
-  handleCreateMindMap: () => Promise<void>;
+  handleCreateMindMap: (config: MindMapConfig) => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
   handleCreateWrittenQuestions: (config: WrittenQuestionsConfig) => void;
   handleCreateInfographic: (config: InfographicConfig) => Promise<void>;
@@ -83,6 +86,7 @@ export function useStudioHandlers({
   const [isWrittenQuestionsModalOpen, setIsWrittenQuestionsModalOpen] = useState(false);
   const [isInfographicModalOpen, setIsInfographicModalOpen] = useState(false);
   const [isSpreadsheetsModalOpen, setIsSpreadsheetsModalOpen] = useState(false);
+  const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
 
   const toast = useToast();
 
@@ -125,19 +129,16 @@ export function useStudioHandlers({
   const createSpreadsheetFlow = useCreateSpreadsheetFlow(flowContext);
   const createAudioFlow = useCreateAudioFlow(flowContext);
 
-  const handleToolClick = useCallback(
-    (toolId: string) => {
-      if (toolId === "reports") setIsReportModalOpen(true);
-      else if (toolId === "flashcards") setIsFlashcardModalOpen(true);
-      else if (toolId === "quiz") setIsQuizModalOpen(true);
-      else if (toolId === "infographic") setIsInfographicModalOpen(true);
-      else if (toolId === "audio") setIsAudioModalOpen(true);
-      else if (toolId === "mindmap") createMindMapFlow();
-      else if (toolId === "writtenQuestions") setIsWrittenQuestionsModalOpen(true);
-      else if (toolId === "spreadsheets") setIsSpreadsheetsModalOpen(true);
-    },
-    [createMindMapFlow]
-  );
+  const handleToolClick = useCallback((toolId: string) => {
+    if (toolId === "reports") setIsReportModalOpen(true);
+    else if (toolId === "flashcards") setIsFlashcardModalOpen(true);
+    else if (toolId === "quiz") setIsQuizModalOpen(true);
+    else if (toolId === "infographic") setIsInfographicModalOpen(true);
+    else if (toolId === "audio") setIsAudioModalOpen(true);
+    else if (toolId === "mindmap") setIsMindMapModalOpen(true);
+    else if (toolId === "writtenQuestions") setIsWrittenQuestionsModalOpen(true);
+    else if (toolId === "spreadsheets") setIsSpreadsheetsModalOpen(true);
+  }, []);
 
   const handleCreateReport = useCallback(
     async (formatId: string, customPrompt?: string) => {
@@ -187,6 +188,14 @@ export function useStudioHandlers({
     [createInfographicFlow]
   );
 
+  const handleCreateMindMap = useCallback(
+    async (config: MindMapConfig) => {
+      setIsMindMapModalOpen(false);
+      await createMindMapFlow(config);
+    },
+    [createMindMapFlow]
+  );
+
   const handleCreateSpreadsheet = useCallback(
     async (config: SpreadsheetConfig) => {
       setIsSpreadsheetsModalOpen(false);
@@ -203,6 +212,7 @@ export function useStudioHandlers({
     isWrittenQuestionsModalOpen,
     isInfographicModalOpen,
     isSpreadsheetsModalOpen,
+    isMindMapModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
@@ -210,11 +220,12 @@ export function useStudioHandlers({
     setIsWrittenQuestionsModalOpen,
     setIsInfographicModalOpen,
     setIsSpreadsheetsModalOpen,
+    setIsMindMapModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
     handleCreateQuiz,
-    handleCreateMindMap: createMindMapFlow,
+    handleCreateMindMap,
     handleCreateAudio,
     handleCreateWrittenQuestions,
     handleCreateInfographic,

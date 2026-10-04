@@ -18,6 +18,7 @@ import { ActiveNoteView } from "./ActiveNoteView";
 import { CustomizeAudioModal } from "./CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 import { CustomizeInfographicModal } from "./CustomizeInfographicModal";
+import { CustomizeMindMapModal } from "./CustomizeMindMapModal";
 import { CustomizeQuizModal } from "./CustomizeQuizModal";
 import { CustomizeReportModal } from "./CustomizeReportModal";
 import { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";
@@ -169,6 +170,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     isWrittenQuestionsModalOpen,
     isInfographicModalOpen,
     isSpreadsheetsModalOpen,
+    isMindMapModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
@@ -176,6 +178,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     setIsWrittenQuestionsModalOpen,
     setIsInfographicModalOpen,
     setIsSpreadsheetsModalOpen,
+    setIsMindMapModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
@@ -184,6 +187,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     handleCreateWrittenQuestions,
     handleCreateInfographic,
     handleCreateSpreadsheet,
+    handleCreateMindMap,
   } = useStudioHandlers({
     notes,
     sources,
@@ -410,6 +414,12 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         isOpen={isSpreadsheetsModalOpen}
         onClose={() => setIsSpreadsheetsModalOpen(false)}
         onGenerate={handleCreateSpreadsheet}
+      />
+
+      <CustomizeMindMapModal
+        isOpen={isMindMapModalOpen}
+        onClose={() => setIsMindMapModalOpen(false)}
+        onGenerate={handleCreateMindMap}
       />
 
       <ConfirmDialogComponent />
