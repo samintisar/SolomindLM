@@ -59,7 +59,7 @@ export function buildLegalPrerenderBody(title: string, path: "/privacy" | "/term
       <header>
         <p>Legal</p>
         <h1>${escapeHtml(title)}</h1>
-        <p>Last updated: ${escapeHtml(LEGAL_LAST_UPDATED)}</p>
+        <p>Last updated: ${escapeHtml(LEGAL_LAST_UPDATED[path].label)}</p>
         <p>${escapeHtml(summary)}</p>
       </header>
       <footer>
