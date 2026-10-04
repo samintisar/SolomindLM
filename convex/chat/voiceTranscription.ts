@@ -13,6 +13,9 @@ import { getAuthUserId } from "../auth";
 /** Per-user, per-hour rate limit on voice transcription calls. */
 const _MAX_VOICE_TRANSCRIPTIONS_PER_HOUR = 20;
 
+/** Delay before retrying a voice clip delete that failed at the end of the request. */
+const VOICE_CLIP_DELETE_RETRY_MS = 60_000;
+
 /**
  * Transcribe an ephemeral audio clip in Convex storage (uploaded for this flow only)
  * and delete the blob. Requires notebook read access.
@@ -39,7 +42,8 @@ export const transcribeChatAudio = action({
       userId,
     });
 
-    // From here on the clip is deleted however the request ends (the privacy policy says so).
+    // From here on the clip is deleted however the request ends (the privacy policy says so);
+    // a failed delete is logged and retried by `deleteVoiceClip`.
     try {
       // Rate limit: per-user, per-hour
       await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
@@ -72,8 +76,20 @@ export const transcribeChatAudio = action({
     } finally {
       try {
         await ctx.storage.delete(args.storageId);
-      } catch {
-        // best-effort cleanup
+      } catch (deleteErr) {
+        // Don't let the clip outlive the request silently: log it and retry from a mutation.
+        logger.error("voice_clip_delete_failed", deleteErr, { storageId: args.storageId });
+        try {
+          await ctx.scheduler.runAfter(
+            VOICE_CLIP_DELETE_RETRY_MS,
+            internal.chat.voiceTranscriptionAccess.deleteVoiceClip,
+            { storageId: args.storageId }
+          );
+        } catch (scheduleErr) {
+          logger.error("voice_clip_delete_retry_not_scheduled", scheduleErr, {
+            storageId: args.storageId,
+          });
+        }
       }
     }
   },

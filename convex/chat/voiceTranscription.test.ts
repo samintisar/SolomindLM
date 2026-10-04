@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import * as rateLimitsModule from "../_lib/rateLimits";
 import { preloadModules } from "../_testing/preloadModules.helpers";
@@ -56,9 +56,20 @@ describe("transcribeChatAudio", () => {
         storageId,
         notebookId,
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/Daily chat message limit reached/);
 
     expect(await blobExists(t, storageId)).toBe(false);
+  });
+
+  test("the cleanup retry deletes a clip that is still stored, and ignores one already gone", async () => {
+    const t = convexTest(schema, modules);
+    const { storageId } = await seed(t);
+    const retry = internal.chat.voiceTranscriptionAccess.deleteVoiceClip;
+
+    await t.mutation(retry, { storageId });
+    expect(await blobExists(t, storageId)).toBe(false);
+
+    await expect(t.mutation(retry, { storageId })).resolves.toBeNull();
   });
 
   test("does not delete a storage object for a caller without notebook access", async () => {
