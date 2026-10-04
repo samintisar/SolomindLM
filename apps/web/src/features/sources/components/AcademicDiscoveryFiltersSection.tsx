@@ -292,7 +292,7 @@ export const AcademicDiscoveryFiltersSection: FC<AcademicDiscoveryFiltersSection
         <CollapsibleTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="disclosure"
             size="sm"
             className="group/fields w-full justify-between"
           >
