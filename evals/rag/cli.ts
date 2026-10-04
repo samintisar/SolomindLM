@@ -481,7 +481,7 @@ async function main(): Promise<void> {
     if (opts.sourceMatrix) {
       const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
       const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
-        channels: parseEvalSourceChannels(combo.split("+")),
+        channels: parseEvalSourceChannels(combo.split("+").map((channel) => channel.trim())),
       }));
       expandedFixtures.push(...withSourceMatrix(fixture, matrix));
     } else {

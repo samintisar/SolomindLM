@@ -22,7 +22,7 @@ export function snapshotRetrievalConfig(
   const defaults: RetrievalConfigSnapshot = {
     // chatConfig.ts defaults (env fallbacks in convex/_lib/env.ts)
     contextTokenBudget: parseInt(process.env.CHAT_CONTEXT_TOKEN_BUDGET ?? "8000", 10),
-    minRelevanceThreshold: parseFloat(process.env.CHAT_MIN_RELEVANCE_THRESHOLD ?? "0.20"),
+    minRelevanceThreshold: parseFloat(process.env.CHAT_MIN_RELEVANCE_THRESHOLD ?? "0.35"),
     maxChunksHardLimit: parseInt(process.env.CHAT_MAX_CHUNKS_HARD_LIMIT ?? "50", 10),
 
     // Hybrid search defaults from convex/_lib/env.ts
