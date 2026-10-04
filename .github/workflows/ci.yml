@@ -236,18 +236,14 @@ jobs:
           TOGETHER_AI_API_KEY: test-key-for-ci
         run: bun run test:convex
 
-      - name: Run Web Tests
-        run: bun run test:web
-
       - name: RAG eval fixture dry-run
         run: bun run eval:rag:dry
 
       - name: Use-case eval packs dry-run
         run: bun run eval:usecases:dry
 
-  # Runs the web suite a second time (also in test-unit) to produce the coverage
-  # floor. Fold the web run out of test-unit once "Coverage Report" is a required
-  # check (see branch-protection follow-up in the Phase 4 plan).
+  # The only CI run of the web suite: vitest with --coverage, so a failing web
+  # test or a drop below the coverage floor fails this required check.
   test-coverage:
     name: Coverage Report
     runs-on: ubuntu-latest
