@@ -179,6 +179,7 @@ export const generateInfographicImage = internalAction({
       logger.phaseStart("fetch_chunks", { documentCount: documentIds.length });
       const chunks = await ctx.runAction(internal.documents.chunks.fetchChunks, {
         documentIds,
+        topic: customPrompt,
       });
       logger.phaseComplete("fetch_chunks", { chunkCount: chunks.length });
 
