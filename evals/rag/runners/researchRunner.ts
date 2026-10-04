@@ -1,6 +1,7 @@
 import type { Id } from "../../../convex/_generated/dataModel";
 import { computeConfigHash } from "../configHash";
-import type { ChunkSnapshot, EvalFixture, EvalRunArtifact } from "../types";
+import { parseEvalSourceChannel } from "../sourceChannels";
+import type { ChunkSnapshot, EvalFixture, EvalRunArtifact, EvalSourceChannel } from "../types";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 export interface ResearchAgentInvoker {
@@ -98,9 +99,12 @@ export async function runResearchEval(
     }));
 
     // Build source evidence summary
-    const sourceEvidenceMap = new Map<string, { sourceCount: number; topDomains: string[] }>();
+    const sourceEvidenceMap = new Map<
+      EvalSourceChannel,
+      { sourceCount: number; topDomains: string[] }
+    >();
     for (const ev of result.evidence) {
-      const channel = ev.sourceType;
+      const channel = parseEvalSourceChannel(ev.sourceType);
       const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
       existing.sourceCount++;
       if (ev.sourceUrl) {

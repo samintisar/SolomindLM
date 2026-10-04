@@ -53,6 +53,11 @@ jobs:
       - name: Typecheck Convex
         run: bun run typecheck:convex
 
+      # evals/ imports Convex modules and runs under `bun run`, which strips
+      # types without checking them (#311).
+      - name: Typecheck evals
+        run: bun run typecheck:evals
+
   typecheck-web:
     name: Typecheck (Web)
     runs-on: ubuntu-latest
@@ -239,11 +244,6 @@ jobs:
 
       - name: Use-case eval packs dry-run
         run: bun run eval:usecases:dry
-
-      # Nothing typechecks evals/ (#311); bundling every module catches broken
-      # relative imports and missing named exports the dry-runs don't reach.
-      - name: Evals bundle check
-        run: bun run check:evals
 
   # Runs the web suite a second time (also in test-unit) to produce the coverage
   # floor. Fold the web run out of test-unit once "Coverage Report" is a required

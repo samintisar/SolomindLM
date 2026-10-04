@@ -1,6 +1,6 @@
 #!/bin/sh
 # Pre-push gate: the checks that are embarrassing to fail in CI.
-# Runs typecheck (convex/web/mobile) + Biome + the design-lint ratchet. Fast — tsgo, not tsc.
+# Runs typecheck (convex/evals/web/mobile) + Biome + the design-lint ratchet. Fast — tsgo, not tsc.
 #
 # Bypass for a work-in-progress push:  git push --no-verify
 #
@@ -19,6 +19,7 @@ done
 
 echo "pre-push: typecheck + lint + design-lint  (bypass: git push --no-verify)"
 bun run typecheck:convex
+bun run typecheck:evals
 bun run typecheck:web
 bun run typecheck:mobile
 bun run lint -- --diagnostic-level=error

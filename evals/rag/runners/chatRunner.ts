@@ -2,7 +2,7 @@ import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
 import { computeConfigHash } from "../configHash";
 import { inferSourceChannel } from "../metrics/sourceAware";
-import type { ChunkSnapshot, EvalFixture, EvalRunArtifact } from "../types";
+import type { ChunkSnapshot, EvalFixture, EvalRunArtifact, EvidenceChannel } from "../types";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 // ─── Invoker interface ────────────────────────────────────────
@@ -118,7 +118,7 @@ export async function runChatEval(
   // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
   // future invoker starts using it, that invoker must derive a real userId
   // rather than relying on this string.
-  const agentContext: ChatAgentContext = {
+  const agentContext: Parameters<ChatAgentInvoker["invoke"]>[0] = {
     userId: "__eval_unused__",
     noteId: fixture.notebookId ?? "",
     conversationHistory: [{ role: "user", content: fixture.question }],
@@ -132,7 +132,10 @@ export async function runChatEval(
     const result = await invoker.invoke(agentContext);
 
     // Build source evidence summary from selected chunks
-    const sourceEvidenceMap = new Map<string, { sourceCount: number; topDomains: string[] }>();
+    const sourceEvidenceMap = new Map<
+      EvidenceChannel,
+      { sourceCount: number; topDomains: string[] }
+    >();
     for (const chunk of result.selectedChunks) {
       const channel = inferSourceChannel(chunk.sourceUrl);
       const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
