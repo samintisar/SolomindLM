@@ -50,6 +50,27 @@ describe("AcademicDiscoveryFiltersSection", () => {
     expect(api()).toMatchObject({ publicationYearFrom: cy - 1, publicationYearTo: cy });
   });
 
+  it("lets the Years input be cleared and retyped, clamping only when it loses focus", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole("radio", { name: "Last N years" }));
+    const years = screen.getByRole("spinbutton", { name: "Years" });
+    const cy = new Date().getFullYear();
+
+    await user.clear(years);
+    expect(years).toHaveValue(null);
+    await user.type(years, "5");
+    expect(years).toHaveValue(5);
+    expect(api()).toMatchObject({ publicationYearFrom: cy - 4 });
+
+    await user.clear(years);
+    await user.type(years, "100");
+    expect(years).toHaveValue(100);
+    expect(api()).toMatchObject({ publicationYearFrom: cy - 79 });
+    await user.tab();
+    expect(years).toHaveValue(80);
+  });
+
   it("flags a custom range where From is after To and drops it from the API", async () => {
     const user = userEvent.setup();
     render(<Harness />);

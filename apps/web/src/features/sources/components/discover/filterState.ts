@@ -4,8 +4,6 @@ import {
 } from "../AcademicDiscoveryFiltersSection";
 import type { SourceType } from "./sourceTypes";
 
-export type { SourceType };
-
 export interface FilterState {
   sourceTypes: SourceType[];
   timeRange?: "day" | "week" | "month" | "year";

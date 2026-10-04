@@ -119,6 +119,9 @@ export const AcademicDiscoveryFiltersSection: FC<AcademicDiscoveryFiltersSection
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [fieldQuery, setFieldQuery] = useState("");
   const [moreOpenByGroup, setMoreOpenByGroup] = useState<Record<string, boolean>>({});
+  // The Years text while it is being edited, so it can be cleared and retyped; the stored value is
+  // clamped on every keystroke, and the field shows it again once it loses focus.
+  const [yearsDraft, setYearsDraft] = useState<string | null>(null);
 
   const yearMode = academic.publicationYearMode ?? "all";
   const rangeInvalid = yearMode === "custom" && isCustomRangeInvalid(academic);
@@ -193,14 +196,13 @@ export const AcademicDiscoveryFiltersSection: FC<AcademicDiscoveryFiltersSection
                   min={LAST_N_YEARS_MIN}
                   max={LAST_N_YEARS_MAX}
                   disabled={yearMode !== "lastN"}
-                  value={academic.lastNYears ?? LAST_N_YEARS_DEFAULT}
-                  onChange={(e) =>
-                    setAcademic({
-                      lastNYears: clampLastNYears(
-                        Number.parseInt(e.target.value, 10) || LAST_N_YEARS_MIN
-                      ),
-                    })
-                  }
+                  value={yearsDraft ?? academic.lastNYears ?? LAST_N_YEARS_DEFAULT}
+                  onChange={(e) => {
+                    setYearsDraft(e.target.value);
+                    const n = parseOptionalInt(e.target.value);
+                    if (n !== undefined) setAcademic({ lastNYears: clampLastNYears(n) });
+                  }}
+                  onBlur={() => setYearsDraft(null)}
                   className="w-20"
                 />
               </Field>
