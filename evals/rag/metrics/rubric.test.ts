@@ -117,7 +117,7 @@ describe("rubric prompts", () => {
       } as Partial<EvalRunArtifact>),
       sources
     );
-    expect(withChunks).toContain("[chunk-src]\nchunk text");
+    expect(withChunks).toContain("[c] chunk-src\nchunk text");
     expect(withChunks).not.toContain("[q3.pdf]");
 
     const outputOnly = buildRubricPrompt(pack, pack.rubric[1], fixture, artifact(), sources);
@@ -162,6 +162,24 @@ describe("rubric prompts", () => {
     );
     for (let i = 0; i < 30; i++) expect(prompt).toContain(`CHUNK${i}`);
     expect(prompt).toContain("Source passages retrieved for this answer:");
+  });
+
+  it("numbers passages by chunk id so the answer's citation markers point at them", () => {
+    // Chat answers cite retrieved chunks by id ([7]); chunks often have no source title.
+    const prompt = buildRubricPrompt(
+      pack,
+      pack.rubric[0],
+      fixture,
+      artifact({
+        answer: "Risk was 25% lower [7].",
+        selectedChunks: [{ id: "7", sourceTitle: "", content: "25% lower risk" }],
+      } as Partial<EvalRunArtifact>),
+      []
+    );
+    expect(prompt).toContain("[7]\n25% lower risk");
+    expect(prompt).toContain(
+      "Citation markers such as [7] in the output refer to the passage with that number."
+    );
   });
 
   it("marks an output that was cut for judging as truncated", () => {

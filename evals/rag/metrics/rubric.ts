@@ -78,7 +78,8 @@ function formatChunks(chunks: EvalRunArtifact["selectedChunks"]): {
   const parts: string[] = [];
   let used = 0;
   for (const c of chunks) {
-    const part = `[${c.sourceTitle}]\n${c.content}`;
+    // Chat answers cite chunks by id ([7]), so each passage carries its id.
+    const part = `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`;
     if (parts.length > 0 && used + part.length > CHUNKS_LIMIT) break;
     parts.push(part.slice(0, CHUNKS_LIMIT));
     used += part.length;
@@ -91,7 +92,9 @@ function formatChunks(chunks: EvalRunArtifact["selectedChunks"]): {
 function sourceEvidence(artifact: EvalRunArtifact, sourceTexts: SourceText[]): Evidence | null {
   if (artifact.selectedChunks.length > 0) {
     return {
-      header: "Source passages retrieved for this answer:",
+      header:
+        "Source passages retrieved for this answer:\n" +
+        "Citation markers such as [7] in the output refer to the passage with that number.",
       ...formatChunks(artifact.selectedChunks),
     };
   }
