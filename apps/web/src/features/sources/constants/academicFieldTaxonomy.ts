@@ -112,14 +112,6 @@ export const ACADEMIC_FIELD_GROUPS: AcademicFieldGroup[] = [
   },
 ];
 
-/** SJR journal tiers. Not shown in the UI until discovery results carry venue metrics. */
-export const ACADEMIC_SJR_TIERS = [
-  { id: 1 as const, label: "Q1", subtitle: "Highest-ranked journals" },
-  { id: 2 as const, label: "Q2 & Up", subtitle: "Q1–Q2 journals" },
-  { id: 3 as const, label: "Q3 & Up", subtitle: "Q1–Q3 journals" },
-  { id: 4 as const, label: "Q4 & Up", subtitle: "All ranked tiers" },
-];
-
 export type AcademicSjrWorstAllowed = 1 | 2 | 3 | 4;
 
 export function collectFieldSearchTerms(selectedIds: Set<string>): string[] {

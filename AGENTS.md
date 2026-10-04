@@ -109,6 +109,7 @@ bun x convex dev               # Convex dev backend (separate terminal)
 bun run build                  # Build all workspaces
 bun run build:prod             # Production web build
 bun run typecheck:convex       # Convex typecheck
+bun run typecheck:evals        # evals/ typecheck (bun run doesn't check types)
 bun run typecheck:web          # Web typecheck
 bun run typecheck:mobile       # Expo mobile typecheck
 ```
@@ -220,7 +221,7 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
 - **Auth file location.** `@convex-dev/auth` requires `convex/auth.ts` at root, not in a subdirectory.
 - **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
 - **Validation gates** (in order):
-  1. `bun run typecheck:web` + `typecheck:convex` — always
+  1. `bun run typecheck:web` + `typecheck:convex` — always; `typecheck:evals` when touching `evals/` or Convex types it imports
   2. `bun run test:convex` — vitest + `convex-test`, ~990+ tests. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
   3. `bun run test:web` — vitest for web utilities
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)

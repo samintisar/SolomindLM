@@ -71,7 +71,7 @@ function parseWinner(raw: string): { winner: "A" | "B" | "tie"; reason: string }
   const payload = jsonMatch ? jsonMatch[0] : raw.trim();
   const parsed = JSON.parse(payload) as { winner?: string; reason?: string };
   const w = parsed.winner?.toUpperCase();
-  const winner = w === "A" || w === "B" || w === "TIE" ? (w as "A" | "B" | "TIE") : "tie";
+  const winner = w === "A" || w === "B" ? w : "tie";
   const reason =
     typeof parsed.reason === "string" && parsed.reason.trim() ? parsed.reason.trim() : "No reason";
   return { winner, reason };
