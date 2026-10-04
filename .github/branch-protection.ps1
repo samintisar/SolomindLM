@@ -45,6 +45,7 @@ $json = @{
             @{ context = "Unit Tests" }
             @{ context = "Test (Mobile)" }
             @{ context = "Build (Web, PR parity)" }
+            @{ context = "Coverage Report" }
             @{ context = "Knip (unused code)" }
         )
     }
@@ -70,7 +71,7 @@ try {
     Write-Host "Summary of rules applied:" -ForegroundColor Cyan
     Write-Host "  - Branch: main"
     Write-Host "  - Require pull request reviews: Yes (0 approvals - PR required, CI enforced)"
-    Write-Host "  - Require status checks: Yes (Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Test Mobile, Build Web, Knip)"
+    Write-Host "  - Require status checks: Yes (Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Test Mobile, Build Web, Coverage, Knip)"
     Write-Host "  - Require branches to be up to date: Yes"
     Write-Host "  - Admin enforcement: Yes"
     Write-Host "  - Allow force pushes: No"
