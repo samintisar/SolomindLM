@@ -19,7 +19,7 @@ export interface TogetherJudgeConfig {
   model?: string;
   /** Base URL (defaults to Together AI) */
   baseURL?: string;
-  /** Maximum tokens for judge response, reasoning included (default: 8192) */
+  /** Maximum tokens for judge response, reasoning included (default: 32768) */
   maxTokens?: number;
   /** Temperature for judge (default: 0.1 for consistent evaluation) */
   temperature?: number;
@@ -123,8 +123,9 @@ export function createTogetherJudgeInvoker(
   const client = createTogetherClient(config);
   const model = config.model ?? DEFAULT_JUDGE_MODEL;
   // Reasoning judges (the default) spend most of the budget thinking; 1024 truncated long judge
-  // prompts before the verdict.
-  const maxTokens = config.maxTokens ?? 8192;
+  // prompts before the verdict, and 8192 ran out checking a spreadsheet against whole papers.
+  // It is a ceiling: short judgements still stop early.
+  const maxTokens = config.maxTokens ?? 32_768;
   const temperature = config.temperature ?? 0.1;
 
   return async (prompt: string): Promise<string> => {

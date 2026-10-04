@@ -45,8 +45,56 @@ function excerptForJudge(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}\n[… output cut off here for judging; the full output is ${text.length} characters and continues. Do not treat this cut as the output ending early.]`;
 }
 
+/**
+ * Passage budget for judge prompts; fits every chunk of a typical chat answer (~30 chunks, under
+ * 20K characters). It is a size guide, not a model limit: the cut and skipped-passage notes and the
+ * grounding warning are added on top (tens to a few hundred characters).
+ */
+export const CHUNK_CONTEXT_LIMIT = 48_000;
+const CHUNK_SEPARATOR = "\n\n---\n\n";
+
+/**
+ * Whole chunks, in order, while they fit in `limit` characters; a chunk that does not fit is
+ * skipped and later ones that do are kept. The ids of skipped chunks are listed. A first chunk
+ * longer than the limit on its own is cut and marked. Chat answers cite chunks by id ([7]), so
+ * each chunk carries its id.
+ */
+export function formatChunks(
+  chunks: EvalRunArtifact["selectedChunks"],
+  limit = CHUNK_CONTEXT_LIMIT
+): { text: string; truncated: boolean } {
+  const parts: string[] = [];
+  const skipped: string[] = [];
+  let used = 0;
+  let cut = false;
+  for (const c of chunks) {
+    const part = `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`;
+    const cost = (parts.length > 0 ? CHUNK_SEPARATOR.length : 0) + part.length;
+    if (parts.length === 0 && part.length > limit) {
+      cut = true;
+      parts.push(`${part.slice(0, limit)}\n[… passage cut off here]`);
+      used = limit;
+    } else if (used + cost > limit) {
+      skipped.push(c.id);
+    } else {
+      parts.push(part);
+      used += cost;
+    }
+  }
+  if (skipped.length > 0) {
+    parts.push(`[… ${skipped.length} passages not shown: ${skipped.join(", ")}]`);
+  }
+  return { text: parts.join(CHUNK_SEPARATOR), truncated: cut || skipped.length > 0 };
+}
+
+/** Chunk context for grounding judges, with a note when passages were cut for judging. */
 function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
-  return chunks.map((c) => `[${c.sourceTitle}]\n${c.content}`).join("\n\n---\n\n");
+  const { text, truncated } = formatChunks(chunks);
+  if (!truncated) return text;
+  return (
+    "Some retrieved passages were cut off for judging; do not fail a claim only because its " +
+    `support would be in a passage that is not shown.\n\n${text}`
+  );
 }
 
 function parseBinaryResponse(raw: string): BinaryJudgeResult {
@@ -92,7 +140,7 @@ function chatGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): s
 Question: ${fixture.question}
 
 Retrieved chunks:
-${context.slice(0, 12000)}
+${context}
 
 Answer:
 ${excerptForJudge(artifact.answer, 8000)}
@@ -102,11 +150,16 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
 function chatCitationPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
-  const chunkTitles = artifact.selectedChunks.map((c) => c.sourceTitle).join(", ");
+  const chunkIds = artifact.selectedChunks.map((c) => c.id).join(", ");
+  const chunkTitles = [
+    ...new Set(artifact.selectedChunks.map((c) => c.sourceTitle).filter(Boolean)),
+  ];
   return `You are a citation auditor. Pass if citations in the answer refer to real retrieved sources.
+Citation markers such as [7] refer to the retrieved chunk with that id.
 
 Citations in answer: ${artifact.citations.join(", ") || "(none)"}
-Available chunk source titles: ${chunkTitles || "(none)"}
+Retrieved chunk ids: ${chunkIds || "(none)"}
+Retrieved source titles: ${chunkTitles.join(", ") || "(none recorded)"}
 
 Answer excerpt:
 ${excerptForJudge(artifact.answer, 4000)}
@@ -182,7 +235,7 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 Question: ${fixture.question}
 
 Chunks:
-${context.slice(0, 12000)}
+${context}
 
 Output:
 ${excerptForJudge(artifact.answer, 8000)}

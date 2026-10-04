@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvalRunArtifact } from "../types";
 import {
+  formatChunks,
   formatResearchEvidence,
   parseBinaryResponse,
   scoreBinaryJudgeMetrics,
@@ -80,6 +81,80 @@ describe("formatResearchEvidence", () => {
     );
     expect(text).toContain("Evidence paper");
     expect(text).not.toContain("Ignored chunk");
+  });
+});
+
+describe("chat judges", () => {
+  const fixture = {
+    schemaVersion: 1,
+    id: "chat-dose",
+    question: "How much activity lowered depression risk?",
+    runner: "chat",
+    notebookId: "nb",
+    expectedItems: [],
+  } as unknown as Parameters<typeof scoreBinaryJudgeMetrics>[0];
+
+  async function chatPrompts(overrides: Partial<EvalRunArtifact>): Promise<string[]> {
+    const prompts: string[] = [];
+    const invoke = vi.fn(async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"pass": true, "reason": "ok"}';
+    });
+    await scoreBinaryJudgeMetrics(
+      fixture,
+      stubResearchArtifact({ runner: "chat", ...overrides }),
+      undefined,
+      { invoke }
+    );
+    return prompts;
+  }
+
+  // ~30 chunks of a typical answer, untitled, cited by id.
+  const selectedChunks = Array.from({ length: 30 }, (_, i) => ({
+    id: String(i + 1),
+    sourceTitle: "",
+    content: `${"c".repeat(590)}FACT${i + 1}`,
+  }));
+
+  it("shows the grounding judge every retrieved chunk, numbered by id", async () => {
+    const [grounding] = await chatPrompts({ answer: "Risk fell 25% [23].", selectedChunks });
+    for (let i = 1; i <= 30; i++) expect(grounding).toContain(`[${i}]\n${"c".repeat(590)}FACT${i}`);
+  });
+
+  it("drops whole passages past the budget and tells the grounding judge", async () => {
+    const big = Array.from({ length: 6 }, (_, i) => ({
+      id: String(i + 1),
+      sourceTitle: "",
+      content: `${"b".repeat(10_000)}END${i + 1}`,
+    }));
+    const [grounding] = await chatPrompts({ answer: "x", selectedChunks: big });
+    expect(grounding).toContain("END4");
+    expect(grounding).not.toContain("END5");
+    expect(grounding).toContain("[… 2 passages not shown: 5, 6]");
+    expect(grounding).toContain("Some retrieved passages were cut off for judging");
+  });
+
+  it("skips a passage that does not fit and keeps later ones that do", () => {
+    const { text, truncated } = formatChunks([
+      { id: "1", sourceTitle: "", content: "a".repeat(24_000) },
+      { id: "2", sourceTitle: "", content: "b".repeat(30_000) },
+      { id: "3", sourceTitle: "", content: "small fact" },
+    ]);
+    expect(text).toContain("[3]\nsmall fact");
+    expect(text).not.toContain("b".repeat(100));
+    expect(text).toContain("[… 1 passages not shown: 2]");
+    expect(truncated).toBe(true);
+    expect(text.length).toBeLessThanOrEqual(48_000 + 100);
+  });
+
+  it("lets the citation judge map citation markers to chunk ids", async () => {
+    const [, citation] = await chatPrompts({
+      answer: "Risk fell 25% [7].",
+      citations: ["7"],
+      selectedChunks,
+    });
+    expect(citation).toContain("Retrieved chunk ids: 1, 2, 3");
+    expect(citation).toContain("30");
   });
 });
 
