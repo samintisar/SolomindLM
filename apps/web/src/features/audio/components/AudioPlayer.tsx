@@ -1,5 +1,6 @@
 import { ArrowLeft, Download, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import React from "react";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { formatAudioTime, useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 
@@ -58,8 +59,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         {/* Loading state */}
         {isResolving && (
           <div className="flex items-center justify-center py-8">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+            <div role="status" className="text-center">
+              <span className="mb-2 inline-flex text-primary">
+                <Spinner className="size-8" aria-hidden />
+              </span>
               <p className="text-sm text-muted-foreground">Loading audio...</p>
             </div>
           </div>
@@ -104,7 +107,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             disabled={!canSeek}
             onChange={(e) => seekTo(Number(e.target.value))}
             className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ accentColor: "hsl(var(--primary))" }}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{formatAudioTime(currentTime)}</span>

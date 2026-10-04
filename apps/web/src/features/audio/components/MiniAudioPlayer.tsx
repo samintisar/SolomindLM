@@ -1,5 +1,6 @@
 import { ChevronUp, Download, Pause, Play, RotateCcw, RotateCw, X } from "lucide-react";
 import React, { useEffect, useRef } from "react";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { formatAudioTime, useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 
@@ -64,8 +65,10 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
       {/* Loading state */}
       {isResolving && (
         <div className="flex items-center justify-center py-4">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary mb-1"></div>
+          <div role="status" className="text-center">
+            <span className="mb-1 inline-flex text-primary">
+              <Spinner className="size-6" aria-hidden />
+            </span>
             <p className="text-xs text-muted-foreground">Loading audio...</p>
           </div>
         </div>
@@ -134,7 +137,6 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
             disabled={!canSeek}
             onChange={(e) => seekTo(Number(e.target.value))}
             className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ accentColor: "hsl(var(--primary))" }}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{formatAudioTime(currentTime)}</span>

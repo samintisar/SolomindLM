@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from "convex/react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Spinner } from "@/shared/components/ui/spinner";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -83,7 +84,9 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
       <AuthLoading>
         <div className="flex h-screen w-full items-center justify-center bg-background">
           <div className="flex flex-col items-center gap-4">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <span className="text-primary">
+              <Spinner className="size-8" aria-hidden />
+            </span>
             <p className="text-sm text-muted-foreground">Loading...</p>
           </div>
         </div>
@@ -93,7 +96,9 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
         {waitingForNotebook ? (
           <div className="flex h-screen w-full items-center justify-center bg-background">
             <div className="flex flex-col items-center gap-4">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <span className="text-primary">
+                <Spinner className="size-8" aria-hidden />
+              </span>
               <p className="text-sm text-muted-foreground">Opening notebook…</p>
             </div>
           </div>
