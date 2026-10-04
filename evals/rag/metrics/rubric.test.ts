@@ -164,6 +164,22 @@ describe("rubric prompts", () => {
     expect(prompt).toContain("Source passages retrieved for this answer:");
   });
 
+  it("flags a single passage cut at the budget as truncated", () => {
+    const prompt = buildRubricPrompt(
+      pack,
+      pack.rubric[0],
+      fixture,
+      artifact({
+        selectedChunks: [{ id: "1", sourceTitle: "", content: "h".repeat(60_000) }],
+      } as Partial<EvalRunArtifact>),
+      []
+    );
+    expect(prompt).toContain("[… passage cut off here]");
+    expect(prompt).toContain(
+      "Do not fail the check only because a value is missing from a document that was cut off."
+    );
+  });
+
   it("numbers passages by chunk id so the answer's citation markers point at them", () => {
     // Chat answers cite retrieved chunks by id ([7]); chunks often have no source title.
     const prompt = buildRubricPrompt(

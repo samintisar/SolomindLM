@@ -120,6 +120,19 @@ describe("chat judges", () => {
     for (let i = 1; i <= 30; i++) expect(grounding).toContain(`[${i}]\n${"c".repeat(590)}FACT${i}`);
   });
 
+  it("drops whole passages past the budget and tells the grounding judge", async () => {
+    const big = Array.from({ length: 6 }, (_, i) => ({
+      id: String(i + 1),
+      sourceTitle: "",
+      content: `${"b".repeat(10_000)}END${i + 1}`,
+    }));
+    const [grounding] = await chatPrompts({ answer: "x", selectedChunks: big });
+    expect(grounding).toContain("END4");
+    expect(grounding).not.toContain("END5");
+    expect(grounding).toContain("[… 2 more passages not shown]");
+    expect(grounding).toContain("Some retrieved passages were cut off for judging");
+  });
+
   it("lets the citation judge map citation markers to chunk ids", async () => {
     const [, citation] = await chatPrompts({
       answer: "Risk fell 25% [7].",

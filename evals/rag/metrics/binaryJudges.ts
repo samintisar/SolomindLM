@@ -46,14 +46,45 @@ function excerptForJudge(text: string, maxChars: number): string {
 }
 
 /** Fits every chunk of a typical chat answer (~30 chunks, under 20K characters). */
-const CHUNK_CONTEXT_LIMIT = 48_000;
+export const CHUNK_CONTEXT_LIMIT = 48_000;
+const CHUNK_SEPARATOR = "\n\n---\n\n";
 
-/** Chat answers cite chunks by id ([7]), so each chunk carries its id. */
+/**
+ * Whole chunks up to `limit` characters, then a count of the chunks left out. A chunk longer than
+ * the limit on its own is cut and marked. Chat answers cite chunks by id ([7]), so each chunk
+ * carries its id.
+ */
+export function formatChunks(
+  chunks: EvalRunArtifact["selectedChunks"],
+  limit = CHUNK_CONTEXT_LIMIT
+): { text: string; truncated: boolean } {
+  const parts: string[] = [];
+  let used = 0;
+  let cut = false;
+  for (const c of chunks) {
+    const part = `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`;
+    if (parts.length > 0 && used + CHUNK_SEPARATOR.length + part.length > limit) break;
+    if (part.length > limit) {
+      cut = true;
+      parts.push(`${part.slice(0, limit)}\n[… passage cut off here]`);
+    } else {
+      parts.push(part);
+    }
+    used += (parts.length > 1 ? CHUNK_SEPARATOR.length : 0) + part.length;
+  }
+  const omitted = chunks.length - parts.length;
+  if (omitted > 0) parts.push(`[… ${omitted} more passages not shown]`);
+  return { text: parts.join(CHUNK_SEPARATOR), truncated: cut || omitted > 0 };
+}
+
+/** Chunk context for grounding judges, with a note when passages were cut for judging. */
 function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
-  return chunks
-    .map((c) => `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`)
-    .join("\n\n---\n\n")
-    .slice(0, CHUNK_CONTEXT_LIMIT);
+  const { text, truncated } = formatChunks(chunks);
+  if (!truncated) return text;
+  return (
+    "Some retrieved passages were cut off for judging; do not fail a claim only because its " +
+    `support would be in a passage that is not shown.\n\n${text}`
+  );
 }
 
 function parseBinaryResponse(raw: string): BinaryJudgeResult {

@@ -5,12 +5,14 @@
  */
 import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 import type { RubricCheck, SourceText, UseCasePack } from "../usecases/types";
-import { parseBinaryResponse } from "./binaryJudges";
+import {
+  CHUNK_CONTEXT_LIMIT as CHUNKS_LIMIT,
+  formatChunks,
+  parseBinaryResponse,
+} from "./binaryJudges";
 
 /** Long enough for a full report or a many-row spreadsheet, so the judge sees every row. */
 const OUTPUT_LIMIT = 40_000;
-/** A chat answer's retrieved chunks (typically ~30 chunks, under 20K characters) fit in full. */
-const CHUNKS_LIMIT = 48_000;
 /**
  * Whole-pack source text: fits every current pack in full (the largest, Researchers, is about
  * 226K characters, roughly 60K tokens). A judge that sees only part of a paper fails values that
@@ -70,32 +72,13 @@ function truncateOutput(output: string): string {
   return `${output.slice(0, OUTPUT_LIMIT)}\n[… output truncated at ${OUTPUT_LIMIT} chars for judging]`;
 }
 
-/** Whole chunks up to the budget, then a count of the chunks left out. */
-function formatChunks(chunks: EvalRunArtifact["selectedChunks"]): {
-  text: string;
-  truncated: boolean;
-} {
-  const parts: string[] = [];
-  let used = 0;
-  for (const c of chunks) {
-    // Chat answers cite chunks by id ([7]), so each passage carries its id.
-    const part = `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`;
-    if (parts.length > 0 && used + part.length > CHUNKS_LIMIT) break;
-    parts.push(part.slice(0, CHUNKS_LIMIT));
-    used += part.length;
-  }
-  const omitted = chunks.length - parts.length;
-  if (omitted > 0) parts.push(`[… ${omitted} more passages not shown]`);
-  return { text: parts.join("\n\n---\n\n"), truncated: omitted > 0 };
-}
-
 function sourceEvidence(artifact: EvalRunArtifact, sourceTexts: SourceText[]): Evidence | null {
   if (artifact.selectedChunks.length > 0) {
     return {
       header:
         "Source passages retrieved for this answer:\n" +
         "Citation markers such as [7] in the output refer to the passage with that number.",
-      ...formatChunks(artifact.selectedChunks),
+      ...formatChunks(artifact.selectedChunks, CHUNKS_LIMIT),
     };
   }
   if (sourceTexts.length === 0) return null;
