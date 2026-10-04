@@ -58,7 +58,7 @@ export const env = {
   CHAT_RERANK_TOP_N: "7",
   CHAT_MAX_RESULTS: "7",
   /** Minimum relevance score for chunks to be considered for context (0.0-1.0). Chunks below this threshold are filtered out. */
-  CHAT_MIN_RELEVANCE_THRESHOLD: "0.20",
+  CHAT_MIN_RELEVANCE_THRESHOLD: "0.35",
   /** Maximum tokens for retrieved context chunks (not counting conversation history or system prompt). */
   CHAT_CONTEXT_TOKEN_BUDGET: "8000",
   /** Hard maximum number of chunks to include as a safety cap (prevents pathologically many tiny chunks). */
