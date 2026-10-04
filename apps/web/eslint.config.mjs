@@ -16,6 +16,13 @@ const MIGRATED = [
   "src/features/chat/**/*.tsx",
   "src/features/sources/**/*.tsx",
   "src/dev/**/*.tsx",
+  "src/shared/ui/**/*.tsx",
+  "src/shared/components/*.tsx",
+  "src/shared/components/icons/**/*.tsx",
+  "src/features/billing/**/*.tsx",
+  "src/features/audio/**/*.tsx",
+  "src/features/feedback/**/*.tsx",
+  "src/features/legal/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
@@ -67,6 +74,9 @@ export default defineConfig([
     rules: rules("warn"),
   },
   { files: MIGRATED, rules: rules("error") },
+  // Legacy hand-rolled menu, used only by Studio literature views; #264 replaces it with the shadcn
+  // DropdownMenu and deletes it.
+  { files: ["src/shared/ui/DropdownMenu.tsx"], rules: rules("warn") },
   // Upstream shadcn CLI markup that predates the linter (arbitrary values like ring-[3px], top-[50%],
   // transition-[color,box-shadow]). Stays at warn until each file is regenerated/adapted; all other rules
   // remain errors for these files. Do not add authored components here.
