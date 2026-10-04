@@ -48,8 +48,8 @@ export const Favicon: React.FC<FaviconProps> = ({
       width={size}
       height={size}
       loading="lazy"
-      className={`shrink-0 self-start inline-block ${fit === "cover" ? "object-cover" : "object-contain"} ${className}`}
-      style={{ width: size, height: size, maxWidth: size, maxHeight: size }}
+      className={`inline-block size-(--favicon-size) max-h-(--favicon-size) max-w-(--favicon-size) shrink-0 self-start ${fit === "cover" ? "object-cover" : "object-contain"} ${className}`}
+      style={{ "--favicon-size": `${size}px` } as React.CSSProperties}
       onError={() => setError(true)}
     />
   );

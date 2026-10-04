@@ -79,6 +79,12 @@ export default defineConfig([
     files: ["src/shared/components/ui/field.tsx", "src/shared/components/ui/input-group.tsx"],
     rules: { "shadcn/no-restyle": "warn", "shadcn/require-static-classes": "warn" },
   },
+  // Company logos keep their real brand colours, as the persisted cover swatches do; every other
+  // rule still applies to this file.
+  {
+    files: ["src/shared/components/icons/ModelBrandIcon.tsx"],
+    rules: { "shadcn/no-raw-colors": "off" },
+  },
   // Primitives own the look; outline exceptions there are reviewed variants (docs/design/principles.md).
   { files: ["src/shared/components/ui/**/*.tsx"], rules: { "solomind/soft-surfaces": "off" } },
 ]);
