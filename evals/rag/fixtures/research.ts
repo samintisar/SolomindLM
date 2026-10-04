@@ -3,14 +3,15 @@
  * Runner: "research"
  * Notebook: jd72h9qsq5zap11ede5k8rqkx585djmc
  */
-import type { EvalFixture } from "../types";
+import type { SourceChannel } from "../../../convex/_agents/research/types";
+import type { EvalFixture, SourcePolicyConfig } from "../types";
 
 const RESEARCH_NOTEBOOK_ID = "jd72h9qsq5zap11ede5k8rqkx585djmc";
 
 /** Align eval runs with production Deep Research retrieval breadth. */
 const DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL = 8;
 
-function deepResearchPolicy(channels: string[]) {
+function deepResearchPolicy(channels: SourceChannel[]): SourcePolicyConfig {
   return { channels, maxResultsPerChannel: DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL };
 }
 

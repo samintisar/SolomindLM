@@ -224,12 +224,12 @@ The `.github/workflows/ci.yml` runs on:
 
 **Required** (merge-blocking, enforced in branch protection):
 
-1. **Typecheck (Convex)** - Validates Convex backend TypeScript
+1. **Typecheck (Convex)** - Validates Convex backend TypeScript, then `typecheck:evals` (`evals/` runs under `bun run`, which doesn't check types)
 2. **Typecheck (Web)** - Validates web TypeScript
 3. **Typecheck (Expo mobile)** - Validates mobile TypeScript
 4. **Lint (Biome)** - Biome lint + format check
 5. **Lint (Workflows)** - actionlint on GitHub workflow files
-6. **Unit Tests** - `test:convex` + `test:web` vitest suites, the RAG eval fixture and use-case pack dry-runs, and `check:evals` (bundles every `evals/` module, so a broken import or missing export fails here instead of at eval runtime)
+6. **Unit Tests** - `test:convex` + `test:web` vitest suites, the RAG eval fixture and use-case pack dry-runs
 7. **Test (Mobile)** - `jest-expo` suite for `apps/mobile`
 8. **Build (Web, PR parity)** - Builds the React frontend
 9. **Coverage Report** - web coverage floor

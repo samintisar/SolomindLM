@@ -6,6 +6,7 @@ import type {
   EvalBaseline,
   EvalFixture,
   EvalRunArtifact,
+  EvidenceChannel,
   MetricResult,
   MetricStatus,
 } from "../types";
@@ -139,7 +140,7 @@ export function sourceRecallByChannel(
 /**
  * Infer source channel from a URL or chunk metadata.
  */
-export function inferSourceChannel(sourceUrl?: string): string {
+export function inferSourceChannel(sourceUrl?: string): EvidenceChannel {
   if (!sourceUrl) return "notebook";
   const url = sourceUrl.toLowerCase();
   if (url.includes("arxiv.org")) return "academic";

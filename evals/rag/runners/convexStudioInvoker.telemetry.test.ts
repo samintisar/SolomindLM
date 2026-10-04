@@ -50,18 +50,22 @@ const registeredFactories = Object.entries(STUDIO_INVOKER_FACTORIES).map(
 
 describe("pickStudioInvokeTelemetry", () => {
   it("copies token usage, token usage source, and stage spans when present", () => {
-    expect(
-      pickStudioInvokeTelemetry({
-        status: "completed",
-        tokenUsage: telemetry.tokenUsage,
-        tokenUsageSource: telemetry.tokenUsageSource,
-        stageSpans: telemetry.stageSpans,
-      })
-    ).toEqual(telemetry);
+    // A whole job status object, as the invokers pass it (extra fields included).
+    const status = {
+      status: "completed",
+      tokenUsage: telemetry.tokenUsage,
+      tokenUsageSource: telemetry.tokenUsageSource,
+      stageSpans: telemetry.stageSpans,
+    };
+    expect(pickStudioInvokeTelemetry(status)).toEqual(telemetry);
   });
 
   it("omits telemetry fields when the status does not include them", () => {
-    expect(pickStudioInvokeTelemetry({ status: "completed", title: "T" })).toEqual({});
+    const status: Parameters<typeof pickStudioInvokeTelemetry>[0] & {
+      status: string;
+      title: string;
+    } = { status: "completed", title: "T" };
+    expect(pickStudioInvokeTelemetry(status)).toEqual({});
   });
 });
 

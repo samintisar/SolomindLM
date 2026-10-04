@@ -10,6 +10,7 @@ import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
+import { toEvalSourcePolicy } from "../sourceChannels";
 import type { ChatAgentInvoker } from "./chatRunner";
 
 export interface ConvexChatInvokerOptions {
@@ -61,7 +62,7 @@ export function createConvexChatInvoker(
         tokenUsage: result.tokenUsage,
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
         stageSpans: result.stageSpans,
-        sourcePolicy: result.sourcePolicy,
+        sourcePolicy: toEvalSourcePolicy(result.sourcePolicy),
       };
     },
   };

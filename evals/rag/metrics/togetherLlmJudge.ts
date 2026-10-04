@@ -119,7 +119,7 @@ function extractJsonVerdict(text: string, allowEmbedded: boolean): string | null
  */
 export function createTogetherJudgeInvoker(
   config: TogetherJudgeConfig = {}
-): LlmJudgeOptions["invoke"] {
+): NonNullable<LlmJudgeOptions["invoke"]> {
   const client = createTogetherClient(config);
   const model = config.model ?? DEFAULT_JUDGE_MODEL;
   // Reasoning judges (the default) spend most of the budget thinking; 1024 truncated long judge
