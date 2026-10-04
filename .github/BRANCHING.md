@@ -44,8 +44,8 @@ git push -u origin feature/your-feature-name
 ### 4. CI Checks Run Automatically
 
 See [CI Pipeline Details](#ci-pipeline-details) below for the full list. Required
-checks must pass before merge; `Coverage Report`, `Dependency audit (baseline)`,
-`Lint (PR title)`, and `PR labeler` run but are not merge-blocking.
+checks must pass before merge; `Dependency audit (baseline)`, `Lint (PR title)`,
+`PR labeler` and `Knip production (advisory)` run but are not merge-blocking.
 
 ### 5. Review & Merge
 
@@ -209,7 +209,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Knip (unused code)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
