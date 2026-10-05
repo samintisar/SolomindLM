@@ -16,9 +16,17 @@ export const TOOL_LABELS = [
 
 const studioGrid = (page: Page) => page.getByTestId("studio-tool-grid");
 
-/** Note list row (the Card holding the title and the kebab menu) whose text contains the title. */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Note list row (the Card holding the title and the kebab menu) whose title is exactly `noteTitle`,
+ * so "Summary" doesn't also match "Summary v2".
+ */
 function studioNoteCard(page: Page, noteTitle: string) {
-  return page.getByTestId("studio-note-card").filter({ hasText: noteTitle });
+  const title = page.locator('[data-slot="note-title"]', {
+    hasText: new RegExp(`^\\s*${escapeRegExp(noteTitle)}\\s*$`),
+  });
+  return page.getByTestId("studio-note-card").filter({ has: title });
 }
 
 /**
