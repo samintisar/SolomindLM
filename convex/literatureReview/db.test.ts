@@ -797,3 +797,57 @@ describe("updateLiteratureReviewSessionStatus", () => {
     expect(session!.status).toBe("completed");
   });
 });
+
+describe("notebook papers in drafts and tables", () => {
+  test("keeps a notebook paper's document link and off-topic reason through to the table", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const sessionId = await seedSession(t, notebookId, userId);
+    const documentId = await t.run(async (ctx) =>
+      ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "cohort.pdf",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      } as never)
+    );
+
+    await t.mutation(internal.literatureReview.db.insertDraftBatch, {
+      sessionId,
+      papers: [
+        {
+          title: "Cohort study",
+          authors: ["Laird E"],
+          year: 2023,
+          abstract: "A cohort.",
+          url: "",
+          source: "notebook",
+          score: 1,
+          isIncluded: true,
+          includeReason: "From your notebook",
+          documentId,
+          offTopicReason: "Studies diabetes, not depression.",
+        },
+      ],
+      columns: [],
+      batchNumber: 0,
+    });
+    const { tableId } = await t.mutation(internal.literatureReview.db.persistTable, {
+      sessionId,
+      columns: [],
+    });
+
+    const { citation, table } = await t.run(async (ctx) => {
+      const table = await ctx.db.get(tableId);
+      const citation = table ? await ctx.db.get(table.papers[0].citationId) : null;
+      return { citation, table };
+    });
+    expect(citation?.sourceApi).toBe("notebook");
+    expect(citation?.documentId).toBe(documentId);
+    expect(table?.papers[0].offTopicReason).toBe("Studies diabetes, not depression.");
+  });
+});

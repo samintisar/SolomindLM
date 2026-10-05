@@ -39,6 +39,7 @@ const literatureTablePaperValidator = v.object({
   rowData: v.record(v.string(), v.string()),
   includeReason: v.optional(v.string()),
   isIncluded: v.boolean(),
+  offTopicReason: v.optional(v.string()),
 });
 
 /** Chat workflow tables/reports — never listed in the studio sidebar. */
@@ -518,7 +519,8 @@ const citationMetadataValidator = v.object({
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   abstract: v.optional(v.string()),

@@ -96,7 +96,9 @@ const literaturePaperFields = {
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    /** A paper from the user's notebook (#301): included without screening. */
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   doi: v.optional(v.string()),
@@ -104,6 +106,10 @@ const literaturePaperFields = {
   isIncluded: v.optional(v.boolean()),
   includeReason: v.optional(v.string()),
   extractedData: v.optional(v.record(v.string(), v.string())),
+  /** Set for notebook papers: the source document, read server-side for extraction. */
+  documentId: v.optional(v.id("documents")),
+  /** Set when a notebook paper looks off-topic for the question; it is still included. */
+  offTopicReason: v.optional(v.string()),
 };
 
 const literaturePaperValidator = v.object(literaturePaperFields);

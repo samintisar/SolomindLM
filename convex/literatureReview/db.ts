@@ -26,7 +26,9 @@ const literaturePaperFields = {
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    /** A paper from the user's notebook (#301): included without screening. */
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   doi: v.optional(v.string()),
@@ -34,6 +36,10 @@ const literaturePaperFields = {
   isIncluded: v.optional(v.boolean()),
   includeReason: v.optional(v.string()),
   extractedData: v.optional(v.record(v.string(), v.string())),
+  /** Set for notebook papers: the source document, read server-side for extraction. */
+  documentId: v.optional(v.id("documents")),
+  /** Set when a notebook paper looks off-topic for the question; it is still included. */
+  offTopicReason: v.optional(v.string()),
 };
 
 const literaturePaperValidator = v.object(literaturePaperFields);
@@ -118,6 +124,7 @@ export const insertDraftBatch = internalMutation({
         citationCount: paper.citationCount,
         abstract: paper.abstract,
         citationKey,
+        ...(paper.documentId ? { documentId: paper.documentId } : {}),
       });
 
       // Start with extracted data aligned to column ids (LLM keys often use display names)
@@ -160,6 +167,7 @@ export const insertDraftBatch = internalMutation({
         rowData,
         includeReason: paper.includeReason,
         isIncluded: true,
+        ...(paper.offTopicReason ? { offTopicReason: paper.offTopicReason } : {}),
         batchNumber: args.batchNumber,
         createdAt: now,
       });
@@ -188,6 +196,7 @@ export const persistTable = internalMutation({
       rowData: Record<string, string>;
       includeReason?: string;
       isIncluded: boolean;
+      offTopicReason?: string;
     }> = [];
 
     for (const d of drafts) {
@@ -196,6 +205,7 @@ export const persistTable = internalMutation({
         rowData: d.rowData,
         includeReason: d.includeReason,
         isIncluded: d.isIncluded,
+        ...(d.offTopicReason ? { offTopicReason: d.offTopicReason } : {}),
       });
     }
 
@@ -330,7 +340,11 @@ export const persistRankedPapers = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const now = Date.now();
-    const snapshot = compactPapersForSnapshot(args.papers).map((p) => ({
+    // Only search results are ranked; notebook papers are never in this snapshot.
+    const searchPapers = args.papers.flatMap((p) =>
+      p.source === "notebook" ? [] : [{ ...p, source: p.source }]
+    );
+    const snapshot = compactPapersForSnapshot(searchPapers).map((p) => ({
       title: p.title,
       authors: p.authors,
       year: p.year,
