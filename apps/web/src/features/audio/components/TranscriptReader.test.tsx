@@ -94,6 +94,12 @@ describe("TranscriptReader", () => {
     expect(screen.getByText("Approximate sync")).toBeInTheDocument();
   });
 
+  it("says Syncing… while an estimate is being matched to the audio", () => {
+    renderReader({ approximate: true, syncing: true });
+    expect(screen.getByText("Syncing…")).toBeInTheDocument();
+    expect(screen.queryByText("Approximate sync")).not.toBeInTheDocument();
+  });
+
   it("shows an empty state without lines", () => {
     renderReader({ lines: [] });
     expect(screen.getByText("No transcript")).toBeInTheDocument();

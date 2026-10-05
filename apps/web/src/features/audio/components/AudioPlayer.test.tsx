@@ -1,12 +1,30 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PauseAlignment } from "../hooks/usePauseAlignedLines";
 import { AudioPlayer } from "./AudioPlayer";
 
 let resolvedUrl: string | null | undefined = "https://example.test/audio.mp3";
 vi.mock("../hooks/useResolvedAudioPlaybackUrl", () => ({
   useResolvedAudioPlaybackUrl: () => resolvedUrl,
 }));
+
+let alignment: PauseAlignment = { lines: null, status: "idle" };
+/** Records every call; returns `alignment`, or the real hook's result when `realAlignment`. */
+const usePauseAlignedLines = vi.fn((..._args: [string | null, string, boolean]) => alignment);
+let realAlignment = false;
+vi.mock("../hooks/usePauseAlignedLines", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../hooks/usePauseAlignedLines")>();
+  return {
+    usePauseAlignedLines: (...args: [string | null, string, boolean]) => {
+      const [url, transcript, enabled] = args;
+      const fake = usePauseAlignedLines(...args);
+      // Always called, so hooks keep their order; it only works when `realAlignment` is on.
+      const real = actual.usePauseAlignedLines(url, transcript, realAlignment && enabled);
+      return realAlignment ? real : fake;
+    },
+  };
+});
 
 vi.mock("motion/react", () => ({
   useReducedMotion: () => false,
@@ -44,6 +62,8 @@ function audioElement(container: HTMLElement): HTMLAudioElement {
 
 beforeEach(() => {
   resolvedUrl = "https://example.test/audio.mp3";
+  alignment = { lines: null, status: "idle" };
+  usePauseAlignedLines.mockClear();
   play.mockClear();
   pause.mockClear();
   HTMLMediaElement.prototype.play = play as unknown as typeof HTMLMediaElement.prototype.play;
@@ -84,10 +104,167 @@ describe("AudioPlayer", () => {
     expect(screen.getByText("Audio overview · 2 hosts")).toBeInTheDocument();
   });
 
-  it("estimates lines from the transcript when there are no saved timings", () => {
-    renderPlayer({ metadata: undefined, transcript: "Alpha line.\nBeta line." });
-    expect(screen.getByRole("button", { name: /Alpha line/ })).toBeInTheDocument();
-    expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+  describe("older overviews without saved timings", () => {
+    const transcript = "Alpha line.\nBeta line.";
+
+    /** Loads the audio's duration and starts playback, as the element's events would. */
+    function startPlaying(audio: HTMLAudioElement, durationSec = 600) {
+      Object.defineProperty(audio, "duration", { value: durationSec, configurable: true });
+      fireEvent(audio, new Event("durationchange"));
+      fireEvent(audio, new Event("play"));
+    }
+
+    it("shows the estimate without a badge until played", () => {
+      renderPlayer({ metadata: undefined, transcript });
+      expect(screen.getByRole("button", { name: /Alpha line/ })).toBeInTheDocument();
+      expect(screen.queryByText("Approximate sync")).not.toBeInTheDocument();
+      expect(screen.queryByText("Syncing…")).not.toBeInTheDocument();
+    });
+
+    it("aligns them to the audio's pauses only once played", () => {
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      const audio = audioElement(container);
+      Object.defineProperty(audio, "duration", { value: 600, configurable: true });
+      fireEvent(audio, new Event("durationchange"));
+      expect(usePauseAlignedLines).toHaveBeenLastCalledWith(
+        "https://example.test/audio.mp3",
+        transcript,
+        false
+      );
+      fireEvent(audio, new Event("play"));
+      expect(usePauseAlignedLines).toHaveBeenLastCalledWith(
+        "https://example.test/audio.mp3",
+        transcript,
+        true
+      );
+      // Pausing again does not cancel it.
+      fireEvent(audio, new Event("pause"));
+      expect(usePauseAlignedLines).toHaveBeenLastCalledWith(
+        "https://example.test/audio.mp3",
+        transcript,
+        true
+      );
+    });
+
+    it("never aligns audio over 40 minutes, and says the sync is approximate", () => {
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      startPlaying(audioElement(container), 41 * 60);
+      for (const call of usePauseAlignedLines.mock.calls) expect(call[2]).toBe(false);
+      expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+    });
+
+    it("uses the aligned lines and drops the badge once aligned", async () => {
+      alignment = {
+        status: "aligned",
+        lines: [
+          { speaker: null, text: "Alpha line.", startMs: 400, endMs: 5200 },
+          { speaker: null, text: "Beta line.", startMs: 6100, endMs: 9000 },
+        ],
+      };
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      const audio = audioElement(container);
+      startPlaying(audio, 100);
+      await userEvent.click(screen.getByRole("button", { name: /Beta line/ }));
+      expect(audio.currentTime).toBe(6.1);
+      expect(screen.queryByText("Approximate sync")).not.toBeInTheDocument();
+      expect(screen.queryByText("Syncing…")).not.toBeInTheDocument();
+    });
+
+    it("shows Syncing… while aligning", () => {
+      alignment = { lines: null, status: "aligning" };
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      startPlaying(audioElement(container));
+      expect(screen.getByText("Syncing…")).toBeInTheDocument();
+      expect(screen.queryByText("Approximate sync")).not.toBeInTheDocument();
+    });
+
+    it("keeps the estimate and says so when alignment fails", () => {
+      alignment = { lines: null, status: "failed" };
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      startPlaying(audioElement(container));
+      expect(screen.getByRole("button", { name: /Beta line/ })).toBeInTheDocument();
+      expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+    });
+
+    it("ignores an alignment that does not match the transcript's lines", () => {
+      alignment = {
+        status: "aligned",
+        lines: [{ speaker: null, text: "Alpha line.", startMs: 400, endMs: 9000 }],
+      };
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      startPlaying(audioElement(container));
+      expect(screen.getByRole("button", { name: /Beta line/ })).toBeInTheDocument();
+      expect(screen.queryByText("Syncing…")).not.toBeInTheDocument();
+    });
+
+    it("says the sync is approximate for a single line, which has nothing to align", () => {
+      renderPlayer({ metadata: undefined, transcript: "Only line." });
+      expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+    });
+
+    describe("with the real alignment hook", () => {
+      const fetchMock = vi.fn();
+
+      beforeEach(() => {
+        realAlignment = true;
+        // Hold the download open; unmounting aborts it, as a browser would.
+        fetchMock.mockReset().mockImplementation(
+          (_url: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+            })
+        );
+        vi.stubGlobal("fetch", fetchMock);
+        vi.stubGlobal(
+          "OfflineAudioContext",
+          class {
+            decodeAudioData() {
+              return Promise.reject(new Error("not reached"));
+            }
+          }
+        );
+      });
+
+      afterEach(() => {
+        realAlignment = false;
+        vi.unstubAllGlobals();
+      });
+
+      it("downloads nothing before play, and the audio once playback starts", () => {
+        const { container } = renderPlayer({ metadata: undefined, transcript });
+        const audio = audioElement(container);
+        Object.defineProperty(audio, "duration", { value: 600, configurable: true });
+        fireEvent(audio, new Event("durationchange"));
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        fireEvent(audio, new Event("play"));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith(
+          "https://example.test/audio.mp3",
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
+        expect(screen.getByText("Syncing…")).toBeInTheDocument();
+      });
+
+      it("never downloads a 41-minute overview", () => {
+        const { container } = renderPlayer({ metadata: undefined, transcript });
+        startPlaying(audioElement(container), 41 * 60);
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+      });
+    });
+  });
+
+  it("never aligns an overview with saved timings", () => {
+    alignment = {
+      status: "aligned",
+      lines: [{ speaker: null, text: "Wrong.", startMs: 0, endMs: 1 }],
+    };
+    renderPlayer();
+    expect(usePauseAlignedLines).toHaveBeenCalled();
+    for (const call of usePauseAlignedLines.mock.calls) expect(call[2]).toBe(false);
+    expect(screen.getByRole("button", { name: /Second line, answering/ })).toBeInTheDocument();
+    expect(screen.queryByText("Wrong.")).not.toBeInTheDocument();
   });
 
   it("names the skip buttons and announces the keyboard shortcuts", () => {
