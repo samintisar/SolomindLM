@@ -3,6 +3,7 @@ import React, { useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
+import { usePauseAlignedLines } from "../hooks/usePauseAlignedLines";
 import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 import { currentLineIndex, resolveReaderLines } from "../transcript/transcriptLines";
 import { PlayButton } from "./controls/PlayButton";
@@ -78,10 +79,21 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   // The estimate depends on the duration, which is 0 until the audio loads. currentLineIndex is
   // -1 until then, so the reader does not open on the last line.
-  const resolved = useMemo(
+  const estimated = useMemo(
     () => resolveReaderLines(metadata, transcript ?? "", duration),
     [metadata, transcript, duration]
   );
+  // Older overviews saved no timings: time their lines to the pauses in the audio instead.
+  const needsAlignment = estimated.approximate && estimated.lines.length > 1;
+  const alignment = usePauseAlignedLines(audioSource, transcript ?? "", needsAlignment);
+  const alignedLines =
+    needsAlignment && alignment.lines?.length === estimated.lines.length ? alignment.lines : null;
+  const resolved = useMemo(
+    () => (alignedLines ? { lines: alignedLines, approximate: false, timed: true } : estimated),
+    [alignedLines, estimated]
+  );
+  const syncing =
+    resolved.approximate && needsAlignment && (alignment.status === "aligning" || isResolving);
   const activeIndex = currentLineIndex(resolved, currentTime * 1000);
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -141,6 +153,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         activeIndex={activeIndex}
         isPlaying={isPlaying}
         approximate={resolved.approximate}
+        syncing={syncing}
         onSeek={(ms) => {
           // Before the audio loads a seek would move the highlight with no audio behind it.
           if (canSeek) seekTo(ms / 1000);

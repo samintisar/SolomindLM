@@ -1,11 +1,19 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PauseAlignment } from "../hooks/usePauseAlignedLines";
 import { AudioPlayer } from "./AudioPlayer";
 
 let resolvedUrl: string | null | undefined = "https://example.test/audio.mp3";
 vi.mock("../hooks/useResolvedAudioPlaybackUrl", () => ({
   useResolvedAudioPlaybackUrl: () => resolvedUrl,
+}));
+
+let alignment: PauseAlignment = { lines: null, status: "idle" };
+const usePauseAlignedLines = vi.fn((..._args: [string | null, string, boolean]) => alignment);
+vi.mock("../hooks/usePauseAlignedLines", () => ({
+  usePauseAlignedLines: (...args: [string | null, string, boolean]) =>
+    usePauseAlignedLines(...args),
 }));
 
 vi.mock("motion/react", () => ({
@@ -44,6 +52,8 @@ function audioElement(container: HTMLElement): HTMLAudioElement {
 
 beforeEach(() => {
   resolvedUrl = "https://example.test/audio.mp3";
+  alignment = { lines: null, status: "idle" };
+  usePauseAlignedLines.mockClear();
   play.mockClear();
   pause.mockClear();
   HTMLMediaElement.prototype.play = play as unknown as typeof HTMLMediaElement.prototype.play;
@@ -88,6 +98,73 @@ describe("AudioPlayer", () => {
     renderPlayer({ metadata: undefined, transcript: "Alpha line.\nBeta line." });
     expect(screen.getByRole("button", { name: /Alpha line/ })).toBeInTheDocument();
     expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+  });
+
+  describe("older overviews without saved timings", () => {
+    const transcript = "Alpha line.\nBeta line.";
+
+    it("aligns them to the audio's pauses", () => {
+      renderPlayer({ metadata: undefined, transcript });
+      expect(usePauseAlignedLines).toHaveBeenLastCalledWith(
+        "https://example.test/audio.mp3",
+        transcript,
+        true
+      );
+    });
+
+    it("uses the aligned lines and drops the badge once aligned", async () => {
+      alignment = {
+        status: "aligned",
+        lines: [
+          { speaker: null, text: "Alpha line.", startMs: 400, endMs: 5200 },
+          { speaker: null, text: "Beta line.", startMs: 6100, endMs: 9000 },
+        ],
+      };
+      const { container } = renderPlayer({ metadata: undefined, transcript });
+      const audio = audioElement(container);
+      Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+      fireEvent(audio, new Event("durationchange"));
+      await userEvent.click(screen.getByRole("button", { name: /Beta line/ }));
+      expect(audio.currentTime).toBe(6.1);
+      expect(screen.queryByText("Approximate sync")).not.toBeInTheDocument();
+      expect(screen.queryByText("Syncing…")).not.toBeInTheDocument();
+    });
+
+    it("shows Syncing… while aligning", () => {
+      alignment = { lines: null, status: "aligning" };
+      renderPlayer({ metadata: undefined, transcript });
+      expect(screen.getByText("Syncing…")).toBeInTheDocument();
+      expect(screen.queryByText("Approximate sync")).not.toBeInTheDocument();
+    });
+
+    it("keeps the estimate and says so when alignment fails", () => {
+      alignment = { lines: null, status: "failed" };
+      renderPlayer({ metadata: undefined, transcript });
+      expect(screen.getByRole("button", { name: /Beta line/ })).toBeInTheDocument();
+      expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+    });
+
+    it("ignores an alignment that does not match the transcript's lines", () => {
+      alignment = {
+        status: "aligned",
+        lines: [{ speaker: null, text: "Alpha line.", startMs: 400, endMs: 9000 }],
+      };
+      renderPlayer({ metadata: undefined, transcript });
+      expect(screen.getByRole("button", { name: /Beta line/ })).toBeInTheDocument();
+      expect(screen.getByText("Approximate sync")).toBeInTheDocument();
+    });
+  });
+
+  it("never aligns an overview with saved timings", () => {
+    alignment = {
+      status: "aligned",
+      lines: [{ speaker: null, text: "Wrong.", startMs: 0, endMs: 1 }],
+    };
+    renderPlayer();
+    expect(usePauseAlignedLines).toHaveBeenCalled();
+    for (const call of usePauseAlignedLines.mock.calls) expect(call[2]).toBe(false);
+    expect(screen.getByRole("button", { name: /Second line, answering/ })).toBeInTheDocument();
+    expect(screen.queryByText("Wrong.")).not.toBeInTheDocument();
   });
 
   it("names the skip buttons and announces the keyboard shortcuts", () => {
