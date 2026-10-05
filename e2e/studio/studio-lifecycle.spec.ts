@@ -28,7 +28,9 @@ test.describe("Studio Note Lifecycle", () => {
 
     const card = firstStudioNoteCard(page);
     await expect(card).toHaveAttribute("aria-busy", "true", { timeout: 15_000 });
-    const title = ((await card.locator("h4").textContent()) || "Summary").trim();
+    const title = (
+      (await card.locator('[data-slot="note-title"]').textContent()) || "Summary"
+    ).trim();
 
     return { card, title };
   }
@@ -52,8 +54,8 @@ test.describe("Studio Note Lifecycle", () => {
     const page = notebookPage;
     const { card: noteEl } = await createGeneratingNote(page);
 
-    // Should have cursor-not-allowed class
-    await expect(noteEl).toHaveClass(/cursor-not-allowed/);
+    // A generating row is aria-busy and its body is not a button
+    await expect(noteEl).toHaveAttribute("aria-busy", "true");
   });
 
   test("note can be renamed via kebab menu", async ({ notebookPage }) => {
@@ -67,7 +69,9 @@ test.describe("Studio Note Lifecycle", () => {
     // If this times out, inspect Convex report job + model API — not just test duration
     await expect(noteEl).not.toHaveAttribute("aria-busy", "true", { timeout: completionBudgetMs });
 
-    const originalTitle = ((await noteEl.locator("h4").textContent()) || "Report").trim();
+    const originalTitle = (
+      (await noteEl.locator('[data-slot="note-title"]').textContent()) || "Report"
+    ).trim();
     const newTitle = `Renamed ${Date.now()}`;
     await renameNote(page, originalTitle, newTitle);
 

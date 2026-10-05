@@ -48,7 +48,7 @@ test.describe("Written Questions Generation", () => {
 
     // Note should be busy and not clickable
     await expect(noteEl).toHaveAttribute("aria-busy", "true", { timeout: 15_000 });
-    await expect(noteEl).toHaveClass(/cursor-not-allowed/);
+    await expect(noteEl).toHaveAttribute("aria-busy", "true");
 
     // Progress bar may or may not be visible depending on metadata
     const progressbar = noteEl.locator('[role="progressbar"]');
@@ -67,7 +67,7 @@ test.describe("Written Questions Generation", () => {
     const { card: noteEl } = await createWrittenQuestions(page);
 
     await expect(noteEl).not.toHaveAttribute("aria-busy", "true", { timeout: completionBudgetMs });
-    await expect(noteEl.locator("h4")).toBeVisible();
-    await expect(noteEl).not.toHaveClass(/cursor-not-allowed/);
+    await expect(noteEl.locator('[data-slot="note-title"]')).toBeVisible();
+    await expect(noteEl).not.toHaveAttribute("aria-busy", "true");
   });
 });

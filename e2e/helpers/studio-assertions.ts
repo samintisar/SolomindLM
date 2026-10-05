@@ -16,13 +16,9 @@ export const TOOL_LABELS = [
 
 const studioGrid = (page: Page) => page.getByTestId("studio-tool-grid");
 
-/** Note list item root (contains title h4 + kebab); not the h4's immediate parent */
+/** Note list row (the Card holding the title and the kebab menu) whose text contains the title. */
 function studioNoteCard(page: Page, noteTitle: string) {
-  return page
-    .getByText(noteTitle, { exact: true })
-    .locator(
-      "xpath=ancestor::div[contains(@class,'border-border') and contains(@class,'p-3') and contains(@class,'rounded-sm')][1]"
-    );
+  return page.getByTestId("studio-note-card").filter({ hasText: noteTitle });
 }
 
 /**

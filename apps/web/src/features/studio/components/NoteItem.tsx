@@ -160,7 +160,10 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           >
             <NoteIcon note={note} />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-serif text-sm font-bold leading-tight text-foreground">
+              <p
+                data-slot="note-title"
+                className="truncate font-serif text-sm font-bold leading-tight text-foreground"
+              >
                 {note.title}
               </p>
               <GeneratingStatus lines={generatingLines} preview={note.preview} />
@@ -174,7 +177,10 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           >
             <NoteIcon note={note} popped={justFinished} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-serif text-sm font-bold leading-tight text-foreground transition-colors group-hover:text-primary">
+              <span
+                data-slot="note-title"
+                className="block truncate font-serif text-sm font-bold leading-tight text-foreground transition-colors group-hover:text-primary"
+              >
                 {note.title}
               </span>
               <span
