@@ -3,6 +3,6 @@
  * sitemap lastmod). Bump only the page whose copy changed.
  */
 export const LEGAL_LAST_UPDATED = {
-  "/privacy": { label: "October 4, 2026", iso: "2026-10-04" },
-  "/terms": { label: "June 6, 2026", iso: "2026-06-06" },
+  "/privacy": { label: "October 5, 2026", iso: "2026-10-05" },
+  "/terms": { label: "October 5, 2026", iso: "2026-10-05" },
 } as const;

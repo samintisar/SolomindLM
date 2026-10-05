@@ -37,6 +37,23 @@ export const TermsOfService: React.FC = () => {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Mobile apps</h2>
+        <p className="text-muted-foreground">
+          These Terms also apply to our iOS and Android apps. If you download the iOS app from the
+          Apple App Store, Apple&apos;s{" "}
+          <a
+            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+            className="text-foreground underline underline-offset-2 hover:no-underline"
+          >
+            Licensed Application End User License Agreement
+          </a>{" "}
+          also applies to your use of the app. If you download the Android app from Google Play,
+          Google Play&apos;s terms also apply. Apple and Google are not responsible for the Service
+          or its content.
+        </p>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Accounts</h2>
         <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
           <li>You must be at least 13 years old to use the Service.</li>
@@ -137,13 +154,13 @@ export const TermsOfService: React.FC = () => {
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Governing law and disputes</h2>
         <p className="text-muted-foreground">
-          SolomindLM is operated from Canada. These Terms are governed by the laws of Canada and the
-          laws of the province or territory in which we operate, without regard to conflict-of-law
-          rules that would apply another jurisdiction&apos;s laws. Disputes should first be
-          addressed by contacting us. Where formal resolution is needed, you and we submit to the
-          non-exclusive jurisdiction of the courts of that province or territory, except that
-          mandatory consumer protection rules in your own province, territory, or country may still
-          apply to you where the law requires.
+          SolomindLM is operated from British Columbia, Canada. These Terms are governed by the laws
+          of the Province of British Columbia and the federal laws of Canada that apply there,
+          without regard to conflict-of-law rules that would apply another jurisdiction&apos;s laws.
+          Disputes should first be addressed by contacting us. Where formal resolution is needed,
+          you and we submit to the non-exclusive jurisdiction of the courts of British Columbia,
+          except that mandatory consumer protection rules in your own province, territory, or
+          country may still apply to you where the law requires.
         </p>
       </section>
 
