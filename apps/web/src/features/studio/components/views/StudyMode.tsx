@@ -416,7 +416,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
       </div>
 
       {/* Reserves the rating grid's height so revealing the answer doesn't shift the card. */}
-      <div className="flex min-h-36 flex-col items-center gap-3 sm:min-h-21">
+      <div className="flex min-h-40 flex-col items-center gap-3 sm:min-h-23">
         {!showAnswer ? (
           <Button
             ref={revealRef}
