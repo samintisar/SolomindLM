@@ -209,7 +209,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)`, `Convex codegen (generated API)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -234,11 +234,11 @@ The `.github/workflows/ci.yml` runs on:
 8. **Build (Web, PR parity)** - Builds the React frontend
 9. **Coverage Report** - the `test:web` vitest suite with coverage (`test:web:coverage`): fails on a failing web test or a drop below the coverage floor
 10. **Knip (unused code)** - `bun run knip` (default mode) finds no unused files, exports, dependencies or duplicate exports. A finding fails the PR: delete the dead code, or if it's a false positive add an ignore with a reason to `knip.json` (`ignoreIssues` for a path, `ignoreDependencies`/`ignoreBinaries` for a package). Every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name. Add yours there, or Knip reports it as unused.
+11. **Convex codegen (generated API)** - `bun run check:convex-codegen` fails when `convex/_generated/api.d.ts` is missing a module under `convex/` (underscore dirs included) or still lists a deleted one. Typecheck passes either way, which is how #306 and #331 merged with a stale file. Fix it by running `npx convex codegen` against your dev deployment and committing `convex/_generated`.
 
 **Advisory** (run on PRs, not merge-blocking):
 
 - **Dependency audit (baseline)** - `bun audit`, non-blocking until the baseline is clean
-- **Convex codegen (generated API)** - `bun run check:convex-codegen` fails when `convex/_generated/api.d.ts` is missing a module under `convex/` (underscore dirs included) or still lists a deleted one. Typecheck passes either way, which is how #306 and #331 merged with a stale file. Fix it by running `npx convex codegen` against your dev deployment and committing `convex/_generated`. The job fails on drift, but it is not in branch protection yet, so it does not block merging
 - **Knip production (advisory)** - `bun run knip:production` (shipped code only) reports to the job summary without failing. It's the pass that finds dead Convex code, because convex-test's `import.meta.glob` marks every Convex module as used when tests are included. It still lists the test-only code tracked in #249-#253, so it stays advisory until those are resolved.
 - **Lint (PR title)** - conventional-commit form on the PR title (becomes the squash commit)
 - **PR labeler** - applies `area:*` labels from changed paths (`.github/labeler.yml`)
