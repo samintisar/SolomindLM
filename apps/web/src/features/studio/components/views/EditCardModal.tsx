@@ -1,5 +1,5 @@
 import { Save, Trash2 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,30 +33,29 @@ interface EditCardModalProps {
   onDelete?: () => void;
 }
 
-export const EditCardModal: React.FC<EditCardModalProps> = ({
-  isOpen,
+type CardData = NonNullable<EditCardModalProps["card"]>;
+
+interface CardFormProps {
+  card?: CardData;
+  isNewCard: boolean;
+  canDelete: boolean;
+  onSave: EditCardModalProps["onSave"];
+  onCancel: () => void;
+  onDelete?: () => void;
+}
+
+// Lives inside DialogContent, which Radix unmounts on close, so every open starts from the card
+// it was given and never shows the previous draft.
+const CardForm: React.FC<CardFormProps> = ({
   card,
-  cardIndex,
+  isNewCard,
+  canDelete,
   onSave,
   onCancel,
   onDelete,
 }) => {
-  const [front, setFront] = useState("");
-  const [back, setBack] = useState("");
-
-  // Also keyed on isOpen so a second "Add Card" opens empty instead of with the last draft.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: isOpen is a deliberate reset trigger
-  useEffect(() => {
-    if (card) {
-      setFront(card.front);
-      setBack(card.back);
-    } else {
-      setFront("");
-      setBack("");
-    }
-  }, [card, isOpen]);
-
-  const isNewCard = cardIndex === undefined;
+  const [front, setFront] = useState(card?.front ?? "");
+  const [back, setBack] = useState(card?.back ?? "");
 
   const handleSave = () => {
     if (!front.trim() || !back.trim()) {
@@ -67,6 +66,91 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
       back: back.trim(),
     });
   };
+
+  return (
+    <>
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="flashcard-front">Front (question)</FieldLabel>
+          <Textarea
+            id="flashcard-front"
+            rows={5}
+            value={front}
+            onChange={(e) => setFront(e.target.value)}
+            placeholder="Enter the question or prompt..."
+            autoFocus={isNewCard}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="flashcard-back">Back (answer)</FieldLabel>
+          <Textarea
+            id="flashcard-back"
+            rows={5}
+            value={back}
+            onChange={(e) => setBack(e.target.value)}
+            placeholder="Enter the answer or explanation..."
+          />
+        </Field>
+      </FieldGroup>
+
+      <DialogFooter className="sm:justify-between">
+        {!isNewCard && canDelete ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost-destructive">
+                <Trash2 />
+                Delete Card
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this card?</AlertDialogTitle>
+                <AlertDialogDescription>This can't be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={() => onDelete?.()}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : (
+          <span />
+        )}
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!front.trim() || !back.trim()}>
+            <Save />
+            {isNewCard ? "Add Card" : "Save Changes"}
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  );
+};
+
+export const EditCardModal: React.FC<EditCardModalProps> = ({
+  isOpen,
+  card,
+  cardIndex,
+  onSave,
+  onCancel,
+  onDelete,
+}) => {
+  // The parent clears the card in the same update that closes the dialog, but the dialog fades out
+  // for ~200ms. Keep the last card seen while open so it doesn't turn into "Add New Card" mid-fade.
+  const canDelete = Boolean(onDelete);
+  const [shown, setShown] = useState({ card, cardIndex, canDelete });
+  if (
+    isOpen &&
+    (shown.card !== card || shown.cardIndex !== cardIndex || shown.canDelete !== canDelete)
+  ) {
+    setShown({ card, cardIndex, canDelete });
+  }
+  const isNewCard = shown.cardIndex === undefined;
 
   return (
     <Dialog
@@ -82,66 +166,14 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
             {isNewCard ? "Create a new flashcard" : "Edit flashcard content"}
           </DialogDescription>
         </DialogHeader>
-
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="flashcard-front">Front (question)</FieldLabel>
-            <Textarea
-              id="flashcard-front"
-              rows={5}
-              value={front}
-              onChange={(e) => setFront(e.target.value)}
-              placeholder="Enter the question or prompt..."
-              autoFocus={isNewCard}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="flashcard-back">Back (answer)</FieldLabel>
-            <Textarea
-              id="flashcard-back"
-              rows={5}
-              value={back}
-              onChange={(e) => setBack(e.target.value)}
-              placeholder="Enter the answer or explanation..."
-            />
-          </Field>
-        </FieldGroup>
-
-        <DialogFooter className="sm:justify-between">
-          {!isNewCard && onDelete ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost-destructive">
-                  <Trash2 />
-                  Delete Card
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this card?</AlertDialogTitle>
-                  <AlertDialogDescription>This can't be undone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={onDelete}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={!front.trim() || !back.trim()}>
-              <Save />
-              {isNewCard ? "Add Card" : "Save Changes"}
-            </Button>
-          </div>
-        </DialogFooter>
+        <CardForm
+          card={shown.card}
+          isNewCard={isNewCard}
+          canDelete={shown.canDelete}
+          onSave={onSave}
+          onCancel={onCancel}
+          onDelete={onDelete}
+        />
       </DialogContent>
     </Dialog>
   );

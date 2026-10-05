@@ -26,6 +26,7 @@ import {
   useUpdateFlashcardProgress,
 } from "@/features/studio/services/flashcardsApi";
 import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
 import {
   Empty,
   EmptyContent,
@@ -237,18 +238,17 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
       {/* Header Controls */}
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div
-            role="group"
-            aria-label="Mode"
-            className="flex items-center gap-1 rounded-xl bg-muted p-1"
-          >
+          <ButtonGroup variant="tray" aria-label="Mode">
             {modeToggles.map(({ value, name, tip, icon }) => (
               <Tooltip key={value}>
+                {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
                 <TooltipTrigger asChild>
                   <Toggle
                     size="sm"
                     pressed={mode === value}
-                    onPressedChange={() => handleModeChange(value)}
+                    onPressedChange={(pressed) => {
+                      if (pressed) handleModeChange(value);
+                    }}
                     disabled={value === "study" && dueCards.length === 0}
                     aria-label={name}
                   >
@@ -258,33 +258,33 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                 <TooltipContent>{tip}</TooltipContent>
               </Tooltip>
             ))}
-          </div>
+          </ButtonGroup>
 
           {mode === "browse" && currentCard && <ProficiencyBadge card={currentCard} />}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           {mode === "browse" && (
-            <div
-              role="group"
-              aria-label="Which cards to show"
-              className="flex items-center gap-1 rounded-xl bg-muted p-1"
-            >
+            <ButtonGroup variant="tray" aria-label="Which cards to show">
               <Toggle
                 size="sm"
                 pressed={!showMastered}
-                onPressedChange={() => void setShowMasteredPreference(false)}
+                onPressedChange={(pressed) => {
+                  if (pressed) void setShowMasteredPreference(false);
+                }}
               >
                 <span className="px-1.5">Due</span>
               </Toggle>
               <Toggle
                 size="sm"
                 pressed={showMastered}
-                onPressedChange={() => void setShowMasteredPreference(true)}
+                onPressedChange={(pressed) => {
+                  if (pressed) void setShowMasteredPreference(true);
+                }}
               >
                 <span className="px-1.5">All</span>
               </Toggle>
-            </div>
+            </ButtonGroup>
           )}
 
           {mode === "study" && activeStudyCards.length > 0 && (
@@ -362,9 +362,13 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                 <EmptyMedia variant="icon">
                   <BookOpen />
                 </EmptyMedia>
-                <EmptyTitle>No flashcards available</EmptyTitle>
+                <EmptyTitle>
+                  {showMastered ? "No flashcards yet" : "All cards are mastered!"}
+                </EmptyTitle>
                 <EmptyDescription>
-                  {showMastered ? "Try showing all cards." : "All cards are mastered!"}
+                  {showMastered
+                    ? "Cards will show up here once they are added."
+                    : "Show all cards to review them."}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -428,6 +432,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                   value={((boundedBrowseIndex + 1) / filteredCards.length) * 100}
                   size="sm"
                   aria-label={`Card ${boundedBrowseIndex + 1} of ${filteredCards.length}`}
+                  getValueLabel={() => `Card ${boundedBrowseIndex + 1} of ${filteredCards.length}`}
                   className="flex-1"
                 />
                 <Button variant="secondary" size="icon" onClick={handleNext} aria-label="Next card">

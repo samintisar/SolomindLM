@@ -7,12 +7,13 @@ import { FlashcardView } from "./FlashcardView";
 
 let due: { index: number; card: Flashcard }[] = [];
 const noop = vi.fn().mockResolvedValue(undefined);
+const updateCard = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/features/studio/services/flashcardsApi", () => ({
   useFlashcard: () => null,
   useDueCards: () => due,
   useAddCard: () => noop,
-  useUpdateCard: () => noop,
+  useUpdateCard: () => updateCard,
   useDeleteCard: () => noop,
   useCardReview: () => noop,
   useUpdateFlashcardPreferences: () => noop,
@@ -35,14 +36,14 @@ function makeCards(): Flashcard[] {
   ] as unknown as Flashcard[];
 }
 
-function makeNote(showMastered = false): FlashcardNote {
+function makeNote(showMastered = false, flashcards = makeCards()): FlashcardNote {
   return {
     id: "fc1",
     title: "Deck",
     preview: "",
     type: "flashcards",
     status: "completed",
-    flashcards: makeCards(),
+    flashcards,
     metadata: { showMastered },
   } as unknown as FlashcardNote;
 }
@@ -94,5 +95,51 @@ describe("FlashcardView", () => {
     render(<FlashcardView note={makeNote(true)} />);
     expect(screen.getByRole("button", { name: "Due" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("puts the mode and Due/All toggles directly in a tray group so the pressed look applies", () => {
+    render(<FlashcardView note={makeNote()} />);
+    const modeGroup = screen.getByRole("group", { name: "Mode" });
+    const browse = screen.getByRole("button", { name: "Browse Mode" });
+    expect(browse).toHaveAttribute("aria-pressed", "true");
+    expect(browse.parentElement).toBe(modeGroup);
+    expect(modeGroup).toHaveAttribute("data-variant", "tray");
+    const dueAll = screen.getByRole("group", { name: "Which cards to show" });
+    expect(dueAll).toHaveAttribute("data-variant", "tray");
+    expect(screen.getByRole("button", { name: "Due" }).parentElement).toBe(dueAll);
+  });
+
+  it("does not restart the session when the active mode toggle is pressed again", async () => {
+    const user = userEvent.setup();
+    render(<FlashcardView note={makeNote()} />);
+    await user.click(screen.getByRole("button", { name: "Study Mode" }));
+    await user.click(await screen.findByRole("button", { name: "Reveal answer" }));
+    await user.click(screen.getByRole("button", { name: "Study Mode" }));
+    expect(screen.queryByRole("button", { name: "Reveal answer" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Again/ })).toBeInTheDocument();
+  });
+
+  it("saves an edit against the card's index in the full deck, not the filtered one", async () => {
+    const user = userEvent.setup();
+    const cards = [
+      {
+        front: "Mastered front",
+        back: "Mastered back",
+        type: "basic",
+        proficiency: { interval: 30 },
+      },
+      { front: "Visible front", back: "Visible back", type: "basic" },
+    ] as unknown as Flashcard[];
+    render(<FlashcardView note={makeNote(false, cards)} />);
+    await user.click(screen.getByRole("button", { name: "Edit Mode" }));
+    expect(screen.queryByText("Mastered front")).not.toBeInTheDocument();
+    await user.click(await screen.findByText("Visible front"));
+    const dialog = await screen.findByRole("dialog", { name: "Edit Card" });
+    await user.type(within(dialog).getByLabelText("Back (answer)"), " edited");
+    await user.click(within(dialog).getByRole("button", { name: "Save Changes" }));
+    expect(updateCard).toHaveBeenCalledWith("fc1", 1, {
+      front: "Visible front",
+      back: "Visible back edited",
+    });
   });
 });
