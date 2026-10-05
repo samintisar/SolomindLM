@@ -172,6 +172,12 @@ export const PrivacyPolicy: React.FC = () => {
             and Speed Insights for usage and performance metrics.
           </li>
           <li>
+            <span className="text-foreground">Cloudflare</span> — content delivery network and
+            security proxy in front of our websites; it handles every request to the site, including
+            your IP address and request details. We may also use Cloudflare Web Analytics to measure
+            page views and performance.
+          </li>
+          <li>
             <span className="text-foreground">Google Analytics and Ahrefs Web Analytics</span> —
             website usage measurement (pages visited, referrers, approximate location, device and
             browser type).
@@ -230,10 +236,10 @@ export const PrivacyPolicy: React.FC = () => {
         <p className="text-muted-foreground">
           We use cookies and similar technologies needed for authentication, preferences (such as
           theme), and basic app state. Our websites also load Google Analytics, which sets cookies
-          to measure visits, and Ahrefs Web Analytics and Vercel Analytics, which measure page views
-          and performance. You can limit analytics cookies through your browser settings or by using
-          Google&apos;s Analytics opt-out browser add-on. We do not use third-party advertising
-          cookies as part of this Policy&apos;s scope.
+          to measure visits, and Ahrefs Web Analytics, Vercel Analytics, and Cloudflare Web
+          Analytics, which measure page views and performance. You can limit analytics cookies
+          through your browser settings or by using Google&apos;s Analytics opt-out browser add-on.
+          We do not use third-party advertising cookies as part of this Policy&apos;s scope.
         </p>
       </section>
 
