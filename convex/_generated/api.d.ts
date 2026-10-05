@@ -165,6 +165,7 @@ import type * as _agents_spreadsheet_nodeMerge from "../_agents/spreadsheet/node
 import type * as _agents_spreadsheet_nodeReduce from "../_agents/spreadsheet/nodeReduce.js";
 import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompts.js";
 import type * as _agents_spreadsheet_routing from "../_agents/spreadsheet/routing.js";
+import type * as _agents_spreadsheet_sourcePacking from "../_agents/spreadsheet/sourcePacking.js";
 import type * as _agents_spreadsheet_state from "../_agents/spreadsheet/state.js";
 import type * as _agents_written_questions_WrittenQuestionsGraph from "../_agents/written_questions/WrittenQuestionsGraph.js";
 import type * as _agents_written_questions_chunkHelpers from "../_agents/written_questions/chunkHelpers.js";
@@ -556,6 +557,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/spreadsheet/nodeReduce": typeof _agents_spreadsheet_nodeReduce;
   "_agents/spreadsheet/prompts": typeof _agents_spreadsheet_prompts;
   "_agents/spreadsheet/routing": typeof _agents_spreadsheet_routing;
+  "_agents/spreadsheet/sourcePacking": typeof _agents_spreadsheet_sourcePacking;
   "_agents/spreadsheet/state": typeof _agents_spreadsheet_state;
   "_agents/written_questions/WrittenQuestionsGraph": typeof _agents_written_questions_WrittenQuestionsGraph;
   "_agents/written_questions/chunkHelpers": typeof _agents_written_questions_chunkHelpers;

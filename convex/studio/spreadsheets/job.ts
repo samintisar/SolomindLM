@@ -38,6 +38,7 @@ export const processSpreadsheetMapChunk = internalAction({
     chunk: v.string(),
     spreadsheetType: v.string(),
     customPrompt: v.string(),
+    sourceTitle: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";

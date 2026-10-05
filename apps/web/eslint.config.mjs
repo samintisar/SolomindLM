@@ -31,6 +31,10 @@ const MIGRATED = [
   "src/features/studio/components/NoteIcon.tsx",
   "src/features/studio/components/NoteListView.tsx",
   "src/features/studio/components/ActiveNoteView.tsx",
+  "src/features/studio/motion/**/*.tsx",
+  "src/features/studio/components/practice/**/*.tsx",
+  "src/features/studio/components/views/QuizView.tsx",
+  "src/features/studio/components/views/WrittenQuestionsView.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
