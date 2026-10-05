@@ -49,6 +49,14 @@ async function rate(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
 }
 
 describe("StudyMode", () => {
+  it("starts with focus on Reveal answer, so Space reveals straight away", async () => {
+    const user = userEvent.setup();
+    renderStudy();
+    expect(screen.getByRole("button", { name: "Reveal answer" })).toHaveFocus();
+    await user.keyboard(" ");
+    expect(await screen.findByRole("button", { name: /Good\s+in 10 min/ })).toBeInTheDocument();
+  });
+
   it("reveals, then offers four ratings with their next interval", async () => {
     const user = userEvent.setup();
     renderStudy();

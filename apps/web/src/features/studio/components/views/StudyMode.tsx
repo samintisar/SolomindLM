@@ -114,8 +114,13 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
     []
   );
 
+  // Study mode only opens from the Study toggle, so start the session at "Reveal answer": focus
+  // would otherwise stay on the toggle, where Space and Enter belong to the button, not the card.
+  useEffect(() => {
+    revealRef.current?.focus({ preventScroll: true });
+  }, []);
+
   // Focus follows the flow: Good once the answer shows, "Reveal answer" once the card changes.
-  // Never on the first mount, so opening study mode does not steal focus.
   useEffect(() => {
     const last = lastFocusKey.current;
     if (last.currentIndex === currentIndex && last.showAnswer === showAnswer) return;
@@ -334,14 +339,14 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
           <div
             data-peek
             aria-hidden
-            className="absolute inset-x-0 top-0 h-72 translate-y-6 scale-90 rounded-2xl bg-card opacity-40 shadow-md ring-1 ring-hairline sm:h-80"
+            className="absolute inset-x-0 top-0 h-72 origin-bottom translate-y-6 scale-90 rounded-2xl bg-card opacity-40 shadow-md ring-1 ring-hairline sm:h-80"
           />
         ) : null}
         {remainingCards >= 2 ? (
           <div
             data-peek
             aria-hidden
-            className="absolute inset-x-0 top-0 h-72 translate-y-3 scale-95 rounded-2xl bg-card opacity-70 shadow-md ring-1 ring-hairline sm:h-80"
+            className="absolute inset-x-0 top-0 h-72 origin-bottom translate-y-3 scale-95 rounded-2xl bg-card opacity-70 shadow-md ring-1 ring-hairline sm:h-80"
           />
         ) : null}
 
@@ -410,7 +415,8 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
         </Button>
       </div>
 
-      <div className="flex flex-col items-center gap-3">
+      {/* Reserves the rating grid's height so revealing the answer doesn't shift the card. */}
+      <div className="flex min-h-36 flex-col items-center gap-3 sm:min-h-21">
         {!showAnswer ? (
           <Button
             ref={revealRef}
