@@ -268,3 +268,26 @@ describe("saveLiteratureTableAsStudioSpreadsheet", () => {
     expect(fullSpreadsheet?.data).toEqual(expect.stringContaining("Updated result"));
   });
 });
+
+describe("getLiteratureTable", () => {
+  test("returns rows flagged as off-topic", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const citationId = await seedCitation(t, userId);
+    const tableId = await seedLiteratureTable(t, userId, notebookId, citationId);
+    await t.run(async (ctx) => {
+      const table = await ctx.db.get(tableId);
+      await ctx.db.patch(tableId, {
+        papers: (table?.papers ?? []).map((p) => ({ ...p, offTopicReason: "Not about sleep" })),
+      });
+    });
+
+    const table = await withAuth(t, userId).query(
+      api.studio.literature_tables.index.getLiteratureTable,
+      { tableId }
+    );
+
+    expect(table?.papers[0]).toMatchObject({ offTopicReason: "Not about sleep" });
+  });
+});

@@ -456,7 +456,7 @@ async function screenOnePaperWithLlm(
 
   const prompt = SCREEN_SINGLE_PAPER_PROMPT.replace(/{query}/g, query)
     .replace(/{title}/g, paper.title)
-    .replace(/{abstract}/g, truncateForLiteratureLlm(paper.abstract));
+    .replace(/{abstract}/g, () => truncateForLiteratureLlm(paper.abstract));
 
   const response = await invokeWithHttpRetry(
     () =>
@@ -496,7 +496,7 @@ async function readPdfMetadataWithLlm(text: string): Promise<PdfMetadata> {
         () =>
           structuredLlm.invoke([
             new SystemMessage(PDF_METADATA_SYSTEM_PROMPT),
-            new HumanMessage(PDF_METADATA_PROMPT.replace("{text}", text)),
+            new HumanMessage(PDF_METADATA_PROMPT.replace("{text}", () => text)),
           ]),
         PDF_METADATA_TIMEOUT_MS,
         "pdfMetadata"
@@ -764,8 +764,7 @@ async function extractPaperFieldsWithLlm(
     .replace(/{authors}/g, paper.authors.join(", "))
     .replace(/{year}/g, paper.year !== undefined ? String(paper.year) : "N/A")
     .replace(/{textLabel}/g, fullText ? "Full text (excerpt)" : "Abstract")
-    .replace(
-      /{abstract}/g,
+    .replace(/{abstract}/g, () =>
       fullText
         ? truncateForLiteratureLlm(fullText, NOTEBOOK_PAPER_TEXT_MAX_CHARS)
         : truncateForLiteratureLlm(paper.abstract)

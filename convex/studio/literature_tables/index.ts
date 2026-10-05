@@ -12,10 +12,11 @@ import {
   canReadNotebook,
 } from "../../_lib/notebookAccess";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
+import { toConvexError } from "../../_lib/serviceErrors";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
 import { loadNotebookPaperDocuments } from "../../literatureReview/db";
-import { resolvePaperScope } from "../../literatureReview/notebookPapers";
+import { type PaperScope, resolvePaperScope } from "../../literatureReview/notebookPapers";
 import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
 import { scheduleLiteratureReviewCompletionPush } from "../../push/notify";
 import { literatureTableToCsv } from "./literatureTableCsv.js";
@@ -242,7 +243,12 @@ export const startLiteratureReview = mutation({
     const notebookPaperIds = (
       await loadNotebookPaperDocuments(ctx, args.notebookId, args.documentIds ?? [])
     ).map((d) => d._id as Id<"documents">);
-    const paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
+    let paperScope: PaperScope | undefined;
+    try {
+      paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
+    } catch (error) {
+      throw toConvexError(error);
+    }
 
     const notebook = await ctx.db.get(args.notebookId);
     const notebookSmartModel = notebook?.chatSettings?.smartModel;
@@ -645,6 +651,7 @@ export const getLiteratureTable = query({
           rowData: v.record(v.string(), v.string()),
           includeReason: v.optional(v.string()),
           isIncluded: v.boolean(),
+          offTopicReason: v.optional(v.string()),
           citation: v.union(citationMetadataValidator, v.null()),
         })
       ),

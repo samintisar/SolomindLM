@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { InputValidationError } from "../_lib/errors";
 import {
   dropSearchCopiesOfNotebookPapers,
   isNotebookPaperDocument,
@@ -136,5 +137,6 @@ describe("resolvePaperScope", () => {
     expect(() => resolvePaperScope(0, "papers_only")).toThrow(
       "Select at least one PDF or saved paper to review only your papers."
     );
+    expect(() => resolvePaperScope(0, "papers_only")).toThrow(InputValidationError);
   });
 });

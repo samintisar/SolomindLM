@@ -4,6 +4,8 @@
  * skip screening and are always included.
  */
 
+import { InputValidationError } from "../_lib/errors";
+
 /** Characters of a notebook paper's own text used for extraction (search papers get an abstract). */
 export const NOTEBOOK_PAPER_TEXT_MAX_CHARS = 12_000;
 
@@ -140,7 +142,9 @@ export function resolvePaperScope(
 ): PaperScope | undefined {
   if (paperCount === 0) {
     if (requested === "papers_only") {
-      throw new Error("Select at least one PDF or saved paper to review only your papers.");
+      throw new InputValidationError(
+        "Select at least one PDF or saved paper to review only your papers."
+      );
     }
     return undefined;
   }
