@@ -249,6 +249,15 @@ describe("shadcn ui components render", () => {
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   });
 
+  it("Card interactive shows a selected ring through data-selected", () => {
+    render(
+      <Card variant="interactive" data-selected data-testid="tile">
+        x
+      </Card>
+    );
+    expect(screen.getByTestId("tile").className).toContain("data-[selected=true]:ring-primary/40");
+  });
+
   it("design-system variants render: Card flush + interactive, Button ghost-destructive, ToggleGroup swatch", () => {
     const { container } = render(
       <>
