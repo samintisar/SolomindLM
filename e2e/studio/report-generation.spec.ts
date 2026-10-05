@@ -21,7 +21,7 @@ test.describe("Report Generation", () => {
 
     await page.getByRole("heading", { level: 4, name: "Summary" }).click();
 
-    // Do not key off the list h4 title: Convex replaces the placeholder title with an LLM title when done,
+    // Do not key off the list title: Convex replaces the placeholder title with an LLM title when done,
     // which would detach title-based locators and stall until timeout.
     const card = firstStudioNoteCard(page);
     await expect(card).toHaveAttribute("aria-busy", "true", { timeout: 15_000 });
@@ -69,8 +69,8 @@ test.describe("Report Generation", () => {
 
     await expect(noteEl).not.toHaveAttribute("aria-busy", "true", { timeout: completionBudgetMs });
 
-    // Completed note should have a title (h4) and be clickable (no cursor-not-allowed)
-    await expect(noteEl.locator("h4")).toBeVisible();
-    await expect(noteEl).not.toHaveClass(/cursor-not-allowed/);
+    // Completed note should have a title and be clickable (no longer aria-busy)
+    await expect(noteEl.locator('[data-slot="note-title"]')).toBeVisible();
+    await expect(noteEl).not.toHaveAttribute("aria-busy", "true");
   });
 });

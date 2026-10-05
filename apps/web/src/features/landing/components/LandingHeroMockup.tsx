@@ -182,7 +182,7 @@ export function LandingHeroMockup({
           aria-label="Preview mode"
         >
           <div
-            className="pointer-events-none absolute bottom-1 left-1 top-1 w-[calc(50%-6px)] rounded-xl bg-background/95 shadow-md ring-1 ring-primary/20 transition-transform duration-300 ease-[cubic-bezier(0.34,1.2,0.64,1)]"
+            className="pointer-events-none absolute bottom-1 left-1 top-1 w-[calc(50%-6px)] rounded-xl bg-background/95 shadow-md ring-1 ring-primary/20 transition-transform duration-300 ease-[cubic-bezier(0.34,1.2,0.64,1)] motion-reduce:transition-none"
             style={{
               transform:
                 mode === "studio" ? "translate3d(calc(100% + 4px), 0, 0)" : "translate3d(0, 0, 0)",

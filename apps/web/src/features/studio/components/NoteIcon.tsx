@@ -1,90 +1,37 @@
-import {
-  AudioLines,
-  BookOpen,
-  FileText,
-  GitFork,
-  HelpCircle,
-  Image,
-  Layers,
-  Loader2,
-  MessageSquareText,
-  Table2,
-} from "lucide-react";
-import React from "react";
-import { isReportNote, Note } from "@/shared/types/index";
-import { isLiteratureReviewReportType } from "@/shared/types/reportTypes";
+import type React from "react";
+import type { Note } from "@/shared/types/index";
+import { cn } from "@/shared/utils/cn";
+import { studioTypeStyle } from "../studioTypeStyle";
 
 interface NoteIconProps {
   note: Note;
+  /** Plays the one-off pop when the note has just finished generating. */
+  popped?: boolean;
 }
 
 /**
- * NoteIcon component renders type-specific icons for notes.
- * Matches Create tool grid styling (see STUDIO_TOOLS). Playback is handled on the row (NoteItem).
+ * The type tile on a Saved row, coloured like the Create grid (STUDIO_TOOLS). While the note is
+ * generating, its type icon bobs in place of a spinner; the row's Sheen and progress bar carry the
+ * rest of the progress signal.
  */
-export const NoteIcon: React.FC<NoteIconProps> = ({ note }) => {
-  // Generating state with spinner
-  if (note.status === "generating") {
-    return (
-      <div className="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-        <Loader2 className="w-4 h-4 text-primary animate-spin" />
-      </div>
-    );
-  }
-
-  if (isReportNote(note) && isLiteratureReviewReportType(note.metadata.reportType)) {
-    return (
-      <div className="shrink-0 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
-        <BookOpen className="w-4 h-4 shrink-0" />
-      </div>
-    );
-  }
-
-  // Type-specific icons
-  const iconConfig: Record<
-    string,
-    { icon: React.FC<{ className?: string }>; bgClass: string; textClass: string }
-  > = {
-    audioOverview: {
-      icon: AudioLines,
-      bgClass: "bg-teal-500/10",
-      textClass: "text-teal-700 dark:text-teal-400",
-    },
-    audio: {
-      icon: AudioLines,
-      bgClass: "bg-teal-500/10",
-      textClass: "text-teal-700 dark:text-teal-400",
-    },
-    flashcard: { icon: Layers, bgClass: "bg-red-500/10", textClass: "text-red-700" },
-    report: { icon: FileText, bgClass: "bg-amber-500/10", textClass: "text-amber-600" },
-    quiz: { icon: HelpCircle, bgClass: "bg-blue-500/10", textClass: "text-blue-700" },
-    mindmap: { icon: GitFork, bgClass: "bg-fuchsia-500/10", textClass: "text-fuchsia-600" },
-    writtenQuestions: {
-      icon: MessageSquareText,
-      bgClass: "bg-green-500/10",
-      textClass: "text-green-700",
-    },
-    infographic: { icon: Image, bgClass: "bg-violet-500/10", textClass: "text-violet-600" },
-    spreadsheet: { icon: Table2, bgClass: "bg-cyan-500/10", textClass: "text-cyan-600" },
-    note: { icon: FileText, bgClass: "bg-indigo-500/10", textClass: "text-indigo-600" },
-  };
-
-  const config = iconConfig[note.type];
-  if (config) {
-    const Icon = config.icon;
-    return (
-      <div
-        className={`shrink-0 w-8 h-8 rounded-lg ${config.bgClass} ${config.textClass} flex items-center justify-center`}
-      >
-        <Icon className="w-4 h-4 shrink-0" />
-      </div>
-    );
-  }
-
-  // Default icon
+export const NoteIcon: React.FC<NoteIconProps> = ({ note, popped = false }) => {
+  const { icon: Icon, tileClass } = studioTypeStyle(note);
+  const generating = note.status === "generating";
   return (
-    <div className="shrink-0 w-8 h-8 rounded-lg bg-gray-500/10 text-gray-600 flex items-center justify-center">
-      <FileText className="w-4 h-4 shrink-0" />
-    </div>
+    <span
+      aria-hidden
+      className={cn(
+        "flex size-8 shrink-0 items-center justify-center rounded-lg",
+        tileClass,
+        popped && "animate-studio-pop motion-reduce:animate-none"
+      )}
+    >
+      <Icon
+        className={cn(
+          "size-4 shrink-0",
+          generating && "animate-studio-bob motion-reduce:animate-none"
+        )}
+      />
+    </span>
   );
 };

@@ -3,13 +3,16 @@ import {
   FileText,
   GitFork,
   HelpCircle,
+  Image,
   Layers,
+  type LucideIcon,
   MessageSquareText,
-  Presentation,
   Table2,
 } from "lucide-react";
-import React from "react";
+import type React from "react";
+import { Card } from "@/shared/components/ui/card";
 import { StudioTool } from "@/shared/types/index";
+import { cn } from "@/shared/utils/cn";
 
 interface ToolGridProps {
   tools: StudioTool[];
@@ -18,14 +21,13 @@ interface ToolGridProps {
   activeToolId?: string | null;
 }
 
-// Icon map for tool icons
-const IconMap: Record<string, React.FC<any>> = {
+const IconMap: Record<string, LucideIcon> = {
   AudioLines,
   GitFork,
   FileText,
   Layers,
   HelpCircle,
-  Presentation,
+  Image,
   MessageSquareText,
   Table2,
 };
@@ -40,39 +42,33 @@ export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, activeTo
       data-onboarding="studio-tool-grid"
       data-testid="studio-tool-grid"
     >
-      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 font-display">
+      <h3 className="px-1 font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
         Create
       </h3>
       <div className="grid grid-cols-2 gap-3 @min-[450px]:grid-cols-3">
         {tools.map((tool) => {
-          const Icon = IconMap[tool.iconName] || FileText;
+          const Icon = IconMap[tool.iconName] ?? FileText;
           const isActive = activeToolId != null && activeToolId === tool.id;
           return (
-            <div
-              key={tool.id}
-              aria-label={tool.label}
-              onClick={() => onToolClick(tool.id)}
-              className={`group flex flex-col justify-between p-3 h-[5.5rem] bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer overflow-hidden ${
-                isActive ? "ring-2 ring-primary/40 border-primary/45 shadow-md" : ""
-              }`}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onToolClick(tool.id);
-                }
-              }}
-            >
-              <div className="flex justify-between items-start w-full">
+            <Card key={tool.id} variant="interactive" data-selected={isActive || undefined}>
+              <button
+                type="button"
+                aria-label={tool.label}
+                onClick={() => onToolClick(tool.id)}
+                className="group flex h-22 flex-col justify-between rounded-2xl p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
                 <Icon
-                  className={`w-5 h-5 ${tool.color} opacity-90 group-hover:scale-110 transition-transform`}
+                  aria-hidden
+                  className={cn(
+                    "size-5 opacity-90 transition-transform motion-safe:group-hover:scale-110",
+                    tool.color
+                  )}
                 />
-              </div>
-              <span className="text-xs font-medium text-foreground leading-tight font-display tracking-tight line-clamp-2">
-                {tool.label}
-              </span>
-            </div>
+                <span className="line-clamp-2 font-display text-xs font-medium leading-tight tracking-tight text-foreground">
+                  {tool.label}
+                </span>
+              </button>
+            </Card>
           );
         })}
       </div>
