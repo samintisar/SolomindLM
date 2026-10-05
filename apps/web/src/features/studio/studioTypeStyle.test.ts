@@ -41,4 +41,17 @@ describe("studioTypeStyle", () => {
     expect(style.toneClass).toBe("");
     expect(style.icon).toBe(FileText);
   });
+
+  it.each([
+    ["flashcard", "flashcard"],
+    ["quiz", "quiz"],
+    ["mindmap", "mindmap"],
+    ["infographic", "infographic"],
+    ["spreadsheet", "spreadsheet"],
+    ["note", "note"],
+  ])("maps %s notes to the %s tokens", (type, k) => {
+    const style = studioTypeStyle(note({ type }));
+    expect(style.tileClass).toBe(`bg-studio-${k}/10 text-studio-${k}`);
+    expect(style.toneClass).toBe(`studio-tone-${k}`);
+  });
 });

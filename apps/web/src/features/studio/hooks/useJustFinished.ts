@@ -11,7 +11,10 @@ export function useJustFinished(status: string | undefined, ms = 1400): boolean 
     if (was !== "generating" || status !== "completed") return;
     setJustFinished(true);
     const timer = setTimeout(() => setJustFinished(false), ms);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setJustFinished(false);
+    };
   }, [status, ms]);
 
   return justFinished;

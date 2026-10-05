@@ -35,4 +35,45 @@ describe("useJustFinished", () => {
     rerender({ status: "failed" });
     expect(result.current).toBe(false);
   });
+
+  it("resets when generation restarts inside the window, then flags the next finish", () => {
+    const { result, rerender } = renderHook(({ status }: Props) => useJustFinished(status, 1000), {
+      initialProps: { status: "generating" },
+    });
+    rerender({ status: "completed" });
+    expect(result.current).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    rerender({ status: "generating" });
+    expect(result.current).toBe(false);
+    rerender({ status: "completed" });
+    expect(result.current).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(result.current).toBe(false);
+  });
+
+  it("works under StrictMode", () => {
+    const { result, rerender } = renderHook(({ status }: Props) => useJustFinished(status, 1000), {
+      initialProps: { status: "generating" },
+      reactStrictMode: true,
+    });
+    rerender({ status: "completed" });
+    expect(result.current).toBe(true);
+  });
+
+  it("does not retrigger on a re-render with the same completed status", () => {
+    const { result, rerender } = renderHook(({ status }: Props) => useJustFinished(status, 1000), {
+      initialProps: { status: "generating" },
+    });
+    rerender({ status: "completed" });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(result.current).toBe(false);
+    rerender({ status: "completed" });
+    expect(result.current).toBe(false);
+  });
 });

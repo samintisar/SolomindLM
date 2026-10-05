@@ -93,7 +93,7 @@ const FALLBACK: StudioTypeStyle = {
   toneClass: "",
 };
 
-const NOTE_TYPE_KEY: Partial<Record<Note["type"], StudioTypeKey>> = {
+const NOTE_TYPE_KEY: Record<Note["type"], StudioTypeKey | null> = {
   audio: "audio",
   audioOverview: "audio",
   flashcard: "flashcard",
@@ -104,6 +104,7 @@ const NOTE_TYPE_KEY: Partial<Record<Note["type"], StudioTypeKey>> = {
   infographic: "infographic",
   spreadsheet: "spreadsheet",
   note: "note",
+  text: null,
 };
 
 /** Icon and colour classes for a Studio note's type (Saved list tiles, generating Sheen). */
