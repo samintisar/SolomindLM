@@ -7,11 +7,11 @@
     "solomind/soft-surfaces": 18
   },
   "features/studio": {
-    "shadcn/no-arbitrary-values": 125,
-    "shadcn/no-inline-styles": 9,
-    "shadcn/no-raw-colors": 54,
-    "shadcn/no-unknown-classes": 57,
-    "solomind/soft-surfaces": 85
+    "shadcn/no-arbitrary-values": 97,
+    "shadcn/no-inline-styles": 5,
+    "shadcn/no-raw-colors": 28,
+    "shadcn/no-unknown-classes": 39,
+    "solomind/soft-surfaces": 70
   },
   "shared": {
     "shadcn/no-arbitrary-values": 48,
