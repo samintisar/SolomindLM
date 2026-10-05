@@ -249,6 +249,18 @@ describe("shadcn ui components render", () => {
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   });
 
+  it("Card interactive shows a selected ring through data-selected", () => {
+    render(
+      <Card variant="interactive" data-selected data-testid="tile">
+        x
+      </Card>
+    );
+    const tile = screen.getByTestId("tile");
+    expect(tile).toHaveAttribute("data-selected", "true");
+    expect(tile).toHaveAttribute("data-variant", "interactive");
+    expect(tile.className).toContain("data-[selected=true]:ring-primary/40");
+  });
+
   it("design-system variants render: Card flush + interactive, Button ghost-destructive, ToggleGroup swatch", () => {
     const { container } = render(
       <>
@@ -733,5 +745,41 @@ describe("item rows", () => {
       .querySelector<HTMLElement>("[data-slot=progress-indicator]");
     expect(indicator?.style.getPropertyValue("--progress-offset")).toBe("-60%");
     expect(indicator?.className).toContain("translate-x-(--progress-offset)");
+  });
+
+  it("Progress without a value sweeps as indeterminate", () => {
+    render(<Progress value={null} aria-label="Generating" />);
+    const bar = screen.getByRole("progressbar", { name: "Generating" });
+    expect(bar).toHaveAttribute("data-state", "indeterminate");
+    expect(bar).not.toHaveAttribute("aria-valuenow");
+    const indicator = bar.querySelector("[data-slot=progress-indicator]");
+    expect(indicator).toHaveAttribute("data-state", "indeterminate");
+    expect(indicator?.className).toContain("data-[state=indeterminate]:animate-progress-sweep");
+  });
+
+  it("Progress defaults are unchanged without the opt-in variants", () => {
+    render(<Progress value={40} aria-label="Source limit" />);
+    const bar = screen.getByRole("progressbar", { name: "Source limit" });
+    expect(bar.className).toContain("h-2");
+    expect(bar).toHaveAttribute("data-size", "default");
+    expect(bar.querySelector("[data-slot=progress-indicator]")?.className).not.toContain("after:");
+  });
+
+  it("Progress glint is sized to the filled part through a custom property", () => {
+    render(<Progress value={40} glint aria-label="G" />);
+    const indicator = screen
+      .getByRole("progressbar", { name: "G" })
+      .querySelector<HTMLElement>("[data-slot=progress-indicator]");
+    expect(indicator?.style.getPropertyValue("--progress-fill-start")).toBe("60%");
+    expect(indicator?.className).toContain("after:left-(--progress-fill-start)");
+  });
+
+  it("Progress glint and size are opt-in variants", () => {
+    render(<Progress value={40} glint size="sm" aria-label="Generating" />);
+    const bar = screen.getByRole("progressbar", { name: "Generating" });
+    expect(bar.className).toContain("h-1");
+    const indicator = bar.querySelector("[data-slot=progress-indicator]");
+    expect(indicator?.className).toContain("after:animate-progress-glint");
+    expect(indicator?.className).toContain("motion-reduce:after:hidden");
   });
 });

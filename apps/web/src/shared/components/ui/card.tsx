@@ -14,8 +14,9 @@ const cardVariants = cva(
         flush:
           "gap-0 overflow-hidden py-0 shadow-xs [&_[data-slot=collapsible-trigger]]:focus-visible:ring-inset [&_[data-slot=collapsible-trigger]]:focus-visible:ring-offset-0",
         // Clickable cards: the inner <button> carries the focus ring; the card lifts on hover.
+        // data-selected marks the chosen card (e.g. the marketing preview's active tool).
         interactive:
-          "relative gap-0 overflow-hidden py-0 shadow-xs transition duration-200 ease-out motion-safe:hover:-translate-y-0.5 hover:shadow-md motion-safe:active:scale-99",
+          "relative gap-0 overflow-hidden py-0 shadow-xs transition duration-200 ease-out motion-safe:hover:-translate-y-0.5 hover:shadow-md motion-safe:active:scale-99 data-[selected=true]:shadow-md data-[selected=true]:ring-2 data-[selected=true]:ring-primary/40",
       },
     },
     defaultVariants: { variant: "default" },

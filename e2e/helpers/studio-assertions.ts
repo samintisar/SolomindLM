@@ -9,20 +9,24 @@ export const TOOL_LABELS = [
   "Reports",
   "Flashcards",
   "Quiz",
-  "Slide Deck",
+  "Infographic",
   "Written Questions",
   "Spreadsheets",
 ] as const;
 
 const studioGrid = (page: Page) => page.getByTestId("studio-tool-grid");
 
-/** Note list item root (contains title h4 + kebab); not the h4's immediate parent */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Note list row (the Card holding the title and the kebab menu) whose title is exactly `noteTitle`,
+ * so "Summary" doesn't also match "Summary v2".
+ */
 function studioNoteCard(page: Page, noteTitle: string) {
-  return page
-    .getByText(noteTitle, { exact: true })
-    .locator(
-      "xpath=ancestor::div[contains(@class,'border-border') and contains(@class,'p-3') and contains(@class,'rounded-sm')][1]"
-    );
+  const title = page.locator('[data-slot="note-title"]', {
+    hasText: new RegExp(`^\\s*${escapeRegExp(noteTitle)}\\s*$`),
+  });
+  return page.getByTestId("studio-note-card").filter({ has: title });
 }
 
 /**
