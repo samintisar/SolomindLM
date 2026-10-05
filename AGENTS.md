@@ -98,7 +98,7 @@ If you are unsure which skill applies, invoke `superpowers:brainstorming` first.
 ```bash
 bun install                    # Install dependencies
 bun run dev                    # All dev servers (workspace)
-bun run dev:web                # Web dev server on :5173 (auto-kills stale port)
+bun run dev:web                # Web dev server: :5173 in the main checkout, own port per worktree
 bun run dev:mobile             # Expo mobile dev server
 bun x convex dev               # Convex dev backend (separate terminal)
 ```
@@ -229,7 +229,7 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
 - **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves.
 - **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
 - **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.
-- **Port management:** `bun run dev:web` kills stale :5173 via `kill-port`.
+- **Dev server ports (worktrees):** `dev:web` / `dev:mobile` go through `apps/web/scripts/dev-server.ts`. The main checkout gets :5173 / :8081; each worktree gets a stable port of its own (web 5174-5199, Metro 8082-8107, hashed from its path) and the launcher prints it. It only ever stops this checkout's own leftover server (PID recorded in `.dev-servers/`), never another worktree's. Pin with `WEB_PORT` / `PORT` / `METRO_PORT`. The web range is mirrored in `convex/_lib/allowedOrigins.ts` (CORS); widen both together. Playwright targets the current checkout's server. Google/Apple sign-in always returns to `SITE_URL` (:5173), so use email/password in a worktree.
 - **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
 - **Reranking is best-effort.** `cachedRerank` (`convex/_agents/chat/rerankCache.ts`) calls Voyage through `callVoyageRerank` with one hard `RERANK_TIMEOUT_MS` deadline and no retries except a single one after a 429 with a short `Retry-After`; on any failure chat and literature review fall back to the un-reranked order instead of stalling (a provider outage answering `Retry-After: 86400` once hung every chat reply). Change the model in `convex/_lib/rerankConfig.ts` and bump the cache `name` in `rerankCache.ts` so old-model scores are not served. Voyage scores are not calibrated like the previous reranker's: passages unrelated to the query score ~0.25-0.29 (p99 0.31) and useful ones mostly 0.5-0.94, so `CHAT_MIN_RELEVANCE_THRESHOLD` is 0.35 (re-tuned 2026-10-04 on 61 chat fixtures; see ADR 0002). Chat reranks the whole candidate pool (`createRerankFn` in `convex/chat/_streamSearch.ts`) so every chunk is on Voyage's scale; don't reintroduce a top-N cut there, or unscored chunks keep their vector similarity (~0.5) and slip past the floor. Re-run the sweep if the model changes.
 - **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.
