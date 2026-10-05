@@ -22,12 +22,18 @@ export interface SheetAutosaveOptions {
 /**
  * Debounced autosave for the spreadsheet sheet.
  *
- * - At most one save is in flight. An edit made meanwhile is saved, newest CSV
- *   only, once that save finishes.
+ * - While mounted, at most one save is in flight. An edit made meanwhile is
+ *   saved, newest CSV only, once that save finishes.
  * - A save the server rejects as invalid rolls the sheet back through
- *   `onRejected` and is not retried. Any other failure is retried once after
- *   `RETRY_DELAY_MS`, then waits for `retry()` or the next edit.
- * - On unmount, an unsaved edit is saved at once (unless `enabled` is false).
+ *   `onRejected` to the last CSV the server accepted, and is not retried. The
+ *   rollback also discards edits made while the rejected save was in flight,
+ *   since they build on the rejected change.
+ * - Any other failure is retried once after `RETRY_DELAY_MS`, then waits for
+ *   `retry()` or the next edit.
+ * - On unmount, an unsaved edit is sent at once (unless `enabled` is false),
+ *   even while a save is in flight. `save` must therefore run saves in call
+ *   order, as `useSaveSpreadsheetData` does, so a closed sheet's last edit
+ *   can't land after a reopened sheet's newer one.
  */
 export function useSheetAutosave(options: SheetAutosaveOptions): {
   state: SaveState;
@@ -76,7 +82,7 @@ export function useSheetAutosave(options: SheetAutosaveOptions): {
   }, [setStateIfMounted]);
 
   // `startSave`, its callbacks and the timers call each other; timers go through this ref.
-  const attemptRef = useRef<() => void>(() => {});
+  const attemptRef = useRef<() => void>(() => undefined);
 
   const startSave = useCallback(
     (value: string) => {
@@ -90,11 +96,11 @@ export function useSheetAutosave(options: SheetAutosaveOptions): {
       inFlightRef.current = { csv: value, promise };
       promise.then(
         () => {
-          inFlightRef.current = null;
+          if (inFlightRef.current?.promise === promise) inFlightRef.current = null;
           confirmedRef.current = value;
           hasSavedRef.current = true;
           autoRetryLeftRef.current = true;
-          // After unmount the cleanup has already chained any newer edit.
+          // After unmount the cleanup has already sent any newer edit.
           if (!isMountedRef.current) return;
           // A newer edit still in its debounce saves when its timer fires.
           if (timerRef.current !== null) return;
@@ -105,7 +111,7 @@ export function useSheetAutosave(options: SheetAutosaveOptions): {
           }
         },
         (error: unknown) => {
-          inFlightRef.current = null;
+          if (inFlightRef.current?.promise === promise) inFlightRef.current = null;
           if (!isMountedRef.current) {
             console.error("Failed to save the spreadsheet after it closed:", error);
             return;
@@ -185,20 +191,10 @@ export function useSheetAutosave(options: SheetAutosaveOptions): {
       clearTimer();
       if (!enabledRef.current) return;
       const latest = csvRef.current;
-      const inFlight = inFlightRef.current;
-      if (!inFlight) {
-        if (latest !== confirmedRef.current) startSave(latest);
-        return;
-      }
-      if (inFlight.csv === latest) return;
-      // Keep one save at a time: send the newest CSV once this one settles.
-      void inFlight.promise
-        .catch(() => undefined)
-        .then(() => {
-          // Remounted meanwhile (StrictMode): the live hook takes it from here.
-          if (isMountedRef.current || inFlightRef.current) return;
-          if (confirmedRef.current !== latest) startSave(latest);
-        });
+      if (latest === confirmedRef.current || latest === inFlightRef.current?.csv) return;
+      // Send it now, even behind a save in flight: `save` queues per spreadsheet,
+      // so this lands after it and before any save a reopened sheet makes.
+      startSave(latest);
     };
   }, [clearTimer, startSave]);
 

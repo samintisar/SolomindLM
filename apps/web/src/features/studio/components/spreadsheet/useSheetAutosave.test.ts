@@ -1,6 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  enqueueSpreadsheetSave,
+  isSpreadsheetSaveQueued,
+} from "@/features/studio/services/spreadsheetsApi";
 import { RETRY_DELAY_MS, SAVE_DEBOUNCE_MS, useSheetAutosave } from "./useSheetAutosave";
 
 type Props = { csv: string; serverCsv: string; enabled: boolean };
@@ -156,6 +160,22 @@ describe("useSheetAutosave", () => {
     expect(save).toHaveBeenCalledTimes(2);
   });
 
+  it("a rejection also discards edits made while the rejected save was in flight", async () => {
+    const { result, save, edit, calls, onRejected } = setup();
+    edit("b");
+    advance(SAVE_DEBOUNCE_MS);
+    edit("bc");
+    advance(SAVE_DEBOUNCE_MS);
+    const error = new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: "too big" });
+    await settle(() => calls[0].reject(error));
+    expect(onRejected).toHaveBeenCalledWith("a", error);
+    // The view rolls the sheet back, dropping "bc" along with "b".
+    edit("a");
+    advance(RETRY_DELAY_MS * 5);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(result.current.state).toBe("saved");
+  });
+
   it("rolls back to serverCsv when the server has accepted nothing yet", async () => {
     const { edit, calls, onRejected } = setup();
     edit("b");
@@ -177,18 +197,72 @@ describe("useSheetAutosave", () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
-  it("saves an edit made during an in-flight save after it finishes, even once unmounted", async () => {
-    const { save, edit, calls, unmount } = setup();
+  it("sends an edit made during an in-flight save at unmount, leaving the order to save's queue", () => {
+    const { save, edit, unmount } = setup();
     edit("b");
     advance(SAVE_DEBOUNCE_MS);
     edit("c");
     unmount();
-    expect(save).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      calls[0].resolve();
-    });
     expect(save).toHaveBeenCalledTimes(2);
     expect(save).toHaveBeenLastCalledWith("c");
+    advance(SAVE_DEBOUNCE_MS * 5);
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("a closed sheet's last edit lands before a reopened sheet's newer one", async () => {
+    // A fake server behind the real per-spreadsheet queue.
+    let server = "a";
+    const sent: string[] = [];
+    const pending: Array<() => void> = [];
+    const send = (csv: string) =>
+      new Promise<void>((resolve) => {
+        sent.push(csv);
+        pending.push(() => {
+          server = csv;
+          resolve();
+        });
+      });
+    const save = (csv: string) => enqueueSpreadsheetSave("sheet-1", () => send(csv));
+    const flushMicrotasks = () =>
+      act(async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      });
+
+    const first = renderHook(
+      (props: Props) => useSheetAutosave({ ...props, save, onRejected: vi.fn() }),
+      {
+        initialProps: { csv: "a", serverCsv: "a", enabled: true },
+      }
+    );
+    first.rerender({ csv: "b", serverCsv: "a", enabled: true });
+    advance(SAVE_DEBOUNCE_MS);
+    await flushMicrotasks();
+    expect(sent).toEqual(["b"]);
+    first.rerender({ csv: "c", serverCsv: "a", enabled: true });
+    first.unmount();
+
+    // Reopened, showing the optimistic "b" while "b" is still in flight.
+    const second = renderHook(
+      (props: Props) => useSheetAutosave({ ...props, save, onRejected: vi.fn() }),
+      {
+        initialProps: { csv: "b", serverCsv: "b", enabled: true },
+      }
+    );
+    second.rerender({ csv: "d", serverCsv: "b", enabled: true });
+    advance(SAVE_DEBOUNCE_MS);
+    await flushMicrotasks();
+    expect(sent).toEqual(["b"]);
+
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        pending[i]();
+      });
+      await flushMicrotasks();
+    }
+    expect(sent).toEqual(["b", "c", "d"]);
+    expect(server).toBe("d");
+    expect(isSpreadsheetSaveQueued("sheet-1")).toBe(false);
+    expect(second.result.current.state).toBe("saved");
   });
 
   it("does not flush on unmount when nothing changed", () => {
