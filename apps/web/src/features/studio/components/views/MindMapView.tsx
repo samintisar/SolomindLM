@@ -71,11 +71,14 @@ function mindMapTheme(): Theme {
   };
 }
 
+/** The stored error as text. Metadata isn't validated, so only a non-empty string is shown. */
 function errorMessage(error: unknown): string {
+  if (typeof error === "string" && error) return error;
   if (typeof error === "object" && error !== null) {
-    return (error as { message?: string }).message || "An unknown error occurred";
+    const { message } = error as { message?: unknown };
+    if (typeof message === "string" && message) return message;
   }
-  return typeof error === "string" && error ? error : "An unknown error occurred";
+  return "An unknown error occurred";
 }
 
 export const MindMapView: React.FC<MindMapViewProps> = ({
@@ -87,6 +90,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mindRef = useRef<MindElixirInstance | null>(null);
   const [scale, setScale] = useState(1);
+  const [loadFailed, setLoadFailed] = useState(false);
   const mindMapData = note.mindMapData;
 
   useEffect(() => {
@@ -94,67 +98,75 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
 
     let cancelled = false;
     let teardown: (() => void) | undefined;
+    setLoadFailed(false);
 
-    import("mind-elixir").then(({ default: MindElixir }) => {
-      const el = containerRef.current;
-      if (cancelled || !el) return;
+    import("mind-elixir")
+      .then(({ default: MindElixir }) => {
+        const el = containerRef.current;
+        if (cancelled || !el) return;
 
-      const root = sanitizeNodeTree(
-        mindMapData.nodeData,
-        (note.title && note.title.trim()) || "Mind Map",
-        true
-      );
+        const root = sanitizeNodeTree(
+          mindMapData.nodeData,
+          (note.title && note.title.trim()) || "Mind Map",
+          true
+        );
 
-      const mind = new MindElixir({
-        el,
-        direction: MindElixir.RIGHT,
-        // Read-only: the generated map has nowhere to save edits, renames or moved nodes.
-        editable: false,
-        draggable: false,
-        contextMenu: false,
-        toolBar: false,
-        keypress: false,
-        locale: "en",
-        overflowHidden: false,
-        // Keep drag-to-pan on the left button; marquee selection only on the right.
-        mouseSelectionButton: 2,
-        scaleMin: SCALE_MIN,
-        scaleMax: SCALE_MAX,
-        theme: mindMapTheme(),
-      });
-      mind.init({ nodeData: collapseLargeTree(root) as NodeObj });
-      mindRef.current = mind;
+        const mind = new MindElixir({
+          el,
+          direction: MindElixir.RIGHT,
+          // Read-only: the generated map has nowhere to save edits, renames or moved nodes.
+          editable: false,
+          draggable: false,
+          contextMenu: false,
+          toolBar: false,
+          keypress: false,
+          locale: "en",
+          overflowHidden: false,
+          // Keep drag-to-pan on the left button; marquee selection only on the right.
+          mouseSelectionButton: 2,
+          scaleMin: SCALE_MIN,
+          scaleMax: SCALE_MAX,
+          theme: mindMapTheme(),
+        });
+        mind.init({ nodeData: collapseLargeTree(root) as NodeObj });
+        mindRef.current = mind;
 
-      // Every zoom, the wheel included, reports its scale here.
-      const onScale = (value: number) => setScale(value);
-      mind.bus.addListener("scale", onScale);
+        // Every zoom, the wheel included, reports its scale here.
+        const onScale = (value: number) => setScale(value);
+        mind.bus.addListener("scale", onScale);
 
-      // The palette holds resolved colours, so re-apply the theme when the app's theme class flips.
-      const themeObserver = new MutationObserver(() => mind.changeTheme(mindMapTheme()));
-      themeObserver.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
+        // The palette holds resolved colours, so re-apply the theme when the app's theme class flips.
+        const themeObserver = new MutationObserver(() => mind.changeTheme(mindMapTheme()));
+        themeObserver.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
 
-      // Open fitted, but never so small the topics can't be read (#171): scaleFit ignores scaleMin.
-      requestAnimationFrame(() => {
+        // Open fitted, but never so small the topics can't be read (#171): scaleFit ignores scaleMin.
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          mind.scaleFit();
+          const fitted = mind.scaleVal;
+          const opening = openingScale(fitted);
+          if (opening !== fitted) {
+            mind.toCenter();
+            mind.scale(opening);
+          }
+          setScale(mind.scaleVal);
+        });
+
+        teardown = () => {
+          themeObserver.disconnect();
+          mind.bus.removeListener("scale", onScale);
+          mind.destroy();
+        };
+      })
+      .catch((error: unknown) => {
+        // The chunk failed to download, or the map couldn't be built from this data.
         if (cancelled) return;
-        mind.scaleFit();
-        const fitted = mind.scaleVal;
-        const opening = openingScale(fitted);
-        if (opening !== fitted) {
-          mind.toCenter();
-          mind.scale(opening);
-        }
-        setScale(mind.scaleVal);
+        console.error("Couldn't load the mind map:", error);
+        setLoadFailed(true);
       });
-
-      teardown = () => {
-        themeObserver.disconnect();
-        mind.bus.removeListener("scale", onScale);
-        mind.destroy();
-      };
-    });
 
     return () => {
       cancelled = true;
@@ -291,6 +303,18 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
 
       <div className="relative flex-1 overflow-hidden">
         <div ref={containerRef} className="mind-map-container size-full" />
+        {loadFailed && (
+          <div className="absolute inset-0 flex bg-background">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <XCircle />
+                </EmptyMedia>
+                <EmptyTitle>Couldn't load the mind map</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        )}
       </div>
 
       {!isExpanded && (

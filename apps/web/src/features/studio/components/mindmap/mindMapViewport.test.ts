@@ -115,6 +115,15 @@ describe("fitScale", () => {
   });
 });
 
+describe("a fit measured in a container with no size", () => {
+  it("opens and fits at 1 instead of NaN or Infinity", () => {
+    for (const fitted of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(openingScale(fitted)).toBe(1);
+      expect(fitScale(fitted)).toBe(1);
+    }
+  });
+});
+
 describe("stepScale", () => {
   it("zooms in by 1.25", () => {
     expect(stepScale(1, "in")).toBe(1.25);

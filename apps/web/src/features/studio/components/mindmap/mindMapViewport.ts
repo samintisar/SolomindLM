@@ -72,14 +72,17 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** The zoom to open at: the fitted zoom, but never below MIN_READABLE_SCALE nor above 1. */
+/**
+ * The zoom to open at: the fitted zoom, but never below MIN_READABLE_SCALE nor above 1. A container
+ * with no size yet (a hidden panel) fits to Infinity or NaN; that opens at 1.
+ */
 export function openingScale(fitted: number): number {
-  return clamp(fitted, MIN_READABLE_SCALE, 1);
+  return Number.isFinite(fitted) ? clamp(fitted, MIN_READABLE_SCALE, 1) : 1;
 }
 
-/** Fit for the Fit button: the fitted zoom clamped to [SCALE_MIN, 1]. */
+/** Fit for the Fit button: the fitted zoom clamped to [SCALE_MIN, 1], or 1 when it isn't finite. */
 export function fitScale(fitted: number): number {
-  return clamp(fitted, SCALE_MIN, 1);
+  return Number.isFinite(fitted) ? clamp(fitted, SCALE_MIN, 1) : 1;
 }
 
 /** One zoom step: x1.25 in, /1.25 out, clamped to [SCALE_MIN, SCALE_MAX], rounded to 2 decimals. */

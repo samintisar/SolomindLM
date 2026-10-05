@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
     };
   }>,
   fitted: 1,
+  failToLoad: false,
 }));
 
 vi.mock("mind-elixir", () => {
@@ -61,6 +62,7 @@ vi.mock("mind-elixir", () => {
     destroy = vi.fn();
     changeTheme = vi.fn();
     constructor(options: Record<string, unknown>) {
+      if (h.failToLoad) throw new Error("chunk failed to load");
       this.options = options;
       h.instances.push(this as never);
     }
@@ -108,6 +110,7 @@ async function renderReady(note: MindMapNote = mindMapNote(), props = {}) {
 beforeEach(() => {
   h.instances.length = 0;
   h.fitted = 1;
+  h.failToLoad = false;
   vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
     cb(0);
     return 0;
@@ -269,6 +272,26 @@ describe("MindMapView", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Mind map generation failed");
     expect(screen.getByRole("alert")).toHaveTextContent("The model timed out");
     expect(h.instances).toHaveLength(0);
+  });
+
+  it("says so when the map can't be loaded, instead of leaving a blank canvas", async () => {
+    h.failToLoad = true;
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    render(<MindMapView note={mindMapNote()} />);
+    expect(await screen.findByText("Couldn't load the mind map")).toBeInTheDocument();
+  });
+
+  it("shows a fallback message when the stored error has no usable text", () => {
+    render(
+      <MindMapView
+        note={mindMapNote({
+          status: "failed",
+          mindMapData: undefined,
+          metadata: { error: { message: { nested: true } } } as unknown as MindMapNote["metadata"],
+        })}
+      />
+    );
+    expect(screen.getByText("An unknown error occurred")).toBeInTheDocument();
   });
 
   it("shows an empty state when there is no map data", () => {

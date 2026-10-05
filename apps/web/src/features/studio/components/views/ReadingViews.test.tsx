@@ -88,6 +88,23 @@ describe("ReportView", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("The model timed out");
   });
 
+  it("falls back to a plain message when the stored error's message isn't text", () => {
+    render(
+      <ReportView
+        note={reportNote({
+          status: "failed",
+          content: "Partial",
+          metadata: {
+            reportType: "briefing",
+            documentIds: [],
+            error: { message: { code: 500 } },
+          } as unknown as ReportNote["metadata"],
+        })}
+      />
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("An unknown error occurred");
+  });
+
   it("says so when there is no content", () => {
     render(<ReportView note={reportNote({ content: "" })} />);
     expect(screen.getByText("No content available")).toBeInTheDocument();

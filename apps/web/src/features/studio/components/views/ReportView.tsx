@@ -16,11 +16,14 @@ export interface ReportViewProps {
   onBack?: () => void;
 }
 
+/** The stored error as text. Metadata isn't validated, so only a non-empty string is shown. */
 function errorMessage(error: unknown): string {
+  if (typeof error === "string" && error) return error;
   if (typeof error === "object" && error !== null) {
-    return (error as { message?: string }).message || "An unknown error occurred";
+    const { message } = error as { message?: unknown };
+    if (typeof message === "string" && message) return message;
   }
-  return typeof error === "string" && error ? error : "An unknown error occurred";
+  return "An unknown error occurred";
 }
 
 /** Generated reports must not link out or embed media, so those render as nothing or plain text. */
