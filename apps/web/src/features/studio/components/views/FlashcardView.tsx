@@ -480,7 +480,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
               }}
             >
               <div
-                className={`relative w-full h-full transition-transform duration-700 transform-style-3d shadow-lg rounded-2xl ${
+                className={`relative w-full h-full transition-transform duration-700 motion-reduce:transition-none transform-style-3d shadow-lg rounded-2xl ${
                   isFlipped ? "rotate-y-180" : ""
                 } ${mode === "edit" ? "ring-2 ring-primary ring-offset-2" : ""}`}
               >

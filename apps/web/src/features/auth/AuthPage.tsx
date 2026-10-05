@@ -118,7 +118,7 @@ function AuthHeroMockup() {
         >
           <div
             data-mode={mode}
-            className="pointer-events-none col-start-1 row-start-1 rounded-xl bg-background/95 shadow-md ring-1 ring-primary/20 transition-transform duration-320 ease-spring data-[mode=studio]:translate-x-full"
+            className="pointer-events-none col-start-1 row-start-1 rounded-xl bg-background/95 shadow-md ring-1 ring-primary/20 transition-transform duration-320 ease-spring motion-reduce:transition-none data-[mode=studio]:translate-x-full"
             aria-hidden
           />
           <button

@@ -351,7 +351,7 @@
     }
   }
 
-  --animate-studio-bob: studio-bob 1.6s ease-in-out infinite;
+  --animate-studio-bob: studio-bob 1.6s var(--ease-in-out) infinite;
   --animate-studio-pop: studio-pop 550ms var(--ease-out);
   --animate-studio-glow: studio-glow 1400ms var(--ease-out) forwards;
   --animate-progress-sweep: progress-sweep 1.5s var(--ease-out) infinite;
@@ -546,7 +546,7 @@
   max-height: min(85dvh, 42rem);
 }
 
-/* "Thinking..." label shimmer; static under reduced motion (global rule zeroes animation-duration). */
+/* "Thinking..." label shimmer; keeps shimmering under reduced motion (a background-position shimmer is not movement). */
 @utility text-shimmer {
   background-image: linear-gradient(
     90deg,
@@ -1128,7 +1128,8 @@
   --studio-tone: --value(--color-studio-*);
 }
 
-/* Studio: a soft light in the type colour sweeping across a generating Saved row (spec §1). */
+/* Studio: a soft light in the type colour sweeping across a generating Saved row (spec §1).
+   Needs a positioned host (it sets overflow, not position). */
 @utility studio-sheen {
   overflow: hidden;
 
@@ -1145,6 +1146,13 @@
     );
     transform: translateX(-100%);
     animation: studio-sheen 2.4s var(--ease-out) infinite;
+  }
+
+  /* Decorative only: the progress bar still shows the work. */
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      display: none;
+    }
   }
 }
 
@@ -1173,8 +1181,9 @@
     scroll-behavior: auto !important;
   }
 
-  /* Decorative only: the progress bar still shows the work. */
-  .studio-sheen::before {
-    display: none;
+  /* Studio decorations that move: off (the progress bar still shows the work). */
+  .animate-studio-bob,
+  .animate-studio-pop {
+    animation: none;
   }
 }
