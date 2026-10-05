@@ -1,13 +1,4 @@
-import {
-  ArrowLeft,
-  CheckCircle2,
-  ChevronUp,
-  Eye,
-  Info,
-  Lightbulb,
-  Sparkles,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft, Eye, Info, Lightbulb, RotateCcw } from "lucide-react";
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   useQuiz,
@@ -15,13 +6,56 @@ import {
   useSubmitQuizAnswer,
   useUpdateQuizProgress,
 } from "@/features/studio/services/quizzesApi";
+import type { MarkdownRendererProps } from "@/shared/components/MarkdownRenderer.utils";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import { Button } from "@/shared/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { QuizNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
+import { cn } from "@/shared/utils/cn";
 import { normalizeStoredQuizQuestion, stripQuizOptionLabel } from "@/shared/utils/quizOptionLabels";
+import { useStreak } from "../../motion/useStreak";
+import { QuestionProgress } from "../practice/QuestionProgress";
+import { type OptionState, QuizOption } from "../practice/QuizOption";
+import { ResultsSummary } from "../practice/ResultsSummary";
+import { StreakChip } from "../practice/StreakChip";
+import type { QuestionState } from "../practice/types";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
+
+// Generated content may carry tables; links, media and embeds are dropped.
+const contentComponents: MarkdownRendererProps["components"] = {
+  img: () => null,
+  a: ({ children }) => <span>{children}</span>,
+  video: () => null,
+  audio: () => null,
+  iframe: () => null,
+  table: ({ children }) => (
+    <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
+      {children}
+    </table>
+  ),
+  thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+  th: ({ children }) => (
+    <th className="border-r border-border px-4 py-2 text-left font-semibold last:border-r-0">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="border-r border-border px-4 py-2 last:border-r-0">{children}</td>
+  ),
+};
+
+// Options read inline: paragraphs collapse to spans.
+const optionComponents: MarkdownRendererProps["components"] = {
+  ...contentComponents,
+  p: ({ children }) => <span className="font-medium">{children}</span>,
+};
 
 export interface QuizViewProps {
   note: QuizNote;
@@ -91,11 +125,47 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   // Derived state
   const isAnswered = userAnswers[currentIndex] !== undefined;
 
+  const { streak, record, reset: resetStreak } = useStreak();
+  // The option just answered correctly on this question: plays its pop and burst once.
+  const [celebrated, setCelebrated] = useState<{ question: number; option: number } | null>(null);
+  // Spoken after the learner answers (never on a restored or review view).
+  const [announcement, setAnnouncement] = useState("");
+  // Set when the learner answers; the effect below moves focus to Next once it has remounted.
+  const focusNextPending = useRef(false);
+  const nextButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (focusNextPending.current && isAnswered) {
+      focusNextPending.current = false;
+      nextButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [isAnswered, currentIndex]);
+
+  const questionStates = useMemo<Array<QuestionState | undefined>>(
+    () =>
+      questions.map((question, position) => {
+        const picked = userAnswers[position];
+        if (picked === undefined) return undefined;
+        return picked === question.answer ? "correct" : "incorrect";
+      }),
+    [questions, userAnswers]
+  );
+  const score = questionStates.filter((state) => state === "correct").length;
+
   const handleSelect = async (index: number) => {
     if (isAnswered || reviewMode) return;
 
     // Update local state immediately for responsiveness
     setUserAnswers((prev) => ({ ...prev, [currentIndex]: index }));
+    const correct = index === displayQuestion.answer;
+    record(correct);
+    if (correct) setCelebrated({ question: currentIndex, option: index });
+    setAnnouncement(
+      correct
+        ? "Correct."
+        : `Incorrect. The answer is ${String.fromCharCode(65 + displayQuestion.answer)}.`
+    );
+    focusNextPending.current = true;
 
     // Submit to server in the background
     try {
@@ -112,11 +182,13 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
         delete newState[currentIndex];
         return newState;
       });
+      setAnnouncement("");
     }
   };
 
   const handleNext = () => {
     setShowHint(false);
+    setAnnouncement("");
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
@@ -126,6 +198,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
   const handlePrev = () => {
     setShowHint(false);
+    setAnnouncement("");
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
     }
@@ -142,6 +215,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
       setShowResults(false);
       setShowHint(false);
       setReviewMode(false);
+      setCelebrated(null);
+      setAnnouncement("");
+      resetStreak();
       // Notify parent of the update
       if (latestNote && onNoteUpdate) {
         onNoteUpdate(latestNote);
@@ -154,332 +230,193 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     }
   };
 
-  const reviewQuiz = () => {
-    setCurrentIndex(0);
+  const reviewQuestion = (position: number) => {
+    setCurrentIndex(position);
     setShowResults(false);
     setReviewMode(true);
     setShowHint(false);
+    setAnnouncement("");
+  };
+
+  const optionState = (position: number): OptionState => {
+    if (!isAnswered && !reviewMode) return "idle";
+    if (position === displayQuestion.answer) return "correct";
+    if (position === selectedForDisplay) return "incorrect";
+    return "dimmed";
   };
 
   if (questions.length === 0)
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <p className="text-muted-foreground font-serif italic">No questions available</p>
+      <div className="flex h-full flex-col items-center justify-center space-y-4 p-8 text-center">
+        <p className="font-serif italic text-muted-foreground">No questions available</p>
       </div>
     );
 
   if (showResults) {
-    const score = Object.entries(userAnswers).reduce((acc, [qIdx, aIdx]) => {
-      return acc + (questions[parseInt(qIdx)].answer === aIdx ? 1 : 0);
-    }, 0);
-
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-300">
-        <div className="text-center space-y-6 max-w-md w-full bg-card p-10 rounded-2xl border border-border shadow-lg">
-          <div className="w-20 h-20 bg-primary/10 rounded-xl flex items-center justify-center mx-auto text-primary">
-            <Sparkles className="w-10 h-10" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold font-serif mb-2">Quiz Complete!</h3>
-            <p className="text-muted-foreground">
-              You scored {score} out of {questions.length}
-            </p>
-          </div>
-          <div className="w-full bg-secondary rounded-xl h-3 overflow-hidden">
-            <div
-              className="bg-primary h-full transition-all duration-1000 ease-out"
-              style={{ width: `${(score / questions.length) * 100}%` }}
-            />
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={reviewQuiz}
-              className="flex-1 py-3 bg-secondary text-secondary-foreground font-bold rounded-lg hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
+      <ResultsSummary
+        title="Quiz Complete!"
+        fraction={score / questions.length}
+        value={score}
+        caption={`of ${questions.length}`}
+        questions={questionStates.map((state, position) => ({
+          state,
+          onReview: () => reviewQuestion(position),
+        }))}
+        actions={
+          <>
+            <Button variant="secondary" className="flex-1" onClick={() => reviewQuestion(0)}>
+              <Eye />
               Review
-            </button>
-            <button
-              onClick={resetQuiz}
-              disabled={isResetting}
-              className="flex-1 py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isResetting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Resetting...
-                </>
-              ) : (
-                "Try Again"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+            <Button className="flex-1" onClick={resetQuiz} disabled={isResetting}>
+              {isResetting ? <Spinner /> : <RotateCcw />}
+              {isResetting ? "Resetting…" : "Try Again"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-muted-foreground">
+          You scored {score} out of {questions.length}
+        </p>
+      </ResultsSummary>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300 relative">
-      {/* Mobile Back Button */}
+    <div className="relative flex h-full flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300">
       {onBack && (
-        <div className="md:hidden flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-          <button
-            onClick={onBack}
-            className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
-            aria-label="Back to Studio"
-          >
-            <ArrowLeft className="w-5 h-5 shrink-0" />
-          </button>
-          <span className="text-sm font-semibold text-foreground truncate">{note.title}</span>
+        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm md:hidden">
+          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+            <ArrowLeft />
+          </Button>
+          <span className="truncate text-sm font-semibold text-foreground">{note.title}</span>
         </div>
       )}
-      <div className="flex-1 bg-card border-t border-border">
-        <div className="max-w-2xl mx-auto w-full p-8 md:p-12 flex flex-col">
-          {/* Review Mode Banner */}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-card">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-6 md:p-12">
           {reviewMode && (
-            <div className="mb-6 p-4 bg-warning-muted border border-warning-border rounded-xl flex items-center gap-3">
-              <Eye className="w-5 h-5 text-warning-muted-foreground shrink-0" />
-              <div>
-                <span className="text-sm font-semibold text-warning-muted-foreground">
-                  Review Mode
-                </span>
-                <p className="text-xs text-warning-muted-foreground">
-                  You are viewing your previous answers. Selection is disabled.
-                </p>
-              </div>
-            </div>
+            <Alert variant="warning">
+              <Eye />
+              <AlertTitle>Review Mode</AlertTitle>
+              <AlertDescription>
+                You are viewing your previous answers. Selection is disabled.
+              </AlertDescription>
+            </Alert>
           )}
 
-          <div className="mb-8">
-            <div className="flex justify-between text-xs md:text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
-              <span>Question {currentIndex + 1}</span>
-              <span>{questions.length} Total</span>
-            </div>
-            <div className="w-full bg-secondary/50 rounded-xl h-1.5 overflow-hidden">
-              <div
-                className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-              />
-            </div>
-          </div>
+          <QuestionProgress
+            currentIndex={currentIndex}
+            states={questionStates}
+            trailing={<StreakChip streak={streak} />}
+          />
 
-          <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-10 text-lg md:text-2xl">
-            <Suspense
-              fallback={<div className="animate-pulse h-6 bg-secondary/30 rounded w-full" />}
-            >
-              <MarkdownRenderer
-                components={{
-                  img: () => null,
-                  a: ({ children }) => <span className="text-foreground">{children}</span>,
-                  video: () => null,
-                  audio: () => null,
-                  iframe: () => null,
-                  table: ({ children }) => (
-                    <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
-                      {children}
-                    </table>
-                  ),
-                  thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                  tbody: ({ children }) => <tbody>{children}</tbody>,
-                  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                  th: ({ children }) => (
-                    <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
-                      {children}
-                    </td>
-                  ),
-                }}
+          <div
+            key={currentIndex}
+            className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-300"
+          >
+            <div className="prose max-w-none font-serif text-lg leading-relaxed text-foreground md:text-2xl">
+              <Suspense
+                fallback={<div className="h-6 w-full animate-pulse rounded bg-secondary/30" />}
               >
-                {sanitizeMarkdown(currentQuestion.question)}
-              </MarkdownRenderer>
-            </Suspense>
-          </div>
+                <MarkdownRenderer components={contentComponents}>
+                  {sanitizeMarkdown(currentQuestion.question)}
+                </MarkdownRenderer>
+              </Suspense>
+            </div>
 
-          <div className="space-y-4 flex-1 pb-10">
-            {displayQuestion.options.map((option, idx) => {
-              let stateStyles = "border-border hover:bg-secondary/50 hover:border-primary/50";
-              const isCorrect = idx === displayQuestion.answer;
-              const isIncorrectSelection =
-                idx === selectedForDisplay && idx !== displayQuestion.answer;
-
-              if (reviewMode || isAnswered) {
-                if (isCorrect) {
-                  stateStyles = "bg-success-muted border-success text-success-muted-foreground";
-                } else if (isIncorrectSelection) {
-                  stateStyles =
-                    "bg-destructive-muted border-destructive text-destructive-muted-foreground";
-                } else {
-                  stateStyles = "opacity-50 border-border";
-                }
-              } else if (selectedForDisplay === idx) {
-                stateStyles = "border-primary bg-primary/5";
-              }
-
-              return (
-                <button
+            <div className="space-y-3">
+              {displayQuestion.options.map((option, idx) => (
+                <QuizOption
                   key={idx}
-                  onClick={() => handleSelect(idx)}
+                  position={idx}
+                  state={optionState(idx)}
                   disabled={isAnswered || reviewMode}
-                  className={`w-full text-left p-5 md:p-6 rounded-xl border-2 transition-all flex items-center justify-between group ${stateStyles} ${reviewMode ? "cursor-not-allowed" : ""}`}
+                  celebrate={celebrated?.question === currentIndex && celebrated.option === idx}
+                  onSelect={() => handleSelect(idx)}
                 >
-                  <div className="flex-1 prose prose-stone dark:prose-invert max-w-none font-serif text-base md:text-lg">
+                  <span className="prose block max-w-none font-serif text-base md:text-lg">
                     <Suspense
                       fallback={
-                        <div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />
+                        <span className="block h-5 w-full animate-pulse rounded bg-secondary/30" />
                       }
                     >
-                      <MarkdownRenderer
-                        components={{
-                          img: () => null,
-                          a: ({ children }) => <span className="text-foreground">{children}</span>,
-                          video: () => null,
-                          audio: () => null,
-                          iframe: () => null,
-                          table: ({ children }) => (
-                            <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
-                              {children}
-                            </table>
-                          ),
-                          thead: ({ children }) => (
-                            <thead className="bg-secondary/50">{children}</thead>
-                          ),
-                          tbody: ({ children }) => <tbody>{children}</tbody>,
-                          tr: ({ children }) => (
-                            <tr className="border-b border-border">{children}</tr>
-                          ),
-                          th: ({ children }) => (
-                            <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
-                              {children}
-                            </th>
-                          ),
-                          td: ({ children }) => (
-                            <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
-                              {children}
-                            </td>
-                          ),
-                          p: ({ children }) => <span className="font-medium">{children}</span>,
-                        }}
-                      >
+                      <MarkdownRenderer components={optionComponents}>
                         {sanitizeMarkdown(stripQuizOptionLabel(option))}
                       </MarkdownRenderer>
                     </Suspense>
-                  </div>
-                  {isAnswered && idx === displayQuestion.answer && (
-                    <CheckCircle2 className="w-5 h-5 text-success" />
-                  )}
-                  {isAnswered && idx === selectedForDisplay && idx !== displayQuestion.answer && (
-                    <XCircle className="w-5 h-5 text-destructive" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Explanation shown after answering */}
-          {isAnswered && (
-            <div className="mt-6 p-5 bg-info-muted rounded-xl border border-info-border animate-in fade-in slide-in-from-bottom-2 overflow-hidden">
-              <div className="flex items-start gap-3 min-w-0">
-                <Info className="w-6 h-6 shrink-0 mt-1 text-info-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-base text-info-muted-foreground">
-                    Explanation
                   </span>
-                  <div className="text-base mt-2 leading-relaxed prose prose-base prose-stone dark:prose-invert max-w-none wrap-break-word text-info-muted-foreground">
+                </QuizOption>
+              ))}
+            </div>
+
+            {isAnswered && (
+              <div className="flex items-start gap-3 rounded-xl bg-info-muted p-5 text-info-muted-foreground animate-in fade-in slide-in-from-top-2 duration-300">
+                <Info aria-hidden className="mt-1 size-5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-sans text-xs font-bold uppercase tracking-wide">Explanation</p>
+                  <div className="prose mt-2 max-w-none wrap-break-word text-base leading-relaxed">
                     <Suspense
                       fallback={
-                        <div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />
+                        <div className="h-4 w-full animate-pulse rounded bg-secondary/30" />
                       }
                     >
-                      <MarkdownRenderer
-                        components={{
-                          img: () => null,
-                          a: ({ children }) => (
-                            <span className="text-info-muted-foreground">{children}</span>
-                          ),
-                          video: () => null,
-                          audio: () => null,
-                          iframe: () => null,
-                          table: ({ children }) => (
-                            <table className="w-full border-collapse border border-info-border rounded-lg overflow-hidden">
-                              {children}
-                            </table>
-                          ),
-                          thead: ({ children }) => <thead className="bg-info/15">{children}</thead>,
-                          tbody: ({ children }) => <tbody>{children}</tbody>,
-                          tr: ({ children }) => (
-                            <tr className="border-b border-info-border">{children}</tr>
-                          ),
-                          th: ({ children }) => (
-                            <th className="px-4 py-2 text-left font-semibold border-r border-info-border last:border-r-0 text-info-muted-foreground">
-                              {children}
-                            </th>
-                          ),
-                          td: ({ children }) => (
-                            <td className="px-4 py-2 border-r border-info-border last:border-r-0 text-info-muted-foreground">
-                              {children}
-                            </td>
-                          ),
-                          p: ({ children }) => (
-                            <p className="text-base wrap-break-word text-info-muted-foreground">
-                              {children}
-                            </p>
-                          ),
-                        }}
-                      >
+                      <MarkdownRenderer components={contentComponents}>
                         {sanitizeMarkdown(currentQuestion.explanation)}
                       </MarkdownRenderer>
                     </Suspense>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="shrink-0 p-4 md:px-12 md:py-6 border-t border-border bg-background/80 backdrop-blur-md z-10">
-        <div className="max-w-2xl mx-auto w-full flex items-center justify-between">
-          {!reviewMode && (
-            <div className="relative">
-              <button
-                onClick={() => setShowHint(!showHint)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
-              >
-                <Lightbulb className="w-4 h-4" />
-                <span>Hint</span>
-                <ChevronUp
-                  className={`w-3 h-3 transition-transform ${showHint ? "rotate-180" : ""}`}
-                />
-              </button>
-              {showHint && (
-                <div className="absolute bottom-full left-0 mb-3 w-72 max-w-[calc(100vw-2rem)] p-4 bg-popover border border-border rounded-xl shadow-xl text-sm leading-relaxed animate-in fade-in slide-in-from-bottom-2 z-20">
-                  <span className="font-bold block mb-1 text-xs uppercase tracking-wide text-primary">
-                    Hint
-                  </span>
+      <p aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
+
+      <div className="z-10 shrink-0 border-t border-border bg-background/80 p-4 backdrop-blur-md md:px-12 md:py-6">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-3">
+          {reviewMode ? (
+            <span />
+          ) : (
+            <Popover open={showHint} onOpenChange={setShowHint}>
+              <PopoverTrigger asChild>
+                <Button variant="secondary" size="sm">
+                  <Lightbulb />
+                  Hint
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start">
+                <p className="mb-1 font-sans text-xs font-bold uppercase tracking-wide text-primary">
+                  Hint
+                </p>
+                <p className="text-sm leading-relaxed">
                   {currentQuestion.hint || "Try to recall the definition from your notes."}
-                </div>
-              )}
-            </div>
+                </p>
+              </PopoverContent>
+            </Popover>
           )}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handlePrev}
-              disabled={currentIndex === 0}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
-            >
+          <span
+            key={score}
+            className="font-sans text-xs font-semibold tabular-nums text-muted-foreground animate-studio-pop"
+          >
+            Score {score}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handlePrev} disabled={currentIndex === 0}>
               Previous
-            </button>
-            <button
-              onClick={handleNext}
-              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
+            </Button>
+            <span
+              key={`next-${currentIndex}-${isAnswered}`}
+              className={cn("inline-flex", isAnswered && !reviewMode && "animate-studio-nudge")}
             >
-              {currentIndex === questions.length - 1 ? "Finish" : "Next"}
-            </button>
+              <Button ref={nextButtonRef} size="sm" className="min-w-25" onClick={handleNext}>
+                {currentIndex === questions.length - 1 ? "Finish" : "Next"}
+              </Button>
+            </span>
           </div>
         </div>
       </div>
