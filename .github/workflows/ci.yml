@@ -58,8 +58,8 @@ jobs:
       - name: Typecheck evals
         run: bun run typecheck:evals
 
-  # Its own job, not a step in typecheck-convex, so it is a separate check that
-  # is not required until the repo owner adds it to branch protection.
+  # Its own job, not a step in typecheck-convex, so it shows as its own required
+  # check in branch protection (.github/branch-protection.ps1).
   convex-codegen:
     name: Convex codegen (generated API)
     runs-on: ubuntu-latest
