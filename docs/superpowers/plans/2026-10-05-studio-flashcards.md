@@ -432,7 +432,7 @@ git commit -m "feat(studio): flashcard pieces: flip card, rating button, tally t
   - Ignore events with modifiers, `repeat`, or `defaultPrevented`.
   - Ignore targets inside `input, textarea, select, [contenteditable='true'], [role='dialog']`.
   - For Space and Enter, also ignore targets inside `button, a, [role='button']`, so a focused control handles its own key.
-- **Focus:** after Reveal, focus the Good button. After the card changes (rating, Previous or Next), focus `Reveal answer`. Use `{ preventScroll: true }`, and skip the very first mount: never steal focus on open.
+- **Focus:** after Reveal, focus the Good button. After the card changes (rating, Previous or Next), focus `Reveal answer`. Use `{ preventScroll: true }`. On mount, also focus `Reveal answer`. Study mode only opens from the Study toggle, and focus left on that toggle would swallow Space and Enter (the keyboard handler leaves focused buttons alone), so the shortcut wouldn't reveal the first card. (Changed after the browser check; the first draft skipped focus on mount.)
 
 - [ ] **Step 1: Write the failing tests** (`StudyMode.test.tsx`).
 
