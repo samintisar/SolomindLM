@@ -11,6 +11,12 @@ function clampTime(value: number, duration: number): number {
   return Math.min(duration, Math.max(0, value));
 }
 
+/** The next rate in the cycle; a rate outside the list (indexOf -1) restarts at 1×. */
+export function nextPlaybackRate(rate: number): number {
+  const index = PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]);
+  return PLAYBACK_RATES[(index + 1) % PLAYBACK_RATES.length];
+}
+
 export function formatAudioTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
 
@@ -164,9 +170,7 @@ export function useAudioPlayer(sourceUrl: string | null | undefined) {
 
   const cyclePlaybackRate = useCallback(() => {
     setPlaybackRateState((currentRate) => {
-      const currentIndex = PLAYBACK_RATES.indexOf(currentRate as (typeof PLAYBACK_RATES)[number]);
-      // A rate outside the list gives indexOf -1, so the next one is PLAYBACK_RATES[0] (1×).
-      const nextRate = PLAYBACK_RATES[(currentIndex + 1) % PLAYBACK_RATES.length];
+      const nextRate = nextPlaybackRate(currentRate);
       const audio = audioRef.current;
       if (audio) {
         audio.playbackRate = nextRate;

@@ -10,6 +10,11 @@ export interface ResolvedReaderLines {
   lines: ReaderLine[];
   /** True when the timings are estimated from character counts rather than saved at generation. */
   approximate: boolean;
+  /**
+   * False only for an estimate made before the duration is known: every line then sits at 0, so
+   * no line can be said to be current. Saved lines are always timed.
+   */
+  timed: boolean;
 }
 
 function isSpeaker(value: unknown): value is "host_a" | "host_b" {
@@ -73,15 +78,19 @@ export function resolveReaderLines(
       ? (metadata as { lines?: unknown }).lines
       : undefined;
 
-  if (Array.isArray(raw) && raw.length > 0) {
+  const absent = raw === undefined || raw === null || (Array.isArray(raw) && raw.length === 0);
+  if (!absent) {
     const saved = parseSavedLines(raw);
-    if (saved) return { lines: saved, approximate: false };
-    console.warn("Audio overview has malformed saved line timings; estimating them instead.");
-  } else if (raw !== undefined && raw !== null && !Array.isArray(raw)) {
+    if (saved) return { lines: saved, approximate: false, timed: true };
     console.warn("Audio overview has malformed saved line timings; estimating them instead.");
   }
 
-  return { lines: estimateLines(transcript, durationSec), approximate: true };
+  const hasDuration = Number.isFinite(durationSec) && durationSec > 0;
+  return {
+    lines: estimateLines(transcript, durationSec),
+    approximate: true,
+    timed: hasDuration,
+  };
 }
 
 /**
@@ -102,4 +111,9 @@ export function activeLineIndex(lines: readonly ReaderLine[], timeMs: number): n
     }
   }
   return found;
+}
+
+/** The line to highlight now, or -1 when there is none (before the first line, or untimed). */
+export function currentLineIndex(resolved: ResolvedReaderLines, timeMs: number): number {
+  return resolved.timed ? activeLineIndex(resolved.lines, timeMs) : -1;
 }

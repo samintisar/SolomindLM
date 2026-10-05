@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { activeLineIndex, type ReaderLine, resolveReaderLines } from "./transcriptLines";
+import {
+  activeLineIndex,
+  currentLineIndex,
+  estimateLines,
+  type ReaderLine,
+  resolveReaderLines,
+} from "./transcriptLines";
 
 const savedLines: ReaderLine[] = [
   { speaker: "host_a", text: "Welcome back.", startMs: 0, endMs: 1500 },
@@ -13,7 +19,7 @@ afterEach(() => {
 describe("resolveReaderLines", () => {
   it("returns saved lines as exact", () => {
     const result = resolveReaderLines({ lines: savedLines }, "ignored", 10);
-    expect(result).toEqual({ lines: savedLines, approximate: false });
+    expect(result).toEqual({ lines: savedLines, approximate: false, timed: true });
   });
 
   it("estimates from character counts when there are no saved lines", () => {
@@ -76,15 +82,68 @@ describe("resolveReaderLines", () => {
   });
 
   it("returns no lines for an empty transcript", () => {
-    expect(resolveReaderLines({}, "", 10)).toEqual({ lines: [], approximate: true });
+    expect(resolveReaderLines({}, "", 10)).toEqual({ lines: [], approximate: true, timed: true });
     expect(resolveReaderLines({}, " \n\n ", 10).lines).toEqual([]);
   });
 
-  it("accepts an empty saved lines array as saved, not malformed", () => {
+  it("treats an empty saved lines array as absent, not malformed", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = resolveReaderLines({ lines: [] }, "a\nb", 4);
     expect(result.approximate).toBe(true);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("estimateLines", () => {
+  it("spreads the duration over the lines by character count", () => {
+    const lines = estimateLines("aaaa\nbb\ncccccc", 12);
+    expect(lines.map((l) => [l.startMs, l.endMs])).toEqual([
+      [0, 4000],
+      [4000, 6000],
+      [6000, 12000],
+    ]);
+  });
+
+  it("starts at 0 and ends at the duration even when the shares do not divide evenly", () => {
+    const lines = estimateLines("one\ntwo\nthree", 10.001);
+    expect(lines[0]?.startMs).toBe(0);
+    expect(lines[2]?.endMs).toBe(10001);
+    for (let i = 1; i < lines.length; i++) {
+      expect(lines[i]?.startMs).toBe(lines[i - 1]?.endMs);
+    }
+  });
+
+  it("drops blank lines and returns nothing for an empty transcript", () => {
+    expect(estimateLines("a\n\n  \nb", 2).map((l) => l.text)).toEqual(["a", "b"]);
+    expect(estimateLines("", 5)).toEqual([]);
+  });
+});
+
+describe("timed", () => {
+  it("is true for saved lines and for an estimate with a known duration", () => {
+    expect(resolveReaderLines({ lines: savedLines }, "x", 0).timed).toBe(true);
+    expect(resolveReaderLines({}, "a\nb", 10).timed).toBe(true);
+  });
+
+  it("is false for an estimate made before the duration is known", () => {
+    expect(resolveReaderLines({}, "a\nb", 0).timed).toBe(false);
+    expect(resolveReaderLines({}, "a\nb", Number.NaN).timed).toBe(false);
+  });
+});
+
+describe("currentLineIndex", () => {
+  it("is -1 for an untimed estimate, whatever the time", () => {
+    const resolved = resolveReaderLines({}, "a\nb", 0);
+    expect(currentLineIndex(resolved, 0)).toBe(-1);
+    expect(currentLineIndex(resolved, 5000)).toBe(-1);
+  });
+
+  it("follows the lines once they are timed", () => {
+    const resolved = resolveReaderLines({ lines: savedLines }, "", 0);
+    expect(currentLineIndex(resolved, 0)).toBe(0);
+    expect(currentLineIndex(resolved, 2000)).toBe(1);
+    const estimated = resolveReaderLines({}, "aaaa\nbbbb", 8);
+    expect(currentLineIndex(estimated, 5000)).toBe(1);
   });
 });
 

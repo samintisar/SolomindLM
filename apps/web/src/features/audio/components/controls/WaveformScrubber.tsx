@@ -56,7 +56,7 @@ export function WaveformScrubber({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!canSeek) return;
+    if (!canSeek || event.button !== 0) return;
     draggingRef.current = true;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     seekToPointer(event);
@@ -71,6 +71,11 @@ export function WaveformScrubber({
     if (!draggingRef.current) return;
     draggingRef.current = false;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  // The browser took the pointer away (capture released or lost): stop following it.
+  const handleCaptureLost = () => {
+    draggingRef.current = false;
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -103,17 +108,18 @@ export function WaveformScrubber({
     <div className="w-full">
       <div
         role="slider"
-        tabIndex={disabled ? -1 : 0}
+        tabIndex={canSeek ? 0 : -1}
         aria-label="Seek"
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(currentTime)}
         aria-valuetext={`${formatAudioTime(currentTime)} of ${formatAudioTime(duration)}`}
-        aria-disabled={disabled}
+        aria-disabled={!canSeek}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
+        onLostPointerCapture={handleCaptureLost}
         onKeyDown={handleKeyDown}
         className={cn(
           "flex h-9 touch-none items-center gap-0.5 rounded-md outline-hidden focus-visible:ring-2 focus-visible:ring-ring",

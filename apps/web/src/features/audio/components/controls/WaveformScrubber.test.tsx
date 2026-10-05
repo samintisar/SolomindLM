@@ -117,8 +117,36 @@ describe("WaveformScrubber", () => {
     expect(onSeek).not.toHaveBeenCalled();
   });
 
-  it("does nothing before the duration is known", () => {
+  it("ignores non-primary pointer buttons", () => {
+    const { onSeek, slider } = setup();
+    fireEvent.pointerDown(slider, { clientX: 50, pointerId: 1, button: 2 });
+    expect(onSeek).not.toHaveBeenCalled();
+  });
+
+  it("stops following the pointer when capture is lost", () => {
+    const { onSeek, slider } = setup();
+    vi.spyOn(slider, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      width: 200,
+      right: 200,
+      top: 0,
+      bottom: 36,
+      height: 36,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(slider, { clientX: 50, pointerId: 1 });
+    fireEvent.lostPointerCapture(slider, { pointerId: 1 });
+    onSeek.mockClear();
+    fireEvent.pointerMove(slider, { clientX: 150, pointerId: 1 });
+    expect(onSeek).not.toHaveBeenCalled();
+  });
+
+  it("is inert and out of the tab order before the duration is known", () => {
     const { onSeek, slider } = setup({ duration: 0, currentTime: 0 });
+    expect(slider).toHaveAttribute("aria-disabled", "true");
+    expect(slider).toHaveAttribute("tabindex", "-1");
     fireEvent.keyDown(slider, { key: "ArrowRight" });
     fireEvent.pointerDown(slider, { clientX: 50, pointerId: 1 });
     expect(onSeek).not.toHaveBeenCalled();
