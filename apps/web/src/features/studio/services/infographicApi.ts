@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import type { InfographicNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateInfographicParams {
   notebookId: string;
@@ -114,29 +115,8 @@ export function useCreateInfographic() {
  */
 export function useRenameInfographic() {
   const update = useMutation(api.studio.infographic.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Read the current infographic to get its notebookId
-      const infographic = localStore.getQuery(api.studio.infographic.index.get, { id });
-      if (infographic) {
-        // Update detail view
-        localStore.setQuery(api.studio.infographic.index.get, { id }, { ...infographic, title });
-
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.infographic.index.list, {
-          notebookId: infographic.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.infographic.index.list,
-            { notebookId: infographic.notebookId },
-            listResult.map((item: { _id: string; [key: string]: unknown }) =>
-              item._id === id ? { ...item, title } : item
-            )
-          );
-        }
-      }
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
     }
   );
 
@@ -153,25 +133,8 @@ export function useRenameInfographic() {
  */
 export function useDeleteInfographic() {
   const remove = useMutation(api.studio.infographic.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current infographic to get its notebookId
-      const infographic = localStore.getQuery(api.studio.infographic.index.get, { id: args.id });
-      if (infographic) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.infographic.index.list, {
-          notebookId: infographic.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.infographic.index.list,
-            { notebookId: infographic.notebookId },
-            listResult.filter((item: { _id: string }) => item._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.infographic.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 

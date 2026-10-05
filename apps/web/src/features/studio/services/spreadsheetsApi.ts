@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
 import type { SpreadsheetNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateSpreadsheetParams {
   notebookId: string;
@@ -104,29 +105,8 @@ export function useCreateSpreadsheet() {
  */
 export function useRenameSpreadsheet() {
   const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Read the current spreadsheet to get its notebookId
-      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id });
-      if (spreadsheet) {
-        // Update detail view
-        localStore.setQuery(api.studio.spreadsheets.index.get, { id }, { ...spreadsheet, title });
-
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
-          notebookId: spreadsheet.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.spreadsheets.index.list,
-            { notebookId: spreadsheet.notebookId },
-            listResult.map((ss: { _id: string; [key: string]: unknown }) =>
-              ss._id === id ? { ...ss, title } : ss
-            )
-          );
-        }
-      }
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
     }
   );
 
@@ -143,25 +123,8 @@ export function useRenameSpreadsheet() {
  */
 export function useDeleteSpreadsheet() {
   const remove = useMutation(api.studio.spreadsheets.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current spreadsheet to get its notebookId
-      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id: args.id });
-      if (spreadsheet) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
-          notebookId: spreadsheet.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.spreadsheets.index.list,
-            { notebookId: spreadsheet.notebookId },
-            listResult.filter((ss: { _id: string }) => ss._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.spreadsheets.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 
