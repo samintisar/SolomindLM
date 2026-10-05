@@ -21,6 +21,8 @@ interface TranscriptReaderProps {
   isPlaying: boolean;
   /** True when the timings are estimated rather than saved at generation. */
   approximate: boolean;
+  /** True while estimated timings are being matched to the audio; the badge says so. */
+  syncing?: boolean;
   onSeek: (ms: number) => void;
 }
 
@@ -34,6 +36,7 @@ export function TranscriptReader({
   activeIndex,
   isPlaying,
   approximate,
+  syncing = false,
   onSeek,
 }: TranscriptReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -157,9 +160,15 @@ export function TranscriptReader({
       {/* Siblings of the scroller, not children: the fade mask would dim them too. */}
       {approximate && (
         <div className="absolute top-2 right-4 z-10">
-          <Badge variant="secondary" title="Timings are estimated for this older overview">
-            Approximate sync
-          </Badge>
+          {syncing ? (
+            <Badge variant="secondary" title="Matching the transcript to the audio">
+              Syncing…
+            </Badge>
+          ) : (
+            <Badge variant="secondary" title="Timings are estimated for this older overview">
+              Approximate sync
+            </Badge>
+          )}
         </div>
       )}
 
