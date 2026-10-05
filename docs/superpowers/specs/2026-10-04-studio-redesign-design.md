@@ -50,7 +50,7 @@ Some debt the lint cannot see is in scope too:
 
 The rule applies app-wide, so PR 1 checks chat, sources and notebooks with reduced motion on, at desktop and phone widths.
 
-**Studio motion helpers** live in `features/studio/motion/`, so later PRs reuse them:
+**Studio motion helpers** live in `features/studio/motion/` and ship in PR 2 with their first users (Knip fails CI on unused exports), so PRs 2 and 3 share them:
 - **`useCountUp(target, { duration })`:** an eased number for scores and tallies. It returns the target at once under reduced motion.
 - **`<Burst />`:** a small particle burst from an anchor element, using token colours. It renders nothing under reduced motion.
 - **`useStreak()`:** tracks consecutive good answers. A streak chip shows from 2 in a row.

@@ -23,6 +23,14 @@ const MIGRATED = [
   "src/features/audio/**/*.tsx",
   "src/features/feedback/**/*.tsx",
   "src/features/legal/**/*.tsx",
+  // Studio (#264), migrated PR by PR; PR 8 replaces these with src/features/studio/**/*.tsx.
+  "src/features/studio/components/StudioPanel.tsx",
+  "src/features/studio/components/StudioPanelHeader.tsx",
+  "src/features/studio/components/ToolGrid.tsx",
+  "src/features/studio/components/NoteItem.tsx",
+  "src/features/studio/components/NoteIcon.tsx",
+  "src/features/studio/components/NoteListView.tsx",
+  "src/features/studio/components/ActiveNoteView.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
