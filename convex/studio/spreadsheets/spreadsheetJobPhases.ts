@@ -31,6 +31,7 @@ import {
   REDUCE_PROMPTS,
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/spreadsheet/prompts";
+import { labelWithSource, packChunksBySource } from "../../_agents/spreadsheet/sourcePacking";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -80,6 +81,8 @@ export type ProcessSpreadsheetMapChunkPhaseArgs = {
   chunk: string;
   spreadsheetType: string;
   customPrompt: string;
+  /** Title of the source this chunk comes from (map tasks never span two sources). */
+  sourceTitle?: string;
 };
 
 export type FinalizeSpreadsheetPhaseArgs = {
@@ -231,21 +234,33 @@ export async function runSpreadsheetGenerationPhase(
     const topicDocumentCount = new Set(chunkObjects.map((c) => c.documentId)).size;
 
     // Extract content from chunk objects
-    const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
+    const rawChunks = chunkObjects.map((chunk) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
 
-    // Validate and pack chunks
+    // Source titles, so map tasks and notes say which source they came from.
+    const sourceDocs = await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
+      documentIds: [...new Set(chunkObjects.map((c) => c.documentId))],
+    });
+    const sourceTitles = new Map(sourceDocs.map((d) => [d._id as string, d.fileName]));
+
+    // Validate chunks; map tasks are packed per source below, never mixing two sources.
     const validatedChunks = validateChunks(rawChunks);
     const mapPlan = planStudioJobMapPhase({
       documentCount: topicDocumentCount,
       chunks: validatedChunks,
       estimateTokens: countTokens,
-      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+      pack: () => [],
     });
+    const mapTasks =
+      mapPlan.mode === "map_reduce"
+        ? packChunksBySource(chunkObjects, sourceTitles, (contents) =>
+            packChunks(validateChunks(contents), CONFIG.MAP_CHUNK_SIZE_TOKENS)
+          )
+        : [];
 
     console.log(
-      `[SpreadsheetJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
+      `[SpreadsheetJob] Planned ${validatedChunks.length} validated chunks from ${sourceTitles.size} sources into ${mapTasks.length} map tasks (${mapPlan.mode})`
     );
 
     if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
@@ -260,7 +275,10 @@ export async function runSpreadsheetGenerationPhase(
         spreadsheetId,
         chunkIndex: 0,
         result: JSON.stringify({
-          output: mapPlan.skipMapContent,
+          output: labelWithSource(
+            [...sourceTitles.values()][0] ?? "Source 1",
+            mapPlan.skipMapContent
+          ),
           processingTimeMs: 0,
         }),
       });
@@ -280,36 +298,38 @@ export async function runSpreadsheetGenerationPhase(
       return;
     }
 
-    if (mapPlan.mapChunks.length === 0) {
+    if (mapTasks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
       spreadsheetId,
-      totalMapTasks: mapPlan.mapChunks.length,
+      totalMapTasks: mapTasks.length,
       spreadsheetType: spreadsheetType || "custom",
       customPrompt: customPrompt || "",
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
+    for (let i = 0; i < mapTasks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.processSpreadsheetMapChunk, {
         spreadsheetId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: mapPlan.mapChunks.length,
-        chunk: mapPlan.mapChunks[i],
+        totalChunks: mapTasks.length,
+        chunk: mapTasks[i].text,
         spreadsheetType: spreadsheetType || "custom",
         customPrompt: customPrompt || "",
+        sourceTitle: mapTasks[i].source,
       });
-      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
+      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${mapTasks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: mapPlan.mapChunks.length,
-      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
+      totalMapTasks: mapTasks.length,
+      sourceCount: sourceTitles.size,
+      chunkSizes: mapTasks.map((t) => t.text.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -357,6 +377,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     chunk,
     spreadsheetType,
     customPrompt,
+    sourceTitle,
   } = args;
 
   const logger = createJobLogger({
@@ -399,7 +420,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
         ? MAP_PROMPTS["custom"]
         : MAP_PROMPTS[spreadsheetType] || MAP_PROMPTS["custom"];
     const prompt = fillTemplate(promptTemplate, {
-      chunk,
+      chunk: sourceTitle ? labelWithSource(sourceTitle, chunk) : chunk,
       customPrompt: sanitizeUserInput(customPrompt || ""),
     });
 
@@ -433,8 +454,9 @@ export async function runProcessSpreadsheetMapChunkPhase(
     );
 
     // Store result
+    // Notes keep their source, so collapse and reduce know which source each fact came from.
     const result = {
-      output: mapOutput,
+      output: sourceTitle ? labelWithSource(sourceTitle, mapOutput) : mapOutput,
       processingTimeMs: elapsed,
       ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
