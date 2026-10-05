@@ -1071,26 +1071,22 @@
   animation: studio-generating-bar-sweep 1.9s ease-in-out infinite;
 }
 
+/* Reduced motion: movement becomes a fade, it does not disappear (spec §1).
+   tw-animate-css drives animate-in/out through these variables; resetting them keeps the
+   opacity part of every enter/exit and drops the slide, zoom and spin. Spinners, progress
+   sweeps and the landing marquee keep moving because they are not reset here. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-exit-rotate: 0 !important;
     scroll-behavior: auto !important;
-  }
-
-  /* Spinners are the only sign that work is in progress; a frozen frame reads as stalled. */
-  .animate-spin {
-    animation-duration: 1s !important;
-    animation-iteration-count: infinite !important;
-  }
-
-  /* Landing features marquee (react-fast-marquee) keeps scrolling by product decision: frozen, it shows
-     clipped and duplicated cards. It stays slow and pauses on hover. */
-  .rfm-marquee {
-    animation-duration: var(--duration) !important;
-    animation-iteration-count: var(--iteration-count) !important;
   }
 }
