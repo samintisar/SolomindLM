@@ -136,6 +136,34 @@ describe("audio job mutation sequence", () => {
     expect(row?.metadata.mapResults).toBeUndefined();
   });
 
+  test("completed row keeps the per-line timings and drops the synthesis scratch", async () => {
+    const t = convexTest(schema, modules);
+    const audioOverviewId = await seedAudioOverview(t);
+    await t.run((ctx) =>
+      ctx.db.patch(audioOverviewId, {
+        metadata: {
+          ...settings,
+          synthesisInput: { script: [{ speaker: "host_a", text: "Hi" }], title: "T" },
+          synthesis: { chunks: [], done: {}, startedAt: 0 },
+        },
+      })
+    );
+    const lines = [{ speaker: "host_a", text: "Hi", startMs: 0, endMs: 900 }];
+
+    await t.mutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
+      audioOverviewId,
+      audioUrl: "https://example.com/audio.mp3",
+      transcript: "Hi",
+      metadata: { title: "T", lines },
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.metadata.lines).toEqual(lines);
+    expect(row?.metadata.synthesisInput).toBeUndefined();
+    expect(row?.metadata.synthesis).toBeUndefined();
+    expect(row?.metadata).toMatchObject(settings);
+  });
+
   test("failed row keeps the user's settings and drops map output", async () => {
     const t = convexTest(schema, modules);
     const audioOverviewId = await seedAudioOverview(t);

@@ -47,16 +47,21 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { concatenateMp3Buffers, encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
+import {
+  concatenateMp3Buffers,
+  encodePcmWavToMp3,
+  getMp3DurationMs,
+} from "../../_services/ai/mp3.js";
 import {
   createTogetherTtsClient,
   synthesizeSpeechToBuffer,
 } from "../../_services/ai/togetherTts.js";
-import { concatenateWavBuffers } from "../../_services/ai/wav.js";
+import { concatenateWavBuffers, getPcmWavDurationSeconds } from "../../_services/ai/wav.js";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
 import { planSynthesisChunks } from "./synthesisChunks";
+import { buildTranscriptLines } from "./transcriptLines";
 
 // ============================================================
 // CONFIGURATION
@@ -919,14 +924,21 @@ export async function runSynthesizeAudioOverviewPhase(
 
 /**
  * Synthesizes dialogue lines in order, CONFIG.TTS_BATCH_SIZE at a time. A line that fails is
- * skipped and counted. `lineOffset` is the first line's index in the script, for logs.
+ * skipped and counted. `lineOffset` is the first line's index in the script. `lineTimings` has one
+ * entry per successful line, in the order of `buffers`, keyed by absolute script index.
  */
 async function synthesizeDialogueLines(
   lines: DialogueLine[],
   lineOffset: number
-): Promise<{ buffers: Buffer[]; failedLines: number; firstError?: string }> {
+): Promise<{
+  buffers: Buffer[];
+  lineTimings: { index: number; durationMs: number }[];
+  failedLines: number;
+  firstError?: string;
+}> {
   const ttsClient = createTogetherTtsClient();
   const buffers: Buffer[] = [];
+  const lineTimings: { index: number; durationMs: number }[] = [];
   let failedLines = 0;
   let firstError: string | undefined;
 
@@ -949,12 +961,17 @@ async function synthesizeDialogueLines(
         }
       })
     );
-    for (const buffer of batch) {
-      if (buffer) buffers.push(buffer);
-    }
+    batch.forEach((buffer, batchIdx) => {
+      if (!buffer) return;
+      buffers.push(buffer);
+      lineTimings.push({
+        index: lineOffset + i + batchIdx,
+        durationMs: getPcmWavDurationSeconds(buffer) * 1000,
+      });
+    });
   }
 
-  return { buffers, failedLines, firstError };
+  return { buffers, lineTimings, failedLines, firstError };
 }
 
 /**
@@ -993,13 +1010,15 @@ export async function runSynthesizeAudioOverviewChunkPhase(
     }
 
     const startTime = Date.now();
-    const { buffers, failedLines, firstError } = await synthesizeDialogueLines(
+    const { buffers, lineTimings, failedLines, firstError } = await synthesizeDialogueLines(
       synthesisInput.script.slice(range.start, range.end),
       range.start
     );
     let storageId: Id<"_storage"> | undefined;
+    let mp3DurationMs = 0;
     if (buffers.length > 0) {
       const mp3 = encodePcmWavToMp3(concatenateWavBuffers(buffers));
+      mp3DurationMs = getMp3DurationMs(mp3);
       storageId = await ctx.storage.store(new Blob([new Uint8Array(mp3)], { type: "audio/mpeg" }));
       unrecordedStorageId = storageId;
     }
@@ -1018,6 +1037,8 @@ export async function runSynthesizeAudioOverviewChunkPhase(
         failedLines,
         ...(firstError ? { firstError } : {}),
         latencyMs,
+        lineTimings,
+        mp3DurationMs,
       },
     });
     unrecordedStorageId = undefined;
@@ -1141,6 +1162,8 @@ export async function runAssembleAudioOverviewPhase(
 
     // Build transcript
     const transcript = fullDialogueScript.map((l) => l.text).join("\n");
+    const lines = buildTranscriptLines(fullDialogueScript, results);
+    if (!lines) console.log("[AudioJob] No line timings; transcript sync will be estimated");
 
     // Save results. This also deletes the chunk MP3s.
     await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
@@ -1157,6 +1180,7 @@ export async function runAssembleAudioOverviewPhase(
           mapSuccessCount,
           mapFailedCount,
           dialogueLines: successCount,
+          ...(lines ? { lines } : {}),
         },
         {
           ...telemetry,
