@@ -123,6 +123,25 @@ describe("AddSourceDialog", () => {
     expect(screen.queryByRole("button", { name: "Back to add sources" })).not.toBeInTheDocument();
   });
 
+  it("passes the typed title with pasted text", async () => {
+    const onTextUpload = vi.fn().mockResolvedValue(undefined);
+    renderDialog({ onTextUpload });
+    await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Title (optional)" }), " Lecture 3 ");
+    await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "Some notes");
+    await userEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    expect(onTextUpload).toHaveBeenCalledWith("Some notes", "Lecture 3");
+  });
+
+  it("passes an empty title when none is typed, so one is written from the text", async () => {
+    const onTextUpload = vi.fn().mockResolvedValue(undefined);
+    renderDialog({ onTextUpload });
+    await userEvent.click(screen.getByRole("button", { name: "Copied text" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "More notes");
+    await userEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    expect(onTextUpload).toHaveBeenCalledWith("More notes", "");
+  });
+
   it("reopens unblocked after closing mid-submit", async () => {
     const onTextUpload = vi.fn(() => new Promise<void>(() => undefined));
     const { rerenderWith } = renderDialog({ onTextUpload });

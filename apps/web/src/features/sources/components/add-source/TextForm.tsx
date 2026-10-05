@@ -1,19 +1,23 @@
 import type React from "react";
 import { useId, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/shared/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/shared/components/ui/field";
+import { Input } from "@/shared/components/ui/input";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { type StepFormProps, useReportBusy } from "./types";
 
 interface TextFormProps extends StepFormProps {
-  onUpload: (text: string) => Promise<void>;
+  /** `title` is what the user typed; empty means one is written from the text. */
+  onUpload: (text: string, title: string) => Promise<void>;
   isUploading: boolean;
 }
 
 export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFormProps) {
   const [value, setValue] = useState("");
+  const [title, setTitle] = useState("");
   const id = useId();
+  const titleId = useId();
   // Busy blocks closing, so report only this form's own submit: `isUploading` is shared with file
   // uploads started from the menu, which must not trap the user in this step.
   const [submitting, setSubmitting] = useState(false);
@@ -24,7 +28,7 @@ export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFo
     if (!value.trim() || pending) return;
     setSubmitting(true);
     try {
-      await onUpload(value);
+      await onUpload(value, title.trim());
       onDone();
     } catch {
       // useSourceUpload already toasted; keep the step open so the text is not lost.
@@ -49,6 +53,18 @@ export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFo
       }}
     >
       <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={titleId}>Title (optional)</FieldLabel>
+          <Input
+            id={titleId}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            placeholder="e.g. Lecture 3 notes"
+            disabled={pending}
+          />
+          <FieldDescription>Leave blank and a title is written from the text.</FieldDescription>
+        </Field>
         <Field>
           <FieldLabel htmlFor={id}>Text</FieldLabel>
           <Textarea

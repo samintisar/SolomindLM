@@ -201,6 +201,7 @@ import type * as _lib_semanticScholarThrottle from "../_lib/semanticScholarThrot
 import type * as _lib_serviceErrors from "../_lib/serviceErrors.js";
 import type * as _lib_shareToken from "../_lib/shareToken.js";
 import type * as _lib_srsScheduling from "../_lib/srsScheduling.js";
+import type * as _lib_textTitle from "../_lib/textTitle.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
 import type * as _migration_index from "../_migration/index.js";
 import type * as _migration_reembedBatchesWorker from "../_migration/reembedBatchesWorker.js";
@@ -590,6 +591,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/serviceErrors": typeof _lib_serviceErrors;
   "_lib/shareToken": typeof _lib_shareToken;
   "_lib/srsScheduling": typeof _lib_srsScheduling;
+  "_lib/textTitle": typeof _lib_textTitle;
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;
   "_migration/index": typeof _migration_index;
   "_migration/reembedBatchesWorker": typeof _migration_reembedBatchesWorker;
