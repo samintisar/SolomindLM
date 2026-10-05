@@ -9,6 +9,7 @@ import {
   RAG_CHUNK_OVERLAP_TOKENS,
   RAG_CHUNK_SIZE_TOKENS,
 } from "../_lib/embeddingConfig";
+import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
 import { MistralOCRService } from "../_services/extraction/MistralOCRService";
@@ -370,8 +371,22 @@ export const docEmbedding = internalAction({
       } else if (docDetails.fileType === "paper_record") {
         title = (docDetails.fileName || "").trim() || extractedTitle || "Research paper";
       } else {
-        // For text input
-        title = "Pasted Text";
+        // Pasted text: keep a title the user typed, otherwise write one from the text.
+        const typedTitle = userTitleForText(docDetails.fileName);
+        title = typedTitle ?? PASTED_TEXT_TITLE;
+        if (!typedTitle && extractedText.trim()) {
+          try {
+            const generated: string = await ctx.runAction(
+              internal._services.ai.titleGenerator.generateTitle,
+              { chunk: textTitleSource(extractedText) }
+            );
+            if (generated.trim()) title = generated.trim();
+          } catch (error) {
+            logger.warn("Pasted text title generation failed; keeping the placeholder", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
       }
 
       logger.info("Title set", { title });

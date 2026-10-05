@@ -38,7 +38,7 @@ export interface AddSourceDialogProps {
   onFileSelect?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUrlUpload: (urls: string[]) => Promise<void>;
   onVideoUpload: (urls: string[]) => Promise<void>;
-  onTextUpload: (text: string) => Promise<void>;
+  onTextUpload: (text: string, title?: string) => Promise<void>;
   onDiscoverClick: () => void;
   onGoogleDriveClick: () => void;
 }

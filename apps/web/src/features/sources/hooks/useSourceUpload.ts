@@ -45,7 +45,7 @@ interface UseSourceUploadResult {
   // URL/Social/Text upload handlers
   handleUrlUpload: (urls: string[]) => Promise<void>;
   handleSocialMediaUpload: (urls: string[]) => Promise<void>;
-  handleTextUpload: (text: string) => Promise<void>;
+  handleTextUpload: (text: string, title?: string) => Promise<void>;
 
   // Drag and drop handlers
   handleDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -278,7 +278,7 @@ export function useSourceUpload({
   };
 
   // Text upload handler
-  const handleTextUpload = async (text: string) => {
+  const handleTextUpload = async (text: string, title?: string) => {
     if (!userId || !noteId) {
       showInfo("Please log in and select a notebook before uploading text.");
       return;
@@ -295,7 +295,8 @@ export function useSourceUpload({
         notebookId: noteId,
         type: "text",
         source: text,
-        fileName: "Pasted text",
+        // A blank title keeps the placeholder; processing then writes one from the text.
+        fileName: title?.trim() || "Pasted text",
       });
       onDocumentUploaded?.(result.documentId);
     } catch (err) {

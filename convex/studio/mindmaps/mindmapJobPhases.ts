@@ -29,6 +29,7 @@ import {
 } from "../../_agents/mindmap/prompts";
 import type { ConceptExtraction, FinalMindMap, MindMapNode } from "../../_agents/mindmap/state";
 import { ConceptExtractionSchema } from "../../_agents/mindmap/structuredLlm";
+import { mindMapTitleSource } from "../../_agents/mindmap/title";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -643,10 +644,10 @@ export async function runFinalizeMindMapPhase(
     // Generate title
     let title = finalMindMap.nodeData.topic || "Mind Map";
     try {
-      const titleContent = allExtractions
-        .map((e) => `${e.main_theme}: ${e.summary}`)
-        .join(" ")
-        .substring(0, 2000);
+      const titleContent = mindMapTitleSource(
+        finalMindMap,
+        allExtractions.map((e) => `${e.main_theme}: ${e.summary}`)
+      );
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
         chunk: titleContent,
       });

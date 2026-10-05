@@ -16,7 +16,7 @@ describe("TextForm", () => {
     expect(submit).toBeDisabled();
     await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "notes");
     await userEvent.click(submit);
-    expect(onUpload).toHaveBeenCalledWith("   notes");
+    expect(onUpload).toHaveBeenCalledWith("   notes", "");
     expect(onDone).toHaveBeenCalled();
   });
 
@@ -28,7 +28,7 @@ describe("TextForm", () => {
     );
     await userEvent.type(screen.getByRole("textbox", { name: "Text" }), "notes");
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
-    expect(onUpload).toHaveBeenCalledWith("notes");
+    expect(onUpload).toHaveBeenCalledWith("notes", "");
     expect(onDone).toHaveBeenCalled();
   });
 
