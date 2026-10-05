@@ -7,7 +7,17 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  memo,
+  type RefObject,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +58,8 @@ interface SheetGridProps {
   readOnly: boolean;
   /** Called with the next grid after any edit. The parent owns the grid. */
   onChange: (next: Grid) => void;
+  /** Test hook: called each time a body row renders, to prove only changed rows re-render. */
+  onRowRender?: (row: number) => void;
 }
 
 interface CellPosition {
@@ -60,30 +72,167 @@ interface CellEdit extends CellPosition {
   original: string;
 }
 
-/** Where the selection goes when an edit ends. */
-type EditExit = "stay" | "down" | "right" | "left";
+/**
+ * How an edit ended. Enter, Tab and Escape move the selection; a blur leaves it alone, because the
+ * click that caused the blur is about to choose a cell itself.
+ */
+type EditExit = "blur" | "cancel" | "down" | "right" | "left";
 
 /**
- * What happens to focus once a column menu has closed: back to the grid, left alone (a dialog took
- * it), or into a header edit. An edit waits for the close because the open menu traps focus.
+ * What happens to focus once a column menu has closed: back to the grid (the default), left alone
+ * (a dialog took it, or the user clicked elsewhere), or into a header edit. An edit waits for the
+ * close because the open menu traps focus.
  */
 type MenuExit = "grid" | "keep" | CellEdit | null;
 
+/** Stable entry points the memoised rows call; they always run the latest render's logic. */
+interface SheetActions {
+  cellClick: (row: number, col: number) => void;
+  cellDoubleClick: (row: number, col: number) => void;
+  draftChange: (draft: string) => void;
+  editorKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  editorBlur: () => void;
+}
+
 const cellKey = (row: number, col: number) => `${row}:${col}`;
+const cellId = (prefix: string, row: number, col: number) => `${prefix}-r${row}-c${col}`;
 
 /** The header's text, or the placeholder name an empty header shows. */
 function headerLabel(grid: Grid, col: number): string {
   return grid[0]?.[col] || `Column ${col + 1}`;
 }
 
+interface CellEditorProps {
+  edit: CellEdit;
+  label: string;
+  numeric: boolean;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  actions: SheetActions;
+}
+
+/** The in-place editor: a textarea, because cells may hold line breaks. */
+function CellEditor({ edit, label, numeric, textareaRef, actions }: CellEditorProps) {
+  return (
+    <textarea
+      ref={textareaRef}
+      rows={1}
+      aria-label={label}
+      value={edit.draft}
+      onChange={(event) => actions.draftChange(event.target.value)}
+      onKeyDown={actions.editorKeyDown}
+      onBlur={actions.editorBlur}
+      className={cn(
+        "block w-full resize-none rounded-sm bg-card px-3 py-2 shadow-md ring-2 ring-primary ring-inset outline-hidden field-sizing-content",
+        numeric && "text-right tabular-nums"
+      )}
+    />
+  );
+}
+
+interface SheetRowProps {
+  row: number;
+  cells: readonly string[];
+  idPrefix: string;
+  numericColumns: readonly boolean[];
+  /** The selected column when the selection is in this row. */
+  selectedCol: number | null;
+  /** The edit when it is in this row. */
+  edit: CellEdit | null;
+  /** The editor's accessible name; empty unless this row is being edited. */
+  editLabel: string;
+  /** Comma-separated columns whose cells are flashing; empty when none. */
+  flashCols: string;
+  trailingCell: boolean;
+  actions: SheetActions;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  onRender?: (row: number) => void;
+}
+
+/**
+ * One body row. Memoised on primitive or stable props, so moving the selection re-renders only the
+ * old and new rows and typing re-renders only the row being edited, even at 2,000 × 50 cells.
+ */
+const SheetRow = memo(function SheetRow({
+  row,
+  cells,
+  idPrefix,
+  numericColumns,
+  selectedCol,
+  edit,
+  editLabel,
+  flashCols,
+  trailingCell,
+  actions,
+  textareaRef,
+  onRender,
+}: SheetRowProps) {
+  onRender?.(row);
+  const flashing = flashCols === "" ? [] : flashCols.split(",").map(Number);
+  return (
+    <tr role="row">
+      <th
+        scope="row"
+        role="rowheader"
+        className="sticky left-0 z-10 border-r border-b border-hairline bg-muted px-2 text-center font-sans text-xs text-muted-foreground tabular-nums"
+      >
+        {row}
+      </th>
+      {cells.map((value, col) => {
+        const isSelected = selectedCol === col;
+        const isEditing = edit !== null && edit.col === col;
+        return (
+          <td
+            // Columns have no identity beyond their position.
+            key={col}
+            id={cellId(idPrefix, row, col)}
+            role="gridcell"
+            aria-selected={isSelected}
+            data-cell={cellKey(row, col)}
+            onClick={() => actions.cellClick(row, col)}
+            onDoubleClick={() => actions.cellDoubleClick(row, col)}
+            className={cn(
+              "border-r border-b border-hairline p-0 align-top transition-colors duration-700 ease-out last:border-r-0",
+              flashing.includes(col) && "bg-success-muted"
+            )}
+          >
+            {isEditing ? (
+              <CellEditor
+                edit={edit}
+                label={editLabel}
+                numeric={numericColumns[col] ?? false}
+                textareaRef={textareaRef}
+                actions={actions}
+              />
+            ) : (
+              <div
+                className={cn(
+                  "min-h-9 max-w-80 min-w-28 px-3 py-2 whitespace-pre-wrap",
+                  numericColumns[col] && "text-right tabular-nums",
+                  isSelected && "rounded-sm ring-2 ring-primary ring-inset"
+                )}
+              >
+                {value}
+              </div>
+            )}
+          </td>
+        );
+      })}
+      {trailingCell && <td className="border-b border-hairline" />}
+    </tr>
+  );
+});
+
 /**
  * The editable spreadsheet: a sticky header with a menu per column, sticky row numbers, and cells
- * edited in place. Keys are handled on the grid element and its editor, never on `window`, so the
+ * edited in place. It follows the ARIA grid pattern: the grid is one tab stop, the arrows move
+ * the selection (announced through `aria-activedescendant`), and Shift+F10 opens the selected
+ * column's menu. Keys are handled on the grid element and its editor, never on `window`, so the
  * notebook's hidden second Studio panel never reacts.
  */
-export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
+export function SheetGrid({ grid, readOnly, onChange, onRowRender }: SheetGridProps) {
   const width = columnCount(grid);
   const lastRow = grid.length - 1;
+  const idPrefix = useId();
 
   const gridRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -94,12 +243,19 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
   const [flashing, setFlashing] = useState<ReadonlySet<string>>(() => new Set());
   const flashTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [menuCol, setMenuCol] = useState<number | null>(null);
   const menuExit = useRef<MenuExit>(null);
 
-  const numericColumns = useMemo(
-    () => Array.from({ length: columnCount(grid) }, (_, col) => isNumericColumn(grid, col)),
+  // Keyed by content, so an edit that leaves every column's kind alone keeps the same array and the
+  // memoised rows don't all re-render.
+  const numericKey = useMemo(
+    () =>
+      Array.from({ length: columnCount(grid) }, (_, col) =>
+        isNumericColumn(grid, col) ? "1" : "0"
+      ).join(""),
     [grid]
   );
+  const numericColumns = useMemo(() => [...numericKey].map((flag) => flag === "1"), [numericKey]);
 
   const inBounds = (pos: CellPosition | null) =>
     pos !== null && pos.row <= lastRow && pos.col < width ? pos : null;
@@ -179,7 +335,7 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
     return { row, col: direction === 1 ? 0 : width - 1 };
   };
 
-  const endEdit = (commit: boolean, exit: EditExit, refocus: boolean) => {
+  const endEdit = (commit: boolean, exit: EditExit) => {
     const current = editingRef.current;
     if (!current) return;
     setEdit(null);
@@ -187,17 +343,16 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
       onChange(setCell(grid, current.row, current.col, current.draft));
       if (current.row > 0) flash(current.row, current.col);
     }
-    if (exit !== "stay" || current.row === 0) {
-      let next: CellPosition = { row: current.row, col: current.col };
-      if (exit === "down") next = { row: Math.min(current.row + 1, lastRow), col: current.col };
-      if (exit === "right" || exit === "left") {
-        next = step(current, exit === "right" ? 1 : -1) ?? next;
-      }
-      // A header edit hands the selection to the first body row; the arrows never reach the header.
-      if (next.row === 0) next = { row: 1, col: next.col };
-      setSelected(next.row <= lastRow ? next : null);
+    if (exit === "blur") return;
+    let next: CellPosition = { row: current.row, col: current.col };
+    if (exit === "down") next = { row: Math.min(current.row + 1, lastRow), col: current.col };
+    if (exit === "right" || exit === "left") {
+      next = step(current, exit === "right" ? 1 : -1) ?? next;
     }
-    if (refocus) focusGrid();
+    // A header edit hands the selection to the first body row; the arrows never reach the header.
+    if (next.row === 0) next = { row: 1, col: next.col };
+    setSelected(next.row <= lastRow ? next : null);
+    focusGrid();
   };
 
   const handleCellClick = (row: number, col: number) => {
@@ -209,6 +364,51 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
     setSelected({ row, col });
     focusGrid();
   };
+
+  const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    // 229 is the keyCode browsers report for keys an IME is still composing.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      endEdit(true, "down");
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      event.stopPropagation();
+      endEdit(true, event.shiftKey ? "left" : "right");
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      endEdit(false, "cancel");
+    }
+  };
+
+  // The rows get stable callbacks that forward to this render's handlers, so they stay memoised.
+  const latest = useRef<SheetActions | null>(null);
+  useLayoutEffect(() => {
+    latest.current = {
+      cellClick: handleCellClick,
+      cellDoubleClick: (row, col) => {
+        if (!(edit && edit.row === row && edit.col === col)) startEdit(row, col);
+      },
+      draftChange: (draft) => {
+        const current = editingRef.current;
+        if (current) setEdit({ ...current, draft });
+      },
+      editorKeyDown: handleEditorKeyDown,
+      editorBlur: () => endEdit(true, "blur"),
+    };
+  });
+  const actions = useMemo<SheetActions>(
+    () => ({
+      cellClick: (row, col) => latest.current?.cellClick(row, col),
+      cellDoubleClick: (row, col) => latest.current?.cellDoubleClick(row, col),
+      draftChange: (draft) => latest.current?.draftChange(draft),
+      editorKeyDown: (event) => latest.current?.editorKeyDown(event),
+      editorBlur: () => latest.current?.editorBlur(),
+    }),
+    []
+  );
 
   const handleGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     // Keys from the editor, the menus (portalled, but React bubbles through portals) and the buttons
@@ -253,7 +453,10 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
     }
 
     if (readOnly) return;
-    if (key === "Enter" || key === "F2") {
+    if ((key === "F10" && event.shiftKey) || key === "ContextMenu") {
+      event.preventDefault();
+      setMenuCol(col);
+    } else if (key === "Enter" || key === "F2") {
       event.preventDefault();
       startEdit(row, col);
     } else if (key === "Delete" || key === "Backspace") {
@@ -265,23 +468,6 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
     } else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       startEdit(row, col, key);
-    }
-  };
-
-  const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.nativeEvent.isComposing) return;
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      event.stopPropagation();
-      endEdit(true, "down", true);
-    } else if (event.key === "Tab") {
-      event.preventDefault();
-      event.stopPropagation();
-      endEdit(true, event.shiftKey ? "left" : "right", true);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      endEdit(false, "stay", true);
     }
   };
 
@@ -315,34 +501,22 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
   const filledCells = (col: number) =>
     grid.slice(1).filter((cells) => (cells[col] ?? "").trim() !== "").length;
 
-  const renderEditor = (current: CellEdit) => {
-    const label =
-      current.row === 0
-        ? `Rename column ${headerLabel(grid, current.col)}`
-        : `Edit ${headerLabel(grid, current.col)}, row ${current.row}`;
-    return (
-      <textarea
-        ref={textareaRef}
-        rows={1}
-        aria-label={label}
-        value={current.draft}
-        onChange={(event) => setEdit({ ...current, draft: event.target.value })}
-        onKeyDown={handleEditorKeyDown}
-        onBlur={() => endEdit(true, "stay", false)}
-        className={cn(
-          "block w-full resize-none rounded-sm bg-card px-3 py-2 shadow-md ring-2 ring-primary ring-inset outline-hidden field-sizing-content",
-          current.row > 0 && numericColumns[current.col] && "text-right tabular-nums"
-        )}
-      />
-    );
-  };
-
   const renderHeader = (col: number) => {
     const text = grid[0][col];
     const label = (
       <span className={cn("truncate", text === "" && "italic")}>{headerLabel(grid, col)}</span>
     );
-    if (edit && edit.row === 0 && edit.col === col) return renderEditor(edit);
+    if (edit && edit.row === 0 && edit.col === col) {
+      return (
+        <CellEditor
+          edit={edit}
+          label={`Rename column ${headerLabel(grid, col)}`}
+          numeric={false}
+          textareaRef={textareaRef}
+          actions={actions}
+        />
+      );
+    }
     if (readOnly) {
       return (
         <span className="flex px-3 py-2 font-sans text-xs font-semibold text-muted-foreground">
@@ -352,10 +526,12 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
     }
     const numeric = numericColumns[col];
     return (
-      <DropdownMenu>
+      <DropdownMenu open={menuCol === col} onOpenChange={(open) => setMenuCol(open ? col : null)}>
+        {/* Not a tab stop: the grid is one, and Shift+F10 opens this menu from a selected cell. */}
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            tabIndex={-1}
             className="flex w-full items-center gap-1.5 px-3 py-2 font-sans text-xs font-semibold text-muted-foreground outline-hidden hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           >
             {label}
@@ -364,31 +540,23 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
+          onInteractOutside={() => {
+            menuExit.current = "keep";
+          }}
           onCloseAutoFocus={(event) => {
-            const exit = menuExit.current;
+            const exit = menuExit.current ?? "grid";
             menuExit.current = null;
-            if (exit === null) return;
             event.preventDefault();
             if (exit === "grid") focusGrid();
             else if (exit !== "keep") setEdit(exit);
           }}
         >
           <DropdownMenuGroup>
-            <DropdownMenuItem
-              onSelect={() => {
-                menuExit.current = "grid";
-                handleSort(col, "asc");
-              }}
-            >
+            <DropdownMenuItem onSelect={() => handleSort(col, "asc")}>
               <ArrowDownAZ />
               {numeric ? "Sort smallest first" : "Sort A → Z"}
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                menuExit.current = "grid";
-                handleSort(col, "desc");
-              }}
-            >
+            <DropdownMenuItem onSelect={() => handleSort(col, "desc")}>
               <ArrowDownZA />
               {numeric ? "Sort largest first" : "Sort Z → A"}
             </DropdownMenuItem>
@@ -419,7 +587,6 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
                   menuExit.current = "keep";
                   setPendingDelete(col);
                 } else {
-                  menuExit.current = "grid";
                   removeColumn(col);
                 }
               }}
@@ -433,6 +600,12 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
     );
   };
 
+  const flashByRow = new Map<number, number[]>();
+  for (const key of flashing) {
+    const [row, col] = key.split(":").map(Number);
+    flashByRow.set(row, [...(flashByRow.get(row) ?? []), col]);
+  }
+
   const columns = Array.from({ length: width }, (_, col) => col);
   const deleting = pendingDelete !== null && pendingDelete < width ? pendingDelete : null;
   const deletingCount = deleting === null ? 0 : filledCells(deleting);
@@ -445,6 +618,8 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
       aria-rowcount={grid.length}
       aria-colcount={width + 1}
       aria-readonly={readOnly || undefined}
+      aria-activedescendant={selection ? cellId(idPrefix, selection.row, selection.col) : undefined}
+      aria-keyshortcuts={readOnly ? undefined : "Shift+F10"}
       tabIndex={0}
       onKeyDown={handleGridKeyDown}
       className="relative min-h-0 flex-1 overflow-auto rounded-xl bg-card shadow-xs ring-1 ring-hairline outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
@@ -470,6 +645,7 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  tabIndex={-1}
                   aria-label="Add column"
                   onClick={() => setEdit(insertColumnAfter(width - 1))}
                 >
@@ -482,56 +658,29 @@ export function SheetGrid({ grid, readOnly, onChange }: SheetGridProps) {
         <tbody>
           {grid.slice(1).map((cells, index) => {
             const row = index + 1;
+            const rowEdit = edit !== null && edit.row === row ? edit : null;
             return (
               // A row has no identity beyond its position, so a sort re-renders rows in place.
-              <tr key={row} role="row">
-                <th
-                  scope="row"
-                  role="rowheader"
-                  className="sticky left-0 z-10 border-r border-b border-hairline bg-muted px-2 text-center font-sans text-xs text-muted-foreground tabular-nums"
-                >
-                  {row}
-                </th>
-                {columns.map((col) => {
-                  const isSelected = selection?.row === row && selection.col === col;
-                  const isEditing = edit?.row === row && edit.col === col;
-                  return (
-                    <td
-                      key={col}
-                      role="gridcell"
-                      aria-selected={isSelected}
-                      data-cell={cellKey(row, col)}
-                      onClick={() => handleCellClick(row, col)}
-                      onDoubleClick={() => {
-                        if (!isEditing) startEdit(row, col);
-                      }}
-                      className={cn(
-                        "border-r border-b border-hairline p-0 align-top transition-colors duration-700 ease-out last:border-r-0",
-                        flashing.has(cellKey(row, col)) && "bg-success-muted"
-                      )}
-                    >
-                      {isEditing && edit ? (
-                        renderEditor(edit)
-                      ) : (
-                        <div
-                          className={cn(
-                            "min-h-9 max-w-80 min-w-28 px-3 py-2 whitespace-pre-wrap",
-                            numericColumns[col] && "text-right tabular-nums",
-                            isSelected && "rounded-sm ring-2 ring-primary ring-inset"
-                          )}
-                        >
-                          {cells[col]}
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
-                {!readOnly && <td className="border-b border-hairline" />}
-              </tr>
+              <SheetRow
+                key={row}
+                row={row}
+                cells={cells}
+                idPrefix={idPrefix}
+                numericColumns={numericColumns}
+                selectedCol={selection?.row === row ? selection.col : null}
+                edit={rowEdit}
+                editLabel={rowEdit ? `Edit ${headerLabel(grid, rowEdit.col)}, row ${row}` : ""}
+                flashCols={flashByRow.get(row)?.join(",") ?? ""}
+                trailingCell={!readOnly}
+                actions={actions}
+                textareaRef={textareaRef}
+                onRender={onRowRender}
+              />
             );
           })}
           {!readOnly && (
-            <tr role="row">
+            // Not a grid row: aria-rowcount counts the header and the data rows only.
+            <tr role="presentation">
               <td colSpan={width + 2} className="p-1">
                 <div className="sticky left-1 w-fit">
                   <Button variant="ghost" size="sm" onClick={handleAddRow}>
