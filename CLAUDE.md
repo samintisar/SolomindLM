@@ -100,7 +100,7 @@ bun install                    # Install dependencies
 bun run dev                    # All dev servers (workspace)
 bun run dev:web                # Web dev server on :5173 (auto-kills stale port)
 bun run dev:mobile             # Expo mobile dev server
-bun x convex dev               # Convex dev backend (separate terminal)
+bun run dev:convex             # Convex dev watcher (separate terminal); one per dev deployment across worktrees
 ```
 
 **Build & typecheck** (typechecks must run separately — cannot parallelize):
@@ -237,6 +237,7 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
 - **Port management:** `bun run dev:web` kills stale :5173 via `kill-port`.
 - **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
 - **Reranking is best-effort.** `cachedRerank` (`convex/_agents/chat/rerankCache.ts`) calls Voyage through `callVoyageRerank` with one hard `RERANK_TIMEOUT_MS` deadline and no retries except a single one after a 429 with a short `Retry-After`; on any failure chat and literature review fall back to the un-reranked order instead of stalling (a provider outage answering `Retry-After: 86400` once hung every chat reply). Change the model in `convex/_lib/rerankConfig.ts` and bump the cache `name` in `rerankCache.ts` so old-model scores are not served. Voyage scores are not calibrated like the previous reranker's: passages unrelated to the query score ~0.25-0.29 (p99 0.31) and useful ones mostly 0.5-0.94, so `CHAT_MIN_RELEVANCE_THRESHOLD` is 0.35 (re-tuned 2026-10-04 on 61 chat fixtures; see ADR 0002). Chat reranks the whole candidate pool (`createRerankFn` in `convex/chat/_streamSearch.ts`) so every chunk is on Voyage's scale; don't reintroduce a top-N cut there, or unscored chunks keep their vector similarity (~0.5) and slip past the floor. Re-run the sweep if the model changes.
+- **One `convex dev` watcher per dev deployment.** Every worktree's `.env.local` points at the same cloud dev deployment, and each watcher pushes its own checkout's functions on save, so two watchers overwrite each other. `bun run dev:convex` (`scripts/convex-dev.ts`) refuses to start a second watcher while another checkout holds the lock (in the shared git dir, `convex-dev/`); push from other worktrees with `bun run dev:convex --once`. `--force` takes over a stale lock. Local/anonymous deployments aren't locked. Plain `bun x convex dev` bypasses the guard.
 - **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.
 
 ## Process Skills (superpowers)
