@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
+import { openStudioPanel } from "../helpers/navigation";
 import { firstStudioNoteCard, openStudioTool } from "../helpers/studio-assertions";
 import { seedPastedTextSourceForStudio } from "../helpers/studio-seed";
 
@@ -72,5 +73,42 @@ test.describe("Spreadsheet Generation", () => {
     await expect(noteEl).not.toHaveAttribute("aria-busy", "true", { timeout: completionBudgetMs });
     await expect(noteEl.locator('[data-slot="note-title"]')).toBeVisible();
     await expect(noteEl).not.toHaveAttribute("aria-busy", "true");
+  });
+
+  test("edits a cell and keeps it after a reload", async ({ notebookPage }) => {
+    test.skip(shouldSkipAITests(), "Requires AI LLM for spreadsheet generation");
+    const completionBudgetMs = 600_000;
+    test.setTimeout(completionBudgetMs + 60_000);
+
+    const page = notebookPage;
+    const { card: noteEl } = await createSpreadsheet(page);
+    await expect(noteEl).not.toHaveAttribute("aria-busy", "true", { timeout: completionBudgetMs });
+
+    // The notebook mounts two Studio panels, so only look at the grid that is on screen.
+    const visibleGrid = () =>
+      page.getByRole("grid", { name: "Spreadsheet" }).filter({ visible: true });
+
+    await noteEl.click();
+    const firstCell = visibleGrid().getByRole("gridcell").first();
+    await expect(firstCell).toBeVisible({ timeout: 15_000 });
+
+    // The first click selects the cell, the second opens the editor.
+    await firstCell.click();
+    await firstCell.click();
+    const editor = visibleGrid().getByRole("textbox", { name: /^Edit .+, row \d+$/ });
+    const value = `e2e-${Date.now()}`;
+    await editor.fill(value);
+    await editor.press("Enter");
+
+    await expect(page.getByRole("status").filter({ hasText: /Saved\s*·\s*Edited/ })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.reload();
+    await openStudioPanel(page);
+    await firstStudioNoteCard(page).click();
+    await expect(visibleGrid().getByRole("gridcell", { name: value })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });
