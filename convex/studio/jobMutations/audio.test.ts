@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { internal } from "../../_generated/api";
 import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema";
-import { buildTranscriptLines } from "../audio/transcriptLines";
+import { buildTranscriptLines } from "../audio/synthesisChunks";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(

@@ -49,7 +49,7 @@
 | File | Change | Responsibility |
 |---|---|---|
 | `convex/_services/ai/mp3.ts` (+ `mp3.test.ts`) | Modify | `getMp3DurationMs(buffer)`: decoded length from MPEG audio frame headers |
-| `convex/studio/audio/transcriptLines.ts` (+ `.test.ts`) | Create | `buildTranscriptLines(script, chunkResults)`: pure offsets builder |
+| `convex/studio/audio/synthesisChunks.ts` (+ `.test.ts`) | Modify | `buildTranscriptLines(script, chunkResults)`: pure offsets builder. It lives in this existing module because a new file under `convex/` would need `npx convex codegen` against a deployment. |
 | `convex/studio/jobMutations/audio.ts` | Modify | Chunk result validator gains optional `lineTimings` and `mp3DurationMs` |
 | `convex/studio/audio/audioJobPhases.ts` | Modify | Chunk phase records timings; assemble phase saves `metadata.lines` |
 | `convex/studio/jobMutations/audio.test.ts` (create or extend) | Test | `saveAudioOverviewResults` keeps `metadata.lines` and drops the synthesis scratch |

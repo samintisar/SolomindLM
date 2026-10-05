@@ -60,8 +60,7 @@ import { concatenateWavBuffers, getPcmWavDurationSeconds } from "../../_services
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
-import { planSynthesisChunks } from "./synthesisChunks";
-import { buildTranscriptLines } from "./transcriptLines";
+import { buildTranscriptLines, planSynthesisChunks } from "./synthesisChunks";
 
 // ============================================================
 // CONFIGURATION
