@@ -170,7 +170,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           <button
             type="button"
             onClick={onClick}
-            className="group flex min-w-0 flex-1 items-start gap-3 p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            className="group flex min-w-0 flex-1 items-start gap-3 rounded-l-2xl p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             <NoteIcon note={note} popped={justFinished} />
             <span className="min-w-0 flex-1">
@@ -200,7 +200,13 @@ export const NoteItem: React.FC<NoteItemProps> = ({
               <Play className="fill-current text-studio-audio" />
             </Button>
           ) : null}
-          <DropdownMenu modal={false}>
+          <DropdownMenu
+            modal={false}
+            onOpenChange={(open) => {
+              // Reopened during the exit animation: onCloseAutoFocus never ran, so drop the stale request.
+              if (open) renameRequestedRef.current = false;
+            }}
+          >
             <DropdownMenuTrigger asChild>
               <Button
                 ref={triggerRef}

@@ -126,6 +126,14 @@ describe("NoteItem", () => {
     expect(screen.getByRole("button", { name: "More options" })).toHaveFocus();
   });
 
+  it("does not start a rename when the menu is dismissed with Escape", async () => {
+    const h = renderItem(note());
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
+    await userEvent.keyboard("{Escape}");
+    expect(h.onEditStart).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "More options" })).toHaveFocus();
+  });
+
   it("keeps the menu on a generating row", () => {
     renderItem(note({ status: "generating", metadata: {} }));
     expect(screen.getByRole("button", { name: "More options" })).toBeInTheDocument();
