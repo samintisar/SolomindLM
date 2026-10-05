@@ -1,5 +1,6 @@
 import { PenTool, Search } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shared/components/ui/input-group";
 import { Note, StudioTool } from "@/shared/types/index";
 import { NoteItem } from "./NoteItem";
 import { ToolGrid } from "./ToolGrid";
@@ -41,7 +42,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   onEditCancel,
   onEditKeyDown,
 }) => {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredNotes = useMemo(() => {
@@ -49,19 +49,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
     if (!q) return notes;
     return notes.filter((note) => note.title.toLowerCase().includes(q));
   }, [notes, searchQuery]);
-
-  // Handle click outside to close menus (portal menu has data-note-item-menu so clicks on Rename/Delete count as inside)
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      const insideMenu = target.closest(".kebab-menu") || target.closest("[data-note-item-menu]");
-      if (activeMenuId && !insideMenu) {
-        setActiveMenuId(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [activeMenuId]);
 
   return (
     <div className="p-4 space-y-8">
@@ -73,16 +60,18 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
             Saved
           </h3>
         </div>
-        <div className="relative flex items-center">
-          <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none shrink-0" />
-          <input
-            type="text"
+        <InputGroup>
+          <InputGroupAddon>
+            <Search />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            aria-label="Search notes"
+            placeholder="Search notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search notes..."
-            className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring font-serif shadow-xs"
           />
-        </div>
+        </InputGroup>
         <div className="flex flex-col gap-2">
           {notes.length > 0 && (
             <div className="text-xs text-muted-foreground px-1 mb-1 font-sans">
@@ -104,9 +93,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                 onClick={() => onNoteClick(note)}
                 onDelete={() => onDeleteNote(note)}
                 onPlayAudio={onPlayAudio}
-                isMenuOpen={activeMenuId === note.id}
-                onMenuToggle={() => setActiveMenuId(activeMenuId === note.id ? null : note.id)}
-                onMenuClose={() => setActiveMenuId(null)}
               />
             ))}
             {filteredNotes.length === 0 && (

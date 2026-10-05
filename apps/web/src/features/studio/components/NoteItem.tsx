@@ -1,9 +1,24 @@
 import { MoreVertical, Pencil, Play, Trash2 } from "lucide-react";
 import React, { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { isAudioNote, isAudioOverviewNote, Note } from "@/shared/types/index";
-import { useAnchoredPosition } from "@/shared/ui/anchoredPosition";
-import { getStudioGeneratingListLines } from "../utils/studioGenerationLabels";
+import { Button } from "@/shared/components/ui/button";
+import { Card } from "@/shared/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { Input } from "@/shared/components/ui/input";
+import { Progress } from "@/shared/components/ui/progress";
+import { isAudioNote, isAudioOverviewNote, type Note } from "@/shared/types/index";
+import { cn } from "@/shared/utils/cn";
+import { useJustFinished } from "../hooks/useJustFinished";
+import { studioTypeStyle } from "../studioTypeStyle";
+import {
+  getStudioGeneratingListLines,
+  type StudioGeneratingListLines,
+} from "../utils/studioGenerationLabels";
 import { NoteIcon } from "./NoteIcon";
 
 interface NoteItemProps {
@@ -18,14 +33,42 @@ interface NoteItemProps {
   onClick: () => void;
   onDelete: () => void;
   onPlayAudio?: (note: Note) => void;
-  isMenuOpen: boolean;
-  onMenuToggle: () => void;
-  onMenuClose: () => void;
+}
+
+/** Step text, percentage and progress bar for a generating row. The step text rolls in as it changes. */
+function GeneratingStatus({
+  lines,
+  preview,
+}: {
+  lines: StudioGeneratingListLines;
+  preview: string;
+}) {
+  return (
+    <div className="mt-2 min-w-0 space-y-2">
+      {preview ? (
+        <p className="truncate font-serif text-sm leading-snug text-muted-foreground">{preview}</p>
+      ) : null}
+      <div className="flex min-w-0 items-baseline justify-between gap-2">
+        <p
+          key={lines.primary}
+          className="min-w-0 flex-1 truncate font-serif text-xs leading-snug text-foreground animate-in fade-in slide-in-from-bottom-1 duration-300"
+        >
+          {lines.primary}
+        </p>
+        {lines.progressPercent !== null ? (
+          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+            {lines.progressPercent}%
+          </span>
+        ) : null}
+      </div>
+      <Progress value={lines.progressPercent} size="sm" glint aria-label="Generation progress" />
+    </div>
+  );
 }
 
 /**
- * NoteItem component renders an individual note card in the notes list.
- * Includes icon, title with inline editing, status badge, and action menu.
+ * One Saved row: type tile, title (inline rename) and preview, plus play and a ⋮ menu.
+ * While generating, a Sheen in the type colour sweeps across it; when it finishes it glows once.
  */
 export const NoteItem: React.FC<NoteItemProps> = ({
   note,
@@ -39,27 +82,19 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   onClick,
   onDelete,
   onPlayAudio,
-  isMenuOpen,
-  onMenuToggle,
-  onMenuClose,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  // Portaled so the sidebar's overflow-y-auto doesn't clip it; flips upward for bottom rows.
-  const { style: menuStyle } = useAnchoredPosition(menuButtonRef, menuRef, isMenuOpen, {
-    side: "bottom",
-    align: "end",
-  });
+  // Set when "Rename" is picked, so the menu's close doesn't pull focus back from the title input.
+  const renameRequestedRef = useRef(false);
+  const justFinished = useJustFinished(note.status);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (isEditing) inputRef.current?.focus();
   }, [isEditing]);
 
   const isGenerating = note.status === "generating";
   const generatingLines = isGenerating ? getStudioGeneratingListLines(note) : null;
+  const { toneClass } = studioTypeStyle(note);
 
   const canPlayInline =
     Boolean(onPlayAudio) &&
@@ -68,152 +103,125 @@ export const NoteItem: React.FC<NoteItemProps> = ({
       (note.type === "audio" && isAudioNote(note) && Boolean(note.metadata.audioUrl?.trim())));
 
   return (
-    <div
+    <Card
+      variant={isGenerating ? "flush" : "interactive"}
       data-testid="studio-note-card"
-      onClick={() => {
-        if (!isGenerating) onClick();
-      }}
-      aria-busy={isGenerating ? true : undefined}
-      aria-label={
-        isGenerating && generatingLines ? `${note.title}, ${generatingLines.primary}` : undefined
-      }
-      className={`relative rounded-sm border border-border p-3 overflow-hidden transition-[box-shadow,transform] duration-300 ${
-        isGenerating
-          ? "cursor-not-allowed bg-card/95 shadow-sm"
-          : "bg-card shadow-sm hover:shadow-md cursor-pointer group"
-      }`}
+      aria-busy={isGenerating || undefined}
+      className="relative"
     >
-      <div className="flex justify-between items-start gap-3">
-        <div className="flex-1 flex gap-3 min-w-0">
-          <NoteIcon note={note} />
-          <div className="flex-1 min-w-0">
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                value={editTitle}
-                onChange={(e) => onEditTitleChange(e.target.value)}
-                onBlur={onEditSave}
-                onKeyDown={onEditKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full bg-transparent border-b border-primary text-sm font-bold text-foreground font-serif focus:outline-none mb-1 p-0 rounded-none"
-                aria-label="Edit note title"
-              />
-            ) : (
-              <h4
-                className={`text-sm font-bold text-foreground font-serif truncate leading-tight transition-colors ${
-                  isGenerating ? "mb-0" : "mb-1 group-hover:text-primary"
-                }`}
-              >
+      {isGenerating ? (
+        <span
+          aria-hidden
+          className={cn("studio-sheen pointer-events-none absolute inset-0", toneClass)}
+        />
+      ) : null}
+      {justFinished ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 animate-studio-glow rounded-2xl ring-2 ring-success/40 ring-inset"
+        />
+      ) : null}
+      <div className="flex items-start gap-2 p-3">
+        {isEditing ? (
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <NoteIcon note={note} />
+            <Input
+              ref={inputRef}
+              aria-label="Edit note title"
+              value={editTitle}
+              onChange={(e) => onEditTitleChange(e.target.value)}
+              onBlur={onEditSave}
+              onKeyDown={onEditKeyDown}
+            />
+          </div>
+        ) : isGenerating && generatingLines ? (
+          <div
+            role="group"
+            aria-label={`${note.title}, ${generatingLines.primary}`}
+            className="flex min-w-0 flex-1 items-start gap-3"
+          >
+            <NoteIcon note={note} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-serif text-sm font-bold leading-tight text-foreground">
                 {note.title}
-              </h4>
-            )}
-            {isGenerating && generatingLines ? (
-              <div className="relative z-1 mt-2 min-w-0 space-y-2">
-                {note.preview ? (
-                  <p className="text-sm leading-snug text-muted-foreground font-serif tracking-normal truncate">
-                    {note.preview}
-                  </p>
-                ) : null}
-                <div className="flex items-baseline justify-between gap-2 min-w-0">
-                  <p className="min-w-0 flex-1 text-xs leading-snug text-foreground font-serif truncate">
-                    {generatingLines.primary}
-                  </p>
-                  {generatingLines.progressPercent !== null ? (
-                    <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-                      {generatingLines.progressPercent}%
-                    </span>
-                  ) : null}
-                </div>
-                {generatingLines.progressPercent !== null ? (
-                  <div
-                    className="relative h-1 w-full overflow-hidden rounded-full bg-muted/80"
-                    role="progressbar"
-                    aria-valuenow={generatingLines.progressPercent}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out motion-reduce:transition-none"
-                      style={{ width: `${generatingLines.progressPercent}%` }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="studio-generating-progress-indeterminate relative h-1 w-full rounded-full bg-muted/80"
-                    aria-hidden
-                  />
+              </p>
+              <GeneratingStatus lines={generatingLines} preview={note.preview} />
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onClick}
+            className="group flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <NoteIcon note={note} popped={justFinished} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-serif text-sm font-bold leading-tight text-foreground transition-colors group-hover:text-primary">
+                {note.title}
+              </span>
+              <span
+                className={cn(
+                  "mt-1 block truncate font-serif text-xs tabular-nums text-muted-foreground",
+                  justFinished && "animate-in fade-in duration-500"
                 )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-                <span className="truncate font-serif tracking-normal tabular-nums">
-                  {note.preview}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="relative flex items-start gap-0.5 shrink-0">
+              >
+                {note.preview}
+              </span>
+            </span>
+          </button>
+        )}
+        <div className="flex shrink-0 items-center gap-0.5">
           {canPlayInline ? (
-            <button
+            <Button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlayAudio?.(note);
-              }}
-              className="text-teal-700/85 hover:text-teal-900 dark:text-teal-400/90 dark:hover:text-teal-300 p-1.5 rounded-md hover:bg-teal-500/10 transition-colors flex items-center justify-center shrink-0"
+              variant="ghost"
+              size="icon-sm"
               aria-label="Play audio overview"
+              onClick={() => onPlayAudio?.(note)}
             >
-              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
-            </button>
+              <Play className="fill-current text-studio-audio" />
+            </Button>
           ) : null}
-          <div className="relative kebab-menu">
-            <button
-              ref={menuButtonRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMenuToggle();
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="More options"
+                title="More options"
+              >
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              data-note-item-menu
+              onCloseAutoFocus={(e) => {
+                if (renameRequestedRef.current) {
+                  renameRequestedRef.current = false;
+                  e.preventDefault();
+                }
               }}
-              className="text-muted-foreground hover:text-foreground p-1 rounded-sm hover:bg-secondary transition-colors flex items-center justify-center shrink-0"
-              aria-label="More options"
-              aria-expanded={isMenuOpen}
             >
-              <MoreVertical className="w-3.5 h-3.5 shrink-0" />
-            </button>
-            {isMenuOpen &&
-              createPortal(
-                <div
-                  ref={menuRef}
-                  data-note-item-menu
-                  className="fixed w-36 bg-popover border border-border shadow-lg rounded-md z-100 py-1 animate-in fade-in zoom-in-95 duration-100"
-                  style={menuStyle}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditStart();
-                      onMenuClose();
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-accent text-popover-foreground flex items-center gap-2"
-                  >
-                    <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete();
-                      onMenuClose();
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
-                  </button>
-                </div>,
-                document.body
-              )}
-          </div>
+              <DropdownMenuItem
+                onSelect={() => {
+                  renameRequestedRef.current = true;
+                  onEditStart();
+                }}
+              >
+                <Pencil />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                <Trash2 />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
