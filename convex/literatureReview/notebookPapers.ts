@@ -127,3 +127,22 @@ export function dropSearchCopiesOfNotebookPapers<
     return !titles.has(`${titleKey(p.title)}|${firstAuthorKey(p.authors)}`);
   });
 }
+
+export type PaperScope = "papers_and_search" | "papers_only";
+
+/**
+ * The review's scope given how many selected sources are papers: searching as well by default,
+ * search only when none are papers. Papers-only with no papers is an error.
+ */
+export function resolvePaperScope(
+  paperCount: number,
+  requested: PaperScope | undefined
+): PaperScope | undefined {
+  if (paperCount === 0) {
+    if (requested === "papers_only") {
+      throw new Error("Select at least one PDF or saved paper to review only your papers.");
+    }
+    return undefined;
+  }
+  return requested ?? "papers_and_search";
+}

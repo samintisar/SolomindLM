@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
+import { loadNotebookPaperDocuments } from "./db";
 import {
   RANKED_PAPER_SNAPSHOT_ABSTRACT_MAX_CHARS,
   RANKED_PAPERS_SNAPSHOT_MAX_COUNT,
@@ -849,5 +850,39 @@ describe("notebook papers in drafts and tables", () => {
     expect(citation?.sourceApi).toBe("notebook");
     expect(citation?.documentId).toBe(documentId);
     expect(table?.papers[0].offTopicReason).toBe("Studies diabetes, not depression.");
+  });
+});
+
+describe("loadNotebookPaperDocuments", () => {
+  test("keeps only this notebook's finished PDFs and saved papers", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const otherNotebookId = await seedNotebook(t, userId);
+    const doc = (fields: Record<string, unknown>) =>
+      t.run(async (ctx) =>
+        ctx.db.insert("documents", {
+          userId,
+          notebookId,
+          status: "completed",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          ...fields,
+        } as never)
+      );
+    const pdf = await doc({ fileName: "paper.pdf", fileType: "file" });
+    const record = await doc({ fileName: "Saved paper", fileType: "paper_record" });
+    const pasted = await doc({ fileName: "Pasted text", fileType: "text" });
+    const processing = await doc({ fileName: "late.pdf", fileType: "file", status: "processing" });
+    const elsewhere = await doc({
+      fileName: "other.pdf",
+      fileType: "file",
+      notebookId: otherNotebookId,
+    });
+
+    const loaded = await t.run(async (ctx) =>
+      loadNotebookPaperDocuments(ctx, notebookId, [pdf, record, pasted, processing, elsewhere])
+    );
+    expect(loaded.map((d) => d._id).sort()).toEqual([pdf, record].sort());
   });
 });

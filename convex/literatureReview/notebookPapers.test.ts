@@ -5,6 +5,7 @@ import {
   NOTEBOOK_PAPER_TEXT_MAX_CHARS,
   notebookPaperFromDocument,
   notebookPaperText,
+  resolvePaperScope,
 } from "./notebookPapers";
 
 const pdf = {
@@ -117,5 +118,23 @@ describe("dropSearchCopiesOfNotebookPapers", () => {
   it("keeps everything when there are no notebook papers", () => {
     const search = [{ title: "Paper C", authors: ["Lee M"] }];
     expect(dropSearchCopiesOfNotebookPapers([], search)).toEqual(search);
+  });
+});
+
+describe("resolvePaperScope", () => {
+  it("searches as well by default when papers are selected", () => {
+    expect(resolvePaperScope(2, undefined)).toBe("papers_and_search");
+    expect(resolvePaperScope(2, "papers_only")).toBe("papers_only");
+  });
+
+  it("falls back to search only when no selected source is a paper", () => {
+    expect(resolvePaperScope(0, undefined)).toBeUndefined();
+    expect(resolvePaperScope(0, "papers_and_search")).toBeUndefined();
+  });
+
+  it("rejects papers-only with no papers", () => {
+    expect(() => resolvePaperScope(0, "papers_only")).toThrow(
+      "Select at least one PDF or saved paper to review only your papers."
+    );
   });
 });
