@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import {
+  isNotebookPaperDocument,
+  NOTEBOOK_PAPER_TEXT_MAX_CHARS,
+  type NotebookDocumentLike,
+  notebookPaperText,
+} from "./notebookPapers.js";
 import { compactPapersForSnapshot } from "./rankedPapersSnapshot.js";
 import {
   alignExtractedDataToColumns,
@@ -26,7 +32,9 @@ const literaturePaperFields = {
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    /** A paper from the user's notebook (#301): included without screening. */
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   doi: v.optional(v.string()),
@@ -34,6 +42,10 @@ const literaturePaperFields = {
   isIncluded: v.optional(v.boolean()),
   includeReason: v.optional(v.string()),
   extractedData: v.optional(v.record(v.string(), v.string())),
+  /** Set for notebook papers: the source document, read server-side for extraction. */
+  documentId: v.optional(v.id("documents")),
+  /** Set when a notebook paper looks off-topic for the question; it is still included. */
+  offTopicReason: v.optional(v.string()),
 };
 
 const literaturePaperValidator = v.object(literaturePaperFields);
@@ -118,6 +130,7 @@ export const insertDraftBatch = internalMutation({
         citationCount: paper.citationCount,
         abstract: paper.abstract,
         citationKey,
+        ...(paper.documentId ? { documentId: paper.documentId } : {}),
       });
 
       // Start with extracted data aligned to column ids (LLM keys often use display names)
@@ -160,6 +173,7 @@ export const insertDraftBatch = internalMutation({
         rowData,
         includeReason: paper.includeReason,
         isIncluded: true,
+        ...(paper.offTopicReason ? { offTopicReason: paper.offTopicReason } : {}),
         batchNumber: args.batchNumber,
         createdAt: now,
       });
@@ -188,6 +202,7 @@ export const persistTable = internalMutation({
       rowData: Record<string, string>;
       includeReason?: string;
       isIncluded: boolean;
+      offTopicReason?: string;
     }> = [];
 
     for (const d of drafts) {
@@ -196,6 +211,7 @@ export const persistTable = internalMutation({
         rowData: d.rowData,
         includeReason: d.includeReason,
         isIncluded: d.isIncluded,
+        ...(d.offTopicReason ? { offTopicReason: d.offTopicReason } : {}),
       });
     }
 
@@ -304,6 +320,7 @@ export const getDraftsBySession = internalQuery({
       rowData: v.record(v.string(), v.string()),
       includeReason: v.optional(v.string()),
       isIncluded: v.boolean(),
+      offTopicReason: v.optional(v.string()),
       batchNumber: v.number(),
     })
   ),
@@ -317,6 +334,7 @@ export const getDraftsBySession = internalQuery({
       rowData: d.rowData,
       includeReason: d.includeReason,
       isIncluded: d.isIncluded,
+      ...(d.offTopicReason ? { offTopicReason: d.offTopicReason } : {}),
       batchNumber: d.batchNumber,
     }));
   },
@@ -330,7 +348,11 @@ export const persistRankedPapers = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const now = Date.now();
-    const snapshot = compactPapersForSnapshot(args.papers).map((p) => ({
+    // Only search results are ranked; notebook papers are never in this snapshot.
+    const searchPapers = args.papers.flatMap((p) =>
+      p.source === "notebook" ? [] : [{ ...p, source: p.source }]
+    );
+    const snapshot = compactPapersForSnapshot(searchPapers).map((p) => ({
       title: p.title,
       authors: p.authors,
       year: p.year,
@@ -397,6 +419,8 @@ export const getCitationsByIds = internalQuery({
       doi: v.optional(v.string()),
       url: v.string(),
       abstract: v.optional(v.string()),
+      /** True for papers from the user's notebook (#301). */
+      fromNotebook: v.boolean(),
     })
   ),
   handler: async (ctx, args) => {
@@ -413,6 +437,7 @@ export const getCitationsByIds = internalQuery({
           doi: citation.doi,
           url: citation.url,
           abstract: citation.abstract,
+          fromNotebook: citation.sourceApi === "notebook",
         });
       }
     }
@@ -710,5 +735,69 @@ export const getSessionReportContext = internalQuery({
       workflowProvenance: session.workflowProvenance ?? {},
       confirmedColumns: session.confirmedColumns,
     };
+  },
+});
+
+/**
+ * The given documents that are papers in this notebook (#301): saved paper records and finished
+ * PDF uploads. Text is cut to the extraction budget so the result stays small.
+ */
+export async function loadNotebookPaperDocuments(
+  ctx: QueryCtx,
+  notebookId: Id<"notebooks">,
+  documentIds: Id<"documents">[]
+): Promise<NotebookDocumentLike[]> {
+  const out: NotebookDocumentLike[] = [];
+  for (const id of [...new Set(documentIds)]) {
+    const doc = await ctx.db.get(id);
+    if (!doc || doc.notebookId !== notebookId) continue;
+    const candidate: NotebookDocumentLike = {
+      _id: doc._id,
+      fileName: doc.fileName,
+      fileType: doc.fileType,
+      status: doc.status,
+      contentType: doc.contentType,
+      fileUrl: doc.fileUrl,
+      paperRecord: doc.paperRecord,
+      sourceGuide: doc.sourceGuide,
+      extractedMarkdown: doc.extractedMarkdown?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
+    };
+    if (isNotebookPaperDocument(candidate)) out.push(candidate);
+  }
+  return out;
+}
+
+const notebookPaperDocumentValidator = v.object({
+  _id: v.string(),
+  fileName: v.string(),
+  fileType: v.string(),
+  status: v.optional(v.string()),
+  contentType: v.optional(v.string()),
+  fileUrl: v.optional(v.string()),
+  paperRecord: v.optional(v.any()),
+  sourceGuide: v.optional(v.any()),
+  extractedMarkdown: v.optional(v.string()),
+});
+
+export const getNotebookPaperDocuments = internalQuery({
+  args: {
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
+  },
+  returns: v.array(notebookPaperDocumentValidator),
+  handler: async (ctx, args) => loadNotebookPaperDocuments(ctx, args.notebookId, args.documentIds),
+});
+
+/** A notebook paper's own text for extraction (its extracted text, or its abstract). */
+export const getNotebookPaperText = internalQuery({
+  args: { documentId: v.id("documents") },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) return "";
+    return notebookPaperText({
+      extractedMarkdown: doc.extractedMarkdown?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
+      paperRecord: doc.paperRecord,
+    });
   },
 });

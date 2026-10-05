@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import type { MindMapNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateMindMapParams {
   notebookId: string;
@@ -108,29 +109,8 @@ export function useCreateMindMap() {
  */
 export function useRenameMindMap() {
   const update = useMutation(api.studio.mindmaps.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Read the current mind map to get its notebookId
-      const mindMap = localStore.getQuery(api.studio.mindmaps.index.get, { id });
-      if (mindMap) {
-        // Update detail view
-        localStore.setQuery(api.studio.mindmaps.index.get, { id }, { ...mindMap, title });
-
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.mindmaps.index.list, {
-          notebookId: mindMap.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.mindmaps.index.list,
-            { notebookId: mindMap.notebookId },
-            listResult.map((mm: { _id: string; [key: string]: unknown }) =>
-              mm._id === id ? { ...mm, title } : mm
-            )
-          );
-        }
-      }
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
     }
   );
 
@@ -147,25 +127,8 @@ export function useRenameMindMap() {
  */
 export function useDeleteMindMap() {
   const remove = useMutation(api.studio.mindmaps.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current mind map to get its notebookId
-      const mindMap = localStore.getQuery(api.studio.mindmaps.index.get, { id: args.id });
-      if (mindMap) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.mindmaps.index.list, {
-          notebookId: mindMap.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.mindmaps.index.list,
-            { notebookId: mindMap.notebookId },
-            listResult.filter((mm: { _id: string }) => mm._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.mindmaps.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 

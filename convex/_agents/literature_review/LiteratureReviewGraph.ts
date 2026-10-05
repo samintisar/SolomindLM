@@ -26,6 +26,7 @@ import {
   SCREEN_PAPERS_BATCH_SIZE,
 } from "../../literatureReview/batchSizes.js";
 import { LITERATURE_SCREEN_TOP_N } from "../../literatureReview/llmTuning.js";
+import { dropSearchCopiesOfNotebookPapers } from "../../literatureReview/notebookPapers.js";
 
 export const workflow = new WorkflowManager(components.workflow);
 
@@ -94,6 +95,10 @@ export const literatureReviewWorkflow = workflow
       assistantMessageId: v.id("messages"),
       searchOptions: v.optional(literatureSearchOptionsValidator),
       smartModel: v.optional(v.string()),
+      /** Selected notebook papers: always included, never screened (#301). */
+      documentIds: v.optional(v.array(v.id("documents"))),
+      /** "papers_only" skips the database search. */
+      paperScope: v.optional(v.union(v.literal("papers_and_search"), v.literal("papers_only"))),
     },
     returns: v.object({
       tableId: v.id("literatureTables"),
@@ -169,204 +174,241 @@ export const literatureReviewWorkflow = workflow
         `Confirmed ${confirmedColumns.length} columns`
       );
 
-      // Step 2: Search papers (parallel across sources)
-      const searchQueriesUsed =
-        plan.searchQueries.length > 0
-          ? plan.searchQueries
-          : [args.query.trim()].filter((q) => q.length > 0);
-      const searchQueriesDetail = searchQueriesUsed.join("\n");
-      const searchStepMetadata = { searchQueries: searchQueriesUsed };
-
-      await trackStep(
-        step,
-        args.sessionId,
-        "searching",
-        "in_progress",
-        searchQueriesDetail,
-        searchStepMetadata
-      );
-      const searchResults = await step.runAction(
-        internal.literatureReview.workflowSteps.searchPapers,
-        {
-          query: args.query,
-          searchQueries: plan.searchQueries,
-          searchOptions: args.searchOptions,
-        }
-      );
-      const dbSources = args.searchOptions
-        ? sourcesForResearchDatabase(args.searchOptions.researchDatabase)
-        : ["arxiv", "semantic_scholar", "pubmed"];
-      await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
-        sessionId: args.sessionId,
-        patch: {
-          searchQueries: searchQueriesUsed,
-          databasesUsed: dbSources,
-          recordsIdentified: searchResults.recordsIdentified,
-          recordsAfterDedupe: searchResults.recordsAfterDedupe,
-          searchCompletedAt: Date.now(),
-        },
-      });
-
-      await trackStep(step, args.sessionId, "searching", "completed", searchQueriesDetail, {
-        ...searchStepMetadata,
-        papersFound: searchResults.papers.length,
-        recordsIdentified: searchResults.recordsIdentified,
-        recordsAfterDedupe: searchResults.recordsAfterDedupe,
-        ...(searchResults.rateLimited ? { rateLimited: true } : {}),
-      });
-
-      await trackStep(
-        step,
-        args.sessionId,
-        "deduplicating",
-        "completed",
-        `${searchResults.recordsAfterDedupe} unique papers after deduplication (from ${searchResults.recordsIdentified} identified)`
-      );
-
-      // Step 3: Rank (Voyage)
-      await trackStep(
-        step,
-        args.sessionId,
-        "ranking",
-        "in_progress",
-        "Ranking papers by relevance"
-      );
-      const ranked = await step.runAction(internal.literatureReview.workflowSteps.rankPapers, {
-        papers: searchResults.papers,
-        query: args.query,
-      });
-      await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
-        sessionId: args.sessionId,
-        patch: {
-          recordsRanked: ranked.papers.length,
-          rankCompletedAt: Date.now(),
-        },
-      });
-
-      await trackStep(
-        step,
-        args.sessionId,
-        "ranking",
-        "completed",
-        `Ranked ${ranked.papers.length} papers for your research question.`,
-        { recordsRanked: ranked.papers.length }
-      );
-
-      await step.runMutation(internal.literatureReview.db.persistRankedPapers, {
-        sessionId: args.sessionId,
-        papers: ranked.papers,
-      });
-
-      // Step 5: Screen (top 30) — one workflow step per batch (each gets its own action limit)
-      const papersToScreen = ranked.papers.slice(0, LITERATURE_SCREEN_TOP_N);
-      await trackStep(
-        step,
-        args.sessionId,
-        "screening",
-        "in_progress",
-        `Screening top ${papersToScreen.length} papers`
-      );
-
-      const screeningDecisions = new Map<number, { isIncluded: boolean; reason: string }>();
-      for (let i = 0; i < papersToScreen.length; i += SCREEN_PAPERS_BATCH_SIZE) {
-        const batch = papersToScreen.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
-        const { decisions } = await step.runAction(
-          internal.literatureReview.workflowSteps.screenPapersBatch,
-          {
-            papers: batch,
-            query: args.query,
-            batchStartIndex: i,
-            smartModel: args.smartModel,
-          }
-        );
-        for (const decision of decisions) {
-          screeningDecisions.set(decision.paperIndex, {
-            isIncluded: decision.isIncluded,
-            reason: decision.reason,
-          });
-        }
+      // Notebook papers (#301): always included, never screened; off-topic ones are flagged.
+      const papersOnly = args.paperScope === "papers_only";
+      const notebookPapers = args.documentIds?.length
+        ? (
+            await step.runAction(internal.literatureReview.workflowSteps.loadNotebookPapers, {
+              notebookId: args.notebookId,
+              documentIds: args.documentIds,
+              query: args.query,
+            })
+          ).papers
+        : [];
+      if (papersOnly && notebookPapers.length === 0) {
+        throw new Error("None of the selected sources could be used as papers for this review.");
       }
 
-      const screened = {
-        papers: papersToScreen.map(
-          (
-            p: {
-              title: string;
-              authors: string[];
-              year?: number;
-              abstract: string;
-              url: string;
-              source: string;
-              score: number;
-              isIncluded?: boolean;
-              includeReason?: string;
-            },
-            index: number
-          ) => ({
-            ...p,
-            isIncluded: screeningDecisions.get(index)?.isIncluded ?? true,
-            includeReason:
-              screeningDecisions.get(index)?.reason ?? "No screening decision available.",
-          })
-        ),
-      };
+      let screenedIncluded: typeof notebookPapers = [];
+      if (papersOnly) {
+        await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+          sessionId: args.sessionId,
+          patch: { searchSkipped: true, recordsFromNotebook: notebookPapers.length },
+        });
+        await trackStep(
+          step,
+          args.sessionId,
+          "searching",
+          "completed",
+          `No database search: reviewing ${notebookPapers.length} papers from your notebook`,
+          { recordsFromNotebook: notebookPapers.length, searchSkipped: true }
+        );
+      } else {
+        // Step 2: Search papers (parallel across sources)
+        const searchQueriesUsed =
+          plan.searchQueries.length > 0
+            ? plan.searchQueries
+            : [args.query.trim()].filter((q) => q.length > 0);
+        const searchQueriesDetail = searchQueriesUsed.join("\n");
+        const searchStepMetadata = { searchQueries: searchQueriesUsed };
 
-      const includedCount = screened.papers.filter(
-        (p: { isIncluded?: boolean }) => p.isIncluded === true
-      ).length;
-      const excludedCount = screened.papers.length - includedCount;
+        await trackStep(
+          step,
+          args.sessionId,
+          "searching",
+          "in_progress",
+          searchQueriesDetail,
+          searchStepMetadata
+        );
+        const searchResults = await step.runAction(
+          internal.literatureReview.workflowSteps.searchPapers,
+          {
+            query: args.query,
+            searchQueries: plan.searchQueries,
+            searchOptions: args.searchOptions,
+          }
+        );
+        // A search copy of a notebook paper is dropped; the notebook copy is used.
+        const searchPapers = dropSearchCopiesOfNotebookPapers(notebookPapers, searchResults.papers);
+        const dbSources = args.searchOptions
+          ? sourcesForResearchDatabase(args.searchOptions.researchDatabase)
+          : ["arxiv", "semantic_scholar", "pubmed"];
+        await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+          sessionId: args.sessionId,
+          patch: {
+            searchQueries: searchQueriesUsed,
+            databasesUsed: dbSources,
+            recordsIdentified: searchResults.recordsIdentified,
+            recordsAfterDedupe: searchResults.recordsAfterDedupe,
+            recordsFromNotebook: notebookPapers.length,
+            searchCompletedAt: Date.now(),
+          },
+        });
 
-      await step.runMutation(internal.literatureReview.db.replaceScreeningDecisions, {
-        sessionId: args.sessionId,
-        decisions: screened.papers.map(
-          (
-            p: {
-              title: string;
-              authors: string[];
-              year?: number;
-              isIncluded?: boolean;
-              includeReason?: string;
-            },
-            i: number
-          ) => ({
-            paperIndex: i,
-            title: p.title,
-            authors: p.authors,
-            year: p.year,
-            decision: p.isIncluded === true ? ("included" as const) : ("excluded" as const),
-            reason: p.includeReason ?? "No reason recorded.",
-            rank: i + 1,
-          })
-        ),
-      });
+        await trackStep(step, args.sessionId, "searching", "completed", searchQueriesDetail, {
+          ...searchStepMetadata,
+          papersFound: searchPapers.length,
+          ...(notebookPapers.length > 0 ? { recordsFromNotebook: notebookPapers.length } : {}),
+          recordsIdentified: searchResults.recordsIdentified,
+          recordsAfterDedupe: searchResults.recordsAfterDedupe,
+          ...(searchResults.rateLimited ? { rateLimited: true } : {}),
+        });
 
-      await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
-        sessionId: args.sessionId,
-        patch: {
-          recordsScreened: screened.papers.length,
-          recordsIncluded: includedCount,
-          recordsExcluded: excludedCount,
-          screenCompletedAt: Date.now(),
-        },
-      });
+        await trackStep(
+          step,
+          args.sessionId,
+          "deduplicating",
+          "completed",
+          `${searchResults.recordsAfterDedupe} unique papers after deduplication (from ${searchResults.recordsIdentified} identified)`
+        );
 
-      await trackStep(
-        step,
-        args.sessionId,
-        "screening",
-        "completed",
-        `Screened ${screened.papers.length} papers: ${includedCount} included, ${excludedCount} excluded.`,
-        {
-          recordsScreened: screened.papers.length,
-          recordsIncluded: includedCount,
-          recordsExcluded: excludedCount,
+        // Step 3: Rank (Voyage)
+        await trackStep(
+          step,
+          args.sessionId,
+          "ranking",
+          "in_progress",
+          "Ranking papers by relevance"
+        );
+        const ranked = await step.runAction(internal.literatureReview.workflowSteps.rankPapers, {
+          papers: searchPapers,
+          query: args.query,
+        });
+        await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+          sessionId: args.sessionId,
+          patch: {
+            recordsRanked: ranked.papers.length,
+            rankCompletedAt: Date.now(),
+          },
+        });
+
+        await trackStep(
+          step,
+          args.sessionId,
+          "ranking",
+          "completed",
+          `Ranked ${ranked.papers.length} papers for your research question.`,
+          { recordsRanked: ranked.papers.length }
+        );
+
+        await step.runMutation(internal.literatureReview.db.persistRankedPapers, {
+          sessionId: args.sessionId,
+          papers: ranked.papers,
+        });
+
+        // Step 5: Screen (top 30) — one workflow step per batch (each gets its own action limit)
+        const papersToScreen = ranked.papers.slice(0, LITERATURE_SCREEN_TOP_N);
+        await trackStep(
+          step,
+          args.sessionId,
+          "screening",
+          "in_progress",
+          `Screening top ${papersToScreen.length} papers`
+        );
+
+        const screeningDecisions = new Map<number, { isIncluded: boolean; reason: string }>();
+        for (let i = 0; i < papersToScreen.length; i += SCREEN_PAPERS_BATCH_SIZE) {
+          const batch = papersToScreen.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
+          const { decisions } = await step.runAction(
+            internal.literatureReview.workflowSteps.screenPapersBatch,
+            {
+              papers: batch,
+              query: args.query,
+              batchStartIndex: i,
+              smartModel: args.smartModel,
+            }
+          );
+          for (const decision of decisions) {
+            screeningDecisions.set(decision.paperIndex, {
+              isIncluded: decision.isIncluded,
+              reason: decision.reason,
+            });
+          }
         }
-      );
 
-      // Step 6: Extract data (batch 5, write to literatureTableDrafts)
-      const includedPapers = screened.papers.filter(
-        (p: { isIncluded?: boolean }) => p.isIncluded === true
-      );
+        const screened = {
+          papers: papersToScreen.map(
+            (
+              p: {
+                title: string;
+                authors: string[];
+                year?: number;
+                abstract: string;
+                url: string;
+                source: string;
+                score: number;
+                isIncluded?: boolean;
+                includeReason?: string;
+              },
+              index: number
+            ) => ({
+              ...p,
+              isIncluded: screeningDecisions.get(index)?.isIncluded ?? true,
+              includeReason:
+                screeningDecisions.get(index)?.reason ?? "No screening decision available.",
+            })
+          ),
+        };
+
+        const includedCount = screened.papers.filter(
+          (p: { isIncluded?: boolean }) => p.isIncluded === true
+        ).length;
+        const excludedCount = screened.papers.length - includedCount;
+
+        await step.runMutation(internal.literatureReview.db.replaceScreeningDecisions, {
+          sessionId: args.sessionId,
+          decisions: screened.papers.map(
+            (
+              p: {
+                title: string;
+                authors: string[];
+                year?: number;
+                isIncluded?: boolean;
+                includeReason?: string;
+              },
+              i: number
+            ) => ({
+              paperIndex: i,
+              title: p.title,
+              authors: p.authors,
+              year: p.year,
+              decision: p.isIncluded === true ? ("included" as const) : ("excluded" as const),
+              reason: p.includeReason ?? "No reason recorded.",
+              rank: i + 1,
+            })
+          ),
+        });
+
+        await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+          sessionId: args.sessionId,
+          patch: {
+            recordsScreened: screened.papers.length,
+            recordsIncluded: includedCount,
+            recordsExcluded: excludedCount,
+            screenCompletedAt: Date.now(),
+          },
+        });
+
+        await trackStep(
+          step,
+          args.sessionId,
+          "screening",
+          "completed",
+          `Screened ${screened.papers.length} papers: ${includedCount} included, ${excludedCount} excluded.`,
+          {
+            recordsScreened: screened.papers.length,
+            recordsIncluded: includedCount,
+            recordsExcluded: excludedCount,
+          }
+        );
+
+        screenedIncluded = screened.papers.filter(
+          (p: { isIncluded?: boolean }) => p.isIncluded === true
+        ) as typeof notebookPapers;
+      }
+
+      // Step 6: Extract data (batch 5, write to literatureTableDrafts). Notebook papers go first.
+      const includedPapers = [...notebookPapers, ...screenedIncluded];
       const existingBatchNumbers = await step.runQuery(
         internal.literatureReview.db.getExistingBatchNumbers,
         { sessionId: args.sessionId }
@@ -413,7 +455,7 @@ export const literatureReviewWorkflow = workflow
         args.sessionId,
         "extracting",
         "completed",
-        `Extracted data from ${includedCount} papers`,
+        `Extracted data from ${includedPapers.length} papers`,
         { extractedRowCount: draftCount.length }
       );
 

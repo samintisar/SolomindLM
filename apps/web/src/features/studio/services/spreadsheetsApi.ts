@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { OptimisticLocalStore } from "convex/browser";
 import { useAction, useMutation } from "convex/react";
 import type { SpreadsheetNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateSpreadsheetParams {
   notebookId: string;
@@ -102,36 +103,16 @@ export function useCreateSpreadsheet() {
 }
 
 /**
- * Patch one spreadsheet in the cached notes queries the Studio panel reads.
- *
- * The open sheet comes from `api.notes.index.get` (args `{ type, id }`, full
- * document including `data`), and the saved list from `api.notes.index.list`
- * (args `{ notebookId, types? }`, rows without `data`). Every cached copy is
- * matched by id, so no notebookId or exact args are needed. `data` is only
- * patched into `get`, since list rows never carry it.
+ * Patch one spreadsheet in the cached notes queries the Studio panel reads
+ * (see `patchNoteInNotesCache`). `data` is only patched into `notes.index.get`,
+ * since list rows never carry it; `title` goes into both.
  */
 export function patchSpreadsheetInNotesCache(
   localStore: OptimisticLocalStore,
   id: string,
   patch: { title?: string; data?: string }
 ): void {
-  for (const { args, value } of localStore.getAllQueries(api.notes.index.get)) {
-    if (args.id !== id || !value) continue;
-    localStore.setQuery(api.notes.index.get, args, { ...value, ...patch });
-  }
-
-  if (patch.title === undefined) return;
-  const { title } = patch;
-  for (const { args, value } of localStore.getAllQueries(api.notes.index.list)) {
-    if (!value?.some((row: { _id: unknown }) => row._id === id)) continue;
-    localStore.setQuery(
-      api.notes.index.list,
-      args,
-      value.map((row: { _id: unknown; [key: string]: unknown }) =>
-        row._id === id ? { ...row, title } : row
-      )
-    );
-  }
+  patchNoteInNotesCache(localStore, id, patch);
 }
 
 /** The tail of each spreadsheet's save chain; an entry is removed once its chain drains. */
@@ -167,7 +148,7 @@ export function isSpreadsheetSaveQueued(id: string): boolean {
 export function useRenameSpreadsheet() {
   const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
     (localStore, { id, title }) => {
-      if (title !== undefined) patchSpreadsheetInNotesCache(localStore, id, { title });
+      patchNoteInNotesCache(localStore, id, { title });
     }
   );
 
@@ -202,25 +183,8 @@ export function useSaveSpreadsheetData() {
  */
 export function useDeleteSpreadsheet() {
   const remove = useMutation(api.studio.spreadsheets.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current spreadsheet to get its notebookId
-      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id: args.id });
-      if (spreadsheet) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
-          notebookId: spreadsheet.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.spreadsheets.index.list,
-            { notebookId: spreadsheet.notebookId },
-            listResult.filter((ss: { _id: string }) => ss._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.spreadsheets.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 

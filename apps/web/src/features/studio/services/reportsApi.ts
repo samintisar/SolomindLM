@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
 import type { ReportNote } from "@/shared/types/index";
 import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateReportParams {
   notebookId: string;
@@ -91,35 +92,8 @@ export function useCreateReport() {
  */
 export function useUpdateReport() {
   const update = useMutation(api.studio.reports.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title, content } = args;
-
-      // Read the current report to get its notebookId
-      const report = localStore.getQuery(api.studio.reports.index.get, { id });
-      if (report) {
-        const updates: Record<string, unknown> = {};
-        if (title !== undefined) updates.title = title;
-        if (content !== undefined) updates.content = content;
-        if (Object.keys(updates).length > 0) {
-          localStore.setQuery(api.studio.reports.index.get, { id }, { ...report, ...updates });
-        }
-
-        // Update list view when title changes
-        if (title !== undefined) {
-          const listResult = localStore.getQuery(api.studio.reports.index.list, {
-            notebookId: report.notebookId,
-          });
-          if (listResult) {
-            localStore.setQuery(
-              api.studio.reports.index.list,
-              { notebookId: report.notebookId },
-              listResult.map((r: { id: string; [key: string]: unknown }) =>
-                r.id === id ? { ...r, title } : r
-              )
-            );
-          }
-        }
-      }
+    (localStore, { id, ...updates }) => {
+      patchNoteInNotesCache(localStore, id, updates);
     }
   );
 
@@ -136,25 +110,8 @@ export function useUpdateReport() {
  */
 export function useDeleteReport() {
   const remove = useMutation(api.studio.reports.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current report to get its notebookId
-      const report = localStore.getQuery(api.studio.reports.index.get, { id: args.id });
-      if (report) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.reports.index.list, {
-          notebookId: report.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.reports.index.list,
-            { notebookId: report.notebookId },
-            listResult.filter((r: { id: string }) => r.id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.reports.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 
