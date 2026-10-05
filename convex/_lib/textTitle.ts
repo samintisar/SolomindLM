@@ -1,6 +1,9 @@
 /** Name a pasted-text source has until it gets a typed or generated title. */
 export const PASTED_TEXT_TITLE = "Pasted text";
 
+/** Longest title a user can give pasted text. */
+export const TEXT_TITLE_MAX_LENGTH = 200;
+
 const TITLE_SOURCE_LIMIT = 2000;
 
 /** The title the user typed for pasted text, or null when the name is empty or the placeholder. */

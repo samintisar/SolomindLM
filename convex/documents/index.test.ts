@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST } from "../_lib/queryCaps";
+import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
@@ -172,6 +173,37 @@ describe("documents.upload", () => {
         fileName: "Bad Type",
       } as Parameters<typeof api.documents.index.upload>[0])
     ).rejects.toThrow("Invalid type");
+  });
+
+  test("rejects pasted text whose title is longer than the limit", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+
+    await expect(
+      asUser.mutation(api.documents.index.upload, {
+        notebookId,
+        type: "text",
+        source: "Some notes",
+        fileName: "t".repeat(TEXT_TITLE_MAX_LENGTH + 1),
+      })
+    ).rejects.toThrow(`Title must be ${TEXT_TITLE_MAX_LENGTH} characters or fewer`);
+  });
+
+  test("accepts pasted text with a title at the limit", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+
+    const result = await asUser.mutation(api.documents.index.upload, {
+      notebookId,
+      type: "text",
+      source: "Some notes",
+      fileName: "t".repeat(TEXT_TITLE_MAX_LENGTH),
+    });
+    expect(result.documentId).toBeDefined();
   });
 
   test("rejects file upload without storageId", async () => {

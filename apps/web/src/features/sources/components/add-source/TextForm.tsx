@@ -1,3 +1,4 @@
+import { TEXT_TITLE_MAX_LENGTH } from "@convex/_lib/textTitle";
 import type React from "react";
 import { useId, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
@@ -59,7 +60,7 @@ export function TextForm({ onUpload, isUploading, onDone, onBusyChange }: TextFo
             id={titleId}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            maxLength={200}
+            maxLength={TEXT_TITLE_MAX_LENGTH}
             placeholder="e.g. Lecture 3 notes"
             disabled={pending}
           />
