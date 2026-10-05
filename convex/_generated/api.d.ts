@@ -76,6 +76,7 @@ import type * as _agents_chat_chunkContext from "../_agents/chat/chunkContext.js
 import type * as _agents_chat_grounding_validator from "../_agents/chat/grounding_validator.js";
 import type * as _agents_chat_hybrid_search from "../_agents/chat/hybrid_search.js";
 import type * as _agents_chat_llm_wrapper from "../_agents/chat/llm_wrapper.js";
+import type * as _agents_chat_passageContext from "../_agents/chat/passageContext.js";
 import type * as _agents_chat_queryExpansion from "../_agents/chat/queryExpansion.js";
 import type * as _agents_chat_rerankCache from "../_agents/chat/rerankCache.js";
 import type * as _agents_chat_searchQueryRefiner from "../_agents/chat/searchQueryRefiner.js";
@@ -468,6 +469,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/chat/grounding_validator": typeof _agents_chat_grounding_validator;
   "_agents/chat/hybrid_search": typeof _agents_chat_hybrid_search;
   "_agents/chat/llm_wrapper": typeof _agents_chat_llm_wrapper;
+  "_agents/chat/passageContext": typeof _agents_chat_passageContext;
   "_agents/chat/queryExpansion": typeof _agents_chat_queryExpansion;
   "_agents/chat/rerankCache": typeof _agents_chat_rerankCache;
   "_agents/chat/searchQueryRefiner": typeof _agents_chat_searchQueryRefiner;
