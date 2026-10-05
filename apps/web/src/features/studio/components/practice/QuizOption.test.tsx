@@ -34,6 +34,37 @@ describe("QuizOption", () => {
     expect(screen.getByRole("button").className).toContain("animate-studio-shake");
   });
 
+  it("has the text alone as its accessible name, without the letter", () => {
+    render(
+      <QuizOption position={2} state="idle" disabled={false} onSelect={() => {}}>
+        Some text
+      </QuizOption>
+    );
+    expect(screen.getByRole("button", { name: "Some text" })).toBeInTheDocument();
+  });
+
+  it("dims the options that were not chosen", () => {
+    render(
+      <QuizOption position={0} state="dimmed" disabled onSelect={() => {}}>
+        Other
+      </QuizOption>
+    );
+    const option = screen.getByRole("button", { name: "Other" });
+    expect(option).toHaveAttribute("data-state", "dimmed");
+    expect(option.className).toContain("opacity-50");
+  });
+
+  it("does not call onSelect while disabled", async () => {
+    const onSelect = vi.fn();
+    render(
+      <QuizOption position={0} state="idle" disabled onSelect={onSelect}>
+        Locked
+      </QuizOption>
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Locked" }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("bursts when celebrating", () => {
     const { container } = render(
       <QuizOption position={0} state="correct" disabled celebrate onSelect={() => {}}>
@@ -41,5 +72,6 @@ describe("QuizOption", () => {
       </QuizOption>
     );
     expect(container.querySelector("[data-slot=burst]")).not.toBeNull();
+    expect(screen.getByRole("button").className).toContain("animate-studio-select-pop");
   });
 });

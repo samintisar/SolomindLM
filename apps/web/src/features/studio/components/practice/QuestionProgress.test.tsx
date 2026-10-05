@@ -26,5 +26,16 @@ describe("QuestionProgress", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "4");
     const states = [...bar.children].map((segment) => segment.getAttribute("data-state"));
     expect(states).toEqual(["correct", "incorrect", "current", "pending"]);
+    expect(bar).toHaveAttribute("aria-valuetext", "Question 3 of 4");
+  });
+
+  it("colours part-marks and answered-but-ungraded segments", () => {
+    render(<QuestionProgress currentIndex={2} states={["partial", "answered", undefined]} />);
+    const bar = screen.getByRole("progressbar", { name: "Question progress" });
+    const [partial, answered] = [...bar.children];
+    expect(partial).toHaveAttribute("data-state", "partial");
+    expect(partial).toHaveClass("bg-warning");
+    expect(answered).toHaveAttribute("data-state", "answered");
+    expect(answered.className).toContain("bg-primary/60");
   });
 });

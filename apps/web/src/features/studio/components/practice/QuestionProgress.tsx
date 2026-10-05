@@ -26,7 +26,7 @@ export function QuestionProgress({ currentIndex, states, trailing }: QuestionPro
   const total = states.length;
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground md:text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
         <span className="whitespace-nowrap">
           Question {currentIndex + 1} of {total}
         </span>
@@ -38,6 +38,7 @@ export function QuestionProgress({ currentIndex, states, trailing }: QuestionPro
         aria-valuemin={1}
         aria-valuemax={total}
         aria-valuenow={currentIndex + 1}
+        aria-valuetext={`Question ${currentIndex + 1} of ${total}`}
         className="flex gap-1"
       >
         {states.map((state, position) => (

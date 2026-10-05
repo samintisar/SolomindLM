@@ -399,6 +399,13 @@
   --animate-studio-draw: studio-draw 450ms var(--ease-out) 120ms both;
   --animate-studio-burst: studio-burst 900ms var(--ease-out) forwards;
   --animate-studio-nudge: studio-nudge 1.6s var(--ease-out) 600ms 1;
+  --animate-studio-select-pop: studio-select-pop 450ms var(--ease-out);
+
+  @keyframes studio-select-pop {
+    40% {
+      transform: scale(1.025);
+    }
+  }
 
   @keyframes studio-shake {
     20% {
@@ -1227,6 +1234,7 @@
   .animate-studio-bob,
   .animate-studio-pop,
   .animate-studio-shake,
+  .animate-studio-select-pop,
   .animate-studio-nudge {
     animation: none;
   }

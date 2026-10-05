@@ -9,6 +9,13 @@ import type { QuestionState } from "./types";
 const RADIUS = 64;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
+const RESULT_LABEL: Record<QuestionState, string> = {
+  correct: "correct",
+  partial: "partly correct",
+  incorrect: "incorrect",
+  answered: "answered, not graded",
+};
+
 const CHIP: Record<QuestionState, string> = {
   correct: "bg-success-muted text-success-muted-foreground",
   partial: "bg-warning-muted text-warning-muted-foreground",
@@ -61,17 +68,19 @@ export function ResultsSummary({
                 strokeWidth="10"
                 className="stroke-muted"
               />
-              <circle
-                cx="75"
-                cy="75"
-                r={RADIUS}
-                fill="none"
-                strokeWidth="10"
-                strokeLinecap="round"
-                className="stroke-success"
-                strokeDasharray={CIRCUMFERENCE}
-                strokeDashoffset={CIRCUMFERENCE * (1 - ring)}
-              />
+              {ring > 0 ? (
+                <circle
+                  cx="75"
+                  cy="75"
+                  r={RADIUS}
+                  fill="none"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  className="stroke-success"
+                  strokeDasharray={CIRCUMFERENCE}
+                  strokeDashoffset={CIRCUMFERENCE * (1 - ring)}
+                />
+              ) : null}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="font-display text-4xl font-semibold tabular-nums">{`${shown}${valueSuffix}`}</span>
@@ -97,7 +106,7 @@ export function ResultsSummary({
                   key={position}
                   type="button"
                   data-state={question.state ?? "unanswered"}
-                  aria-label={`Review question ${position + 1}`}
+                  aria-label={`Question ${position + 1}, ${question.state ? RESULT_LABEL[question.state] : "not answered"}. Review`}
                   onClick={question.onReview}
                   className={cn(
                     "flex size-8 items-center justify-center rounded-lg font-sans text-xs font-semibold outline-hidden transition-transform animate-in fade-in slide-in-from-bottom-2 duration-300 focus-visible:ring-2 focus-visible:ring-ring motion-safe:hover:-translate-y-px",

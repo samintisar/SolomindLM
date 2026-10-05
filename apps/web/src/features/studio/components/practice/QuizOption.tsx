@@ -6,7 +6,7 @@ import { Burst } from "../../motion/Burst";
 export type OptionState = "idle" | "correct" | "incorrect" | "dimmed";
 
 const optionVariants = cva(
-  "group relative flex w-full items-center gap-3 rounded-xl p-4 text-left font-serif shadow-xs ring-1 transition duration-200 ease-out disabled:cursor-default md:p-5",
+  "group relative flex w-full items-center gap-3 rounded-xl p-4 text-left font-serif shadow-xs ring-1 transition duration-200 ease-out outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default md:p-5",
   {
     variants: {
       state: {
@@ -39,7 +39,7 @@ interface QuizOptionProps {
   position: number;
   state: OptionState;
   disabled: boolean;
-  /** The option the learner just got right: plays a pop and a burst once. */
+  /** The option the learner just got right: plays a gentle pop and a burst once. */
   celebrate?: boolean;
   onSelect: () => void;
   children: React.ReactNode;
@@ -60,7 +60,7 @@ export function QuizOption({
       data-state={state}
       disabled={disabled}
       onClick={onSelect}
-      className={cn(optionVariants({ state }), celebrate && "animate-studio-pop")}
+      className={cn(optionVariants({ state }), celebrate && "animate-studio-select-pop")}
     >
       <span aria-hidden className={keyVariants({ state })}>
         {String.fromCharCode(65 + position)}
