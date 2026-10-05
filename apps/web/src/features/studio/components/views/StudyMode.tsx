@@ -1,12 +1,20 @@
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import type React from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { srsSubtextForRating } from "@/features/studio/utils/srsReviewLabels";
-import { Flashcard } from "@/shared/types";
-import { sanitizeMarkdown } from "@/shared/utils";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
+import { Button } from "@/shared/components/ui/button";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
+import { useToast } from "@/shared/contexts/useToast";
+import type { Flashcard } from "@/shared/types";
+import { cn } from "@/shared/utils/cn";
+import { Burst } from "../../motion/Burst";
+import { useStreak } from "../../motion/useStreak";
+import { FlashcardBack, FlashcardFront } from "../flashcards/FlashcardContent";
+import { FlipCard } from "../flashcards/FlipCard";
+import { RatingButton } from "../flashcards/RatingButton";
+import { RATINGS, type RatingConfig, ratingForKey, type SrsRating } from "../flashcards/ratings";
+import { TallyTile } from "../flashcards/TallyTile";
+import { StreakChip } from "../practice/StreakChip";
 
 export type DueFlashcard = {
   index: number;
@@ -21,69 +29,49 @@ interface StudyModeProps {
     incorrect: number;
     longestStreak: number;
   }) => void;
-  onRateCard: (cardIndex: number, rating: "again" | "hard" | "good" | "easy") => Promise<void>;
+  onRateCard: (cardIndex: number, rating: SrsRating) => Promise<void>;
   onExit: () => void;
 }
 
-/** Neutral cards + saturated left stripe only — readable sans text, no tinted mud fills. */
-const RATING_BUTTONS = [
-  {
-    label: "Again",
-    rating: "again" as const,
-    stripeClass: "border-l-rose-600 dark:border-l-rose-400",
-  },
-  {
-    label: "Hard",
-    rating: "hard" as const,
-    stripeClass: "border-l-amber-600 dark:border-l-amber-400",
-  },
-  {
-    label: "Good",
-    rating: "good" as const,
-    stripeClass: "border-l-blue-600 dark:border-l-blue-400",
-  },
-  {
-    label: "Easy",
-    rating: "easy" as const,
-    stripeClass: "border-l-emerald-600 dark:border-l-emerald-400",
-  },
-] as const;
+interface ThrownCard {
+  id: number;
+  card: Flashcard;
+  rating: SrsRating;
+}
 
-const RATING_BUTTON_BASE =
-  "font-sans rounded-xl border border-border bg-card px-3 py-3 pl-3.5 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-muted/60 hover:border-foreground/12 active:scale-[0.99] sm:py-3.5 border-l-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const EMPTY_TALLY: Record<SrsRating, number> = { again: 0, hard: 0, good: 0, easy: 0 };
+const RATING_BY_ID = Object.fromEntries(RATINGS.map((r) => [r.rating, r])) as Record<
+  SrsRating,
+  RatingConfig
+>;
+/** Entrance delay of each tally tile, and the same wait in ms so its count starts as it appears. */
+const TALLY_DELAY = [
+  { cls: "delay-300", ms: 300 },
+  { cls: "delay-400", ms: 400 },
+  { cls: "delay-500", ms: 500 },
+  { cls: "delay-600", ms: 600 },
+];
+/** jsdom and some browsers never fire animationend; this clears the thrown card regardless. */
+const THROW_FALLBACK_MS = 700;
 
-const answerMarkdownComponents = {
-  img: () => null,
-  a: ({ children }: { children?: React.ReactNode }) => (
-    <span className="text-foreground">{children}</span>
-  ),
-  video: () => null,
-  audio: () => null,
-  iframe: () => null,
-  table: ({ children }: { children?: React.ReactNode }) => (
-    <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
-      {children}
-    </table>
-  ),
-  thead: ({ children }: { children?: React.ReactNode }) => (
-    <thead className="bg-muted/50">{children}</thead>
-  ),
-  tbody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
-  tr: ({ children }: { children?: React.ReactNode }) => (
-    <tr className="border-b border-border">{children}</tr>
-  ),
-  th: ({ children }: { children?: React.ReactNode }) => (
-    <th className="border-r border-border px-4 py-2 text-left font-semibold text-foreground last:border-r-0">
-      {children}
-    </th>
-  ),
-  td: ({ children }: { children?: React.ReactNode }) => (
-    <td className="border-r border-border px-4 py-2 text-foreground last:border-r-0">{children}</td>
-  ),
-};
+/** Keystrokes that belong to a field, a dialog, or (for Space and Enter) a focused control. */
+function isIgnoredTarget(target: EventTarget | null, key: string): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target instanceof HTMLElement && target.isContentEditable) return true;
+  if (
+    target.closest(
+      "input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog'], [aria-modal='true']"
+    )
+  ) {
+    return true;
+  }
+  const activatesControls = key === " " || key === "Enter";
+  return activatesControls && target.closest("button, a, [role='button']") !== null;
+}
 
 /**
- * Study mode for spaced repetition — layout aligned with FlashcardView browse styling.
+ * Study mode for spaced repetition: a deck. The next cards peek out behind the current one, a
+ * rating throws the card away in its direction, and progress is stacked by rating colour.
  */
 export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModeProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -94,21 +82,72 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
   const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [tally, setTally] = useState<Record<SrsRating, number>>(EMPTY_TALLY);
+  const [thrown, setThrown] = useState<ThrownCard | null>(null);
+  const { streak, record, reset: resetStreak } = useStreak();
+  const toast = useToast();
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const revealRef = useRef<HTMLButtonElement>(null);
+  const goodRef = useRef<HTMLButtonElement>(null);
+  const againRef = useRef<HTMLButtonElement>(null);
+  const throwId = useRef(0);
+  const throwTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFocusKey = useRef({ currentIndex, showAnswer });
+  const wasComplete = useRef(false);
+
+  const total = cards.length;
   const currentCardEntry = cards[currentIndex];
   const currentCard = currentCardEntry?.card;
-  const remainingCards = cards.length - reviewedCards.length;
-  const isComplete = reviewedCards.length === cards.length;
+  const remainingCards = total - reviewedCards.length;
+  const isComplete = reviewedCards.length === total;
 
-  const sessionProgressPercent = cards.length > 0 ? (reviewedCards.length / cards.length) * 100 : 0;
-  const deckPositionPercent = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
+  const clearThrown = () => {
+    if (throwTimer.current) clearTimeout(throwTimer.current);
+    throwTimer.current = null;
+    setThrown(null);
+  };
 
-  const handleRating = async (rating: "again" | "hard" | "good" | "easy") => {
+  useEffect(
+    () => () => {
+      if (throwTimer.current) clearTimeout(throwTimer.current);
+    },
+    []
+  );
+
+  // Study mode only opens from the Study toggle, so start the session at "Reveal answer": focus
+  // would otherwise stay on the toggle, where Space and Enter belong to the button, not the card.
+  useEffect(() => {
+    revealRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  // Focus follows the flow: Good once the answer shows, "Reveal answer" once the card changes.
+  useEffect(() => {
+    const last = lastFocusKey.current;
+    if (last.currentIndex === currentIndex && last.showAnswer === showAnswer) return;
+    lastFocusKey.current = { currentIndex, showAnswer };
+    (showAnswer ? goodRef.current : revealRef.current)?.focus({ preventScroll: true });
+  }, [currentIndex, showAnswer]);
+
+  // The complete screen replaces the card and its buttons, so focus would drop to <body>.
+  const completeNow = reviewedCards.length === cards.length;
+  useEffect(() => {
+    if (wasComplete.current === completeNow) return;
+    wasComplete.current = completeNow;
+    if (completeNow) againRef.current?.focus({ preventScroll: true });
+  }, [completeNow]);
+
+  const handleRating = async (rating: SrsRating) => {
     if (!currentCardEntry || isSubmittingRating) return;
 
     setIsSubmittingRating(true);
     try {
-      await onRateCard(currentCardEntry.index, rating);
+      try {
+        await onRateCard(currentCardEntry.index, rating);
+      } catch {
+        toast.error("Couldn't save your rating. Try again.");
+        return;
+      }
 
       const isNewCorrect = rating !== "again";
       const isNewIncorrect = rating === "again";
@@ -123,10 +162,19 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
         setCurrentStreak(0);
         setIncorrectCount((prev) => prev + 1);
       }
+      // The chip counts clean answers only: Hard neither extends nor breaks it.
+      if (rating === "again") record(false);
+      else if (rating !== "hard") record(true);
+      setTally((prev) => ({ ...prev, [rating]: prev[rating] + 1 }));
+
+      throwId.current += 1;
+      setThrown({ id: throwId.current, card: currentCardEntry.card, rating });
+      if (throwTimer.current) clearTimeout(throwTimer.current);
+      throwTimer.current = setTimeout(clearThrown, THROW_FALLBACK_MS);
 
       setReviewedCards(nextReviewedCards);
 
-      if (nextReviewedCards.length >= cards.length) {
+      if (nextReviewedCards.length >= total) {
         onComplete({
           reviewed: nextReviewedCards.length,
           correct: correctCount + (isNewCorrect ? 1 : 0),
@@ -147,16 +195,23 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
     }
   };
 
+  // Browsing skips cards already reviewed this session, so a card is never rated twice.
+  let previousIndex = -1;
+  for (let i = currentIndex - 1; i >= 0 && previousIndex === -1; i -= 1) {
+    if (!reviewedCards.includes(i)) previousIndex = i;
+  }
+  const nextIndex = cards.findIndex((_, i) => i > currentIndex && !reviewedCards.includes(i));
+
   const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+    if (previousIndex !== -1) {
+      setCurrentIndex(previousIndex);
       setShowAnswer(false);
     }
   };
 
   const handleNext = () => {
-    if (currentIndex < cards.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+    if (nextIndex !== -1) {
+      setCurrentIndex(nextIndex);
       setShowAnswer(false);
     }
   };
@@ -166,6 +221,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
   };
 
   const handleReset = () => {
+    clearThrown();
     setCurrentIndex(0);
     setShowAnswer(false);
     setReviewedCards([]);
@@ -173,119 +229,69 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
     setIncorrectCount(0);
     setCurrentStreak(0);
     setLongestStreak(0);
+    setTally(EMPTY_TALLY);
+    resetStreak();
   };
 
-  const renderCardFront = (card: Flashcard) => {
-    switch (card.type) {
-      case "true-false":
-        return (
-          <div className="w-full space-y-6 text-center">
-            <div className="prose prose-base sm:prose-lg max-w-none text-center">
-              <Suspense
-                fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}
-              >
-                <MarkdownRenderer>{sanitizeMarkdown(card.front)}</MarkdownRenderer>
-              </Suspense>
-            </div>
-            <div className="flex justify-center gap-12 sm:gap-16">
-              <span className="text-lg font-semibold text-emerald-700 sm:text-xl dark:text-emerald-400">
-                ✓ True
-              </span>
-              <span className="text-lg font-semibold text-rose-700 sm:text-xl dark:text-rose-400">
-                ✗ False
-              </span>
-            </div>
-          </div>
-        );
+  // useEffectEvent: the handler always sees the latest state, yet the listener is added once.
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.repeat) return;
+    // The notebook keeps a second, CSS-hidden Studio panel for the other breakpoint; a hidden
+    // session must not rate cards on keys meant for the visible one.
+    const root = rootRef.current;
+    if (!root || (typeof root.checkVisibility === "function" && !root.checkVisibility())) return;
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (isIgnoredTarget(event.target, event.key)) return;
+    if (!currentCard || isComplete) return;
 
-      case "fill-blank":
-        return (
-          <div className="prose prose-base sm:prose-lg max-w-none text-center">
-            <Suspense
-              fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}
-            >
-              <MarkdownRenderer>
-                {sanitizeMarkdown(card.front.replace(/_+/g, "______"))}
-              </MarkdownRenderer>
-            </Suspense>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="prose prose-base sm:prose-lg max-w-none text-center">
-            <Suspense
-              fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}
-            >
-              <MarkdownRenderer>{sanitizeMarkdown(card.front)}</MarkdownRenderer>
-            </Suspense>
-          </div>
-        );
+    if (event.key === " " || event.key === "Enter") {
+      if (showAnswer) return;
+      event.preventDefault();
+      handleShowAnswer();
+      return;
     }
-  };
+    const config = ratingForKey(event.key);
+    if (config && showAnswer && !isSubmittingRating) {
+      event.preventDefault();
+      void handleRating(config.rating);
+    }
+  });
+  useEffect(() => {
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   if (isComplete) {
     return (
-      <div className="mx-auto flex max-w-xl flex-col items-center justify-center px-1 py-8 text-center sm:py-12">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-100 shadow-md dark:bg-emerald-900/20">
-          <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6 py-8 text-center animate-in fade-in duration-500">
+        <div className="flex size-16 items-center justify-center rounded-2xl bg-success-muted text-success animate-in zoom-in-50 spin-in-12 fade-in duration-700 ease-out">
+          <CheckCircle2 className="size-8" />
         </div>
-
-        <h2 className="mb-2 text-2xl font-semibold tracking-tight sm:text-3xl">Session complete</h2>
-        <p className="mb-8 max-w-sm text-sm text-muted-foreground">
-          You have reviewed all due cards in this set.
-        </p>
-
-        <div className="mb-8 grid w-full max-w-xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <div className="text-2xl font-bold tabular-nums sm:text-3xl">
-              {reviewedCards.length}
-            </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Reviewed
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <div className="text-2xl font-bold tabular-nums text-emerald-600 sm:text-3xl dark:text-emerald-400">
-              {correctCount}
-            </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Correct
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <div className="text-2xl font-bold tabular-nums text-rose-600 sm:text-3xl dark:text-rose-400">
-              {incorrectCount}
-            </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Again
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <div className="text-2xl font-bold tabular-nums text-amber-600 sm:text-3xl dark:text-amber-400">
-              {longestStreak}
-            </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Best streak
-            </div>
-          </div>
+        <div className="space-y-1">
+          <h2 className="font-display text-2xl font-semibold tracking-tight">Session complete</h2>
+          <p className="font-sans text-sm text-muted-foreground">
+            {reviewedCards.length} cards reviewed · best streak {longestStreak}
+          </p>
         </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-medium shadow-sm transition-all hover:bg-muted/50"
-          >
+        <div className="grid w-full grid-cols-4 gap-2">
+          {RATINGS.map((r, k) => (
+            <TallyTile
+              key={r.rating}
+              config={r}
+              value={tally[r.rating]}
+              delayMs={TALLY_DELAY[k].ms}
+              className={cn(
+                "animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-500",
+                TALLY_DELAY[k].cls
+              )}
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button ref={againRef} variant="secondary" onClick={handleReset}>
             Study again
-          </button>
-          <button
-            type="button"
-            onClick={onExit}
-            className="rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90"
-          >
-            Back to browse
-          </button>
+          </Button>
+          <Button onClick={onExit}>Back to browse</Button>
         </div>
       </div>
     );
@@ -293,162 +299,155 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
 
   if (!currentCard) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="text-center">
-          <BookOpen className="mx-auto mb-4 h-14 w-14 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">No cards available for study.</p>
-        </div>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <BookOpen />
+          </EmptyMedia>
+          <EmptyTitle>No cards available for study.</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
+  const throwConfig = thrown ? RATING_BY_ID[thrown.rating] : null;
+
   return (
-    <div className="flex w-full min-w-0 max-w-xl flex-col gap-6">
-      {/* Session progress (reviewed) — single bar + one line of copy */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm leading-snug text-muted-foreground">
-          <span>
-            <span className="font-semibold tabular-nums text-foreground">
-              {reviewedCards.length}
-            </span>
-            <span className="font-normal"> of </span>
-            <span className="font-semibold tabular-nums text-foreground">{cards.length}</span>
-            <span className="font-normal"> reviewed</span>
-          </span>
-          <span className="tabular-nums">
-            <span className="font-semibold text-foreground/90">{remainingCards}</span>
-            <span className="font-normal"> left</span>
-          </span>
-        </div>
-        <div
-          className="relative h-2 w-full overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(sessionProgressPercent)}
-          aria-label={`${reviewedCards.length} of ${cards.length} cards reviewed`}
-        >
+    <div ref={rootRef} className="flex w-full min-w-0 max-w-xl flex-col gap-5">
+      <div className="flex items-center justify-between gap-3 font-sans text-sm text-muted-foreground">
+        <span className="whitespace-nowrap">{`${reviewedCards.length} of ${total} reviewed`}</span>
+        <StreakChip streak={streak} />
+      </div>
+
+      <div
+        role="progressbar"
+        aria-label="Cards reviewed"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={reviewedCards.length}
+        aria-valuetext={`${reviewedCards.length} of ${total} cards reviewed`}
+        className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      >
+        {RATINGS.map((r) => (
+          <span
+            key={r.rating}
+            className={cn("studio-segment h-full duration-500 ease-out", r.toneBar)}
+            style={
+              { "--studio-segment": `${(tally[r.rating] / total) * 100}%` } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+
+      <div className="relative pb-6">
+        {remainingCards >= 3 ? (
           <div
-            className="h-full rounded-full bg-foreground/25 transition-[width] duration-300 ease-out dark:bg-foreground/35"
-            style={{ width: `${sessionProgressPercent}%` }}
+            data-peek
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-72 origin-bottom translate-y-6 scale-90 rounded-2xl bg-card opacity-40 shadow-md ring-1 ring-hairline sm:h-80"
+          />
+        ) : null}
+        {remainingCards >= 2 ? (
+          <div
+            data-peek
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-72 origin-bottom translate-y-3 scale-95 rounded-2xl bg-card opacity-70 shadow-md ring-1 ring-hairline sm:h-80"
+          />
+        ) : null}
+
+        <div
+          key={`card-${currentIndex}`}
+          className="relative animate-in fade-in slide-in-from-bottom-3 zoom-in-95 duration-300"
+        >
+          <FlipCard
+            flipped={showAnswer}
+            front={<FlashcardFront card={currentCard} />}
+            back={<FlashcardBack card={currentCard} />}
           />
         </div>
-      </div>
 
-      {/* Card — match browse dimensions; avoid items-center so content stays full width (prose/KaTeX won’t shrink) */}
-      <div className="flex h-[min(40vh,22rem)] min-h-56 max-h-96 w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-        {!showAnswer ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 text-center sm:p-6">
-            <span className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Question
-            </span>
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
-              <div className="flex min-h-full w-full min-w-0 flex-col justify-center py-1 text-base font-medium text-foreground sm:text-lg">
-                {renderCardFront(currentCard)}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 text-center sm:p-6">
-            <span className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {thrown && throwConfig ? (
+          <div
+            key={`thrown-${thrown.id}`}
+            data-thrown
+            data-rating={thrown.rating}
+            aria-hidden
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget) clearThrown();
+            }}
+            className={cn(
+              "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-72 flex-col items-center overflow-hidden rounded-2xl bg-muted p-5 text-center shadow-lg ring-1 ring-hairline animate-out fade-out fill-mode-forwards duration-500 ease-out sm:h-80 sm:p-6",
+              throwConfig.throwClass
+            )}
+          >
+            <span className="mb-2 shrink-0 font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Answer
             </span>
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
-              <div className="flex min-h-full w-full min-w-0 flex-col justify-center py-1">
-                <div className="prose prose-base sm:prose-lg w-full min-w-0 max-w-none text-center leading-relaxed text-foreground [&_p]:leading-relaxed [&_code]:rounded-md [&_code]:border [&_code]:border-border/60 [&_code]:bg-muted/70 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.9em] [&_code]:font-normal [&_code]:text-foreground [&_pre]:text-left [&_pre_code]:border-0 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_.katex]:max-w-full [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto">
-                  <Suspense
-                    fallback={
-                      <div className="mx-auto h-6 w-3/4 max-w-full animate-pulse rounded bg-muted" />
-                    }
-                  >
-                    <MarkdownRenderer components={answerMarkdownComponents}>
-                      {sanitizeMarkdown(currentCard.back)}
-                    </MarkdownRenderer>
-                  </Suspense>
-                </div>
+            <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex min-h-full w-full flex-col items-center justify-center py-1 text-base font-medium text-foreground sm:text-lg">
+                <FlashcardBack card={thrown.card} />
               </div>
             </div>
           </div>
-        )}
+        ) : null}
+
+        {thrown && (thrown.rating === "good" || thrown.rating === "easy") ? (
+          <Burst key={`burst-${thrown.id}`} className="z-20" />
+        ) : null}
       </div>
 
-      {/* Deck position — same pattern as browse (circular arrows + track) */}
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <button
-            type="button"
-            onClick={handlePrevious}
-            disabled={currentIndex === 0 || isSubmittingRating}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
-            aria-label="Previous card"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <div
-            className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-valuemin={1}
-            aria-valuemax={cards.length}
-            aria-valuenow={currentIndex + 1}
-            aria-label={`Viewing card ${currentIndex + 1} of ${cards.length}`}
-          >
-            <div
-              className="h-full rounded-full bg-foreground/25 transition-[width] duration-300 ease-out dark:bg-foreground/35"
-              style={{ width: `${deckPositionPercent}%` }}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={currentIndex === cards.length - 1 || isSubmittingRating}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
-            aria-label="Next card"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="text-center text-sm tabular-nums leading-snug text-muted-foreground">
-          <span className="font-semibold text-foreground">{currentIndex + 1}</span>
-          <span className="mx-2 text-base font-light text-foreground/35" aria-hidden>
-            ·
-          </span>
-          <span className="font-medium text-foreground/85">{cards.length}</span>
-          <span className="ml-2 text-sm font-normal text-muted-foreground">in deck</span>
-        </p>
+      <div className="flex items-center justify-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Previous card"
+          onClick={handlePrevious}
+          disabled={previousIndex === -1 || isSubmittingRating}
+        >
+          <ChevronLeft />
+        </Button>
+        <span className="font-sans text-sm tabular-nums text-muted-foreground">
+          Card {currentIndex + 1} of {total}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Next card"
+          onClick={handleNext}
+          disabled={nextIndex === -1 || isSubmittingRating}
+        >
+          <ChevronRight />
+        </Button>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-col items-stretch gap-3 sm:items-center">
+      {/* Reserves the rating grid's height so revealing the answer doesn't shift the card. */}
+      <div className="flex min-h-40 flex-col items-center gap-3 sm:min-h-23">
         {!showAnswer ? (
-          <button
-            type="button"
+          <Button
+            ref={revealRef}
+            className="w-full sm:w-auto sm:min-w-50"
             onClick={handleShowAnswer}
-            className="w-full rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99] sm:w-auto sm:min-w-[200px]"
           >
             Reveal answer
-          </button>
+          </Button>
         ) : (
-          <div className="w-full space-y-3">
-            <p className="text-center font-sans text-sm font-medium leading-snug text-foreground/85">
+          <>
+            <p className="text-center font-sans text-sm text-muted-foreground">
               How well did you know this?
             </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
-              {RATING_BUTTONS.map(({ label, rating, stripeClass }) => (
-                <button
-                  key={rating}
-                  type="button"
-                  onClick={() => void handleRating(rating)}
+            <div className="grid w-full grid-cols-2 gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300 sm:grid-cols-4">
+              {RATINGS.map((r) => (
+                <RatingButton
+                  key={r.rating}
+                  ref={r.rating === "good" ? goodRef : undefined}
+                  config={r}
+                  subtext={srsSubtextForRating(currentCard.proficiency, r.rating)}
+                  onRate={handleRating}
                   disabled={isSubmittingRating}
-                  className={`${RATING_BUTTON_BASE} ${stripeClass}`}
-                >
-                  <div className="font-semibold tracking-tight">{label}</div>
-                  <div className="mt-1.5 font-sans text-xs font-medium tabular-nums leading-snug text-muted-foreground">
-                    {srsSubtextForRating(currentCard.proficiency, rating)}
-                  </div>
-                </button>
+                />
               ))}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

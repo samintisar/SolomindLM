@@ -9,7 +9,12 @@ import {
   Plus,
   RotateCw,
 } from "lucide-react";
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  FlashcardBack,
+  FlashcardFront,
+} from "@/features/studio/components/flashcards/FlashcardContent";
+import { FlipCard } from "@/features/studio/components/flashcards/FlipCard";
 import {
   useAddCard,
   useCardReview,
@@ -20,15 +25,24 @@ import {
   useUpdateFlashcardPreferences,
   useUpdateFlashcardProgress,
 } from "@/features/studio/services/flashcardsApi";
+import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
+import { Progress } from "@/shared/components/ui/progress";
+import { Toggle } from "@/shared/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Flashcard, FlashcardNote } from "@/shared/types/index";
-import { sanitizeMarkdown } from "@/shared/utils";
+import { cn } from "@/shared/utils/cn";
 import { EditCardModal } from "./EditCardModal";
 import { ProficiencyBadge } from "./ProficiencyBadge";
 import { type DueFlashcard, StudyMode } from "./StudyMode";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
 
 export interface FlashcardViewProps {
   note: FlashcardNote;
@@ -36,11 +50,6 @@ export interface FlashcardViewProps {
 }
 
 type ViewMode = "browse" | "study" | "edit";
-
-// Flip visibility swap for the card faces: lands when the card is edge-on (90°), which the default
-// easing reaches ~245ms into the 700ms rotation. Instant under reduced motion, where the rotation
-// itself is instant.
-const FACE_SWAP = "transition-[visibility] duration-0 delay-245 motion-reduce:delay-0";
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
   // State
@@ -198,183 +207,103 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
     await submitCardReview(note.id, cardIndex, rating);
   };
 
-  // Render different card types
-  const renderCardFront = (card: Flashcard) => {
-    const content = sanitizeMarkdown(card.front);
-
-    switch (card.type) {
-      case "true-false":
-        return (
-          <div className="space-y-8 w-full">
-            <div className="prose prose-base sm:prose-lg max-w-none text-center">
-              <Suspense
-                fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}
-              >
-                <MarkdownRenderer>{content}</MarkdownRenderer>
-              </Suspense>
-            </div>
-            <div className="flex justify-center gap-16">
-              <span className="text-xl font-semibold text-emerald-700 dark:text-emerald-400">
-                ✓ True
-              </span>
-              <span className="text-xl font-semibold text-rose-700 dark:text-rose-400">
-                ✗ False
-              </span>
-            </div>
-          </div>
-        );
-
-      case "fill-blank":
-        return (
-          <div className="prose prose-base sm:prose-lg max-w-none text-center w-full">
-            <Suspense
-              fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}
-            >
-              <MarkdownRenderer>{content.replace(/_+/g, "______")}</MarkdownRenderer>
-            </Suspense>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="prose prose-base sm:prose-lg max-w-none text-center w-full">
-            <Suspense
-              fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}
-            >
-              <MarkdownRenderer>{content}</MarkdownRenderer>
-            </Suspense>
-          </div>
-        );
-    }
-  };
-
   const boundedBrowseIndex =
     filteredCards.length === 0 ? 0 : Math.min(Math.max(0, currentIndex), filteredCards.length - 1);
   const currentCard = filteredCards.length > 0 ? filteredCards[boundedBrowseIndex] : undefined;
   const activeStudyCards = mode === "study" ? studySessionCards : dueCards;
 
+  const modeToggles = [
+    { value: "browse", name: "Browse Mode", tip: "Browse", icon: <BookOpen /> },
+    { value: "study", name: "Study Mode", tip: "Study", icon: <Brain /> },
+    { value: "edit", name: "Edit Mode", tip: "Edit", icon: <Edit3 /> },
+  ] as const;
+
   return (
     <div
-      className={`flex flex-col h-full min-h-0 p-4 sm:p-6 lg:p-8 bg-background animate-in fade-in duration-300 gap-4 sm:gap-6 relative ${
-        onBack ? "md:pt-0 pt-16" : ""
-      }`}
+      className={cn(
+        "relative flex h-full min-h-0 flex-col gap-4 bg-background p-4 animate-in fade-in duration-300 sm:gap-6 sm:p-6 lg:p-8",
+        onBack && "pt-16 md:pt-0"
+      )}
     >
       {/* Mobile Back Button */}
       {onBack && (mode === "browse" || mode === "study") && (
-        <div className="md:hidden absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-background z-20">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-muted active:bg-muted/70 rounded-lg transition-colors"
-            aria-label="Back to Studio"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="text-sm font-medium truncate">{note.title}</span>
+        <div className="absolute top-0 right-0 left-0 z-20 flex items-center gap-2 border-b border-border bg-background px-4 py-3 md:hidden">
+          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+            <ArrowLeft />
+          </Button>
+          <span className="truncate text-sm font-medium">{note.title}</span>
         </div>
       )}
 
       {/* Header Controls */}
-      <div className="shrink-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-xl">
-            <button
-              type="button"
-              onClick={() => handleModeChange("browse")}
-              className={`p-2.5 rounded-lg transition-all ${
-                mode === "browse"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Browse Mode"
-              aria-label="Browse Mode"
-            >
-              <BookOpen className="w-4.5 h-4.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeChange("study")}
-              className={`p-2.5 rounded-lg transition-all ${
-                (mode as string) === "study"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              disabled={dueCards.length === 0}
-              title="Study Mode"
-              aria-label="Study Mode"
-            >
-              <Brain className="w-4.5 h-4.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeChange("edit")}
-              className={`p-2.5 rounded-lg transition-all ${
-                mode === "edit"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              }`}
-              title="Edit Mode"
-              aria-label="Edit Mode"
-            >
-              <Edit3 className="w-4.5 h-4.5" />
-            </button>
-          </div>
+          <ButtonGroup variant="tray" aria-label="Mode">
+            {modeToggles.map(({ value, name, tip, icon }) => (
+              <Tooltip key={value}>
+                {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
+                <TooltipTrigger asChild>
+                  <Toggle
+                    size="sm"
+                    pressed={mode === value}
+                    onPressedChange={(pressed) => {
+                      if (pressed) handleModeChange(value);
+                    }}
+                    disabled={value === "study" && dueCards.length === 0}
+                    aria-label={name}
+                  >
+                    {icon}
+                  </Toggle>
+                </TooltipTrigger>
+                <TooltipContent>{tip}</TooltipContent>
+              </Tooltip>
+            ))}
+          </ButtonGroup>
 
           {mode === "browse" && currentCard && <ProficiencyBadge card={currentCard} />}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           {mode === "browse" && (
-            <div
-              className="flex items-center gap-0.5 p-1 bg-muted/50 rounded-xl"
-              role="group"
-              aria-label="Which cards to show"
-            >
-              <button
-                type="button"
-                onClick={() => void setShowMasteredPreference(false)}
-                className={`rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm ${
-                  !showMastered
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
+            <ButtonGroup variant="tray" aria-label="Which cards to show">
+              <Toggle
+                size="sm"
+                pressed={!showMastered}
+                onPressedChange={(pressed) => {
+                  if (pressed) void setShowMasteredPreference(false);
+                }}
               >
-                Due
-              </button>
-              <button
-                type="button"
-                onClick={() => void setShowMasteredPreference(true)}
-                className={`rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm ${
-                  showMastered
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
+                <span className="px-1.5">Due</span>
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={showMastered}
+                onPressedChange={(pressed) => {
+                  if (pressed) void setShowMasteredPreference(true);
+                }}
               >
-                All
-              </button>
-            </div>
+                <span className="px-1.5">All</span>
+              </Toggle>
+            </ButtonGroup>
           )}
 
           {mode === "study" && activeStudyCards.length > 0 && (
-            <span className="tabular-nums text-sm font-medium leading-none text-foreground/90">
+            <span className="font-sans text-sm leading-none font-medium text-foreground tabular-nums">
               {activeStudyCards.length}
               <span className="ml-1 font-normal text-muted-foreground">due</span>
             </span>
           )}
 
           {mode === "edit" && (
-            <button
-              type="button"
-              onClick={handleAddCard}
-              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-medium transition-all"
-            >
-              <Plus className="w-4 h-4" />
+            <Button size="sm" onClick={handleAddCard}>
+              <Plus />
               Add Card
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
         {mode === "study" && activeStudyCards.length > 0 && (
           <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center pb-1">
             <StudyMode
@@ -387,234 +316,131 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
         )}
 
         {mode === "study" && activeStudyCards.length === 0 && (
-          <div className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/20">
-              <Brain className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <h3 className="mb-2 text-2xl font-semibold">All caught up</h3>
-              <p className="text-muted-foreground">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Brain />
+              </EmptyMedia>
+              <EmptyTitle>All caught up</EmptyTitle>
+              <EmptyDescription>
                 No cards are due for review right now. Check back later.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleModeChange("browse")}
-              className="rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition-all hover:bg-primary/90"
-            >
-              Back to browse
-            </button>
-          </div>
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={() => handleModeChange("browse")}>Back to browse</Button>
+            </EmptyContent>
+          </Empty>
         )}
 
         {(mode === "browse" || mode === "edit") &&
           filteredCards.length === 0 &&
           displayNote.status === "failed" && (
-            <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
-              </div>
-              <div>
-                <p className="text-lg font-medium text-foreground">Generation failed</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <AlertTriangle className="text-destructive" />
+                </EmptyMedia>
+                <EmptyTitle>Generation failed</EmptyTitle>
+                <EmptyDescription>
                   {displayNote.metadata?.error ||
                     "Something went wrong while generating these flashcards."}
-                </p>
-              </div>
+                </EmptyDescription>
+              </EmptyHeader>
               {onBack && (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition-all hover:bg-primary/90"
-                >
-                  Back to Studio to try again
-                </button>
+                <EmptyContent>
+                  <Button onClick={onBack}>Back to Studio to try again</Button>
+                </EmptyContent>
               )}
-            </div>
+            </Empty>
           )}
 
         {(mode === "browse" || mode === "edit") &&
           filteredCards.length === 0 &&
           displayNote.status !== "failed" && (
-            <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
-                <BookOpen className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-lg text-muted-foreground">
-                {showMastered
-                  ? "No flashcards available. Try showing all cards."
-                  : "No flashcards available. All cards are mastered!"}
-              </p>
-            </div>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <BookOpen />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {showMastered ? "No flashcards yet" : "All cards are mastered!"}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {showMastered
+                    ? "Cards will show up here once they are added."
+                    : "Show all cards to review them."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
 
         {(mode === "browse" || mode === "edit") && filteredCards.length > 0 && currentCard && (
           <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6">
-            {/* Card Display */}
-            <div
-              role={mode === "browse" ? "button" : undefined}
-              tabIndex={mode === "browse" ? 0 : undefined}
-              aria-label={
-                mode === "browse"
-                  ? isFlipped
-                    ? "Flashcard answer. Press Enter or Space to show question."
-                    : "Flashcard question. Press Enter or Space to reveal answer."
-                  : undefined
+            <FlipCard
+              flipped={isFlipped}
+              front={<FlashcardFront card={currentCard} />}
+              back={<FlashcardBack card={currentCard} />}
+              frontFooter={
+                <p
+                  className={cn(
+                    "mt-2 flex shrink-0 items-center gap-1.5 font-sans text-sm",
+                    mode === "edit" ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <RotateCw className="size-3 opacity-70" aria-hidden />
+                  <span>{mode === "browse" ? "Tap or Space to flip" : "Tap to edit"}</span>
+                </p>
               }
-              onKeyDown={(e) => {
-                if (mode !== "browse") return;
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setIsFlipped((f) => !f);
-                }
-              }}
-              className={`w-full max-w-xl mx-auto h-[min(40vh,22rem)] min-h-56 max-h-96 shrink-0 perspective-1000 group cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                mode === "edit" ? "cursor-pointer" : ""
-              }`}
-              onClick={() => {
+              backFooter={
+                mode === "browse" ? (
+                  <p className="mt-2 flex shrink-0 items-center gap-1.5 font-sans text-sm text-muted-foreground">
+                    <RotateCw className="size-3 opacity-70" aria-hidden />
+                    <span>Tap or Space to flip back</span>
+                  </p>
+                ) : undefined
+              }
+              onActivate={() => {
                 if (mode === "browse") {
                   setIsFlipped(!isFlipped);
                 } else if (mode === "edit") {
                   handleEditCard(boundedBrowseIndex);
                 }
               }}
-            >
-              <div
-                className={`relative w-full h-full transition-transform duration-700 motion-reduce:transition-none transform-style-3d shadow-lg rounded-2xl ${
-                  isFlipped ? "rotate-y-180" : ""
-                } ${mode === "edit" ? "ring-2 ring-primary ring-offset-2" : ""}`}
-              >
-                {/* Front. backface-visibility alone is unreliable (composited descendants such
-                    as the scroll area can ignore it and bleed through mirrored), so the inactive
-                    face is also hidden. The swap waits for the edge-on midpoint of the flip. */}
-                <div
-                  className={`absolute inset-0 backface-hidden ${FACE_SWAP} ${
-                    isFlipped ? "invisible" : "visible"
-                  } bg-card rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border`}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
-                    Question
-                  </span>
-                  <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg font-medium text-foreground [scrollbar-gutter:stable]">
-                    <div className="min-h-full w-full flex flex-col items-center justify-center py-1">
-                      {renderCardFront(currentCard)}
-                    </div>
-                  </div>
-                  <p
-                    className={`mt-2 flex items-center justify-center gap-1.5 text-sm shrink-0 ${
-                      mode === "browse" ? "text-muted-foreground" : "text-primary"
-                    }`}
-                  >
-                    <RotateCw className="h-3 w-3 opacity-70" aria-hidden />
-                    <span>{mode === "browse" ? "Tap or Space to flip" : "Tap to edit"}</span>
-                  </p>
-                </div>
+              label={
+                mode === "browse"
+                  ? isFlipped
+                    ? "Flashcard answer. Press Enter or Space to show question."
+                    : "Flashcard question. Press Enter or Space to reveal answer."
+                  : "Edit this flashcard"
+              }
+              tone={mode === "edit" ? "edit" : "default"}
+              className="mx-auto max-w-xl"
+            />
 
-                {/* Back */}
-                <div
-                  className={`absolute inset-0 backface-hidden rotate-y-180 ${FACE_SWAP} ${
-                    isFlipped ? "visible" : "invisible"
-                  } bg-muted/30 rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border`}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
-                    Answer
-                  </span>
-                  <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg font-medium text-foreground [scrollbar-gutter:stable]">
-                    <div className="min-h-full w-full flex flex-col items-center justify-center py-1 prose prose-base sm:prose-lg max-w-none text-center">
-                      <Suspense
-                        fallback={
-                          <div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />
-                        }
-                      >
-                        <MarkdownRenderer
-                          components={{
-                            img: () => null,
-                            a: ({ children }) => (
-                              <span className="text-foreground">{children}</span>
-                            ),
-                            video: () => null,
-                            audio: () => null,
-                            iframe: () => null,
-                            table: ({ children }) => (
-                              <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
-                                {children}
-                              </table>
-                            ),
-                            thead: ({ children }) => (
-                              <thead className="bg-muted/50">{children}</thead>
-                            ),
-                            tbody: ({ children }) => <tbody>{children}</tbody>,
-                            tr: ({ children }) => (
-                              <tr className="border-b border-border">{children}</tr>
-                            ),
-                            th: ({ children }) => (
-                              <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
-                                {children}
-                              </th>
-                            ),
-                            td: ({ children }) => (
-                              <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
-                                {children}
-                              </td>
-                            ),
-                          }}
-                        >
-                          {sanitizeMarkdown(currentCard.back)}
-                        </MarkdownRenderer>
-                      </Suspense>
-                    </div>
-                  </div>
-                  {mode === "browse" && (
-                    <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-muted-foreground shrink-0">
-                      <RotateCw className="h-3 w-3 opacity-70" aria-hidden />
-                      <span>Tap or Space to flip back</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Navigation: progress + circular arrows (distinct from header segments) */}
-            <div className="flex w-full max-w-xl mx-auto shrink-0 flex-col items-stretch gap-2.5">
+            {/* Navigation: previous, progress, next */}
+            <div className="mx-auto flex w-full max-w-xl shrink-0 flex-col items-stretch gap-2.5">
               <div className="flex items-center gap-3 sm:gap-4">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="icon"
                   onClick={handlePrev}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
                   aria-label="Previous card"
                 >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <div
-                  className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
-                  role="progressbar"
-                  aria-valuemin={1}
-                  aria-valuemax={filteredCards.length}
-                  aria-valuenow={boundedBrowseIndex + 1}
+                  <ChevronLeft />
+                </Button>
+                <Progress
+                  value={((boundedBrowseIndex + 1) / filteredCards.length) * 100}
+                  size="sm"
                   aria-label={`Card ${boundedBrowseIndex + 1} of ${filteredCards.length}`}
-                >
-                  <div
-                    className="h-full rounded-full bg-foreground/25 transition-[width] duration-300 ease-out dark:bg-foreground/35"
-                    style={{
-                      width: `${((boundedBrowseIndex + 1) / filteredCards.length) * 100}%`,
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
-                  aria-label="Next card"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
+                  getValueLabel={() => `Card ${boundedBrowseIndex + 1} of ${filteredCards.length}`}
+                  className="flex-1"
+                />
+                <Button variant="secondary" size="icon" onClick={handleNext} aria-label="Next card">
+                  <ChevronRight />
+                </Button>
               </div>
-              <p className="text-center text-sm tabular-nums leading-snug text-muted-foreground">
-                <span className="font-semibold text-foreground">{boundedBrowseIndex + 1}</span>
-                <span className="mx-2 text-base font-light text-foreground/35" aria-hidden>
-                  ·
-                </span>
-                <span className="font-medium text-foreground/85">{filteredCards.length}</span>
+              <p className="text-center font-sans text-sm text-muted-foreground tabular-nums">
+                {boundedBrowseIndex + 1} of {filteredCards.length}
               </p>
             </div>
           </div>
@@ -634,21 +460,6 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
         }}
         onDelete={editingCardIndex !== undefined ? handleDeleteCard : undefined}
       />
-
-      <style>{`
-        .perspective-1000 {
-          perspective: 1000px;
-        }
-        .transform-style-3d {
-          transform-style: preserve-3d;
-        }
-        .backface-hidden {
-          backface-visibility: hidden;
-        }
-        .rotate-y-180 {
-          transform: rotateY(180deg);
-        }
-      `}</style>
     </div>
   );
 };

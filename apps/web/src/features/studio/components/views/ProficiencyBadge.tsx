@@ -1,4 +1,5 @@
 import { Flashcard } from "@/shared/types";
+import { cn } from "@/shared/utils/cn";
 
 interface ProficiencyBadgeProps {
   card: Flashcard;
@@ -17,21 +18,21 @@ export function ProficiencyBadge({ card }: ProficiencyBadgeProps) {
 
   if (interval >= 21) {
     label = "Mastered";
-    dotClass = "bg-emerald-500/80 dark:bg-emerald-400/80";
+    dotClass = "bg-success";
   } else if (interval >= 7) {
     label = "Learning";
-    dotClass = "bg-sky-500/80 dark:bg-sky-400/80";
+    dotClass = "bg-info";
   } else if (streak >= 3) {
     label = `${streak}-day streak`;
-    dotClass = "bg-amber-500/80 dark:bg-amber-400/80";
+    dotClass = "bg-warning";
   } else if (proficiency?.totalReviews && proficiency.totalReviews > 0) {
     const accuracy = proficiency.correctCount / proficiency.totalReviews;
     if (accuracy >= 0.7) {
       label = "Progressing";
-      dotClass = "bg-violet-500/80 dark:bg-violet-400/80";
+      dotClass = "bg-primary";
     } else {
       label = "Learning";
-      dotClass = "bg-sky-500/80 dark:bg-sky-400/80";
+      dotClass = "bg-info";
     }
   } else {
     label = "New";
@@ -40,7 +41,7 @@ export function ProficiencyBadge({ card }: ProficiencyBadgeProps) {
 
   return (
     <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-xl ${dotClass}`} aria-hidden />
+      <span className={cn("size-1.5 shrink-0 rounded-full", dotClass)} aria-hidden />
       <span>{label}</span>
     </span>
   );

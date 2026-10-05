@@ -817,6 +817,7 @@
 }
 
 .prose pre {
+  text-align: left;
   color: var(--foreground);
   background-color: var(--muted);
   overflow-x: auto;
@@ -1174,6 +1175,17 @@
 /* Studio: --studio-tone carries a type colour into decorations (studio-tone-flashcard, …). */
 @utility studio-tone-* {
   --studio-tone: --value(--color-studio-*);
+}
+
+/* One slice of a stacked progress bar; width comes from --studio-segment (style may only set custom properties) and eases when it changes. */
+@utility studio-segment {
+  width: var(--studio-segment, 0%);
+  transition-property: width;
+}
+
+/* A flip-card face swaps visibility and opacity only (a precise property list, not transition-all). */
+@utility studio-face-swap {
+  transition-property: visibility, opacity;
 }
 
 /* Studio: a soft light in the type colour sweeping across a generating Saved row (spec §1).
