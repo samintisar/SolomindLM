@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { FlipCard } from "./FlipCard";
@@ -35,5 +35,35 @@ describe("FlipCard", () => {
   it("is not a button when it has no action", () => {
     render(<FlipCard flipped={false} front="Q" back="A" />);
     expect(screen.queryByRole("button")).toBeNull();
+  });
+  it("ignores repeated keydowns so holding Space does not flip back and forth", () => {
+    const onActivate = vi.fn();
+    render(<FlipCard flipped={false} front="Q" back="A" onActivate={onActivate} label="Card" />);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Card" }), { key: " ", repeat: true });
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it("ignores keys pressed on a control inside the card", () => {
+    const onActivate = vi.fn();
+    render(
+      <FlipCard
+        flipped={false}
+        front={<button type="button">Inner</button>}
+        back="A"
+        onActivate={onActivate}
+        label="Card"
+      />
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "Inner" }), { key: "Enter" });
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it("only names the card when it is interactive", () => {
+    const { container, rerender } = render(
+      <FlipCard flipped={false} front="Q" back="A" label="Card" />
+    );
+    expect(container.firstElementChild).not.toHaveAttribute("aria-label");
+    rerender(<FlipCard flipped={false} front="Q" back="A" label="Card" onActivate={() => {}} />);
+    expect(container.firstElementChild).toHaveAttribute("aria-label", "Card");
   });
 });

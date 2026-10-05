@@ -21,7 +21,8 @@ interface RatingButtonProps {
 export function RatingButton({ config, subtext, onRate, disabled, ref }: RatingButtonProps) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
+      {/* Focus must not open the hint: study mode focuses Good after Reveal. Hover still does. */}
+      <TooltipTrigger asChild onFocus={(event) => event.preventDefault()}>
         <button
           ref={ref}
           type="button"

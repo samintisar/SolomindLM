@@ -21,7 +21,7 @@ interface FlipCardProps {
 // can bleed through mirrored), so the hidden face is also made invisible. Under reduced motion
 // nothing turns and the faces cross-fade over 200ms.
 const FACE =
-  "absolute inset-0 flex flex-col items-center overflow-hidden rounded-2xl p-5 text-center shadow-lg ring-1 ring-hairline backface-hidden transition-all delay-245 duration-0 data-[shown=false]:invisible data-[shown=false]:opacity-0 sm:p-6 motion-reduce:delay-0 motion-reduce:duration-200";
+  "absolute inset-0 flex flex-col items-center overflow-hidden rounded-2xl p-5 text-center shadow-lg ring-1 ring-hairline backface-hidden studio-face-swap delay-245 duration-0 data-[shown=false]:invisible data-[shown=false]:opacity-0 sm:p-6 motion-reduce:delay-0 motion-reduce:duration-200";
 
 export function FlipCard({
   flipped,
@@ -39,18 +39,18 @@ export function FlipCard({
     <div
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={label}
+      aria-label={interactive ? label : undefined}
       onClick={onActivate}
       onKeyDown={(event) => {
-        if (!onActivate) return;
+        if (!onActivate || event.repeat || event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onActivate();
         }
       }}
       className={cn(
-        "group h-72 w-full shrink-0 rounded-2xl outline-hidden perspective-distant focus-visible:ring-2 focus-visible:ring-ring sm:h-80",
-        interactive && "cursor-pointer",
+        "h-72 w-full shrink-0 rounded-2xl outline-hidden perspective-distant focus-visible:ring-2 focus-visible:ring-ring sm:h-80",
+        interactive && "group cursor-pointer",
         className
       )}
     >
@@ -78,7 +78,7 @@ export function FlipCard({
           data-shown={flipped}
           className={cn(
             FACE,
-            "bg-muted/40 rotate-y-180 motion-reduce:rotate-y-0",
+            "bg-muted rotate-y-180 motion-reduce:rotate-y-0",
             tone === "edit" && "ring-2 ring-primary/40"
           )}
         >

@@ -44,10 +44,12 @@ function Skeleton() {
 export function FlashcardFront({ card }: { card: Flashcard }) {
   const text = card.type === "fill-blank" ? card.front.replace(/_+/g, "______") : card.front;
   const body = (
-    <div className="prose max-w-none text-center">
-      <Suspense fallback={<Skeleton />}>
-        <MarkdownRenderer>{sanitizeMarkdown(text)}</MarkdownRenderer>
-      </Suspense>
+    <div className="w-full min-w-0 overflow-x-auto">
+      <div className="prose max-w-none text-center">
+        <Suspense fallback={<Skeleton />}>
+          <MarkdownRenderer>{sanitizeMarkdown(text)}</MarkdownRenderer>
+        </Suspense>
+      </div>
     </div>
   );
 
@@ -63,7 +65,7 @@ export function FlashcardFront({ card }: { card: Flashcard }) {
     );
   }
 
-  return <div className="w-full">{body}</div>;
+  return body;
 }
 
 /** The answer side of a card: markdown with media stripped; wide maths scrolls sideways. */

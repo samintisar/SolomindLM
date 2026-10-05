@@ -31,7 +31,7 @@ export const RATINGS: readonly RatingConfig[] = [
     rating: "hard",
     label: "Hard",
     key: "2",
-    toneText: "text-warning",
+    toneText: "text-warning-muted-foreground",
     toneHover: "hover:bg-warning-muted",
     toneBar: "bg-warning",
     throwClass: "zoom-out-95",
