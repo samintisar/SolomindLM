@@ -56,3 +56,14 @@ export function normalizeStoredQuizQuestion(q: QuizQuestion): QuizQuestion {
   const { options, answer } = coerceToFourOptions(stripped, q.answer);
   return { ...q, options, answer };
 }
+
+/**
+ * Maps a stored pick (an index into the raw options) to the option shown after
+ * `normalizeStoredQuizQuestion`, so it can be compared with the normalized answer.
+ */
+export function toDisplayPick(raw: QuizQuestion, pick: number): number {
+  if (raw.options.length === 5 && pick === 4) return 3;
+  const shown = normalizeStoredQuizQuestion(raw).options.length;
+  if (pick >= shown) return shown - 1;
+  return pick;
+}

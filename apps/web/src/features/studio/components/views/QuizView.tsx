@@ -14,7 +14,11 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { QuizNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
-import { normalizeStoredQuizQuestion, stripQuizOptionLabel } from "@/shared/utils/quizOptionLabels";
+import {
+  normalizeStoredQuizQuestion,
+  stripQuizOptionLabel,
+  toDisplayPick,
+} from "@/shared/utils/quizOptionLabels";
 import { useStreak } from "../../motion/useStreak";
 import { QuestionProgress } from "../practice/QuestionProgress";
 import { type OptionState, QuizOption } from "../practice/QuizOption";
@@ -146,7 +150,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
       questions.map((question, position) => {
         const picked = userAnswers[position];
         if (picked === undefined) return undefined;
-        return picked === question.answer ? "correct" : "incorrect";
+        const correct =
+          toDisplayPick(question, picked) === normalizeStoredQuizQuestion(question).answer;
+        return correct ? "correct" : "incorrect";
       }),
     [questions, userAnswers]
   );
@@ -160,11 +166,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     const correct = index === displayQuestion.answer;
     record(correct);
     if (correct) setCelebrated({ question: currentIndex, option: index });
-    setAnnouncement(
-      correct
-        ? "Correct."
-        : `Incorrect. The answer is ${String.fromCharCode(65 + displayQuestion.answer)}.`
-    );
+    setAnnouncement(correct ? "Correct." : "Incorrect. The correct answer is marked.");
     focusNextPending.current = true;
 
     // Submit to server in the background
@@ -183,12 +185,15 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
         return newState;
       });
       setAnnouncement("");
+      setCelebrated(null);
+      resetStreak();
     }
   };
 
   const handleNext = () => {
     setShowHint(false);
     setAnnouncement("");
+    setCelebrated(null);
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
@@ -199,6 +204,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   const handlePrev = () => {
     setShowHint(false);
     setAnnouncement("");
+    setCelebrated(null);
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
     }
@@ -236,6 +242,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     setReviewMode(true);
     setShowHint(false);
     setAnnouncement("");
+    setCelebrated(null);
   };
 
   const optionState = (position: number): OptionState => {
@@ -296,7 +303,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
       <div className="min-h-0 flex-1 overflow-y-auto bg-card">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-6 md:p-12">
           {reviewMode && (
-            <Alert variant="warning">
+            <Alert variant="warning" role="note">
               <Eye />
               <AlertTitle>Review Mode</AlertTitle>
               <AlertDescription>
@@ -410,7 +417,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
               Previous
             </Button>
             <span
-              key={`next-${currentIndex}-${isAnswered}`}
               className={cn("inline-flex", isAnswered && !reviewMode && "animate-studio-nudge")}
             >
               <Button ref={nextButtonRef} size="sm" className="min-w-25" onClick={handleNext}>
