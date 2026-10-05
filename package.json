@@ -24,6 +24,7 @@
     "typecheck:convex": "bun x tsgo --noEmit -p convex/tsconfig.json",
     "typecheck:evals": "bun x tsgo --noEmit -p evals/tsconfig.json",
     "verify:convex-deps": "node scripts/verify-convex-deps.mjs",
+    "check:convex-codegen": "node scripts/check-convex-codegen.mjs",
     "typecheck:web": "bun x tsgo --noEmit -p apps/web/tsconfig.json",
     "typecheck:mobile": "bun x tsgo --noEmit -p apps/mobile/tsconfig.json",
     "convex:env:pull": "node scripts/pull-convex-env.mjs",
