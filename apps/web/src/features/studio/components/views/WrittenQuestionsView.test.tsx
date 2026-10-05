@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -592,5 +592,65 @@ describe("WrittenQuestionsView redesign", () => {
     await user.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByText("Graded: 3 of 5 points.");
     expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
+  });
+
+  it("does not steal focus or announce when a slow grade lands after the learner moved on", async () => {
+    let resolveGrade: (value: { score: number; maxScore: number }) => void = () => {};
+    submitAnswer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveGrade = resolve;
+        })
+    );
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    const q2Answer = screen.getByPlaceholderText(/Type your short answer/i);
+    await user.type(q2Answer, "half typed");
+
+    await act(async () => resolveGrade({ score: 5, maxScore: 5 }));
+
+    expect(q2Answer).toHaveFocus();
+    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+    expect(screen.queryByText(/Graded: /)).not.toBeInTheDocument();
+  });
+
+  it("counts the score up when the reactive echo lands before the submit resolves", async () => {
+    let resolveGrade: (value: { score: number; maxScore: number }) => void = () => {};
+    submitAnswer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveGrade = resolve;
+        })
+    );
+    latestNote = makeNote();
+    const user = userEvent.setup();
+    const { rerender } = render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    // The server write lands (reactive echo) while the submit promise is still pending.
+    latestNote = makeNote({
+      userAnswers: { q1: { answer: "a", graded: true, score: 4, maxScore: 5 } },
+    });
+    rerender(<WrittenQuestionsView note={makeNote()} />);
+    expect(await screen.findByText("Answer Graded")).toBeInTheDocument();
+    expect(screen.getByText("0 / 5")).toBeInTheDocument();
+
+    await act(async () => resolveGrade({ score: 4, maxScore: 5 }));
+    await waitFor(() => expect(screen.getByText("4 / 5")).toBeInTheDocument(), { timeout: 3000 });
+  });
+
+  it("ignores a second Submit click while the grade is pending", async () => {
+    submitAnswer.mockResolvedValueOnce({ score: 5, maxScore: 5 });
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("Graded: 5 of 5 points.");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(submitAnswer).toHaveBeenCalledTimes(1);
   });
 });

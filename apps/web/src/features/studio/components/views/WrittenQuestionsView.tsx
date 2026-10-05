@@ -102,7 +102,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const [justGraded, setJustGraded] = useState<{ id: string; fullMarks: boolean } | null>(null);
   // Spoken after a grade arrives (never on a restored or review view).
   const [announcement, setAnnouncement] = useState("");
+  // The question whose grade is in flight; keeps its score counting up even if the
+  // reactive echo marks it graded before the submit promise resolves.
+  const [gradingId, setGradingId] = useState<string | null>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   // Track if we've initialized the index from saved progress
   const hasInitializedIndex = useRef(false);
@@ -292,25 +296,37 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     return got > 0 ? "partial" : "incorrect";
   });
 
-  const handleSubmitAnswer = async () => {
-    if (!isAnswered || isSubmitting) return;
+  // A grade is in flight, or has just come back and the reactive echo hasn't landed yet.
+  const gradePending = gradingId === currentQuestion.id || justGraded?.id === currentQuestion.id;
 
+  const handleSubmitAnswer = async () => {
+    if (!isAnswered || isSubmitting || gradePending) return;
+
+    const submittedId = currentQuestion.id;
     setIsSubmitting(true);
+    setGradingId(submittedId);
 
     try {
       // Submit answer for grading - now synchronous, returns graded result
       const result = await submitAnswerMutation({
         writtenQuestionsId: note.id,
-        questionId: currentQuestion.id,
+        questionId: submittedId,
         answer: currentAnswer,
       });
 
       const fullMarks = result.maxScore > 0 && result.score >= result.maxScore;
       record(fullMarks);
-      setJustGraded({ id: currentQuestion.id, fullMarks });
-      setAnnouncement(`Graded: ${result.score} of ${result.maxScore} points.`);
-      // Submit is about to disappear; keep keyboard focus on the way forward.
-      nextButtonRef.current?.focus({ preventScroll: true });
+      setJustGraded({ id: submittedId, fullMarks });
+      // Grading takes seconds: only speak and move focus if the learner is still on this
+      // question and isn't typing elsewhere (a focus jump onto Next could trigger Finish).
+      if (currentQuestionIdRef.current === submittedId) {
+        setAnnouncement(`Graded: ${result.score} of ${result.maxScore} points.`);
+        const active = document.activeElement;
+        if (!active || active === document.body || active === submitButtonRef.current) {
+          // Submit is about to disappear; keep keyboard focus on the way forward.
+          nextButtonRef.current?.focus({ preventScroll: true });
+        }
+      }
 
       // The useEffect will sync userAnswers from latestNote when the database updates
       // Just notify parent of the update
@@ -322,6 +338,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       alert(error instanceof Error ? error.message : "Failed to submit answer");
     } finally {
       setIsSubmitting(false);
+      setGradingId(null);
     }
   };
 
@@ -667,7 +684,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
                     }
                     disabled={reviewMode}
                     data-answered={isAnswered ? "true" : undefined}
-                    className="w-full flex-1 resize-none rounded-xl bg-background p-6 font-serif text-base leading-relaxed shadow-xs ring-1 ring-hairline outline-hidden transition-shadow placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70 data-[answered=true]:ring-primary/40"
+                    className="w-full flex-1 resize-none rounded-xl bg-background p-6 font-serif text-base leading-relaxed shadow-xs ring-1 ring-hairline outline-hidden transition-shadow placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70 not-focus-visible:data-[answered=true]:ring-primary/40"
                   />
                   {isSubmitting ? (
                     <span
@@ -695,7 +712,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
                           <GradedScore
                             score={currentGradedResult.score}
                             maxScore={currentGradedResult.maxScore}
-                            duration={isFreshGrade ? 900 : 0}
+                            duration={isFreshGrade || gradingId === currentQuestion.id ? 900 : 0}
                           />
                         </div>
                       </div>
@@ -716,7 +733,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
                 </div>
 
                 {/* Your Answer */}
-                <div className="rounded-xl bg-secondary/30 p-4 animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards delay-100 duration-300">
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards delay-100 duration-300">
                   <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     Your Answer
                   </span>
@@ -801,10 +818,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
 
           {!isGraded && !reviewMode && (
             <Button
+              ref={submitButtonRef}
               size="sm"
               className="min-w-25"
               onClick={handleSubmitAnswer}
-              disabled={!isAnswered || isSubmitting}
+              disabled={!isAnswered || isSubmitting || gradePending}
             >
               {isSubmitting ? <Spinner /> : <CheckCircle2 />}
               {isSubmitting ? "Grading…" : "Submit"}
