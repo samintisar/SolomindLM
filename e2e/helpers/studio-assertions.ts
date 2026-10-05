@@ -9,7 +9,7 @@ export const TOOL_LABELS = [
   "Reports",
   "Flashcards",
   "Quiz",
-  "Slide Deck",
+  "Infographic",
   "Written Questions",
   "Spreadsheets",
 ] as const;

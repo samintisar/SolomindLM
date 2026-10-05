@@ -255,7 +255,10 @@ describe("shadcn ui components render", () => {
         x
       </Card>
     );
-    expect(screen.getByTestId("tile").className).toContain("data-[selected=true]:ring-primary/40");
+    const tile = screen.getByTestId("tile");
+    expect(tile).toHaveAttribute("data-selected", "true");
+    expect(tile).toHaveAttribute("data-variant", "interactive");
+    expect(tile.className).toContain("data-[selected=true]:ring-primary/40");
   });
 
   it("design-system variants render: Card flush + interactive, Button ghost-destructive, ToggleGroup swatch", () => {
