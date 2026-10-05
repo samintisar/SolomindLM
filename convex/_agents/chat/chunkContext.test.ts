@@ -112,3 +112,95 @@ describe("selectChunksByTokenBudgetWithReservation", () => {
 it("keeps a list-query cap large enough for long enumerations", () => {
   expect(LIST_QUERY_MAX_SELECTED_CHUNKS).toBeGreaterThanOrEqual(24);
 });
+
+describe("selectChunksByTokenBudget across several documents (#347)", () => {
+  // Documents are chunked at up to ~1000 tokens, so an 8000-token budget holds ~8 passages.
+  const PASSAGE = "word ".repeat(800);
+  const passage = (documentId: string, chunkIndex: number, similarity: number) =>
+    chunk({ sourceId: `src-${documentId}`, documentId, chunkIndex, content: PASSAGE, similarity });
+  const keysOf = (chunks: ReferenceChunk[]) => new Set(chunks.map(chunkDedupKey));
+  const docs = (chunks: ReferenceChunk[]) => new Set(chunks.map((c) => c.documentId));
+  const dominant = () => Array.from({ length: 25 }, (_, i) => passage("A", i, 0.95 - i * 0.01));
+
+  it("gives every relevant source a share and widens the budget per extra source", () => {
+    const others = [passage("B", 0, 0.6), passage("B", 1, 0.55), passage("C", 0, 0.5)];
+    const pool = [...dominant(), ...others];
+
+    const selected = selectChunksByTokenBudget(pool, undefined, 0.35, {
+      maxContextTokens: 8000,
+      rerankedKeys: keysOf(pool),
+    });
+
+    expect(docs(selected)).toEqual(new Set(["A", "B", "C"]));
+    expect(selected.filter((c) => c.documentId === "B")).toHaveLength(2);
+    // 3 relevant sources: 8000 + 2 × 4000 tokens, about 16 passages.
+    expect(selected).toHaveLength(16);
+    const scores = selected.map((c) => c.similarity ?? 0);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+  });
+
+  it("caps the extra budget however many sources are relevant", () => {
+    const pool = [...dominant(), ...["B", "C", "D", "E", "F", "G"].map((d) => passage(d, 0, 0.5))];
+
+    const selected = selectChunksByTokenBudget(pool, undefined, 0.35, {
+      maxContextTokens: 8000,
+      rerankedKeys: keysOf(pool),
+    });
+
+    expect(selected).toHaveLength(20);
+  });
+
+  it("ignores selected sources whose passages the rerank never scored", () => {
+    // 10 sources selected, the question is about A: the others surface one passage each that
+    // missed the rerank and still carries its ~0.5 vector similarity.
+    const a = dominant();
+    const strays = ["B", "C", "D", "E", "F", "G", "H", "I", "J"].map((d) => passage(d, 0, 0.5));
+
+    const selected = selectChunksByTokenBudget([...a, ...strays], undefined, 0.35, {
+      maxContextTokens: 8000,
+      rerankedKeys: keysOf(a),
+    });
+
+    expect(docs(selected)).toEqual(new Set(["A"]));
+    expect(selected).toHaveLength(8);
+  });
+
+  it("does not count a source whose reranked passages fall below the relevance floor", () => {
+    const pool = [...dominant(), passage("B", 0, 0.2)];
+
+    const selected = selectChunksByTokenBudget(pool, undefined, 0.35, {
+      maxContextTokens: 8000,
+      rerankedKeys: keysOf(pool),
+    });
+
+    expect(docs(selected)).toEqual(new Set(["A"]));
+  });
+
+  it("falls back to plain score order when there are no rerank scores", () => {
+    const pool = [...dominant(), passage("B", 0, 0.6), passage("C", 0, 0.5)];
+
+    const selected = selectChunksByTokenBudget(pool, undefined, 0.35, { maxContextTokens: 8000 });
+
+    expect(docs(selected)).toEqual(new Set(["A"]));
+    expect(selected).toHaveLength(8);
+  });
+});
+
+describe("selectChunksByTokenBudgetWithReservation without external sources", () => {
+  it("gives the whole budget to notebook passages", () => {
+    const passages = Array.from({ length: 30 }, (_, i) =>
+      chunk({
+        sourceId: "n1",
+        chunkIndex: i,
+        content: "retrieved passage text ".repeat(52),
+        similarity: 0.9,
+      })
+    );
+
+    const selected = selectChunksByTokenBudgetWithReservation(passages, [], undefined, 0.35, {
+      maxContextTokens: 8000,
+    });
+
+    expect(selected.length).toBeGreaterThan(20);
+  });
+});

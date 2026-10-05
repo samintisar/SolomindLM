@@ -16,6 +16,15 @@ export const MIN_RELEVANCE_THRESHOLD = parseFloat(env.CHAT_MIN_RELEVANCE_THRESHO
 export const CONTEXT_TOKEN_BUDGET = parseInt(env.CHAT_CONTEXT_TOKEN_BUDGET, 10);
 export const MAX_CHUNKS_HARD_LIMIT = parseInt(env.CHAT_MAX_CHUNKS_HARD_LIMIT, 10);
 
+/** Passages each relevant source is guaranteed when a question draws on several sources. */
+export const MIN_PASSAGES_PER_DOCUMENT = 2;
+
+/** Extra context tokens per additional relevant source, so guaranteed shares do not eat the budget. */
+export const MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT = 4000;
+
+/** Cap on the extra tokens multi-source questions add (8000 base → at most 20000). */
+export const MULTI_SOURCE_MAX_EXTRA_TOKENS = 12000;
+
 /** Max chunks passed to the LLM for list/enumeration questions after global rerank. */
 export const LIST_QUERY_MAX_SELECTED_CHUNKS = 24;
 

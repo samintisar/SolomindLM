@@ -11,6 +11,7 @@ import { resolveSmartModel } from "../_lib/resolveSmartModel";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
 import {
   createChatVectorSearchRunner,
+  createFetchDocumentFn,
   createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
@@ -158,23 +159,7 @@ export async function streamChatResponse(
     globalRerankFn,
     smartModel: resolvedSmartModel,
     outputLanguage: userPrefs?.outputLanguage,
-    fetchDocumentFn: async (documentId: string) => {
-      const chunks = await ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
-        documentId: documentId as Id<"documents">,
-      });
-      if (!chunks || chunks.length === 0) return null;
-
-      const sortedChunks = chunks.sort(
-        (a: { chunkIndex: number }, b: { chunkIndex: number }) => a.chunkIndex - b.chunkIndex
-      );
-      const content = sortedChunks.map((c: { content: string }) => c.content).join("\n\n");
-
-      return {
-        documentId: documentId as Id<"documents">,
-        content,
-        chunkCount: chunks.length,
-      };
-    },
+    fetchDocumentFn: createFetchDocumentFn(ctx),
   });
 
   // External search

@@ -24,7 +24,7 @@ import { action } from "../_generated/server";
 import { env } from "../_lib/env";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
-import { createRerankFn } from "../chat/_streamSearch";
+import { createFetchDocumentFn, createRerankFn } from "../chat/_streamSearch";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
 import { buildChatEvalTelemetry } from "./chatEvalTelemetry";
@@ -244,9 +244,12 @@ export const runChatEval = action({
       rerankFn
     );
 
+    // Production passes the full-document fetcher too; without it evals never exercised
+    // full-document expansion.
     const agent = new ChatAgent({
       vectorSearchHandler: hybridSearch,
       globalRerankFn: spyGlobalRerankFn,
+      fetchDocumentFn: createFetchDocumentFn(ctx),
     });
 
     // ── Consume the full generator stream ──
