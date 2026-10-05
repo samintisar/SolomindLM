@@ -40,6 +40,14 @@ describe("buildTranscriptLines", () => {
     expect(buildTranscriptLines(script, [{ storageId: "a" }])).toBeNull();
   });
 
+  it("returns null when a chunk's MP3 is shorter than the lines inside it", () => {
+    expect(
+      buildTranscriptLines(script, [
+        { storageId: "a", lineTimings: [{ index: 0, durationMs: 1000 }], mp3DurationMs: 500 },
+      ])
+    ).toBeNull();
+  });
+
   it("returns null when a timing points outside the script", () => {
     expect(
       buildTranscriptLines(script, [

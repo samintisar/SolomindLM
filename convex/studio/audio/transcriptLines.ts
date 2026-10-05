@@ -36,6 +36,9 @@ export function buildTranscriptLines(
       cursor += timing.durationMs;
       lines.push({ speaker: line.speaker, text: line.text, startMs, endMs: Math.round(cursor) });
     }
+    // A chunk's MP3 can't be shorter than the lines inside it; a broken length would shift
+    // every later chunk.
+    if (chunk.mp3DurationMs < cursor - chunkStartMs) return null;
     chunkStartMs += chunk.mp3DurationMs;
   }
   return lines;
