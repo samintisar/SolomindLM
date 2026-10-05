@@ -40,6 +40,8 @@ const MIGRATED = [
   "src/features/studio/components/views/StudyMode.tsx",
   "src/features/studio/components/views/EditCardModal.tsx",
   "src/features/studio/components/views/ProficiencyBadge.tsx",
+  "src/features/studio/components/views/SpreadsheetView.tsx",
+  "src/features/studio/components/spreadsheet/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
