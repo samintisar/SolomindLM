@@ -15,6 +15,10 @@ export type ReportPaperRow = {
   authors: string;
   year: string;
   rowData: Record<string, string>;
+  /** A paper from the user's notebook rather than from search (#301). */
+  fromNotebook?: boolean;
+  /** Set when a notebook paper looks off-topic for the question; it is still included. */
+  offTopicReason?: string;
 };
 
 /** Citation-backed row keys; excluded from custom-column extraction prompts and alignment. */
@@ -165,12 +169,35 @@ export function buildGroundedNumericSet(
 }
 
 export function buildPrismaMethodsBlock(provenance: LiteratureReviewWorkflowProvenance): string {
+  const fromNotebook = provenance.recordsFromNotebook ?? 0;
+  if (provenance.searchSkipped) {
+    return `### Search Strategy
+
+No database search was run; this review is limited to ${fromNotebook} papers from the user's notebook.
+
+### Study Selection
+
+| Stage | Count |
+|-------|------:|
+| Papers from your notebook | ${fromNotebook} |
+| Studies included | ${fromNotebook} |
+
+### Data Extraction
+
+Data were extracted into a structured evidence table using question-specific columns. Extracted fields were used for narrative synthesis; numeric claims in this report are limited to values present in extracted cells or the counts above.`;
+  }
+
   const queries = provenance.searchQueries ?? [];
   const databases = provenance.databasesUsed?.join(", ") ?? "academic search APIs";
   const identified = provenance.recordsIdentified ?? "not recorded";
   const deduped = provenance.recordsAfterDedupe ?? identified;
   const screened = provenance.recordsScreened ?? "not recorded";
-  const included = provenance.recordsIncluded ?? "not recorded";
+  // Notebook papers skip screening, so they add to the included total.
+  const included =
+    provenance.recordsIncluded !== undefined
+      ? provenance.recordsIncluded + fromNotebook
+      : "not recorded";
+  const notebookRow = fromNotebook > 0 ? `| Papers from your notebook | ${fromNotebook} |\n` : "";
   const excluded = provenance.recordsExcluded ?? "not recorded";
 
   const queryList =
@@ -194,7 +221,7 @@ PRISMA-style flow (counts from this review run):
 | After deduplication | ${deduped} |
 | Records screened | ${screened} |
 | Records excluded | ${excluded} |
-| Studies included | ${included} |
+${notebookRow}| Studies included | ${included} |
 
 ### Data Extraction
 
@@ -337,7 +364,7 @@ export function buildStudyCharacteristicsTable(
 
   const rows = papers.map((p) => {
     const authorLabel = p.authors.split(",")[0]?.trim() ?? "Unknown";
-    const studyCell = `${authorLabel} et al. [${p.citationKey}]`;
+    const studyCell = `${authorLabel} et al. [${p.citationKey}]${p.fromNotebook ? " †" : ""}`;
     const cells = [
       studyCell,
       p.year || "N/A",
@@ -351,7 +378,27 @@ export function buildStudyCharacteristicsTable(
     return `| ${cells.join(" | ")} |`;
   });
 
-  return `| ${headers.join(" | ")} |\n| ${headers.map(() => "---").join(" | ")} |\n${rows.join("\n")}`;
+  const table = `| ${headers.join(" | ")} |\n| ${headers.map(() => "---").join(" | ")} |\n${rows.join("\n")}`;
+  return papers.some((p) => p.fromNotebook) ? `${table}\n\n† From the user's notebook.` : table;
+}
+
+/**
+ * Note on papers from the user's notebook: how many, and which look off-topic for the question
+ * (they are included anyway because the user chose them). Empty when there are none.
+ */
+export function buildNotebookPapersNote(papers: ReportPaperRow[]): string {
+  const notebook = papers.filter((p) => p.fromNotebook);
+  if (notebook.length === 0) return "";
+  const one = notebook.length === 1;
+  const lines = [
+    `${notebook.length} ${one ? "paper comes" : "papers come"} from the user's notebook and ${one ? "was" : "were"} included without screening.`,
+  ];
+  for (const p of notebook) {
+    if (p.offTopicReason) {
+      lines.push(`- [${p.citationKey}] may be off-topic for the question: ${p.offTopicReason}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 const DETERMINISTIC_RESULTS_MARKER = "Characteristics of Included Studies";
@@ -510,6 +557,8 @@ export function mergeDeterministicReportSections(
   deterministic: {
     methodsBlock: string;
     studyTable: string;
+    /** From `buildNotebookPapersNote`; empty or absent when there are no notebook papers. */
+    notebookNote?: string;
   }
 ): Array<{ heading: string; content: string }> {
   const byHeading = new Map(llmSections.map((s) => [s.heading.trim().toLowerCase(), s.content]));
@@ -524,9 +573,12 @@ export function mergeDeterministicReportSections(
     byHeading.get("results") ?? "",
     "Results"
   );
+  const notebookNote = deterministic.notebookNote?.trim()
+    ? `\n\n### Papers from Your Notebook\n\n${deterministic.notebookNote.trim()}`
+    : "";
   const resultsContent = `### Characteristics of Included Studies
 
-${deterministic.studyTable}
+${deterministic.studyTable}${notebookNote}
 
 ### Thematic Findings
 
