@@ -18,7 +18,7 @@ const progressIndicatorVariants = cva(
       tone: { default: "bg-primary", destructive: "bg-destructive" },
       // A highlight gliding along the filled part, for work in progress. Off under reduced motion.
       glint: {
-        true: "relative overflow-hidden after:absolute after:inset-0 after:bg-linear-to-r after:from-transparent after:via-primary-foreground/45 after:to-transparent after:animate-progress-glint motion-reduce:after:hidden",
+        true: "relative overflow-hidden after:absolute after:inset-y-0 after:right-0 after:left-(--progress-fill-start) data-[state=indeterminate]:after:left-0 after:bg-linear-to-r after:from-transparent after:via-primary-foreground/45 after:to-transparent after:animate-progress-glint motion-reduce:after:hidden",
         false: "",
       },
     },
@@ -39,14 +39,22 @@ function Progress({
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
+      data-size={size ?? "default"}
       className={cn(progressVariants({ size }), className)}
       value={value}
       {...props}
     >
       <ProgressPrimitive.Indicator
+        // Remount when the mode flips so leaving the sweep does not animate from mid-track.
+        key={value == null ? "indeterminate" : "determinate"}
         data-slot="progress-indicator"
         className={progressIndicatorVariants({ tone, glint })}
-        style={{ "--progress-offset": `${(value ?? 0) - 100}%` } as React.CSSProperties}
+        style={
+          {
+            "--progress-offset": `${(value ?? 0) - 100}%`,
+            "--progress-fill-start": `${100 - (value ?? 0)}%`,
+          } as React.CSSProperties
+        }
       />
     </ProgressPrimitive.Root>
   );

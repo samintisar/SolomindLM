@@ -739,9 +739,27 @@ describe("item rows", () => {
     render(<Progress value={null} aria-label="Generating" />);
     const bar = screen.getByRole("progressbar", { name: "Generating" });
     expect(bar).toHaveAttribute("data-state", "indeterminate");
-    expect(bar.querySelector("[data-slot=progress-indicator]")?.className).toContain(
-      "data-[state=indeterminate]:animate-progress-sweep"
-    );
+    expect(bar).not.toHaveAttribute("aria-valuenow");
+    const indicator = bar.querySelector("[data-slot=progress-indicator]");
+    expect(indicator).toHaveAttribute("data-state", "indeterminate");
+    expect(indicator?.className).toContain("data-[state=indeterminate]:animate-progress-sweep");
+  });
+
+  it("Progress defaults are unchanged without the opt-in variants", () => {
+    render(<Progress value={40} aria-label="Source limit" />);
+    const bar = screen.getByRole("progressbar", { name: "Source limit" });
+    expect(bar.className).toContain("h-2");
+    expect(bar).toHaveAttribute("data-size", "default");
+    expect(bar.querySelector("[data-slot=progress-indicator]")?.className).not.toContain("after:");
+  });
+
+  it("Progress glint is sized to the filled part through a custom property", () => {
+    render(<Progress value={40} glint aria-label="G" />);
+    const indicator = screen
+      .getByRole("progressbar", { name: "G" })
+      .querySelector<HTMLElement>("[data-slot=progress-indicator]");
+    expect(indicator?.style.getPropertyValue("--progress-fill-start")).toBe("60%");
+    expect(indicator?.className).toContain("after:left-(--progress-fill-start)");
   });
 
   it("Progress glint and size are opt-in variants", () => {
