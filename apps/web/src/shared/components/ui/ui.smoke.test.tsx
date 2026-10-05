@@ -734,4 +734,22 @@ describe("item rows", () => {
     expect(indicator?.style.getPropertyValue("--progress-offset")).toBe("-60%");
     expect(indicator?.className).toContain("translate-x-(--progress-offset)");
   });
+
+  it("Progress without a value sweeps as indeterminate", () => {
+    render(<Progress value={null} aria-label="Generating" />);
+    const bar = screen.getByRole("progressbar", { name: "Generating" });
+    expect(bar).toHaveAttribute("data-state", "indeterminate");
+    expect(bar.querySelector("[data-slot=progress-indicator]")?.className).toContain(
+      "data-[state=indeterminate]:animate-progress-sweep"
+    );
+  });
+
+  it("Progress glint and size are opt-in variants", () => {
+    render(<Progress value={40} glint size="sm" aria-label="Generating" />);
+    const bar = screen.getByRole("progressbar", { name: "Generating" });
+    expect(bar.className).toContain("h-1");
+    const indicator = bar.querySelector("[data-slot=progress-indicator]");
+    expect(indicator?.className).toContain("after:animate-progress-glint");
+    expect(indicator?.className).toContain("motion-reduce:after:hidden");
+  });
 });
