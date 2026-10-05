@@ -69,6 +69,7 @@ function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
       phase: dbSpreadsheet.metadata?.phase,
       error: dbSpreadsheet.metadata?.error,
       customPrompt: dbSpreadsheet.metadata?.customPrompt,
+      editedAt: dbSpreadsheet.metadata?.editedAt,
     },
   };
 }
@@ -134,6 +135,44 @@ export function useRenameSpreadsheet() {
     return await update({
       id: spreadsheetId as Id<"spreadsheets">,
       title: newTitle,
+    });
+  };
+}
+
+/**
+ * Save a spreadsheet's CSV with an optimistic update. The server stamps
+ * `metadata.editedAt`, which arrives through the query.
+ */
+export function useSaveSpreadsheetData() {
+  const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
+    (localStore, args) => {
+      const { id, data } = args;
+      if (data === undefined) return;
+
+      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id });
+      if (spreadsheet) {
+        localStore.setQuery(api.studio.spreadsheets.index.get, { id }, { ...spreadsheet, data });
+
+        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
+          notebookId: spreadsheet.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.spreadsheets.index.list,
+            { notebookId: spreadsheet.notebookId },
+            listResult.map((ss: { _id: string; [key: string]: unknown }) =>
+              ss._id === id ? { ...ss, data } : ss
+            )
+          );
+        }
+      }
+    }
+  );
+
+  return async (spreadsheetId: string, data: string): Promise<unknown> => {
+    return await update({
+      id: spreadsheetId as Id<"spreadsheets">,
+      data,
     });
   };
 }
