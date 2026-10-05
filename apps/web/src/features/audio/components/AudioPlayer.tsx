@@ -1,5 +1,5 @@
 import { ArrowLeft, Download } from "lucide-react";
-import React, { useEffect, useEffectEvent, useMemo, useRef } from "react";
+import React, { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
@@ -13,6 +13,8 @@ import { WaveformScrubber } from "./controls/WaveformScrubber";
 import { TranscriptReader } from "./TranscriptReader";
 
 const SKIP_SECONDS = 10;
+/** Older overviews longer than this keep estimated timings rather than decode the whole file. */
+const MAX_ALIGN_SECONDS = 40 * 60;
 
 /** Keys typed here belong to the field or dialog, not the player. */
 const IGNORED_TARGETS =
@@ -83,17 +85,35 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     () => resolveReaderLines(metadata, transcript ?? "", duration),
     [metadata, transcript, duration]
   );
-  // Older overviews saved no timings: time their lines to the pauses in the audio instead.
+  // Older overviews saved no timings: time their lines to the pauses in the audio instead. That
+  // downloads and decodes the whole file, so wait until it is played (opening one to read or
+  // download must not cost the full file on mobile data), and skip long files, whose decode
+  // would hold hundreds of MB and freeze playback.
+  const [playedSource, setPlayedSource] = useState<string | null>(null);
+  if (isPlaying && audioSource && playedSource !== audioSource) setPlayedSource(audioSource);
+  const hasPlayed = audioSource !== null && playedSource === audioSource;
+  const tooLongToAlign = duration > MAX_ALIGN_SECONDS;
   const needsAlignment = estimated.approximate && estimated.lines.length > 1;
-  const alignment = usePauseAlignedLines(audioSource, transcript ?? "", needsAlignment);
+  const alignment = usePauseAlignedLines(
+    audioSource,
+    transcript ?? "",
+    needsAlignment && hasPlayed && duration > 0 && !tooLongToAlign
+  );
   const alignedLines =
     needsAlignment && alignment.lines?.length === estimated.lines.length ? alignment.lines : null;
   const resolved = useMemo(
     () => (alignedLines ? { lines: alignedLines, approximate: false, timed: true } : estimated),
     [alignedLines, estimated]
   );
-  const syncing =
-    resolved.approximate && needsAlignment && (alignment.status === "aligning" || isResolving);
+  // Before play the estimate may still be replaced, so it carries no badge; "Syncing…" while it
+  // is matched to the audio; "Approximate sync" once the estimate is here to stay.
+  const syncBadge: "syncing" | "approximate" | null = !resolved.approximate
+    ? null
+    : !needsAlignment || tooLongToAlign || isUnavailable || error || alignment.status === "failed"
+      ? "approximate"
+      : alignment.status === "aligning"
+        ? "syncing"
+        : null;
   const activeIndex = currentLineIndex(resolved, currentTime * 1000);
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -152,8 +172,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         lines={resolved.lines}
         activeIndex={activeIndex}
         isPlaying={isPlaying}
-        approximate={resolved.approximate}
-        syncing={syncing}
+        approximate={syncBadge !== null}
+        syncing={syncBadge === "syncing"}
         onSeek={(ms) => {
           // Before the audio loads a seek would move the highlight with no audio behind it.
           if (canSeek) seekTo(ms / 1000);
