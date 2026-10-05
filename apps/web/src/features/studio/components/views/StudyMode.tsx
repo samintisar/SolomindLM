@@ -87,6 +87,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
   const { streak, record, reset: resetStreak } = useStreak();
   const toast = useToast();
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef<HTMLButtonElement>(null);
   const goodRef = useRef<HTMLButtonElement>(null);
   const againRef = useRef<HTMLButtonElement>(null);
@@ -235,6 +236,10 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
   // useEffectEvent: the handler always sees the latest state, yet the listener is added once.
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.defaultPrevented || event.repeat) return;
+    // The notebook keeps a second, CSS-hidden Studio panel for the other breakpoint; a hidden
+    // session must not rate cards on keys meant for the visible one.
+    const root = rootRef.current;
+    if (!root || (typeof root.checkVisibility === "function" && !root.checkVisibility())) return;
     if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     if (isIgnoredTarget(event.target, event.key)) return;
     if (!currentCard || isComplete) return;
@@ -308,7 +313,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
   const throwConfig = thrown ? RATING_BY_ID[thrown.rating] : null;
 
   return (
-    <div className="flex w-full min-w-0 max-w-xl flex-col gap-5">
+    <div ref={rootRef} className="flex w-full min-w-0 max-w-xl flex-col gap-5">
       <div className="flex items-center justify-between gap-3 font-sans text-sm text-muted-foreground">
         <span className="whitespace-nowrap">{`${reviewedCards.length} of ${total} reviewed`}</span>
         <StreakChip streak={streak} />

@@ -228,6 +228,21 @@ describe("StudyMode", () => {
     expect(await screen.findByRole("button", { name: "Study again" })).toHaveFocus();
   });
 
+  it("ignores keys while the session is not visible (the other breakpoint's hidden panel)", async () => {
+    const original = HTMLElement.prototype.checkVisibility;
+    HTMLElement.prototype.checkVisibility = () => false;
+    try {
+      const user = userEvent.setup();
+      renderStudy();
+      (document.activeElement as HTMLElement | null)?.blur();
+      await user.keyboard(" ");
+      expect(screen.queryByRole("button", { name: /Good\s+in 10 min/ })).toBeNull();
+      expect(onRateCard).not.toHaveBeenCalled();
+    } finally {
+      HTMLElement.prototype.checkVisibility = original;
+    }
+  });
+
   it("ignores keys typed in a dialog", async () => {
     const user = userEvent.setup();
     renderStudy();
