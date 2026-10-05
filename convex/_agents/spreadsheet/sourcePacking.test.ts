@@ -36,6 +36,23 @@ describe("packChunksBySource", () => {
     expect(tasks.map((t) => t.text)).toEqual(["b1", "a1"]);
   });
 
+  it("numbers sources that share a title so their labels stay distinct", () => {
+    const tasks = packChunksBySource(
+      [
+        { documentId: "a", content: "a1" },
+        { documentId: "u", content: "u1" },
+        { documentId: "b", content: "b1" },
+      ],
+      new Map([
+        ["a", "notes.pdf"],
+        ["u", "unique.pdf"],
+        ["b", " notes.pdf "],
+      ]),
+      packAll
+    );
+    expect(tasks.map((t) => t.source)).toEqual(["notes.pdf (1)", "unique.pdf", "notes.pdf (2)"]);
+  });
+
   it("names a source without a title by its position", () => {
     const tasks = packChunksBySource([{ documentId: "x", content: "x1" }], new Map(), packAll);
     expect(tasks[0].source).toBe("Source 1");

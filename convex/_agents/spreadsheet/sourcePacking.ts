@@ -30,13 +30,22 @@ export function packChunksBySource(
     list.push(content);
     bySource.set(documentId, list);
   }
+  const baseTitles = [...bySource.keys()].map(
+    (documentId, i) => titles.get(documentId)?.trim() || `Source ${i + 1}`
+  );
+  // Sources that share a title are numbered in order, so their notes stay distinct.
+  const titleCounts = new Map<string, number>();
+  for (const title of baseTitles) titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
+  const seen = new Map<string, number>();
+
   const tasks: SourceMapTask[] = [];
-  let position = 0;
-  for (const [documentId, contents] of bySource) {
-    position++;
-    const source = titles.get(documentId)?.trim() || `Source ${position}`;
+  [...bySource.values()].forEach((contents, i) => {
+    const title = baseTitles[i];
+    const nth = (seen.get(title) ?? 0) + 1;
+    seen.set(title, nth);
+    const source = (titleCounts.get(title) ?? 0) > 1 ? `${title} (${nth})` : title;
     for (const text of pack(contents)) tasks.push({ source, text });
-  }
+  });
   return tasks;
 }
 
