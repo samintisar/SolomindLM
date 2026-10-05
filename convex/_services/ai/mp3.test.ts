@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { concatenateMp3Buffers, encodePcmWavToMp3 } from "./mp3";
+import { concatenateMp3Buffers, encodePcmWavToMp3, getMp3DurationMs } from "./mp3";
 
 function makeSilentWav(seconds: number): Buffer {
   const sampleRate = 24000;
@@ -72,5 +72,27 @@ describe("concatenateMp3Buffers", () => {
     const joined = concatenateMp3Buffers([chunk, chunk]);
     expect(joined.length).toBe(chunk.length * 2);
     expect(joined[chunk.length] === 0xff && (joined[chunk.length + 1] & 0xe0) === 0xe0).toBe(true);
+  });
+});
+
+describe("getMp3DurationMs", () => {
+  it("measures the decoded length of an encoded MP3", () => {
+    const ms = getMp3DurationMs(encodePcmWavToMp3(makeSilentWav(2)));
+    // LAME adds encoder delay and end padding (a few frames at most).
+    expect(ms).toBeGreaterThanOrEqual(2000);
+    expect(ms).toBeLessThan(2200);
+  });
+
+  it("adds up across joined MP3s", () => {
+    const a = encodePcmWavToMp3(makeSilentWav(1));
+    const b = encodePcmWavToMp3(makeSilentWav(1.5));
+    expect(getMp3DurationMs(concatenateMp3Buffers([a, b]))).toBeCloseTo(
+      getMp3DurationMs(a) + getMp3DurationMs(b),
+      5
+    );
+  });
+
+  it("returns 0 for bytes with no MPEG frames", () => {
+    expect(getMp3DurationMs(Buffer.from("not audio at all"))).toBe(0);
   });
 });
