@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -526,5 +526,131 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
       ([n]) => n && (n as WrittenQuestionsNote).userAnswers?.q1?.graded !== true
     );
     expect(staleCalls).toEqual([]);
+  });
+});
+
+// --- Redesign ------------------------------------------------------------
+describe("WrittenQuestionsView redesign", () => {
+  it("keeps the header phrases whole for narrow panels (#177)", () => {
+    render(<WrittenQuestionsView note={makeNote()} />);
+    expect(screen.getByText("Question 1 of 2")).toHaveClass("whitespace-nowrap");
+    expect(screen.getByText("0 of 2 answered")).toHaveClass("whitespace-nowrap");
+  });
+
+  it("builds a streak from full-mark answers", async () => {
+    // Once per Submit: vi.clearAllMocks() doesn't reset implementations, so a persistent mock would leak.
+    submitAnswer
+      .mockResolvedValueOnce({ score: 5, maxScore: 5 })
+      .mockResolvedValueOnce({ score: 5, maxScore: 5 });
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "b");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("2 in a row")).toBeInTheDocument();
+  });
+
+  it("finishes on the results ring with review chips", async () => {
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "a", graded: true, score: 5, maxScore: 5 },
+        q2: { answer: "b", graded: true, score: 2, maxScore: 5 },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    expect(await screen.findByText("Assessment Complete!")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Question 1, correct/ })).toHaveAttribute(
+      "data-state",
+      "correct"
+    );
+    expect(screen.getByRole("button", { name: /Question 2, partly correct/ })).toHaveAttribute(
+      "data-state",
+      "partial"
+    );
+  });
+
+  it("announces the grade to screen readers after Submit", async () => {
+    submitAnswer.mockResolvedValueOnce({ score: 3, maxScore: 5 });
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Graded: 3 of 5 points.")).toBeInTheDocument();
+  });
+
+  it("moves focus to Next after Submit", async () => {
+    submitAnswer.mockResolvedValueOnce({ score: 3, maxScore: 5 });
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("Graded: 3 of 5 points.");
+    expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
+  });
+
+  it("does not steal focus or announce when a slow grade lands after the learner moved on", async () => {
+    let resolveGrade: (value: { score: number; maxScore: number }) => void = () => {};
+    submitAnswer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveGrade = resolve;
+        })
+    );
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    const q2Answer = screen.getByPlaceholderText(/Type your short answer/i);
+    await user.type(q2Answer, "half typed");
+
+    await act(async () => resolveGrade({ score: 5, maxScore: 5 }));
+
+    expect(q2Answer).toHaveFocus();
+    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+    expect(screen.queryByText(/Graded: /)).not.toBeInTheDocument();
+  });
+
+  it("counts the score up when the reactive echo lands before the submit resolves", async () => {
+    let resolveGrade: (value: { score: number; maxScore: number }) => void = () => {};
+    submitAnswer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveGrade = resolve;
+        })
+    );
+    latestNote = makeNote();
+    const user = userEvent.setup();
+    const { rerender } = render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    // The server write lands (reactive echo) while the submit promise is still pending.
+    latestNote = makeNote({
+      userAnswers: { q1: { answer: "a", graded: true, score: 4, maxScore: 5 } },
+    });
+    rerender(<WrittenQuestionsView note={makeNote()} />);
+    expect(await screen.findByText("Answer Graded")).toBeInTheDocument();
+    expect(screen.getByText("0 / 5")).toBeInTheDocument();
+
+    await act(async () => resolveGrade({ score: 4, maxScore: 5 }));
+    await waitFor(() => expect(screen.getByText("4 / 5")).toBeInTheDocument(), { timeout: 3000 });
+  });
+
+  it("ignores a second Submit click while the grade is pending", async () => {
+    submitAnswer.mockResolvedValueOnce({ score: 5, maxScore: 5 });
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+    await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("Graded: 5 of 5 points.");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(submitAnswer).toHaveBeenCalledTimes(1);
   });
 });
