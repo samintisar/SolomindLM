@@ -28,7 +28,6 @@ interface NoteItemProps {
   onEditTitleChange: (value: string) => void;
   onEditStart: () => void;
   onEditSave: () => void;
-  onEditCancel: () => void;
   onEditKeyDown: (e: React.KeyboardEvent) => void;
   onClick: () => void;
   onDelete: () => void;
@@ -77,7 +76,6 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   onEditTitleChange,
   onEditStart,
   onEditSave,
-  onEditCancel: _onEditCancel,
   onEditKeyDown,
   onClick,
   onDelete,

@@ -1163,9 +1163,10 @@
 }
 
 /* Reduced motion: movement becomes a fade, it does not disappear (spec §1).
-   tw-animate-css drives animate-in/out through these variables; resetting them keeps the
-   opacity part of every enter/exit and drops the slide, zoom and spin. Spinners, progress
-   sweeps and the landing marquee keep moving because they are not reset here. */
+   Only tw-animate-css enter/exit movement is neutralised (plus the Studio decorations below);
+   other transitions and keyframes keep running, so new movement that matters must add its own
+   motion-reduce guard. tw-animate-css drives animate-in/out through these variables; resetting
+   them keeps the opacity part of every enter/exit and drops the slide, zoom and spin. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

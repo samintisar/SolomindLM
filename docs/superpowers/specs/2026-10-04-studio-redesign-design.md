@@ -54,7 +54,7 @@ The rule applies app-wide, so PR 1 checks chat, sources and notebooks with reduc
 - **`useCountUp(target, { duration })`:** an eased number for scores and tallies. It returns the target at once under reduced motion.
 - **`<Burst />`:** a small particle burst from an anchor element, using token colours. It renders nothing under reduced motion.
 - **`useStreak()`:** tracks consecutive good answers. A streak chip shows from 2 in a row.
-- **Keyframes:** a few house keyframes in `index.css` (`studio-shake`, `studio-sheen`, `studio-pop`), each using the house `ease-out` curve and each paired with a reduced-motion rule.
+- **Keyframes:** PR 1 ships `studio-sheen`, `studio-bob`, `studio-pop`, `studio-glow` and the `Progress` sweep and glint in `index.css`, each paired with a reduced-motion rule; `studio-shake` comes with PR 2.
 
 **Type colour tokens.** `--studio-audio`, `--studio-mindmap`, `--studio-report`, `--studio-flashcard`, `--studio-quiz`, `--studio-infographic`, `--studio-written`, `--studio-spreadsheet`, `--studio-note` and `--studio-literature`:
 - **Values:** defined in `index.css` with light and dark values that reproduce today's hues (teal, fuchsia, amber, red, blue, violet, green, cyan, indigo and orange), exposed as `bg-studio-*` and `text-studio-*`.

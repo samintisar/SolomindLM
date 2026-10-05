@@ -18,7 +18,6 @@ interface NoteListViewProps {
   onEditTitleChange: (value: string) => void;
   onEditStart: (note: Note) => void;
   onEditSave: () => void;
-  onEditCancel: () => void;
   onEditKeyDown: (e: React.KeyboardEvent) => void;
 }
 
@@ -39,7 +38,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   onEditTitleChange,
   onEditStart,
   onEditSave,
-  onEditCancel,
   onEditKeyDown,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,7 +86,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                 onEditTitleChange={onEditTitleChange}
                 onEditStart={() => onEditStart(note)}
                 onEditSave={onEditSave}
-                onEditCancel={onEditCancel}
                 onEditKeyDown={onEditKeyDown}
                 onClick={() => onNoteClick(note)}
                 onDelete={() => onDeleteNote(note)}

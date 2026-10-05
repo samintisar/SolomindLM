@@ -7,7 +7,6 @@ import {
   Layers,
   type LucideIcon,
   MessageSquareText,
-  Presentation,
   Table2,
 } from "lucide-react";
 import type React from "react";
@@ -29,7 +28,6 @@ const IconMap: Record<string, LucideIcon> = {
   Layers,
   HelpCircle,
   Image,
-  Presentation,
   MessageSquareText,
   Table2,
 };

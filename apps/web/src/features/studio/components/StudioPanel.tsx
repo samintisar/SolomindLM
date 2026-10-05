@@ -353,7 +353,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               onEditTitleChange={noteActions.setEditTitle}
               onEditStart={noteActions.handleStartEdit}
               onEditSave={noteActions.handleSaveEdit}
-              onEditCancel={noteActions.handleEditCancel}
               onEditKeyDown={noteActions.handleKeyDown}
             />
           )}

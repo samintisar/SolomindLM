@@ -20,7 +20,6 @@ const handlers = () => ({
   onEditTitleChange: vi.fn(),
   onEditStart: vi.fn(),
   onEditSave: vi.fn(),
-  onEditCancel: vi.fn(),
   onEditKeyDown: vi.fn(),
   onClick: vi.fn(),
   onDelete: vi.fn(),
