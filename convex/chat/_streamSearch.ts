@@ -75,9 +75,14 @@ export function createKeywordSearchRunner(
   };
 }
 
+/**
+ * Rerank scores the whole candidate pool. Voyage bills by input tokens, not `top_k`, so this
+ * costs the same as a top-15 cut, and it keeps every chunk on Voyage's scale: a chunk left
+ * unscored would keep its vector similarity (~0.5) and slip past CHAT_MIN_RELEVANCE_THRESHOLD.
+ */
 export function createRerankFn(ctx: ActionCtx): RerankFunction {
   return async (query, documents) => {
-    return cachedRerank(ctx, query, documents as RerankDocument[], 15);
+    return cachedRerank(ctx, query, documents as RerankDocument[], documents.length);
   };
 }
 
