@@ -1,5 +1,27 @@
-import { Edit3, Save, Trash2, X } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/shared/components/ui/alert-dialog";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/shared/components/ui/field";
+import { Textarea } from "@/shared/components/ui/textarea";
 import { Flashcard } from "@/shared/types";
 
 interface EditCardModalProps {
@@ -22,6 +44,8 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
 
+  // Also keyed on isOpen so a second "Add Card" opens empty instead of with the last draft.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: isOpen is a deliberate reset trigger
   useEffect(() => {
     if (card) {
       setFront(card.front);
@@ -30,9 +54,7 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
       setFront("");
       setBack("");
     }
-  }, [card]);
-
-  if (!isOpen) return null;
+  }, [card, isOpen]);
 
   const isNewCard = cardIndex === undefined;
 
@@ -46,97 +68,81 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
     });
   };
 
-  const handleDelete = () => {
-    if (onDelete && confirm("Are you sure you want to delete this card?")) {
-      onDelete();
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{isNewCard ? "Add New Card" : "Edit Card"}</DialogTitle>
+          <DialogDescription>
+            {isNewCard ? "Create a new flashcard" : "Edit flashcard content"}
+          </DialogDescription>
+        </DialogHeader>
 
-      <div className="relative w-full max-w-3xl bg-background rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-muted rounded-lg">
-              <Edit3 className="w-5 h-5 text-foreground" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight">
-                {isNewCard ? "Add New Card" : "Edit Card"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {isNewCard ? "Create a new flashcard" : "Edit flashcard content"}
-              </p>
-            </div>
-          </div>
-          <button onClick={onCancel} className="p-2 hover:bg-muted rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 md:p-8 space-y-6 overflow-y-auto">
-          {/* Front (Question) */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Front (Question)
-            </label>
-            <textarea
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="flashcard-front">Front (question)</FieldLabel>
+            <Textarea
+              id="flashcard-front"
+              rows={5}
               value={front}
               onChange={(e) => setFront(e.target.value)}
               placeholder="Enter the question or prompt..."
-              className="w-full h-32 bg-background border border-border rounded-xl p-4 text-base leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none placeholder:text-muted-foreground/50"
               autoFocus={isNewCard}
             />
-          </div>
-
-          {/* Back (Answer) */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Back (Answer)
-            </label>
-            <textarea
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="flashcard-back">Back (answer)</FieldLabel>
+            <Textarea
+              id="flashcard-back"
+              rows={5}
               value={back}
               onChange={(e) => setBack(e.target.value)}
               placeholder="Enter the answer or explanation..."
-              className="w-full h-32 bg-background border border-border rounded-xl p-4 text-base leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none placeholder:text-muted-foreground/50"
             />
-          </div>
-        </div>
+          </Field>
+        </FieldGroup>
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between p-6 border-t border-border bg-muted/30 flex-shrink-0">
-          <div className="flex gap-3">
-            {!isNewCard && onDelete && (
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors text-sm font-medium"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Card
-              </button>
-            )}
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onCancel}
-              className="px-6 py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors text-sm font-medium"
-            >
+        <DialogFooter className="sm:justify-between">
+          {!isNewCard && onDelete ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost-destructive">
+                  <Trash2 />
+                  Delete Card
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this card?</AlertDialogTitle>
+                  <AlertDialogDescription>This can't be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={onDelete}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onCancel}>
               Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!front.trim() || !back.trim()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            >
-              <Save className="w-4 h-4" />
+            </Button>
+            <Button onClick={handleSave} disabled={!front.trim() || !back.trim()}>
+              <Save />
               {isNewCard ? "Add Card" : "Save Changes"}
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
