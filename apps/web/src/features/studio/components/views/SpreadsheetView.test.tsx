@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ConvexError } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpreadsheetNote } from "@/shared/types/index";
@@ -173,7 +174,45 @@ describe("SpreadsheetView", () => {
     expect(screen.queryByRole("button", { name: /Add row/ })).toBeNull();
   });
 
-  it.each(["", "   ", "{}"])("shows the empty state for content %j", (content) => {
+  it("keeps showing a sheet whose only header was cleared, and saves it", async () => {
+    const user = userEvent.setup();
+    render(<SpreadsheetView note={makeNote({ content: "Name\nApple\nPear" })} />);
+    await user.click(screen.getByRole("button", { name: /Name/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+    const editor = await screen.findByRole("textbox", { name: "Rename column Name" });
+    await user.clear(editor);
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("grid", { name: "Spreadsheet" })).toBeInTheDocument();
+    expect(cell(1, 0)).toHaveTextContent("Apple");
+    expect(cell(2, 0)).toHaveTextContent("Pear");
+    expect(screen.getByRole("button", { name: "Download CSV" })).toBeEnabled();
+    await waitFor(() => expect(saveData).toHaveBeenCalledWith("s1", '""\nApple\nPear'), {
+      timeout: 2000,
+    });
+  });
+
+  it.each([
+    ['""\nApple\nPear', "Apple"],
+    [",\nApple,3", "Apple"],
+    ["Name,Score\n,", ""],
+  ])("shows the grid for blank-header content %j", (content, firstCell) => {
+    render(<SpreadsheetView note={makeNote({ content })} />);
+    expect(screen.getByRole("grid", { name: "Spreadsheet" })).toBeInTheDocument();
+    expect(cell(1, 0)).toHaveTextContent(firstCell);
+    expect(screen.getByRole("button", { name: "Download CSV" })).toBeEnabled();
+  });
+
+  // A sheet whose every cell was cleared is still a saved sheet: it stays editable, so the
+  // user can type into it again instead of hitting a dead end.
+  it.each(['""', ",,", ",\n,"])("keeps an all-blank saved sheet editable: %j", (content) => {
+    render(<SpreadsheetView note={makeNote({ content })} />);
+    expect(screen.getByRole("grid", { name: "Spreadsheet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add row/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download CSV" })).toBeEnabled();
+  });
+
+  it.each(["", "   ", "{}", " {} "])("shows the empty state for content %j", (content) => {
     render(<SpreadsheetView note={makeNote({ content })} />);
     expect(screen.getByText("No data to display")).toBeInTheDocument();
     expect(screen.queryByRole("grid")).toBeNull();

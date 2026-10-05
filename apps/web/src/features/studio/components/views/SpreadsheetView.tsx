@@ -40,11 +40,15 @@ function errorMessage(error: unknown): string {
   return typeof error === "string" && error ? error : "An unknown error occurred";
 }
 
-/** Whether the note holds a table, not the `{}` a generating row starts with. */
-function hasTableContent(content: unknown, grid: Grid): boolean {
+/**
+ * Whether the note holds a sheet, decided from its saved content alone: any CSV text except
+ * blank and the `{}` a generating row starts with. Blank headers or cells don't count against
+ * it, since an edit can clear them and the sheet must stay reachable to fill them in again.
+ */
+function hasTableContent(content: unknown): boolean {
   if (typeof content !== "string") return false;
   const trimmed = content.trim();
-  return trimmed !== "" && trimmed !== "{}" && (grid[0] ?? []).some((cell) => cell.trim() !== "");
+  return trimmed !== "" && trimmed !== "{}";
 }
 
 /**
@@ -113,7 +117,7 @@ function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
     adoptServerContent(note.content, serverCsv);
   }, [note.content, serverCsv]);
 
-  const hasTable = hasTableContent(note.content, grid);
+  const hasTable = hasTableContent(note.content);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300 ease-out">

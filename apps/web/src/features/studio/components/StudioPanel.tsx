@@ -298,7 +298,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           onEditReport={handleEditReport}
           onCopyReport={noteActions.handleCopyReport}
           onDownloadReport={noteActions.handleDownloadReport}
-          onDownloadSpreadsheet={noteActions.handleDownloadSpreadsheet}
           onExportFlashcards={noteActions.handleExportFlashcards}
           onCopyUserNote={noteActions.handleCopyUserNote}
           onDownloadUserNote={noteActions.handleDownloadUserNote}
@@ -309,7 +308,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           canCopyOrDownload={noteActions.canCopyOrDownloadReport}
           canCopyOrDownloadUserNote={noteActions.canCopyOrDownloadUserNote}
           canExportFlashcards={noteActions.canExportFlashcards}
-          canDownloadSpreadsheet={noteActions.canDownloadSpreadsheet}
           isExporting={noteActions.isExporting}
           isMobile={isMobile}
         />
