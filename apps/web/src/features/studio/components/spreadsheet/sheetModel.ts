@@ -21,6 +21,23 @@ export function toCsv(grid: Grid): string {
   return serializeCsv(grid);
 }
 
+/** Starts like a formula (`=`, `+`, `-` or `@` with something after it), leading blanks allowed. */
+const FORMULA_START = /^\s*[=+\-@]./s;
+const SIGNED_NUMBER = /^\s*[+-]?[\d.,]+%?\s*$/;
+
+/**
+ * CSV for a downloaded file. Spreadsheet apps run a cell that starts like a formula, so such
+ * cells get a leading apostrophe and open as text; signed numbers stay numbers. The grid, and
+ * the CSV the app saves, are unchanged.
+ */
+export function toExportCsv(grid: Grid): string {
+  return serializeCsv(
+    grid.map((row) =>
+      row.map((cell) => (FORMULA_START.test(cell) && !SIGNED_NUMBER.test(cell) ? `'${cell}` : cell))
+    )
+  );
+}
+
 /** Number of columns, taken from the header row. */
 export function columnCount(grid: Grid): number {
   return grid[0]?.length ?? 0;

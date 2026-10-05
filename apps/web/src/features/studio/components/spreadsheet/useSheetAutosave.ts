@@ -16,6 +16,11 @@ export interface SheetAutosaveOptions {
   save: (csv: string) => Promise<unknown>;
   /** A save the server refused for good (validation): roll the sheet back to this CSV. */
   onRejected: (lastGoodCsv: string, error: unknown) => void;
+  /**
+   * A save sent as the sheet closed failed, so nothing on screen can show it or retry. The
+   * callback must outlive the sheet (an app-level toast does).
+   */
+  onErrorAfterClose?: (error: unknown) => void;
   enabled: boolean;
 }
 
@@ -52,6 +57,8 @@ export function useSheetAutosave(options: SheetAutosaveOptions): {
   saveRef.current = options.save;
   const onRejectedRef = useRef(options.onRejected);
   onRejectedRef.current = options.onRejected;
+  const onErrorAfterCloseRef = useRef(options.onErrorAfterClose);
+  onErrorAfterCloseRef.current = options.onErrorAfterClose;
 
   /** The CSV the server is known to hold: what it last accepted, else `serverCsv`. */
   const confirmedRef = useRef(serverCsv);
@@ -114,6 +121,7 @@ export function useSheetAutosave(options: SheetAutosaveOptions): {
           if (inFlightRef.current?.promise === promise) inFlightRef.current = null;
           if (!isMountedRef.current) {
             console.error("Failed to save the spreadsheet after it closed:", error);
+            onErrorAfterCloseRef.current?.(error);
             return;
           }
           if (parseServiceError(error)?.kind === "input_validation") {

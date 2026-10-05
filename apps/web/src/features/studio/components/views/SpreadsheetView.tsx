@@ -9,7 +9,7 @@ import type { SpreadsheetNote } from "@/shared/types/index";
 import { useSaveSpreadsheetData } from "../../services/spreadsheetsApi";
 import { SheetGrid } from "../spreadsheet/SheetGrid";
 import { SheetSaveStatus } from "../spreadsheet/SheetSaveStatus";
-import { type Grid, toCsv, toGrid } from "../spreadsheet/sheetModel";
+import { type Grid, toCsv, toExportCsv, toGrid } from "../spreadsheet/sheetModel";
 import { useSheetAutosave } from "../spreadsheet/useSheetAutosave";
 
 export interface SpreadsheetViewProps {
@@ -22,9 +22,12 @@ function safeFileName(title: string): string {
   return title.replace(/[\\/:*?"<>|]/g, "-").trim() || "spreadsheet";
 }
 
-/** Saves the CSV as a file, with a BOM so Excel reads it as UTF-8. */
-function downloadCsv(csv: string, title: string) {
-  const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
+/**
+ * Saves the sheet as a CSV file, with a BOM so Excel reads it as UTF-8. Cells that a spreadsheet
+ * app would run as formulas are written as text (see `toExportCsv`).
+ */
+function downloadCsv(grid: Grid, title: string) {
+  const blob = new Blob([`﻿${toExportCsv(grid)}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -103,6 +106,7 @@ function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
     serverCsv,
     save,
     onRejected,
+    onErrorAfterClose: showError,
     enabled: !readOnly,
   });
 
@@ -146,7 +150,7 @@ function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
           size="icon-sm"
           aria-label="Download CSV"
           disabled={!hasTable}
-          onClick={() => downloadCsv(csv, note.title)}
+          onClick={() => downloadCsv(grid, note.title)}
         >
           <Download />
         </Button>

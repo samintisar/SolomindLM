@@ -8,7 +8,7 @@ import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema.js";
 
 // Root-relative glob normalized to "./studio/..." keys, as in convex/studio/prompts/index.test.ts.
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<any>>;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
@@ -158,6 +158,16 @@ describe("spreadsheets.index.update", () => {
       data: rows(2000),
     });
     expect(updated?.data).toBe(rows(2000));
+  });
+
+  it("rejects CSV with an unclosed quote, which would merge the rows after it", async () => {
+    const { id, owner } = await setup();
+    await expect(
+      owner.mutation(api.studio.spreadsheets.index.update, {
+        id,
+        data: 'a,b\n1,"unfinished\n2,ok',
+      })
+    ).rejects.toMatchObject(INPUT_VALIDATION);
   });
 
   it("accepts 50 columns and rejects 51", async () => {

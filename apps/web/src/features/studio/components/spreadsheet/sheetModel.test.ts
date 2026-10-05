@@ -10,6 +10,7 @@ import {
   setCell,
   sortByColumn,
   toCsv,
+  toExportCsv,
   toGrid,
 } from "./sheetModel";
 
@@ -220,5 +221,32 @@ describe("sortByColumn", () => {
     const sorted = sortByColumn(grid, 1, "asc");
     expect(sorted).not.toBe(grid);
     expect(grid[1][0]).toBe("b");
+  });
+});
+
+describe("toExportCsv", () => {
+  it("writes cells a spreadsheet app would run as formulas as text", () => {
+    const grid = [
+      ["Name", "Note"],
+      ['=HYPERLINK("x")', "+cmd"],
+      ["@SUM(A1)", " =1+1"],
+    ];
+    expect(toExportCsv(grid)).toBe('Name,Note\n"\'=HYPERLINK(""x"")",\'+cmd\n\'@SUM(A1),\' =1+1');
+  });
+
+  it("leaves signed numbers and ordinary text alone", () => {
+    const grid = [
+      ["Change", "Text"],
+      ["-5", "a-b"],
+      ["+3.2%", "-"],
+      ["-1,200", "x=1"],
+    ];
+    expect(toExportCsv(grid)).toBe(toCsv(grid));
+  });
+
+  it("does not change the grid it exports", () => {
+    const grid = Object.freeze([Object.freeze(["=1"])]) as string[][];
+    toExportCsv(grid);
+    expect(grid[0][0]).toBe("=1");
   });
 });

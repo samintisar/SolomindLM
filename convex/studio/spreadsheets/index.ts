@@ -5,7 +5,7 @@ import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import { toConvexError } from "../../_lib/serviceErrors";
 import * as Spreadsheets from "../../_model/spreadsheets";
-import { parseCsv } from "../../_shared/csv.helpers";
+import { parseCsvDetailed } from "../../_shared/csv.helpers";
 import { getAuthUserId } from "../../auth";
 
 /** Largest CSV, in UTF-8 bytes, that `update` will store. */
@@ -23,7 +23,10 @@ function assertValidSpreadsheetCsv(data: string): void {
   if (new TextEncoder().encode(data).length > SPREADSHEET_MAX_BYTES) {
     invalidData("This spreadsheet is too large to save (512 KB at most).");
   }
-  const rows = parseCsv(data);
+  const { rows, unterminatedQuote } = parseCsvDetailed(data);
+  if (unterminatedQuote) {
+    invalidData("This spreadsheet has a quote that is never closed, so it can't be saved.");
+  }
   if (rows.length > SPREADSHEET_MAX_ROWS) {
     invalidData("This spreadsheet has too many rows to save (2,000 at most).");
   }

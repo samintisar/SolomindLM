@@ -197,6 +197,24 @@ describe("useSheetAutosave", () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
+  it("reports a save that fails after the sheet closed, since nothing on screen can", async () => {
+    const { save, calls } = controllableSave();
+    const onErrorAfterClose = vi.fn();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const hook = renderHook(
+      (props: Props) =>
+        useSheetAutosave({ ...props, save, onRejected: vi.fn(), onErrorAfterClose }),
+      { initialProps: { csv: "a", serverCsv: "a", enabled: true } }
+    );
+    hook.rerender({ csv: "b", serverCsv: "a", enabled: true });
+    hook.unmount();
+    expect(save).toHaveBeenCalledWith("b");
+    const error = new Error("offline");
+    await settle(() => calls[0].reject(error));
+    expect(onErrorAfterClose).toHaveBeenCalledWith(error);
+    consoleError.mockRestore();
+  });
+
   it("sends an edit made during an in-flight save at unmount, leaving the order to save's queue", () => {
     const { save, edit, unmount } = setup();
     edit("b");
