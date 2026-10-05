@@ -33,10 +33,18 @@ interface SkipButtonProps {
   onSkip: () => void;
   disabled?: boolean;
   size?: "default" | "sm";
+  /** Announced as `aria-keyshortcuts`, for a player that listens for this key. */
+  keyShortcuts?: string;
 }
 
 /** Podcast-style 10 second skip: a circular arrow with "10" inside that twists when pressed. */
-export function SkipButton({ direction, onSkip, disabled, size = "default" }: SkipButtonProps) {
+export function SkipButton({
+  direction,
+  onSkip,
+  disabled,
+  size = "default",
+  keyShortcuts,
+}: SkipButtonProps) {
   const label = direction === "back" ? "Back 10 seconds" : "Forward 10 seconds";
 
   return (
@@ -44,6 +52,7 @@ export function SkipButton({ direction, onSkip, disabled, size = "default" }: Sk
       type="button"
       aria-label={label}
       title={label}
+      aria-keyshortcuts={keyShortcuts}
       disabled={disabled}
       onClick={onSkip}
       className={skipVariants({ size })}

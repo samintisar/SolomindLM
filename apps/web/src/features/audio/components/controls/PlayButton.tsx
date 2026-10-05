@@ -20,16 +20,25 @@ interface PlayButtonProps {
   onToggle: () => void;
   disabled?: boolean;
   size?: "default" | "sm";
+  /** Announced as `aria-keyshortcuts`, for a player that listens for these keys. */
+  keyShortcuts?: string;
 }
 
 /** The round primary play/pause button. */
-export function PlayButton({ isPlaying, onToggle, disabled, size = "default" }: PlayButtonProps) {
+export function PlayButton({
+  isPlaying,
+  onToggle,
+  disabled,
+  size = "default",
+  keyShortcuts,
+}: PlayButtonProps) {
   const iconSize = size === "sm" ? "size-4" : "size-5";
 
   return (
     <button
       type="button"
       aria-label={isPlaying ? "Pause" : "Play"}
+      aria-keyshortcuts={keyShortcuts}
       disabled={disabled}
       onClick={onToggle}
       className={playVariants({ size })}
