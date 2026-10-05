@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReaderLine } from "../transcript/transcriptLines";
 import { TranscriptReader } from "./TranscriptReader";
 
@@ -16,6 +16,19 @@ const lines: ReaderLine[] = [
 ];
 
 const scrollTo = vi.fn();
+
+// jsdom has no layout. Give the scroller room to scroll and every line a position away from the
+// top, so centring has somewhere to go (it skips scrolls that would not move).
+beforeAll(() => {
+  const define = (name: string, get: (this: HTMLElement) => number) =>
+    Object.defineProperty(HTMLElement.prototype, name, { configurable: true, get });
+  define("clientHeight", () => 200);
+  define("scrollHeight", () => 2000);
+  define("offsetHeight", () => 50);
+  define("offsetTop", function (this: HTMLElement) {
+    return 300 + Number(this.dataset.lineIndex ?? 0) * 100;
+  });
+});
 
 beforeEach(() => {
   reduceMotion = false;
@@ -84,6 +97,91 @@ describe("TranscriptReader", () => {
   it("shows an empty state without lines", () => {
     renderReader({ lines: [] });
     expect(screen.getByText("No transcript")).toBeInTheDocument();
+  });
+
+  it("is a region named Transcript", () => {
+    renderReader();
+    expect(screen.getByRole("region", { name: "Transcript" })).toBeInTheDocument();
+  });
+
+  it("has a single tab stop: the active line", () => {
+    renderReader({ activeIndex: 1 });
+    const tabbable = screen
+      .getAllByRole("button")
+      .filter((b) => b.getAttribute("tabindex") === "0");
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0]).toHaveAttribute("aria-current", "true");
+  });
+
+  it("makes the first line the tab stop when none is active", () => {
+    renderReader({ activeIndex: -1 });
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0]).toHaveAttribute("tabindex", "0");
+    expect(buttons[1]).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("moves focus between lines with the arrow keys, Home and End", async () => {
+    renderReader({ activeIndex: 0 });
+    const [first, second, third] = screen.getAllByRole("button");
+    first?.focus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(second).toHaveFocus();
+    await userEvent.keyboard("{ArrowUp}");
+    expect(first).toHaveFocus();
+    await userEvent.keyboard("{End}");
+    expect(third).toHaveFocus();
+    await userEvent.keyboard("{Home}");
+    expect(first).toHaveFocus();
+  });
+
+  it("offers Follow along after a scrollbar drag or any other scroll the code did not start", () => {
+    const { container } = renderReader({ isPlaying: true });
+    expect(screen.queryByRole("button", { name: "Follow along" })).not.toBeInTheDocument();
+    const scroller = container.querySelector(".overflow-y-auto") as Element;
+    fireEvent(scroller, new Event("scrollend")); // the jump that opened the reader has finished
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "Follow along" })).toBeInTheDocument();
+  });
+
+  it("does not mistake its own centring scroll for the user leaving", () => {
+    const { container, rerender } = renderReader({ isPlaying: true, activeIndex: 0 });
+    rerender(
+      <TranscriptReader
+        lines={lines}
+        activeIndex={1}
+        isPlaying
+        approximate={false}
+        onSeek={vi.fn()}
+      />
+    );
+    expect(scrollTo).toHaveBeenCalled();
+    // The browser reports the scroll it was asked for.
+    const scroller = container.querySelector(".overflow-y-auto") as Element;
+    fireEvent.scroll(scroller);
+    expect(screen.queryByRole("button", { name: "Follow along" })).not.toBeInTheDocument();
+
+    // Once it has finished, the next scroll is the user's.
+    fireEvent(scroller, new Event("scrollend"));
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "Follow along" })).toBeInTheDocument();
+  });
+
+  it("puts focus on the active line when rejoining", async () => {
+    const { container } = renderReader({ isPlaying: true, activeIndex: 1 });
+    fireEvent.wheel(container.querySelector(".overflow-y-auto") as Element);
+    await userEvent.click(screen.getByRole("button", { name: "Follow along" }));
+    expect(screen.getByRole("button", { name: /Glad to be here/ })).toHaveFocus();
+  });
+
+  it("re-centres a clicked line even when it is already the active one", async () => {
+    const { container } = renderReader({ isPlaying: true, activeIndex: 1 });
+    const scroller = container.querySelector(".overflow-y-auto") as Element;
+    fireEvent(scroller, new Event("scrollend"));
+    fireEvent.wheel(scroller);
+    scrollTo.mockClear();
+    await userEvent.click(screen.getByRole("button", { name: /Glad to be here/ }));
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Follow along" })).not.toBeInTheDocument();
   });
 
   it("offers Follow along after a manual scroll while playing, and hides it on click", async () => {

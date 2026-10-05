@@ -56,8 +56,17 @@ beforeEach(() => {
 describe("AudioPlayer", () => {
   it("renders the saved lines as buttons and seeks to a clicked line", async () => {
     const { container } = renderPlayer();
+    const audio = audioElement(container);
+    Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+    fireEvent(audio, new Event("durationchange"));
     await userEvent.click(screen.getByRole("button", { name: /Second line, answering/ }));
-    expect(audioElement(container).currentTime).toBe(3);
+    expect(audio.currentTime).toBe(3);
+  });
+
+  it("ignores a line click until the audio can seek", async () => {
+    const { container } = renderPlayer();
+    await userEvent.click(screen.getByRole("button", { name: /Second line, answering/ }));
+    expect(audioElement(container).currentTime).toBe(0);
   });
 
   it("shows the title and a subtitle from the audio type", () => {
@@ -182,9 +191,44 @@ describe("AudioPlayer", () => {
       expect(play).not.toHaveBeenCalled();
     });
 
-    it("stops listening once unmounted", async () => {
+    it("ignores arrows when focus is elsewhere on the page", async () => {
+      const { container } = renderPlayer();
+      const audio = audioElement(container);
+      Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+      audio.currentTime = 50;
+      fireEvent(audio, new Event("durationchange"));
+      const outside = document.createElement("div");
+      outside.tabIndex = 0;
+      document.body.append(outside);
+      outside.focus();
+      await userEvent.keyboard("{ArrowRight}");
+      expect(audio.currentTime).toBe(50);
+      outside.remove();
+    });
+
+    it("ignores Space on a tab, menu item or modal", async () => {
+      renderPlayer();
+      for (const html of [
+        '<div role="tab" tabindex="0"></div>',
+        '<div role="menuitem" tabindex="0"></div>',
+        '<div aria-modal="true"><div tabindex="0"></div></div>',
+      ]) {
+        const host = document.createElement("div");
+        host.innerHTML = html;
+        document.body.append(host);
+        (host.querySelector("[tabindex]") as HTMLElement).focus();
+        await userEvent.keyboard(" ");
+        host.remove();
+      }
+      expect(play).not.toHaveBeenCalled();
+    });
+
+    it("removes its listener once unmounted", async () => {
+      const remove = vi.spyOn(window, "removeEventListener");
       const { unmount } = renderPlayer();
       unmount();
+      expect(remove).toHaveBeenCalledWith("keydown", expect.any(Function));
+      remove.mockRestore();
       await userEvent.keyboard(" ");
       expect(play).not.toHaveBeenCalled();
     });

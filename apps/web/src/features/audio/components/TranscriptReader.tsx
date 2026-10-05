@@ -1,4 +1,4 @@
-import { ArrowDown, FileText } from "lucide-react";
+import { FileText, LocateFixed } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
@@ -38,46 +38,100 @@ export function TranscriptReader({
 }: TranscriptReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [following, setFollowing] = useState(true);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const reduceMotion = useReducedMotion();
 
-  const centreActiveLine = useEffectEvent((behavior: ScrollBehavior) => {
-    const container = containerRef.current;
-    if (!container || activeIndex < 0) return;
-    const line = container.querySelector<HTMLElement>(`[data-line-index="${activeIndex}"]`);
-    if (!line) return;
-    container.scrollTo({
-      top: line.offsetTop - container.clientHeight / 2 + line.offsetHeight / 2,
-      behavior,
-    });
-  });
+  // True while a scroll the reader started itself is in flight, so its `scroll` events are not
+  // mistaken for the user leaving. Cleared by `scrollend`, or by a timer where that is missing.
+  const programmaticRef = useRef(false);
+  const settleRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(settleRef.current), []);
+
+  const settleProgrammaticScroll = () => {
+    programmaticRef.current = false;
+    window.clearTimeout(settleRef.current);
+  };
 
   // Not scrollIntoView: it also scrolls every ancestor, which would drag the whole page along.
+  // Plain function reading only refs, so effects and handlers can both call it.
+  const centreLine = (index: number, behavior: ScrollBehavior) => {
+    const container = containerRef.current;
+    const line = container?.querySelector<HTMLElement>(`[data-line-index="${index}"]`);
+    if (!container || !line) return;
+    const top = line.offsetTop - container.clientHeight / 2 + line.offsetHeight / 2;
+    const target = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, top));
+    // No movement means no scroll or scrollend events, so there is nothing to wait for.
+    if (Math.abs(container.scrollTop - target) < 1) return;
+    programmaticRef.current = true;
+    window.clearTimeout(settleRef.current);
+    settleRef.current = window.setTimeout(
+      () => {
+        programmaticRef.current = false;
+      },
+      behavior === "smooth" ? 1000 : 150
+    );
+    container.scrollTo({ top: target, behavior });
+  };
+
   // The first centring (on open) jumps; later ones glide unless the user prefers reduced motion.
   const hasCentredRef = useRef(false);
   const followActiveLine = useEffectEvent(() => {
     if (!following || activeIndex < 0) return;
     const glide = hasCentredRef.current && !reduceMotion;
     hasCentredRef.current = true;
-    centreActiveLine(glide ? "smooth" : "auto");
+    centreLine(activeIndex, glide ? "smooth" : "auto");
   });
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the active line changes; the effect event reads everything else.
   useEffect(() => {
     followActiveLine();
   }, [activeIndex]);
 
-  // Only the user's own input counts as leaving: programmatic scrolls fire `scroll` too.
   const handleManualScroll = () => {
     if (isPlaying) setFollowing(false);
   };
 
-  const rejoin = () => {
-    setFollowing(true);
-    centreActiveLine(reduceMotion ? "auto" : "smooth");
+  const focusLine = (index: number, options?: FocusOptions) => {
+    containerRef.current
+      ?.querySelector<HTMLElement>(`[data-line-index="${index}"]`)
+      ?.focus(options);
   };
 
-  const handleSeek = (line: ReaderLine) => {
+  const rejoin = () => {
     setFollowing(true);
+    centreLine(activeIndex, reduceMotion ? "auto" : "smooth");
+    // The button unmounts, so a keyboard user would otherwise lose their place.
+    focusLine(activeIndex, { preventScroll: true });
+  };
+
+  const handleSeek = (index: number, line: ReaderLine) => {
+    setFollowing(true);
+    // The line may already be the active one, so no line change would re-centre it.
+    centreLine(index, reduceMotion ? "auto" : "smooth");
     onSeek(line.startMs);
+  };
+
+  // One tab stop for the whole transcript: the line being spoken, else the last one focused.
+  const lastIndex = lines.length - 1;
+  const tabStop = Math.min(
+    lastIndex,
+    activeIndex >= 0 ? activeIndex : focusedIndex >= 0 ? focusedIndex : 0
+  );
+
+  const handleLineKeyDown = (event: React.KeyboardEvent, index: number) => {
+    const next =
+      event.key === "ArrowDown"
+        ? Math.min(lastIndex, index + 1)
+        : event.key === "ArrowUp"
+          ? Math.max(0, index - 1)
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? lastIndex
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    focusLine(next);
   };
 
   if (lines.length === 0) {
@@ -94,7 +148,7 @@ export function TranscriptReader({
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <section aria-label="Transcript" className="relative flex min-h-0 flex-1 flex-col">
       {/* Siblings of the scroller, not children: the fade mask would dim them too. */}
       {approximate && (
         <div className="absolute top-2 right-4 z-10">
@@ -108,13 +162,27 @@ export function TranscriptReader({
         ref={containerRef}
         role="presentation"
         className="relative min-h-0 flex-1 overflow-y-auto reader-fade px-6"
+        onScroll={() => {
+          if (!programmaticRef.current) handleManualScroll();
+        }}
+        onScrollEnd={settleProgrammaticScroll}
+        onPointerDown={(event) => {
+          // Grabbing the scrollbar mid-glide is the user taking over.
+          if (
+            event.target === event.currentTarget &&
+            event.nativeEvent.offsetX >= event.currentTarget.clientWidth
+          ) {
+            settleProgrammaticScroll();
+          }
+        }}
+        // Wheel, touch and keys also catch input that interrupts a glide still in flight.
         onWheel={handleManualScroll}
         onTouchMove={handleManualScroll}
         onKeyDown={(event) => {
           if (SCROLL_KEYS.has(event.key)) handleManualScroll();
         }}
       >
-        <div aria-hidden className="h-32" />
+        <div aria-hidden className="h-1/2 min-h-32" />
         {lines.map((line, index) => {
           const speaker = line.speaker ? SPEAKERS[line.speaker] : null;
           const isActive = index === activeIndex;
@@ -124,8 +192,11 @@ export function TranscriptReader({
               key={index}
               type="button"
               data-line-index={index}
+              tabIndex={index === tabStop ? 0 : -1}
               aria-current={isActive ? "true" : undefined}
-              onClick={() => handleSeek(line)}
+              onClick={() => handleSeek(index, line)}
+              onFocus={() => setFocusedIndex(index)}
+              onKeyDown={(event) => handleLineKeyDown(event, index)}
               className={cn(
                 "block w-full origin-left rounded-md py-2 text-left outline-hidden transition duration-500 ease-out focus-visible:ring-2 focus-visible:ring-ring hover:opacity-60 motion-reduce:scale-100",
                 isActive && "scale-100 opacity-100 hover:opacity-100",
@@ -149,17 +220,17 @@ export function TranscriptReader({
             </button>
           );
         })}
-        <div aria-hidden className="h-48" />
+        <div aria-hidden className="h-1/2 min-h-48" />
       </div>
 
       {!following && (
         <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 animate-in duration-200 ease-out fade-in slide-in-from-bottom-2">
           <Button size="sm" variant="secondary" onClick={rejoin}>
-            <ArrowDown />
+            <LocateFixed />
             Follow along
           </Button>
         </div>
       )}
-    </div>
+    </section>
   );
 }

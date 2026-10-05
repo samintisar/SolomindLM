@@ -15,9 +15,10 @@ const SKIP_SECONDS = 10;
 
 /** Keys typed here belong to the field or dialog, not the player. */
 const IGNORED_TARGETS =
-  "input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog']";
+  "input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog'], [aria-modal='true']";
 /** Space presses these, so the player must not also toggle playback. */
-const PRESSABLE_TARGETS = "button, a, [role='button'], [role='slider']";
+const PRESSABLE_TARGETS =
+  "button, a, summary, [role='button'], [role='slider'], [role='tab'], [role='menuitem'], [role='checkbox'], [role='switch'], [role='option']";
 
 const AUDIO_TYPE_LABELS: Record<string, string> = {
   deep_dive: "Deep dive",
@@ -93,6 +94,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(IGNORED_TARGETS)) return;
+    if (target instanceof HTMLElement && target.isContentEditable) return;
 
     if (event.key === " " || event.key.toLowerCase() === "k") {
       // A focused button or link presses itself on Space; k is not pressed by anything.
@@ -106,6 +108,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       // The scrubber skips on arrows itself.
       if (target?.closest("[role='slider']")) return;
+      // Arrows also scroll sideways in code blocks and tables elsewhere on the page.
+      if (target !== document.body && !(target && root.contains(target))) return;
       if (!canSeek) return;
       event.preventDefault();
       skipBy(event.key === "ArrowLeft" ? -SKIP_SECONDS : SKIP_SECONDS);
@@ -137,7 +141,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         activeIndex={activeIndex}
         isPlaying={isPlaying}
         approximate={resolved.approximate}
-        onSeek={(ms) => seekTo(ms / 1000)}
+        onSeek={(ms) => {
+          // Before the audio loads a seek would move the highlight with no audio behind it.
+          if (canSeek) seekTo(ms / 1000);
+        }}
       />
 
       {(isResolving || isUnavailable || error) && (
