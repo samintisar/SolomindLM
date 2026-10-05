@@ -116,6 +116,7 @@ import type * as _agents_mindmap_prompts from "../_agents/mindmap/prompts.js";
 import type * as _agents_mindmap_routing from "../_agents/mindmap/routing.js";
 import type * as _agents_mindmap_state from "../_agents/mindmap/state.js";
 import type * as _agents_mindmap_structuredLlm from "../_agents/mindmap/structuredLlm.js";
+import type * as _agents_mindmap_title from "../_agents/mindmap/title.js";
 import type * as _agents_quiz_QuizGraph from "../_agents/quiz/QuizGraph.js";
 import type * as _agents_quiz_chunkHelpers from "../_agents/quiz/chunkHelpers.js";
 import type * as _agents_quiz_config from "../_agents/quiz/config.js";
@@ -506,6 +507,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/mindmap/routing": typeof _agents_mindmap_routing;
   "_agents/mindmap/state": typeof _agents_mindmap_state;
   "_agents/mindmap/structuredLlm": typeof _agents_mindmap_structuredLlm;
+  "_agents/mindmap/title": typeof _agents_mindmap_title;
   "_agents/quiz/QuizGraph": typeof _agents_quiz_QuizGraph;
   "_agents/quiz/chunkHelpers": typeof _agents_quiz_chunkHelpers;
   "_agents/quiz/config": typeof _agents_quiz_config;
