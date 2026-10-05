@@ -7,12 +7,15 @@ export function TallyTile({
   config,
   value,
   className,
+  delayMs = 0,
 }: {
   config: RatingConfig;
   value: number;
   className?: string;
+  /** Wait this long (match the tile's entrance delay) before counting. */
+  delayMs?: number;
 }) {
-  const shown = useCountUp(value, 700);
+  const shown = useCountUp(value, 700, delayMs);
   return (
     <div
       className={cn(

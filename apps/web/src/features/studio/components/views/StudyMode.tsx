@@ -1,9 +1,10 @@
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { srsSubtextForRating } from "@/features/studio/utils/srsReviewLabels";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
+import { useToast } from "@/shared/contexts/useToast";
 import type { Flashcard } from "@/shared/types";
 import { cn } from "@/shared/utils/cn";
 import { Burst } from "../../motion/Burst";
@@ -43,14 +44,25 @@ const RATING_BY_ID = Object.fromEntries(RATINGS.map((r) => [r.rating, r])) as Re
   SrsRating,
   RatingConfig
 >;
-const TALLY_DELAY = ["delay-300", "delay-400", "delay-500", "delay-600"];
+/** Entrance delay of each tally tile, and the same wait in ms so its count starts as it appears. */
+const TALLY_DELAY = [
+  { cls: "delay-300", ms: 300 },
+  { cls: "delay-400", ms: 400 },
+  { cls: "delay-500", ms: 500 },
+  { cls: "delay-600", ms: 600 },
+];
 /** jsdom and some browsers never fire animationend; this clears the thrown card regardless. */
 const THROW_FALLBACK_MS = 700;
 
 /** Keystrokes that belong to a field, a dialog, or (for Space and Enter) a focused control. */
 function isIgnoredTarget(target: EventTarget | null, key: string): boolean {
   if (!(target instanceof Element)) return false;
-  if (target.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) {
+  if (target instanceof HTMLElement && target.isContentEditable) return true;
+  if (
+    target.closest(
+      "input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog'], [aria-modal='true']"
+    )
+  ) {
     return true;
   }
   const activatesControls = key === " " || key === "Enter";
@@ -73,12 +85,15 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
   const [tally, setTally] = useState<Record<SrsRating, number>>(EMPTY_TALLY);
   const [thrown, setThrown] = useState<ThrownCard | null>(null);
   const { streak, record, reset: resetStreak } = useStreak();
+  const toast = useToast();
 
   const revealRef = useRef<HTMLButtonElement>(null);
   const goodRef = useRef<HTMLButtonElement>(null);
+  const againRef = useRef<HTMLButtonElement>(null);
   const throwId = useRef(0);
   const throwTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFocusKey = useRef({ currentIndex, showAnswer });
+  const wasComplete = useRef(false);
 
   const total = cards.length;
   const currentCardEntry = cards[currentIndex];
@@ -108,12 +123,25 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
     (showAnswer ? goodRef.current : revealRef.current)?.focus({ preventScroll: true });
   }, [currentIndex, showAnswer]);
 
+  // The complete screen replaces the card and its buttons, so focus would drop to <body>.
+  const completeNow = reviewedCards.length === cards.length;
+  useEffect(() => {
+    if (wasComplete.current === completeNow) return;
+    wasComplete.current = completeNow;
+    if (completeNow) againRef.current?.focus({ preventScroll: true });
+  }, [completeNow]);
+
   const handleRating = async (rating: SrsRating) => {
     if (!currentCardEntry || isSubmittingRating) return;
 
     setIsSubmittingRating(true);
     try {
-      await onRateCard(currentCardEntry.index, rating);
+      try {
+        await onRateCard(currentCardEntry.index, rating);
+      } catch {
+        toast.error("Couldn't save your rating. Try again.");
+        return;
+      }
 
       const isNewCorrect = rating !== "again";
       const isNewIncorrect = rating === "again";
@@ -161,16 +189,23 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
     }
   };
 
+  // Browsing skips cards already reviewed this session, so a card is never rated twice.
+  let previousIndex = -1;
+  for (let i = currentIndex - 1; i >= 0 && previousIndex === -1; i -= 1) {
+    if (!reviewedCards.includes(i)) previousIndex = i;
+  }
+  const nextIndex = cards.findIndex((_, i) => i > currentIndex && !reviewedCards.includes(i));
+
   const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+    if (previousIndex !== -1) {
+      setCurrentIndex(previousIndex);
       setShowAnswer(false);
     }
   };
 
   const handleNext = () => {
-    if (currentIndex < total - 1) {
-      setCurrentIndex(currentIndex + 1);
+    if (nextIndex !== -1) {
+      setCurrentIndex(nextIndex);
       setShowAnswer(false);
     }
   };
@@ -192,30 +227,29 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
     resetStreak();
   };
 
-  // Re-subscribed every render so the handler always sees the latest state.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs every render
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-      if (isIgnoredTarget(event.target, event.key)) return;
-      if (!currentCard || isComplete) return;
+  // useEffectEvent: the handler always sees the latest state, yet the listener is added once.
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.repeat) return;
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (isIgnoredTarget(event.target, event.key)) return;
+    if (!currentCard || isComplete) return;
 
-      if (event.key === " " || event.key === "Enter") {
-        if (showAnswer) return;
-        event.preventDefault();
-        handleShowAnswer();
-        return;
-      }
-      const config = ratingForKey(event.key);
-      if (config && showAnswer && !isSubmittingRating) {
-        event.preventDefault();
-        void handleRating(config.rating);
-      }
-    };
+    if (event.key === " " || event.key === "Enter") {
+      if (showAnswer) return;
+      event.preventDefault();
+      handleShowAnswer();
+      return;
+    }
+    const config = ratingForKey(event.key);
+    if (config && showAnswer && !isSubmittingRating) {
+      event.preventDefault();
+      void handleRating(config.rating);
+    }
+  });
+  useEffect(() => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  }, []);
 
   if (isComplete) {
     return (
@@ -235,15 +269,16 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
               key={r.rating}
               config={r}
               value={tally[r.rating]}
+              delayMs={TALLY_DELAY[k].ms}
               className={cn(
                 "animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-500",
-                TALLY_DELAY[k]
+                TALLY_DELAY[k].cls
               )}
             />
           ))}
         </div>
         <div className="flex flex-wrap justify-center gap-3">
-          <Button variant="secondary" onClick={handleReset}>
+          <Button ref={againRef} variant="secondary" onClick={handleReset}>
             Study again
           </Button>
           <Button onClick={onExit}>Back to browse</Button>
@@ -311,7 +346,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
         ) : null}
 
         <div
-          key={currentIndex}
+          key={`card-${currentIndex}`}
           className="relative animate-in fade-in slide-in-from-bottom-3 zoom-in-95 duration-300"
         >
           <FlipCard
@@ -323,7 +358,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
 
         {thrown && throwConfig ? (
           <div
-            key={thrown.id}
+            key={`thrown-${thrown.id}`}
             data-thrown
             data-rating={thrown.rating}
             aria-hidden
@@ -331,16 +366,23 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
               if (event.target === event.currentTarget) clearThrown();
             }}
             className={cn(
-              "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-72 flex-col items-center justify-center overflow-hidden rounded-2xl bg-muted p-6 text-center shadow-lg ring-1 ring-hairline animate-out fade-out fill-mode-forwards duration-500 ease-out sm:h-80",
+              "pointer-events-none absolute inset-x-0 top-0 z-10 flex h-72 flex-col items-center overflow-hidden rounded-2xl bg-muted p-5 text-center shadow-lg ring-1 ring-hairline animate-out fade-out fill-mode-forwards duration-500 ease-out sm:h-80 sm:p-6",
               throwConfig.throwClass
             )}
           >
-            <FlashcardBack card={thrown.card} />
+            <span className="mb-2 shrink-0 font-sans text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Answer
+            </span>
+            <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex min-h-full w-full flex-col items-center justify-center py-1 text-base font-medium text-foreground sm:text-lg">
+                <FlashcardBack card={thrown.card} />
+              </div>
+            </div>
           </div>
         ) : null}
 
         {thrown && (thrown.rating === "good" || thrown.rating === "easy") ? (
-          <Burst key={thrown.id} />
+          <Burst key={`burst-${thrown.id}`} className="z-20" />
         ) : null}
       </div>
 
@@ -350,7 +392,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
           size="icon-sm"
           aria-label="Previous card"
           onClick={handlePrevious}
-          disabled={currentIndex === 0 || isSubmittingRating}
+          disabled={previousIndex === -1 || isSubmittingRating}
         >
           <ChevronLeft />
         </Button>
@@ -362,7 +404,7 @@ export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModePr
           size="icon-sm"
           aria-label="Next card"
           onClick={handleNext}
-          disabled={currentIndex === total - 1 || isSubmittingRating}
+          disabled={nextIndex === -1 || isSubmittingRating}
         >
           <ChevronRight />
         </Button>

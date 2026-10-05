@@ -1,10 +1,15 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { SrsRating } from "@/features/studio/utils/srsReviewLabels";
 import type { Flashcard } from "@/shared/types";
 import { type DueFlashcard, StudyMode } from "./StudyMode";
+
+const toastError = vi.fn();
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: toastError }),
+}));
 
 vi.mock("@/shared/components/MarkdownRenderer", () => ({
   __esModule: true,
@@ -21,6 +26,7 @@ function deck(n: number): DueFlashcard[] {
 let onRateCard: Mock<(cardIndex: number, rating: SrsRating) => Promise<void>>;
 let onComplete: Mock<() => void>;
 beforeEach(() => {
+  toastError.mockClear();
   onRateCard = vi
     .fn<(cardIndex: number, rating: SrsRating) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -151,5 +157,80 @@ describe("StudyMode", () => {
       expect(peek).toHaveTextContent("");
     }
     expect(screen.getAllByText("Front 1")).toHaveLength(1);
+  });
+
+  it("plays a burst on Good but not on Again", async () => {
+    const user = userEvent.setup();
+    const { container } = renderStudy();
+    await rate(user, /Again/);
+    await screen.findByText("Front 2");
+    expect(container.querySelector('[data-slot="burst"]')).toBeNull();
+    await rate(user, /Good/);
+    await waitFor(() => expect(container.querySelector('[data-slot="burst"]')).not.toBeNull());
+  });
+
+  it("clears the thrown card after the fallback delay", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { container } = renderStudy();
+      await rate(user, /Good/);
+      await waitFor(() => expect(container.querySelector("[data-thrown]")).not.toBeNull());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
+      expect(container.querySelector("[data-thrown]")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the card revealed and tells the learner when saving a rating fails", async () => {
+    onRateCard.mockRejectedValueOnce(new Error("x"));
+    const user = userEvent.setup();
+    const { container } = renderStudy();
+    await rate(user, /Good/);
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Couldn't save your rating. Try again.")
+    );
+    expect(screen.getByText("0 of 3 reviewed")).toBeInTheDocument();
+    expect(container.querySelector("[data-thrown]")).toBeNull();
+    const good = screen.getByRole("button", { name: /Good\s+in 10 min/ });
+    await waitFor(() => expect(good).toBeEnabled());
+  });
+
+  it("browses only to unreviewed cards", async () => {
+    const user = userEvent.setup();
+    renderStudy();
+    await rate(user, /Good/);
+    await screen.findByText("Front 2");
+    expect(screen.getByRole("button", { name: "Previous card" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next card" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Next card" }));
+    await screen.findByText("Front 3");
+    expect(screen.getByRole("button", { name: "Previous card" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Previous card" }));
+    await screen.findByText("Front 2");
+  });
+
+  it("moves focus to Study again when the session completes", async () => {
+    const user = userEvent.setup();
+    renderStudy(1);
+    await rate(user, /Good/);
+    expect(await screen.findByRole("button", { name: "Study again" })).toHaveFocus();
+  });
+
+  it("ignores keys typed in a dialog", async () => {
+    const user = userEvent.setup();
+    renderStudy();
+    await screen.findByText("Front 1");
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "alertdialog");
+    document.body.appendChild(dialog);
+    dialog.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    expect(screen.queryByRole("button", { name: /Good/ })).toBeNull();
+    dialog.remove();
+    await user.keyboard(" ");
+    expect(screen.getByRole("button", { name: /Good/ })).toBeInTheDocument();
   });
 });
