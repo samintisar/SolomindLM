@@ -283,7 +283,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   return (
     <>
-      <div className="relative h-full w-full min-w-0 bg-sidebar border-l-2 border-border flex flex-col overflow-hidden opacity-100">
+      <div className="relative h-full w-full min-w-0 bg-sidebar flex flex-col overflow-hidden">
         {/* Header */}
         <StudioPanelHeader
           activeNote={activeNoteId ? headerNote : null}

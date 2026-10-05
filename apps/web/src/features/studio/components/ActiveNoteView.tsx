@@ -1,6 +1,7 @@
 import { Loader2, Save, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { AudioPlayer } from "@/features/audio/components/AudioPlayer";
+import { Button } from "@/shared/components/ui/button";
 import type { ReportNote } from "@/shared/types/index";
 import {
   isAudioNote,
@@ -51,29 +52,19 @@ const ReportMarkdownEditor: React.FC<ReportMarkdownEditorProps> = ({ note, onSav
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex items-center justify-end gap-2 p-3 border-b border-border bg-card/50 shrink-0">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSaving}
-          className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground border border-transparent hover:border-border rounded-md bg-transparent hover:bg-secondary/50 transition-colors disabled:opacity-50"
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
           Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors disabled:opacity-50"
-        >
-          <Save className="w-4 h-4" />
+        </Button>
+        <Button type="button" size="sm" onClick={handleSave} disabled={isSaving}>
+          <Save />
           {isSaving ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </div>
       <div className="flex-1 min-h-0 p-4">
         <textarea
           value={draftContent}
           onChange={(e) => setDraftContent(e.target.value)}
-          className="w-full h-full min-h-[200px] p-4 rounded-lg border border-border bg-card text-foreground font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          className="w-full h-full min-h-50 p-4 rounded-lg border border-border bg-card text-foreground font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           placeholder="Write your report in Markdown..."
           spellCheck={false}
         />
