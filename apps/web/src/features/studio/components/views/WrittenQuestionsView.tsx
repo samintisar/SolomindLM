@@ -1,4 +1,11 @@
-import { AlertCircle, ArrowLeft, Award, CheckCircle2, Eye, MessageSquareText } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  MessageSquareText,
+  RotateCcw,
+} from "lucide-react";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useResetWrittenAnswers,
@@ -11,8 +18,21 @@ import {
   selectPendingGradeIds,
   summarizeWrittenQuestions,
 } from "@/features/studio/utils/writtenQuestionsScore";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Progress } from "@/shared/components/ui/progress";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
+import { cn } from "@/shared/utils/cn";
+import { Burst } from "../../motion/Burst";
+import { useCountUp } from "../../motion/useCountUp";
+import { useStreak } from "../../motion/useStreak";
+import { QuestionProgress } from "../practice/QuestionProgress";
+import { ResultsSummary } from "../practice/ResultsSummary";
+import { StreakChip } from "../practice/StreakChip";
+import type { QuestionState } from "../practice/types";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -27,6 +47,24 @@ export interface WrittenQuestionsViewProps {
 // Idle value for the grade-on-Finish progress state. Must be reset between runs
 // so a stale `failed` count can't leak the failure banner onto a later clean finish.
 const GRADING_ALL_IDLE = { active: false, done: 0, total: 0, failed: 0, stopping: false };
+
+/** "7 / 10", counting up when a grade has just arrived (duration 0 shows it at once). */
+function GradedScore({
+  score,
+  maxScore,
+  duration,
+}: {
+  score: number;
+  maxScore: number;
+  duration: number;
+}) {
+  const shown = useCountUp(score, duration);
+  return (
+    <>
+      {shown} / {maxScore}
+    </>
+  );
+}
 
 export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   note,
@@ -59,6 +97,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const resetAnswersMutation = useResetWrittenAnswers();
   const saveDraftMutation = useSaveWrittenAnswerDraft();
   const latestNote = useWrittenQuestionSet(note.id);
+  const { streak, record, reset: resetStreak } = useStreak();
+  // The question whose grade just arrived: its score counts up, and bursts on full marks.
+  const [justGraded, setJustGraded] = useState<{ id: string; fullMarks: boolean } | null>(null);
+  // Spoken after a grade arrives (never on a restored or review view).
+  const [announcement, setAnnouncement] = useState("");
+  const nextButtonRef = useRef<HTMLButtonElement>(null);
 
   // Track if we've initialized the index from saved progress
   const hasInitializedIndex = useRef(false);
@@ -238,6 +282,15 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     (qid) => userAnswers[qid]?.answer?.trim().length > 0
   ).length;
   const totalCount = questions.length;
+  const questionStates: Array<QuestionState | undefined> = questions.map((question) => {
+    const entry = userAnswers[question.id];
+    if (!entry?.answer?.trim()) return undefined;
+    if (!entry.graded) return "answered";
+    const max = entry.maxScore ?? 0;
+    const got = entry.score ?? 0;
+    if (max > 0 && got >= max) return "correct";
+    return got > 0 ? "partial" : "incorrect";
+  });
 
   const handleSubmitAnswer = async () => {
     if (!isAnswered || isSubmitting) return;
@@ -252,7 +305,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
         answer: currentAnswer,
       });
 
-      console.log("Grading complete:", result);
+      const fullMarks = result.maxScore > 0 && result.score >= result.maxScore;
+      record(fullMarks);
+      setJustGraded({ id: currentQuestion.id, fullMarks });
+      setAnnouncement(`Graded: ${result.score} of ${result.maxScore} points.`);
+      // Submit is about to disappear; keep keyboard focus on the way forward.
+      nextButtonRef.current?.focus({ preventScroll: true });
 
       // The useEffect will sync userAnswers from latestNote when the database updates
       // Just notify parent of the update
@@ -341,6 +399,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   };
 
   const handleNext = () => {
+    setJustGraded(null);
+    setAnnouncement("");
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
@@ -349,6 +409,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   };
 
   const handlePrev = () => {
+    setJustGraded(null);
+    setAnnouncement("");
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
     }
@@ -375,6 +437,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       setReviewMode(false);
       setUserAnswers({});
       setGradingAll(GRADING_ALL_IDLE);
+      resetStreak();
+      setJustGraded(null);
+      setAnnouncement("");
       // Notify parent to refresh note
       if (latestNote && onNoteUpdate) {
         onNoteUpdate(latestNote);
@@ -388,24 +453,46 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   };
 
   const reviewAnswers = () => {
+    setJustGraded(null);
+    setAnnouncement("");
     setCurrentIndex(0);
+    setShowResults(false);
+    setReviewMode(true);
+  };
+
+  const reviewQuestion = (position: number) => {
+    setJustGraded(null);
+    setAnnouncement("");
+    setCurrentIndex(position);
     setShowResults(false);
     setReviewMode(true);
   };
 
   if (gradingAll.active) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8">
-        <div className="text-center space-y-4" role="status" aria-live="polite">
-          <div
-            className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto"
-            aria-hidden="true"
-          />
+      <div className="flex h-full flex-col items-center justify-center p-8">
+        <div
+          className="flex flex-col items-center gap-4 text-center"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-primary" aria-hidden="true">
+            <Spinner className="size-8" />
+          </span>
           <p className="text-muted-foreground">
             Grading your answers… {gradingAll.done} of {gradingAll.total}
           </p>
-          <button
+          <Progress
+            value={gradingAll.total > 0 ? (gradingAll.done / gradingAll.total) * 100 : null}
+            size="sm"
+            glint
+            aria-label="Grading progress"
+            className="w-48"
+          />
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => {
               gradingCancelledRef.current = true;
               // Reflect the stop in render state right away; the loop only
@@ -414,10 +501,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
               setGradingAll((s) => ({ ...s, stopping: true }));
             }}
             disabled={gradingAll.stopping}
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {gradingAll.stopping ? "Stopping…" : "Stop grading"}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -431,319 +517,298 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     );
 
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-300">
-        <div className="text-center space-y-6 max-w-md w-full bg-card p-10 rounded-2xl border border-border shadow-lg">
-          <div className="w-20 h-20 bg-primary/10 rounded-xl flex items-center justify-center mx-auto text-primary">
-            <Award className="w-10 h-10" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold font-serif mb-2">Assessment Complete!</h3>
-            <p className="text-muted-foreground">
-              You scored {score} out of {maxScore} points
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Graded {gradedCount} of {totalCount} questions
-            </p>
-            {gradedCount < totalCount && (
-              <p className="text-xs text-muted-foreground/80 mt-0.5">
-                Ungraded questions count as 0.
-              </p>
-            )}
-            {gradingAll.failed > 0 && (
-              <p className="text-xs text-warning-muted-foreground mt-0.5">
-                {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
-              </p>
-            )}
-          </div>
-          <div className="w-full bg-secondary rounded-xl h-3 overflow-hidden">
-            <div
-              className="bg-primary h-full transition-all duration-1000 ease-out"
-              style={{ width: `${percentage}%` }}
-            />
-          </div>
-          <div className="text-sm text-muted-foreground">{percentage}%</div>
-          <div className="flex gap-3">
-            <button
-              onClick={reviewAnswers}
-              className="flex-1 py-3 bg-secondary text-secondary-foreground font-bold rounded-lg hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
+      <ResultsSummary
+        title="Assessment Complete!"
+        fraction={percentage / 100}
+        value={percentage}
+        valueSuffix="%"
+        questions={questionStates.map((state, position) => ({
+          state,
+          onReview: () => reviewQuestion(position),
+        }))}
+        actions={
+          <>
+            <Button variant="secondary" className="flex-1" onClick={reviewAnswers}>
+              <Eye />
               Review
-            </button>
-            <button
-              onClick={resetQuestions}
-              disabled={isResetting}
-              className="flex-1 py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isResetting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Resetting...
-                </>
-              ) : (
-                "Try Again"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+            <Button className="flex-1" onClick={resetQuestions} disabled={isResetting}>
+              {isResetting ? <Spinner /> : <RotateCcw />}
+              {isResetting ? "Resetting…" : "Try Again"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-muted-foreground">
+          You scored {score} out of {maxScore} points
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Graded {gradedCount} of {totalCount} questions
+        </p>
+        {gradedCount < totalCount && (
+          <p className="text-xs text-muted-foreground">Ungraded questions count as 0.</p>
+        )}
+        {gradingAll.failed > 0 && (
+          <p className="text-xs text-warning-muted-foreground">
+            {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
+          </p>
+        )}
+      </ResultsSummary>
     );
   }
 
+  const isFreshGrade = justGraded?.id === currentQuestion.id;
+
   return (
-    <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300 relative">
+    <div className="relative flex h-full flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300">
       {/* Mobile Back Button */}
       {onBack && (
-        <div className="md:hidden flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-          <button
-            onClick={onBack}
-            className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
-            aria-label="Back to Studio"
-          >
-            <ArrowLeft className="w-5 h-5 shrink-0" />
-          </button>
-          <span className="text-sm font-semibold text-foreground truncate">{note.title}</span>
+        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm md:hidden">
+          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+            <ArrowLeft />
+          </Button>
+          <span className="truncate text-sm font-semibold text-foreground">{note.title}</span>
         </div>
       )}
-      <div className="flex-1 bg-card border-t border-border min-h-0 overflow-y-auto">
-        <div className="max-w-3xl mx-auto w-full min-h-full p-8 md:p-12 flex flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-card">
+        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col p-8 md:p-12">
           {/* Review Mode Banner */}
           {reviewMode && (
-            <div className="mb-6 p-4 bg-warning-muted border border-warning-border rounded-xl flex items-center gap-3">
-              <Eye className="w-5 h-5 text-warning-muted-foreground shrink-0" />
-              <div>
-                <span className="text-sm font-semibold text-warning-muted-foreground">
-                  Review Mode
-                </span>
-                <p className="text-xs text-warning-muted-foreground">
-                  You are viewing your previous answers. Editing is disabled.
-                </p>
-              </div>
-            </div>
+            <Alert variant="warning" role="note" className="mb-6">
+              <Eye />
+              <AlertTitle>Review Mode</AlertTitle>
+              <AlertDescription>
+                You are viewing your previous answers. Editing is disabled.
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Progress Header */}
           <div className="mb-8">
-            <div className="flex justify-between text-xs md:text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
-              <span>Question {currentIndex + 1}</span>
-              <span>
-                {answeredCount} of {totalCount} Answered
-              </span>
-            </div>
-            <div className="w-full bg-secondary/50 rounded-xl h-1.5 overflow-hidden">
-              <div
-                className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-              />
-            </div>
+            <QuestionProgress
+              currentIndex={currentIndex}
+              states={questionStates}
+              trailing={
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="whitespace-nowrap">
+                    {answeredCount} of {totalCount} answered
+                  </span>
+                  <StreakChip streak={streak} />
+                </span>
+              }
+            />
           </div>
 
           {/* Question Type Badge */}
           <div className="mb-4">
-            {currentQuestion.questionType === "short" ? (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary text-foreground border border-border">
-                <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold uppercase tracking-wide">SHORT ANSWER</span>
+            <Badge variant="secondary">
+              <MessageSquareText />
+              {currentQuestion.questionType === "short" ? "Short answer" : "Essay"}
+              {currentQuestion.questionType === "short" ? null : (
+                <span className="text-muted-foreground">
+                  · {currentQuestion.rubric.maxPoints} pts
+                </span>
+              )}
+            </Badge>
+          </div>
+
+          <div
+            key={currentIndex}
+            className="flex flex-1 flex-col animate-in fade-in slide-in-from-right-4 duration-300"
+          >
+            {/* Question */}
+            <div className="prose mb-6 w-full max-w-none font-serif text-lg leading-relaxed text-foreground md:text-xl">
+              <Suspense
+                fallback={<div className="h-5 w-full animate-pulse rounded bg-secondary/30" />}
+              >
+                <MarkdownRenderer
+                  components={{
+                    img: () => null,
+                    a: ({ children }) => <span className="text-foreground">{children}</span>,
+                    video: () => null,
+                    audio: () => null,
+                    iframe: () => null,
+                    table: ({ children }) => (
+                      <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
+                        {children}
+                      </table>
+                    ),
+                    thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                    tbody: ({ children }) => <tbody>{children}</tbody>,
+                    tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                    th: ({ children }) => (
+                      <th className="border-r border-border px-4 py-2 text-left font-semibold text-foreground last:border-r-0">
+                        {children}
+                      </th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="border-r border-border px-4 py-2 text-foreground last:border-r-0">
+                        {children}
+                      </td>
+                    ),
+                  }}
+                >
+                  {sanitizeMarkdown(currentQuestion.question)}
+                </MarkdownRenderer>
+              </Suspense>
+            </div>
+
+            {/* Answer Input or Graded Result */}
+            {!isGraded ? (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="relative flex min-h-50 flex-1">
+                  <textarea
+                    value={currentAnswer}
+                    onChange={(e) => handleAnswerChange(e.target.value)}
+                    placeholder={
+                      currentQuestion.questionType === "short"
+                        ? "Type your short answer here (1-3 sentences)..."
+                        : "Type your detailed answer here..."
+                    }
+                    disabled={reviewMode}
+                    data-answered={isAnswered ? "true" : undefined}
+                    className="w-full flex-1 resize-none rounded-xl bg-background p-6 font-serif text-base leading-relaxed shadow-xs ring-1 ring-hairline outline-hidden transition-shadow placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70 data-[answered=true]:ring-primary/40"
+                  />
+                  {isSubmitting ? (
+                    <span
+                      aria-hidden
+                      className="studio-sheen pointer-events-none absolute inset-0 rounded-xl"
+                    />
+                  ) : null}
+                </div>
+                <div className="mt-2 flex shrink-0 items-center justify-between font-mono text-xs text-muted-foreground">
+                  <span>{currentAnswer.length} characters</span>
+                  <span>{currentAnswer.split(/\s+/).filter(Boolean).length} words</span>
+                </div>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary text-foreground border border-border">
-                <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold uppercase tracking-wide">ESSAY</span>
-                <span className="text-xs font-semibold text-muted-foreground ml-1">
-                  {currentQuestion.rubric.maxPoints} pts
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Question */}
-          <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-6 text-lg md:text-xl">
-            <Suspense
-              fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}
-            >
-              <MarkdownRenderer
-                components={{
-                  img: () => null,
-                  a: ({ children }) => <span className="text-foreground">{children}</span>,
-                  video: () => null,
-                  audio: () => null,
-                  iframe: () => null,
-                  table: ({ children }) => (
-                    <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
-                      {children}
-                    </table>
-                  ),
-                  thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                  tbody: ({ children }) => <tbody>{children}</tbody>,
-                  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                  th: ({ children }) => (
-                    <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
-                      {children}
-                    </td>
-                  ),
-                }}
-              >
-                {sanitizeMarkdown(currentQuestion.question)}
-              </MarkdownRenderer>
-            </Suspense>
-          </div>
-
-          {/* Answer Input or Graded Result */}
-          {!isGraded ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              <textarea
-                value={currentAnswer}
-                onChange={(e) => handleAnswerChange(e.target.value)}
-                placeholder={
-                  currentQuestion.questionType === "short"
-                    ? "Type your short answer here (1-3 sentences)..."
-                    : "Type your detailed answer here..."
-                }
-                disabled={reviewMode}
-                className={`flex-1 w-full bg-background border-2 rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/40 ${
-                  isAnswered ? "border-primary" : "border-border"
-                } ${reviewMode ? "opacity-70 cursor-not-allowed bg-muted/30" : ""}`}
-              />
-              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 font-mono shrink-0">
-                <span>{currentAnswer.length} characters</span>
-                <span>{currentAnswer.split(/\s+/).filter(Boolean).length} words</span>
-              </div>
-            </div>
-          ) : (
-            /* Graded Result Display */
-            <div className="flex-1 space-y-4">
-              {/* Score Banner */}
-              <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-primary" />
-                    <div>
-                      <span className="text-sm font-semibold text-primary">Answer Graded</span>
-                      <div className="text-2xl font-bold text-primary mt-0.5">
-                        {currentGradedResult.score} / {currentGradedResult.maxScore}
+              /* Graded Result Display */
+              <div className="flex-1 space-y-4">
+                {/* Score Banner */}
+                <div className="relative rounded-xl bg-primary/10 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="size-6 text-primary" />
+                      <div>
+                        <span className="text-sm font-semibold text-primary">Answer Graded</span>
+                        <div className="mt-0.5 text-2xl font-bold tabular-nums text-primary">
+                          <GradedScore
+                            score={currentGradedResult.score}
+                            maxScore={currentGradedResult.maxScore}
+                            duration={isFreshGrade ? 900 : 0}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-muted-foreground">Score</div>
+                      <div className="text-lg font-bold text-foreground">
+                        {currentGradedResult.maxScore > 0
+                          ? Math.round(
+                              (currentGradedResult.score / currentGradedResult.maxScore) * 100
+                            )
+                          : 0}
+                        %
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Score</div>
-                    <div className="text-lg font-bold text-foreground">
-                      {currentGradedResult.maxScore > 0
-                        ? Math.round(
-                            (currentGradedResult.score / currentGradedResult.maxScore) * 100
-                          )
-                        : 0}
-                      %
-                    </div>
+                  {isFreshGrade && justGraded.fullMarks ? <Burst /> : null}
+                </div>
+
+                {/* Your Answer */}
+                <div className="rounded-xl bg-secondary/30 p-4 animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards delay-100 duration-300">
+                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Your Answer
+                  </span>
+                  <div className="mt-2 whitespace-pre-wrap font-serif text-base leading-relaxed text-foreground">
+                    {userAnswers[currentQuestion.id]?.answer || ""}
                   </div>
                 </div>
-              </div>
 
-              {/* Your Answer */}
-              <div className="p-4 bg-secondary/30 rounded-xl border border-border">
-                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Your Answer
-                </span>
-                <div className="mt-2 text-base leading-relaxed text-foreground whitespace-pre-wrap font-serif">
-                  {userAnswers[currentQuestion.id]?.answer || ""}
-                </div>
-              </div>
-
-              {/* Feedback */}
-              <div className="p-4 bg-info-muted rounded-xl border border-info-border">
-                <span className="text-sm font-bold uppercase tracking-wide text-info-muted-foreground">
-                  Feedback
-                </span>
-                <div className="mt-2 text-base leading-relaxed text-info-muted-foreground">
-                  {currentGradedResult.feedback}
-                </div>
-              </div>
-
-              {/* Strengths */}
-              {currentGradedResult.strengths && currentGradedResult.strengths.length > 0 && (
-                <div className="p-4 bg-success-muted rounded-xl border border-success-border">
-                  <span className="text-sm font-bold uppercase tracking-wide text-success-muted-foreground">
-                    Strengths
+                {/* Feedback */}
+                <div className="rounded-xl border border-info-border bg-info-muted p-4 animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards delay-150 duration-300">
+                  <span className="text-sm font-bold uppercase tracking-wide text-info-muted-foreground">
+                    Feedback
                   </span>
-                  <ul className="mt-2 space-y-2">
-                    {currentGradedResult.strengths.map((strength, idx) => (
-                      <li
-                        key={idx}
-                        className="text-base text-success-muted-foreground flex items-start gap-2"
-                      >
-                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-1" />
-                        <span>{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-2 text-base leading-relaxed text-info-muted-foreground">
+                    {currentGradedResult.feedback}
+                  </div>
                 </div>
-              )}
 
-              {/* Improvements */}
-              {currentGradedResult.improvements && currentGradedResult.improvements.length > 0 && (
-                <div className="p-4 bg-warning-muted rounded-xl border border-warning-border">
-                  <span className="text-sm font-bold uppercase tracking-wide text-warning-muted-foreground">
-                    Areas for Improvement
-                  </span>
-                  <ul className="mt-2 space-y-2">
-                    {currentGradedResult.improvements.map((improvement, idx) => (
-                      <li
-                        key={idx}
-                        className="text-base text-warning-muted-foreground flex items-start gap-2"
-                      >
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-1" />
-                        <span>{improvement}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+                {/* Strengths */}
+                {currentGradedResult.strengths && currentGradedResult.strengths.length > 0 && (
+                  <div className="rounded-xl border border-success-border bg-success-muted p-4 animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards delay-200 duration-300">
+                    <span className="text-sm font-bold uppercase tracking-wide text-success-muted-foreground">
+                      Strengths
+                    </span>
+                    <ul className="mt-2 space-y-2">
+                      {currentGradedResult.strengths.map((strength, idx) => (
+                        <li
+                          key={idx}
+                          className="flex items-start gap-2 text-base text-success-muted-foreground"
+                        >
+                          <CheckCircle2 className="mt-1 size-4 shrink-0" />
+                          <span>{strength}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Improvements */}
+                {currentGradedResult.improvements &&
+                  currentGradedResult.improvements.length > 0 && (
+                    <div className="rounded-xl border border-warning-border bg-warning-muted p-4 animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards delay-300 duration-300">
+                      <span className="text-sm font-bold uppercase tracking-wide text-warning-muted-foreground">
+                        Areas for Improvement
+                      </span>
+                      <ul className="mt-2 space-y-2">
+                        {currentGradedResult.improvements.map((improvement, idx) => (
+                          <li
+                            key={idx}
+                            className="flex items-start gap-2 text-base text-warning-muted-foreground"
+                          >
+                            <AlertCircle className="mt-1 size-4 shrink-0" />
+                            <span>{improvement}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      <p aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
+
       {/* Bottom Controls */}
-      <div className="shrink-0 p-4 md:px-12 md:py-6 border-t border-border bg-background/80 backdrop-blur-md z-10">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-between">
+      <div className="z-10 shrink-0 border-t border-border bg-background/80 p-4 backdrop-blur-md md:px-12 md:py-6">
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={handlePrev}
-              disabled={currentIndex === 0}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
-            >
+            <Button variant="ghost" size="sm" onClick={handlePrev} disabled={currentIndex === 0}>
               Previous
-            </button>
-            <button
-              onClick={handleNext}
-              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {currentIndex === questions.length - 1 ? "Finish" : "Next"}
-            </button>
+            </Button>
+            <span className={cn("inline-flex", isGraded && !reviewMode && "animate-studio-nudge")}>
+              <Button ref={nextButtonRef} size="sm" className="min-w-25" onClick={handleNext}>
+                {currentIndex === questions.length - 1 ? "Finish" : "Next"}
+              </Button>
+            </span>
           </div>
 
           {!isGraded && !reviewMode && (
-            <button
+            <Button
+              size="sm"
+              className="min-w-25"
               onClick={handleSubmitAnswer}
               disabled={!isAnswered || isSubmitting}
-              className="px-6 py-2 bg-success hover:bg-success/90 text-success-foreground text-sm font-bold rounded-xl transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-success flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Grading...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  Submit
-                </>
-              )}
-            </button>
+              {isSubmitting ? <Spinner /> : <CheckCircle2 />}
+              {isSubmitting ? "Grading…" : "Submit"}
+            </Button>
           )}
         </div>
       </div>
