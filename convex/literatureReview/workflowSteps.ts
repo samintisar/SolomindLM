@@ -1,5 +1,5 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import { allWithConcurrency } from "../_agents/_shared/concurrency.js";
 import { createLLM } from "../_agents/_shared/llm_factory.js";
 import { invokeWithHttpRetry } from "../_agents/_shared/retry.js";
@@ -20,6 +20,9 @@ import {
   GENERATE_REPORT_SECTION_PROMPT,
   GENERATE_REPORT_SECTION_SYSTEM_PROMPT,
   GenerateFullReportOutputSchema,
+  PDF_METADATA_PROMPT,
+  PDF_METADATA_SYSTEM_PROMPT,
+  PdfMetadataOutputSchema,
   PLAN_REVIEW_PROMPT,
   PLAN_REVIEW_SYSTEM_PROMPT,
   PlanReviewOutputSchema,
@@ -52,13 +55,21 @@ import {
   truncateForLiteratureLlm,
 } from "./llmTuning.js";
 import {
+  NOTEBOOK_PAPER_TEXT_MAX_CHARS,
+  type NotebookDocumentLike,
+  notebookPaperFromDocument,
+  type PdfMetadata,
+} from "./notebookPapers.js";
+import {
   compactPapersForSnapshot,
   compactPapersForWorkflow,
   compactRankedPapersForWorkflow,
+  truncateAbstractForWorkflow,
 } from "./rankedPapersSnapshot.js";
 import {
   alignExtractedDataToColumns,
   buildGroundedNumericSet,
+  buildNotebookPapersNote,
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
   columnsForExtraction,
@@ -96,7 +107,9 @@ const literaturePaperFields = {
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    /** A paper from the user's notebook (#301): included without screening. */
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   doi: v.optional(v.string()),
@@ -104,6 +117,10 @@ const literaturePaperFields = {
   isIncluded: v.optional(v.boolean()),
   includeReason: v.optional(v.string()),
   extractedData: v.optional(v.record(v.string(), v.string())),
+  /** Set for notebook papers: the source document, read server-side for extraction. */
+  documentId: v.optional(v.id("documents")),
+  /** Set when a notebook paper looks off-topic for the question; it is still included. */
+  offTopicReason: v.optional(v.string()),
 };
 
 const literaturePaperValidator = v.object(literaturePaperFields);
@@ -439,7 +456,7 @@ async function screenOnePaperWithLlm(
 
   const prompt = SCREEN_SINGLE_PAPER_PROMPT.replace(/{query}/g, query)
     .replace(/{title}/g, paper.title)
-    .replace(/{abstract}/g, truncateForLiteratureLlm(paper.abstract));
+    .replace(/{abstract}/g, () => truncateForLiteratureLlm(paper.abstract));
 
   const response = await invokeWithHttpRetry(
     () =>
@@ -457,6 +474,111 @@ async function screenOnePaperWithLlm(
 
   return { isIncluded: response.isIncluded, reason: response.reason };
 }
+
+const PDF_METADATA_TEXT_MAX_CHARS = 4_000;
+const PDF_METADATA_TIMEOUT_MS = 45_000;
+
+/** Title, authors and year from the start of an uploaded paper, so its citation key is right. */
+async function readPdfMetadataWithLlm(text: string): Promise<PdfMetadata> {
+  const llm = createLLM({
+    apiKey: env.TOGETHER_AI_API_KEY,
+    mapModel: bulkLlmModel(),
+    temperatures: 0,
+    maxTokens: 512,
+    phase: "fast",
+  });
+  const structuredLlm = llm.withStructuredOutput(PdfMetadataOutputSchema, {
+    name: "pdf_metadata",
+  });
+  const response = await invokeWithHttpRetry(
+    () =>
+      invokeWithTimeout(
+        () =>
+          structuredLlm.invoke([
+            new SystemMessage(PDF_METADATA_SYSTEM_PROMPT),
+            new HumanMessage(PDF_METADATA_PROMPT.replace("{text}", () => text)),
+          ]),
+        PDF_METADATA_TIMEOUT_MS,
+        "pdfMetadata"
+      ),
+    "pdfMetadata"
+  );
+  return {
+    title: response.title,
+    authors: response.authors,
+    year: response.year ?? undefined,
+  };
+}
+
+/**
+ * The user's selected notebook papers as workflow papers (#301): always included, never screened.
+ * Each runs through the screening check without gating; a "would exclude" verdict is kept as
+ * `offTopicReason` so the table and report can flag it.
+ */
+export async function loadNotebookPapersHandler(
+  ctx: ActionCtx,
+  args: { notebookId: Id<"notebooks">; documentIds: Id<"documents">[]; query: string }
+): Promise<{ papers: Infer<typeof literaturePaperValidator>[] }> {
+  const logger = createServiceLogger("literatureReview", "loadNotebookPapers");
+  const docs: NotebookDocumentLike[] = await ctx.runQuery(
+    internal.literatureReview.db.getNotebookPaperDocuments,
+    {
+      notebookId: args.notebookId,
+      documentIds: args.documentIds,
+    }
+  );
+
+  const papers: Infer<typeof literaturePaperValidator>[] = await allWithConcurrency(
+    docs.map((doc) => async () => {
+      let metadata: PdfMetadata = {};
+      if (doc.fileType === "file" && doc.extractedMarkdown?.trim()) {
+        try {
+          metadata = await readPdfMetadataWithLlm(
+            doc.extractedMarkdown.slice(0, PDF_METADATA_TEXT_MAX_CHARS)
+          );
+        } catch (error) {
+          logger.error("Reading paper details failed; using the file name", error, {
+            documentId: doc._id,
+          });
+        }
+      }
+      const paper = notebookPaperFromDocument(doc, metadata);
+      let offTopicReason: string | undefined;
+      try {
+        const verdict = await screenOnePaperWithLlm(paper, args.query);
+        if (!verdict.isIncluded) offTopicReason = verdict.reason;
+      } catch (error) {
+        logger.error("Off-topic check failed; leaving the paper unflagged", error, {
+          documentId: doc._id,
+        });
+      }
+      return {
+        ...paper,
+        abstract: truncateAbstractForWorkflow(paper.abstract),
+        documentId: doc._id as Id<"documents">,
+        ...(offTopicReason ? { offTopicReason } : {}),
+      };
+    }),
+    LITERATURE_BULK_LLM_CONCURRENCY
+  );
+
+  logger.info("Loaded notebook papers", {
+    requested: args.documentIds.length,
+    loaded: papers.length,
+    flaggedOffTopic: papers.filter((p) => p.offTopicReason).length,
+  });
+  return { papers };
+}
+
+export const loadNotebookPapers = internalAction({
+  args: {
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
+    query: v.string(),
+  },
+  returns: v.object({ papers: v.array(literaturePaperValidator) }),
+  handler: loadNotebookPapersHandler,
+});
 
 /** Screens up to five papers per action (parallel per-paper LLM calls). */
 export async function screenPapersBatchHandler(
@@ -609,7 +731,9 @@ async function extractPaperFieldsWithLlm(
   columns: Array<{ id: string; name: string; instructions?: string }>,
   query: string | undefined,
   smartModel: string | undefined,
-  logger: ReturnType<typeof createServiceLogger>
+  logger: ReturnType<typeof createServiceLogger>,
+  /** A notebook paper's own text; search papers are extracted from their abstract. */
+  fullText?: string
 ): Promise<Record<string, string> | undefined> {
   const extractionColumns = columnsForExtraction(columns);
   if (extractionColumns.length === 0) {
@@ -639,7 +763,12 @@ async function extractPaperFieldsWithLlm(
     .replace(/{title}/g, paper.title)
     .replace(/{authors}/g, paper.authors.join(", "))
     .replace(/{year}/g, paper.year !== undefined ? String(paper.year) : "N/A")
-    .replace(/{abstract}/g, truncateForLiteratureLlm(paper.abstract))
+    .replace(/{textLabel}/g, fullText ? "Full text (excerpt)" : "Abstract")
+    .replace(/{abstract}/g, () =>
+      fullText
+        ? truncateForLiteratureLlm(fullText, NOTEBOOK_PAPER_TEXT_MAX_CHARS)
+        : truncateForLiteratureLlm(paper.abstract)
+    )
     .replace(/{url}/g, paper.url)
     .replace(/{columns}/g, columnsText);
 
@@ -691,12 +820,18 @@ export async function extractDataBatchHandler(
   const papersWithExtractedData = await allWithConcurrency(
     args.papers.map((paper) => async () => {
       try {
+        const fullText: string | undefined = paper.documentId
+          ? await ctx.runQuery(internal.literatureReview.db.getNotebookPaperText, {
+              documentId: paper.documentId,
+            })
+          : undefined;
         const extractedData = await extractPaperFieldsWithLlm(
           paper,
           args.columns,
           args.query,
           args.smartModel,
-          logger
+          logger,
+          fullText || undefined
         );
         return extractedData ? { ...paper, extractedData } : paper;
       } catch (error) {
@@ -914,6 +1049,15 @@ export async function generateReportHandler(
         `- Title: ${citation.title}`,
         `- Authors: ${citation.authors.join(", ")}`,
         `- Year: ${citation.year ?? "N/A"}`,
+        ...(citation.fromNotebook
+          ? [
+              `- Origin: from the user's notebook (included without screening)${
+                draft.offTopicReason
+                  ? `; may be off-topic for the question: ${draft.offTopicReason}`
+                  : ""
+              }`,
+            ]
+          : []),
         `- Extracted Data:`,
       ];
 
@@ -949,6 +1093,8 @@ export async function generateReportHandler(
         authors: citation.authors.join(", "),
         year: citation.year !== undefined ? String(citation.year) : "",
         rowData: draft.rowData,
+        ...(citation.fromNotebook ? { fromNotebook: true } : {}),
+        ...(draft.offTopicReason ? { offTopicReason: draft.offTopicReason } : {}),
       });
     }
 
@@ -958,6 +1104,7 @@ export async function generateReportHandler(
     const sessionMetadata = JSON.stringify(provenance, null, 2);
     const methodsBlock = buildPrismaMethodsBlock(provenance);
     const studyTable = buildStudyCharacteristicsTable(reportPapers, reportTableColumns);
+    const notebookNote = buildNotebookPapersNote(reportPapers);
     logger.info("Starting report generation", {
       paperCount: drafts.length,
       sectionCount: 6,
@@ -1120,6 +1267,7 @@ export async function generateReportHandler(
     generatedSections = mergeDeterministicReportSections(sanitized, {
       methodsBlock,
       studyTable,
+      notebookNote,
     });
 
     // Step 5: Combine sections into full markdown report

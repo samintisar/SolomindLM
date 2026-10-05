@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   alignExtractedDataToColumns,
+  buildNotebookPapersNote,
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
   columnsForExtraction,
@@ -325,5 +326,97 @@ describe("reportContext", () => {
         ["Abstract", "Introduction", "Methods"]
       )
     ).toEqual(["Introduction", "Methods"]);
+  });
+});
+
+describe("notebook papers in the report", () => {
+  it("adds notebook papers to the PRISMA counts", () => {
+    const block = buildPrismaMethodsBlock({
+      searchQueries: ["physical activity depression"],
+      databasesUsed: ["arxiv"],
+      recordsIdentified: 40,
+      recordsAfterDedupe: 35,
+      recordsScreened: 25,
+      recordsExcluded: 13,
+      recordsIncluded: 12,
+      recordsFromNotebook: 4,
+    });
+    expect(block).toContain("| Papers from your notebook | 4 |");
+    expect(block).toContain("| Studies included | 16 |");
+  });
+
+  it("says no database search ran when the review is limited to notebook papers", () => {
+    const block = buildPrismaMethodsBlock({ searchSkipped: true, recordsFromNotebook: 4 });
+    expect(block).toContain(
+      "No database search was run; this review is limited to 4 papers from the user's notebook."
+    );
+    expect(block).not.toContain("Records identified");
+    expect(block).toContain("| Studies included | 4 |");
+  });
+
+  it("marks notebook papers in the study table", () => {
+    const table = buildStudyCharacteristicsTable(
+      [
+        {
+          citationKey: "Laird2023",
+          title: "T",
+          authors: "Laird E",
+          year: "2023",
+          rowData: {},
+          fromNotebook: true,
+        },
+        { citationKey: "Kim2019", title: "K", authors: "Kim S", year: "2019", rowData: {} },
+      ],
+      []
+    );
+    expect(table).toContain("Laird E et al. [Laird2023] †");
+    expect(table).toContain("Kim S et al. [Kim2019] |");
+    expect(table).toContain("† From the user's notebook.");
+  });
+
+  it("lists notebook papers flagged as off-topic, with the reason", () => {
+    const note = buildNotebookPapersNote([
+      {
+        citationKey: "Laird2023",
+        title: "Cohort",
+        authors: "Laird E",
+        year: "2023",
+        rowData: {},
+        fromNotebook: true,
+      },
+      {
+        citationKey: "Smith2020",
+        title: "Diabetes trial",
+        authors: "Smith J",
+        year: "2020",
+        rowData: {},
+        fromNotebook: true,
+        offTopicReason: "Studies diabetes, not depression.",
+      },
+      { citationKey: "Kim2019", title: "K", authors: "Kim S", year: "2019", rowData: {} },
+    ]);
+    expect(note).toContain("2 papers come from the user's notebook");
+    expect(note).toContain(
+      "[Smith2020] may be off-topic for the question: Studies diabetes, not depression."
+    );
+    expect(note).not.toContain("Laird2023] may be");
+  });
+
+  it("adds no note when there are no notebook papers", () => {
+    expect(
+      buildNotebookPapersNote([
+        { citationKey: "Kim2019", title: "K", authors: "Kim S", year: "2019", rowData: {} },
+      ])
+    ).toBe("");
+  });
+
+  it("puts the notebook note after the study table in Results", () => {
+    const sections = mergeDeterministicReportSections([], {
+      methodsBlock: "M",
+      studyTable: "TABLE",
+      notebookNote: "NOTEBOOK NOTE",
+    });
+    const results = sections.find((s) => s.heading === "Results")?.content ?? "";
+    expect(results.indexOf("TABLE")).toBeLessThan(results.indexOf("NOTEBOOK NOTE"));
   });
 });

@@ -88,4 +88,20 @@ describe("Workflow step sequence", () => {
     expect(actions.lastIndexOf("extractDataBatch")).toBeLessThan(actions.indexOf("generateTable"));
     expect(events).toEqual(["columnsConfirmedEvent"]);
   });
+
+  it("loads notebook papers after the column checkpoint, before search, and drops their search copies", () => {
+    const source = getWorkflowSource();
+    const at = (needle: string) => source.indexOf(needle);
+    expect(at("workflowSteps.loadNotebookPapers")).toBeGreaterThan(
+      at("awaitEvent(columnsConfirmedEvent")
+    );
+    expect(at("workflowSteps.loadNotebookPapers")).toBeLessThan(at("workflowSteps.searchPapers"));
+    // Search copies are dropped before ranking, and notebook papers lead the extraction list.
+    expect(at("dropSearchCopiesOfNotebookPapers(notebookPapers")).toBeLessThan(
+      at("workflowSteps.rankPapers")
+    );
+    expect(source).toContain("[...notebookPapers, ...screenedIncluded]");
+    // "Only your papers" skips the search entirely.
+    expect(at('args.paperScope === "papers_only"')).toBeLessThan(at("workflowSteps.searchPapers"));
+  });
 });

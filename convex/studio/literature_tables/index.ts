@@ -12,8 +12,11 @@ import {
   canReadNotebook,
 } from "../../_lib/notebookAccess";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
+import { toConvexError } from "../../_lib/serviceErrors";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
+import { loadNotebookPaperDocuments } from "../../literatureReview/db";
+import { type PaperScope, resolvePaperScope } from "../../literatureReview/notebookPapers";
 import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
 import { scheduleLiteratureReviewCompletionPush } from "../../push/notify";
 import { literatureTableToCsv } from "./literatureTableCsv.js";
@@ -39,6 +42,7 @@ const literatureTablePaperValidator = v.object({
   rowData: v.record(v.string(), v.string()),
   includeReason: v.optional(v.string()),
   isIncluded: v.boolean(),
+  offTopicReason: v.optional(v.string()),
 });
 
 /** Chat workflow tables/reports — never listed in the studio sidebar. */
@@ -220,6 +224,10 @@ export const startLiteratureReview = mutation({
     conversationId: v.optional(v.id("conversations")),
     searchOptions: v.optional(literatureSearchOptionsValidator),
     smartModel: v.optional(v.string()),
+    /** Selected sources; the PDFs and saved papers among them are always included (#301). */
+    documentIds: v.optional(v.array(v.id("documents"))),
+    /** "papers_only" skips the database search. Defaults to searching as well. */
+    paperScope: v.optional(v.union(v.literal("papers_and_search"), v.literal("papers_only"))),
   },
   returns: v.object({
     sessionId: v.id("literatureReviewSessions"),
@@ -230,6 +238,17 @@ export const startLiteratureReview = mutation({
     if (!userId) throw new Error("Unauthenticated");
 
     await assertCanEditNotebook(ctx, args.notebookId, userId);
+
+    // Keep only this notebook's finished PDFs and saved papers; the client list is not trusted.
+    const notebookPaperIds = (
+      await loadNotebookPaperDocuments(ctx, args.notebookId, args.documentIds ?? [])
+    ).map((d) => d._id as Id<"documents">);
+    let paperScope: PaperScope | undefined;
+    try {
+      paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
+    } catch (error) {
+      throw toConvexError(error);
+    }
 
     const notebook = await ctx.db.get(args.notebookId);
     const notebookSmartModel = notebook?.chatSettings?.smartModel;
@@ -295,6 +314,7 @@ export const startLiteratureReview = mutation({
         workflowId: "", // Will be updated after workflow starts
         smartModel,
         searchOptions: args.searchOptions,
+        ...(notebookPaperIds.length > 0 ? { documentIds: notebookPaperIds, paperScope } : {}),
         status: "planning" as const,
         conversationId,
         assistantMessageId,
@@ -326,6 +346,7 @@ export const startLiteratureReview = mutation({
         assistantMessageId,
         searchOptions: args.searchOptions,
         smartModel,
+        ...(notebookPaperIds.length > 0 ? { documentIds: notebookPaperIds, paperScope } : {}),
       }
     );
 
@@ -410,7 +431,12 @@ export const retryLiteratureReview = mutation({
       }
     }
 
-    const fromAction = stepMap[fromStep];
+    // A papers-only review never ran the search steps; restart it from loading the notebook papers.
+    const searchSteps = new Set(["searching", "deduplicating", "ranking", "screening"]);
+    const fromAction =
+      session.paperScope === "papers_only" && searchSteps.has(fromStep)
+        ? internal.literatureReview.workflowSteps.loadNotebookPapers
+        : stepMap[fromStep];
     if (!fromAction) {
       throw new Error(`Invalid fromStep: ${fromStep}`);
     }
@@ -518,7 +544,8 @@ const citationMetadataValidator = v.object({
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   abstract: v.optional(v.string()),
@@ -624,6 +651,7 @@ export const getLiteratureTable = query({
           rowData: v.record(v.string(), v.string()),
           includeReason: v.optional(v.string()),
           isIncluded: v.boolean(),
+          offTopicReason: v.optional(v.string()),
           citation: v.union(citationMetadataValidator, v.null()),
         })
       ),
