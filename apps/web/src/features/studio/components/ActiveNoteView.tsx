@@ -206,6 +206,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
           audioUrl={url}
           audioOverviewId={activeNote.id}
           transcript={activeNote.transcript}
+          metadata={activeNote.metadata}
           title={activeNote.title}
           onBack={undefined}
         />

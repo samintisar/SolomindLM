@@ -1,22 +1,60 @@
-import { ArrowLeft, Download, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
-import React from "react";
+import { ArrowLeft, Download } from "lucide-react";
+import React, { useEffect, useEffectEvent, useMemo, useRef } from "react";
+import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
-import { formatAudioTime, useAudioPlayer } from "../hooks/useAudioPlayer";
+import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
+import { currentLineIndex, resolveReaderLines } from "../transcript/transcriptLines";
+import { PlayButton } from "./controls/PlayButton";
+import { SkipButton } from "./controls/SkipButton";
+import { SpeedPill } from "./controls/SpeedPill";
+import { WaveformScrubber } from "./controls/WaveformScrubber";
+import { TranscriptReader } from "./TranscriptReader";
+
+const SKIP_SECONDS = 10;
+
+/** Keys typed here belong to the field or dialog, not the player. */
+const IGNORED_TARGETS =
+  "input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog'], [aria-modal='true']";
+/** Space presses these, so the player must not also toggle playback. */
+const PRESSABLE_TARGETS =
+  "button, a, summary, [role='button'], [role='slider'], [role='tab'], [role='menuitem'], [role='checkbox'], [role='switch'], [role='option']";
+
+const AUDIO_TYPE_LABELS: Record<string, string> = {
+  deep_dive: "Deep dive",
+  brief: "Brief",
+  critique: "Critique",
+  debate: "Debate",
+};
+
+function audioTypeLabel(metadata: Record<string, unknown> | undefined): string {
+  const audioType = metadata?.audioType;
+  return (typeof audioType === "string" && AUDIO_TYPE_LABELS[audioType]) || "Audio overview";
+}
 
 interface AudioPlayerProps {
   audioUrl: string;
   audioOverviewId?: string;
   transcript?: string;
   title?: string;
+  /** The saved `audioOverviews.metadata`: `lines` carries the per-line timings. */
+  metadata?: Record<string, unknown>;
   onBack?: () => void;
 }
 
+/**
+ * The "Reader": the transcript reads like live lyrics and follows the audio, above a floating
+ * three-row card (title and speed, waveform scrubber, transport).
+ *
+ * Space or k toggles play and the arrow keys skip 10 seconds, but only while this player is on
+ * screen: the notebook keeps a second, CSS-hidden Studio panel for the other breakpoint.
+ */
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   audioUrl,
   audioOverviewId,
   transcript,
   title,
+  metadata,
   onBack,
 }) => {
   const resolvedPlayback = useResolvedAudioPlaybackUrl(audioUrl, audioOverviewId);
@@ -38,129 +76,149 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const isUnavailable = resolvedPlayback === null;
   const canPlay = !!audioSource && !error;
 
+  // The estimate depends on the duration, which is 0 until the audio loads. currentLineIndex is
+  // -1 until then, so the reader does not open on the last line.
+  const resolved = useMemo(
+    () => resolveReaderLines(metadata, transcript ?? "", duration),
+    [metadata, transcript, duration]
+  );
+  const activeIndex = currentLineIndex(resolved, currentTime * 1000);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.repeat) return;
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+
+    const root = rootRef.current;
+    if (!root || root.checkVisibility?.() === false) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(IGNORED_TARGETS)) return;
+    if (target instanceof HTMLElement && target.isContentEditable) return;
+
+    if (event.key === " " || event.key.toLowerCase() === "k") {
+      // A focused button or link presses itself on Space; k is not pressed by anything.
+      if (event.key === " " && target?.closest(PRESSABLE_TARGETS)) return;
+      if (!canPlay) return;
+      event.preventDefault();
+      void togglePlay();
+      return;
+    }
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      // The scrubber skips on arrows itself.
+      if (target?.closest("[role='slider']")) return;
+      // Arrows also scroll sideways in code blocks and tables elsewhere on the page.
+      if (target !== document.body && !(target && root.contains(target))) return;
+      if (!canSeek) return;
+      event.preventDefault();
+      skipBy(event.key === "ArrowLeft" ? -SKIP_SECONDS : SKIP_SECONDS);
+    }
+  });
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => handleKeyDown(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
+
   return (
-    <div className="h-full flex flex-col relative">
+    <div ref={rootRef} className="relative flex h-full flex-col">
       {/* Mobile Back Button */}
       {onBack && (
-        <div className="md:hidden flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm z-20 mb-4">
-          <button
-            onClick={onBack}
-            className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
-            aria-label="Back to Studio"
-          >
-            <ArrowLeft className="w-5 h-5 shrink-0" />
-          </button>
-          <span className="text-sm font-semibold text-foreground truncate">
+        <div className="z-20 flex shrink-0 items-center gap-2 px-4 py-3 md:hidden">
+          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+            <ArrowLeft />
+          </Button>
+          <span className="truncate text-sm font-semibold text-foreground">
             {title || "Audio Overview"}
           </span>
         </div>
       )}
-      <div className="flex-1 flex flex-col bg-card border border-border rounded-xl p-4 space-y-4">
-        {/* Loading state */}
-        {isResolving && (
-          <div className="flex items-center justify-center py-8">
-            <div role="status" className="text-center">
-              <span className="mb-2 inline-flex text-primary">
-                <Spinner className="size-8" aria-hidden />
+
+      <TranscriptReader
+        lines={resolved.lines}
+        activeIndex={activeIndex}
+        isPlaying={isPlaying}
+        approximate={resolved.approximate}
+        onSeek={(ms) => {
+          // Before the audio loads a seek would move the highlight with no audio behind it.
+          if (canSeek) seekTo(ms / 1000);
+        }}
+      />
+
+      {(isResolving || isUnavailable || error) && (
+        <div className="shrink-0 px-6 py-2 text-center">
+          {isResolving && (
+            <div role="status" className="flex items-center justify-center gap-2">
+              <span className="inline-flex text-primary">
+                <Spinner className="size-4" aria-hidden />
               </span>
               <p className="text-sm text-muted-foreground">Loading audio...</p>
             </div>
+          )}
+          {isUnavailable && (
+            <p className="text-sm text-destructive">
+              Could not resolve audio URL. Try regenerating the audio overview.
+            </p>
+          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+      )}
+
+      {/* Hidden audio element */}
+      <audio ref={audioRef} src={audioSource ?? undefined} preload="metadata" />
+
+      <div className="mx-3 mb-3 shrink-0 space-y-2 rounded-2xl bg-card p-3 shadow-lg ring-1 ring-hairline">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-display text-sm font-semibold text-foreground">
+              {title || "Audio Overview"}
+            </h3>
+            <p className="text-xs text-muted-foreground">{audioTypeLabel(metadata)} · 2 hosts</p>
           </div>
-        )}
-
-        {isUnavailable && (
-          <p className="text-sm text-destructive text-center py-4">
-            Could not resolve audio URL. Try regenerating the audio overview.
-          </p>
-        )}
-
-        {error && <p className="text-sm text-destructive text-center py-2">{error}</p>}
-
-        {/* Hidden audio element */}
-        <audio ref={audioRef} src={audioSource ?? undefined} preload="metadata" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-          <h3 className="font-bold text-foreground">{title || "Audio Overview"}</h3>
-          <div className="flex gap-2">
-            <a
-              href={audioSource ?? "#"}
-              download
-              className={`p-2 hover:bg-secondary rounded-lg transition-colors ${
-                audioSource ? "" : "pointer-events-none opacity-50"
-              }`}
-              title="Download audio"
-            >
-              <Download className="w-4 h-4" />
-            </a>
-          </div>
+          <SpeedPill rate={playbackRate} onCycle={cyclePlaybackRate} disabled={!canPlay} />
+          {audioSource ? (
+            <Button variant="ghost" size="icon-sm" asChild>
+              <a href={audioSource} download aria-label="Download audio" title="Download audio">
+                <Download />
+              </a>
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon-sm" disabled aria-label="Download audio">
+              <Download />
+            </Button>
+          )}
         </div>
 
-        {/* Progress bar */}
-        <div className="space-y-2 shrink-0">
-          <input
-            type="range"
-            min="0"
-            max={duration || 0}
-            step="0.1"
-            value={currentTime}
+        <WaveformScrubber
+          seed={audioOverviewId ?? audioUrl}
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={seekTo}
+          disabled={!canSeek}
+        />
+
+        <div className="flex items-center justify-center gap-4">
+          <SkipButton
+            direction="back"
+            onSkip={() => skipBy(-SKIP_SECONDS)}
             disabled={!canSeek}
-            onChange={(e) => seekTo(Number(e.target.value))}
-            className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+            keyShortcuts="ArrowLeft"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatAudioTime(currentTime)}</span>
-            <span>{formatAudioTime(duration)}</span>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-3 shrink-0">
-          <button
-            onClick={() => skipBy(-5)}
-            disabled={!canSeek}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Backward 5 seconds"
-            title="Backward 5s"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </button>
-          <button
-            onClick={togglePlay}
+          <PlayButton
+            isPlaying={isPlaying}
+            onToggle={togglePlay}
             disabled={!canPlay || isResolving}
-            className="p-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </button>
-          <button
-            onClick={() => skipBy(5)}
+            keyShortcuts="Space k"
+          />
+          <SkipButton
+            direction="forward"
+            onSkip={() => skipBy(SKIP_SECONDS)}
             disabled={!canSeek}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Forward 5 seconds"
-            title="Forward 5s"
-          >
-            <RotateCw className="w-5 h-5" />
-          </button>
-          <button
-            onClick={cyclePlaybackRate}
-            disabled={!canPlay}
-            className="px-3 py-1 text-sm font-medium bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
-            title="Change playback speed"
-          >
-            {playbackRate}x
-          </button>
+            keyShortcuts="ArrowRight"
+          />
         </div>
-
-        {/* Transcript - Always shown and takes up remaining space */}
-        {transcript && (
-          <div className="flex-1 overflow-hidden flex flex-col border-t border-border pt-4 min-h-0">
-            <h4 className="font-semibold text-sm mb-2 shrink-0">Transcript</h4>
-            <div className="flex-1 overflow-y-auto text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-              {transcript}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

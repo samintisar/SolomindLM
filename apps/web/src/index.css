@@ -1222,6 +1222,16 @@
   }
 }
 
+/* One waveform bar; its height comes from --audio-bar (style may only set custom properties). */
+@utility audio-bar {
+  height: var(--audio-bar, 50%);
+}
+
+/* Fades a scrolling transcript out at the top and bottom. */
+@utility reader-fade {
+  mask-image: linear-gradient(transparent, #000 18%, #000 75%, transparent);
+}
+
 /* Reduced motion: movement becomes a fade, it does not disappear (spec §1).
    Only tw-animate-css enter/exit movement is neutralised (plus the Studio decorations below);
    other transitions and keyframes keep running, so new movement that matters must add its own

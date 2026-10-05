@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+export const PLAYBACK_RATES = [1, 1.25, 1.5, 2] as const;
 
 function isFinitePositive(value: number): boolean {
   return Number.isFinite(value) && value > 0;
@@ -9,6 +9,12 @@ function isFinitePositive(value: number): boolean {
 function clampTime(value: number, duration: number): number {
   if (!isFinitePositive(duration)) return Math.max(0, value);
   return Math.min(duration, Math.max(0, value));
+}
+
+/** The next rate in the cycle; a rate outside the list (indexOf -1) restarts at 1×. */
+export function nextPlaybackRate(rate: number): number {
+  const index = PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]);
+  return PLAYBACK_RATES[(index + 1) % PLAYBACK_RATES.length];
 }
 
 export function formatAudioTime(seconds: number): string {
@@ -164,8 +170,7 @@ export function useAudioPlayer(sourceUrl: string | null | undefined) {
 
   const cyclePlaybackRate = useCallback(() => {
     setPlaybackRateState((currentRate) => {
-      const currentIndex = PLAYBACK_RATES.indexOf(currentRate as (typeof PLAYBACK_RATES)[number]);
-      const nextRate = PLAYBACK_RATES[(currentIndex + 1) % PLAYBACK_RATES.length];
+      const nextRate = nextPlaybackRate(currentRate);
       const audio = audioRef.current;
       if (audio) {
         audio.playbackRate = nextRate;

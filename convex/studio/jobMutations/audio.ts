@@ -235,6 +235,10 @@ const synthesisChunkResultValidator = v.object({
   failedLines: v.number(),
   firstError: v.optional(v.string()),
   latencyMs: v.number(),
+  /** One entry per synthesized line, in script order: absolute script index and WAV duration. */
+  lineTimings: v.optional(v.array(v.object({ index: v.number(), durationMs: v.number() }))),
+  /** Decoded length of this chunk's MP3, from its frame headers. */
+  mp3DurationMs: v.optional(v.number()),
 });
 
 export type AudioSynthesisChunkResult = Infer<typeof synthesisChunkResultValidator>;

@@ -100,3 +100,59 @@ export function concatenateMp3Buffers(buffers: Buffer[]): Buffer {
   }
   return Buffer.concat(buffers);
 }
+
+const MPEG1_L3_KBPS = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+const MPEG2_L3_KBPS = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+/** Sample rates by version bits: 3 = MPEG-1, 2 = MPEG-2, 0 = MPEG-2.5 (1 is reserved). */
+const SAMPLE_RATES: Record<number, readonly number[]> = {
+  3: [44100, 48000, 32000],
+  2: [22050, 24000, 16000],
+  0: [11025, 12000, 8000],
+};
+
+/**
+ * Decoded length of an MP3 stream in milliseconds, counted from its Layer III frame headers.
+ * This is what a player's clock reaches at the end of the file, encoder delay and padding
+ * included, so it is the right offset for whatever audio is joined after it.
+ */
+export function getMp3DurationMs(buffer: Buffer): number {
+  let offset = 0;
+  let samples = 0;
+  let sampleRate = 0;
+  while (offset + 4 <= buffer.length) {
+    const b1 = buffer[offset + 1];
+    const b2 = buffer[offset + 2];
+    if (buffer[offset] !== 0xff || (b1 & 0xe0) !== 0xe0) {
+      offset += 1;
+      continue;
+    }
+    const version = (b1 >> 3) & 0x3;
+    const layer = (b1 >> 1) & 0x3;
+    const bitrateIndex = b2 >> 4;
+    const rateIndex = (b2 >> 2) & 0x3;
+    if (
+      version === 1 ||
+      layer !== 1 ||
+      bitrateIndex === 0 ||
+      bitrateIndex === 15 ||
+      rateIndex === 3
+    ) {
+      offset += 1;
+      continue;
+    }
+    const isMpeg1 = version === 3;
+    const kbps = (isMpeg1 ? MPEG1_L3_KBPS : MPEG2_L3_KBPS)[bitrateIndex];
+    const rate = SAMPLE_RATES[version][rateIndex];
+    const samplesPerFrame = isMpeg1 ? 1152 : 576;
+    const padding = (b2 >> 1) & 0x1;
+    const frameLength = Math.floor(((samplesPerFrame / 8) * kbps * 1000) / rate) + padding;
+    if (frameLength <= 4) {
+      offset += 1;
+      continue;
+    }
+    samples += samplesPerFrame;
+    sampleRate = rate;
+    offset += frameLength;
+  }
+  return sampleRate > 0 ? (samples / sampleRate) * 1000 : 0;
+}
