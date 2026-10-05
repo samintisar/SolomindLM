@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { MindElixirInstance, NodeObj, Theme } from "mind-elixir";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { ButtonGroup } from "@/shared/components/ui/button-group";
@@ -108,10 +108,12 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
       const mind = new MindElixir({
         el,
         direction: MindElixir.RIGHT,
-        draggable: true,
+        // Read-only: the generated map has nowhere to save edits, renames or moved nodes.
+        editable: false,
+        draggable: false,
         contextMenu: false,
         toolBar: false,
-        keypress: true,
+        keypress: false,
         locale: "en",
         overflowHidden: false,
         // Keep drag-to-pan on the left button; marquee selection only on the right.
@@ -160,6 +162,21 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
       mindRef.current = null;
     };
   }, [mindMapData, note.title]);
+
+  // Escape leaves full screen. The notebook also mounts a hidden copy of the Studio panel, so only
+  // the visible map answers.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const exitOnEscape = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    const root = rootRef.current;
+    if (!root || (typeof root.checkVisibility === "function" && !root.checkVisibility())) return;
+    onToggleExpanded?.();
+  });
+  useEffect(() => {
+    if (!isExpanded) return;
+    window.addEventListener("keydown", exitOnEscape);
+    return () => window.removeEventListener("keydown", exitOnEscape);
+  }, [isExpanded]);
 
   const zoom = (direction: "in" | "out") => {
     mindRef.current?.scale(stepScale(scale, direction));
@@ -213,10 +230,12 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
 
   return (
     <div
+      ref={rootRef}
       className={cn(
         "flex flex-col bg-background",
+        // Full screen sits on the portal layer, above the z-70 app header, so its toolbar shows.
         isExpanded
-          ? "fixed inset-0 z-50 h-screen"
+          ? "fixed inset-0 z-100 h-screen"
           : "h-full duration-300 ease-out animate-in fade-in slide-in-from-right-4"
       )}
     >

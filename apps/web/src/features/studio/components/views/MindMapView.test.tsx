@@ -121,6 +121,13 @@ afterEach(() => {
 });
 
 describe("MindMapView", () => {
+  it("opens the map read-only, since edits would never be saved", async () => {
+    const { mind } = await renderReady();
+    expect(mind.options.editable).toBe(false);
+    expect(mind.options.keypress).toBe(false);
+    expect(mind.options.draggable).toBe(false);
+  });
+
   it("passes the zoom limits and a theme built on the app's tokens", async () => {
     const { mind } = await renderReady();
     expect(mind.options.scaleMin).toBe(0.2);
@@ -224,6 +231,24 @@ describe("MindMapView", () => {
     expect(screen.getAllByRole("button", { name: "Zoom in" })).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
     expect(onToggleExpanded).toHaveBeenCalled();
+  });
+
+  it("puts full screen above the app header and leaves it on Escape", async () => {
+    const onToggleExpanded = vi.fn();
+    const user = userEvent.setup();
+    await renderReady(mindMapNote(), { isExpanded: true, onToggleExpanded });
+    const exit = screen.getByRole("button", { name: "Exit full screen" });
+    expect(exit.closest(".fixed")).toHaveClass("z-100");
+    await user.keyboard("{Escape}");
+    expect(onToggleExpanded).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores Escape when not in full screen", async () => {
+    const onToggleExpanded = vi.fn();
+    const user = userEvent.setup();
+    await renderReady(mindMapNote(), { onToggleExpanded });
+    await user.keyboard("{Escape}");
+    expect(onToggleExpanded).not.toHaveBeenCalled();
   });
 
   it("names the mobile back button 'Back to Studio'", async () => {

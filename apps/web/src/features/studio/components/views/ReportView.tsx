@@ -56,7 +56,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
         </div>
       )}
 
-      <div className="flex-1 bg-card p-6 md:p-8">
+      {/* Scrolls itself: the panel stops scrolling while the audio mini player is docked. */}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-card p-6 md:p-8">
         {note.content ? (
           <div className="animate-in fade-in duration-300 ease-out">
             <Suspense
