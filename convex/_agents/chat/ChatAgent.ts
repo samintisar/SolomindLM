@@ -20,12 +20,15 @@ import {
   LIST_QUERY_CONTEXT_TOKEN_BUDGET,
   LIST_QUERY_MAX_SELECTED_CHUNKS,
   MAX_CHUNKS_HARD_LIMIT,
+  MAX_NEIGHBOUR_PASSAGES,
+  NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
 import { budgetConversationHistory } from "./chatHistoryBudget.js";
 import { routeChatMessage } from "./chatRouter.js";
 import {
+  addNeighbourPassages,
   chunkDedupKey,
   chunkRankingScore,
   documentsWithRerankedPassages,
@@ -657,7 +660,7 @@ export class ChatAgent {
     const chunkCapTotal = isListQuery ? LIST_QUERY_MAX_SELECTED_CHUNKS : MAX_CHUNKS_HARD_LIMIT;
     const maxForRest = Math.max(0, chunkCapTotal - userAttachedNotebook.length);
 
-    const rankedChunks = [
+    const selectedChunks = [
       ...userAttachedNotebook,
       ...selectChunksByTokenBudgetWithReservation(
         restNotebook,
@@ -678,6 +681,22 @@ export class ChatAgent {
             }
       ),
     ];
+
+    // Whole neighbours of the selected passages, when retrieval found them, so text the model
+    // reads in a neighbour preview is a passage it can cite.
+    const rankedChunks = addNeighbourPassages(selectedChunks, restNotebook, {
+      tokenBudget: NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+      maxPassages: Math.min(
+        MAX_NEIGHBOUR_PASSAGES,
+        Math.max(0, MAX_CHUNKS_HARD_LIMIT - selectedChunks.length)
+      ),
+    });
+    if (rankedChunks.length > selectedChunks.length) {
+      logger.info("Added neighbouring passages", {
+        added: rankedChunks.length - selectedChunks.length,
+        total: rankedChunks.length,
+      });
+    }
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");
