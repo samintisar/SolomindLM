@@ -35,6 +35,11 @@ const MIGRATED = [
   "src/features/studio/components/practice/**/*.tsx",
   "src/features/studio/components/views/QuizView.tsx",
   "src/features/studio/components/views/WrittenQuestionsView.tsx",
+  "src/features/studio/components/flashcards/**/*.tsx",
+  "src/features/studio/components/views/FlashcardView.tsx",
+  "src/features/studio/components/views/StudyMode.tsx",
+  "src/features/studio/components/views/EditCardModal.tsx",
+  "src/features/studio/components/views/ProficiencyBadge.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [

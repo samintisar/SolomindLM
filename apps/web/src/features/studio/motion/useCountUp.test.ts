@@ -83,4 +83,21 @@ describe("useCountUp", () => {
     const { result } = renderHook(() => useCountUp(4, 0));
     expect(result.current).toBe(4);
   });
+
+  it("holds still for the delay, then reaches the target after delay plus duration", () => {
+    const { result } = renderHook(() => useCountUp(10, 400, 300));
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(result.current).toBe(0);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current).toBeGreaterThan(0);
+    expect(result.current).toBeLessThan(10);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(result.current).toBe(10);
+  });
 });
