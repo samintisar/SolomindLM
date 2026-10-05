@@ -50,4 +50,37 @@ describe("useCountUp", () => {
     });
     expect(result.current).toBe(5);
   });
+
+  it("lands exactly on a fractional target", () => {
+    const { result } = renderHook(() => useCountUp(2.5, 100));
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current).toBe(2.5);
+  });
+
+  it("eases from the value shown when the target changes", () => {
+    const { result, rerender } = renderHook(({ target }) => useCountUp(target, 100), {
+      initialProps: { target: 3 },
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current).toBe(3);
+    rerender({ target: 5 });
+    const seen: number[] = [];
+    for (let elapsed = 0; elapsed < 200; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      seen.push(result.current);
+    }
+    expect(Math.min(...seen)).toBeGreaterThanOrEqual(3);
+    expect(result.current).toBe(5);
+  });
+
+  it("returns the target at once for a zero duration", () => {
+    const { result } = renderHook(() => useCountUp(4, 0));
+    expect(result.current).toBe(4);
+  });
 });
