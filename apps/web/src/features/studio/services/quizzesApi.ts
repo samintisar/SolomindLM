@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef } from "react";
 import type { QuizNote, QuizQuestion } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateQuizParams {
   notebookId: string;
@@ -136,28 +137,12 @@ export function useCreateQuiz() {
  */
 export function useRenameQuiz() {
   const update = useMutation(api.studio.quizzes.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Get current quiz (has notebookId for list query)
-      const quiz = localStore.getQuery(api.studio.quizzes.index.get, { id });
-      if (quiz) {
-        // Update list view
-        const listResult = localStore.getQuery(api.studio.quizzes.index.list, {
-          notebookId: quiz.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.quizzes.index.list,
-            { notebookId: quiz.notebookId },
-            listResult.map((q: { _id: string; [key: string]: unknown }) =>
-              q._id === id ? { ...q, title } : q
-            )
-          );
-        }
-
-        // Update detail view
-        localStore.setQuery(api.studio.quizzes.index.get, { id }, { ...quiz, title });
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
+      // The view also reads the per-type query (live progress) while it is open
+      const current = localStore.getQuery(api.studio.quizzes.index.get, { id });
+      if (current) {
+        localStore.setQuery(api.studio.quizzes.index.get, { id }, { ...current, title });
       }
     }
   );
@@ -175,23 +160,10 @@ export function useRenameQuiz() {
  */
 export function useDeleteQuiz() {
   const remove = useMutation(api.studio.quizzes.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      const quiz = localStore.getQuery(api.studio.quizzes.index.get, { id: args.id });
-      if (quiz) {
-        const listResult = localStore.getQuery(api.studio.quizzes.index.list, {
-          notebookId: quiz.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.quizzes.index.list,
-            { notebookId: quiz.notebookId },
-            listResult.filter((q: { _id: string }) => q._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.quizzes.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
+      // The view also reads the per-type query (live progress) while it is open
+      localStore.setQuery(api.studio.quizzes.index.get, { id }, null);
     }
   );
 
