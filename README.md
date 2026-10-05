@@ -262,7 +262,7 @@ bun run dev:web
 bun run dev:mobile
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open the URL the dev server prints: [http://localhost:5173](http://localhost:5173) in the main checkout. Each git worktree gets its own port (5174-5199) so several can run at once.
 
 ---
 
@@ -641,10 +641,7 @@ rm -rf apps/web/node_modules/.vite
 
 **Port already in use**
 
-```bash
-# The dev script automatically kills stale ports, but manually:
-bun run --cwd apps/web kill-port
-```
+`dev:web` / `dev:mobile` stop this checkout's own leftover server automatically and otherwise move to the next free port. They never kill another checkout's server. If you pinned a port (`WEB_PORT`, `PORT`, `METRO_PORT`) that another process holds, stop that process by its PID or drop the pin.
 
 **Convex environment variables not updating**
 
