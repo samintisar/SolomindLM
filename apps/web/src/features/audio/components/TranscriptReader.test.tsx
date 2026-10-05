@@ -143,6 +143,28 @@ describe("TranscriptReader", () => {
     expect(screen.getByRole("button", { name: "Follow along" })).toBeInTheDocument();
   });
 
+  it("ignores a held-back scroll event that lands exactly where it centred (a background tab)", () => {
+    const { container, rerender } = renderReader({ isPlaying: true, activeIndex: 0 });
+    rerender(
+      <TranscriptReader
+        lines={lines}
+        activeIndex={1}
+        isPlaying
+        approximate={false}
+        onSeek={vi.fn()}
+      />
+    );
+    const lastCall = scrollTo.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    const { top } = (lastCall as [ScrollToOptions])[0];
+    const scroller = container.querySelector(".overflow-y-auto") as HTMLElement;
+    // The scroll finished while the tab was hidden; its event arrives after the timer ran out.
+    scroller.scrollTop = top as number;
+    fireEvent(scroller, new Event("scrollend"));
+    fireEvent.scroll(scroller);
+    expect(screen.queryByRole("button", { name: "Follow along" })).not.toBeInTheDocument();
+  });
+
   it("does not mistake its own centring scroll for the user leaving", () => {
     const { container, rerender } = renderReader({ isPlaying: true, activeIndex: 0 });
     rerender(

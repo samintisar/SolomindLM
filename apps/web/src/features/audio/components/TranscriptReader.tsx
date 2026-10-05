@@ -45,6 +45,9 @@ export function TranscriptReader({
   // mistaken for the user leaving. Cleared by `scrollend`, or by a timer where that is missing.
   const programmaticRef = useRef(false);
   const settleRef = useRef<number | undefined>(undefined);
+  // Where the reader last scrolled to. A background tab holds scroll events back until it is
+  // shown again, after the timer has run out; landing exactly here still means it was ours.
+  const lastTargetRef = useRef<number | null>(null);
 
   useEffect(() => () => window.clearTimeout(settleRef.current), []);
 
@@ -63,6 +66,7 @@ export function TranscriptReader({
     const target = Math.max(0, Math.min(container.scrollHeight - container.clientHeight, top));
     // No movement means no scroll or scrollend events, so there is nothing to wait for.
     if (Math.abs(container.scrollTop - target) < 1) return;
+    lastTargetRef.current = target;
     programmaticRef.current = true;
     window.clearTimeout(settleRef.current);
     settleRef.current = window.setTimeout(
@@ -78,7 +82,8 @@ export function TranscriptReader({
   const hasCentredRef = useRef(false);
   const followActiveLine = useEffectEvent(() => {
     if (!following || activeIndex < 0) return;
-    const glide = hasCentredRef.current && !reduceMotion;
+    // No glide in a hidden tab: nothing renders there, so it would only replay on return.
+    const glide = hasCentredRef.current && !reduceMotion && !document.hidden;
     hasCentredRef.current = true;
     centreLine(activeIndex, glide ? "smooth" : "auto");
   });
@@ -162,8 +167,11 @@ export function TranscriptReader({
         ref={containerRef}
         role="presentation"
         className="relative min-h-0 flex-1 overflow-y-auto reader-fade px-6"
-        onScroll={() => {
-          if (!programmaticRef.current) handleManualScroll();
+        onScroll={(event) => {
+          if (programmaticRef.current) return;
+          const last = lastTargetRef.current;
+          if (last !== null && Math.abs(event.currentTarget.scrollTop - last) < 2) return;
+          handleManualScroll();
         }}
         onScrollEnd={settleProgrammaticScroll}
         onPointerDown={(event) => {
