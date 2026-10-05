@@ -1,4 +1,7 @@
-export type RankedPaperSource = "arxiv" | "semantic_scholar" | "pubmed";
+export type RankedPaperSource = "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+
+/** Where a table paper came from: a database search, or the user's own notebook (#301). */
+export type PaperCitationSource = RankedPaperSource | "notebook";
 
 export interface RankedPaper {
   title: string;
@@ -20,7 +23,7 @@ export function rankedPaperKey(paper: RankedPaper, index: number): string {
   return `idx:${index}|${paper.title.toLowerCase().trim()}|${first}`;
 }
 
-export function sourceLabel(source: RankedPaperSource): string {
+export function sourceLabel(source: PaperCitationSource): string {
   switch (source) {
     case "arxiv":
       return "arXiv (Cornell University)";
@@ -28,6 +31,10 @@ export function sourceLabel(source: RankedPaperSource): string {
       return "Semantic Scholar";
     case "pubmed":
       return "PubMed";
+    case "openalex":
+      return "OpenAlex";
+    case "notebook":
+      return "Your notebook";
     default:
       return "Journal Unavailable";
   }
