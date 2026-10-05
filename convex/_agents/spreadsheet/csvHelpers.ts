@@ -1,6 +1,6 @@
 "use node";
 
-import { parseCsv, serializeCsv } from "../../_shared/csv.helpers.js";
+import { parseCsv, parseCsvDetailed, serializeCsv } from "../../_shared/csv.helpers.js";
 
 /**
  * Helper to extract message content safely
@@ -43,7 +43,14 @@ export function cleanCsvOutput(output: string): string {
   }
 
   // Attempt to fix unquoted CSV by parsing and re-quoting (RFC 4180, so quoted line breaks survive)
-  const rows = parseCsv(cleaned);
+  const { rows: parsed, unterminatedQuote } = parseCsvDetailed(cleaned);
+  // An unclosed quote would swallow every following line into one cell, so read line by line instead.
+  const rows = unterminatedQuote
+    ? cleaned
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== "")
+        .map((line) => parseCsv(line)[0] ?? [])
+    : parsed;
   if (rows.length > 0) {
     console.log("[SpreadsheetGraph] Applied RFC 4180 CSV formatting to output");
     return serializeCsv(rows, { quoteAll: true });

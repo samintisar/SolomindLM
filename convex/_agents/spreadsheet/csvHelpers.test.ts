@@ -22,4 +22,20 @@ describe("cleanCsvOutput", () => {
   it("skips blank lines", () => {
     expect(cleanCsvOutput("a,b\n\n1,2")).toBe('"a","b"\n"1","2"');
   });
+
+  it("skips whitespace-only lines", () => {
+    expect(cleanCsvOutput("a,b\n   \n1,2")).toBe('"a","b"\n"1","2"');
+  });
+
+  it("keeps spaces after a closing quote", () => {
+    expect(cleanCsvOutput('Title,Quote\nX,"Hello" she said')).toBe(
+      '"Title","Quote"\n"X","Hello she said"'
+    );
+  });
+
+  it("falls back to line-by-line parsing when a quote is never closed", () => {
+    expect(cleanCsvOutput('Name,Note\nBob,"unterminated\nAmy,ok\nCal,fine')).toBe(
+      '"Name","Note"\n"Bob","unterminated"\n"Amy","ok"\n"Cal","fine"'
+    );
+  });
 });

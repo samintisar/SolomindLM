@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCsv, serializeCsv } from "./csv.helpers";
+import { parseCsv, parseCsvDetailed, serializeCsv } from "./csv.helpers";
 
 describe("parseCsv", () => {
   it("parses plain rows", () => {
@@ -41,13 +41,41 @@ describe("parseCsv", () => {
     expect(parseCsv('"a" , "b"')).toEqual([["a", "b"]]);
   });
 
+  it("keeps spaces in stray text after a closing quote", () => {
+    expect(parseCsv('"a" b c,d')).toEqual([["a b c", "d"]]);
+    expect(parseCsv('"Hello" she said')).toEqual([["Hello she said"]]);
+  });
+
   it("returns no rows for empty or whitespace-only input", () => {
     expect(parseCsv("")).toEqual([]);
     expect(parseCsv("\n\n")).toEqual([]);
+    expect(parseCsv("   ")).toEqual([]);
+  });
+
+  it("skips whitespace-only lines but keeps quoted whitespace fields", () => {
+    expect(parseCsv("a\n \t \nb")).toEqual([["a"], ["b"]]);
+    expect(parseCsv('"   "')).toEqual([["   "]]);
+    expect(parseCsv("a, ,b")).toEqual([["a", " ", "b"]]);
   });
 
   it("treats an unterminated quote as running to the end", () => {
     expect(parseCsv('a,"b\nc')).toEqual([["a", "b\nc"]]);
+  });
+});
+
+describe("parseCsvDetailed", () => {
+  it("reports an unterminated quote", () => {
+    expect(parseCsvDetailed('a,"b\nc')).toEqual({ rows: [["a", "b\nc"]], unterminatedQuote: true });
+  });
+
+  it("reports no problem for well-formed input", () => {
+    expect(parseCsvDetailed('a,"b"\n1,2')).toEqual({
+      rows: [
+        ["a", "b"],
+        ["1", "2"],
+      ],
+      unterminatedQuote: false,
+    });
   });
 });
 
@@ -82,6 +110,7 @@ describe("round trip", () => {
       ["", "", ""],
     ],
     [["only"], [""], ["z"]],
+    [["h"], ["   "]],
     [["a", "b", "c"], ["1"], ["2", "3"]],
   ];
   it.each(cases.map((rows) => [rows]))("parseCsv(serializeCsv(rows)) equals rows", (rows) => {
