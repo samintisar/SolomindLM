@@ -18,6 +18,7 @@ import {
   getNotebookAccess,
 } from "../_lib/notebookAccess";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
+import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
@@ -104,6 +105,10 @@ export const upload = mutation({
     }
     if ((args.type === "url" || args.type === "youtube" || args.type === "text") && !args.source) {
       throw new Error("source is required for url/youtube/text type");
+    }
+    // For pasted text, fileName is the title the user typed (the form caps it too).
+    if (args.type === "text" && args.fileName.trim().length > TEXT_TITLE_MAX_LENGTH) {
+      throw new Error(`Title must be ${TEXT_TITLE_MAX_LENGTH} characters or fewer`);
     }
     if (args.type === "paper_record") {
       if (!args.paperRecord) {

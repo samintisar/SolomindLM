@@ -58,6 +58,31 @@ jobs:
       - name: Typecheck evals
         run: bun run typecheck:evals
 
+  # Its own job, not a step in typecheck-convex, so it shows as its own required
+  # check in branch protection (.github/branch-protection.ps1).
+  convex-codegen:
+    name: Convex codegen (generated API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      # A module added under convex/ (underscore dirs included) without running
+      # codegen still typechecks, so it merges with a stale api.d.ts (#322, #337).
+      # Full `convex codegen` needs a deployment; this uses the CLI's offline
+      # module listing and deploys nothing.
+      - name: Check convex/_generated lists every module
+        run: bun run check:convex-codegen
+
+      - name: Check convex/_generated is unchanged
+        run: git diff --exit-code -- convex/_generated
+
   typecheck-web:
     name: Typecheck (Web)
     runs-on: ubuntu-latest
