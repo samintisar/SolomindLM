@@ -1,7 +1,9 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { OptimisticLocalStore } from "convex/browser";
 import { useAction, useMutation } from "convex/react";
 import type { SpreadsheetNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateSpreadsheetParams {
   notebookId: string;
@@ -69,6 +71,7 @@ function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
       phase: dbSpreadsheet.metadata?.phase,
       error: dbSpreadsheet.metadata?.error,
       customPrompt: dbSpreadsheet.metadata?.customPrompt,
+      editedAt: dbSpreadsheet.metadata?.editedAt,
     },
   };
 }
@@ -100,33 +103,52 @@ export function useCreateSpreadsheet() {
 }
 
 /**
+ * Patch one spreadsheet in the cached notes queries the Studio panel reads
+ * (see `patchNoteInNotesCache`). `data` is only patched into `notes.index.get`,
+ * since list rows never carry it; `title` goes into both.
+ */
+export function patchSpreadsheetInNotesCache(
+  localStore: OptimisticLocalStore,
+  id: string,
+  patch: { title?: string; data?: string }
+): void {
+  patchNoteInNotesCache(localStore, id, patch);
+}
+
+/** The tail of each spreadsheet's save chain; an entry is removed once its chain drains. */
+const spreadsheetSaveQueues = new Map<string, Promise<unknown>>();
+
+/**
+ * Run `run` after every save already queued for this spreadsheet, so saves for
+ * one id reach the server one at a time and in call order, even across a sheet
+ * that was closed and reopened. A failed save doesn't stop the ones behind it.
+ */
+export function enqueueSpreadsheetSave<T>(id: string, run: () => Promise<T>): Promise<T> {
+  const previous = spreadsheetSaveQueues.get(id) ?? Promise.resolve();
+  const result = previous.then(run);
+  const tail = result.then(
+    () => undefined,
+    () => undefined
+  );
+  spreadsheetSaveQueues.set(id, tail);
+  void tail.then(() => {
+    if (spreadsheetSaveQueues.get(id) === tail) spreadsheetSaveQueues.delete(id);
+  });
+  return result;
+}
+
+/** Whether a save for this spreadsheet is queued or running. */
+export function isSpreadsheetSaveQueued(id: string): boolean {
+  return spreadsheetSaveQueues.has(id);
+}
+
+/**
  * Rename a spreadsheet by ID with optimistic update
  */
 export function useRenameSpreadsheet() {
   const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Read the current spreadsheet to get its notebookId
-      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id });
-      if (spreadsheet) {
-        // Update detail view
-        localStore.setQuery(api.studio.spreadsheets.index.get, { id }, { ...spreadsheet, title });
-
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
-          notebookId: spreadsheet.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.spreadsheets.index.list,
-            { notebookId: spreadsheet.notebookId },
-            listResult.map((ss: { _id: string; [key: string]: unknown }) =>
-              ss._id === id ? { ...ss, title } : ss
-            )
-          );
-        }
-      }
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
     }
   );
 
@@ -139,29 +161,30 @@ export function useRenameSpreadsheet() {
 }
 
 /**
+ * Save a spreadsheet's CSV with an optimistic update. Saves for one spreadsheet
+ * run strictly in call order (see `enqueueSpreadsheetSave`). The server stamps
+ * `metadata.editedAt`, which arrives through the query.
+ */
+export function useSaveSpreadsheetData() {
+  const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
+    (localStore, { id, data }) => {
+      if (data !== undefined) patchSpreadsheetInNotesCache(localStore, id, { data });
+    }
+  );
+
+  return (spreadsheetId: string, data: string): Promise<unknown> =>
+    enqueueSpreadsheetSave(spreadsheetId, () =>
+      update({ id: spreadsheetId as Id<"spreadsheets">, data })
+    );
+}
+
+/**
  * Delete a spreadsheet by ID with optimistic update
  */
 export function useDeleteSpreadsheet() {
   const remove = useMutation(api.studio.spreadsheets.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current spreadsheet to get its notebookId
-      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id: args.id });
-      if (spreadsheet) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
-          notebookId: spreadsheet.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.spreadsheets.index.list,
-            { notebookId: spreadsheet.notebookId },
-            listResult.filter((ss: { _id: string }) => ss._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.spreadsheets.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 

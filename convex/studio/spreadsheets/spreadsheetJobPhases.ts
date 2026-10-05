@@ -23,6 +23,7 @@ import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
+import { cleanCsvOutput } from "../../_agents/spreadsheet/csvHelpers";
 import {
   COLLAPSE_PROMPTS,
   COLLAPSE_SYSTEM_PROMPT,
@@ -92,87 +93,6 @@ export type FinalizeSpreadsheetPhaseArgs = {
   spreadsheetType: string;
   customPrompt: string;
 };
-
-// ============================================================
-// HELPER: Clean CSV output
-// ============================================================
-
-function cleanCsvOutput(output: string): string {
-  let cleaned = output.trim();
-
-  // Remove markdown code blocks if present
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:csv)?\n?/, "").replace(/\n?```$/, "");
-  }
-
-  cleaned = cleaned.trim();
-
-  // Check if CSV is already properly quoted (heuristic: first line should start with quote)
-  const lines = cleaned.split("\n");
-  if (lines.length > 0 && lines[0].trim().startsWith('"')) {
-    return cleaned;
-  }
-
-  // Attempt to fix unquoted CSV by parsing and re-quoting
-  try {
-    const fixedLines: string[] = [];
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      const fields = parseCsvLine(line);
-      const quotedFields = fields.map((field) => {
-        const escaped = field.replace(/"/g, '""');
-        return `"${escaped}"`;
-      });
-
-      fixedLines.push(quotedFields.join(","));
-    }
-
-    if (fixedLines.length > 0) {
-      return fixedLines.join("\n");
-    }
-  } catch (error) {
-    console.warn("[SpreadsheetJob] Failed to auto-format CSV, returning as-is:", error);
-  }
-
-  return cleaned;
-}
-
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let currentField = "";
-  let insideQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const char = line[i];
-    const nextChar = line[i + 1];
-
-    if (char === '"') {
-      if (insideQuotes && nextChar === '"') {
-        currentField += '"';
-        i += 2;
-        continue;
-      }
-      insideQuotes = !insideQuotes;
-      i++;
-      continue;
-    }
-
-    if (char === "," && !insideQuotes) {
-      fields.push(currentField);
-      currentField = "";
-      i++;
-      continue;
-    }
-
-    currentField += char;
-    i++;
-  }
-
-  fields.push(currentField);
-  return fields;
-}
 
 // ============================================================
 // PHASE 1: Initialize & Schedule Map Tasks

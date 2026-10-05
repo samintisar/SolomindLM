@@ -4,6 +4,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateFlashcardsParams {
   notebookId: string;
@@ -112,28 +113,12 @@ export function useCreateFlashcard() {
  */
 export function useRenameFlashcard() {
   const update = useMutation(api.studio.flashcards.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Read the current flashcard to get its notebookId
-      const flashcard = localStore.getQuery(api.studio.flashcards.index.get, { id });
-      if (flashcard) {
-        // Update detail view
-        localStore.setQuery(api.studio.flashcards.index.get, { id }, { ...flashcard, title });
-
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.flashcards.index.list, {
-          notebookId: flashcard.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.flashcards.index.list,
-            { notebookId: flashcard.notebookId },
-            listResult.map((fc: { _id: string; [key: string]: unknown }) =>
-              fc._id === id ? { ...fc, title } : fc
-            )
-          );
-        }
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
+      // The view also reads the per-type query (live progress) while it is open
+      const current = localStore.getQuery(api.studio.flashcards.index.get, { id });
+      if (current) {
+        localStore.setQuery(api.studio.flashcards.index.get, { id }, { ...current, title });
       }
     }
   );
@@ -151,25 +136,10 @@ export function useRenameFlashcard() {
  */
 export function useDeleteFlashcard() {
   const remove = useMutation(api.studio.flashcards.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current flashcard to get its notebookId
-      const flashcard = localStore.getQuery(api.studio.flashcards.index.get, { id: args.id });
-      if (flashcard) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.flashcards.index.list, {
-          notebookId: flashcard.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.flashcards.index.list,
-            { notebookId: flashcard.notebookId },
-            listResult.filter((fc: { _id: string }) => fc._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.studio.flashcards.index.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
+      // The view also reads the per-type query (live progress) while it is open
+      localStore.setQuery(api.studio.flashcards.index.get, { id }, null);
     }
   );
 

@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import type { AudioOverviewNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateAudioOverviewParams {
   notebookId: string;
@@ -89,10 +90,14 @@ export function useCreateAudioOverview() {
 }
 
 /**
- * Update an audio overview
+ * Update an audio overview with optimistic update
  */
 export function useUpdateAudioOverview() {
-  const update = useMutation(api.studio.audio.index.update);
+  const update = useMutation(api.studio.audio.index.update).withOptimisticUpdate(
+    (localStore, { id, ...updates }) => {
+      patchNoteInNotesCache(localStore, id, updates);
+    }
+  );
 
   return async (
     audioOverviewId: string,
@@ -106,10 +111,14 @@ export function useUpdateAudioOverview() {
 }
 
 /**
- * Delete an audio overview by ID
+ * Delete an audio overview by ID with optimistic update
  */
 export function useDeleteAudioOverview() {
-  const remove = useMutation(api.studio.audio.index.remove);
+  const remove = useMutation(api.studio.audio.index.remove).withOptimisticUpdate(
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
+    }
+  );
 
   return async (audioOverviewId: string) => {
     await remove({ id: audioOverviewId as Id<"audioOverviews"> });

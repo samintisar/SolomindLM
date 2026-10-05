@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useRef } from "react";
 import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
+import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
 export interface CreateWrittenQuestionsParams {
   notebookId: string;
@@ -121,28 +122,12 @@ export function useCreateWrittenQuestions() {
  */
 export function useRenameWrittenQuestions() {
   const update = useMutation(api.studio.writtenQuestions.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Read the current written questions to get its notebookId
-      const wq = localStore.getQuery(api.studio.writtenQuestions.index.get, { id });
-      if (wq) {
-        // Update detail view
-        localStore.setQuery(api.studio.writtenQuestions.index.get, { id }, { ...wq, title });
-
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.writtenQuestions.index.list, {
-          notebookId: wq.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.writtenQuestions.index.list,
-            { notebookId: wq.notebookId },
-            listResult.map((item: { _id: string; [key: string]: unknown }) =>
-              item._id === id ? { ...item, title } : item
-            )
-          );
-        }
+    (localStore, { id, title }) => {
+      patchNoteInNotesCache(localStore, id, { title });
+      // The view also reads the per-type query (live progress) while it is open
+      const current = localStore.getQuery(api.studio.writtenQuestions.index.get, { id });
+      if (current) {
+        localStore.setQuery(api.studio.writtenQuestions.index.get, { id }, { ...current, title });
       }
     }
   );
@@ -160,31 +145,10 @@ export function useRenameWrittenQuestions() {
  */
 export function useDeleteWrittenQuestions() {
   const remove = useMutation(api.studio.writtenQuestions.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current written questions to get its notebookId
-      const wq = localStore.getQuery(api.studio.writtenQuestions.index.get, {
-        id: args.writtenQuestionId,
-      });
-      if (wq) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.studio.writtenQuestions.index.list, {
-          notebookId: wq.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.studio.writtenQuestions.index.list,
-            { notebookId: wq.notebookId },
-            listResult.filter((item: { _id: string }) => item._id !== args.writtenQuestionId)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(
-        api.studio.writtenQuestions.index.get,
-        { id: args.writtenQuestionId },
-        null
-      );
+    (localStore, { writtenQuestionId }) => {
+      removeNoteFromNotesCache(localStore, writtenQuestionId);
+      // The view also reads the per-type query (live progress) while it is open
+      localStore.setQuery(api.studio.writtenQuestions.index.get, { id: writtenQuestionId }, null);
     }
   );
 

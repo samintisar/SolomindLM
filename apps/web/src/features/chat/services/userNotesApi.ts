@@ -1,6 +1,10 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
+import {
+  patchNoteInNotesCache,
+  removeNoteFromNotesCache,
+} from "@/features/studio/services/notesCache";
 import type { UserNote } from "@/shared/types/index";
 
 /**
@@ -58,35 +62,8 @@ export function useSaveChat() {
  */
 export function useUpdateUserNote() {
   const update = useMutation(api.notes.userNotes.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title, content } = args;
-
-      // Read the current note
-      const note = localStore.getQuery(api.notes.userNotes.get, { id });
-      if (note) {
-        const updates: Record<string, unknown> = {};
-        if (title !== undefined) updates.title = title;
-        if (content !== undefined) updates.content = content;
-        if (Object.keys(updates).length > 0) {
-          localStore.setQuery(api.notes.userNotes.get, { id }, { ...note, ...updates });
-        }
-
-        // Update list view when title changes
-        if (title !== undefined) {
-          const listResult = localStore.getQuery(api.notes.userNotes.list, {
-            notebookId: note.notebookId,
-          });
-          if (listResult) {
-            localStore.setQuery(
-              api.notes.userNotes.list,
-              { notebookId: note.notebookId },
-              listResult.map((n: { _id: string; [key: string]: unknown }) =>
-                n._id === id ? { ...n, title } : n
-              )
-            );
-          }
-        }
-      }
+    (localStore, { id, ...updates }) => {
+      patchNoteInNotesCache(localStore, id, updates);
     }
   );
 
@@ -103,25 +80,8 @@ export function useUpdateUserNote() {
  */
 export function useDeleteUserNote() {
   const remove = useMutation(api.notes.userNotes.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Read the current note to get its notebookId
-      const note = localStore.getQuery(api.notes.userNotes.get, { id: args.id });
-      if (note) {
-        // Update list view using the notebookId from the item
-        const listResult = localStore.getQuery(api.notes.userNotes.list, {
-          notebookId: note.notebookId,
-        });
-        if (listResult) {
-          localStore.setQuery(
-            api.notes.userNotes.list,
-            { notebookId: note.notebookId },
-            listResult.filter((n: { _id: string }) => n._id !== args.id)
-          );
-        }
-      }
-
-      // Clear detail view
-      localStore.setQuery(api.notes.userNotes.get, { id: args.id }, null);
+    (localStore, { id }) => {
+      removeNoteFromNotesCache(localStore, id);
     }
   );
 
