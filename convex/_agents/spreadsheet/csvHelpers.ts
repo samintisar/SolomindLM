@@ -1,5 +1,7 @@
 "use node";
 
+import { parseCsv, serializeCsv } from "../../_shared/csv.helpers.js";
+
 /**
  * Helper to extract message content safely
  */
@@ -16,49 +18,6 @@ export function getMessageContent(response: unknown): string {
     }
   }
   return String(response);
-}
-
-/**
- * Parse a CSV line into fields (handles quoted fields with commas).
- * Simplified parser - not fully RFC 4180 compliant but handles most cases.
- */
-export function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let currentField = "";
-  let insideQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const char = line[i];
-    const nextChar = line[i + 1];
-
-    if (char === '"') {
-      if (insideQuotes && nextChar === '"') {
-        // Escaped quote
-        currentField += '"';
-        i += 2;
-        continue;
-      }
-      insideQuotes = !insideQuotes;
-      i++;
-      continue;
-    }
-
-    if (char === "," && !insideQuotes) {
-      fields.push(currentField);
-      currentField = "";
-      i++;
-      continue;
-    }
-
-    currentField += char;
-    i++;
-  }
-
-  // Add the last field
-  fields.push(currentField);
-
-  return fields;
 }
 
 /**
@@ -83,35 +42,12 @@ export function cleanCsvOutput(output: string): string {
     return cleaned;
   }
 
-  // Attempt to fix unquoted CSV by parsing and re-quoting
-  try {
-    const fixedLines: string[] = [];
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue; // Skip empty lines
-      }
-
-      // Parse CSV line (naive approach: split by comma, but respect quotes if present)
-      const fields = parseCsvLine(line);
-
-      // Re-quote all fields properly
-      const quotedFields = fields.map((field) => {
-        // Escape internal quotes by doubling them
-        const escaped = field.replace(/"/g, '""');
-        return `"${escaped}"`;
-      });
-
-      fixedLines.push(quotedFields.join(","));
-    }
-
-    if (fixedLines.length > 0) {
-      console.log("[SpreadsheetGraph] Applied RFC 4180 CSV formatting to output");
-      return fixedLines.join("\n");
-    }
-  } catch (error) {
-    console.warn("[SpreadsheetGraph] Failed to auto-format CSV, returning as-is:", error);
+  // Attempt to fix unquoted CSV by parsing and re-quoting (RFC 4180, so quoted line breaks survive)
+  const rows = parseCsv(cleaned);
+  if (rows.length > 0) {
+    console.log("[SpreadsheetGraph] Applied RFC 4180 CSV formatting to output");
+    return serializeCsv(rows, { quoteAll: true });
   }
-
   return cleaned;
 }
 
