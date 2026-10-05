@@ -20,4 +20,13 @@ describe("useStreak", () => {
     act(() => result.current.reset());
     expect(result.current.streak).toBe(0);
   });
+
+  it("restores an earlier count", () => {
+    const { result } = renderHook(() => useStreak());
+    act(() => result.current.record(true));
+    act(() => result.current.record(true));
+    act(() => result.current.record(true));
+    act(() => result.current.restore(2));
+    expect(result.current.streak).toBe(2);
+  });
 });

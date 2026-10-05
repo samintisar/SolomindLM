@@ -7,5 +7,7 @@ export function useStreak() {
     setStreak((current) => (success ? current + 1 : 0));
   }, []);
   const reset = useCallback(() => setStreak(0), []);
-  return { streak, record, reset };
+  /** Puts back an earlier count, e.g. when a recorded answer fails to save. */
+  const restore = useCallback((value: number) => setStreak(value), []);
+  return { streak, record, reset, restore };
 }

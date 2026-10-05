@@ -163,6 +163,27 @@ describe("QuizView", () => {
     consoleError.mockRestore();
   });
 
+  it("keeps the earlier streak when a later answer fails to save", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<QuizView note={makeQuiz()} />);
+    await user.click(await screen.findByRole("button", { name: /Right one/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(await screen.findByRole("button", { name: /Yes/ }));
+    expect(screen.getByRole("status")).toHaveTextContent("2 in a row");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    submitAnswer.mockRejectedValueOnce(new Error("x"));
+    await user.click((await screen.findAllByRole("button", { name: /Yes/ }))[0]);
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: /Yes/ })[0]).toHaveAttribute(
+        "data-state",
+        "idle"
+      )
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("2 in a row");
+    consoleError.mockRestore();
+  });
+
   it("scores a legacy five-option question in the options the learner sees", async () => {
     const quiz = makeQuiz();
     quiz.questions[0] = {

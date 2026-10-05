@@ -129,7 +129,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   // Derived state
   const isAnswered = userAnswers[currentIndex] !== undefined;
 
-  const { streak, record, reset: resetStreak } = useStreak();
+  const { streak, record, reset: resetStreak, restore: restoreStreak } = useStreak();
   // The option just answered correctly on this question: plays its pop and burst once.
   const [celebrated, setCelebrated] = useState<{ question: number; option: number } | null>(null);
   // Spoken after the learner answers (never on a restored or review view).
@@ -164,6 +164,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     // Update local state immediately for responsiveness
     setUserAnswers((prev) => ({ ...prev, [currentIndex]: index }));
     const correct = index === displayQuestion.answer;
+    const streakBefore = streak;
     record(correct);
     if (correct) setCelebrated({ question: currentIndex, option: index });
     setAnnouncement(correct ? "Correct." : "Incorrect. The correct answer is marked.");
@@ -186,7 +187,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
       });
       setAnnouncement("");
       setCelebrated(null);
-      resetStreak();
+      // The answer never counted: put the streak back to what it was before it.
+      restoreStreak(streakBefore);
     }
   };
 
