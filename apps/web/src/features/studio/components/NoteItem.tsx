@@ -84,13 +84,30 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   onPlayAudio,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  // Set when "Rename" is picked, so the menu's close doesn't pull focus back from the title input.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Set when "Rename" is picked. The edit starts only once the menu has fully closed: while the
+  // menu animates out it is still interactive, and a pointermove over it would focus an item,
+  // blurring the new input and ending the edit at once.
   const renameRequestedRef = useRef(false);
+  // Set when Enter/Escape ends a rename, so focus returns to the menu trigger (not when the
+  // rename ended by clicking elsewhere).
+  const returnFocusRef = useRef(false);
   const justFinished = useJustFinished(note.status);
 
   useEffect(() => {
-    if (isEditing) inputRef.current?.focus();
+    if (isEditing) {
+      returnFocusRef.current = false;
+      inputRef.current?.focus();
+    } else if (returnFocusRef.current) {
+      returnFocusRef.current = false;
+      triggerRef.current?.focus();
+    }
   }, [isEditing]);
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === "Escape") returnFocusRef.current = true;
+    onEditKeyDown(e);
+  };
 
   const isGenerating = note.status === "generating";
   const generatingLines = isGenerating ? getStudioGeneratingListLines(note) : null;
@@ -104,7 +121,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
 
   return (
     <Card
-      variant={isGenerating ? "flush" : "interactive"}
+      variant={isGenerating || isEditing ? "flush" : "interactive"}
       data-testid="studio-note-card"
       aria-busy={isGenerating || undefined}
       className="relative"
@@ -118,12 +135,13 @@ export const NoteItem: React.FC<NoteItemProps> = ({
       {justFinished ? (
         <span
           aria-hidden
+          data-slot="finish-glow"
           className="pointer-events-none absolute inset-0 animate-studio-glow rounded-2xl ring-2 ring-success/40 ring-inset"
         />
       ) : null}
-      <div className="flex items-start gap-2 p-3">
+      <div className="relative flex items-start gap-2">
         {isEditing ? (
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3 p-3">
             <NoteIcon note={note} />
             <Input
               ref={inputRef}
@@ -131,14 +149,14 @@ export const NoteItem: React.FC<NoteItemProps> = ({
               value={editTitle}
               onChange={(e) => onEditTitleChange(e.target.value)}
               onBlur={onEditSave}
-              onKeyDown={onEditKeyDown}
+              onKeyDown={handleTitleKeyDown}
             />
           </div>
         ) : isGenerating && generatingLines ? (
           <div
             role="group"
             aria-label={`${note.title}, ${generatingLines.primary}`}
-            className="flex min-w-0 flex-1 items-start gap-3"
+            className="flex min-w-0 flex-1 items-start gap-3 p-3"
           >
             <NoteIcon note={note} />
             <div className="min-w-0 flex-1">
@@ -152,7 +170,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           <button
             type="button"
             onClick={onClick}
-            className="group flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex min-w-0 flex-1 items-start gap-3 p-3 text-left outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             <NoteIcon note={note} popped={justFinished} />
             <span className="min-w-0 flex-1">
@@ -170,7 +188,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
             </span>
           </button>
         )}
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5 py-3 pr-3">
           {canPlayInline ? (
             <Button
               type="button"
@@ -185,6 +203,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
+                ref={triggerRef}
                 type="button"
                 variant="ghost"
                 size="icon-sm"
@@ -201,13 +220,13 @@ export const NoteItem: React.FC<NoteItemProps> = ({
                 if (renameRequestedRef.current) {
                   renameRequestedRef.current = false;
                   e.preventDefault();
+                  onEditStart();
                 }
               }}
             >
               <DropdownMenuItem
                 onSelect={() => {
                   renameRequestedRef.current = true;
-                  onEditStart();
                 }}
               >
                 <Pencil />

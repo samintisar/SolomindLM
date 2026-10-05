@@ -97,7 +97,47 @@ describe("NoteItem", () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
-    expect(screen.getByRole("textbox", { name: "Edit note title" })).toHaveFocus();
+    expect(await screen.findByRole("textbox", { name: "Edit note title" })).toHaveFocus();
+  });
+
+  it("returns focus to the menu trigger after Enter ends a rename", async () => {
+    function Harness() {
+      const [editing, setEditing] = React.useState(false);
+      const [title, setTitle] = React.useState("SQL Joins");
+      return (
+        <NoteItem
+          note={note()}
+          isEditing={editing}
+          editTitle={title}
+          {...handlers()}
+          onEditStart={() => setEditing(true)}
+          onEditTitleChange={setTitle}
+          onEditKeyDown={(e) => {
+            if (e.key === "Enter") setEditing(false);
+          }}
+        />
+      );
+    }
+    render(<Harness />);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    const input = await screen.findByRole("textbox", { name: "Edit note title" });
+    await userEvent.type(input, "!{Enter}");
+    expect(screen.getByRole("button", { name: "More options" })).toHaveFocus();
+  });
+
+  it("keeps the menu on a generating row", () => {
+    renderItem(note({ status: "generating", metadata: {} }));
+    expect(screen.getByRole("button", { name: "More options" })).toBeInTheDocument();
+  });
+
+  it("glows once when a generating row finishes", () => {
+    const h = handlers();
+    const props = { isEditing: false, editTitle: "", ...h };
+    const { rerender } = render(<NoteItem note={note({ status: "generating" })} {...props} />);
+    expect(document.querySelector("[data-slot='finish-glow']")).toBeNull();
+    rerender(<NoteItem note={note({ status: "completed" })} {...props} />);
+    expect(document.querySelector("[data-slot='finish-glow']")).not.toBeNull();
   });
 
   it("offers inline play for a finished audio overview", async () => {
