@@ -179,3 +179,31 @@ describe("LiteratureReviewMessage completed state", () => {
     expect(onOpenReport).toHaveBeenCalledWith("r1");
   });
 });
+
+describe("LiteratureReviewMessage with notebook papers", () => {
+  test("the column card says which of the user's papers are included", () => {
+    mocks.session = {
+      notebookId: "nb1",
+      status: "awaiting_columns",
+      documentIds: ["d1", "d2"],
+      paperScope: "papers_only",
+    };
+    renderMessage({ suggestedColumns: columns });
+    expect(screen.getByText("Papers: Only your 2 papers")).toBeInTheDocument();
+  });
+
+  test("the completion message splits the user's papers from search results", () => {
+    mocks.session = { notebookId: "nb1", status: "completed", tableId: "t1" };
+    mocks.table = {
+      title: "Lit table",
+      papers: [
+        { isIncluded: true, citation: { sourceApi: "notebook" } },
+        { isIncluded: true, citation: { sourceApi: "notebook" } },
+        { isIncluded: true, citation: { sourceApi: "pubmed" } },
+      ],
+      columns: [{ isVisible: true }],
+    };
+    renderMessage({ status: "completed" });
+    expect(screen.getByText("2 of your papers + 1 from search")).toBeInTheDocument();
+  });
+});

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Source } from "@/shared/types";
 import {
   countNotebookAndSearchPapers,
+  includedPapersPhrase,
   paperScopeLabel,
   selectedNotebookPaperIds,
 } from "./literatureReviewPapers";
@@ -56,5 +57,22 @@ describe("countNotebookAndSearchPapers", () => {
     ]);
 
     expect(counts).toEqual({ notebook: 1, search: 3 });
+  });
+});
+
+describe("includedPapersPhrase", () => {
+  it("keeps the plain count when no notebook papers were included", () => {
+    expect(includedPapersPhrase({ notebook: 0, search: 12 })).toBe("12 papers");
+  });
+
+  it("splits the user's papers from search results", () => {
+    expect(includedPapersPhrase({ notebook: 4, search: 12 })).toBe(
+      "4 of your papers + 12 from search"
+    );
+  });
+
+  it("names only the user's papers when there were no search results", () => {
+    expect(includedPapersPhrase({ notebook: 4, search: 0 })).toBe("your 4 papers");
+    expect(includedPapersPhrase({ notebook: 1, search: 0 })).toBe("your paper");
   });
 });

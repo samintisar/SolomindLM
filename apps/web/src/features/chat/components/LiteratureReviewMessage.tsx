@@ -18,6 +18,11 @@ import {
 } from "../services/literatureReviewApi";
 import { useResearchSteps } from "../services/researchApi";
 import { buildLiteratureReportChatPreview } from "../utils/literatureReportPreview";
+import {
+  countNotebookAndSearchPapers,
+  includedPapersPhrase,
+  paperScopeLabel,
+} from "../utils/literatureReviewPapers";
 import { ControlTooltip } from "./ControlTooltip";
 import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
 import { ResultCard } from "./ResultCard";
@@ -256,10 +261,8 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
   const isAwaitingColumns = status === "awaiting_columns";
   const showSteps = steps.length > 0 || (!isComplete && !isFailed);
 
-  const includedPaperCount =
-    table?.papers.filter((p: { isIncluded: boolean }) => p.isIncluded).length ??
-    table?.papers.length ??
-    0;
+  const includedPapers = countNotebookAndSearchPapers(table?.papers ?? []);
+  const notebookPaperCount = session?.documentIds?.length ?? 0;
   const visibleColumnCount =
     table?.columns.filter((c: { isVisible: boolean }) => c.isVisible).length ?? 0;
 
@@ -282,6 +285,11 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
       {isAwaitingColumns && suggestedColumns && (
         <ColumnConfirmationCard
           columns={suggestedColumns}
+          paperScopeSummary={
+            notebookPaperCount > 0
+              ? paperScopeLabel(session?.paperScope ?? "papers_and_search", notebookPaperCount)
+              : undefined
+          }
           isConfirming={isConfirmingColumns}
           onPatch={patchEditingColumns}
           onConfirm={handleConfirmColumns}
@@ -315,7 +323,7 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
         <div className="mt-8 text-base leading-relaxed text-foreground">
           <p>
             I&apos;ve created your literature review table with{" "}
-            <strong>{includedPaperCount} papers</strong> and{" "}
+            <strong>{includedPapersPhrase(includedPapers)}</strong> and{" "}
             <strong>{visibleColumnCount} columns</strong>
             {report
               ? ". Now I'll generate a comprehensive report summarizing the key findings across all papers..."
@@ -367,6 +375,8 @@ type ColumnRow = {
 
 interface ColumnConfirmationCardProps {
   columns: ColumnRow[];
+  /** "Your 4 papers + search" when the review includes the user's notebook papers. */
+  paperScopeSummary?: string;
   isConfirming: boolean;
   onPatch: (updater: (columns: ColumnRow[]) => ColumnRow[]) => void;
   onConfirm: () => void;
@@ -374,6 +384,7 @@ interface ColumnConfirmationCardProps {
 
 const ColumnConfirmationCard: React.FC<ColumnConfirmationCardProps> = ({
   columns,
+  paperScopeSummary,
   isConfirming,
   onPatch,
   onConfirm,
@@ -390,6 +401,11 @@ const ColumnConfirmationCard: React.FC<ColumnConfirmationCardProps> = ({
         <p className="font-sans text-sm leading-relaxed text-muted-foreground">
           Check the fields to include, rename as needed, then continue.
         </p>
+        {paperScopeSummary ? (
+          <p className="font-sans text-sm leading-relaxed text-muted-foreground">
+            Papers: {paperScopeSummary}
+          </p>
+        ) : null}
       </CardHeader>
 
       <CardContent>

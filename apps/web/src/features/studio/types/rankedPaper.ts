@@ -1,4 +1,4 @@
-export type RankedPaperSource = "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+type RankedPaperSource = "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
 
 /** Where a table paper came from: a database search, or the user's own notebook (#301). */
 export type PaperCitationSource = RankedPaperSource | "notebook";

@@ -1,4 +1,6 @@
 export interface LiteratureReviewStepCounts {
+  /** The user's selected notebook papers, included without screening (#301). */
+  recordsFromNotebook?: number;
   recordsIdentified?: number;
   recordsAfterDedupe?: number;
   recordsRanked?: number;
@@ -35,6 +37,7 @@ export function parseResearchStepMetadata(metadata: unknown): {
     typeof record[key] === "number" ? (record[key] as number) : undefined;
 
   const prismaCounts: LiteratureReviewStepCounts = {
+    recordsFromNotebook: num("recordsFromNotebook"),
     recordsIdentified: num("recordsIdentified"),
     recordsAfterDedupe: num("recordsAfterDedupe"),
     recordsRanked: num("recordsRanked"),

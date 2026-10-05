@@ -37,3 +37,16 @@ export function countNotebookAndSearchPapers(rows: readonly IncludedRowLike[]): 
   }
   return { notebook, search };
 }
+
+/** How the completion message counts the included papers. */
+export function includedPapersPhrase({
+  notebook,
+  search,
+}: {
+  notebook: number;
+  search: number;
+}): string {
+  if (notebook === 0) return `${search} papers`;
+  if (search === 0) return notebook === 1 ? "your paper" : `your ${notebook} papers`;
+  return `${notebook} of your papers + ${search} from search`;
+}

@@ -70,12 +70,8 @@ function OffTopicBadge({ reason }: { reason: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge
-          tabIndex={0}
-          aria-describedby={reasonId}
-          className="bg-warning-muted text-warning-muted-foreground"
-        >
-          <TriangleAlert aria-hidden />
+        <Badge variant="outline" tabIndex={0} aria-describedby={reasonId}>
+          <TriangleAlert aria-hidden className="text-warning" />
           Off-topic?
         </Badge>
       </TooltipTrigger>
@@ -137,7 +133,7 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
                 {title}
               </a>
             ) : (
-              <p className="text-[15px] font-semibold leading-snug text-foreground">{title}</p>
+              <p className="text-sm font-semibold leading-snug text-foreground">{title}</p>
             )}
             <p className="text-sm leading-relaxed text-neutral-500">
               {formatPaperMetaLine(citation)}
