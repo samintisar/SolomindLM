@@ -14,7 +14,6 @@ import {
   isFlashcardNote,
   isInfographicNote,
   isReportNote,
-  isSpreadsheetNote,
   isUserNote,
   Note,
 } from "@/shared/types/index";
@@ -32,7 +31,6 @@ interface StudioPanelHeaderProps {
   onEditReport?: () => void;
   onCopyReport: () => void;
   onDownloadReport: () => void;
-  onDownloadSpreadsheet: () => void;
   onExportFlashcards: () => void;
   onCopyUserNote: () => void;
   onDownloadUserNote: () => void;
@@ -43,7 +41,6 @@ interface StudioPanelHeaderProps {
   canCopyOrDownload: boolean;
   canCopyOrDownloadUserNote: boolean;
   canExportFlashcards: boolean;
-  canDownloadSpreadsheet: boolean;
   isExporting: boolean;
   isMobile: boolean;
 }
@@ -65,7 +62,6 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   onEditReport,
   onCopyReport,
   onDownloadReport,
-  onDownloadSpreadsheet,
   onExportFlashcards,
   onCopyUserNote,
   onDownloadUserNote,
@@ -76,7 +72,6 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   canCopyOrDownload,
   canCopyOrDownloadUserNote,
   canExportFlashcards: _canExportFlashcards,
-  canDownloadSpreadsheet,
   isExporting,
   isMobile,
 }) => {
@@ -211,20 +206,6 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
-                </button>
-              </div>
-            )}
-            {isSpreadsheetNote(activeNote) && (
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={onDownloadSpreadsheet}
-                  disabled={!canDownloadSpreadsheet}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download as CSV"
-                  aria-label="Download as CSV"
-                >
-                  <Download className="w-4 h-4" />
                 </button>
               </div>
             )}
@@ -404,20 +385,6 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
-              </button>
-            </div>
-          )}
-          {isSpreadsheetNote(activeNote) && (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={onDownloadSpreadsheet}
-                disabled={!canDownloadSpreadsheet}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download as CSV"
-                aria-label="Download as CSV"
-              >
-                <Download className="w-4 h-4" />
               </button>
             </div>
           )}
