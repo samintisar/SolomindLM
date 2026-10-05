@@ -1176,6 +1176,11 @@
   --studio-tone: --value(--color-studio-*);
 }
 
+/* One slice of a stacked progress bar; width comes from --studio-segment (style may only set custom properties). */
+@utility studio-segment {
+  width: var(--studio-segment, 0%);
+}
+
 /* Studio: a soft light in the type colour sweeping across a generating Saved row (spec §1).
    Needs a positioned host (it sets overflow, not position). */
 @utility studio-sheen {
