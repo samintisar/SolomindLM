@@ -245,8 +245,10 @@ bun run convex:env:push
 **Terminal 1 — Convex backend:**
 
 ```bash
-bun x convex dev
+bun run dev:convex
 ```
+
+Only one checkout can watch the dev deployment at a time. In other git worktrees, push changes once with `bun run dev:convex --once`.
 
 **Terminal 2 — Web frontend:**
 
