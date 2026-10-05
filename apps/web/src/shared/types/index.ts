@@ -342,17 +342,20 @@ export interface InfographicNote extends BaseNote {
 // Spreadsheet note - structured table data
 export interface SpreadsheetNote extends BaseNote {
   type: "spreadsheet";
-  content: string; // Markdown table content
+  content: string; // CSV text (RFC 4180; see convex/_shared/csv.helpers.ts)
   metadata: {
     spreadsheetType:
       | "data_extraction"
       | "comparison_table"
       | "timeline"
       | "financial_summary"
-      | "custom";
+      | "custom"
+      | "literature_review";
     documentIds: string[];
     error?: string;
     customPrompt?: string;
+    /** When someone last edited the sheet (ms since epoch); absent if never edited. */
+    editedAt?: number;
   } & StudioGenerationMetadata;
 }
 
