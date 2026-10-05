@@ -463,6 +463,51 @@ Run the test. Expected: PASS (4).
 
 ---
 
+### Task 4b: Align older overviews to the real pauses (added after the browser check)
+
+**Why:** the character-count estimate drifts visibly on a long overview. The user tried it and said "it doesn't actually sync". Overviews generated before this PR have no saved timings. The audio, though, has a clear pause between lines: the TTS output for each line starts and ends with silence, so the joins sit in the longest silences, while pauses inside a line (at commas) are shorter. Decode the audio in the browser, find those pauses, and match them to the transcript's line boundaries, with the estimate as a guide. The user chose this, and the "Approximate sync" badge only shows if alignment fails.
+
+**Files:**
+- Create: `apps/web/src/features/audio/transcript/alignToPauses.ts` and its test (pure, no DOM).
+- Create: `apps/web/src/features/audio/hooks/usePauseAlignedLines.ts` (decode and cache).
+- Modify: `AudioPlayer.tsx`, to use aligned lines when there are no saved timings.
+
+**`alignToPauses.ts` (pure):**
+- **`findPauses(samples: Float32Array, sampleRate: number): Pause[]`**, where `Pause = { startMs: number; endMs: number }`.
+  - Compute the RMS of 20 ms frames.
+  - The silence threshold adapts to the recording: a fraction of a high percentile of the frame RMS, for example 4% of the 95th percentile, with a small absolute floor.
+  - A pause is a run of silent frames of at least 120 ms.
+  - Ignore leading and trailing silence.
+- **`alignLinesToPauses(estimate: ReaderLine[], pauses: Pause[], durationMs: number): ReaderLine[] | null`**:
+  - Choose N−1 boundaries, one per gap between lines, from the pauses, in order, with dynamic programming over (boundary, pause). Each pause is used at most once and the order is kept.
+  - The cost of putting boundary i at pause j grows with the distance from the pause's midpoint to the estimated boundary (normalised by the average line length) and shrinks with the pause's length, since longer pauses are much more likely to be line breaks.
+  - Each line's `startMs` and `endMs` come from the chosen pauses: a line ends where its pause starts, and the next line starts where that pause ends.
+  - The first line starts at the first sound, and the last line ends at the last sound or at `durationMs`.
+  - Return `null` when there are fewer pauses than N−1, or when the best path is implausible (for example, the average distance from the estimate is more than about two average line lengths).
+  - Keep the speakers and text from the estimate.
+- **Tests:**
+  - Build synthetic audio: noise bursts for lines, with a length proportional to the characters times a per-voice speed (±15% jitter), joined by 400–600 ms silences. Add 150–250 ms commas inside lines.
+  - `findPauses` finds every gap between lines.
+  - `alignLinesToPauses` recovers every line start within 100 ms on a 60-line script whose character-count estimate is off by several seconds by the middle.
+  - Fewer pauses than lines returns null.
+  - Silent or empty input returns null.
+
+**`usePauseAlignedLines(audioUrl, estimate, enabled)`:**
+- **Enabled** only when there are no saved lines, the URL has resolved and `estimate.length > 1`.
+- **Steps:**
+  - `fetch(audioUrl)` to get an `arrayBuffer`.
+  - Decode it with `new OfflineAudioContext(1, 1, 8000).decodeAudioData(...)`, which keeps memory small: a 13-minute overview at 8 kHz is about 25 MB of floats. If the 8 kHz context throws, fall back to 22050 Hz.
+  - Then `findPauses` and `alignLinesToPauses`.
+- **Cache:** results go in a module-level `Map` keyed by `audioUrl`, so reopening is instant.
+- **Results:** it returns `{ lines: ReaderLine[] | null; status: "idle" | "aligning" | "aligned" | "failed" }`.
+- **Failures:** any failure (CORS, decode, null alignment) gives `failed`, with one `console.warn`, and the player keeps the estimate.
+- **Unmount:** abort the fetch with an `AbortController`.
+- **`AudioPlayer`:**
+  - With no saved lines, use the aligned lines once `status === "aligned"`, and `approximate` becomes false.
+  - While aligning, keep the estimate. The badge can read "Syncing…". When alignment fails, it reads "Approximate sync".
+
+---
+
 ### Task 5: `MiniAudioPlayer` on the shared controls
 
 - **Keep:** the props, the autoplay effect, and the loading, unavailable and error states with their wording.
