@@ -16,7 +16,6 @@
 import { v } from "convex/values";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
-import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
 import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
 import { internal } from "../_generated/api";
@@ -25,6 +24,7 @@ import { action } from "../_generated/server";
 import { env } from "../_lib/env";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
+import { createRerankFn } from "../chat/_streamSearch";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
 import { buildChatEvalTelemetry } from "./chatEvalTelemetry";
@@ -204,9 +204,8 @@ export const runChatEval = action({
 
     const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
-    const rerankFn = async (query: string, documents: Array<{ id: string; content: string }>) => {
-      return cachedRerank(ctx, query, documents as RerankDocument[], 15);
-    };
+    // Same rerank as production chat, so eval scores match what users get.
+    const rerankFn = createRerankFn(ctx);
 
     // ── Spy wrapper for globalRerankFn ──
 

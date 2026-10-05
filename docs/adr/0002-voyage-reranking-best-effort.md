@@ -59,8 +59,13 @@ are never served.
   verbatim, a lexical proxy rather than a human judgement. 0.40 also keeps all
   of those but cuts into on-topic context (5% of the top-15 chunks), so 0.35
   leaves a margin on the safe side.
-  Chunks past the rerank top-N keep their vector similarity (~0.5) and pass the
-  floor either way; unifying those scales is a separate change.
+  On 2026-10-05 chat switched from reranking the top 15 candidates to the whole
+  pool (same Voyage cost, which is per input token), so no chunk keeps its vector
+  similarity (~0.5) and slips past the floor. Re-checked on the same pools: at
+  0.35 the floor now trims 26% of the pool, and none of the 69 expected items
+  found in a pool loses its last supporting chunk (5 of 136 item-bearing chunks
+  score 0.28-0.33, but every item they carry also appears in a chunk above the
+  floor).
 - Voyage's higher rate-limit tier needs a payment method on the account.
 - Privacy policy subprocessor list now names Voyage AI instead of ZeroEntropy.
 - The unused `ZEROENTROPY_API_KEY` / `ZEROENTROPY_RERANK_MODEL` Convex env vars were
