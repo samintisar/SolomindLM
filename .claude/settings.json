@@ -155,6 +155,19 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.mjs",
+            "statusMessage": "Checking dependencies...",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
