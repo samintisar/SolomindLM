@@ -75,8 +75,6 @@ const ReportMarkdownEditor: React.FC<ReportMarkdownEditorProps> = ({ note, onSav
 
 interface ActiveNoteViewProps {
   activeNote: Note;
-  isMindMapExpanded: boolean;
-  onToggleMindMap: () => void;
   onUpdateNoteFull?: (id: string, note: Note) => void;
   isMobile: boolean;
   onBack: () => void;
@@ -94,8 +92,6 @@ interface ActiveNoteViewProps {
  */
 export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
   activeNote,
-  isMindMapExpanded,
-  onToggleMindMap,
   onUpdateNoteFull,
   isMobile,
   onBack,
@@ -138,15 +134,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
 
   // MindMap view
   if (isMindMapNote(activeNote)) {
-    return (
-      <MindMapView
-        note={activeNote}
-        isExpanded={isMindMapExpanded}
-        onToggleExpanded={onToggleMindMap}
-        onBack={undefined}
-        onAskInChat={onAskInChat}
-      />
-    );
+    return <MindMapView note={activeNote} onBack={undefined} onAskInChat={onAskInChat} />;
   }
 
   // Audio view

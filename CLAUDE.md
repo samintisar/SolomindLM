@@ -141,7 +141,7 @@ bun run convex:env:push:dry    # Dry run
 
 Bun workspaces monorepo:
 
-- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4; React Router 7, Mind Elixir 5, Streamdown + KaTeX, DOMPurify, Stripe SDK
+- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4; React Router 7, Streamdown + KaTeX, DOMPurify, Stripe SDK
 - `apps/mobile/` — Expo 55 + React Native 0.83 WebView shell (loads web routes; native auth, file upload, push notifications)
 - `convex/` — Convex backend (auth, schema, functions, agents)
 
