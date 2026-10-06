@@ -74,7 +74,7 @@ export const CitePaperModal: React.FC<CitePaperModalProps> = ({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-svh overflow-y-auto">
+      <DialogContent className="max-h-9/10 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Cite Paper</DialogTitle>
           <DialogDescription>

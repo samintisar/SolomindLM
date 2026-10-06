@@ -33,6 +33,18 @@ describe("CitePaperModal", () => {
       "APA 7th"
     );
     expect(screen.getByText(/Attention Is All You Need/)).toBeInTheDocument();
+    expect(screen.getByText("(Ashish & Noam, 2017)")).toBeInTheDocument();
+  });
+
+  it("numbers the in-text citation in a numbered style", async () => {
+    render(<CitePaperModal paper={PAPER} paperIndex={0} isOpen onClose={vi.fn()} />);
+    await userEvent.click(screen.getByRole("combobox", { name: "Select citation style" }));
+    await userEvent.click(await screen.findByRole("option", { name: "IEEE" }));
+    expect(screen.getByRole("combobox", { name: "Select citation style" })).toHaveTextContent(
+      "IEEE"
+    );
+    expect(screen.getByText("[1]")).toBeInTheDocument();
+    expect(screen.queryByText("(Ashish & Noam, 2017)")).not.toBeInTheDocument();
   });
 
   it("copies the full citation", async () => {
