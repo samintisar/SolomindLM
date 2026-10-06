@@ -10,7 +10,7 @@
  * any with node_modules and no log here) gets no output.
  *
  *   node .claude/hooks/session-start.mjs                 hook entry point
- *   node .claude/hooks/session-start.mjs install <log>   the detached runner (internal)
+ *   node .claude/hooks/session-start.mjs install         the detached runner (internal)
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -23,6 +23,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -35,10 +36,46 @@ const lockPath = join(stateDir, `${key}-install.lock`);
 const logPath = join(stateDir, `${key}-install.log`);
 const DONE_MARKER = "bun install finished";
 const SUCCESS_LINE = `${DONE_MARKER} (exit 0)`;
-// A cold install takes ~3.5 min; a lock older than this belongs to a runner that died.
-const STALE_LOCK_MS = 15 * 60 * 1000;
+// The lock holds the runner's PID ("pending" for the instant before it is spawned). It is live
+// while that process is; the age cap only guards against the PID being reused after a crash.
+const PENDING = "pending";
+const PENDING_MAX_MS = 60 * 1000;
+const PID_REUSE_MAX_MS = 3 * 60 * 60 * 1000;
 
-/** Runs in the detached child: install, record the outcome in the log, release the lock. */
+/** The lock's owner and age, or null when there is no lock. */
+function readLock() {
+  try {
+    return {
+      owner: readFileSync(lockPath, "utf8").trim(),
+      ageMs: Date.now() - statSync(lockPath).mtimeMs,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM"; // Exists but belongs to someone else.
+  }
+}
+
+function lockLive(lock) {
+  if (!lock) return false;
+  if (lock.owner === PENDING || lock.owner === "") return lock.ageMs <= PENDING_MAX_MS;
+  const pid = Number(lock.owner);
+  return Number.isInteger(pid) && processAlive(pid) && lock.ageMs <= PID_REUSE_MAX_MS;
+}
+
+/** Removes the lock only if it still names `owner` — never a lock someone else took since. */
+function releaseLock(owner) {
+  if (readLock()?.owner === owner) rmSync(lockPath, { force: true });
+}
+
+/** Runs in the detached child: install, record the outcome in the log, release its own lock. */
 function runInstall() {
   const result = spawnSync("bun", ["install", "--frozen-lockfile"], {
     cwd: projectDir,
@@ -47,12 +84,14 @@ function runInstall() {
   });
   const status = result.error ? result.error.message : `exit ${result.status}`;
   appendFileSync(logPath, `\n${DONE_MARKER} (${status})\n`);
-  rmSync(lockPath, { force: true });
+  // The parent may not have swapped "pending" for our PID yet; that lock is ours either way.
+  releaseLock(String(process.pid));
+  releaseLock(PENDING);
 }
 
 /** A live lock means our install is mid-run; bun creates node_modules long before it finishes. */
 function installRunning() {
-  return existsSync(lockPath) && Date.now() - statSync(lockPath).mtimeMs <= STALE_LOCK_MS;
+  return lockLive(readLock());
 }
 
 /** This hook installed here before, and that install failed or never finished (stale lock). */
@@ -64,12 +103,16 @@ function lastInstallFailed() {
 /** Starts the detached runner unless one is already running for this checkout. */
 function startInstall() {
   mkdirSync(stateDir, { recursive: true });
-  if (existsSync(lockPath) && !installRunning()) rmSync(lockPath, { force: true });
+  const seen = readLock();
+  if (seen && !lockLive(seen)) releaseLock(seen.owner); // Dead runner: reclaim its lock only.
+  let fd;
   try {
-    closeSync(openSync(lockPath, "wx"));
+    fd = openSync(lockPath, "wx");
   } catch {
     return; // An install for this checkout is already running (e.g. /clear mid-install).
   }
+  writeFileSync(fd, PENDING);
+  closeSync(fd);
   rmSync(logPath, { force: true });
   const log = openSync(logPath, "a");
   const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "install"], {
@@ -78,10 +121,11 @@ function startInstall() {
     stdio: ["ignore", log, log],
     windowsHide: true,
   });
+  if (child.pid) writeFileSync(lockPath, String(child.pid));
   // A launch failure arrives as an event, not a throw. Leave no lock claiming a running install.
   child.on("error", (error) => {
     appendFileSync(logPath, `\n${DONE_MARKER} (could not start: ${error.message})\n`);
-    rmSync(lockPath, { force: true });
+    releaseLock(PENDING);
   });
   child.unref();
   closeSync(log);
