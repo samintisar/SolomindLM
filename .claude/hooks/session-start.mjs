@@ -69,13 +69,18 @@ function startInstall() {
   return logPath;
 }
 
+/** A live lock means our install is mid-run; bun creates node_modules long before it finishes. */
+function installRunning() {
+  return existsSync(lockPath) && Date.now() - statSync(lockPath).mtimeMs <= STALE_LOCK_MS;
+}
+
 if (process.argv[2] === "install") {
   runInstall(process.argv[3]);
-} else if (!existsSync(join(projectDir, "node_modules"))) {
-  const logPath = startInstall();
+} else if (installRunning() || !existsSync(join(projectDir, "node_modules"))) {
+  const logPath = startInstall(); // Joins the running install instead of starting another.
   // SessionStart stdout is added to the agent's context.
   process.stdout.write(
-    `node_modules is missing in this checkout, so \`bun install\` is running in the background (log: ${logPath}). ` +
+    `This checkout's dependencies are being installed by \`bun install\` in the background (log: ${logPath}). ` +
       `Read and plan freely, but before running any bun/bunx/vitest/tsgo command wait for the log's last line, "${DONE_MARKER} (exit 0)". ` +
       "If it reports another exit code or an error, fix the install before running those commands. " +
       "Do not start a second `bun install` while it runs.\n"
