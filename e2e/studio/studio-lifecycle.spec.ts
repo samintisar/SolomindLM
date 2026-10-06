@@ -24,7 +24,10 @@ test.describe("Studio Note Lifecycle", () => {
       timeout: 15_000,
     });
 
-    await page.getByRole("heading", { level: 4, name: "Summary" }).click();
+    await page
+      .getByRole("dialog", { name: /create report/i })
+      .getByRole("button", { name: "Summary", exact: true })
+      .click();
 
     const card = firstStudioNoteCard(page);
     await expect(card).toHaveAttribute("aria-busy", "true", { timeout: 15_000 });

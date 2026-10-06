@@ -1,13 +1,28 @@
-import { Bookmark, MessageSquareText, X } from "lucide-react";
-import React, { useState } from "react";
-import { SaveAsPromptModal } from "./SaveAsPromptModal";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { FieldGroup } from "@/shared/components/ui/field";
+import type { StudioDialogTheme } from "./customize/dialogContext";
+import { OptionToggleGroup } from "./customize/OptionToggleGroup";
+import { COUNT_OPTIONS, DIFFICULTY_OPTIONS, type ToggleOption } from "./customize/options";
+import { PromptField } from "./customize/PromptField";
+import {
+  StudioCustomizeBody,
+  StudioCustomizeDialog,
+  StudioCustomizeFooter,
+  StudioCustomizeHeader,
+} from "./customize/StudioCustomizeDialog";
 
 interface CustomizeWrittenQuestionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (config: WrittenQuestionsConfig) => void;
+  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
   embedded?: boolean;
+  /** Pins light-theme tokens on always-light pages (the auth page). */
+  theme?: StudioDialogTheme;
+  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
+  preview?: boolean;
 }
 
 export interface WrittenQuestionsConfig {
@@ -17,171 +32,83 @@ export interface WrittenQuestionsConfig {
   focus: string;
 }
 
+const QUESTION_TYPE_OPTIONS = [
+  { value: "short", label: "Short" },
+  { value: "essay", label: "Essay" },
+] as const satisfies readonly ToggleOption<WrittenQuestionsConfig["questionType"]>[];
+
 export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsModalProps> = ({
   isOpen,
   onClose,
   onGenerate,
   embedded = false,
-}) => {
+  theme,
+  preview = false,
+}) => (
+  <StudioCustomizeDialog
+    open={isOpen}
+    onClose={onClose}
+    embedded={embedded}
+    theme={theme}
+    preview={preview}
+    wide
+  >
+    <WrittenQuestionsForm onGenerate={onGenerate} />
+  </StudioCustomizeDialog>
+);
+
+// Inside DialogContent, which unmounts on close: every open starts from the defaults.
+function WrittenQuestionsForm({
+  onGenerate,
+}: {
+  onGenerate: (config: WrittenQuestionsConfig) => void;
+}) {
   const [count, setCount] = useState<WrittenQuestionsConfig["count"]>("standard");
   const [difficulty, setDifficulty] = useState<WrittenQuestionsConfig["difficulty"]>("medium");
   const [questionType, setQuestionType] = useState<WrittenQuestionsConfig["questionType"]>("short");
   const [focus, setFocus] = useState("");
-  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
-
-  if (!isOpen) return null;
-
-  const overlayClass = embedded
-    ? "absolute inset-0 z-50 flex min-h-0 items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200"
-    : "fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200";
-
   return (
-    <div className={overlayClass}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="relative flex max-h-full min-h-0 w-full max-w-4xl flex-col overflow-x-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-secondary/50 rounded-lg">
-              <MessageSquareText className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-xl font-bold font-sans tracking-tight">
-              Customize Written Questions
-            </h2>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton
-              studioTool="writtenQuestions"
-              onApplyPrompt={setFocus}
-            />
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl p-2 transition-colors hover:bg-secondary/50"
-            >
-              <X className="h-5 w-5 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 md:p-10 space-y-8 bg-card/50">
-          <div className="grid grid-cols-1 gap-x-2 gap-y-3 sm:grid-cols-3 sm:gap-y-2 sm:gap-x-3">
-            <div className="flex min-w-0 flex-col gap-1">
-              <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
-                Count
-              </label>
-              <div className="flex w-full min-w-0 rounded-lg border border-border bg-background p-0.5">
-                {(["fewer", "standard", "more"] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setCount(opt)}
-                    className={`
-                      flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-md px-0.5 py-1 text-[10px] font-semibold transition-all sm:min-h-8 sm:px-1 sm:text-xs
-                      ${
-                        count === opt
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }
-                    `}
-                  >
-                    <span className="truncate">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-1">
-              <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
-                Type
-              </label>
-              <div className="flex w-full min-w-0 rounded-lg border border-border bg-background p-0.5">
-                {(["short", "essay"] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setQuestionType(opt)}
-                    className={`
-                      flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-md px-0.5 py-1 text-[10px] font-semibold transition-all sm:min-h-8 sm:px-1 sm:text-xs
-                      ${
-                        questionType === opt
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }
-                    `}
-                  >
-                    <span className="truncate">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-1">
-              <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
-                Difficulty
-              </label>
-              <div className="flex w-full min-w-0 rounded-lg border border-border bg-background p-0.5">
-                {(["easy", "medium", "hard"] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setDifficulty(opt)}
-                    className={`
-                      flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-md px-0.5 py-1 text-[10px] font-semibold transition-all sm:min-h-8 sm:px-1 sm:text-xs
-                      ${
-                        difficulty === opt
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }
-                    `}
-                  >
-                    <span className="truncate">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
-              Area of Focus
-            </label>
-            <textarea
-              value={focus}
-              onChange={(e) => setFocus(e.target.value)}
-              placeholder="e.g. Focus on 'Database Normalization' concepts or create a comprehensive review..."
-              className="w-full h-32 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
-            />
-            <button
-              type="button"
-              onClick={() => setSaveAsPromptModalOpen(true)}
-              disabled={!focus.trim()}
-              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              Save as reusable prompt
-            </button>
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={() => onGenerate({ count, difficulty, questionType, focus })}
-              className="px-10 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-md active:scale-95 text-sm"
-            >
-              Generate Written Questions
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Save as Prompt Modal */}
-      <SaveAsPromptModal
-        isOpen={saveAsPromptModalOpen}
-        onClose={() => setSaveAsPromptModalOpen(false)}
-        studioTool="writtenQuestions"
-        initialPromptText={focus}
+    <>
+      <StudioCustomizeHeader
+        kind="written"
+        title="Customize Written Questions"
+        description="Choose how many questions, their type and difficulty, and what to focus on."
+        promptLibrary={{ studioTool: "writtenQuestions", onApplyPrompt: setFocus }}
       />
-    </div>
+      <StudioCustomizeBody>
+        <FieldGroup className="grid lg:grid-cols-3">
+          <OptionToggleGroup
+            label="Number of questions"
+            value={count}
+            options={COUNT_OPTIONS}
+            onValueChange={setCount}
+          />
+          <OptionToggleGroup
+            label="Question type"
+            value={questionType}
+            options={QUESTION_TYPE_OPTIONS}
+            onValueChange={setQuestionType}
+          />
+          <OptionToggleGroup
+            label="Difficulty"
+            value={difficulty}
+            options={DIFFICULTY_OPTIONS}
+            onValueChange={setDifficulty}
+          />
+        </FieldGroup>
+        <PromptField
+          label="Area of focus"
+          placeholder="e.g. Focus on 'Database Normalization' concepts or create a comprehensive review..."
+          value={focus}
+          onChange={setFocus}
+          studioTool="writtenQuestions"
+        />
+      </StudioCustomizeBody>
+      <StudioCustomizeFooter>
+        <Button onClick={() => onGenerate({ count, difficulty, questionType, focus })}>
+          Generate Written Questions
+        </Button>
+      </StudioCustomizeFooter>
+    </>
   );
-};
+}

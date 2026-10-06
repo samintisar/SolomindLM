@@ -506,6 +506,7 @@ export function LandingHeroMockup({
 
       <CustomizeReportModal
         embedded
+        preview
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}
         onSelectFormat={previewNoop}
@@ -513,6 +514,7 @@ export function LandingHeroMockup({
 
       <CustomizeFlashcardsModal
         embedded
+        preview
         isOpen={studioModal === "flashcards"}
         onClose={closeStudioModal}
         onGenerate={previewNoop}
@@ -520,6 +522,7 @@ export function LandingHeroMockup({
 
       <CustomizeQuizModal
         embedded
+        preview
         isOpen={studioModal === "quiz"}
         onClose={closeStudioModal}
         onGenerate={previewNoop}
@@ -527,6 +530,7 @@ export function LandingHeroMockup({
 
       <CustomizeAudioModal
         embedded
+        preview
         isOpen={studioModal === "audio"}
         onClose={closeStudioModal}
         onGenerate={previewNoop}
@@ -534,6 +538,7 @@ export function LandingHeroMockup({
 
       <CustomizeWrittenQuestionsModal
         embedded
+        preview
         isOpen={studioModal === "writtenQuestions"}
         onClose={closeStudioModal}
         onGenerate={previewNoop}
@@ -541,6 +546,7 @@ export function LandingHeroMockup({
 
       <CustomizeInfographicModal
         embedded
+        preview
         isOpen={studioModal === "infographic"}
         onClose={closeStudioModal}
         onGenerate={previewNoop}
@@ -548,6 +554,7 @@ export function LandingHeroMockup({
 
       <CustomizeSpreadsheetsModal
         embedded
+        preview
         isOpen={studioModal === "spreadsheets"}
         onClose={closeStudioModal}
         onGenerate={previewNoop}

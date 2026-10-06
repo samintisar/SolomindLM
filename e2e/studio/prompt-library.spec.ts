@@ -109,17 +109,15 @@ test.describe("Prompt Library", () => {
       await expect(page.getByRole("heading", { name: /save as prompt/i })).toBeVisible();
 
       // Initially shows private state
-      await expect(page.getByText("Private")).toBeVisible();
       await expect(page.getByText(/Only you can see and use this prompt/)).toBeVisible();
 
-      // Click the visibility toggle (testid + role=switch)
+      // Click the visibility toggle (a Radix checkbox, so aria-checked)
       const toggleButton = page.getByTestId("save-as-prompt-visibility-toggle");
       await expect(toggleButton).toHaveAttribute("aria-checked", "false");
       await toggleButton.click();
       await expect(toggleButton).toHaveAttribute("aria-checked", "true");
 
       // Should now show public state
-      await expect(page.getByText("Public")).toBeVisible();
       await expect(page.getByText(/Anyone can discover and use this prompt/)).toBeVisible();
 
       // Public hint should appear
@@ -145,7 +143,10 @@ test.describe("Prompt Library", () => {
       await expect(page.getByRole("heading", { name: /save as prompt/i })).toBeVisible();
 
       // Click Cancel
-      await page.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", { name: /save as prompt/i })
+        .getByRole("button", { name: "Cancel" })
+        .click();
 
       // Modal should close
       await expect(page.getByRole("heading", { name: /save as prompt/i })).not.toBeVisible();
@@ -193,11 +194,12 @@ test.describe("Prompt Library", () => {
 
       // Discover Prompts modal should open
       await expect(page.getByRole("heading", { name: /prompt library/i })).toBeVisible();
-      await expect(page.getByText(/Flashcards/)).toBeVisible();
+      const library = page.getByRole("dialog", { name: /prompt library/i });
+      await expect(library.getByText("Flashcards", { exact: true })).toBeVisible();
 
       // Should have Public and My Prompts tabs
-      await expect(page.getByRole("button", { name: /public/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /my prompts/i })).toBeVisible();
+      await expect(library.getByRole("tab", { name: "Public" })).toBeVisible();
+      await expect(library.getByRole("tab", { name: "My Prompts" })).toBeVisible();
     });
 
     test("shows search and sort options in Public tab", async ({ notebookPage }) => {
@@ -210,13 +212,13 @@ test.describe("Prompt Library", () => {
       await expect(page.getByRole("heading", { name: /prompt library/i })).toBeVisible();
 
       // Click Public tab
-      await page.getByRole("button", { name: /public/i }).click();
+      await page.getByRole("tab", { name: "Public" }).click();
 
       // Should show search input
       await expect(page.getByPlaceholder(/search prompts/i)).toBeVisible();
 
       // Should show sort dropdown
-      await expect(page.getByText(/most saved/i)).toBeVisible();
+      await expect(page.getByRole("combobox", { name: "Sort prompts" })).toHaveText(/most saved/i);
     });
 
     test("switches between Public and My Prompts tabs", async ({ notebookPage }) => {

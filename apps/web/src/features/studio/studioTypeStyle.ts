@@ -13,7 +13,7 @@ import {
 import { isReportNote, type Note } from "@/shared/types/index";
 import { isLiteratureReviewReportType } from "@/shared/types/reportTypes";
 
-type StudioTypeKey =
+export type StudioTypeKey =
   | "audio"
   | "mindmap"
   | "report"
@@ -114,4 +114,9 @@ export function studioTypeStyle(note: Note): StudioTypeStyle {
       ? "literature"
       : NOTE_TYPE_KEY[note.type];
   return key ? STYLES[key] : FALLBACK;
+}
+
+/** Icon and colour classes for a Studio type key (the Customize dialogs' header tiles). */
+export function studioTypeStyleForKey(key: StudioTypeKey): StudioTypeStyle {
+  return STYLES[key];
 }
