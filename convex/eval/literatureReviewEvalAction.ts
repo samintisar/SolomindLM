@@ -450,6 +450,8 @@ export const runLiteratureReviewEval = action({
       papers: [...notebookPapers, ...screenedIncluded.slice(0, 25)],
       columns: confirmedColumns,
       sessionId,
+      // The workflow passes the question; without it the prompt's RESEARCH QUESTION is blank.
+      query: args.question,
     });
     const tableResult: { tableId: Id<"literatureTables"> } = await ctx.runAction(
       internal.literatureReview.workflowSteps.generateTable,

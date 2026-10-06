@@ -165,7 +165,7 @@ export const generateMindMap = mutation({
       notebookId,
       title: title || "Mind Map",
       data: {},
-      metadata: {},
+      metadata: { documentIds },
       status: "generating",
     });
 

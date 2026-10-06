@@ -328,3 +328,77 @@ export function selectChunksByTokenBudgetWithReservation(
 
   return [...notebookSelected, ...topExternals];
 }
+
+export type NeighbourPassageOptions = {
+  /** Tokens the added neighbours may use in total. */
+  tokenBudget: number;
+  /** Most neighbours to add. */
+  maxPassages: number;
+};
+
+const positionKey = (documentId: string, chunkIndex: number) => `${documentId}#${chunkIndex}`;
+
+/**
+ * Adds the whole neighbouring passages of selected passages, when retrieval already found them,
+ * so text the model would otherwise only see as a ~100-character preview becomes a passage it
+ * can cite. Best-ranked passages go first, the next neighbour before the previous one; each
+ * neighbour sits beside its passage. Previews of passages that end up in the context are then
+ * dropped, since the full text is there.
+ *
+ * @param selected - Context passages in rank order
+ * @param pool - Every retrieved passage the neighbours may come from
+ */
+export function addNeighbourPassages(
+  selected: ReferenceChunk[],
+  pool: ReferenceChunk[],
+  options: NeighbourPassageOptions
+): ReferenceChunk[] {
+  const byPosition = new Map<string, ReferenceChunk>();
+  for (const c of pool) {
+    if (c.documentId && c.chunkIndex >= 0)
+      byPosition.set(positionKey(c.documentId, c.chunkIndex), c);
+  }
+  const inContext = new Set(
+    selected
+      .filter((c) => c.documentId && c.chunkIndex >= 0)
+      .map((c) => positionKey(c.documentId as string, c.chunkIndex))
+  );
+
+  const result = [...selected];
+  let usedTokens = 0;
+  let added = 0;
+  for (const anchor of selected) {
+    if (!anchor.documentId || anchor.chunkIndex < 0) continue;
+    const steps: Array<1 | -1> = [];
+    if (anchor.metadata?.nextChunkPreview) steps.push(1);
+    if (anchor.metadata?.previousChunkPreview) steps.push(-1);
+    for (const step of steps) {
+      if (added >= options.maxPassages) break;
+      const key = positionKey(anchor.documentId, anchor.chunkIndex + step);
+      const neighbour = byPosition.get(key);
+      if (!neighbour || inContext.has(key)) continue;
+      const tokens = countTokens(neighbour.content);
+      if (usedTokens + tokens > options.tokenBudget) continue;
+      const at = result.indexOf(anchor);
+      result.splice(step === 1 ? at + 1 : at, 0, neighbour);
+      inContext.add(key);
+      usedTokens += tokens;
+      added++;
+    }
+  }
+
+  return result.map((c) => {
+    if (!c.documentId || c.chunkIndex < 0 || !c.metadata) return c;
+    const hasNext = inContext.has(positionKey(c.documentId, c.chunkIndex + 1));
+    const hasPrevious = inContext.has(positionKey(c.documentId, c.chunkIndex - 1));
+    if (!hasNext && !hasPrevious) return c;
+    return {
+      ...c,
+      metadata: {
+        ...c.metadata,
+        ...(hasNext ? { nextChunkPreview: undefined } : {}),
+        ...(hasPrevious ? { previousChunkPreview: undefined } : {}),
+      },
+    };
+  });
+}

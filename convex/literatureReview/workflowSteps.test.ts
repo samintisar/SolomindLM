@@ -1,6 +1,7 @@
 "use node";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import {
@@ -711,6 +712,65 @@ describe("extractDataHandler with LLM extraction", () => {
     expect(callArgs.papers[0].extractedData["key_findings"]).toBe(
       "30% improvement in primary outcome"
     );
+  });
+
+  it("asks for every extraction column id in the structured schema, with reasoning off", async () => {
+    // The mock answers through the schema it is given, as structured output does.
+    const withStructuredOutput = vi.fn((schema: z.ZodType) => ({
+      invoke: vi.fn(async () =>
+        schema.parse({
+          extractedData: { dose_metric: "MET-h/week", outcome_measure: "PHQ-9" },
+        })
+      ),
+    }));
+    vi.mocked(createLLM).mockReturnValue({ withStructuredOutput } as unknown as ReturnType<
+      typeof createLLM
+    >);
+    vi.mocked(invokeWithHttpRetry).mockImplementation(((fn: () => Promise<unknown>) =>
+      fn()) as typeof invokeWithHttpRetry);
+    vi.mocked(mockCtx.runQuery).mockResolvedValue([]);
+    vi.mocked(mockCtx.runMutation).mockResolvedValue(null);
+
+    await extractDataHandler(mockCtx, {
+      papers: [
+        {
+          title: "Paper One",
+          authors: ["Smith, J."],
+          year: 2023,
+          abstract: "Abstract one",
+          url: "http://example.com/1",
+          source: "arxiv" as const,
+          score: 0.9,
+          isIncluded: true,
+        },
+      ],
+      columns: [
+        { id: "title", name: "Title", isVisible: true },
+        { id: "dose_metric", name: "Dose Metric", isVisible: true },
+        { id: "outcome_measure", name: "Outcome Measure", isVisible: true },
+      ],
+      sessionId: "test-session" as Id<"literatureReviewSessions">,
+    });
+
+    const schema = withStructuredOutput.mock.calls[0][0];
+    const json = z.toJSONSchema(schema) as {
+      properties: { extractedData: { properties: Record<string, unknown> } };
+    };
+    expect(JSON.stringify(json)).not.toContain("propertyNames");
+    expect(Object.keys(json.properties.extractedData.properties)).toEqual([
+      "dose_metric",
+      "outcome_measure",
+    ]);
+    // Both custom columns reach the stored draft, keyed by column id.
+    const draft = vi.mocked(mockCtx.runMutation).mock.calls[0][1] as {
+      papers: Array<{ extractedData?: Record<string, string> }>;
+    };
+    expect(draft.papers[0].extractedData).toEqual({
+      dose_metric: "MET-h/week",
+      outcome_measure: "PHQ-9",
+    });
+    // Reasoning shares max_tokens on hybrid models; with it on, extraction ran out of tokens.
+    expect(createLLM).toHaveBeenCalledWith(expect.objectContaining({ phase: "fast" }));
   });
 
   it("falls back to basic metadata when LLM extraction fails", async () => {
