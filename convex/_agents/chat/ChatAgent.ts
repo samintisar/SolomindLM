@@ -683,14 +683,13 @@ export class ChatAgent {
     ];
 
     // Whole neighbours of the selected passages, when retrieval found them, so text the model
-    // reads in a neighbour preview is a passage it can cite. They count toward the same cap as
-    // selection, so list questions stay within LIST_QUERY_MAX_SELECTED_CHUNKS.
+    // reads in a neighbour preview is a passage it can cite. They get their own allowance on top
+    // of the selection cap (at most MAX_NEIGHBOUR_PASSAGES within NEIGHBOUR_PASSAGE_TOKEN_BUDGET):
+    // selection usually fills the cap, and evals showed neighbours sharing it were almost never
+    // added.
     const rankedChunks = addNeighbourPassages(selectedChunks, restNotebook, {
       tokenBudget: NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
-      maxPassages: Math.min(
-        MAX_NEIGHBOUR_PASSAGES,
-        Math.max(0, chunkCapTotal - selectedChunks.length)
-      ),
+      maxPassages: MAX_NEIGHBOUR_PASSAGES,
     });
     if (rankedChunks.length > selectedChunks.length) {
       logger.info("Added neighbouring passages", {
