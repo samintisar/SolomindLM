@@ -1,6 +1,16 @@
 import { createCitationEngine } from "@convex/_utils/CitationEngine";
-import { Copy, Quote, X } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { Copy } from "lucide-react";
+import type React from "react";
+import { useId, useMemo, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel, FieldTitle } from "@/shared/components/ui/field";
 import { useToast } from "@/shared/contexts/useToast";
 import type { RankedPaper } from "../types/rankedPaper";
 import { rankedPaperToCitation } from "../utils/rankedPaperMappers";
@@ -20,7 +30,8 @@ export const CitePaperModal: React.FC<CitePaperModalProps> = ({
   onClose,
 }) => {
   const [style, setStyle] = useState<CitationStyle>("apa7");
-  const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const styleId = useId();
 
   const engine = useMemo(() => createCitationEngine(), []);
   const citation = useMemo(
@@ -52,105 +63,71 @@ export const CitePaperModal: React.FC<CitePaperModalProps> = ({
       await navigator.clipboard.writeText(text);
       toastSuccess(`${label} copied`);
     } catch {
-      // ignore
+      toastError("Couldn't copy to the clipboard");
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="presentation"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <Dialog onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <Quote className="h-5 w-5 text-primary" />
-            <h2 id="cite-paper-title" className="text-lg font-semibold text-foreground">
-              Cite Paper
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
-          <Field label="Citation style">
-            <CitationStylePicker value={style} onChange={setStyle} />
+      <DialogContent className="max-h-svh overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Cite Paper</DialogTitle>
+          <DialogDescription>
+            Copy a reference or an in-text citation in the style you need.
+          </DialogDescription>
+        </DialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor={styleId}>Citation style</FieldLabel>
+            <CitationStylePicker id={styleId} value={style} onChange={setStyle} />
           </Field>
-
-          <Field label="Full citation">
-            <CitationBox text={fullCitation} />
-            <CopyButton label="Copy Citation" onClick={() => void copy(fullCitation, "Citation")} />
-          </Field>
-
-          <Field label="In-text citation">
-            <CitationBox text={inlineCitation} />
-            <CopyButton
-              label="Copy In-Text"
-              onClick={() => void copy(inlineCitation, "In-text citation")}
-            />
-          </Field>
-        </div>
-      </Dialog>
-    </div>
+          <CitationOutput
+            label="Full citation"
+            text={fullCitation}
+            copyLabel="Copy Citation"
+            onCopy={() => void copy(fullCitation, "Citation")}
+          />
+          <CitationOutput
+            label="In-text citation"
+            text={inlineCitation}
+            copyLabel="Copy In-Text"
+            onCopy={() => void copy(inlineCitation, "In-text citation")}
+          />
+        </FieldGroup>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function CitationBox({ text }: { text: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-foreground">
-      {text}
-    </div>
-  );
-}
-
-function CopyButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80"
-    >
-      <Copy className="h-4 w-4" />
-      {label}
-    </button>
-  );
-}
-
-function Dialog({
-  children,
-  onClick,
+function CitationOutput({
+  label,
+  text,
+  copyLabel,
+  onCopy,
 }: {
-  children: React.ReactNode;
-  onClick: (e: React.MouseEvent) => void;
+  label: string;
+  text: string;
+  copyLabel: string;
+  onCopy: () => void;
 }) {
   return (
-    <div
-      className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
-      onClick={onClick}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cite-paper-title"
-    >
-      {children}
-    </div>
+    <Field>
+      <FieldTitle>{label}</FieldTitle>
+      <p className="rounded-lg bg-muted/40 px-4 py-3 text-sm leading-relaxed text-foreground">
+        {text}
+      </p>
+      {/* The wrapper takes Field's full-width child rule, so the button keeps its own width. */}
+      <div>
+        <Button variant="ghost" size="sm" onClick={onCopy}>
+          <Copy data-icon="inline-start" />
+          {copyLabel}
+        </Button>
+      </div>
+    </Field>
   );
 }
