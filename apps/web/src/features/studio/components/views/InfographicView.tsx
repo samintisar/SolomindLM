@@ -1,6 +1,16 @@
-import { RefreshCw } from "lucide-react";
+import { ImageOff } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
+import { Skeleton } from "@/shared/components/ui/skeleton";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { InfographicNote } from "@/shared/types/index";
+import { cn } from "@/shared/utils/cn";
 
 export type InfographicViewControls = {
   download: () => void;
@@ -22,7 +32,11 @@ export const InfographicView: React.FC<InfographicViewProps> = ({
   onFullscreenChange,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  // Keyed by URL so a regenerated image starts blurred again and a past error doesn't stick.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [erroredUrl, setErroredUrl] = useState<string | null>(null);
+  const imageError = erroredUrl !== null && erroredUrl === note.imageUrl;
+  const loaded = loadedUrl !== null && loadedUrl === note.imageUrl;
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -84,11 +98,11 @@ export const InfographicView: React.FC<InfographicViewProps> = ({
   // Loading state
   if (note.status === "generating") {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <div className="w-12 h-12 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        <p className="text-muted-foreground font-serif italic">Generating your infographic...</p>
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+        <Spinner className="size-8" />
+        <p className="italic text-muted-foreground">Generating your infographic…</p>
         {note.metadata?.currentStep && (
-          <p className="text-xs text-muted-foreground">{note.metadata.currentStep}</p>
+          <p className="font-sans text-xs text-muted-foreground">{note.metadata.currentStep}</p>
         )}
       </div>
     );
@@ -97,50 +111,59 @@ export const InfographicView: React.FC<InfographicViewProps> = ({
   // Error state
   if (note.status === "failed" || imageError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <p className="text-lg font-semibold text-foreground mb-2">Infographic Unavailable</p>
-        <p className="text-sm text-muted-foreground">
-          {note.metadata?.error || "The image could not be loaded"}
-        </p>
-      </div>
+      <Empty className="h-full">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ImageOff />
+          </EmptyMedia>
+          <EmptyTitle>Infographic unavailable</EmptyTitle>
+          <EmptyDescription>
+            {note.metadata?.error || "The image could not be loaded"}
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300 ${
-        isFullscreen ? "fixed inset-0 z-50" : ""
-      }`}
+      className={cn(
+        "flex h-full flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300",
+        isFullscreen && "fixed inset-0 z-50"
+      )}
     >
       <div
-        className={`flex-1 flex flex-col items-center justify-center min-h-0 ${isFullscreen ? "p-2" : "p-4 md:p-8"}`}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col items-center justify-center",
+          isFullscreen ? "p-2" : "p-4 md:p-8"
+        )}
       >
         <div
-          className={`relative bg-black overflow-hidden shadow-2xl ${
-            isFullscreen ? "h-full max-h-full" : "max-w-5xl w-full rounded-xl"
-          }`}
+          className={cn(
+            "relative overflow-hidden bg-muted shadow-md",
+            isFullscreen ? "h-full max-h-full" : "w-full max-w-5xl rounded-xl",
+            !loaded && "aspect-video"
+          )}
         >
-          {note.imageUrl && !imageError ? (
+          {!loaded && <Skeleton className="absolute inset-0" />}
+          {note.imageUrl && (
             <img
               src={note.imageUrl}
               alt={note.title || "Infographic"}
-              className="w-full h-full object-contain"
-              onError={() => setImageError(true)}
+              className={cn(
+                "relative size-full object-contain transition duration-700 ease-out motion-reduce:blur-none motion-reduce:scale-100",
+                loaded ? "scale-100 opacity-100 blur-none" : "scale-105 opacity-0 blur-md"
+              )}
+              onLoad={() => setLoadedUrl(note.imageUrl ?? null)}
+              onError={() => setErroredUrl(note.imageUrl ?? null)}
               draggable={false}
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center aspect-video">
-              <div className="text-center p-8">
-                <RefreshCw className="w-8 h-8 text-muted-foreground animate-spin mx-auto mb-4" />
-                <p className="text-muted-foreground">Loading infographic...</p>
-              </div>
-            </div>
           )}
         </div>
 
         {!isFullscreen && note.title && (
-          <h2 className="mt-6 text-xl md:text-2xl font-bold text-center font-serif text-foreground">
+          <h2 className="mt-6 text-center font-display text-xl text-foreground md:text-2xl">
             {note.title}
           </h2>
         )}

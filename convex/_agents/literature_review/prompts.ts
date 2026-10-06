@@ -35,6 +35,22 @@ export const ScreenSinglePaperOutputSchema = z.object({
 
 export type ScreenSinglePaperOutput = z.infer<typeof ScreenSinglePaperOutputSchema>;
 
+/** Bibliographic details read from the first page of an uploaded paper. */
+export const PdfMetadataOutputSchema = z.object({
+  title: z.string(),
+  authors: z.array(z.string()),
+  year: z.number().int().nullable(),
+});
+
+export const PDF_METADATA_SYSTEM_PROMPT =
+  "You read the first page of an academic paper and return its bibliographic details as JSON.";
+
+export const PDF_METADATA_PROMPT = `Read the start of this paper and return its title, its authors (as written, in order) and its publication year.
+Use only what the text states. If the year is not stated, return null. If no authors are listed, return an empty array.
+
+PAPER TEXT:
+{text}`;
+
 /**
  * Schema for data extraction output.
  */
@@ -92,6 +108,7 @@ NUMERIC GROUNDING (mandatory):
 STRUCTURE:
 - Results: organize thematic subsections (### headings). Include a ### Summary of Evidence markdown table with columns: Theme | Key finding | Applicability | Effect direction | Confidence | Supporting studies.
 - Discussion: use ### Principal Findings, ### Comparison With Existing Literature, ### Practical Implications (researchers, developers, practitioners, regulators), ### Strengths and Limitations, ### Gaps and Future Directions.
+- Papers whose Origin says "from the user's notebook" were chosen by the user and included without screening. If one is marked as possibly off-topic, say so under ### Strengths and Limitations and do not overstate its relevance.
 
 MARKDOWN FORMAT (mandatory):
 - Do NOT repeat the section name (Abstract, Introduction, Results, etc.) inside section content — the UI already shows it as the section title.
@@ -218,14 +235,14 @@ PAPER:
 Title: {title}
 Authors: {authors}
 Year: {year}
-Abstract: {abstract}
+{textLabel}: {abstract}
 URL: {url}
 
 EXTRACTION COLUMNS:
 {columns}
 
 For each column, extract the relevant information from the paper.
-Use the abstract and title as your primary sources. If the exact information is not explicitly stated, infer it from context when reasonable (e.g., guess study design from methods described, estimate sample size from participant counts).
+Use the paper text and title above as your primary sources. If the exact information is not explicitly stated, infer it from context when reasonable (e.g., guess study design from methods described, estimate sample size from participant counts).
 Only use "N/A" as a last resort when the information is truly impossible to infer from the available text.
 Keep extractions concise but complete (1-3 sentences per cell).
 
@@ -235,9 +252,9 @@ Respond in the following JSON format exactly. Each key in extractedData MUST be 
 
 Guidelines:
 - Only use "N/A" when the information is completely absent and cannot be reasonably inferred.
-- Do not invent data not present in the paper, but do make reasonable inferences from the abstract and title.
+- Do not invent data not present in the paper, but do make reasonable inferences from the paper text and title.
 - For columns about paper title, citation, or "Paper Title & Year", always set the value to the PAPER title and year shown above (e.g. "Title Here (2024)").
-- For methodology columns (retrieval approach, knowledge source, integration), infer from the abstract when not stated explicitly; prefer a short specific phrase over "N/A".
+- For methodology columns (retrieval approach, knowledge source, integration), infer from the paper text when not stated explicitly; prefer a short specific phrase over "N/A".
 - For numeric values, include units where applicable.
 - For multi-part answers, use semicolons to separate items.
 - Maintain consistency with extraction instructions for each column.

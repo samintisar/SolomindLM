@@ -727,11 +727,15 @@ export default defineSchema({
       v.literal("openalex"),
       v.literal("arxiv"),
       v.literal("semantic_scholar"),
-      v.literal("pubmed")
+      v.literal("pubmed"),
+      /** A paper from the user's notebook in a literature review (#301). */
+      v.literal("notebook")
     ),
     citationCount: v.optional(v.number()),
     abstract: v.optional(v.string()),
     citationKey: v.string(),
+    /** Set for `notebook` citations: the notebook source the paper came from. */
+    documentId: v.optional(v.id("documents")),
   })
     .index("by_paperId", ["paperId"])
     .index("by_citationKey", ["citationKey"]),
@@ -766,6 +770,8 @@ export default defineSchema({
         rowData: v.record(v.string(), v.string()),
         includeReason: v.optional(v.string()),
         isIncluded: v.boolean(),
+        /** A notebook paper that looks off-topic for the question; it is still included (#301). */
+        offTopicReason: v.optional(v.string()),
       })
     ),
     /** Set for chat workflow outputs — excluded from studio sidebar lists. */
@@ -841,6 +847,10 @@ export default defineSchema({
     workflowId: v.string(),
     /** Smart model used for LLM steps (plan, screen, extract, report). */
     smartModel: v.optional(v.string()),
+    /** Selected notebook papers, included without screening (#301). */
+    documentIds: v.optional(v.array(v.id("documents"))),
+    /** "papers_only" skips the database search; default searches as well. */
+    paperScope: v.optional(v.union(v.literal("papers_and_search"), v.literal("papers_only"))),
     searchOptions: v.optional(
       v.object({
         researchDatabase: v.union(v.literal("all"), v.literal("pubmed"), v.literal("arxiv")),
@@ -900,6 +910,8 @@ export default defineSchema({
         recordsScreened: v.optional(v.number()),
         recordsIncluded: v.optional(v.number()),
         recordsExcluded: v.optional(v.number()),
+        recordsFromNotebook: v.optional(v.number()),
+        searchSkipped: v.optional(v.boolean()),
         extractedRowCount: v.optional(v.number()),
         searchCompletedAt: v.optional(v.number()),
         rankCompletedAt: v.optional(v.number()),
@@ -932,6 +944,7 @@ export default defineSchema({
     rowData: v.record(v.string(), v.string()),
     includeReason: v.optional(v.string()),
     isIncluded: v.boolean(),
+    offTopicReason: v.optional(v.string()),
     batchNumber: v.number(),
     createdAt: v.number(),
   })
