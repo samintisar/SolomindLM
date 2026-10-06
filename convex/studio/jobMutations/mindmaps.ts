@@ -68,7 +68,7 @@ export const updateMindMapStatus = internalMutation({
       updatedAt: Date.now(),
     };
     if (args.metadata) {
-      const row = await ctx.db.get(args.mindmapId);
+      const row = await ctx.db.get("mindmaps", args.mindmapId);
       updates.metadata = keepDocumentIds(row?.metadata, args.metadata);
     }
     await ctx.db.patch(args.mindmapId, updates);
@@ -87,7 +87,7 @@ export const markMindMapFailed = internalMutation({
       args.metadata?.phase || "unknown",
       args.metadata
     );
-    const row = await ctx.db.get(args.mindmapId);
+    const row = await ctx.db.get("mindmaps", args.mindmapId);
     await ctx.db.patch(args.mindmapId, {
       status: "failed",
       updatedAt: Date.now(),

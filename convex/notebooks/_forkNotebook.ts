@@ -4,6 +4,23 @@ import type { MutationCtx } from "../_generated/server";
 const MAX_FORK_DOCUMENTS = 200;
 const MAX_FORK_CHUNKS = 10_000;
 
+/** A forked mind map must point at the fork's own copies of its sources, not the original's. */
+function remapMindmapMetadata(
+  metadata: unknown,
+  docIdMap: Map<Id<"documents">, Id<"documents">>
+): unknown {
+  const stored = metadata as Record<string, unknown> | undefined;
+  const documentIds = stored?.documentIds;
+  if (!Array.isArray(documentIds)) return metadata;
+  return {
+    ...stored,
+    documentIds: documentIds.flatMap((id) => {
+      const forked = docIdMap.get(id as Id<"documents">);
+      return forked ? [forked] : [];
+    }),
+  };
+}
+
 /**
  * Deep-copies a notebook into forkUserId's account. Single-transaction helper (not an API).
  */
@@ -180,7 +197,7 @@ export async function performNotebookFork(
       title: r.title,
       data: r.data,
       status: r.status,
-      metadata: r.metadata,
+      metadata: remapMindmapMetadata(r.metadata, docIdMap),
       createdAt: now,
       updatedAt: now,
     });
