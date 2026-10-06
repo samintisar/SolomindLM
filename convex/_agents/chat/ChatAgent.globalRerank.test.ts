@@ -1,4 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// ChatAgent builds its LLM clients on construction; these tests never call them.
+vi.hoisted(() => {
+  process.env.TOGETHER_AI_API_KEY ??= "test-key";
+  process.env.OPENAI_API_KEY ??= "test-key";
+});
+
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { ChatAgent } from "./ChatAgent";
