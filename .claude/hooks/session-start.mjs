@@ -76,7 +76,8 @@ if (process.argv[2] === "install") {
   // SessionStart stdout is added to the agent's context.
   process.stdout.write(
     `node_modules is missing in this checkout, so \`bun install\` is running in the background (log: ${logPath}). ` +
-      `Read and plan freely, but before running any bun/bunx/vitest/tsgo command wait until that log ends with "${DONE_MARKER}". ` +
+      `Read and plan freely, but before running any bun/bunx/vitest/tsgo command wait for the log's last line, "${DONE_MARKER} (exit 0)". ` +
+      "If it reports another exit code or an error, fix the install before running those commands. " +
       "Do not start a second `bun install` while it runs.\n"
   );
 }
