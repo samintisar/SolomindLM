@@ -26,23 +26,49 @@ export function isReferenceListChunk(chunk: SectionedChunk): boolean {
   return REFERENCE_HEADING_LINE.test(firstLine);
 }
 
+/** A Markdown heading on a chunk's first line; any heading other than a reference one ends a list. */
+const ANY_HEADING_LINE = /^\s*#{1,6}\s+\S/;
+
 /**
  * The chunks without their reference lists, in their original order. A document whose every chunk
  * is a reference list (an uploaded bibliography) keeps them all, since that list is its content.
+ *
+ * Chunks with a section title are judged by it. In documents chunked without titles, a chunk that
+ * opens with a reference heading starts the list, and the untitled chunks after it (in chunkIndex
+ * order) stay in it until another heading or a titled chunk.
  */
-export function withoutReferenceLists<T extends SectionedChunk & { documentId: string }>(
-  chunks: T[]
-): T[] {
-  const referenceIds = new Set<T>();
-  const keptPerDocument = new Map<string, number>();
+export function withoutReferenceLists<
+  T extends SectionedChunk & { documentId: string; chunkIndex?: number },
+>(chunks: T[]): T[] {
+  const byDocument = new Map<string, T[]>();
   for (const chunk of chunks) {
-    if (isReferenceListChunk(chunk)) {
-      referenceIds.add(chunk);
-    } else {
-      keptPerDocument.set(chunk.documentId, (keptPerDocument.get(chunk.documentId) ?? 0) + 1);
-    }
+    const list = byDocument.get(chunk.documentId);
+    if (list) list.push(chunk);
+    else byDocument.set(chunk.documentId, [chunk]);
   }
-  return chunks.filter(
-    (chunk) => !referenceIds.has(chunk) || !keptPerDocument.get(chunk.documentId)
-  );
+
+  const references = new Set<T>();
+  const keptPerDocument = new Map<string, number>();
+  for (const [documentId, documentChunks] of byDocument) {
+    const ordered = [...documentChunks].sort((a, b) => (a.chunkIndex ?? 0) - (b.chunkIndex ?? 0));
+    let inUntitledList = false;
+    let kept = 0;
+    for (const chunk of ordered) {
+      let isReference: boolean;
+      if (chunk.sectionTitle?.trim()) {
+        inUntitledList = false;
+        isReference = isReferenceListChunk(chunk);
+      } else {
+        const firstLine = chunk.content.trimStart().split("\n", 1)[0] ?? "";
+        if (REFERENCE_HEADING_LINE.test(firstLine)) inUntitledList = true;
+        else if (ANY_HEADING_LINE.test(firstLine)) inUntitledList = false;
+        isReference = inUntitledList;
+      }
+      if (isReference) references.add(chunk);
+      else kept++;
+    }
+    keptPerDocument.set(documentId, kept);
+  }
+
+  return chunks.filter((chunk) => !references.has(chunk) || !keptPerDocument.get(chunk.documentId));
 }

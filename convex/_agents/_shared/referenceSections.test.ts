@@ -66,6 +66,32 @@ describe("withoutReferenceLists", () => {
     expect(withoutReferenceLists(chunks).map((c) => c.content)).toEqual(["a0", "a2", "b0"]);
   });
 
+  it("drops the untitled citation chunks that follow an untitled reference heading", () => {
+    const untitled = (chunkIndex: number, content: string) => ({
+      documentId: "u",
+      chunkIndex,
+      content,
+    });
+    const chunks = [
+      untitled(0, "Body text about the method."),
+      untitled(1, "## References\n\n[1] A. Author. A paper. 2020."),
+      untitled(2, "[2] B. Author. Another paper. 2021."),
+      untitled(3, "## Appendix A\n\nExtra results."),
+    ];
+
+    expect(withoutReferenceLists(chunks).map((c) => c.chunkIndex)).toEqual([0, 3]);
+  });
+
+  it("follows chunkIndex order, not input order", () => {
+    const chunks = [
+      { documentId: "u", chunkIndex: 2, content: "[2] B. Author. 2021." },
+      { documentId: "u", chunkIndex: 0, content: "Body." },
+      { documentId: "u", chunkIndex: 1, content: "References\n[1] A. Author. 2020." },
+    ];
+
+    expect(withoutReferenceLists(chunks).map((c) => c.chunkIndex)).toEqual([0]);
+  });
+
   it("keeps a document that is nothing but a reference list", () => {
     const chunks = [chunk("bib", 0, "Bibliography"), chunk("bib", 1, "Bibliography")];
 

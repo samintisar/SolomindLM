@@ -17,6 +17,14 @@ describe("spreadsheetTitleSource", () => {
     for (const row of ["Self-RAG", "ReAct", "RAG"]) expect(source).toContain(row);
   });
 
+  it("keeps the table within what the title model reads when the request is long", () => {
+    const source = spreadsheetTitleSource(csv, `Compare these papers ${"in detail ".repeat(200)}`);
+
+    expect(source.length).toBeLessThanOrEqual(500);
+    expect(source).toContain("title, authors, year, method");
+    expect(source).toContain("Self-RAG; ReAct; RAG");
+  });
+
   it("works without a request", () => {
     expect(spreadsheetTitleSource(csv, "")).toContain("Self-RAG; ReAct; RAG");
   });
@@ -25,7 +33,7 @@ describe("spreadsheetTitleSource", () => {
     const big = ['"name","value"', ...Array.from({ length: 500 }, (_, i) => `"Row ${i}","x"`)].join(
       "\n"
     );
-    expect(spreadsheetTitleSource(big, "").length).toBeLessThanOrEqual(2000);
+    expect(spreadsheetTitleSource(big, "").length).toBeLessThanOrEqual(500);
   });
 
   it("returns an empty string for an empty table", () => {
