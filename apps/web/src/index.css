@@ -59,6 +59,12 @@
     --studio-spreadsheet: oklch(0.609 0.126 221.723);
     --studio-note: oklch(0.511 0.262 276.966);
     --studio-literature: oklch(0.646 0.222 41.116);
+    /* Mind map outline main-branch colours, cycled by branchColorVar in features/studio/components/mindmap/outline.ts. */
+    --mindmap-branch-1: oklch(0.6 0.13 30);
+    --mindmap-branch-2: oklch(0.58 0.11 150);
+    --mindmap-branch-3: oklch(0.56 0.12 250);
+    --mindmap-branch-4: oklch(0.62 0.12 75);
+    --mindmap-branch-5: oklch(0.58 0.13 320);
     --destructive-muted: oklch(0.95 0.025 30);
     --destructive-muted-foreground: oklch(0.36 0.09 30);
     --destructive-border: oklch(0.85 0.045 30);
@@ -183,6 +189,11 @@
     --studio-spreadsheet: oklch(0.789 0.154 211.53);
     --studio-note: oklch(0.673 0.182 276.935);
     --studio-literature: oklch(0.75 0.183 55.934);
+    --mindmap-branch-1: oklch(0.72 0.13 30);
+    --mindmap-branch-2: oklch(0.72 0.11 150);
+    --mindmap-branch-3: oklch(0.72 0.12 250);
+    --mindmap-branch-4: oklch(0.72 0.12 75);
+    --mindmap-branch-5: oklch(0.72 0.13 320);
     --destructive-muted: oklch(0.26 0.035 25);
     --destructive-muted-foreground: oklch(0.85 0.06 25);
     --destructive-border: oklch(0.38 0.05 25);
@@ -501,6 +512,7 @@
   --color-studio-spreadsheet: var(--studio-spreadsheet);
   --color-studio-note: var(--studio-note);
   --color-studio-literature: var(--studio-literature);
+  --color-branch: var(--branch);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -1131,46 +1143,6 @@
   background-size: 40px 40px;
 }
 
-/* Mind map: every node is a card on the canvas, on the app's tokens so it follows light and dark */
-.mind-map-container me-tpc,
-.mind-map-container .topic {
-  background-color: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  padding: 8px 14px !important;
-  color: var(--card-foreground) !important;
-}
-
-.mind-map-container me-root > me-tpc,
-.mind-map-container .topic[data-nodeid="root"] {
-  border-radius: calc(var(--radius) * 1.5) !important;
-  font-weight: 600 !important;
-  color: var(--foreground) !important;
-}
-
-/* Mind map: one connector weight; the colour comes from the theme palette (MindMapView) */
-.mind-map-container svg path,
-.mind-map-container .map-canvas path {
-  stroke-width: 1.6px !important;
-}
-
-/* Keep selected links neutral (no blue highlight) */
-.mind-map-container svg path.selected,
-.mind-map-container .map-canvas path.selected {
-  stroke: var(--muted-foreground) !important;
-}
-
-/* Mind map: never show drag selection marquee on left drag */
-.mind-map-container .map-select,
-.mind-map-container .selection-box,
-.mind-map-container .selection-rect,
-.mind-map-container .select-rectangle,
-.mind-map-container .selection-area {
-  display: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
 /* Studio: --studio-tone carries a type colour into decorations (studio-tone-flashcard, …). */
 @utility studio-tone-* {
   --studio-tone: --value(--color-studio-*);
@@ -1229,6 +1201,62 @@
 /* Fades a scrolling transcript out at the top and bottom. */
 @utility reader-fade {
   mask-image: linear-gradient(transparent, #000 18%, #000 75%, transparent);
+}
+
+/* Mind map outline: an open branch's children slide open by animating the grid row to 1fr.
+   A closed group is also visibility:hidden so it is out of the tab order and the accessibility tree;
+   visibility flips at once on open and only after the fade on close. */
+@utility mindmap-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.4s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0.4s;
+
+  &[data-state="open"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  & > * {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* The soft guide line down an open branch, in the branch colour. */
+@utility mindmap-guide {
+  box-shadow: inset 1.5px 0 0 color-mix(in oklch, var(--branch) 32%, transparent);
+}
+
+/* A treeitem holds its row and its whole subtree; its keyboard focus ring goes on the row
+   (its first child) only, so an open branch does not ring everything under it. Inset, because a
+   nested row sits flush against its group's overflow:hidden wrapper, which would clip an outer ring. */
+@utility mindmap-item {
+  &:focus-visible > :first-child {
+    @apply ring-2 ring-ring ring-inset;
+  }
+}
+
+/* A row's brief flash after it asks the chat, in the branch colour. A colour fade, not movement,
+   so it stays under reduced motion: it is the only sign that the topic was asked. */
+@utility mindmap-flash {
+  animation: mindmap-flash 1.2s var(--ease-out);
+}
+
+@keyframes mindmap-flash {
+  from {
+    background-color: color-mix(in oklch, var(--branch) 22%, transparent);
+  }
 }
 
 /* Reduced motion: movement becomes a fade, it does not disappear (spec §1).

@@ -159,7 +159,7 @@ Then line by line:
   widen-migrate-narrow
 - **Authz** — every function that reads/writes user data verifies the caller owns
   the notebook / document / resource
-- **Prompts** — no text tuned to eval fixtures (CLAUDE.md → Prompt authoring)
+- **Prompts** — no text tuned to eval fixtures (AGENTS.md → Prompt authoring)
 
 Comment etiquette: prefix non-blocking notes `nit:`; ask ("what happens if
 `chunks` is empty?") rather than command; approve with open nits if nothing
@@ -246,7 +246,7 @@ The `.github/workflows/ci.yml` runs on:
 
 E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it is not a required check. Phase 3 of the CI/CD deployment plan wires it to run against the Vercel preview deployment.
 
-Deeper suites are not in CI — run them locally when the change warrants (see CLAUDE.md validation gates): `bun run test:e2e` before merging UI flows, `bun run eval:rag --case=… / --runner=…` or `eval:studio` for agent/prompt changes.
+Deeper suites are not in CI — run them locally when the change warrants (see AGENTS.md validation gates): `bun run test:e2e` before merging UI flows, `bun run eval:rag --case … / --runner …` or `eval:studio` for agent/prompt changes.
 
 ## Code quality over time
 
