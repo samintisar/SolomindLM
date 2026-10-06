@@ -14,7 +14,7 @@
     "solomind/soft-surfaces": 15
   },
   "shared": {
-    "shadcn/no-arbitrary-values": 48,
+    "shadcn/no-arbitrary-values": 46,
     "shadcn/no-inline-styles": 1,
     "shadcn/no-restyle": 22,
     "shadcn/require-static-classes": 1

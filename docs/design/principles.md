@@ -17,7 +17,9 @@ primitives (`apps/web/src/shared/components/ui`); feature code places components
 ## Tokens, not `dark:`
 
 Dark mode uses the same ladder. Theme differences live in tokens in `apps/web/src/index.css`
-(`--surface-raised`, `--hairline`, `--overlay`, `--link`), declared for `:root`, `.dark` and `.auth-form-light`.
+(`--surface-raised`, `--surface-selected`, `--hairline`, `--overlay`, `--link`), declared for `:root`, `.dark` and `.auth-form-light`.
+A selected state on a raised control needs a fill that stands off `surface-raised` in both themes: `--accent`
+is darker than `--surface-raised` in dark, so the outline toggle uses `--surface-selected` plus an inset ring.
 Don't reach for `dark:` utilities: in this app they follow the OS setting, not the app's theme.
 
 ## Hierarchy through fill

@@ -14,6 +14,8 @@
     --card: oklch(0.9914 0.0098 87.4695);
     /* Soft-layered surfaces: a raised chip/segment and a faint ring that stands in for a border. */
     --surface-raised: var(--card);
+    /* The chosen segment of a raised option set (outline toggle group): must stand off surface-raised. */
+    --surface-selected: var(--accent);
     --hairline: color-mix(in oklab, var(--border) 50%, transparent);
     --overlay: color-mix(in oklab, var(--foreground) 25%, transparent);
     --link: var(--primary);
@@ -134,6 +136,8 @@
     */
     --card: oklch(0.22 0.008 65);
     --surface-raised: oklch(0.32 0.008 65);
+    /* Lighter than surface-raised (accent, 0.28, is darker and vanishes on it). */
+    --surface-selected: oklch(0.44 0.03 70);
     --hairline: color-mix(in oklab, var(--foreground) 8%, transparent);
     --overlay: color-mix(in oklab, var(--background) 70%, transparent);
     --link: oklch(0.82 0.07 70);
@@ -271,6 +275,7 @@
     --foreground: oklch(0.21 0.01 0);
     --card: oklch(0.9914 0.0098 87.4695);
     --surface-raised: var(--card);
+    --surface-selected: var(--accent);
     --hairline: color-mix(in oklab, var(--border) 50%, transparent);
     --overlay: color-mix(in oklab, var(--foreground) 25%, transparent);
     --link: var(--primary);
@@ -460,6 +465,7 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-selected: var(--surface-selected);
   --color-hairline: var(--hairline);
   --color-overlay: var(--overlay);
   --color-link: var(--link);

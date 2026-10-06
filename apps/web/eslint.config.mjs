@@ -70,7 +70,6 @@ const UPSTREAM_ARBITRARY = [
   "tabs",
   "textarea",
   "toggle-group",
-  "toggle",
   "tooltip",
 ];
 
