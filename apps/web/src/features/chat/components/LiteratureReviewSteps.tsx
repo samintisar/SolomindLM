@@ -210,6 +210,9 @@ function StepStatusIcon({ status }: { status: ResearchStep["status"] }) {
 
 function PrismaCountsSummary({ counts }: { counts: LiteratureReviewStepCounts }) {
   const items: string[] = [];
+  if (counts.recordsFromNotebook != null) {
+    items.push(`${counts.recordsFromNotebook.toLocaleString()} from your notebook`);
+  }
   if (counts.recordsIdentified != null) {
     items.push(`${counts.recordsIdentified.toLocaleString()} identified`);
   }

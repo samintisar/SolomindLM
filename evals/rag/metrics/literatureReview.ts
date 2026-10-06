@@ -45,6 +45,13 @@ function getRaw(artifact: EvalRunArtifact): LiteratureReviewEvalResult | undefin
   return artifact.studioOutput?.raw as LiteratureReviewEvalResult | undefined;
 }
 
+/** "Only your papers" (#301): the review used the user's notebook papers and ran no search. */
+function searchWasSkipped(raw: LiteratureReviewEvalResult | undefined): boolean {
+  return raw?.workflowProvenance?.searchSkipped === true;
+}
+
+const NO_SEARCH_DETAIL = "No database search: the review used only the user's papers.";
+
 /** Normalize text for keyword matching. */
 function normalize(text: string): string {
   return text
@@ -242,6 +249,13 @@ function lrSearchYield(
   const searchQueries = raw?.searchQueries ?? [];
   const found = raw?.counts.found ?? 0;
 
+  if (searchWasSkipped(raw)) {
+    return baseMetric("lr_search_yield", fixture, artifact, "info", 0, NO_SEARCH_DETAIL, {
+      found,
+      queryCount: 0,
+    });
+  }
+
   if (searchQueries.length === 0) {
     return baseMetric(
       "lr_search_yield",
@@ -325,6 +339,12 @@ function lrRankingTopRelevance(
   const ranked = raw?.stagePapers.ranked ?? [];
   const query = fixture.question;
 
+  if (searchWasSkipped(raw)) {
+    return baseMetric("lr_ranking_top_relevance", fixture, artifact, "info", 0, NO_SEARCH_DETAIL, {
+      top5Relevant: 0,
+    });
+  }
+
   if (ranked.length === 0) {
     return baseMetric(
       "lr_ranking_top_relevance",
@@ -371,6 +391,18 @@ function lrScreeningInclusionRate(
   const raw = getRaw(artifact);
   const screened = raw?.counts.screened ?? 0;
   const included = raw?.counts.included ?? 0;
+
+  if (searchWasSkipped(raw)) {
+    return baseMetric(
+      "lr_screening_inclusion_rate",
+      fixture,
+      artifact,
+      "info",
+      0,
+      NO_SEARCH_DETAIL,
+      { screened, included, rate: 0 }
+    );
+  }
 
   if (screened === 0) {
     return baseMetric(
@@ -1020,6 +1052,11 @@ function buildGroundedNumericSetForEval(raw: LiteratureReviewEvalResult): Set<st
     raw.counts.screened,
     raw.counts.included,
     raw.counts.extractedRows,
+    // The user's notebook papers (#301), and the included total the report's PRISMA block prints.
+    prov.recordsFromNotebook,
+    raw.counts.fromNotebook,
+    (prov.recordsIncluded ?? raw.counts.included) +
+      (prov.recordsFromNotebook ?? raw.counts.fromNotebook ?? 0),
   ];
   for (const n of countParts) {
     if (n != null) {
@@ -1105,12 +1142,18 @@ export function lrPrismaConsistency(
   const found = prov?.recordsIdentified ?? raw?.counts.found ?? 0;
   const deduplicated = prov?.recordsAfterDedupe ?? raw?.counts.deduplicated ?? 0;
   const screened = prov?.recordsScreened ?? raw?.counts.screened ?? 0;
-  const included = prov?.recordsIncluded ?? raw?.counts.included ?? 0;
+  // Screening includes search papers only; the user's notebook papers (#301) skip it, and the
+  // report's PRISMA block counts both as included.
+  const includedFromSearch = searchWasSkipped(raw)
+    ? 0
+    : (prov?.recordsIncluded ?? raw?.counts.included ?? 0);
+  const fromNotebook = prov?.recordsFromNotebook ?? raw?.counts.fromNotebook ?? 0;
+  const included = includedFromSearch + fromNotebook;
   const methods =
     raw?.report.sections.find((s) => s.heading.toLowerCase() === "methods")?.content ?? "";
 
   let arithmeticOk = true;
-  if (included > screened) arithmeticOk = false;
+  if (includedFromSearch > screened) arithmeticOk = false;
   if (screened > deduplicated && deduplicated > 0) arithmeticOk = false;
   if (deduplicated > found && found > 0) arithmeticOk = false;
 
@@ -1132,7 +1175,17 @@ export function lrPrismaConsistency(
     arithmeticOk
       ? `PRISMA counts consistent (included=${included}, screened=${screened}).`
       : `PRISMA count ordering violated.`,
-    { found, deduplicated, screened, included, mentionsIncluded, arithmeticOk, provMatchesCounts }
+    {
+      found,
+      deduplicated,
+      screened,
+      included,
+      includedFromSearch,
+      fromNotebook,
+      mentionsIncluded,
+      arithmeticOk,
+      provMatchesCounts,
+    }
   );
 }
 

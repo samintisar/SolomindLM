@@ -1,4 +1,5 @@
 import {
+  BookMarked,
   CirclePlus,
   FileText,
   FlaskConical,
@@ -8,8 +9,11 @@ import {
   PieChart,
   Quote,
   Search,
+  TriangleAlert,
 } from "lucide-react";
-import React from "react";
+import React, { useId } from "react";
+import { Badge } from "@/shared/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import type { TablePaperRow } from "../utils/literatureTablePaper";
 import {
   collectStudyTypeLabels,
@@ -60,6 +64,25 @@ function StudyTypeBadge({ label }: { label: string }) {
   );
 }
 
+/** A notebook paper the screening check judged off-topic; the reason shows on hover and focus. */
+function OffTopicBadge({ reason }: { reason: string }) {
+  const reasonId = useId();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" tabIndex={0} aria-describedby={reasonId}>
+          <TriangleAlert aria-hidden className="text-warning" />
+          Off-topic?
+        </Badge>
+      </TooltipTrigger>
+      <span id={reasonId} className="sr-only">
+        {reason}
+      </span>
+      <TooltipContent className="max-w-72">{reason}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> = ({
   rank,
   paper,
@@ -76,6 +99,8 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
   const studyBadges = collectStudyTypeLabels(paper, columns);
   const pdfHref = citation?.pdfUrl?.trim() || citation?.url;
   const isOpenAccess = Boolean(citation?.pdfUrl?.trim());
+  /** Included from the user's own notebook (#301), so it's already there. */
+  const isNotebookPaper = citation?.sourceApi === "notebook";
 
   return (
     <div className="relative flex gap-3 pr-10">
@@ -98,14 +123,18 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
       <div className="min-w-0 flex-1 space-y-2.5">
         {citation ? (
           <>
-            <a
-              href={citation.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-[15px] font-semibold leading-snug text-foreground hover:text-primary hover:underline"
-            >
-              {title}
-            </a>
+            {citation.url ? (
+              <a
+                href={citation.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-[15px] font-semibold leading-snug text-foreground hover:text-primary hover:underline"
+              >
+                {title}
+              </a>
+            ) : (
+              <p className="text-sm font-semibold leading-snug text-foreground">{title}</p>
+            )}
             <p className="text-sm leading-relaxed text-neutral-500">
               {formatPaperMetaLine(citation)}
             </p>
@@ -122,8 +151,17 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
           </>
         )}
 
-        {studyBadges.length > 0 && (
+        {(studyBadges.length > 0 || isNotebookPaper) && (
           <div className="flex flex-wrap gap-2 pt-0.5">
+            {isNotebookPaper && (
+              <Badge variant="secondary">
+                <BookMarked aria-hidden />
+                Your paper
+              </Badge>
+            )}
+            {isNotebookPaper && paper.offTopicReason && (
+              <OffTopicBadge reason={paper.offTopicReason} />
+            )}
             {studyBadges.map((label) => (
               <StudyTypeBadge key={label} label={label} />
             ))}
@@ -144,19 +182,21 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
             <Quote className="h-4 w-4" strokeWidth={2} />
             <span>Cite</span>
           </button>
-          <button
-            type="button"
-            onClick={onAddToNotebook}
-            disabled={isInNotebook || isAdding || !citation}
-            className="inline-flex items-center gap-1.5 hover:text-foreground disabled:opacity-50"
-          >
-            {isAdding ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CirclePlus className="h-4 w-4" strokeWidth={2} />
-            )}
-            <span>{isInNotebook ? "In notebook" : "Add to notebook"}</span>
-          </button>
+          {!isNotebookPaper && (
+            <button
+              type="button"
+              onClick={onAddToNotebook}
+              disabled={isInNotebook || isAdding || !citation}
+              className="inline-flex items-center gap-1.5 hover:text-foreground disabled:opacity-50"
+            >
+              {isAdding ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CirclePlus className="h-4 w-4" strokeWidth={2} />
+              )}
+              <span>{isInNotebook ? "In notebook" : "Add to notebook"}</span>
+            </button>
+          )}
         </div>
       </div>
 

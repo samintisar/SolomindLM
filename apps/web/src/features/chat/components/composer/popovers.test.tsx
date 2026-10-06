@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { FiltersPopover } from "./FiltersPopover";
+import { PaperScopeMenu } from "./PaperScopeMenu";
 import { ResearchDatabaseMenu } from "./ResearchDatabaseMenu";
 
 describe("ResearchDatabaseMenu", () => {
@@ -285,5 +286,25 @@ describe("FiltersPopover", () => {
     );
     await userEvent.hover(screen.getByRole("button", { name: "Filters" }));
     expect(await screen.findAllByText("Filters · academic filters applied")).not.toHaveLength(0);
+  });
+});
+
+describe("PaperScopeMenu", () => {
+  test("the trigger says how many of the user's papers are used", () => {
+    render(<PaperScopeMenu value="papers_and_search" paperCount={4} onChange={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: "Paper scope: Your 4 papers + search" })
+    ).toBeInTheDocument();
+  });
+
+  test("chooses only the user's papers and closes", async () => {
+    const onChange = vi.fn();
+    render(<PaperScopeMenu value="papers_and_search" paperCount={2} onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Paper scope/ }));
+    const radio = await screen.findByRole("radio", { name: "Only your 2 papers" });
+    expect(radio).toHaveAccessibleDescription("Review just these papers, with no database search");
+    await userEvent.click(radio);
+    expect(onChange).toHaveBeenCalledWith("papers_only");
+    await waitFor(() => expect(screen.queryByRole("radio")).not.toBeInTheDocument());
   });
 });

@@ -1,4 +1,5 @@
 import type { Id } from "../../../convex/_generated/dataModel";
+import type { PaperScope } from "../../../convex/literatureReview/notebookPapers";
 import { computeConfigHash } from "../configHash";
 import type { EvalFixture, EvalRunArtifact, StudioOutput } from "../types";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
@@ -13,7 +14,10 @@ export interface LiteratureReviewEvalResult {
     found: number;
     deduplicated: number;
     screened: number;
+    /** Search papers included by screening. */
     included: number;
+    /** Selected notebook papers, included without screening (#301). Absent in older results. */
+    fromNotebook?: number;
     extractedRows: number;
   };
   stagePapers: {
@@ -106,6 +110,9 @@ export interface LiteratureReviewEvalResult {
     recordsScreened?: number;
     recordsIncluded?: number;
     recordsExcluded?: number;
+    recordsFromNotebook?: number;
+    /** "Only your papers": no database search ran. */
+    searchSkipped?: boolean;
     extractedRowCount?: number;
   };
   latencyMs: number;
@@ -115,6 +122,9 @@ export interface LiteratureReviewInvoker {
   invoke(args: {
     question: string;
     notebookId: Id<"notebooks">;
+    /** Notebook sources to include as papers; the action keeps only PDFs and saved papers. */
+    documentIds?: Id<"documents">[];
+    paperScope?: PaperScope;
   }): Promise<LiteratureReviewEvalResult>;
 }
 
@@ -155,6 +165,7 @@ function serializeLiteratureReview(result: LiteratureReviewEvalResult): string {
     "",
     `Found: ${result.counts.found}`,
     `Included: ${result.counts.included}`,
+    ...(result.counts.fromNotebook ? [`From your notebook: ${result.counts.fromNotebook}`] : []),
     "",
     result.table.columns.map((c) => c.name).join(" | "),
     ...result.table.papers.map((paper) =>
@@ -193,9 +204,14 @@ export async function runLiteratureReviewEval(
 
   const errors: string[] = [];
   try {
+    const paperScope = fixture.studioParams?.paperScope;
     const result = await invoker.invoke({
       question: fixture.question,
       notebookId: fixture.notebookId as Id<"notebooks">,
+      ...(fixture.documentIds?.length
+        ? { documentIds: fixture.documentIds as Id<"documents">[] }
+        : {}),
+      ...(paperScope ? { paperScope } : {}),
     });
 
     const answer = serializeLiteratureReview(result);

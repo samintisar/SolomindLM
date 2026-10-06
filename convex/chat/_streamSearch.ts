@@ -3,6 +3,7 @@
 import type { HybridSearchConfig, KeywordSearchRunner } from "../_agents/chat/hybrid_search.js";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
+import type { ChatAgentOptions } from "../_agents/chat/types.js";
 import type { RerankFunction, VectorSearchRunner } from "../_agents/chat/vector_search.js";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -83,6 +84,29 @@ export function createKeywordSearchRunner(
 export function createRerankFn(ctx: ActionCtx): RerankFunction {
   return async (query, documents) => {
     return cachedRerank(ctx, query, documents as RerankDocument[], documents.length);
+  };
+}
+
+/** Loads a document's full text (its chunks in order) for chat's full-document expansion. */
+export function createFetchDocumentFn(
+  ctx: ActionCtx
+): NonNullable<ChatAgentOptions["fetchDocumentFn"]> {
+  return async (documentId: string) => {
+    const chunks = await ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
+      documentId: documentId as Id<"documents">,
+    });
+    if (!chunks || chunks.length === 0) return null;
+
+    const sortedChunks = chunks.sort(
+      (a: { chunkIndex: number }, b: { chunkIndex: number }) => a.chunkIndex - b.chunkIndex
+    );
+    const content = sortedChunks.map((c: { content: string }) => c.content).join("\n\n");
+
+    return {
+      documentId: documentId as Id<"documents">,
+      content,
+      chunkCount: chunks.length,
+    };
   };
 }
 

@@ -4,8 +4,9 @@ import type { EvalFixture } from "../../types";
  * Researchers pack fixtures. Requests are phrased the way a researcher working
  * through a set of papers would ask. Questions about one paper scope to it with
  * `studioParams.documentTitleHint` (like ticking one source in the app);
- * synthesis requests use every paper. The literature review fixture searches
- * external databases, so it is judged on structure only. Notebook and document
+ * synthesis requests use every paper. The literature review fixture includes all
+ * four papers and searches external databases as well (#301), so it should cite
+ * both; each pack paper is checked by its first author or cohort name. Notebook and document
  * ids are filled in at run time from the seeded "Researchers" notebook, so they
  * are never set here.
  *
@@ -150,6 +151,23 @@ export const researchersFixtures: EvalFixture[] = [
   },
   {
     ...base,
+    id: "researchers/chat-each-paper-activity-measure",
+    split: "train",
+    runner: "chat",
+    question: "How did each of my four papers measure physical activity?",
+    // One term per paper, so the answer only passes if every selected source contributed.
+    expectedItems: ["mMET", "IPAQ", "acceleromet", "GPAQ"],
+    expectedAnswer:
+      "Pearce 2022 harmonised the cohorts' self-reported activity into marginal MET-hours per week (mMET-h/wk); " +
+      "Laird 2023 (TILDA) used the self-reported IPAQ; Lambert 2018 (eMotion) used accelerometers alongside " +
+      "self-report; Rutherford 2022 (NHANES) used the self-reported GPAQ, split into work, travel and leisure domains.",
+    expectedBehavior:
+      "Covers all four papers, one measure per paper attributed to the right study, and says nothing is missing " +
+      "for any of them.",
+    tags: tags("chat", "synthesis", "multi-source"),
+  },
+  {
+    ...base,
     id: "researchers/spreadsheet-meta-analysis-risk",
     split: "train",
     runner: "spreadsheet",
@@ -213,10 +231,20 @@ export const researchersFixtures: EvalFixture[] = [
     runner: "literatureReview",
     question:
       "What is the dose-response relationship between physical activity and depression in adults?",
-    expectedItems: ["depression", "physical activity"],
+    // One entry per pack paper (any of its words counts): the review must include and cite all four.
+    // Terms a search-only review also produces ("NHANES"; "Laird" is a co-author of Pearce) are avoided.
+    expectedItems: [
+      "depression",
+      "physical activity",
+      "Pearce",
+      "TILDA Irish",
+      "Lambert",
+      "Rutherford",
+    ],
     expectedBehavior:
-      "Searches academic databases, screens relevant papers, extracts a table and writes a structured narrative " +
-      "review that cites the papers it includes.",
+      "Includes the four papers from the notebook without screening them out, adds papers found by searching " +
+      "academic databases, extracts a table and writes a structured narrative review that cites both the " +
+      "notebook papers and the search results it includes.",
     expectedStructure: {
       minItems: 1,
       requiredSections: ["Introduction", "Methods", "Results", "Discussion", "Conclusion"],

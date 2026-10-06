@@ -5,7 +5,22 @@ export interface PrismaFlowCounts {
   recordsAfterDedupe?: number;
   recordsScreened?: number;
   recordsExcluded?: number;
+  /** Search papers included after screening; notebook papers are counted separately. */
   recordsIncluded?: number;
+  /** The user's selected notebook papers, included without screening (#301). */
+  recordsFromNotebook?: number;
+  /** "Only your papers": no database search ran. */
+  searchSkipped?: boolean;
+}
+
+/** Whether a run has counts to draw: a database search, or a papers-only review. */
+export function hasPrismaCounts(counts: PrismaFlowCounts): boolean {
+  if (counts.searchSkipped) return counts.recordsFromNotebook != null;
+  return (
+    counts.recordsIdentified != null ||
+    counts.recordsAfterDedupe != null ||
+    counts.recordsScreened != null
+  );
 }
 
 interface PrismaFlowDiagramProps {
@@ -21,10 +36,26 @@ export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, cl
   const deduped = counts.recordsAfterDedupe ?? identified;
   const screened = counts.recordsScreened ?? deduped;
   const excluded = counts.recordsExcluded ?? 0;
-  const included = counts.recordsIncluded ?? 0;
+  const fromNotebook = counts.recordsFromNotebook ?? 0;
+  const includedFromSearch = counts.searchSkipped ? 0 : (counts.recordsIncluded ?? 0);
+  const included = includedFromSearch + fromNotebook;
 
-  if (identified == null && deduped == null && screened == null) {
+  if (!hasPrismaCounts(counts)) {
     return null;
+  }
+
+  if (counts.searchSkipped) {
+    return (
+      <div className={`rounded-lg border border-border bg-muted/30 p-4 text-sm ${className}`}>
+        <p className="mb-1 font-semibold text-foreground">PRISMA flow</p>
+        <p className="mb-3 text-xs text-muted-foreground">No database search</p>
+        <div className="flex flex-col items-center gap-2">
+          <FlowBox label="From your notebook" value={fromNotebook} variant="blue" />
+          <Arrow />
+          <FlowBox label="Studies included" value={included} variant="green" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -43,6 +74,15 @@ export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, cl
           </div>
         </div>
         <Arrow />
+        {fromNotebook > 0 ? (
+          <>
+            <div className="flex w-full max-w-md flex-wrap items-start justify-center gap-4">
+              <FlowBox label="Included from search" value={includedFromSearch} variant="purple" />
+              <FlowBox label="From your notebook" value={fromNotebook} variant="blue" />
+            </div>
+            <Arrow />
+          </>
+        ) : null}
         <FlowBox label="Studies included" value={included} variant="green" />
       </div>
     </div>

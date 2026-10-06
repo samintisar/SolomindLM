@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TableColumn } from "../components/ColumnManager";
 import {
   collectStudyTypeLabels,
+  formatPaperMetaLine,
   getStudyTypePillStyle,
   inferStudyTypeLabel,
 } from "./literatureTablePaper";
@@ -98,5 +99,17 @@ describe("getStudyTypePillStyle", () => {
     expect(getStudyTypePillStyle("Literature Review").icon).toBe("literature");
     expect(getStudyTypePillStyle("Systematic Review").icon).toBe("systematic");
     expect(getStudyTypePillStyle("Empirical study").icon).toBe("empirical");
+  });
+});
+
+describe("formatPaperMetaLine", () => {
+  it("names the user's notebook as the source of a notebook paper", () => {
+    expect(formatPaperMetaLine({ ...basePaper.citation, sourceApi: "notebook", year: 2021 })).toBe(
+      "Your notebook · 2021"
+    );
+  });
+
+  it("names OpenAlex", () => {
+    expect(formatPaperMetaLine({ ...basePaper.citation, sourceApi: "openalex" })).toBe("OpenAlex");
   });
 });

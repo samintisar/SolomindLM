@@ -62,6 +62,8 @@ interface StudioParams {
   smartLlm?: string;
   /** When set, eval resolves only notebook documents whose fileName contains this substring */
   documentTitleHint?: string;
+  /** Literature review: include the fixture's documents with a search (default) or alone (#301) */
+  paperScope?: "papers_and_search" | "papers_only";
 }
 
 /**
@@ -154,6 +156,11 @@ export interface ChunkSnapshot {
   sourceTitle: string;
   sourceUrl?: string;
   content: string;
+  /**
+   * The passage as the chat model saw it (citation markers stripped, neighbouring passages'
+   * previews around it). Judges score against this, since the model may use preview text.
+   */
+  contextText?: string;
   similarity?: number;
   rrfScore?: number;
   vectorRank?: number;
