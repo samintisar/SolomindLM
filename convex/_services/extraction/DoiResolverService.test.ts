@@ -428,6 +428,27 @@ describe("DoiResolverService", () => {
       await assertion;
     });
 
+    it("does not ask for a retry when a registry rejects the request outright", async () => {
+      routeFetch({ "api.crossref.org": { status: 400, body: "Bad Request" } });
+
+      const err = await service.resolve("10.1234/whatever").catch((e) => e);
+
+      expect(err).toBeInstanceOf(ExternalServiceError);
+      expect(err.retryable).toBe(false);
+      expect(err.data.detail).not.toMatch(/try again/i);
+    });
+
+    it("asks for a retry when the registry is down", async () => {
+      routeFetch({ "api.crossref.org": { status: 503, body: "Service Unavailable" } });
+
+      const pending = service.resolve("10.1234/whatever").catch((e) => e);
+      await vi.runAllTimersAsync();
+      const err = await pending;
+
+      expect(err.retryable).toBe(true);
+      expect(err.data.detail).toMatch(/try again/i);
+    });
+
     it("uses DataCite when Crossref is down but DataCite has the DOI", async () => {
       routeFetch({
         "api.crossref.org": { status: 503, body: "Service Unavailable" },

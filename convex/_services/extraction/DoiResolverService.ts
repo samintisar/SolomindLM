@@ -208,13 +208,16 @@ export class DoiResolverService {
 
   /** Asks each registry in turn; the first that has the DOI wins. */
   private async lookupMetadata(doi: string, registries: Registry[]): Promise<WorkMetadata | null> {
-    const unreachable: string[] = [];
+    const failed: string[] = [];
+    let anyRetryable = false;
     for (const registry of registries) {
       try {
         const metadata = await registry.lookup(doi);
         if (metadata) return metadata;
       } catch (error) {
-        unreachable.push(registry.name);
+        failed.push(registry.name);
+        // Errors that are not ExternalServiceError (network failures) are worth retrying.
+        anyRetryable ||= !(error instanceof ExternalServiceError) || error.retryable;
         this.logger.error("DOI registry lookup failed", {
           doi,
           registry: registry.name,
@@ -222,13 +225,15 @@ export class DoiResolverService {
         });
       }
     }
-    if (unreachable.length > 0) {
+    if (failed.length > 0) {
       throw new ExternalServiceError(
-        unreachable.join("+"),
-        `DOI lookup failed: ${unreachable.join(", ")} unreachable`,
+        failed.join("+"),
+        `DOI lookup failed: ${failed.join(", ")} ${anyRetryable ? "unreachable" : "rejected the request"}`,
         {
-          retryable: true,
-          detail: "Couldn't reach the DOI registry to look this paper up. Try again in a minute.",
+          retryable: anyRetryable,
+          detail: anyRetryable
+            ? "Couldn't reach the DOI registry to look this paper up. Try again in a minute."
+            : "The DOI registry couldn't look this paper up. Check the DOI, or add the paper manually.",
         }
       );
     }
