@@ -88,6 +88,7 @@ describe("mapDatabaseNoteToNote", () => {
       data: { topic: "My Map", id: "root", children: [] },
       metadata: { documentIds: ["doc1", 7, "doc2"] },
     });
+    expect(result.type).toBe("mindmap");
     if (result.type === "mindmap") {
       expect(result.metadata?.documentIds).toEqual(["doc1", "doc2"]);
     }
@@ -99,6 +100,7 @@ describe("mapDatabaseNoteToNote", () => {
       _type: "mindmap",
       data: { topic: "My Map", id: "root", children: [] },
     });
+    expect(result.type).toBe("mindmap");
     if (result.type === "mindmap") {
       expect(result.metadata?.documentIds).toBeUndefined();
     }

@@ -224,7 +224,6 @@ export function NotebookView() {
     );
   }, [
     activeLiteratureView,
-
     handleAskInChat,
     handleCloseLiteratureView,
     handleOpenSavedReport,
