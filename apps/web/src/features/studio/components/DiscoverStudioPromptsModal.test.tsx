@@ -117,6 +117,47 @@ describe("DiscoverStudioPromptsModal", () => {
     expect(within(dialog).getByText("Report this prompt?")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Confirm" }));
     expect(api.reportPrompt).toHaveBeenCalledWith("p1");
+    await waitFor(() => expect(api.success).toHaveBeenCalledWith("Prompt reported"));
+  });
+
+  it("shows the error when saving a prompt fails", async () => {
+    const user = userEvent.setup();
+    api.savePrompt.mockRejectedValueOnce(new Error("Already in your library"));
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(api.savePrompt).toHaveBeenCalledWith("p1");
+    await waitFor(() => expect(api.error).toHaveBeenCalledWith("Already in your library"));
+    expect(api.success).not.toHaveBeenCalled();
+  });
+
+  it("trims the search, and spaces alone search for nothing", async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    const search = within(dialog).getByPlaceholderText("Search prompts...");
+    await user.type(search, "  exam ");
+    expect(api.usePublicPrompts).toHaveBeenLastCalledWith("flashcards", "saves", "exam");
+    await user.clear(search);
+    await user.type(search, "   ");
+    expect(api.usePublicPrompts).toHaveBeenLastCalledWith("flashcards", "saves", undefined);
+  });
+
+  it("starts each open on the Public tab with an empty search", async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    let dialog = await openLibrary(user);
+    await user.type(within(dialog).getByPlaceholderText("Search prompts..."), "exam");
+    await user.click(within(dialog).getByTestId("discover-prompts-tab-my"));
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    dialog = await openLibrary(user);
+    expect(within(dialog).getByTestId("discover-prompts-tab-public")).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(within(dialog).getByPlaceholderText("Search prompts...")).toHaveValue("");
   });
 
   it("asks the query again when the sort changes", async () => {
@@ -162,5 +203,45 @@ describe("DiscoverStudioPromptsModal", () => {
     );
     expect(api.deletePrompt).toHaveBeenCalledWith("m1");
     await waitFor(() => expect(api.success).toHaveBeenCalledWith("Prompt deleted"));
+  });
+
+  it("Cancel returns focus to the row's delete button", async () => {
+    const user = userEvent.setup();
+    api.myPage = [{ ...PROMPT, _id: "m1", title: "My drill", visibility: "private" }];
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    await user.click(within(dialog).getByTestId("discover-prompts-tab-my"));
+    const trash = within(dialog).getByRole("button", { name: "Delete prompt" });
+    await user.click(trash);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(trash).toHaveFocus());
+  });
+
+  it("after a delete, focus moves to the next prompt's delete button", async () => {
+    const user = userEvent.setup();
+    api.myPage = [
+      { ...PROMPT, _id: "m1", title: "My drill", visibility: "private" },
+      { ...PROMPT, _id: "m2", title: "My summary", visibility: "private" },
+    ];
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    await user.click(within(dialog).getByTestId("discover-prompts-tab-my"));
+    const [first, second] = within(dialog).getAllByRole("button", { name: "Delete prompt" });
+    await user.click(first);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(api.deletePrompt).toHaveBeenCalledWith("m1");
+    await waitFor(() => expect(second).toHaveFocus());
+  });
+
+  it("after deleting the only prompt, focus moves to the My Prompts tab", async () => {
+    const user = userEvent.setup();
+    api.myPage = [{ ...PROMPT, _id: "m1", title: "My drill", visibility: "private" }];
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    const myTab = within(dialog).getByTestId("discover-prompts-tab-my");
+    await user.click(myTab);
+    await user.click(within(dialog).getByRole("button", { name: "Delete prompt" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(myTab).toHaveFocus());
   });
 });

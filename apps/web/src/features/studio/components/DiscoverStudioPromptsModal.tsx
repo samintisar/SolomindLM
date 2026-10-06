@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/shared/components/ui/alert-dialog";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -146,6 +145,7 @@ function PromptLibrary({
   const [tab, setTab] = useState<"public" | "my">("public");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<PromptSortBy>("saves");
+  const myTabRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Tabs
@@ -158,7 +158,7 @@ function PromptLibrary({
           <Library />
           Public
         </TabsTrigger>
-        <TabsTrigger value="my" data-testid="discover-prompts-tab-my">
+        <TabsTrigger value="my" data-testid="discover-prompts-tab-my" ref={myTabRef}>
           <Bookmark />
           My Prompts
         </TabsTrigger>
@@ -202,7 +202,7 @@ function PromptLibrary({
       </TabsContent>
       <TabsContent value="my" className="min-h-0 overflow-y-auto">
         <div className="px-6 pt-1 pb-6">
-          <MyPromptsList studioTool={studioTool} onApply={onApply} />
+          <MyPromptsList studioTool={studioTool} onApply={onApply} tabRef={myTabRef} />
         </div>
       </TabsContent>
     </Tabs>
@@ -413,7 +413,9 @@ function PublicPromptCard({
   return (
     <Item variant="outline">
       <ItemContent>
-        <ItemTitle>{prompt.title}</ItemTitle>
+        <ItemTitle>
+          <span className="line-clamp-1">{prompt.title}</span>
+        </ItemTitle>
         {prompt.description && <ItemDescription>{prompt.description}</ItemDescription>}
         <PromptPreview text={prompt.promptText} />
       </ItemContent>
@@ -425,15 +427,26 @@ function PublicPromptCard({
 function MyPromptsList({
   studioTool,
   onApply,
+  tabRef,
 }: {
   studioTool: StudioTool;
   onApply: (promptText: string) => void;
+  /** The My Prompts tab: where focus lands after deleting the last prompt. */
+  tabRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const result = useMyPrompts(studioTool);
   const publishPrompt = usePublishPrompt();
   const unpublishPrompt = useUnpublishPrompt();
   const deletePrompt = useDeletePrompt();
   const run = usePromptAction();
+  // One confirmation for the whole list. `pendingDelete` outlives `confirmOpen` so the title stays
+  // put while the dialog animates out.
+  const [pendingDelete, setPendingDelete] = useState<PublicPrompt | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteButtons = useRef(new Map<string, HTMLButtonElement>());
+  // Where focus goes when the confirmation closes: the row's delete button on Cancel; after a
+  // delete (whose row is about to go), the next row's delete button, or the tab.
+  const returnFocusTo = useRef<HTMLElement | null>(null);
 
   if (result === undefined) return <LoadingPrompts label="Loading your prompts..." />;
   const prompts = (result.page as PublicPrompt[] | undefined) ?? [];
@@ -451,90 +464,111 @@ function MyPromptsList({
     );
   }
   return (
-    <ul className="flex flex-col gap-3">
-      {prompts.map((prompt) => (
-        <li key={prompt._id}>
-          <Item variant="outline">
-            <ItemContent>
-              <ItemTitle>
-                {prompt.title}
-                {prompt.visibility === "public" && <Badge variant="secondary">Public</Badge>}
-                {prompt.sourcePromptId && <Badge variant="outline">Saved copy</Badge>}
-              </ItemTitle>
-              <PromptPreview text={prompt.promptText} />
-            </ItemContent>
-            <ItemFooter>
-              <ItemActions>
-                <Button variant="secondary" size="xs" onClick={() => onApply(prompt.promptText)}>
-                  Use
-                </Button>
-                {prompt.visibility === "private" ? (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() =>
-                      void run(
-                        () => publishPrompt(prompt._id),
-                        "Prompt published",
-                        "Failed to publish"
-                      )
-                    }
-                  >
-                    <Eye data-icon="inline-start" />
-                    Publish
+    <>
+      <ul className="flex flex-col gap-3">
+        {prompts.map((prompt) => (
+          <li key={prompt._id}>
+            <Item variant="outline">
+              <ItemContent>
+                <ItemTitle>
+                  <span className="line-clamp-1">{prompt.title}</span>
+                  {prompt.visibility === "public" && <Badge variant="secondary">Public</Badge>}
+                  {prompt.sourcePromptId && <Badge variant="outline">Saved copy</Badge>}
+                </ItemTitle>
+                <PromptPreview text={prompt.promptText} />
+              </ItemContent>
+              <ItemFooter>
+                <ItemActions>
+                  <Button variant="secondary" size="xs" onClick={() => onApply(prompt.promptText)}>
+                    Use
                   </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() =>
-                      void run(
-                        () => unpublishPrompt(prompt._id),
-                        "Prompt unpublished",
-                        "Failed to unpublish"
-                      )
-                    }
-                  >
-                    <EyeOff data-icon="inline-start" />
-                    Unpublish
-                  </Button>
-                )}
-              </ItemActions>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost-destructive" size="icon-sm" aria-label="Delete prompt">
-                    <Trash2 />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this prompt?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      &ldquo;{prompt.title}&rdquo; is removed from your library. This can&apos;t be
-                      undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
+                  {prompt.visibility === "private" ? (
+                    <Button
+                      variant="ghost"
+                      size="xs"
                       onClick={() =>
                         void run(
-                          () => deletePrompt(prompt._id),
-                          "Prompt deleted",
-                          "Failed to delete"
+                          () => publishPrompt(prompt._id),
+                          "Prompt published",
+                          "Failed to publish"
                         )
                       }
                     >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </ItemFooter>
-          </Item>
-        </li>
-      ))}
-    </ul>
+                      <Eye data-icon="inline-start" />
+                      Publish
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        void run(
+                          () => unpublishPrompt(prompt._id),
+                          "Prompt unpublished",
+                          "Failed to unpublish"
+                        )
+                      }
+                    >
+                      <EyeOff data-icon="inline-start" />
+                      Unpublish
+                    </Button>
+                  )}
+                </ItemActions>
+                <Button
+                  ref={(el) => {
+                    if (el) deleteButtons.current.set(prompt._id, el);
+                    else deleteButtons.current.delete(prompt._id);
+                  }}
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  aria-label="Delete prompt"
+                  onClick={(e) => {
+                    returnFocusTo.current = e.currentTarget;
+                    setPendingDelete(prompt);
+                    setConfirmOpen(true);
+                  }}
+                >
+                  <Trash2 />
+                </Button>
+              </ItemFooter>
+            </Item>
+          </li>
+        ))}
+      </ul>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        {/* No `theme`: the only light context is the auth-page preview, which hides the library. */}
+        <AlertDialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            returnFocusTo.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this prompt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{pendingDelete?.title}&rdquo; is removed from your library. This can&apos;t be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (!pendingDelete) return;
+                const index = prompts.findIndex((p) => p._id === pendingDelete._id);
+                const neighbour = prompts[index + 1] ?? prompts[index - 1];
+                returnFocusTo.current =
+                  (neighbour && deleteButtons.current.get(neighbour._id)) ?? tabRef.current;
+                const id = pendingDelete._id;
+                void run(() => deletePrompt(id), "Prompt deleted", "Failed to delete");
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
