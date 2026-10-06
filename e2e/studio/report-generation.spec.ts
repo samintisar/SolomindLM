@@ -19,7 +19,10 @@ test.describe("Report Generation", () => {
       timeout: 15_000,
     });
 
-    await page.getByRole("heading", { level: 4, name: "Summary" }).click();
+    await page
+      .getByRole("dialog", { name: /create report/i })
+      .getByRole("button", { name: "Summary", exact: true })
+      .click();
 
     // Do not key off the list title: Convex replaces the placeholder title with an LLM title when done,
     // which would detach title-based locators and stall until timeout.
@@ -36,7 +39,10 @@ test.describe("Report Generation", () => {
     await expect(page.getByRole("heading", { name: /create report/i })).toBeVisible({
       timeout: 15_000,
     });
-    await page.getByRole("heading", { level: 4, name: "Summary" }).click();
+    await page
+      .getByRole("dialog", { name: /create report/i })
+      .getByRole("button", { name: "Summary", exact: true })
+      .click();
 
     await expect(page.getByRole("alertdialog")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/no sources selected/i)).toBeVisible();
