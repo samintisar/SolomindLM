@@ -25,6 +25,15 @@ export const MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT = 4000;
 /** Cap on the extra tokens multi-source questions add (8000 base → at most 20000). */
 export const MULTI_SOURCE_MAX_EXTRA_TOKENS = 12000;
 
+/**
+ * Tokens for whole neighbouring passages added beside selected ones, so text the model would
+ * only see as a neighbour preview can be cited (and a reader opening the citation sees it).
+ */
+export const NEIGHBOUR_PASSAGE_TOKEN_BUDGET = 2000;
+
+/** Most neighbouring passages added to one answer's context. */
+export const MAX_NEIGHBOUR_PASSAGES = 8;
+
 /** Max chunks passed to the LLM for list/enumeration questions after global rerank. */
 export const LIST_QUERY_MAX_SELECTED_CHUNKS = 24;
 

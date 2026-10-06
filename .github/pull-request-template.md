@@ -43,4 +43,4 @@ Closes #<!-- issue -->
 - [ ] Errors surface to the user — no silent catches or fallbacks
 - [ ] UI follows docs/design/principles.md; `bun run lint:design` passes with no new `solomind/soft-surfaces` findings
 - [ ] Convex functions validate all args and have indexes for new query patterns
-- [ ] No prompt text tuned to eval fixtures (see CLAUDE.md → Prompt authoring)
+- [ ] No prompt text tuned to eval fixtures (see AGENTS.md → Prompt authoring)

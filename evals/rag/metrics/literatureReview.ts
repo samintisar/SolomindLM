@@ -1157,7 +1157,12 @@ export function lrPrismaConsistency(
   if (screened > deduplicated && deduplicated > 0) arithmeticOk = false;
   if (deduplicated > found && found > 0) arithmeticOk = false;
 
-  const mentionsIncluded = methods.includes(String(included));
+  // The whole number, so a small count isn't found inside a year, a scale name, a hyphenated
+  // phrase or a comma-grouped number ("2014", "PHQ-4", "4-year", "4,000").
+  const methodsWithoutGrouping = methods.replace(/(?<=\d),(?=\d{3}(?!\d))/g, "");
+  const mentionsIncluded = new RegExp(String.raw`(?<![\d.-])${included}(?![\d.-])`).test(
+    methodsWithoutGrouping
+  );
   const provMatchesCounts =
     prov?.recordsIncluded == null || prov.recordsIncluded === (raw?.counts.included ?? 0);
   const score =

@@ -58,6 +58,8 @@ export interface ReferenceChunk {
   content: string;
   chunkIndex: number;
   similarity?: number;
+  /** Retrieval metadata. The previews are the neighbouring passages' edges the answer also saw. */
+  metadata?: { previousChunkPreview?: string | null; nextChunkPreview?: string | null };
 }
 
 export interface MessageToolCall {
