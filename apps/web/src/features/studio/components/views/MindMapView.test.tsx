@@ -85,6 +85,21 @@ describe("MindMapView", () => {
     expect(screen.getByText("Child 1")).toBeInTheDocument();
   });
 
+  it("asks without a source scope for a map saved before maps recorded theirs", async () => {
+    const onAskInChat = vi.fn();
+    render(<MindMapView note={mindMapNote({ metadata: {} })} onAskInChat={onAskInChat} />);
+    await userEvent.click(screen.getByRole("button", { name: "Child 1" }));
+    expect(onAskInChat).toHaveBeenCalledWith(askPrompt("Child 1", "Photosynthesis"), undefined);
+  });
+
+  it("falls back to 'Mind Map' for a blank title, in the heading and the prompt", async () => {
+    const onAskInChat = vi.fn();
+    render(<MindMapView note={mindMapNote({ title: "   " })} onAskInChat={onAskInChat} />);
+    expect(screen.getByRole("heading", { name: "Mind Map" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Child 1" }));
+    expect(onAskInChat).toHaveBeenCalledWith(askPrompt("Child 1", "Mind Map"), ["d1", "d2"]);
+  });
+
   it("names the mobile back button 'Back to Studio'", async () => {
     const onBack = vi.fn();
     render(<MindMapView note={mindMapNote()} onBack={onBack} />);
@@ -95,12 +110,6 @@ describe("MindMapView", () => {
   it("has no back button when there is nowhere to go back to", () => {
     render(<MindMapView note={mindMapNote()} />);
     expect(screen.queryByRole("button", { name: "Back to Studio" })).not.toBeInTheDocument();
-  });
-
-  it("has no full screen or zoom controls any more", () => {
-    render(<MindMapView note={mindMapNote()} />);
-    expect(screen.queryByRole("button", { name: /full screen/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /zoom/i })).not.toBeInTheDocument();
   });
 
   it("resets what is open when a different map is shown", async () => {

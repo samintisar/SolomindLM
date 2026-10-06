@@ -28,10 +28,13 @@ function errorMessage(error: unknown): string {
 /** A mind map note as a collapsible outline; clicking a topic asks the notebook chat about it. */
 export const MindMapView: React.FC<MindMapViewProps> = ({ note, onBack, onAskInChat }) => {
   const { isChatStreaming, remoteGenerationBlocksSend } = useChatStreamingContext();
-  const nodeData = note.mindMapData?.nodeData;
+  const title = note.title?.trim() || "Mind Map";
+  // `content` is the stored map serialised, so it only changes when the map does. The note is
+  // mapped afresh on every render, which makes `mindMapData` a new object each time.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on `content`, see above
   const root = useMemo(
-    () => sanitizeNodeTree(nodeData, note.title?.trim() || "Mind Map", true),
-    [nodeData, note.title]
+    () => sanitizeNodeTree(note.mindMapData?.nodeData, title, true),
+    [note.content, title]
   );
 
   if (note.status === "failed") {
@@ -96,7 +99,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, onBack, onAskInC
       <div className="min-h-0 flex-1 overflow-y-auto">
         <MindMapOutline
           key={note.id}
-          title={note.title}
+          title={title}
           root={root}
           onAsk={
             onAskInChat ? (prompt) => onAskInChat(prompt, note.metadata?.documentIds) : undefined
