@@ -52,5 +52,25 @@ describe("OptionToggleGroup", () => {
     );
     await userEvent.click(screen.getByRole("radio", { name: "Standard" }));
     expect(onValueChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("radio", { name: "Standard" })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("works from the keyboard: Tab to the chosen option, Arrow to the next, Space to pick it", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <OptionToggleGroup
+        label="Number of questions"
+        value="standard"
+        options={COUNT_OPTIONS}
+        onValueChange={onValueChange}
+      />
+    );
+    await user.tab();
+    expect(screen.getByRole("radio", { name: "Standard" })).toHaveFocus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("radio", { name: "More" })).toHaveFocus();
+    await user.keyboard(" ");
+    expect(onValueChange).toHaveBeenCalledWith("more");
   });
 });

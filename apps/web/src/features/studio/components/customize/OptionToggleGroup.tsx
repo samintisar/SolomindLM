@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { FieldLegend, FieldSet } from "@/shared/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import type { ToggleOption } from "./options";
@@ -16,13 +17,16 @@ export function OptionToggleGroup<T extends string>({
   options,
   onValueChange,
 }: OptionToggleGroupProps<T>) {
+  const legendId = useId();
   return (
     <FieldSet>
-      <FieldLegend variant="label">{label}</FieldLegend>
+      <FieldLegend id={legendId} variant="label">
+        {label}
+      </FieldLegend>
       <ToggleGroup
         type="single"
         variant="outline"
-        aria-label={label}
+        aria-labelledby={legendId}
         value={value}
         onValueChange={(next) => {
           // Radix sends "" when the chosen item is clicked again; keep the choice.

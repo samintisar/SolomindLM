@@ -38,6 +38,13 @@ describe("PromptField", () => {
     expect(save).toBeEnabled();
   });
 
+  it("keeps Save disabled while the text is only whitespace", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.type(screen.getByLabelText("Area of focus"), "   ");
+    expect(screen.getByRole("button", { name: /save as reusable prompt/i })).toBeDisabled();
+  });
+
   it("opens Save as Prompt with the text, and returns focus to the button when it closes", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -48,6 +55,27 @@ describe("PromptField", () => {
     expect(screen.getByPlaceholderText(/Enter your custom prompt/)).toHaveValue("Normal forms");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(save).toHaveFocus());
+  });
+
+  it("closes only Save as Prompt on Escape inside a Customize dialog, and focus returns to the button", async () => {
+    const user = userEvent.setup();
+    render(
+      <StudioCustomizeDialog open onClose={vi.fn()}>
+        <DialogTitle>Customize</DialogTitle>
+        <DialogDescription>A real dialog.</DialogDescription>
+        <Harness />
+      </StudioCustomizeDialog>
+    );
+    await user.type(screen.getByLabelText("Area of focus"), "Normal forms");
+    const save = screen.getByRole("button", { name: /save as reusable prompt/i });
+    await user.click(save);
+    expect(screen.getByRole("dialog", { name: "Save as Prompt" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Save as Prompt" })).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole("dialog", { name: "Customize" })).toBeInTheDocument();
     await waitFor(() => expect(save).toHaveFocus());
   });
 

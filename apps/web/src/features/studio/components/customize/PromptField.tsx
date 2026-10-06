@@ -31,14 +31,16 @@ export function PromptField({
   tall = false,
 }: PromptFieldProps) {
   const id = useId();
+  const descriptionId = useId();
   const [saveOpen, setSaveOpen] = useState(false);
   const preview = useStudioCustomizePreview();
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      {description && <FieldDescription>{description}</FieldDescription>}
+      {description && <FieldDescription id={descriptionId}>{description}</FieldDescription>}
       <Textarea
         id={id}
+        aria-describedby={description ? descriptionId : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
