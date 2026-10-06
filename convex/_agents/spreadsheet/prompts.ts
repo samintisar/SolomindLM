@@ -251,19 +251,22 @@ User Request: "{customPrompt}"
 
 Rules:
 1. **Columns:** Auto-detect the best columns to represent the data.
-2. **Rows:** One row per distinct entity/subject.
+2. **Rows:** One row per distinct item the request is about.
 3. **Density:** Consolidate details to avoid sparse rows.
-4. **Coverage-First:** If the source enumerates a discrete, named list of items
-   (e.g. "20 patterns", "the 7 principles", "frameworks: X, Y, Z"), every named
+4. **Coverage:** If the items the request is about form a discrete, named list
+   in the sources (e.g. "the 7 principles", "frameworks: X, Y, Z"), every named
    item MUST appear as its own row. Never drop a named item because its row
    would look similar to another named item's row.
-4. **CSV Formatting (RFC 4180):**
+5. **Nested lists stay in cells:** Lists that belong to one item (works it cites,
+   studies it includes, examples it gives) go in that item's cells, not in rows
+   of their own.
+6. **CSV Formatting (RFC 4180):**
    - Enclose EVERY field in double quotes ("field")
    - If a field contains double quotes, escape them by doubling ("")
    - Preserve line breaks and special characters inside quoted fields
    - Example: "Field with, comma","Field with ""quotes""","Field with
    line break"
-5. **Output:** Raw CSV only. No markdown blocks, no code fences.
+7. **Output:** Raw CSV only. No markdown blocks, no code fences.
 
 Research Notes:
 {content}
