@@ -300,8 +300,11 @@ function PaperList({
   return (
     <div className="flex-1 overflow-y-auto">
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-          <Spinner className="size-8" />
+        <div
+          role="status"
+          className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground"
+        >
+          <Spinner aria-hidden className="size-8" />
           <p className="text-sm">Loading ranked papers…</p>
         </div>
       ) : isEmpty ? (
@@ -424,7 +427,9 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
           onClick={onAdd}
           disabled={isInNotebook || isAdding}
         />
-        <PaperAction icon={<FileText aria-hidden />} label="PDF" href={pdfHref} external />
+        {pdfHref && (
+          <PaperAction icon={<FileText aria-hidden />} label="PDF" href={pdfHref} external />
+        )}
         {paper.url && (
           <Button variant="ghost" size="icon-sm" asChild className="ml-auto">
             <a href={paper.url} target="_blank" rel="noopener noreferrer" aria-label="Open paper">
@@ -469,6 +474,7 @@ function PaperAction({
           target={external ? "_blank" : undefined}
           rel={external ? "noopener noreferrer" : undefined}
           title={label === "PDF" ? "View PDF" : label}
+          aria-label={label === "PDF" ? "View PDF" : undefined}
         >
           {icon}
           {label}
