@@ -26,7 +26,6 @@ import type * as _agents__shared_citationExtract from "../_agents/_shared/citati
 import type * as _agents__shared_concurrency from "../_agents/_shared/concurrency.js";
 import type * as _agents__shared_graph_builder from "../_agents/_shared/graph_builder.js";
 import type * as _agents__shared_index from "../_agents/_shared/index.js";
-import type * as _agents__shared_jobHelpers from "../_agents/_shared/jobHelpers.js";
 import type * as _agents__shared_languageInstruction from "../_agents/_shared/languageInstruction.js";
 import type * as _agents__shared_llmErrors from "../_agents/_shared/llmErrors.js";
 import type * as _agents__shared_llm_factory from "../_agents/_shared/llm_factory.js";
@@ -420,7 +419,6 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/concurrency": typeof _agents__shared_concurrency;
   "_agents/_shared/graph_builder": typeof _agents__shared_graph_builder;
   "_agents/_shared/index": typeof _agents__shared_index;
-  "_agents/_shared/jobHelpers": typeof _agents__shared_jobHelpers;
   "_agents/_shared/languageInstruction": typeof _agents__shared_languageInstruction;
   "_agents/_shared/llmErrors": typeof _agents__shared_llmErrors;
   "_agents/_shared/llm_factory": typeof _agents__shared_llm_factory;
