@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import type { Doc } from "@convex/_generated/dataModel";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

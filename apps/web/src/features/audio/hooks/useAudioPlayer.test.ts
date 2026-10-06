@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { nextPlaybackRate, PLAYBACK_RATES, useAudioPlayer } from "./useAudioPlayer";
