@@ -107,7 +107,10 @@ describe("CustomizeInfographicModal", () => {
     renderInfographic();
     for (const name of STYLE_NAMES) {
       const card = screen.getByRole("button", { name });
-      expect(card.querySelector("[aria-hidden=true]")).not.toBeNull();
+      const thumbnail = card.querySelector("[aria-hidden=true]");
+      expect(thumbnail, name).not.toBeNull();
+      // A style that falls through to the empty default frame has no preview.
+      expect(thumbnail?.childElementCount, name).toBeGreaterThan(0);
     }
   });
 

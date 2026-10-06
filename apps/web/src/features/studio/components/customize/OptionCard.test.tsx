@@ -21,6 +21,39 @@ describe("OptionCard", () => {
     expect(card.closest("[data-slot=card]")).toHaveAttribute("data-selected", "true");
   });
 
+  it("shows a decorative check on the chosen card only", () => {
+    const { container, rerender } = render(
+      <OptionCard title="Debate" description="Two hosts." selected onSelect={vi.fn()} />
+    );
+    const check = container.querySelector("[data-slot=option-card-check]");
+    expect(check).toHaveAttribute("aria-hidden", "true");
+    expect(check).toHaveClass("right-2");
+    expect(check?.querySelector("svg")).not.toBeNull();
+    rerender(
+      <OptionCard title="Debate" description="Two hosts." selected={false} onSelect={vi.fn()} />
+    );
+    expect(container.querySelector("[data-slot=option-card-check]")).toBeNull();
+    expect(screen.getByRole("button", { name: "Debate" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("puts the check in the other corner from the corner action", () => {
+    const { container } = render(
+      <OptionCard
+        title="Briefing Doc"
+        description="Key insights."
+        selected
+        onSelect={vi.fn()}
+        action={<button type="button">Edit the Briefing Doc prompt</button>}
+      />
+    );
+    const check = container.querySelector("[data-slot=option-card-check]");
+    expect(check).toHaveClass("left-2");
+    expect(check).not.toHaveClass("right-2");
+    expect(check?.contains(screen.getByRole("button", { name: /edit the briefing doc/i }))).toBe(
+      false
+    );
+  });
+
   it("keeps its corner action separate from selecting", async () => {
     const onSelect = vi.fn();
     const onEdit = vi.fn();
