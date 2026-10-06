@@ -24,8 +24,10 @@ const COUNTED_LIST_TAIL = new RegExp(
 export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
   if (trimmed.includes("\n")) return false;
   if (trimmed.length > 200) return false;
+  // Comparative and per-source questions ("how does X differ from Y", "each paper", "both
+  // studies") span several sources; one search tends to return passages from just one of them.
   if (
-    /\b(compare|comparing|versus|vs\.?|differences?\s+between|similarit|contrasts?\b|respectively)\b/i.test(
+    /\b(compar\w*|versus|vs\.?|differ\w*|similarit\w*|contrasts?|respectively|each|both)\b/i.test(
       trimmed
     )
   ) {

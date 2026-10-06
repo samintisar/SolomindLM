@@ -150,6 +150,23 @@ export const researchersFixtures: EvalFixture[] = [
   },
   {
     ...base,
+    id: "researchers/chat-each-paper-activity-measure",
+    split: "train",
+    runner: "chat",
+    question: "How did each of my four papers measure physical activity?",
+    // One term per paper, so the answer only passes if every selected source contributed.
+    expectedItems: ["mMET", "IPAQ", "acceleromet", "GPAQ"],
+    expectedAnswer:
+      "Pearce 2022 harmonised the cohorts' self-reported activity into marginal MET-hours per week (mMET-h/wk); " +
+      "Laird 2023 (TILDA) used the self-reported IPAQ; Lambert 2018 (eMotion) used accelerometers alongside " +
+      "self-report; Rutherford 2022 (NHANES) used the self-reported GPAQ, split into work, travel and leisure domains.",
+    expectedBehavior:
+      "Covers all four papers, one measure per paper attributed to the right study, and says nothing is missing " +
+      "for any of them.",
+    tags: tags("chat", "synthesis", "multi-source"),
+  },
+  {
+    ...base,
     id: "researchers/spreadsheet-meta-analysis-risk",
     split: "train",
     runner: "spreadsheet",
