@@ -35,10 +35,25 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.ts"],
     execArgv: webstorageExecArgv,
+    // Building a jsdom window per file is the suite's biggest cost, so only component tests
+    // (.tsx) get one by default. A .ts test that needs the DOM (renderHook, document, window)
+    // opts in with a `// @vitest-environment jsdom` first line.
+    projects: [
+      {
+        extends: true,
+        test: { name: "dom", environment: "jsdom", include: ["src/**/*.{test,spec}.tsx"] },
+      },
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: ["src/**/*.{test,spec}.ts", "scripts/**/*.test.ts"],
+        },
+      },
+    ],
     // CI has no apps/web .env; chatApi.ts validates CONVEX URL at import time
     env: {
       VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud",
