@@ -47,6 +47,13 @@ const MIGRATED = [
   "src/features/studio/components/views/ProficiencyBadge.tsx",
   "src/features/studio/components/views/SpreadsheetView.tsx",
   "src/features/studio/components/spreadsheet/**/*.tsx",
+  "src/features/studio/components/customize/**/*.tsx",
+  "src/features/studio/components/Customize*Modal.tsx",
+  "src/features/studio/components/DiscoverStudioPromptsModal.tsx",
+  "src/features/studio/components/SaveAsPromptModal.tsx",
+  "src/features/studio/components/StudioModalDiscoverPromptsButton.tsx",
+  "src/features/studio/components/CitePaperModal.tsx",
+  "src/features/studio/components/CitationStylePicker.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
@@ -63,7 +70,6 @@ const UPSTREAM_ARBITRARY = [
   "tabs",
   "textarea",
   "toggle-group",
-  "toggle",
   "tooltip",
 ];
 
@@ -118,6 +124,16 @@ export default defineConfig([
   {
     files: ["src/shared/components/icons/ModelBrandIcon.tsx"],
     rules: { "shadcn/no-raw-colors": "off" },
+  },
+  // Infographic style thumbnails illustrate the generated image's palette (kawaii pastels, clay
+  // shadows, anime outlines), not app chrome, like the brand colours in ModelBrandIcon.
+  {
+    files: ["src/features/studio/components/customize/InfographicStyleThumbnail.tsx"],
+    rules: {
+      "shadcn/no-raw-colors": "off",
+      "shadcn/no-arbitrary-values": "off",
+      "solomind/soft-surfaces": "off",
+    },
   },
   // Primitives own the look; outline exceptions there are reviewed variants (docs/design/principles.md).
   { files: ["src/shared/components/ui/**/*.tsx"], rules: { "solomind/soft-surfaces": "off" } },

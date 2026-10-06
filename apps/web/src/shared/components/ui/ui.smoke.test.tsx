@@ -419,6 +419,23 @@ describe("shadcn ui components render", () => {
       expect(toggle).not.toHaveClass("border");
     });
 
+    it("outline toggle group marks the chosen item with a selected fill and an inset ring", () => {
+      render(
+        <ToggleGroup type="single" variant="outline" defaultValue="b">
+          <ToggleGroupItem value="a">A</ToggleGroupItem>
+          <ToggleGroupItem value="b">B</ToggleGroupItem>
+        </ToggleGroup>
+      );
+      const chosen = screen.getByRole("radio", { name: "B" });
+      expect(chosen).toHaveAttribute("data-state", "on");
+      // accent is darker than surface-raised in dark mode, so the selected fill is the brand primary.
+      expect(chosen).toHaveClass(
+        "data-[state=on]:bg-primary",
+        "data-[state=on]:text-primary-foreground"
+      );
+      expect(chosen).not.toHaveClass("data-[state=on]:bg-accent");
+    });
+
     it("Badge outline uses the hairline ring", () => {
       render(<Badge variant="outline">b</Badge>);
       expect(screen.getByText("b")).toHaveClass("bg-surface-raised", "ring-1", "ring-hairline");

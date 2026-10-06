@@ -4,13 +4,15 @@ import * as React from "react";
 import { cn } from "@/shared/utils/cn";
 
 const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md font-sans text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex items-center justify-center gap-2 rounded-md font-sans text-sm font-medium whitespace-nowrap transition outline-none hover:bg-muted hover:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-transparent",
+        // The chosen item gets its own fill plus an inset hairline, so it reads in both themes without
+        // the fill alone carrying it. Inset, so a neighbouring item never covers it and focus rings don't clash.
         outline:
-          "bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground data-[state=on]:bg-accent aria-invalid:ring-destructive",
+          "bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:inset-ring-1 data-[state=on]:inset-ring-primary-foreground/15 data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground aria-invalid:ring-destructive",
         // Colour swatch picker: the colour is a child <span>; selection is a ring, not a fill.
         swatch:
           "rounded-full bg-transparent hover:bg-transparent data-[state=on]:bg-transparent data-[state=on]:ring-2 data-[state=on]:ring-ring",

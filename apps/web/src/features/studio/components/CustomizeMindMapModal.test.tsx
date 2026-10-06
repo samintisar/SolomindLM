@@ -75,4 +75,26 @@ describe("CustomizeMindMapModal", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it("starts with an empty prompt each time it opens", async () => {
+    const onGenerate = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <CustomizeMindMapModal isOpen onClose={onClose} onGenerate={onGenerate} />
+    );
+    await userEvent.type(screen.getByLabelText("Custom prompt"), "Draft");
+    rerender(<CustomizeMindMapModal isOpen={false} onClose={onClose} onGenerate={onGenerate} />);
+    rerender(<CustomizeMindMapModal isOpen onClose={onClose} onGenerate={onGenerate} />);
+    expect(screen.getByLabelText("Custom prompt")).toHaveValue("");
+  });
+
+  it("saves the prompt as a Mind Maps prompt without closing the dialog", async () => {
+    renderModal();
+    await userEvent.type(screen.getByLabelText("Custom prompt"), "Focus on the cardiac cycle");
+    await userEvent.click(screen.getByRole("button", { name: /save as reusable prompt/i }));
+    expect(screen.getByTestId("save-as-prompt-tool-label")).toHaveTextContent("Mind Maps");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByTestId("save-as-prompt-tool-label")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Customize Mind Map" })).toBeInTheDocument();
+  });
 });

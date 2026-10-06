@@ -372,6 +372,8 @@ function AuthHeroMockup() {
       </div>
 
       <CustomizeReportModal
+        theme="light"
+        preview
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}
         onSelectFormat={() => {
@@ -380,6 +382,8 @@ function AuthHeroMockup() {
       />
 
       <CustomizeFlashcardsModal
+        theme="light"
+        preview
         isOpen={studioModal === "flashcards"}
         onClose={closeStudioModal}
         onGenerate={() => {
@@ -388,6 +392,8 @@ function AuthHeroMockup() {
       />
 
       <CustomizeQuizModal
+        theme="light"
+        preview
         isOpen={studioModal === "quiz"}
         onClose={closeStudioModal}
         onGenerate={() => {
@@ -396,6 +402,8 @@ function AuthHeroMockup() {
       />
 
       <CustomizeAudioModal
+        theme="light"
+        preview
         isOpen={studioModal === "audio"}
         onClose={closeStudioModal}
         onGenerate={() => {
@@ -404,6 +412,8 @@ function AuthHeroMockup() {
       />
 
       <CustomizeWrittenQuestionsModal
+        theme="light"
+        preview
         isOpen={studioModal === "writtenQuestions"}
         onClose={closeStudioModal}
         onGenerate={() => {
@@ -412,6 +422,8 @@ function AuthHeroMockup() {
       />
 
       <CustomizeInfographicModal
+        theme="light"
+        preview
         isOpen={studioModal === "infographic"}
         onClose={closeStudioModal}
         onGenerate={() => {
@@ -420,6 +432,8 @@ function AuthHeroMockup() {
       />
 
       <CustomizeSpreadsheetsModal
+        theme="light"
+        preview
         isOpen={studioModal === "spreadsheets"}
         onClose={closeStudioModal}
         onGenerate={() => {
