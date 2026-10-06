@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Download,
   FileText,
-  Loader2,
   Minus,
   PlusCircle,
   Quote,
@@ -14,6 +13,17 @@ import {
   XCircle,
 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { cn } from "@/shared/utils/cn";
 import {
   useLiteratureReviewScreeningDecisions,
   useLiteratureReviewSession,
@@ -33,6 +43,10 @@ type ScreeningCriterion = {
   status: CriterionStatus;
   explanation: string;
 };
+
+const SCREENING_GRID_STYLE = {
+  "--screening-cols": "minmax(300px, 0.95fr) minmax(420px, 1fr)",
+} as React.CSSProperties;
 
 const GENERIC_SCREENING_CRITERIA = [
   "Research Question Focus",
@@ -94,7 +108,7 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
   }, [session?.reviewTitle, sortedDecisions]);
 
   return (
-    <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden border-l-2 border-border bg-background">
+    <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border/50 bg-background">
       <ScreeningPanelHeader
         title="Screening Decisions and Outcome Summary"
         canExport={total > 0}
@@ -132,28 +146,18 @@ function ScreeningPanelHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-background p-4">
+    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background px-4">
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-sm font-medium text-foreground">{title}</h2>
+        <h2 className="truncate font-sans text-sm font-medium text-foreground">{title}</h2>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={!canExport}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Download className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="sm" onClick={onExport} disabled={!canExport}>
+          <Download />
           Export
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Close screening panel"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        </Button>
+        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close screening panel">
+          <X />
+        </Button>
       </div>
     </div>
   );
@@ -161,22 +165,26 @@ function ScreeningPanelHeader({
 
 function LoadingState() {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-      <Loader2 className="mb-3 h-8 w-8 animate-spin text-muted-foreground" />
-      <p className="text-sm">Loading screening decisions…</p>
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
+      <Spinner className="size-6" />
+      <p>Loading screening decisions…</p>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-muted-foreground">
-      <BookOpen className="h-10 w-10 mb-3 opacity-40" />
-      <p className="text-sm font-medium text-foreground">No screening decisions yet</p>
-      <p className="text-xs mt-1">
-        Decisions appear here after the screening step completes in your literature review.
-      </p>
-    </div>
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <BookOpen />
+        </EmptyMedia>
+        <EmptyTitle>No screening decisions yet</EmptyTitle>
+        <EmptyDescription>
+          Decisions appear here after the screening step completes in your literature review.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
@@ -192,9 +200,9 @@ function ScreeningDecisionGrid({
   onToggleExpanded: (paperIndex: number) => void;
 }) {
   return (
-    <div className="min-w-[760px]">
-      <div className="sticky top-0 z-10 grid grid-cols-[minmax(300px,0.95fr)_minmax(420px,1fr)] border-b border-border bg-muted/40 text-[11px] font-medium text-muted-foreground backdrop-blur">
-        <div className="border-r border-border px-4 py-2.5">Papers ({decisions.length})</div>
+    <div className="min-w-190" style={SCREENING_GRID_STYLE}>
+      <div className="sticky top-0 z-10 grid grid-cols-(--screening-cols) border-b border-border/50 bg-muted font-sans text-xs font-medium text-muted-foreground">
+        <div className="border-r border-border/50 px-4 py-2.5">Papers ({decisions.length})</div>
         <div className="px-4 py-2.5">Screening Results</div>
       </div>
       <ul>
@@ -229,7 +237,7 @@ function ScreeningDecisionRow({
   );
 
   return (
-    <li className="grid grid-cols-[minmax(300px,0.95fr)_minmax(420px,1fr)] border-b border-border transition-colors hover:bg-muted/10">
+    <li className="grid grid-cols-(--screening-cols) border-b border-border/50 transition-colors hover:bg-muted/10">
       <PaperSummaryCell decision={decision} />
       <ScreeningResultCell
         criteria={criteria}
@@ -249,27 +257,29 @@ function PaperSummaryCell({ decision }: { decision: LiteratureScreeningDecision 
   const rank = decision.rank ?? decision.paperIndex + 1;
 
   return (
-    <div className="flex gap-3 border-r border-border px-4 py-4">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
+    <div className="flex gap-3 border-r border-border/50 px-4 py-4">
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted font-sans text-xs font-medium text-muted-foreground">
         {rank}
       </span>
       <div className="min-w-0 flex-1 space-y-2">
-        <p className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
+        <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
           {decision.title}
         </p>
-        {meta ? <p className="line-clamp-1 text-[11px] text-muted-foreground">{meta}</p> : null}
-        <div className="flex flex-wrap gap-3 pt-1 text-[11px] text-muted-foreground">
+        {meta ? (
+          <p className="line-clamp-1 font-sans text-xs text-muted-foreground">{meta}</p>
+        ) : null}
+        <div className="flex flex-wrap gap-3 pt-1 font-sans text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
-            <Quote className="h-3 w-3" />
+            <Quote className="size-3" />
             Cite
           </span>
           <span className="inline-flex items-center gap-1">
-            <PlusCircle className="h-3 w-3" />
+            <PlusCircle className="size-3" />
             My References
           </span>
         </div>
       </div>
-      <FileText className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <FileText className="mt-1 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
     </div>
   );
 }
@@ -289,7 +299,7 @@ function ScreeningResultCell({
 
   return (
     <div className="px-4 py-4">
-      <p className="text-[12px] leading-relaxed text-foreground">{decision.reason}</p>
+      <p className="text-xs leading-relaxed text-foreground">{decision.reason}</p>
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
         {criteria.map((criterion) => (
           <CriterionChip key={criterion.label} criterion={criterion} />
@@ -297,17 +307,15 @@ function ScreeningResultCell({
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <DecisionBadge included={isIncluded} />
-        <button
-          type="button"
+        <Button
+          variant="disclosure"
+          size="xs"
           onClick={onToggleExpanded}
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
           aria-expanded={isExpanded}
         >
           {isExpanded ? "Hide screening criteria" : "View screening criteria"}
-          <ChevronDown
-            className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}
-          />
-        </button>
+          <ChevronDown className={cn("transition-transform", isExpanded && "rotate-180")} />
+        </Button>
       </div>
       {isExpanded ? (
         <div className="mt-4 space-y-2.5">
@@ -322,7 +330,7 @@ function ScreeningResultCell({
 
 function CriterionChip({ criterion }: { criterion: ScreeningCriterion }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] leading-none text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 font-sans text-xs leading-none text-muted-foreground">
       <CriterionIcon status={criterion.status} />
       {criterion.label}
     </span>
@@ -331,11 +339,11 @@ function CriterionChip({ criterion }: { criterion: ScreeningCriterion }) {
 
 function CriterionDetail({ criterion }: { criterion: ScreeningCriterion }) {
   return (
-    <div className="grid grid-cols-[16px_1fr] gap-2 text-[11px] leading-relaxed">
-      <span className="pt-0.5">
+    <div className="flex gap-2 text-xs leading-relaxed">
+      <span className="shrink-0 pt-0.5">
         <CriterionIcon status={criterion.status} />
       </span>
-      <div>
+      <div className="min-w-0">
         <p className="font-medium text-foreground">{criterion.label}</p>
         <p className="text-muted-foreground">{criterion.explanation}</p>
       </div>
@@ -344,20 +352,18 @@ function CriterionDetail({ criterion }: { criterion: ScreeningCriterion }) {
 }
 
 function CriterionIcon({ status }: { status: CriterionStatus }) {
-  const iconClass = "h-3.5 w-3.5 text-muted-foreground";
-  if (status === "met") return <Check className={iconClass} aria-hidden />;
-  if (status === "partial") return <Minus className={iconClass} aria-hidden />;
-  return <X className={iconClass} aria-hidden />;
+  if (status === "met") return <Check className="size-3.5 text-success" aria-hidden />;
+  if (status === "partial") return <Minus className="size-3.5 text-warning" aria-hidden />;
+  return <X className="size-3.5 text-muted-foreground" aria-hidden />;
 }
 
 function DecisionBadge({ included }: { included: boolean }) {
-  const label = included ? "Included" : "Excluded";
   const Icon = included ? CheckCircle2 : XCircle;
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground">
-      <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-      {label}
-    </span>
+    <Badge variant="outline">
+      <Icon aria-hidden className={included ? "text-success" : "text-destructive"} />
+      {included ? "Included" : "Excluded"}
+    </Badge>
   );
 }
 
@@ -500,8 +506,4 @@ function escapeCsvValue(value: string) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
-}
-
-function cn(...classes: (string | false | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
 }
