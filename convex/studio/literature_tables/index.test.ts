@@ -291,3 +291,70 @@ describe("getLiteratureTable", () => {
     expect(table?.papers[0]).toMatchObject({ offTopicReason: "Not about sleep" });
   });
 });
+
+async function seedPaperDocument(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  notebookId: Id<"notebooks">
+): Promise<Id<"documents">> {
+  return t.run(async (ctx) =>
+    ctx.db.insert("documents", {
+      userId,
+      notebookId,
+      fileName: "Saved Paper",
+      fileType: "paper_record",
+      paperRecord: { abstract: "Abstract", authors: ["Smith, J."], isOa: false },
+      status: "completed",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+  );
+}
+
+describe("getLiteratureTable notebook citations", () => {
+  test("returns the notebook document a citation came from", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const documentId = await seedPaperDocument(t, userId, notebookId);
+    const citationId = await seedCitation(t, userId);
+    await t.run(async (ctx) => ctx.db.patch(citationId, { sourceApi: "notebook", documentId }));
+    const tableId = await seedLiteratureTable(t, userId, notebookId, citationId);
+
+    const table = await withAuth(t, userId).query(
+      api.studio.literature_tables.index.getLiteratureTable,
+      { tableId }
+    );
+
+    expect(table?.papers[0].citation).toMatchObject({ sourceApi: "notebook", documentId });
+  });
+});
+
+describe("getLiteratureReviewSession", () => {
+  test("returns a session started with notebook papers", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const documentId = await seedPaperDocument(t, userId, notebookId);
+    const sessionId = await t.run(async (ctx) =>
+      ctx.db.insert("literatureReviewSessions", {
+        query: "sleep and memory",
+        notebookId,
+        userId,
+        workflowId: "wf-1",
+        status: "awaiting_columns",
+        documentIds: [documentId],
+        paperScope: "papers_only",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+
+    const session = await withAuth(t, userId).query(
+      api.studio.literature_tables.index.getLiteratureReviewSession,
+      { sessionId }
+    );
+
+    expect(session).toMatchObject({ documentIds: [documentId], paperScope: "papers_only" });
+  });
+});

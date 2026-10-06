@@ -474,6 +474,8 @@ export const getLiteratureReviewSession = query({
       userId: v.id("users"),
       workflowId: v.string(),
       smartModel: v.optional(v.string()),
+      documentIds: v.optional(v.array(v.id("documents"))),
+      paperScope: v.optional(v.union(v.literal("papers_and_search"), v.literal("papers_only"))),
       status: v.union(
         v.literal("planning"),
         v.literal("awaiting_columns"),
@@ -547,6 +549,8 @@ const citationMetadataValidator = v.object({
     v.literal("pubmed"),
     v.literal("notebook")
   ),
+  /** The notebook source a "notebook" citation came from. */
+  documentId: v.optional(v.id("documents")),
   citationCount: v.optional(v.number()),
   abstract: v.optional(v.string()),
 });
@@ -690,6 +694,7 @@ export const getLiteratureTable = query({
                 url: citation.url,
                 pdfUrl: citation.pdfUrl,
                 sourceApi: citation.sourceApi,
+                documentId: citation.documentId,
                 citationCount: citation.citationCount,
                 abstract: citation.abstract,
               }

@@ -32,13 +32,7 @@ import { ColumnManager, type TableColumn } from "../ColumnManager";
 import { LiteratureTableExtractionCell } from "../LiteratureTableExtractionCell";
 import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
 
-interface TablePaper {
-  citationId: string;
-  rowData: Record<string, string>;
-  includeReason?: string;
-  isIncluded: boolean;
-  citation: TablePaperRow["citation"];
-}
+type TablePaper = TablePaperRow;
 
 export interface LiteratureTable {
   title: string;
@@ -208,11 +202,17 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 
   const addPapersToNotebook = useCallback(
     async (papers: TablePaper[]) => {
+      // Papers from the user's notebook are already in it.
       const withCitation = papers.filter(
         (p): p is TablePaper & { citation: NonNullable<TablePaper["citation"]> } =>
-          Boolean(p.citation)
+          Boolean(p.citation) && p.citation?.sourceApi !== "notebook"
       );
-      if (withCitation.length === 0) return;
+      if (withCitation.length === 0) {
+        if (papers.some((p) => p.citation?.sourceApi === "notebook")) {
+          toastError("Selected papers are already in this notebook");
+        }
+        return;
+      }
 
       setIsBulkAdding(true);
       try {

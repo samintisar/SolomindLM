@@ -124,6 +124,33 @@ describe("ChatInput toolbar", () => {
     expect(filtersTrigger()).toBeInTheDocument();
   });
 
+  test("literature review: the paper scope menu shows only with selected papers", () => {
+    const scopeTrigger = () => screen.queryByRole("button", { name: /^Paper scope/ });
+    const { rerender } = renderInput({
+      mode: "literatureReview",
+      onPaperScopeChange: vi.fn(),
+    });
+    expect(scopeTrigger()).not.toBeInTheDocument();
+
+    rerender(
+      chatInput({ mode: "literatureReview", onPaperScopeChange: vi.fn(), notebookPaperCount: 3 })
+    );
+    expect(scopeTrigger()).toHaveAccessibleName("Paper scope: Your 3 papers + search");
+    expect(dbTrigger()).toBeInTheDocument();
+  });
+
+  test("literature review: only your papers hides the search controls", () => {
+    renderInput({
+      mode: "literatureReview",
+      onPaperScopeChange: vi.fn(),
+      onAcademicDiscoveryFiltersChange: vi.fn(),
+      notebookPaperCount: 2,
+      paperScope: "papers_only",
+    });
+    expect(dbTrigger()).not.toBeInTheDocument();
+    expect(filtersTrigger()).not.toBeInTheDocument();
+  });
+
   test("literature review without an academic handler has no filters", () => {
     renderInput({ mode: "literatureReview" });
     expect(filtersTrigger()).not.toBeInTheDocument();

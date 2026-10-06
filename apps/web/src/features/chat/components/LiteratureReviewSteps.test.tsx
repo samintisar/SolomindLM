@@ -123,3 +123,26 @@ describe("LiteratureReviewSteps disclosure", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
   });
 });
+
+describe("LiteratureReviewSteps counts", () => {
+  it("counts the user's notebook papers in the search step", () => {
+    render(
+      <LiteratureReviewSteps
+        steps={[
+          {
+            type: "searching",
+            status: "completed",
+            title: "Searching relevant studies",
+            description: "Search complete",
+            searchQueries: ["sleep memory consolidation"],
+            prismaCounts: { recordsFromNotebook: 4, recordsIdentified: 120 },
+          },
+        ]}
+        expandAll
+        sessionId={sessionId}
+      />
+    );
+
+    expect(screen.getByText("4 from your notebook · 120 identified")).toBeInTheDocument();
+  });
+});

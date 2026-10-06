@@ -1,4 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
+import type { PaperScope } from "@convex/literatureReview/notebookPapers";
 import {
   Download,
   FileText,
@@ -34,6 +35,7 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
+import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
@@ -47,6 +49,7 @@ import { useApproveResearchPlan, useRejectResearchPlan } from "../services/resea
 import { useSaveChat } from "../services/userNotesApi";
 import { useChatStreamingContext } from "../useChatStreaming";
 import { exportAsMarkdown } from "../utils/exportChat";
+import { selectedNotebookPaperIds } from "../utils/literatureReviewPapers";
 import { stripReferencesSection } from "../utils/messageRendering.utils";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput } from "./ChatInput";
@@ -135,6 +138,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
   const notebookDocumentIds = useMemo(() => new Set(sources.map((s) => s.id)), [sources]);
+  const notebookPaperIds = useMemo(() => selectedNotebookPaperIds(sources), [sources]);
+  const [chosenPaperScope, setPaperScope] = useState<PaperScope>("papers_and_search");
+  /** "Only your papers" needs papers; with none selected the review searches as before. */
+  const paperScope: PaperScope =
+    notebookPaperIds.length > 0 ? chosenPaperScope : "papers_and_search";
   const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -574,14 +582,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             ...(Object.keys(api).length > 0 ? { academicFilters: api } : {}),
           },
           conversationId,
-          chatSettings?.smartModel
+          chatSettings?.smartModel,
+          {
+            documentIds: notebookPaperIds as Id<"documents">[],
+            paperScope,
+          }
         );
         if (reviewConversationId !== activeConversationId) {
           onSelectConversation?.(reviewConversationId);
         }
         setActiveLiteratureSessionId(sessionId);
-      } catch {
-        toastError("Failed to start literature review. Please try again.");
+      } catch (err) {
+        console.error("[LiteratureReview] Start failed:", err);
+        const parsed = parseServiceError(err);
+        toastError(
+          parsed?.kind === "input_validation"
+            ? getServiceErrorMessage(parsed)
+            : "Failed to start literature review. Please try again."
+        );
       }
     } else {
       onSendMessage(trimmed, composerMode === "deepResearch" ? true : undefined, chatSourcePolicy);
@@ -601,6 +619,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     researchDatabase,
     chatAcademicFilters,
     chatSettings?.smartModel,
+    notebookPaperIds,
+    paperScope,
     activeConversationId,
     messages.length,
     onCreateConversation,
@@ -906,6 +926,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             onModeChange={handleComposerModeChange}
             researchDatabase={researchDatabase}
             onResearchDatabaseChange={setResearchDatabase}
+            notebookPaperCount={notebookPaperIds.length}
+            paperScope={paperScope}
+            onPaperScopeChange={setPaperScope}
             sourceFilters={sourceFilters}
             onSourceFilterChange={setSourceFilters}
             academicDiscoveryFilters={chatAcademicFilters}
