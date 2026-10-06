@@ -92,6 +92,18 @@ describe("withoutReferenceLists", () => {
     expect(withoutReferenceLists(chunks).map((c) => c.chunkIndex)).toEqual([0]);
   });
 
+  it("ends an untitled reference list at a bold heading", () => {
+    const chunks = [
+      { documentId: "u", chunkIndex: 0, content: "Body." },
+      { documentId: "u", chunkIndex: 1, content: "**References**\n\n[1] A. Author. 2020." },
+      { documentId: "u", chunkIndex: 2, content: "[2] B. Author. 2021." },
+      { documentId: "u", chunkIndex: 3, content: "**Appendix**\n\nExtra results." },
+      { documentId: "u", chunkIndex: 4, content: "More appendix text." },
+    ];
+
+    expect(withoutReferenceLists(chunks).map((c) => c.chunkIndex)).toEqual([0, 3, 4]);
+  });
+
   it("keeps a document that is nothing but a reference list", () => {
     const chunks = [chunk("bib", 0, "Bibliography"), chunk("bib", 1, "Bibliography")];
 

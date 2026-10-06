@@ -25,6 +25,19 @@ describe("spreadsheetTitleSource", () => {
     expect(source).toContain("Self-RAG; ReAct; RAG");
   });
 
+  it("keeps rows and the request when the table has very wide headers", () => {
+    const wideHeader = Array.from({ length: 60 }, (_, i) => `"Measured outcome column ${i}"`).join(
+      ","
+    );
+    const wide = [wideHeader, '"Self-RAG"', '"ReAct"', '"RAG"'].join("\n");
+
+    const source = spreadsheetTitleSource(wide, "Compare these papers");
+
+    expect(source.length).toBeLessThanOrEqual(500);
+    expect(source).toContain("Rows: Self-RAG; ReAct; RAG");
+    expect(source).toContain("Request: Compare these papers");
+  });
+
   it("works without a request", () => {
     expect(spreadsheetTitleSource(csv, "")).toContain("Self-RAG; ReAct; RAG");
   });

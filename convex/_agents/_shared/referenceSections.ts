@@ -26,8 +26,11 @@ export function isReferenceListChunk(chunk: SectionedChunk): boolean {
   return REFERENCE_HEADING_LINE.test(firstLine);
 }
 
-/** A Markdown heading on a chunk's first line; any heading other than a reference one ends a list. */
-const ANY_HEADING_LINE = /^\s*#{1,6}\s+\S/;
+/**
+ * A heading on a chunk's first line (`## Appendix` or a bold-only line like `**Appendix**`); any
+ * heading other than a reference one ends a list.
+ */
+const ANY_HEADING_LINE = /^\s*(?:#{1,6}\s+\S|\*\*[^*\n]+\*\*:?\s*$)/;
 
 /**
  * The chunks without their reference lists, in their original order. A document whose every chunk
