@@ -1,4 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
+import type { PaperScope } from "@convex/literatureReview/notebookPapers";
 import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { DiscoveryAcademicFilterState } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
@@ -19,6 +20,7 @@ import {
 import { FiltersPopover } from "./composer/FiltersPopover";
 import { ModelMenu } from "./composer/ModelMenu";
 import { ModeMenu } from "./composer/ModeMenu";
+import { PaperScopeMenu } from "./composer/PaperScopeMenu";
 import { ResearchDatabaseMenu } from "./composer/ResearchDatabaseMenu";
 import { SendButton } from "./composer/SendButton";
 import { VoiceButton } from "./composer/VoiceButton";
@@ -39,6 +41,10 @@ interface ChatInputProps {
   onModeChange: (mode: ChatComposerMode) => void;
   researchDatabase: ResearchDatabaseOption;
   onResearchDatabaseChange: (db: ResearchDatabaseOption) => void;
+  /** Literature review: selected PDFs and saved papers; the scope menu shows when above zero. */
+  notebookPaperCount?: number;
+  paperScope?: PaperScope;
+  onPaperScopeChange?: (scope: PaperScope) => void;
   sourceFilters?: SourceFilterId[];
   onSourceFilterChange?: (filters: SourceFilterId[]) => void;
   /** Academic sub-filters when the Academic channel is enabled (persisted in session). */
@@ -85,6 +91,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onModeChange,
   researchDatabase,
   onResearchDatabaseChange,
+  notebookPaperCount = 0,
+  paperScope = "papers_and_search",
+  onPaperScopeChange,
   sourceFilters,
   onSourceFilterChange,
   academicDiscoveryFilters,
@@ -110,16 +119,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     onError: (message) => onVoiceError?.(message) ?? console.error(message),
   });
 
+  const showPaperScope =
+    Boolean(notebookId) &&
+    mode === "literatureReview" &&
+    notebookPaperCount > 0 &&
+    Boolean(onPaperScopeChange);
+  /** "Only your papers" runs no database search, so the search controls have nothing to set. */
+  const searchesDatabases = !(showPaperScope && paperScope === "papers_only");
   const showResearchDatabases =
     Boolean(notebookId) &&
-    (mode === "literatureReview" ||
+    ((mode === "literatureReview" && searchesDatabases) ||
       ((mode === "chat" || mode === "deepResearch") && activeFilters.includes("academic")));
   const showSourceChannelFilters =
     Boolean(onSourceFilterChange) && (mode === "chat" || mode === "deepResearch");
   const showLiteratureAcademicFilters =
-    mode === "literatureReview" && Boolean(onAcademicDiscoveryFiltersChange);
+    mode === "literatureReview" && searchesDatabases && Boolean(onAcademicDiscoveryFiltersChange);
   const toolbarControlCount =
     1 +
+    (showPaperScope ? 1 : 0) +
     (showResearchDatabases ? 1 : 0) +
     (showLiteratureAcademicFilters ? 1 : 0) +
     (showSourceChannelFilters ? 1 : 0);
@@ -196,8 +213,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               mode={mode}
               onModeChange={onModeChange}
               disabled={isDisabled}
-              crowded={showResearchDatabases}
+              crowded={showResearchDatabases || showPaperScope}
             />
+            {showPaperScope && onPaperScopeChange ? (
+              <PaperScopeMenu
+                value={paperScope}
+                paperCount={notebookPaperCount}
+                onChange={onPaperScopeChange}
+                disabled={isDisabled}
+              />
+            ) : null}
             {/* Literature review always; chat / deep research while the Academic channel is on. */}
             {showResearchDatabases ? (
               <ResearchDatabaseMenu

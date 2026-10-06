@@ -18,7 +18,7 @@ import React, { lazy, Suspense, useMemo, useState } from "react";
 import { DropdownMenu } from "@/shared/ui/DropdownMenu";
 import { cn, sanitizeMarkdown } from "@/shared/utils";
 import { CitationStyle, CitationStylePicker } from "../CitationStylePicker";
-import { type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
+import { hasPrismaCounts, type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -63,12 +63,7 @@ function isReferencesSectionHeading(heading: string): boolean {
 
 const SectionRenderer: React.FC<SectionRendererProps> = ({ section, workflowProvenance }) => {
   const isMethods = section.heading.trim().toLowerCase() === "methods";
-  const showPrismaDiagram =
-    isMethods &&
-    workflowProvenance &&
-    (workflowProvenance.recordsIdentified != null ||
-      workflowProvenance.recordsAfterDedupe != null ||
-      workflowProvenance.recordsScreened != null);
+  const showPrismaDiagram = isMethods && workflowProvenance && hasPrismaCounts(workflowProvenance);
 
   return (
     <section className="mb-8">
