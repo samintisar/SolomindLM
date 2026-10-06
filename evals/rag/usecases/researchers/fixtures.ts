@@ -6,7 +6,7 @@ import type { EvalFixture } from "../../types";
  * `studioParams.documentTitleHint` (like ticking one source in the app);
  * synthesis requests use every paper. The literature review fixture includes all
  * four papers and searches external databases as well (#301), so it should cite
- * both; each pack paper is checked by its first author or study name. Notebook and document
+ * both; each pack paper is checked by its first author or cohort name. Notebook and document
  * ids are filled in at run time from the seeded "Researchers" notebook, so they
  * are never set here.
  *
@@ -232,13 +232,14 @@ export const researchersFixtures: EvalFixture[] = [
     question:
       "What is the dose-response relationship between physical activity and depression in adults?",
     // One entry per pack paper (any of its words counts): the review must include and cite all four.
+    // Terms a search-only review also produces ("NHANES"; "Laird" is a co-author of Pearce) are avoided.
     expectedItems: [
       "depression",
       "physical activity",
       "Pearce",
-      "TILDA Laird",
+      "TILDA Irish",
       "Lambert",
-      "NHANES Rutherford",
+      "Rutherford",
     ],
     expectedBehavior:
       "Includes the four papers from the notebook without screening them out, adds papers found by searching " +
