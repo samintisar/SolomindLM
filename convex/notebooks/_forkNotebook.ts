@@ -4,20 +4,37 @@ import type { MutationCtx } from "../_generated/server";
 const MAX_FORK_DOCUMENTS = 200;
 const MAX_FORK_CHUNKS = 10_000;
 
-/** A forked mind map must point at the fork's own copies of its sources, not the original's. */
-function remapMindmapMetadata(
+/**
+ * A forked studio item must point at the fork's own copies of its sources, not the original's.
+ * Rewrites the id list stored under `field` through docIdMap and drops ids that have no copy.
+ */
+function remapDocumentIds(
   metadata: unknown,
+  field: string,
   docIdMap: Map<Id<"documents">, Id<"documents">>
 ): unknown {
   const stored = metadata as Record<string, unknown> | undefined;
-  const documentIds = stored?.documentIds;
+  const documentIds = stored?.[field];
   if (!Array.isArray(documentIds)) return metadata;
   return {
     ...stored,
-    documentIds: documentIds.flatMap((id) => {
+    [field]: documentIds.flatMap((id) => {
       const forked = docIdMap.get(id as Id<"documents">);
       return forked ? [forked] : [];
     }),
+  };
+}
+
+/** A completed infographic repeats its source ids in `data.metadata`, so remap that copy too. */
+function remapInfographicData(
+  data: unknown,
+  docIdMap: Map<Id<"documents">, Id<"documents">>
+): unknown {
+  const stored = data as Record<string, unknown> | undefined;
+  if (stored?.metadata === undefined) return data;
+  return {
+    ...stored,
+    metadata: remapDocumentIds(stored.metadata, "sourceDocumentIds", docIdMap),
   };
 }
 
@@ -197,7 +214,7 @@ export async function performNotebookFork(
       title: r.title,
       data: r.data,
       status: r.status,
-      metadata: remapMindmapMetadata(r.metadata, docIdMap),
+      metadata: remapDocumentIds(r.metadata, "documentIds", docIdMap),
       createdAt: now,
       updatedAt: now,
     });
@@ -231,9 +248,9 @@ export async function performNotebookFork(
       userId: forkUserId,
       notebookId: newNotebookId,
       title: r.title,
-      data: r.data,
+      data: remapInfographicData(r.data, docIdMap),
       status: r.status,
-      metadata: r.metadata,
+      metadata: remapDocumentIds(r.metadata, "sourceDocumentIds", docIdMap),
       createdAt: now,
       updatedAt: now,
     });
