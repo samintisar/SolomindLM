@@ -31,7 +31,7 @@ describe("CitePaperModal", () => {
     expect(screen.getByRole("dialog", { name: "Cite Paper" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Citation style" })).toHaveTextContent("APA 7th");
     expect(screen.getByText(/Attention Is All You Need/)).toBeInTheDocument();
-    expect(screen.getByText("(Ashish & Noam, 2017)")).toBeInTheDocument();
+    expect(screen.getByText("(Vaswani & Shazeer, 2017)")).toBeInTheDocument();
   });
 
   it("numbers the in-text citation in a numbered style", async () => {
@@ -40,7 +40,7 @@ describe("CitePaperModal", () => {
     await userEvent.click(await screen.findByRole("option", { name: "IEEE" }));
     expect(screen.getByRole("combobox", { name: "Citation style" })).toHaveTextContent("IEEE");
     expect(screen.getByText("[1]")).toBeInTheDocument();
-    expect(screen.queryByText("(Ashish & Noam, 2017)")).not.toBeInTheDocument();
+    expect(screen.queryByText("(Vaswani & Shazeer, 2017)")).not.toBeInTheDocument();
   });
 
   it("copies the full citation", async () => {
