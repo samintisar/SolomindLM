@@ -918,3 +918,45 @@ describe("createEvalSession", () => {
     expect(session).toMatchObject({ documentIds: [documentId], paperScope: "papers_only" });
   });
 });
+
+describe("getTableById with notebook papers", () => {
+  test("returns a row flagged as off-topic", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const sessionId = await seedSession(t, notebookId, userId);
+    const { tableId } = await t.mutation(internal.literatureReview.db.persistTable, {
+      sessionId,
+      columns: [{ id: "title", name: "Title", isVisible: true }],
+    });
+    const citationId = await t.run(async (ctx) =>
+      ctx.db.insert("citations", {
+        paperId: "p1",
+        title: "Uploaded study",
+        authors: ["B. Writer"],
+        url: "",
+        sourceApi: "notebook",
+        citationKey: "Writer2022",
+      })
+    );
+    await t.run(async (ctx) =>
+      ctx.db.patch(tableId, {
+        papers: [
+          {
+            citationId,
+            rowData: { title: "Uploaded study" },
+            includeReason: "From your notebook",
+            isIncluded: true,
+            offTopicReason: "Cross-sectional, not dose-response",
+          },
+        ],
+      })
+    );
+
+    const table = await t.query(internal.literatureReview.db.getTableById, { tableId });
+
+    expect(table?.papers[0]).toMatchObject({
+      offTopicReason: "Cross-sectional, not dose-response",
+    });
+  });
+});
