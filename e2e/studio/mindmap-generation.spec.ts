@@ -65,4 +65,33 @@ test.describe("Mind Map Generation", () => {
     await expect(noteEl.locator('[data-slot="note-title"]')).toBeVisible();
     await expect(noteEl).not.toHaveAttribute("aria-busy", "true");
   });
+
+  test("opens a generated mind map as an outline", async ({ notebookPage }) => {
+    test.skip(shouldSkipAITests(), "Requires AI LLM for mind map generation");
+    const completionBudgetMs = 600_000;
+    test.setTimeout(completionBudgetMs + 60_000);
+
+    const page = notebookPage;
+    const { card: noteEl } = await createMindMap(page);
+    await expect(noteEl).not.toHaveAttribute("aria-busy", "true", { timeout: completionBudgetMs });
+
+    await noteEl.click();
+
+    // The notebook mounts two Studio panels, so only look at the tree that is on screen.
+    const tree = page.getByRole("tree").filter({ visible: true });
+    await expect(tree).toBeVisible({ timeout: 15_000 });
+
+    // Open the first branch; its children are one level deeper.
+    const branch = tree.getByRole("treeitem", { expanded: false }).first();
+    await expect(branch).toBeVisible();
+    await branch
+      .getByRole("button", { name: /^Expand / })
+      .first()
+      .click();
+    await expect(branch).toHaveAttribute("aria-expanded", "true");
+    await expect(tree.locator('[role="treeitem"][aria-level="2"]').first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Collapse all" }).filter({ visible: true }).click();
+    await expect(tree.locator('[role="treeitem"][aria-level="2"]')).toHaveCount(0);
+  });
 });
