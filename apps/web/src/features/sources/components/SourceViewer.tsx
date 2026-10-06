@@ -205,7 +205,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           <XCircle aria-hidden />
           <AlertTitle>Failed to process document</AlertTitle>
           <AlertDescription>
-            There was an error while processing this document. Please try uploading it again.
+            {source.failureReason ??
+              "There was an error while processing this document. Please try uploading it again."}
           </AlertDescription>
         </Alert>
       )}
