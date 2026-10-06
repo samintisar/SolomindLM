@@ -56,7 +56,7 @@ afterEach(() => {
 describe("MindMapOutline", () => {
   test("shows only the main branches at first, with counts and tree semantics", () => {
     renderOutline();
-    expect(screen.getByRole("heading", { name: TITLE })).toBeInTheDocument();
+    expect(screen.queryByRole("heading")).toBeNull();
     expect(screen.getByRole("tree", { name: TITLE })).toBeInTheDocument();
 
     const items = screen.getAllByRole("treeitem");

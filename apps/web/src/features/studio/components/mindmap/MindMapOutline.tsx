@@ -194,8 +194,8 @@ export function MindMapOutline({ title, root, onAsk, askDisabled = false }: Mind
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center gap-2 bg-card px-4 py-3">
-        <h2 className="flex-1 truncate font-display text-lg">{title}</h2>
+      {/* No title of its own: the Studio header above already shows it. */}
+      <div className="sticky top-0 z-10 flex items-center justify-end gap-2 bg-card px-4 py-2">
         <Button type="button" variant="ghost" size="sm" onClick={expandAll}>
           Expand all
         </Button>

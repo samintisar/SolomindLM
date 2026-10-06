@@ -45,9 +45,9 @@ afterEach(() => {
 });
 
 describe("MindMapView", () => {
-  it("shows the main branches as tree items under the note's title", () => {
+  it("shows the main branches as tree items in a tree named after the note", () => {
     render(<MindMapView note={mindMapNote()} />);
-    expect(screen.getByRole("heading", { name: "Photosynthesis" })).toBeInTheDocument();
+    expect(screen.getByRole("tree", { name: "Photosynthesis" })).toBeInTheDocument();
     const items = screen.getAllByRole("treeitem");
     expect(items.map((el) => el.textContent)).toEqual([
       expect.stringContaining("Child 0"),
@@ -92,10 +92,10 @@ describe("MindMapView", () => {
     expect(onAskInChat).toHaveBeenCalledWith(askPrompt("Child 1", "Photosynthesis"), undefined);
   });
 
-  it("falls back to 'Mind Map' for a blank title, in the heading and the prompt", async () => {
+  it("falls back to 'Mind Map' for a blank title, in the tree's name and the prompt", async () => {
     const onAskInChat = vi.fn();
     render(<MindMapView note={mindMapNote({ title: "   " })} onAskInChat={onAskInChat} />);
-    expect(screen.getByRole("heading", { name: "Mind Map" })).toBeInTheDocument();
+    expect(screen.getByRole("tree", { name: "Mind Map" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Child 1" }));
     expect(onAskInChat).toHaveBeenCalledWith(askPrompt("Child 1", "Mind Map"), ["d1", "d2"]);
   });
