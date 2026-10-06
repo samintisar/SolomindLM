@@ -593,6 +593,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
         setActiveLiteratureSessionId(sessionId);
       } catch (err) {
+        console.error("[LiteratureReview] Start failed:", err);
         const parsed = parseServiceError(err);
         toastError(
           parsed?.kind === "input_validation"
