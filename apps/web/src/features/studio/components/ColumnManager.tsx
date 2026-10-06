@@ -1,5 +1,11 @@
 import { GripVertical, Plus, X } from "lucide-react";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/shared/components/ui/field";
+import { Input } from "@/shared/components/ui/input";
+import { Switch } from "@/shared/components/ui/switch";
+import { Textarea } from "@/shared/components/ui/textarea";
+import { cn } from "@/shared/utils/cn";
 import {
   catalogColumnInTable,
   LITERATURE_TABLE_COLUMN_CATALOG,
@@ -23,46 +29,13 @@ interface ColumnManagerProps {
   onClose?: () => void;
 }
 
-function cn(...classes: (string | false | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function ColumnToggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={onChange}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        checked ? "bg-emerald-500" : "bg-muted-foreground/25"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-          checked ? "translate-x-[18px]" : "translate-x-0.5"
-        )}
-      />
-    </button>
-  );
-}
-
 export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange, onClose }) => {
   const [customName, setCustomName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const nameId = useId();
+  const instructionsId = useId();
 
   const visibleDataColumns = useMemo(
     () =>
@@ -115,6 +88,12 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
     },
     [columns, onChange, toggleColumnVisibility]
   );
+
+  const cancelCustomForm = () => {
+    setShowCustomForm(false);
+    setCustomName("");
+    setCustomInstructions("");
+  };
 
   const addCustomColumn = () => {
     if (!customName.trim()) return;
@@ -183,10 +162,10 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
         )}
       >
         <span className="min-w-0 flex-1 text-sm text-foreground">{col.name}</span>
-        <ColumnToggle
+        <Switch
           checked={options.checked}
-          onChange={options.onToggle}
-          label={`Toggle ${col.name}`}
+          onCheckedChange={() => options.onToggle()}
+          aria-label={`Toggle ${col.name}`}
         />
         {options.draggable && (
           <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
@@ -196,76 +175,74 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
   };
 
   return (
-    <div className="flex h-full w-[min(100%,22rem)] shrink-0 flex-col border-l border-border bg-card shadow-[-4px_0_24px_rgba(0,0,0,0.04)]">
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-        <h3 className="text-sm font-semibold text-foreground">Manage Columns</h3>
+    <aside
+      aria-label="Manage columns"
+      className="flex h-full w-88 max-w-full shrink-0 flex-col border-l border-border/50 bg-card shadow-lg"
+    >
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 px-5">
+        <h3 className="font-sans text-sm font-semibold text-foreground">Manage Columns</h3>
         {onClose && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Close column manager"
           >
-            <X className="h-4 w-4" />
-          </button>
+            <X />
+          </Button>
         )}
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
         <section>
-          <p className="mb-3 text-sm font-medium text-foreground">Create custom column</p>
+          <p className="mb-3 font-sans text-sm font-medium text-foreground">Create custom column</p>
           {showCustomForm ? (
-            <div className="space-y-3 rounded-xl border border-border bg-background p-4">
-              <input
-                type="text"
-                placeholder="Column name"
-                value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
-              />
-              <textarea
-                placeholder="Instructions for extraction (optional)"
-                value={customInstructions}
-                onChange={(e) => setCustomInstructions(e.target.value)}
-                rows={3}
-                className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={addCustomColumn}
-                  className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                >
+            <div className="rounded-xl bg-muted/40 p-4">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor={nameId}>Column name</FieldLabel>
+                  <Input
+                    id={nameId}
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="e.g. Sample size"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={instructionsId}>
+                    Instructions for extraction (optional)
+                  </FieldLabel>
+                  <Textarea
+                    id={instructionsId}
+                    rows={3}
+                    className="resize-none"
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" className="flex-1" onClick={addCustomColumn}>
                   Add column
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCustomForm(false);
-                    setCustomName("");
-                    setCustomInstructions("");
-                  }}
-                  className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
-                >
+                </Button>
+                <Button size="sm" variant="ghost" onClick={cancelCustomForm}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setShowCustomForm(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
-            >
-              <Plus className="h-4 w-4" />
+            <Button variant="outline" className="w-full" onClick={() => setShowCustomForm(true)}>
+              <Plus />
               Add Column
-            </button>
+            </Button>
           )}
         </section>
 
         {suggestedRows.length > 0 && (
           <section>
-            <h4 className="mb-2 text-sm font-semibold text-foreground">Suggested Columns</h4>
+            <h4 className="mb-2 font-sans text-sm font-semibold text-foreground">
+              Suggested Columns
+            </h4>
             <div className="space-y-0.5">
               {suggestedRows.map((col) => {
                 const existing = columns.find((c) => c.id === col.id || c.name === col.name);
@@ -291,14 +268,16 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
         )}
 
         <section>
-          <h4 className="mb-2 text-sm font-semibold text-foreground">Saved Columns</h4>
+          <h4 className="mb-2 font-sans text-sm font-semibold text-foreground">Saved Columns</h4>
           <p className="text-sm text-muted-foreground">No saved columns</p>
         </section>
 
         {(defaultCatalogRows.length > 0 || hiddenTableColumns.length > 0) && (
           <section>
-            <h4 className="mb-2 text-sm font-semibold text-foreground">Default Columns</h4>
-            <div className="max-h-[280px] space-y-0.5 overflow-y-auto pr-1">
+            <h4 className="mb-2 font-sans text-sm font-semibold text-foreground">
+              Default Columns
+            </h4>
+            <div className="max-h-70 space-y-0.5 overflow-y-auto pr-1">
               {hiddenTableColumns.map((col) =>
                 renderColumnRow(col, {
                   draggable: false,
@@ -320,6 +299,6 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
           </section>
         )}
       </div>
-    </div>
+    </aside>
   );
 };
