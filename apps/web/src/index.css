@@ -59,6 +59,12 @@
     --studio-spreadsheet: oklch(0.609 0.126 221.723);
     --studio-note: oklch(0.511 0.262 276.966);
     --studio-literature: oklch(0.646 0.222 41.116);
+    /* Mind map outline main-branch colours, cycled by branchColorVar in features/studio/components/mindmap/outline.ts. */
+    --mindmap-branch-1: oklch(0.6 0.13 30);
+    --mindmap-branch-2: oklch(0.58 0.11 150);
+    --mindmap-branch-3: oklch(0.56 0.12 250);
+    --mindmap-branch-4: oklch(0.62 0.12 75);
+    --mindmap-branch-5: oklch(0.58 0.13 320);
     --destructive-muted: oklch(0.95 0.025 30);
     --destructive-muted-foreground: oklch(0.36 0.09 30);
     --destructive-border: oklch(0.85 0.045 30);
@@ -183,6 +189,11 @@
     --studio-spreadsheet: oklch(0.789 0.154 211.53);
     --studio-note: oklch(0.673 0.182 276.935);
     --studio-literature: oklch(0.75 0.183 55.934);
+    --mindmap-branch-1: oklch(0.72 0.13 30);
+    --mindmap-branch-2: oklch(0.72 0.11 150);
+    --mindmap-branch-3: oklch(0.72 0.12 250);
+    --mindmap-branch-4: oklch(0.72 0.12 75);
+    --mindmap-branch-5: oklch(0.72 0.13 320);
     --destructive-muted: oklch(0.26 0.035 25);
     --destructive-muted-foreground: oklch(0.85 0.06 25);
     --destructive-border: oklch(0.38 0.05 25);
@@ -501,6 +512,7 @@
   --color-studio-spreadsheet: var(--studio-spreadsheet);
   --color-studio-note: var(--studio-note);
   --color-studio-literature: var(--studio-literature);
+  --color-branch: var(--branch);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -1229,6 +1241,56 @@
 /* Fades a scrolling transcript out at the top and bottom. */
 @utility reader-fade {
   mask-image: linear-gradient(transparent, #000 18%, #000 75%, transparent);
+}
+
+/* Mind map outline: an open branch's children slide open by animating the grid row to 1fr.
+   A closed group is also visibility:hidden so it is out of the tab order and the accessibility tree;
+   visibility flips at once on open and only after the fade on close. */
+@utility mindmap-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.4s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0.4s;
+
+  &[data-state="open"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  & > * {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* The soft guide line down an open branch, in the branch colour. */
+@utility mindmap-guide {
+  box-shadow: inset 1.5px 0 0 color-mix(in oklch, var(--branch) 32%, transparent);
+}
+
+/* A row's brief flash after it asks the chat, in the branch colour. */
+@utility mindmap-flash {
+  animation: mindmap-flash 1.2s var(--ease-out);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes mindmap-flash {
+  from {
+    background-color: color-mix(in oklch, var(--branch) 22%, transparent);
+  }
 }
 
 /* Reduced motion: movement becomes a fade, it does not disappear (spec §1).
