@@ -81,17 +81,25 @@ test.describe("Mind Map Generation", () => {
     const tree = page.getByRole("tree").filter({ visible: true });
     await expect(tree).toBeVisible({ timeout: 15_000 });
 
-    // Open the first branch; its children are one level deeper.
-    const branch = tree.getByRole("treeitem", { expanded: false }).first();
-    await expect(branch).toBeVisible();
+    // Pin the first closed branch by its label: a live "closed" locator would move on to the next
+    // item the moment this one opens.
+    const firstClosed = tree.getByRole("treeitem", { expanded: false }).first();
+    await expect(firstClosed).toBeVisible();
+    const label = await firstClosed.getAttribute("aria-label");
+    expect(label).toBeTruthy();
+    const branch = tree.getByRole("treeitem", { name: label as string, exact: true }).first();
+
     await branch
       .getByRole("button", { name: /^Expand / })
       .first()
       .click();
     await expect(branch).toHaveAttribute("aria-expanded", "true");
-    await expect(tree.locator('[role="treeitem"][aria-level="2"]').first()).toBeVisible();
+    await expect(branch.locator('[role="treeitem"][aria-level="2"]').first()).toBeVisible();
 
+    // Closed groups stay mounted but hidden after a fade, so only count the ones still visible.
     await page.getByRole("button", { name: "Collapse all" }).filter({ visible: true }).click();
-    await expect(tree.locator('[role="treeitem"][aria-level="2"]')).toHaveCount(0);
+    await expect(
+      tree.locator('[role="treeitem"][aria-level="2"]').filter({ visible: true })
+    ).toHaveCount(0);
   });
 });
