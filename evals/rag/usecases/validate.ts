@@ -59,11 +59,7 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
       problems.push(`${f.id}: research fixtures must set sourcePolicy.channels`);
     }
     const hint = f.studioParams?.documentTitleHint;
-    if (hint && f.runner === "literatureReview") {
-      problems.push(
-        `${f.id}: literatureReview fixtures cannot set documentTitleHint (they use the whole notebook)`
-      );
-    } else if (hint && !pack.sources.some((file) => matchesTitleHint(file, hint))) {
+    if (hint && !pack.sources.some((file) => matchesTitleHint(file, hint))) {
       problems.push(`${f.id}: documentTitleHint "${hint}" matches no pack source`);
     }
     if (f.runner === "both" || !pack.features.includes(f.runner as ConcreteRunnerKind)) {

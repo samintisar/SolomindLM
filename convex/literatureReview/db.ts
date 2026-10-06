@@ -71,6 +71,8 @@ export const createEvalSession = internalMutation({
     userId: v.id("users"),
     suggestedColumns: v.array(suggestedColumnValidator),
     confirmedColumns: v.array(confirmedColumnValidator),
+    documentIds: v.optional(v.array(v.id("documents"))),
+    paperScope: v.optional(v.union(v.literal("papers_and_search"), v.literal("papers_only"))),
   },
   returns: v.id("literatureReviewSessions"),
   handler: async (ctx, args) => {
@@ -83,6 +85,8 @@ export const createEvalSession = internalMutation({
       status: "processing",
       suggestedColumns: args.suggestedColumns,
       confirmedColumns: args.confirmedColumns,
+      ...(args.documentIds ? { documentIds: args.documentIds } : {}),
+      ...(args.paperScope ? { paperScope: args.paperScope } : {}),
       createdAt: now,
       updatedAt: now,
     });

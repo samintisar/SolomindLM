@@ -43,7 +43,7 @@ Rubric metrics (`rubric:<pack-id>:<check-id>`) feed the judge calibration queue 
 
 Pack notebooks live in the eval owner's `Test` folder. The eval owner is the account whose email is `RAG_EVAL_OWNER_EMAIL` (set on the dev deployment). `eval:seed` creates the `Test` folder and the pack notebook if they are missing, uploads changed sources and waits for ingestion.
 
-`literatureReview` fixtures take only a `notebookId` (the eval action has no `documentIds` input), so they use the whole pack notebook. Don't hand-add documents to a pack notebook that has `literatureReview` fixtures; other runners are restricted to the pack's source documents. To scope a fixture to some of them (like ticking one source in the app), set `studioParams.documentTitleHint`: the fixture and its rubric judge evidence keep only pack sources whose file name contains it (case-insensitive). `validatePack` rejects a hint that matches no source, and any hint on a `literatureReview` fixture.
+Every runner is restricted to the pack's source documents. `literatureReview` fixtures include those documents as the user's papers (PDFs and saved papers only), searching academic databases as well unless `studioParams.paperScope` is `"papers_only"`. To scope a fixture to some of them (like ticking one source in the app), set `studioParams.documentTitleHint`: the fixture and its rubric judge evidence keep only pack sources whose file name contains it (case-insensitive). `validatePack` rejects a hint that matches no source.
 
 Pack fixtures only run when selected explicitly (`--use-case`, `--prefix <pack-id>/…` or `--case <id>`). Plain `eval:rag`, `eval:studio` and `--runner` runs skip them. Every run validates the packs it selects; dry runs also pin pack fixtures to a placeholder notebook.
 

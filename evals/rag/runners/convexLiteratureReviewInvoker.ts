@@ -21,6 +21,8 @@ export function createConvexLiteratureReviewInvoker(
         evalSecret: options.evalSecret,
         question: args.question,
         notebookId: args.notebookId,
+        ...(args.documentIds ? { documentIds: args.documentIds } : {}),
+        ...(args.paperScope ? { paperScope: args.paperScope } : {}),
       });
     },
   };

@@ -12,6 +12,10 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { DataModel, Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
+import {
+  dropSearchCopiesOfNotebookPapers,
+  resolvePaperScope,
+} from "../literatureReview/notebookPapers";
 import { literatureReviewWorkflowProvenanceValidator } from "../literatureReview/workflowProvenance";
 import { assertRagEvalGate } from "./_gate";
 
@@ -53,13 +57,16 @@ const stagePaperValidator = v.object({
     v.literal("openalex"),
     v.literal("arxiv"),
     v.literal("semantic_scholar"),
-    v.literal("pubmed")
+    v.literal("pubmed"),
+    v.literal("notebook")
   ),
   citationCount: v.optional(v.number()),
   doi: v.optional(v.string()),
   score: v.number(),
   isIncluded: v.optional(v.boolean()),
   includeReason: v.optional(v.string()),
+  documentId: v.optional(v.id("documents")),
+  offTopicReason: v.optional(v.string()),
 });
 
 const screeningDecisionValidator = v.object({
@@ -127,12 +134,14 @@ interface LiteraturePaper {
   abstract: string;
   url: string;
   pdfUrl?: string;
-  source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+  source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed" | "notebook";
   citationCount?: number;
   doi?: string;
   score: number;
   isIncluded?: boolean;
   includeReason?: string;
+  documentId?: Id<"documents">;
+  offTopicReason?: string;
 }
 
 interface LiteratureReviewEvalResult {
@@ -145,10 +154,14 @@ interface LiteratureReviewEvalResult {
     found: number;
     deduplicated: number;
     screened: number;
+    /** Search papers included by screening. */
     included: number;
+    /** The selected notebook papers, included without screening (#301). */
+    fromNotebook: number;
     extractedRows: number;
   };
   stagePapers: {
+    notebook: LiteraturePaper[];
     search: LiteraturePaper[];
     deduped: LiteraturePaper[];
     ranked: LiteraturePaper[];
@@ -228,11 +241,115 @@ function toSuggestedColumns(
   }));
 }
 
+interface SearchRankScreenResult {
+  recordsIdentified: number;
+  recordsAfterDedupe: number;
+  search: LiteraturePaper[];
+  deduped: LiteraturePaper[];
+  ranked: LiteraturePaper[];
+  screened: LiteraturePaper[];
+  /** Screened papers that were included. */
+  included: LiteraturePaper[];
+}
+
+/** Search, rank and screen, recording provenance; search copies of notebook papers are dropped. */
+async function searchRankAndScreen(
+  ctx: EvalActionCtx,
+  args: {
+    sessionId: Id<"literatureReviewSessions">;
+    question: string;
+    searchQueries: string[];
+    notebookPapers: LiteraturePaper[];
+  }
+): Promise<SearchRankScreenResult> {
+  const { sessionId } = args;
+  const searchResults: {
+    papers: LiteraturePaper[];
+    recordsIdentified: number;
+    recordsAfterDedupe: number;
+  } = await ctx.runAction(internal.literatureReview.workflowSteps.searchPapers, {
+    query: args.question,
+    searchQueries: args.searchQueries,
+  });
+  const searchPapers = dropSearchCopiesOfNotebookPapers(args.notebookPapers, searchResults.papers);
+
+  await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+    sessionId,
+    patch: {
+      searchQueries: args.searchQueries,
+      databasesUsed: ["arxiv", "semantic_scholar", "pubmed"],
+      recordsIdentified: searchResults.recordsIdentified,
+      recordsAfterDedupe: searchResults.recordsAfterDedupe,
+      recordsFromNotebook: args.notebookPapers.length,
+      searchCompletedAt: Date.now(),
+    },
+  });
+
+  const deduped: { papers: LiteraturePaper[] } = await ctx.runAction(
+    internal.literatureReview.workflowSteps.deduplicatePapers,
+    { papers: searchPapers }
+  );
+  const ranked: { papers: LiteraturePaper[] } = await ctx.runAction(
+    internal.literatureReview.workflowSteps.rankPapers,
+    { papers: deduped.papers, query: args.question }
+  );
+
+  await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+    sessionId,
+    patch: {
+      recordsRanked: ranked.papers.length,
+      rankCompletedAt: Date.now(),
+    },
+  });
+
+  const screened: { papers: LiteraturePaper[] } = await ctx.runAction(
+    internal.literatureReview.workflowSteps.screenPapers,
+    { papers: ranked.papers.slice(0, 25), query: args.question }
+  );
+  const included = screened.papers.filter((paper) => paper.isIncluded === true);
+
+  await ctx.runMutation(internal.literatureReview.db.replaceScreeningDecisions, {
+    sessionId,
+    decisions: screened.papers.map((paper, i) => ({
+      paperIndex: i,
+      title: paper.title,
+      authors: paper.authors,
+      year: paper.year,
+      decision: paper.isIncluded === true ? ("included" as const) : ("excluded" as const),
+      reason: paper.includeReason ?? "No reason recorded.",
+      rank: i + 1,
+    })),
+  });
+
+  await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+    sessionId,
+    patch: {
+      recordsScreened: screened.papers.length,
+      recordsIncluded: included.length,
+      recordsExcluded: screened.papers.length - included.length,
+      screenCompletedAt: Date.now(),
+    },
+  });
+
+  return {
+    recordsIdentified: searchResults.recordsIdentified,
+    recordsAfterDedupe: searchResults.recordsAfterDedupe,
+    search: searchResults.papers,
+    deduped: deduped.papers,
+    ranked: ranked.papers,
+    screened: screened.papers,
+    included,
+  };
+}
+
 export const runLiteratureReviewEval = action({
   args: {
     evalSecret: v.string(),
     question: v.string(),
     notebookId: v.id("notebooks"),
+    /** Selected notebook sources to include as papers (#301); non-papers are ignored. */
+    documentIds: v.optional(v.array(v.id("documents"))),
+    paperScope: v.optional(v.union(v.literal("papers_and_search"), v.literal("papers_only"))),
   },
   returns: v.object({
     sessionId: v.string(),
@@ -245,9 +362,11 @@ export const runLiteratureReviewEval = action({
       deduplicated: v.number(),
       screened: v.number(),
       included: v.number(),
+      fromNotebook: v.number(),
       extractedRows: v.number(),
     }),
     stagePapers: v.object({
+      notebook: v.array(stagePaperValidator),
       search: v.array(stagePaperValidator),
       deduped: v.array(stagePaperValidator),
       ranked: v.array(stagePaperValidator),
@@ -266,6 +385,16 @@ export const runLiteratureReviewEval = action({
     const startTime = Date.now();
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
 
+    // Same rules as startLiteratureReview: only this notebook's finished PDFs and saved papers count.
+    const notebookPaperDocs: Array<{ _id: string }> = args.documentIds?.length
+      ? await ctx.runQuery(internal.literatureReview.db.getNotebookPaperDocuments, {
+          notebookId: args.notebookId,
+          documentIds: args.documentIds,
+        })
+      : [];
+    const notebookPaperIds = notebookPaperDocs.map((d) => d._id as Id<"documents">);
+    const paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
+
     const plan: { searchQueries: string[]; suggestedColumns: ConfirmedColumn[] } =
       await ctx.runAction(internal.literatureReview.workflowSteps.planReview, {
         query: args.question,
@@ -280,88 +409,45 @@ export const runLiteratureReviewEval = action({
         userId,
         suggestedColumns,
         confirmedColumns,
+        ...(paperScope ? { documentIds: notebookPaperIds, paperScope } : {}),
       }
     );
 
-    const searchResults: {
-      papers: LiteraturePaper[];
-      recordsIdentified: number;
-      recordsAfterDedupe: number;
-    } = await ctx.runAction(internal.literatureReview.workflowSteps.searchPapers, {
-      query: args.question,
-      searchQueries: plan.searchQueries,
-    });
+    // From here the steps mirror LiteratureReviewGraph: notebook papers are loaded first and always
+    // included; "papers_only" skips search, ranking and screening.
+    const notebookPapers: LiteraturePaper[] = paperScope
+      ? (
+          await ctx.runAction(internal.literatureReview.workflowSteps.loadNotebookPapers, {
+            notebookId: args.notebookId,
+            documentIds: notebookPaperIds,
+            query: args.question,
+          })
+        ).papers
+      : [];
+    if (paperScope === "papers_only" && notebookPapers.length === 0) {
+      throw new Error("None of the selected sources could be used as papers for this review.");
+    }
+    const papersOnly = paperScope === "papers_only";
 
-    await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
-      sessionId,
-      patch: {
-        searchQueries: plan.searchQueries,
-        databasesUsed: ["arxiv", "semantic_scholar", "pubmed"],
-        recordsIdentified: searchResults.recordsIdentified,
-        recordsAfterDedupe: searchResults.recordsAfterDedupe,
-        searchCompletedAt: Date.now(),
-      },
-    });
+    const search = papersOnly
+      ? null
+      : await searchRankAndScreen(ctx, {
+          sessionId,
+          question: args.question,
+          searchQueries: plan.searchQueries,
+          notebookPapers,
+        });
+    if (papersOnly) {
+      await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
+        sessionId,
+        patch: { searchSkipped: true, recordsFromNotebook: notebookPapers.length },
+      });
+    }
+    const screenedIncluded = search?.included ?? [];
 
-    const deduped: { papers: LiteraturePaper[] } = await ctx.runAction(
-      internal.literatureReview.workflowSteps.deduplicatePapers,
-      {
-        papers: searchResults.papers,
-      }
-    );
-    const ranked: { papers: LiteraturePaper[] } = await ctx.runAction(
-      internal.literatureReview.workflowSteps.rankPapers,
-      {
-        papers: deduped.papers,
-        query: args.question,
-      }
-    );
-
-    await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
-      sessionId,
-      patch: {
-        recordsRanked: ranked.papers.length,
-        rankCompletedAt: Date.now(),
-      },
-    });
-
-    const screened: { papers: LiteraturePaper[] } = await ctx.runAction(
-      internal.literatureReview.workflowSteps.screenPapers,
-      {
-        papers: ranked.papers.slice(0, 25),
-        query: args.question,
-      }
-    );
-    const includedPapers = screened.papers.filter(
-      (paper: LiteraturePaper) => paper.isIncluded === true
-    );
-    const excludedCount = screened.papers.length - includedPapers.length;
-
-    await ctx.runMutation(internal.literatureReview.db.replaceScreeningDecisions, {
-      sessionId,
-      decisions: screened.papers.map((paper, i) => ({
-        paperIndex: i,
-        title: paper.title,
-        authors: paper.authors,
-        year: paper.year,
-        decision: paper.isIncluded === true ? ("included" as const) : ("excluded" as const),
-        reason: paper.includeReason ?? "No reason recorded.",
-        rank: i + 1,
-      })),
-    });
-
-    await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
-      sessionId,
-      patch: {
-        recordsScreened: screened.papers.length,
-        recordsIncluded: includedPapers.length,
-        recordsExcluded: excludedCount,
-        screenCompletedAt: Date.now(),
-      },
-    });
-
+    // Notebook papers go first, as in the workflow.
     await ctx.runAction(internal.literatureReview.workflowSteps.extractData, {
-      papers: includedPapers.slice(0, 25),
+      papers: [...notebookPapers, ...screenedIncluded.slice(0, 25)],
       columns: confirmedColumns,
       sessionId,
     });
@@ -475,20 +561,22 @@ export const runLiteratureReviewEval = action({
       searchQueries: plan.searchQueries,
       confirmedColumns,
       counts: {
-        found: searchResults.recordsIdentified,
-        deduplicated: searchResults.recordsAfterDedupe,
-        screened: screened.papers.length,
-        included: includedPapers.length,
+        found: search?.recordsIdentified ?? 0,
+        deduplicated: search?.recordsAfterDedupe ?? 0,
+        screened: search?.screened.length ?? 0,
+        included: screenedIncluded.length,
+        fromNotebook: notebookPapers.length,
         extractedRows: table.papers.length,
       },
       workflowProvenance,
       stagePapers: {
-        search: searchResults.papers.slice(0, 10).map(truncateAbstract),
-        deduped: deduped.papers.slice(0, 10).map(truncateAbstract),
-        ranked: ranked.papers.slice(0, 10).map(truncateAbstract),
-        screened: screened.papers.slice(0, 10).map(truncateAbstract),
+        notebook: notebookPapers.map(truncateAbstract),
+        search: (search?.search ?? []).slice(0, 10).map(truncateAbstract),
+        deduped: (search?.deduped ?? []).slice(0, 10).map(truncateAbstract),
+        ranked: (search?.ranked ?? []).slice(0, 10).map(truncateAbstract),
+        screened: (search?.screened ?? []).slice(0, 10).map(truncateAbstract),
       },
-      screeningDecisions: screened.papers.map((p) => ({
+      screeningDecisions: (search?.screened ?? []).map((p) => ({
         title: p.title,
         isIncluded: p.isIncluded ?? true,
         reason: p.includeReason,
