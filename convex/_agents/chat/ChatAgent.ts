@@ -28,6 +28,7 @@ import { routeChatMessage } from "./chatRouter.js";
 import {
   chunkDedupKey,
   chunkRankingScore,
+  documentsWithRerankedPassages,
   mergeChunkScores,
   selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext.js";
@@ -112,15 +113,18 @@ export class ChatAgent {
    * replace those chunks with the full document content.
    *
    * This ensures comprehensive coverage when the query relates to many parts
-   * of a single source, regardless of query type.
+   * of a single source, regardless of query type. Pools that span several
+   * documents are left as passages so each source keeps its share of the budget.
    *
    * @param chunks - All retrieved chunks after reranking
    * @param logger - Service logger
+   * @param rerankedKeys - Dedup keys the global rerank scored; decides which documents are relevant
    * @returns Chunks with multi-section documents replaced by full content
    */
   private async expandMultiSectionDocuments(
     chunks: ReferenceChunk[],
-    logger: ServiceLogger
+    logger: ServiceLogger,
+    rerankedKeys?: ReadonlySet<string>
   ): Promise<ReferenceChunk[]> {
     if (!this.fetchDocumentFn || chunks.length === 0) return chunks;
 
@@ -134,6 +138,19 @@ export class ChatAgent {
         chunksByDocument.set(docId, []);
       }
       chunksByDocument.get(docId)!.push(chunk);
+    }
+
+    // A full document is one oversized passage that the token budget admits on its own, so
+    // expanding it when several documents are relevant drops every other source (#347).
+    // Without rerank scores every pooled document counts, since none can be ruled out.
+    const relevantDocumentCount = rerankedKeys
+      ? documentsWithRerankedPassages(chunks, rerankedKeys).length
+      : chunksByDocument.size;
+    if (relevantDocumentCount > 1) {
+      logger.info("Skipping full-document expansion: several sources are relevant", {
+        relevantDocumentCount,
+      });
+      return chunks;
     }
 
     // Find documents with many chunks retrieved
@@ -325,9 +342,9 @@ export class ChatAgent {
     rerankQueryFromDecomposer: string | undefined,
     userMessage: string,
     logger: ServiceLogger
-  ): Promise<ReferenceChunk[]> {
+  ): Promise<{ chunks: ReferenceChunk[]; rerankedKeys?: Set<string> }> {
     if (!this.globalRerankFn || merged.length === 0) {
-      return merged;
+      return { chunks: merged };
     }
     const rerankQueryForCache =
       (rerankQueryFromDecomposer?.trim() && rerankQueryFromDecomposer.trim()) || userMessage;
@@ -361,14 +378,17 @@ export class ChatAgent {
         return chunkRankingScore(b) - chunkRankingScore(a);
       });
 
-      return sorted.map((c) => {
+      const rerankedKeys = new Set<string>();
+      const chunks = sorted.map((c) => {
         const id = `${c.sourceId}:${c.chunkIndex}`;
         const sc = scoreMap.get(id);
         if (sc != null && !Number.isNaN(sc)) {
+          rerankedKeys.add(chunkDedupKey(c));
           return { ...c, similarity: sc };
         }
         return c;
       });
+      return { chunks, rerankedKeys };
     } catch (error) {
       logger.apiError("Rerank", "global", error, { inputCount: merged.length });
       throw error;
@@ -609,12 +629,14 @@ export class ChatAgent {
     // doc often loses to a short snippet from another source, so citations point at the wrong file.
     const pinnedForRerank = merged.filter((c) => c.metadata?.userAttached === true);
     const poolForRerank = merged.filter((c) => !c.metadata?.userAttached);
+    let rerankedKeys: Set<string> | undefined;
     try {
-      const rerankedPool =
+      const reranked =
         poolForRerank.length > 0
           ? await this.applyGlobalRerank(poolForRerank, rerankQueryOpt, userMessage, logger)
-          : [];
-      merged = [...pinnedForRerank, ...rerankedPool];
+          : { chunks: [] };
+      rerankedKeys = reranked.rerankedKeys;
+      merged = [...pinnedForRerank, ...reranked.chunks];
     } catch (e) {
       logger.warn("Global rerank failed, using merged hybrid scores", { error: String(e) });
       merged = [...pinnedForRerank, ...poolForRerank];
@@ -623,7 +645,7 @@ export class ChatAgent {
     // GENERAL MULTI-SECTION DOCUMENT RETRIEVAL:
     // If many chunks come from a single document, replace them with the full document.
     // This applies whenever retrieval finds multiple relevant sections, regardless of query type.
-    merged = await this.expandMultiSectionDocuments(merged, logger);
+    merged = await this.expandMultiSectionDocuments(merged, logger, rerankedKeys);
 
     // Split merged chunks back into notebook and external pools
     const notebookChunks = merged.filter((c) => !externalChunkKeys.has(chunkDedupKey(c)));
@@ -647,10 +669,12 @@ export class ChatAgent {
               maxSelectedChunks: maxForRest,
               maxContextTokens: Math.max(LIST_QUERY_CONTEXT_TOKEN_BUDGET - pinnedTokens, 800),
               lexicalQuery: userMessage,
+              rerankedKeys,
             }
           : {
               maxSelectedChunks: maxForRest,
               maxContextTokens: Math.max(CONTEXT_TOKEN_BUDGET - pinnedTokens, 800),
+              rerankedKeys,
             }
       ),
     ];
