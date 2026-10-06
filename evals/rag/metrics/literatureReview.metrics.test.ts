@@ -228,6 +228,33 @@ describe("literatureReview metrics with notebook papers", () => {
     expect(result.breakdown).toMatchObject({ mentionsIncluded: false });
   });
 
+  it("lr_prisma_consistency reads comma-grouped numbers whole", () => {
+    const four = lrPrismaConsistency(
+      fixture,
+      stubArtifact(notebookReview({ methods: "Of 4,000 records, none were screened." }))
+    );
+    expect(four.breakdown).toMatchObject({ mentionsIncluded: false });
+
+    const many = lrPrismaConsistency(
+      fixture,
+      stubArtifact(
+        notebookReview({
+          methods: "1,204 studies from your notebook were included.",
+          counts: {
+            found: 0,
+            deduplicated: 0,
+            screened: 0,
+            included: 0,
+            fromNotebook: 1204,
+            extractedRows: 0,
+          },
+          workflowProvenance: { searchSkipped: true, recordsFromNotebook: 1204 },
+        })
+      )
+    );
+    expect(many.breakdown).toMatchObject({ mentionsIncluded: true });
+  });
+
   it("lr_prisma_consistency doesn't take a hyphenated number for the included count", () => {
     const result = lrPrismaConsistency(
       fixture,
