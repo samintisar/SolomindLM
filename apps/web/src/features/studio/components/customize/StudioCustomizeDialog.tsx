@@ -192,8 +192,11 @@ export function StudioCustomizeBody({ children }: { children: ReactNode }) {
   );
 }
 
-/** Cancel, then the dialog's Generate button (its children). */
-export function StudioCustomizeFooter({ children }: { children: ReactNode }) {
+/**
+ * Cancel, then the dialog's Generate button (its children). A step that generates from its cards
+ * (the Report/Spreadsheet format grid) passes none and gets Cancel alone.
+ */
+export function StudioCustomizeFooter({ children }: { children?: ReactNode }) {
   return (
     <div className="px-6 pt-2 pb-6">
       <DialogFooter>

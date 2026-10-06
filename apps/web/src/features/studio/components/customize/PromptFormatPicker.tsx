@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/shared/components/ui/item";
 import { cn } from "@/shared/utils/cn";
@@ -40,9 +40,18 @@ interface PromptFormatPickerProps<Id extends string> {
   columns: 3 | 4;
 }
 
+/** Which control opened the prompt step, so Back can give it focus again. */
+interface Opener<Id extends string> {
+  formatId: Id;
+  control: "card" | "edit";
+}
+
 /**
  * Two steps: a grid of formats, then a prompt for the chosen one (Create Your Own, or a built-in
  * format's prompt to edit). It lives inside DialogContent, so each open starts on the grid.
+ *
+ * Each step replaces the control that was used to reach it, so focus is moved by hand: into the
+ * prompt on the way in, and back to the card or Edit button that opened it on the way out.
  */
 export function PromptFormatPicker<Id extends string>({
   kind,
@@ -61,14 +70,37 @@ export function PromptFormatPicker<Id extends string>({
   const [configuring, setConfiguring] = useState<PromptFormat<Id> | null>(null);
   const [prompt, setPrompt] = useState("");
   const gridLabelId = useId();
+  const formatTitleId = useId();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<Opener<Id> | null>(null);
 
-  const configure = (format: PromptFormat<Id>, text: string) => {
+  // Back to the grid: focus the card or Edit button that opened the prompt step. A layout effect,
+  // so it runs before Radix's focus scope notices the removed Back button and focuses the dialog.
+  useLayoutEffect(() => {
+    if (configuring) return;
+    const opener = openerRef.current;
+    openerRef.current = null;
+    if (!opener) return;
+    const wrapper = Array.from(
+      gridRef.current?.querySelectorAll<HTMLElement>("[data-format-id]") ?? []
+    ).find((el) => el.dataset.formatId === opener.formatId);
+    const target = wrapper?.querySelector<HTMLElement>(
+      opener.control === "edit" ? "[data-format-edit]" : '[data-slot="card"] > button'
+    );
+    target?.focus();
+  }, [configuring]);
+
+  const configure = (format: PromptFormat<Id>, text: string, control: Opener<Id>["control"]) => {
+    openerRef.current = { formatId: format.id, control };
     setConfiguring(format);
     setPrompt(text);
   };
   const promptLibrary = {
     studioTool,
-    onApplyPrompt: (text: string) => configure(configuring ?? customFormat, text),
+    // On the prompt step a library prompt replaces the text and keeps the format (and the opener).
+    // On the grid it opens Create Your Own, and Back returns to that card.
+    onApplyPrompt: (text: string) =>
+      configuring ? setPrompt(text) : configure(customFormat, text, "card"),
   };
 
   if (configuring) {
@@ -85,7 +117,7 @@ export function PromptFormatPicker<Id extends string>({
           <div className="flex flex-col gap-6 duration-300 ease-out animate-in fade-in-0 slide-in-from-right-4">
             <Item variant="muted">
               <ItemContent>
-                <ItemTitle>{configuring.title}</ItemTitle>
+                <ItemTitle id={formatTitleId}>{configuring.title}</ItemTitle>
                 <ItemDescription>{configuring.description}</ItemDescription>
               </ItemContent>
             </Item>
@@ -96,6 +128,8 @@ export function PromptFormatPicker<Id extends string>({
               onChange={setPrompt}
               studioTool={studioTool}
               tall
+              autoFocus
+              describedBy={formatTitleId}
             />
           </div>
         </StudioCustomizeBody>
@@ -123,36 +157,41 @@ export function PromptFormatPicker<Id extends string>({
             Format
           </h3>
           <div
+            ref={gridRef}
             className={cn(
               "grid gap-3 sm:grid-cols-2",
               columns === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"
             )}
           >
             {formats.map((format) => (
-              <OptionCard
-                key={format.id}
-                title={format.title}
-                description={format.description}
-                onSelect={() =>
-                  format.id === customFormat.id ? configure(format, "") : onPick(format)
-                }
-                action={
-                  format.prompt ? (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Edit the ${format.title} prompt`}
-                      onClick={() => configure(format, format.prompt)}
-                    >
-                      <Pencil />
-                    </Button>
-                  ) : undefined
-                }
-              />
+              // `contents` keeps the card a grid item; the wrapper only marks it for refocusing.
+              <div key={format.id} data-format-id={format.id} className="contents">
+                <OptionCard
+                  title={format.title}
+                  description={format.description}
+                  onSelect={() =>
+                    format.id === customFormat.id ? configure(format, "", "card") : onPick(format)
+                  }
+                  action={
+                    format.prompt ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Edit the ${format.title} prompt`}
+                        data-format-edit
+                        onClick={() => configure(format, format.prompt, "edit")}
+                      >
+                        <Pencil />
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              </div>
             ))}
           </div>
         </section>
       </StudioCustomizeBody>
+      <StudioCustomizeFooter />
     </>
   );
 }

@@ -156,12 +156,37 @@ describe("CustomizeSpreadsheetsModal", () => {
     expect(screen.getByTestId("save-as-prompt-tool-label")).toHaveTextContent("Spreadsheets");
   });
 
-  it("closes from Close and from Cancel", async () => {
+  it("closes from Close and from Cancel, on both steps", async () => {
     const { onClose } = renderSpreadsheets();
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
-    await userEvent.click(screen.getByRole("button", { name: "Create Your Own" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "Create Your Own" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(4);
+  });
+
+  it("moves focus to the prompt, and Back returns it to the card that opened it", async () => {
+    renderSpreadsheets();
+    await userEvent.click(screen.getByRole("button", { name: "Create Your Own" }));
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Back to formats" }));
+    expect(screen.getByRole("button", { name: "Create Your Own" })).toHaveFocus();
+  });
+
+  it("Back returns focus to the Edit button that opened the prompt", async () => {
+    renderSpreadsheets();
+    await userEvent.click(screen.getByRole("button", { name: "Edit the Timeline prompt" }));
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Back to formats" }));
+    expect(screen.getByRole("button", { name: "Edit the Timeline prompt" })).toHaveFocus();
+  });
+
+  it("the prompt is described by the chosen format's title", async () => {
+    renderSpreadsheets();
+    await userEvent.click(screen.getByRole("button", { name: "Edit the Comparison prompt" }));
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveAccessibleDescription("Comparison");
   });
 
   it("hides the prompt-library actions in previews", async () => {

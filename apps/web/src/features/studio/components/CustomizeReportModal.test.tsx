@@ -146,12 +146,46 @@ describe("CustomizeReportModal", () => {
     expect(screen.getByTestId("save-as-prompt-tool-label")).toHaveTextContent("Reports");
   });
 
-  it("closes from Close and from Cancel", async () => {
+  it("closes from Close and from Cancel, on both steps", async () => {
     const { onClose } = renderReport();
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
-    await userEvent.click(screen.getByRole("button", { name: "Create Your Own" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "Create Your Own" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(4);
+  });
+
+  it("moves focus to the prompt, and Back returns it to the card that opened it", async () => {
+    renderReport();
+    await userEvent.click(screen.getByRole("button", { name: "Create Your Own" }));
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Back to formats" }));
+    expect(screen.getByRole("button", { name: "Create Your Own" })).toHaveFocus();
+  });
+
+  it("Back returns focus to the Edit button that opened the prompt", async () => {
+    renderReport();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Edit the Concept Explainer prompt" })
+    );
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Back to formats" }));
+    expect(screen.getByRole("button", { name: "Edit the Concept Explainer prompt" })).toHaveFocus();
+  });
+
+  it("Back after a library prompt returns focus to Create Your Own", async () => {
+    renderReport();
+    await userEvent.click(screen.getByRole("button", { name: "Discover Prompts" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back to formats" }));
+    expect(screen.getByRole("button", { name: "Create Your Own" })).toHaveFocus();
+  });
+
+  it("the prompt is described by the chosen format's title", async () => {
+    renderReport();
+    await userEvent.click(screen.getByRole("button", { name: "Edit the Technical Report prompt" }));
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveAccessibleDescription("Technical Report");
   });
 
   it("hides the prompt-library actions in previews", async () => {

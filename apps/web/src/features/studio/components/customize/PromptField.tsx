@@ -1,5 +1,5 @@
 import { Bookmark } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/shared/components/ui/field";
 import { Textarea } from "@/shared/components/ui/textarea";
@@ -18,6 +18,13 @@ interface PromptFieldProps {
   studioTool: StudioTool;
   /** A taller box, for long instructions (Report, Spreadsheet). */
   tall?: boolean;
+  /**
+   * Focus the box when it mounts: for a step that replaces the control the user just used (the
+   * Report/Spreadsheet prompt step), so focus doesn't fall back to the dialog.
+   */
+  autoFocus?: boolean;
+  /** Ids of more text that describes the box (the chosen format's title), after `description`. */
+  describedBy?: string;
 }
 
 /** A Customize dialog's free-text prompt, with "Save as reusable prompt" under it (not in previews). */
@@ -29,9 +36,19 @@ export function PromptField({
   onChange,
   studioTool,
   tall = false,
+  autoFocus = false,
+  describedBy,
 }: PromptFieldProps) {
   const id = useId();
   const descriptionId = useId();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // A layout effect, so focus lands before Radix's focus scope sees the removed control and
+  // moves focus to the dialog.
+  useLayoutEffect(() => {
+    if (autoFocus) textareaRef.current?.focus();
+  }, [autoFocus]);
+  const ariaDescribedBy =
+    [description ? descriptionId : undefined, describedBy].filter(Boolean).join(" ") || undefined;
   const [saveOpen, setSaveOpen] = useState(false);
   const preview = useStudioCustomizePreview();
   return (
@@ -39,8 +56,9 @@ export function PromptField({
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {description && <FieldDescription id={descriptionId}>{description}</FieldDescription>}
       <Textarea
+        ref={textareaRef}
         id={id}
-        aria-describedby={description ? descriptionId : undefined}
+        aria-describedby={ariaDescribedBy}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
