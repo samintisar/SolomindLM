@@ -228,6 +228,14 @@ describe("literatureReview metrics with notebook papers", () => {
     expect(result.breakdown).toMatchObject({ mentionsIncluded: false });
   });
 
+  it("lr_prisma_consistency doesn't take a hyphenated number for the included count", () => {
+    const result = lrPrismaConsistency(
+      fixture,
+      stubArtifact(notebookReview({ methods: "Cohorts had a 4-year follow-up." }))
+    );
+    expect(result.breakdown).toMatchObject({ mentionsIncluded: false });
+  });
+
   it("lr_prisma_consistency counts notebook papers when no search ran", () => {
     const result = lrPrismaConsistency(
       fixture,
