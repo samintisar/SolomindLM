@@ -290,6 +290,8 @@ export const getTableById = internalQuery({
           rowData: v.record(v.string(), v.string()),
           includeReason: v.optional(v.string()),
           isIncluded: v.boolean(),
+          /** A notebook paper the screening check judged off-topic (#301); it is still included. */
+          offTopicReason: v.optional(v.string()),
         })
       ),
       createdAt: v.number(),
