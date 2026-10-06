@@ -75,6 +75,28 @@ describe("LiteratureTablePaperCell", () => {
     expect(onToggleSelect).toHaveBeenCalledTimes(1);
   });
 
+  test("shows the paper as selected", () => {
+    renderCell(searchPaper, { isSelected: true });
+    expect(screen.getByRole("checkbox", { name: /^Select / })).toBeChecked();
+  });
+
+  test("links to the paper's PDF", () => {
+    renderCell({
+      ...searchPaper,
+      citation: { ...searchPaper.citation!, pdfUrl: "https://example.com/paper.pdf" },
+    });
+    expect(screen.getByRole("link", { name: "View PDF" })).toHaveAttribute(
+      "href",
+      "https://example.com/paper.pdf"
+    );
+  });
+
+  test("while adding, the button reads Adding… and is disabled", () => {
+    renderCell(searchPaper, { isAdding: true });
+    expect(screen.getByRole("button", { name: "Adding…" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Loading/ })).not.toBeInTheDocument();
+  });
+
   test("an off-topic notebook paper is flagged with the reason", async () => {
     renderCell({ ...notebookPaper, offTopicReason: "Studies diet, not sleep" });
     const flag = screen.getByText("Off-topic?");

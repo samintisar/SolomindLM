@@ -115,7 +115,7 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
           checked={isSelected}
           onCheckedChange={() => onToggleSelect()}
           aria-label={`Select ${title}`}
-          className="mt-1"
+          className="mt-1.5"
         />
       </div>
 
@@ -183,8 +183,8 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
               onClick={onAddToNotebook}
               disabled={isInNotebook || isAdding || !citation}
             >
-              {isAdding ? <Spinner /> : <CirclePlus aria-hidden />}
-              {isInNotebook ? "In notebook" : "Add to notebook"}
+              {isAdding ? <Spinner aria-hidden /> : <CirclePlus aria-hidden />}
+              {isAdding ? "Adding…" : isInNotebook ? "In notebook" : "Add to notebook"}
             </Button>
           )}
         </div>
@@ -194,6 +194,7 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
         {isOpenAccess && (
           <span className="text-studio-literature" title="Open access">
             <LockOpen className="size-4" aria-hidden />
+            <span className="sr-only">Open access</span>
           </span>
         )}
         {pdfHref && (
