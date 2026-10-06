@@ -93,6 +93,26 @@
       "mcp__serena__read_file",
       "mcp__serena__get_diagnostics_for_file"
     ],
+    "ask": [
+      "Bash(git checkout -f *)",
+      "Bash(git checkout * -f)",
+      "Bash(git checkout * -f *)",
+      "Bash(git checkout --force *)",
+      "Bash(git checkout * --force)",
+      "Bash(git checkout * --force *)",
+      "Bash(git switch -f *)",
+      "Bash(git switch * -f)",
+      "Bash(git switch * -f *)",
+      "Bash(git switch --force *)",
+      "Bash(git switch * --force)",
+      "Bash(git switch * --force *)",
+      "Bash(git switch --discard-changes *)",
+      "Bash(git switch * --discard-changes)",
+      "Bash(git switch * --discard-changes *)",
+      "Bash(git checkout -- *)",
+      "Bash(git checkout * -- *)",
+      "Bash(git checkout .)"
+    ],
     "deny": [
       "Edit(.env*)",
       "Edit(bun.lock)",
