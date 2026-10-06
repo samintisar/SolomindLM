@@ -12,7 +12,7 @@ const toggleVariants = cva(
         // The chosen item gets its own fill plus an inset hairline, so it reads in both themes without
         // the fill alone carrying it. Inset, so a neighbouring item never covers it and focus rings don't clash.
         outline:
-          "bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground data-[state=on]:bg-surface-selected data-[state=on]:text-foreground data-[state=on]:inset-ring-1 data-[state=on]:inset-ring-foreground/40 aria-invalid:ring-destructive",
+          "bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:inset-ring-1 data-[state=on]:inset-ring-primary-foreground/15 data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground aria-invalid:ring-destructive",
         // Colour swatch picker: the colour is a child <span>; selection is a ring, not a fill.
         swatch:
           "rounded-full bg-transparent hover:bg-transparent data-[state=on]:bg-transparent data-[state=on]:ring-2 data-[state=on]:ring-ring",

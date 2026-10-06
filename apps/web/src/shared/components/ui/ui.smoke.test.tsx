@@ -428,11 +428,10 @@ describe("shadcn ui components render", () => {
       );
       const chosen = screen.getByRole("radio", { name: "B" });
       expect(chosen).toHaveAttribute("data-state", "on");
-      // accent is darker than surface-raised in dark mode, so it must not be the selected fill.
+      // accent is darker than surface-raised in dark mode, so the selected fill is the brand primary.
       expect(chosen).toHaveClass(
-        "data-[state=on]:bg-surface-selected",
-        "data-[state=on]:inset-ring-1",
-        "data-[state=on]:inset-ring-foreground/40"
+        "data-[state=on]:bg-primary",
+        "data-[state=on]:text-primary-foreground"
       );
       expect(chosen).not.toHaveClass("data-[state=on]:bg-accent");
     });
