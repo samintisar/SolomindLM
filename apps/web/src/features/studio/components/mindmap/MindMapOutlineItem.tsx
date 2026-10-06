@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useCallback } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/utils/cn";
 import { branchColorVar, type OutlineNode } from "./outline";
@@ -17,6 +17,8 @@ export interface TreeContext {
   flash: { id: string; count: number } | null;
   canAsk: boolean;
   askDisabled: boolean;
+  /** Id of the hidden "wait for the chat" note while asking is blocked, else undefined. */
+  busyDescriptionId: string | undefined;
   toggle: (id: string) => void;
   ask: (node: OutlineNode, parentTopic: string) => void;
   focusItem: (id: string) => void;
@@ -37,6 +39,17 @@ export function OutlineItem({ node, depth, index, setSize, parentTopic, ctx }: O
   const hasChildren = node.children.length > 0;
   const open = hasChildren && ctx.expansion.open.has(node.id);
   const flashKey = ctx.flash?.id === node.id ? ctx.flash.count : null;
+  const { register } = ctx;
+  const id = node.id;
+  // Stable, so a row registers once on mount and unregisters once on unmount (React 19 ref cleanup).
+  const itemRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (!el) return;
+      register(id, el);
+      return () => register(id, null);
+    },
+    [register, id]
+  );
   const typeClass = cn(
     "min-w-0 text-left font-serif",
     depth === 1 ? "text-base font-semibold" : "text-sm"
@@ -81,11 +94,12 @@ export function OutlineItem({ node, depth, index, setSize, parentTopic, ctx }: O
       aria-expanded={hasChildren ? open : undefined}
       aria-setsize={setSize}
       aria-posinset={index + 1}
+      aria-describedby={ctx.busyDescriptionId}
       tabIndex={ctx.tabStopId === node.id ? 0 : -1}
       data-node-id={node.id}
-      ref={(el) => ctx.register(node.id, el)}
+      ref={itemRef}
       style={depth === 1 ? ({ "--branch": branchColorVar(index) } as CSSProperties) : undefined}
-      className="rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      className="mindmap-item rounded-lg outline-hidden"
     >
       <div className="relative isolate flex min-h-8 items-center gap-1.5 rounded-lg px-1.5 hover:bg-muted/40">
         {flashKey !== null && (

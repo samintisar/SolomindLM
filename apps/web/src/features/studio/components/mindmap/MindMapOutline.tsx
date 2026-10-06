@@ -4,6 +4,7 @@ import {
   type KeyboardEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -32,8 +33,8 @@ function withOpened(state: Expansion, ids: readonly string[]): Expansion {
 export interface MindMapOutlineProps {
   title: string;
   /**
-   * The map. Pass a stable (memoised) object: a different root object counts as a new map and
-   * resets what is open and focused.
+   * The map. A new object with the same ids (a reactive re-render) keeps what is open.
+   * Remount with a `key` to reset for a different map.
    */
   root: OutlineNode;
   /** Absent outside a notebook: topics are then plain text. */
@@ -48,7 +49,6 @@ export interface MindMapOutlineProps {
  */
 export function MindMapOutline({ title, root, onAsk, askDisabled = false }: MindMapOutlineProps) {
   const { error: toastError } = useToast();
-  const [shownRoot, setShownRoot] = useState(root);
   const [expansion, setExpansion] = useState<Expansion>(NOTHING_OPEN);
   const [focusedId, setFocusedId] = useState<string | null>(root.children[0]?.id ?? null);
   const [flash, setFlash] = useState<{ id: string; count: number } | null>(null);
@@ -56,14 +56,8 @@ export function MindMapOutline({ title, root, onAsk, askDisabled = false }: Mind
   const items = useRef(new Map<string, HTMLElement>());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  // A new map starts closed again (state adjusted during render, not in an effect).
-  if (shownRoot !== root) {
-    setShownRoot(root);
-    setExpansion(NOTHING_OPEN);
-    setFocusedId(root.children[0]?.id ?? null);
-    setFlash(null);
-  }
+  const busyId = useId();
+  const busy = Boolean(onAsk) && askDisabled;
 
   useEffect(
     () => () => {
@@ -191,6 +185,7 @@ export function MindMapOutline({ title, root, onAsk, askDisabled = false }: Mind
     flash,
     canAsk: Boolean(onAsk),
     askDisabled,
+    busyDescriptionId: busy ? busyId : undefined,
     toggle,
     ask,
     focusItem,
@@ -217,6 +212,12 @@ export function MindMapOutline({ title, root, onAsk, askDisabled = false }: Mind
           {copied ? <Check /> : <Copy />}
         </Button>
       </div>
+      {/* Outside the tree, which may only hold treeitems; every treeitem points here while busy. */}
+      {busy && (
+        <span id={busyId} className="sr-only">
+          Wait for the chat to finish answering
+        </span>
+      )}
       <div
         role="tree"
         aria-label={title}

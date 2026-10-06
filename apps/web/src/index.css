@@ -1278,6 +1278,15 @@
   box-shadow: inset 1.5px 0 0 color-mix(in oklch, var(--branch) 32%, transparent);
 }
 
+/* A treeitem holds its row and its whole subtree; its keyboard focus ring goes on the row
+   (its first child) only, so an open branch does not ring everything under it. Inset, because a
+   nested row sits flush against its group's overflow:hidden wrapper, which would clip an outer ring. */
+@utility mindmap-item {
+  &:focus-visible > :first-child {
+    @apply ring-2 ring-ring ring-inset;
+  }
+}
+
 /* A row's brief flash after it asks the chat, in the branch colour. */
 @utility mindmap-flash {
   animation: mindmap-flash 1.2s var(--ease-out);

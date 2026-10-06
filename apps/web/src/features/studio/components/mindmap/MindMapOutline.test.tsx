@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MindMapOutline } from "./MindMapOutline";
 import { askPrompt, type OutlineNode, toMarkdown } from "./outline";
 
@@ -248,17 +248,98 @@ describe("MindMapOutline", () => {
     ]);
   });
 
-  test("a new root resets what is open", async () => {
-    const { rerender } = renderOutline();
-    await userEvent.click(screen.getByRole("button", { name: "Expand all" }));
-    expect(item("Queries")).toBeInTheDocument();
+  test("a re-render with an equal new root keeps what is open", async () => {
+    const { rerender, onAsk } = renderOutline();
+    await userEvent.click(screen.getByRole("button", { name: "Expand Attention" }));
+    await userEvent.click(screen.getByRole("button", { name: "Self-attention" }));
 
-    const next = n("root", "Other", [n("x", "Xylophones", [n("x1", "Mallets")]), n("y", "Yaks")]);
-    rerender(<MindMapOutline title="Other" root={next} onAsk={vi.fn()} />);
-    expect(screen.getAllByRole("treeitem").map((el) => el.getAttribute("aria-label"))).toEqual([
-      "Xylophones",
-      "Yaks",
-    ]);
-    expect(tabStops()).toEqual([item("Xylophones")]);
+    rerender(<MindMapOutline title={TITLE} root={structuredClone(ROOT)} onAsk={onAsk} />);
+    expect(item("Attention")).toHaveAttribute("aria-expanded", "true");
+    expect(item("Self-attention")).toBeInTheDocument();
+    expect(tabStops()).toEqual([item("Self-attention")]);
+  });
+
+  test("while busy, every treeitem is described as waiting for the chat", () => {
+    const { rerender, onAsk } = renderOutline({ askDisabled: true });
+    for (const el of screen.getAllByRole("treeitem")) {
+      expect(el).toHaveAccessibleDescription("Wait for the chat to finish answering");
+    }
+
+    rerender(<MindMapOutline title={TITLE} root={ROOT} onAsk={onAsk} />);
+    for (const el of screen.getAllByRole("treeitem")) {
+      expect(el).not.toHaveAttribute("aria-describedby");
+    }
+    expect(screen.queryByText("Wait for the chat to finish answering")).toBeNull();
+
+    rerender(<MindMapOutline title={TITLE} root={ROOT} askDisabled />);
+    expect(item("Attention")).not.toHaveAttribute("aria-describedby");
+  });
+
+  test("while busy, hovering a topic explains why it can't ask", async () => {
+    renderOutline({ askDisabled: true });
+    const wrapper = screen.getByRole("button", { name: "Attention" }).parentElement as HTMLElement;
+    await userEvent.hover(wrapper);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Wait for the chat to finish answering"
+    );
+  });
+
+  test("Enter does not ask while busy", async () => {
+    const { onAsk } = renderOutline({ askDisabled: true });
+    act(() => item("Attention").focus());
+    await userEvent.keyboard("{Enter}");
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(item("Attention")).toHaveFocus();
+  });
+
+  test("ArrowRight on a leaf and ArrowLeft on a closed main branch do nothing", async () => {
+    renderOutline();
+    act(() => item("Feed-forward layers").focus());
+    await userEvent.keyboard("{ArrowRight}");
+    expect(item("Feed-forward layers")).toHaveFocus();
+    expect(screen.getAllByRole("treeitem")).toHaveLength(6);
+
+    act(() => item("Attention").focus());
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(item("Attention")).toHaveFocus();
+    expect(item("Attention")).toHaveAttribute("aria-expanded", "false");
+    expect(tabStops()).toEqual([item("Attention")]);
+  });
+
+  describe("timers", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("Copied reverts to Copy as Markdown after 1.5 s", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderOutline();
+
+      // fireEvent, not userEvent: userEvent's own delays stall under fake timers.
+      fireEvent.click(screen.getByRole("button", { name: "Copy as Markdown" }));
+      await act(async () => {});
+      expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(1499));
+      expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByRole("button", { name: "Copy as Markdown" })).toBeInTheDocument();
+    });
+
+    test("the asked row's flash is gone after 1.2 s", async () => {
+      renderOutline();
+
+      fireEvent.click(screen.getByRole("button", { name: "Attention" }));
+      expect(item("Attention").querySelector(".mindmap-flash")).not.toBeNull();
+
+      act(() => vi.advanceTimersByTime(1199));
+      expect(item("Attention").querySelector(".mindmap-flash")).not.toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(item("Attention").querySelector(".mindmap-flash")).toBeNull();
+    });
   });
 });
