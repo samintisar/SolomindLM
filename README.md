@@ -631,7 +631,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 **Build fails with "Cannot find module '@convex/...'"**
 
-- Run `bun x convex dev` to regenerate the Convex client
+- Run `bun run dev:convex --once` to regenerate the Convex client
 
 **Vite cache issues**
 
@@ -652,8 +652,8 @@ bun run convex:env:push
 **Type errors in generated files**
 
 ```bash
-# Regenerate Convex types
-bun x convex dev
+# Regenerate Convex types (one push; safe while another worktree runs the watcher)
+bun run dev:convex --once
 ```
 
 ### Getting Help
