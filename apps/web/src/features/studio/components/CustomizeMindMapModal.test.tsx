@@ -75,4 +75,16 @@ describe("CustomizeMindMapModal", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it("starts with an empty prompt each time it opens", async () => {
+    const onGenerate = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <CustomizeMindMapModal isOpen onClose={onClose} onGenerate={onGenerate} />
+    );
+    await userEvent.type(screen.getByLabelText("Custom prompt"), "Draft");
+    rerender(<CustomizeMindMapModal isOpen={false} onClose={onClose} onGenerate={onGenerate} />);
+    rerender(<CustomizeMindMapModal isOpen onClose={onClose} onGenerate={onGenerate} />);
+    expect(screen.getByLabelText("Custom prompt")).toHaveValue("");
+  });
 });
