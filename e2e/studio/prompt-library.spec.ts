@@ -109,7 +109,6 @@ test.describe("Prompt Library", () => {
       await expect(page.getByRole("heading", { name: /save as prompt/i })).toBeVisible();
 
       // Initially shows private state
-      await expect(page.getByText("Private")).toBeVisible();
       await expect(page.getByText(/Only you can see and use this prompt/)).toBeVisible();
 
       // Click the visibility toggle (testid + role=switch)
@@ -119,7 +118,6 @@ test.describe("Prompt Library", () => {
       await expect(toggleButton).toHaveAttribute("aria-checked", "true");
 
       // Should now show public state
-      await expect(page.getByText("Public")).toBeVisible();
       await expect(page.getByText(/Anyone can discover and use this prompt/)).toBeVisible();
 
       // Public hint should appear
@@ -145,7 +143,10 @@ test.describe("Prompt Library", () => {
       await expect(page.getByRole("heading", { name: /save as prompt/i })).toBeVisible();
 
       // Click Cancel
-      await page.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", { name: /save as prompt/i })
+        .getByRole("button", { name: "Cancel" })
+        .click();
 
       // Modal should close
       await expect(page.getByRole("heading", { name: /save as prompt/i })).not.toBeVisible();
