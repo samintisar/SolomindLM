@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -346,11 +346,27 @@ function PublicPromptCard({
 }) {
   const [mode, setMode] = useState<"actions" | "rating" | "reporting">("actions");
   const done = () => setMode("actions");
+  const rateTrigger = useRef<HTMLButtonElement>(null);
+  const reportTrigger = useRef<HTMLButtonElement>(null);
+  const modeControls = useRef<HTMLDivElement>(null);
+  const previousMode = useRef(mode);
+  // Switching modes unmounts the focused button: move focus to the new row's first control, and
+  // back to the Rate or Report button that opened it.
+  useLayoutEffect(() => {
+    const previous = previousMode.current;
+    previousMode.current = mode;
+    if (previous === mode) return;
+    if (mode === "actions") {
+      (previous === "rating" ? rateTrigger : reportTrigger).current?.focus();
+    } else {
+      modeControls.current?.querySelector("button")?.focus();
+    }
+  }, [mode]);
 
   let footer: React.ReactNode;
   if (mode === "rating") {
     footer = (
-      <div className="flex flex-wrap items-center gap-1">
+      <div ref={modeControls} className="flex flex-wrap items-center gap-1">
         <span className="mr-1 font-sans text-xs text-muted-foreground">Rate:</span>
         {[1, 2, 3, 4, 5].map((rating) => (
           <Button
@@ -373,7 +389,7 @@ function PublicPromptCard({
     );
   } else if (mode === "reporting") {
     footer = (
-      <div className="flex flex-wrap items-center gap-2">
+      <div ref={modeControls} className="flex flex-wrap items-center gap-2">
         <span className="font-sans text-xs text-muted-foreground">Report this prompt?</span>
         <Button
           variant="ghost-destructive"
@@ -414,6 +430,7 @@ function PublicPromptCard({
             Save
           </Button>
           <Button
+            ref={rateTrigger}
             variant="ghost"
             size="icon-sm"
             aria-label="Rate this prompt"
@@ -422,6 +439,7 @@ function PublicPromptCard({
             <Star />
           </Button>
           <Button
+            ref={reportTrigger}
             variant="ghost"
             size="icon-sm"
             aria-label="Report this prompt"

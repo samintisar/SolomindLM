@@ -120,6 +120,27 @@ describe("DiscoverStudioPromptsModal", () => {
     await waitFor(() => expect(api.success).toHaveBeenCalledWith("Prompt reported"));
   });
 
+  it("keeps focus on the card while rating: first star in, Rate this prompt back out", async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    await user.click(within(dialog).getByRole("button", { name: "Rate this prompt" }));
+    expect(within(dialog).getByRole("button", { name: "Rate 1 out of 5" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(within(dialog).getByRole("button", { name: "Rate this prompt" })).toHaveFocus();
+  });
+
+  it("keeps focus on the card while reporting: Confirm in, Report this prompt back out", async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const dialog = await openLibrary(user);
+    await user.click(within(dialog).getByRole("button", { name: "Report this prompt" }));
+    expect(within(dialog).getByRole("button", { name: "Confirm" })).toHaveFocus();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(within(dialog).getByRole("button", { name: "Report this prompt" })).toHaveFocus();
+    expect(api.reportPrompt).not.toHaveBeenCalled();
+  });
+
   it("shows the error when saving a prompt fails", async () => {
     const user = userEvent.setup();
     api.savePrompt.mockRejectedValueOnce(new Error("Already in your library"));
