@@ -91,12 +91,55 @@ describe("LiteratureTableView", () => {
     );
   });
 
+  it("Escape closes an open menu first, then leaves full screen", async () => {
+    const user = userEvent.setup();
+    renderTable();
+    await user.click(screen.getByRole("button", { name: "Full screen table" }));
+    await user.click(screen.getByRole("button", { name: "Export table" }));
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Exit full screen" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Full screen table" })).toBeInTheDocument()
+    );
+  });
+
+  it("Manage Columns toggles the column manager", async () => {
+    const user = userEvent.setup();
+    renderTable();
+    const toggle = screen.getByRole("button", { name: "Manage columns" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("complementary", { name: "Manage Columns" })).not.toBeInTheDocument();
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+  });
+
+  it("disables Save while saving, under the name Saving table", () => {
+    renderTable({ onSave: vi.fn(), isSaving: true });
+    expect(screen.getByRole("button", { name: "Saving table" })).toBeDisabled();
+  });
+
   it("shows an empty state with Add Papers when there are no papers", async () => {
     const user = userEvent.setup();
     const onAddPapers = vi.fn();
     renderTable({ table: { ...TABLE, papers: [] }, onAddPapers });
-    expect(screen.getByText("No papers in this table yet")).toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: /Add Papers/ }).at(-1) as HTMLElement);
+    const empty = screen
+      .getByText("No papers in this table yet")
+      .closest<HTMLElement>('[data-slot="empty"]');
+    expect(empty).not.toBeNull();
+    await user.click(within(empty as HTMLElement).getByRole("button", { name: "Add Papers" }));
     expect(onAddPapers).toHaveBeenCalled();
+  });
+
+  it("renders no Add Papers buttons without onAddPapers", () => {
+    renderTable({ table: { ...TABLE, papers: [] } });
+    expect(screen.getByText("No papers in this table yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add papers/i })).not.toBeInTheDocument();
   });
 });

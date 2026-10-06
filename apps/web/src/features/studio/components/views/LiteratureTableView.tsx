@@ -249,7 +249,8 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
     if (!isFocusMode) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      // An open menu or dialog handles its own Escape (Radix prevents the default).
+      if (event.key === "Escape" && !event.defaultPrevented) {
         setIsFocusMode(false);
       }
     };
@@ -267,7 +268,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   const shellClassName = cn(
     "flex min-w-0 flex-col bg-background",
     isFocusMode
-      ? "fixed inset-x-0 top-14 bottom-0 z-60 flex flex-col bg-background"
+      ? "fixed inset-x-0 top-14 bottom-0 z-60"
       : "h-full animate-in fade-in slide-in-from-right-4 duration-300 ease-out"
   );
 
@@ -294,16 +295,18 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm-adaptive"
-            onClick={onAddPapers}
-            title="Add papers"
-            aria-label="Add papers"
-          >
-            <Plus />
-            <span className="hidden @xl/table-toolbar:inline">Add Papers</span>
-          </Button>
+          {onAddPapers && (
+            <Button
+              variant="ghost"
+              size="sm-adaptive"
+              onClick={onAddPapers}
+              title="Add papers"
+              aria-label="Add papers"
+            >
+              <Plus />
+              <span className="hidden @xl/table-toolbar:inline">Add Papers</span>
+            </Button>
+          )}
           <Button
             variant={columnManagerOpen ? "secondary" : "ghost"}
             size="sm-adaptive"
@@ -410,7 +413,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col bg-background">
+        <div className="flex min-w-0 flex-1 flex-col bg-card">
           {table.papers.length === 0 ? (
             <Empty>
               <EmptyHeader>
@@ -419,9 +422,11 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                 </EmptyMedia>
                 <EmptyTitle>No papers in this table yet</EmptyTitle>
               </EmptyHeader>
-              <EmptyContent>
-                <Button onClick={onAddPapers}>Add Papers</Button>
-              </EmptyContent>
+              {onAddPapers && (
+                <EmptyContent>
+                  <Button onClick={onAddPapers}>Add Papers</Button>
+                </EmptyContent>
+              )}
             </Empty>
           ) : (
             <Table containerClassName="min-h-0 flex-1" className="min-w-275">
