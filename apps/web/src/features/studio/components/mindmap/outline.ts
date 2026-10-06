@@ -18,6 +18,13 @@ function isNonBlankString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+/** A non-blank string topic as is, a finite number as its text, anything else null. */
+function readTopic(value: unknown): string | null {
+  if (isNonBlankString(value)) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
 /** Every real (non-blank string) id in the raw tree, so generated ids can steer clear of them. */
 function collectRawIds(node: unknown, into: Set<string>): void {
   if (!node || typeof node !== "object") return;
@@ -69,7 +76,7 @@ export function sanitizeNodeTree(
     }
 
     const raw = current as Record<string, unknown>;
-    const topic = isNonBlankString(raw.topic) ? raw.topic : root ? fallbackTopic : "Untitled";
+    const topic = readTopic(raw.topic) ?? (root ? fallbackTopic : "Untitled");
     // Claim this node's id before its children's, so the first occurrence of a repeated id keeps it.
     const id = claimId(raw.id, root);
     const children = Array.isArray(raw.children)
@@ -82,9 +89,14 @@ export function sanitizeNodeTree(
   return visit(node, isRoot);
 }
 
+/** Line breaks inside a topic or title become one space, so a multi-line topic stays one bullet. */
+function oneLine(text: string): string {
+  return text.replace(/\s*[\r\n]+\s*/g, " ");
+}
+
 function bulletLines(nodes: OutlineNode[], depth: number): string[] {
   return nodes.flatMap((child) => [
-    `${"  ".repeat(depth)}- ${child.topic}`,
+    `${"  ".repeat(depth)}- ${oneLine(child.topic)}`,
     ...bulletLines(child.children, depth + 1),
   ]);
 }
@@ -92,7 +104,9 @@ function bulletLines(nodes: OutlineNode[], depth: number): string[] {
 /** `# {title}` then the whole tree (open or not) as nested "- " bullets, two spaces per level. */
 export function toMarkdown(title: string, root: OutlineNode): string {
   const bullets = bulletLines(root.children, 0);
-  return bullets.length === 0 ? `# ${title}` : [`# ${title}`, "", ...bullets].join("\n");
+  return bullets.length === 0
+    ? `# ${oneLine(title)}`
+    : [`# ${oneLine(title)}`, "", ...bullets].join("\n");
 }
 
 /** "Discuss what these sources say about {topic}, in the context of {context}." */

@@ -17,6 +17,11 @@ function allIds(root: OutlineNode): string[] {
   return [root.id, ...root.children.flatMap(allIds)];
 }
 
+function expectUniqueIds(root: OutlineNode): void {
+  const ids = allIds(root);
+  expect(new Set(ids).size).toBe(ids.length);
+}
+
 describe("branchColorVar", () => {
   it("maps the first five branches to tokens 1 to 5", () => {
     expect(BRANCH_COLOR_COUNT).toBe(5);
@@ -91,6 +96,7 @@ describe("sanitizeNodeTree", () => {
     expect(result.id).toBe("root");
     expect(result.children[0].id.length).toBeGreaterThan(0);
     expect(result.children[0].id).not.toBe("root");
+    expectUniqueIds(result);
   });
 
   it("replaces blank ids", () => {
@@ -100,6 +106,53 @@ describe("sanitizeNodeTree", () => {
       true
     );
     expect(result.children[0].id.trim().length).toBeGreaterThan(0);
+    expectUniqueIds(result);
+  });
+
+  it("replaces a numeric id with a unique string id", () => {
+    const result = sanitizeNodeTree(
+      {
+        id: "root",
+        topic: "R",
+        children: [
+          { id: 7, topic: "x" },
+          { id: "7", topic: "y" },
+        ],
+      },
+      "F",
+      true
+    );
+    expect(typeof result.children[0].id).toBe("string");
+    expect(result.children[0].id.length).toBeGreaterThan(0);
+    expect(result.children[1].id).toBe("7");
+    expectUniqueIds(result);
+  });
+
+  it("keeps a finite numeric topic as its text", () => {
+    const result = sanitizeNodeTree(
+      {
+        id: "root",
+        topic: 2024,
+        children: [
+          { id: "a", topic: 3.5 },
+          { id: "b", topic: 0 },
+        ],
+      },
+      "F",
+      true
+    );
+    expect(result.topic).toBe("2024");
+    expect(result.children.map((c) => c.topic)).toEqual(["3.5", "0"]);
+  });
+
+  it("does not turn NaN or Infinity into a topic", () => {
+    const result = sanitizeNodeTree(
+      { id: "root", topic: Number.NaN, children: [{ id: "a", topic: Number.POSITIVE_INFINITY }] },
+      "F",
+      true
+    );
+    expect(result.topic).toBe("F");
+    expect(result.children[0].topic).toBe("Untitled");
   });
 
   it("gives children that share an id different ids", () => {
@@ -198,6 +251,19 @@ describe("toMarkdown", () => {
   it("leaves special characters as they are", () => {
     const tree = node("root", [node("a", [], "*bold* # not a heading [x]")]);
     expect(toMarkdown("T", tree)).toBe("# T\n\n- *bold* # not a heading [x]");
+  });
+
+  it("collapses line breaks inside a topic to one space", () => {
+    const tree = node("root", [
+      node("a", [node("b", [], "tail\r\nCRLF  \r  and CR")], "first line\n  second line\n\nthird"),
+    ]);
+    expect(toMarkdown("T", tree)).toBe(
+      ["# T", "", "- first line second line third", "  - tail CRLF and CR"].join("\n")
+    );
+  });
+
+  it("collapses line breaks inside the title", () => {
+    expect(toMarkdown("Two\nlines", node("root"))).toBe("# Two lines");
   });
 
   it("is just the heading when the root has no children", () => {
