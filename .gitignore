@@ -1,6 +1,9 @@
 # Git worktrees
 .worktrees/
 
+# Dev server launcher state (apps/web/scripts/dev-server.ts)
+.dev-servers/
+
 # Logs
 logs
 *.log

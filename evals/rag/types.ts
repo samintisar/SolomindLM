@@ -154,6 +154,11 @@ export interface ChunkSnapshot {
   sourceTitle: string;
   sourceUrl?: string;
   content: string;
+  /**
+   * The passage as the chat model saw it (citation markers stripped, neighbouring passages'
+   * previews around it). Judges score against this, since the model may use preview text.
+   */
+  contextText?: string;
   similarity?: number;
   rrfScore?: number;
   vectorRank?: number;

@@ -67,6 +67,15 @@ describe("allowedOrigins", () => {
       expect(new Set(result).size).toBe(result.length);
     });
 
+    it("allows every web dev port a worktree can get, and nothing past it", () => {
+      const result = allowedOrigins();
+      expect(result).toContain("http://localhost:5199");
+      expect(result).toContain("http://127.0.0.1:5186");
+      expect(result).toContain("http://10.0.2.2:5174");
+      expect(result).not.toContain("http://localhost:5200");
+      expect(result).not.toContain("http://localhost:5172");
+    });
+
     it("does not duplicate SITE_URL when it is already a dev origin", () => {
       process.env.SITE_URL = "http://localhost:5173";
       const result = allowedOrigins();

@@ -1,3 +1,4 @@
+import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
 import { computeConfigHash } from "../configHash";
@@ -37,6 +38,7 @@ function toChunkSnapshot(chunk: ReferenceChunk): ChunkSnapshot {
     sourceTitle: chunk.sourceTitle,
     sourceUrl: chunk.sourceUrl,
     content: chunk.content,
+    contextText: passageTextForModel(chunk),
     similarity: chunk.similarity,
     rrfScore: chunk.rrfScore,
     vectorRank: chunk.vectorRank,
