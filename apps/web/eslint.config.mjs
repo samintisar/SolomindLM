@@ -47,6 +47,13 @@ const MIGRATED = [
   "src/features/studio/components/views/ProficiencyBadge.tsx",
   "src/features/studio/components/views/SpreadsheetView.tsx",
   "src/features/studio/components/spreadsheet/**/*.tsx",
+  "src/features/studio/components/customize/**/*.tsx",
+  "src/features/studio/components/Customize*Modal.tsx",
+  "src/features/studio/components/DiscoverStudioPromptsModal.tsx",
+  "src/features/studio/components/SaveAsPromptModal.tsx",
+  "src/features/studio/components/StudioModalDiscoverPromptsButton.tsx",
+  "src/features/studio/components/CitePaperModal.tsx",
+  "src/features/studio/components/CitationStylePicker.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
