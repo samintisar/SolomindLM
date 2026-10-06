@@ -27,7 +27,7 @@ import { useToast } from "@/shared/contexts/useToast";
 import { type StudioTool, useCreatePrompt, usePublishPrompt } from "../services/promptsApi";
 import { useStudioDialogTheme } from "./customize/dialogTheme";
 
-interface SaveAsPromptModalProps {
+interface SaveAsPromptBaseProps {
   isOpen: boolean;
   onClose: () => void;
   studioTool: StudioTool;
@@ -35,11 +35,19 @@ interface SaveAsPromptModalProps {
   initialPromptText: string;
   /** Optional notebook ID to associate with the prompt. */
   notebookId?: string;
-  /** The button that opens it. Radix returns focus there when the dialog closes. */
-  trigger?: React.ReactElement;
-  /** Called when `trigger` is clicked. */
-  onOpen?: () => void;
 }
+
+/** A `trigger` always comes with the `onOpen` that opens it: the dialog is controlled by `isOpen`. */
+type SaveAsPromptTriggerProps =
+  | {
+      /** The button that opens it. Radix returns focus there when the dialog closes. */
+      trigger: React.ReactElement;
+      /** Called when `trigger` is clicked. */
+      onOpen: () => void;
+    }
+  | { trigger?: never; onOpen?: never };
+
+type SaveAsPromptModalProps = SaveAsPromptBaseProps & SaveAsPromptTriggerProps;
 
 const TOOL_LABELS: Record<StudioTool, string> = {
   report: "Reports",

@@ -111,7 +111,7 @@ test.describe("Prompt Library", () => {
       // Initially shows private state
       await expect(page.getByText(/Only you can see and use this prompt/)).toBeVisible();
 
-      // Click the visibility toggle (testid + role=switch)
+      // Click the visibility toggle (a Radix checkbox, so aria-checked)
       const toggleButton = page.getByTestId("save-as-prompt-visibility-toggle");
       await expect(toggleButton).toHaveAttribute("aria-checked", "false");
       await toggleButton.click();

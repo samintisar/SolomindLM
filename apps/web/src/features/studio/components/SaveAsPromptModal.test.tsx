@@ -87,6 +87,32 @@ describe("SaveAsPromptModal", () => {
     expect(promptBox()).toHaveValue("Start and more");
   });
 
+  it("starts fresh when it is closed and opened again with new text", async () => {
+    const user = userEvent.setup();
+    const props = { onClose, studioTool: "flashcards" as const };
+    const { rerender } = render(<SaveAsPromptModal {...props} isOpen initialPromptText="First" />);
+    await user.type(titleInput(), "Draft title");
+    await user.type(promptBox(), " edited");
+    rerender(<SaveAsPromptModal {...props} isOpen={false} initialPromptText="First" />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    rerender(<SaveAsPromptModal {...props} isOpen initialPromptText="Second" />);
+    expect(promptBox()).toHaveValue("Second");
+    expect(titleInput()).toHaveValue("");
+  });
+
+  it("shows an error and stays open when saving fails", async () => {
+    const user = userEvent.setup();
+    api.createPrompt.mockRejectedValue(new Error("Network down"));
+    renderOpen("Prompt body");
+    await user.type(titleInput(), "My prompt");
+    await user.click(saveButton());
+    expect(api.error).toHaveBeenCalledWith("Network down");
+    expect(api.success).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(saveButton()).toBeEnabled();
+    expect(titleInput()).toHaveValue("My prompt");
+  });
+
   it("shows character counts", () => {
     renderOpen("Initial prompt text");
     expect(screen.getByText("0/100")).toBeInTheDocument();
