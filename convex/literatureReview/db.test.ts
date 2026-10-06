@@ -886,3 +886,35 @@ describe("loadNotebookPaperDocuments", () => {
     expect(loaded.map((d) => d._id).sort()).toEqual([pdf, record].sort());
   });
 });
+
+describe("createEvalSession", () => {
+  test("stores the selected notebook papers and the scope", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const documentId = await t.run(async (ctx) =>
+      ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "paper.pdf",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+
+    const sessionId = await t.mutation(internal.literatureReview.db.createEvalSession, {
+      query: "q",
+      notebookId,
+      userId,
+      suggestedColumns: [],
+      confirmedColumns: [],
+      documentIds: [documentId],
+      paperScope: "papers_only",
+    });
+
+    const session = await t.run(async (ctx) => ctx.db.get(sessionId));
+    expect(session).toMatchObject({ documentIds: [documentId], paperScope: "papers_only" });
+  });
+});

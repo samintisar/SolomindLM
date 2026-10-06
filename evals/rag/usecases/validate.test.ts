@@ -159,7 +159,7 @@ describe("validatePack", () => {
     expect(problems.filter((p) => p.includes("r-ok"))).toEqual([]);
   });
 
-  it("flags a documentTitleHint that matches no pack source, and one on literatureReview", () => {
+  it("flags a documentTitleHint that matches no pack source, on any runner", () => {
     const p = pack({ features: ["flashcards", "literatureReview"] });
     const fixtures = [
       fixture({ studioParams: { documentTitleHint: "UNIT-1" } }),
@@ -172,7 +172,6 @@ describe("validatePack", () => {
     ];
     expect(validatePack(registered(p, fixtures))).toEqual([
       'language-learners/typo: documentTitleHint "unit-2" matches no pack source',
-      "language-learners/lit: literatureReview fixtures cannot set documentTitleHint (they use the whole notebook)",
     ]);
   });
 

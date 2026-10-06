@@ -4,8 +4,9 @@ import type { EvalFixture } from "../../types";
  * Researchers pack fixtures. Requests are phrased the way a researcher working
  * through a set of papers would ask. Questions about one paper scope to it with
  * `studioParams.documentTitleHint` (like ticking one source in the app);
- * synthesis requests use every paper. The literature review fixture searches
- * external databases, so it is judged on structure only. Notebook and document
+ * synthesis requests use every paper. The literature review fixture includes all
+ * four papers and searches external databases as well (#301), so it should cite
+ * both; each pack paper is checked by its first author or study name. Notebook and document
  * ids are filled in at run time from the seeded "Researchers" notebook, so they
  * are never set here.
  *
@@ -230,10 +231,19 @@ export const researchersFixtures: EvalFixture[] = [
     runner: "literatureReview",
     question:
       "What is the dose-response relationship between physical activity and depression in adults?",
-    expectedItems: ["depression", "physical activity"],
+    // One entry per pack paper (any of its words counts): the review must include and cite all four.
+    expectedItems: [
+      "depression",
+      "physical activity",
+      "Pearce",
+      "TILDA Laird",
+      "Lambert",
+      "NHANES Rutherford",
+    ],
     expectedBehavior:
-      "Searches academic databases, screens relevant papers, extracts a table and writes a structured narrative " +
-      "review that cites the papers it includes.",
+      "Includes the four papers from the notebook without screening them out, adds papers found by searching " +
+      "academic databases, extracts a table and writes a structured narrative review that cites both the " +
+      "notebook papers and the search results it includes.",
     expectedStructure: {
       minItems: 1,
       requiredSections: ["Introduction", "Methods", "Results", "Discussion", "Conclusion"],
