@@ -1,7 +1,8 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { Loader2 } from "lucide-react";
 import React, { useCallback, useState } from "react";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
+import { cn } from "@/shared/utils/cn";
 import {
   useLiteratureReportDetail,
   useLiteratureTable,
@@ -175,22 +176,22 @@ function PanelShell({
   children: React.ReactNode;
   variant?: "default" | "table";
 }) {
-  const shellClass =
-    variant === "table"
-      ? "relative h-full w-full min-w-0 bg-background border-l border-border/70 flex flex-col overflow-hidden"
-      : "relative h-full w-full min-w-0 bg-sidebar border-l-2 border-border flex flex-col overflow-hidden";
-
   return (
-    <div className={shellClass}>
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">{children}</div>
+    <div
+      className={cn(
+        "relative flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border/50",
+        variant === "table" ? "bg-background" : "bg-sidebar"
+      )}
+    >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="flex flex-1 items-center justify-center text-muted-foreground">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex flex-1 items-center justify-center text-primary">
+      <Spinner className="size-8" />
     </div>
   );
 }
