@@ -18,6 +18,7 @@ import {
   InputGroupInput,
 } from "@/shared/components/ui/input-group";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import { useResolveDoi, useUpload } from "../../services/documentsApi";
 import { type StepFormProps, useReportBusy } from "./types";
 
@@ -64,7 +65,8 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
         setError("Could not resolve DOI. Please check the DOI and try again.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resolve DOI");
+      const parsed = parseServiceError(err);
+      setError(parsed ? getServiceErrorMessage(parsed) : "Failed to resolve DOI. Try again.");
     } finally {
       setIsResolving(false);
     }
@@ -98,7 +100,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
   return (
     <div className="flex flex-col gap-6">
       <Field>
-        <FieldLabel htmlFor={id}>DOI</FieldLabel>
+        <FieldLabel htmlFor={id}>DOI or arXiv ID</FieldLabel>
         <InputGroup>
           <InputGroupInput
             id={id}
@@ -116,7 +118,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
                 void handleResolve();
               }
             }}
-            placeholder="e.g., 10.1038/s41586-020-2649-2"
+            placeholder="e.g., 10.1038/s41586-020-2649-2 or 2005.11401"
             autoFocus
             disabled={isResolving || isUploading}
           />
