@@ -136,7 +136,7 @@ export function OutlineItem({ node, depth, index, setSize, parentTopic, ctx }: O
           <span
             aria-hidden
             className={cn(
-              "ml-auto pr-1 font-sans text-xs text-muted-foreground tabular-nums transition-opacity",
+              "ml-auto pr-1 font-sans text-xs text-muted-foreground tabular-nums transition-opacity duration-300 ease-out",
               open && "opacity-0"
             )}
           >

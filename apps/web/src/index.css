@@ -1247,13 +1247,10 @@
   }
 }
 
-/* A row's brief flash after it asks the chat, in the branch colour. */
+/* A row's brief flash after it asks the chat, in the branch colour. A colour fade, not movement,
+   so it stays under reduced motion: it is the only sign that the topic was asked. */
 @utility mindmap-flash {
   animation: mindmap-flash 1.2s var(--ease-out);
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
 }
 
 @keyframes mindmap-flash {
