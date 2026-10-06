@@ -1,0 +1,6 @@
+# Gitignored files Claude Code copies into each new worktree (desktop sessions, --worktree,
+# subagent worktrees). Only files that match here AND are gitignored are copied.
+# Without them a fresh worktree has no Convex URL, no service keys and no E2E login.
+.env
+.env.local
+.env.e2e

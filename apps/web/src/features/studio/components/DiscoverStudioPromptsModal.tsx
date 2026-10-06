@@ -1,20 +1,61 @@
-import type { Id } from "@convex/_generated/dataModel";
 import {
   Bookmark,
-  ChevronDown,
-  Compass,
   Eye,
   EyeOff,
   Flag,
   Library,
-  Loader2,
   MessageSquareQuote,
   Search,
   Star,
   Trash2,
-  X,
 } from "lucide-react";
-import React, { useState } from "react";
+import type React from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/shared/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shared/components/ui/input-group";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemTitle,
+} from "@/shared/components/ui/item";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useToast } from "@/shared/contexts/useToast";
 import {
   type PromptSortBy,
@@ -29,18 +70,20 @@ import {
   useSavePublicPrompt,
   useUnpublishPrompt,
 } from "../services/promptsApi";
-
-// ── Props ──────────────────────────────────────────────────────────────
+import { useStudioDialogTheme } from "./customize/dialogContext";
 
 interface DiscoverStudioPromptsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
   studioTool: StudioTool;
-  /** Called when user clicks "Use" — fills the parent modal's prompt field. */
+  /** Fills the Customize dialog's prompt field; the library then closes. */
   onApplyPrompt: (promptText: string) => void;
+  /** The button that opens the library. Radix returns focus to it on close. */
+  trigger: React.ReactElement;
+  /**
+   * Asked for after a prompt is applied, once the library has closed: the element that should take
+   * focus instead of the trigger (the prompt box the apply just filled). Null keeps the default.
+   */
+  focusAfterApply?: () => HTMLElement | null;
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 const SORT_OPTIONS: { value: PromptSortBy; label: string }[] = [
   { value: "saves", label: "Most saved" },
@@ -61,7 +104,7 @@ const TOOL_LABELS: Record<StudioTool, string> = {
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
-  return text.slice(0, max).trimEnd() + "...";
+  return `${text.slice(0, max).trimEnd()}...`;
 }
 
 function formatCount(n: number | undefined): string {
@@ -70,530 +113,504 @@ function formatCount(n: number | undefined): string {
   return String(n);
 }
 
-// ── Component ──────────────────────────────────────────────────────────
-
-export const DiscoverStudioPromptsModal: React.FC<DiscoverStudioPromptsModalProps> = ({
-  isOpen,
-  onClose,
+export function DiscoverStudioPromptsModal({
   studioTool,
   onApplyPrompt,
-}) => {
-  const [activeTab, setActiveTab] = useState<"public" | "my">("public");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<PromptSortBy>("saves");
-  const [sortOpen, setSortOpen] = useState(false);
-
-  // Reporting state
-  const [reportingId, setReportingId] = useState<Id<"studioPrompts"> | null>(null);
-
-  // Rating follow-up state
-  const [ratingPromptId, setRatingPromptId] = useState<Id<"studioPrompts"> | null>(null);
-
-  if (!isOpen) return null;
-
+  trigger,
+  focusAfterApply,
+}: DiscoverStudioPromptsModalProps) {
+  const [open, setOpen] = useState(false);
+  const theme = useStudioDialogTheme();
+  const appliedRef = useRef(false);
+  const apply = (promptText: string) => {
+    appliedRef.current = true;
+    onApplyPrompt(promptText);
+    setOpen(false);
+  };
+  // Radix focuses the trigger on close, which would override a box the apply wants focused. Only
+  // after an apply: Escape and Close still return focus to the trigger.
+  const handleCloseAutoFocus = (event: Event) => {
+    const applied = appliedRef.current;
+    appliedRef.current = false;
+    const target = applied ? focusAfterApply?.() : null;
+    if (target) {
+      event.preventDefault();
+      target.focus();
+    }
+  };
   return (
-    <div
-      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-3xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col max-h-[85vh] min-h-0"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent
+        size="wide"
+        padding="none"
+        theme={theme}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
-        {/* Header: tool context (eyebrow) + scoped title — avoids "Discover Prompts" + tool inline */}
-        <div className="flex items-center justify-between p-5 border-b border-border/50">
-          <div className="flex min-w-0 items-center gap-3">
-            <Compass className="h-5 w-5 shrink-0 text-primary" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">{TOOL_LABELS[studioTool]}</p>
-              <h2 className="text-lg font-bold leading-snug tracking-tight">Prompt library</h2>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        <div className="flex flex-col gap-1 px-6 pt-6 pr-12">
+          <p className="font-sans text-xs text-muted-foreground">{TOOL_LABELS[studioTool]}</p>
+          <DialogTitle>Prompt library</DialogTitle>
+          <DialogDescription>Use a prompt someone shared, or one you saved.</DialogDescription>
         </div>
-
-        {/* Tabs */}
-        <div role="tablist" className="flex border-b border-border/50 px-5">
-          <button
-            role="tab"
-            aria-selected={activeTab === "public"}
-            data-testid="discover-prompts-tab-public"
-            onClick={() => setActiveTab("public")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "public"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Library className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-            Public
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === "my"}
-            data-testid="discover-prompts-tab-my"
-            onClick={() => setActiveTab("my")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "my"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Bookmark className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-            My Prompts
-          </button>
-        </div>
-
-        {/* Search & Sort (public tab only) */}
-        {activeTab === "public" && (
-          <div className="flex items-center gap-3 px-5 py-3 border-b border-border/30">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search prompts..."
-                className="w-full pl-8 pr-3 py-2 bg-secondary/20 border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/50"
-              />
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setSortOpen(!sortOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-              >
-                {SORT_OPTIONS.find((o) => o.value === sortBy)?.label}
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-              {sortOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        setSortBy(opt.value);
-                        setSortOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 transition-colors ${
-                        sortBy === opt.value ? "text-primary font-medium" : "text-foreground"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {activeTab === "public" ? (
-            <PublicPromptsList
-              studioTool={studioTool}
-              sortBy={sortBy}
-              searchQuery={searchQuery}
-              onApplyPrompt={(text) => {
-                onApplyPrompt(text);
-                onClose();
-              }}
-              reportingId={reportingId}
-              setReportingId={setReportingId}
-              ratingPromptId={ratingPromptId}
-              setRatingPromptId={setRatingPromptId}
-            />
-          ) : (
-            <MyPromptsList
-              studioTool={studioTool}
-              onApplyPrompt={(text) => {
-                onApplyPrompt(text);
-                onClose();
-              }}
-            />
-          )}
-        </div>
-      </div>
-    </div>
+        <PromptLibrary studioTool={studioTool} onApply={apply} />
+      </DialogContent>
+    </Dialog>
   );
-};
-
-// ── Public Prompts List ────────────────────────────────────────────────
-
-interface PublicPromptsListProps {
-  studioTool: StudioTool;
-  sortBy: PromptSortBy;
-  searchQuery: string;
-  onApplyPrompt: (text: string) => void;
-  reportingId: Id<"studioPrompts"> | null;
-  setReportingId: (id: Id<"studioPrompts"> | null) => void;
-  ratingPromptId: Id<"studioPrompts"> | null;
-  setRatingPromptId: (id: Id<"studioPrompts"> | null) => void;
 }
 
-const PublicPromptsList: React.FC<PublicPromptsListProps> = ({
+// Inside DialogContent: the tab, search and sort start fresh on each open.
+function PromptLibrary({
+  studioTool,
+  onApply,
+}: {
+  studioTool: StudioTool;
+  onApply: (promptText: string) => void;
+}) {
+  const [tab, setTab] = useState<"public" | "my">("public");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<PromptSortBy>("saves");
+  const myTabRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(value) => setTab(value === "my" ? "my" : "public")}
+      className="mt-4 min-h-0 flex-1"
+    >
+      <TabsList variant="line" className="mx-6">
+        <TabsTrigger value="public" data-testid="discover-prompts-tab-public">
+          <Library />
+          Public
+        </TabsTrigger>
+        <TabsTrigger value="my" data-testid="discover-prompts-tab-my" ref={myTabRef}>
+          <Bookmark />
+          My Prompts
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="public" className="flex min-h-0 flex-col">
+        <div className="flex items-center gap-3 px-6 pt-1 pb-3">
+          <InputGroup className="flex-1">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search prompts..."
+              aria-label="Search prompts"
+            />
+          </InputGroup>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as PromptSortBy)}>
+            <SelectTrigger aria-label="Sort prompts">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="end">
+              <SelectGroup>
+                {SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+          <PublicPromptsList
+            studioTool={studioTool}
+            sortBy={sortBy}
+            searchQuery={searchQuery}
+            onApply={onApply}
+          />
+        </div>
+      </TabsContent>
+      <TabsContent value="my" className="min-h-0 overflow-y-auto">
+        <div className="px-6 pt-1 pb-6">
+          <MyPromptsList studioTool={studioTool} onApply={onApply} tabRef={myTabRef} />
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+/** Runs a prompt mutation and reports the outcome as a toast. */
+function usePromptAction() {
+  const { success, error: showError } = useToast();
+  return async (action: () => Promise<unknown>, done: string, failed: string) => {
+    try {
+      await action();
+      success(done);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : failed);
+    }
+  };
+}
+
+function LoadingPrompts({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      className="flex items-center justify-center gap-2 py-16 font-sans text-sm text-muted-foreground"
+    >
+      <Spinner />
+      {label}
+    </div>
+  );
+}
+
+function PromptPreview({ text }: { text: string }) {
+  return (
+    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+      {truncate(text, 120)}
+    </p>
+  );
+}
+
+function PublicPromptsList({
   studioTool,
   sortBy,
   searchQuery,
-  onApplyPrompt,
-  reportingId,
-  setReportingId,
-  ratingPromptId,
-  setRatingPromptId,
-}) => {
+  onApply,
+}: {
+  studioTool: StudioTool;
+  sortBy: PromptSortBy;
+  searchQuery: string;
+  onApply: (promptText: string) => void;
+}) {
   const trimmedQuery = searchQuery.trim() || undefined;
   const result = usePublicPrompts(studioTool, sortBy, trimmedQuery);
   const savePrompt = useSavePublicPrompt();
   const ratePrompt = useRatePrompt();
   const reportPrompt = useReportPrompt();
-  const { success, error: showError } = useToast();
+  const run = usePromptAction();
 
-  const prompts: PublicPrompt[] = (result?.page as PublicPrompt[] | undefined) ?? [];
-  const isLoading = result === undefined;
-
-  const handleSave = async (prompt: PublicPrompt) => {
-    try {
-      await savePrompt(prompt._id);
-      success("Prompt saved to your library");
-    } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to save prompt");
-    }
-  };
-
-  const handleRate = async (promptId: Id<"studioPrompts">, rating: number) => {
-    try {
-      await ratePrompt(promptId, rating);
-      setRatingPromptId(null);
-      success("Rating submitted");
-    } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to rate prompt");
-    }
-  };
-
-  const handleReport = async (promptId: Id<"studioPrompts">) => {
-    try {
-      await reportPrompt(promptId);
-      setReportingId(null);
-      success("Prompt reported");
-    } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to report prompt");
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-        <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading prompts...</p>
-      </div>
-    );
-  }
-
+  if (result === undefined) return <LoadingPrompts label="Loading prompts..." />;
+  const prompts = (result.page as PublicPrompt[] | undefined) ?? [];
   if (prompts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center opacity-50">
-        <MessageSquareQuote className="w-8 h-8 mb-3" />
-        <p className="text-sm italic">
-          {trimmedQuery ? "No prompts match your search" : "No public prompts yet for this tool"}
-        </p>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <MessageSquareQuote />
+          </EmptyMedia>
+          <EmptyTitle>
+            {trimmedQuery ? "No prompts match your search" : "No public prompts yet for this tool"}
+          </EmptyTitle>
+        </EmptyHeader>
+      </Empty>
     );
   }
-
   return (
-    <div className="p-5 space-y-3">
+    <ul className="flex flex-col gap-3">
       {prompts.map((prompt) => (
-        <PublicPromptCard
-          key={prompt._id}
-          prompt={prompt}
-          onUse={() => onApplyPrompt(prompt.promptText)}
-          onSave={() => handleSave(prompt)}
-          onReport={() => setReportingId(prompt._id)}
-          isReporting={reportingId === prompt._id}
-          onSubmitReport={() => handleReport(prompt._id)}
-          onCancelReport={() => setReportingId(null)}
-          isRating={ratingPromptId === prompt._id}
-          onRequestRate={() => setRatingPromptId(prompt._id)}
-          onSubmitRating={(r) => handleRate(prompt._id, r)}
-          onCancelRate={() => setRatingPromptId(null)}
-        />
+        <li key={prompt._id}>
+          <PublicPromptCard
+            prompt={prompt}
+            onUse={() => onApply(prompt.promptText)}
+            onSave={() =>
+              void run(
+                () => savePrompt(prompt._id),
+                "Prompt saved to your library",
+                "Failed to save prompt"
+              )
+            }
+            onRate={(rating) =>
+              void run(
+                () => ratePrompt(prompt._id, rating),
+                "Rating submitted",
+                "Failed to rate prompt"
+              )
+            }
+            onReport={() =>
+              void run(() => reportPrompt(prompt._id), "Prompt reported", "Failed to report prompt")
+            }
+          />
+        </li>
       ))}
-    </div>
+    </ul>
   );
-};
-
-// ── Public Prompt Card ─────────────────────────────────────────────────
-
-interface PublicPromptCardProps {
-  prompt: PublicPrompt;
-  onUse: () => void;
-  onSave: () => void;
-  onReport: () => void;
-  isReporting: boolean;
-  onSubmitReport: () => void;
-  onCancelReport: () => void;
-  isRating: boolean;
-  onRequestRate: () => void;
-  onSubmitRating: (rating: number) => void;
-  onCancelRate: () => void;
 }
 
-const PublicPromptCard: React.FC<PublicPromptCardProps> = ({
+function PublicPromptCard({
   prompt,
   onUse,
   onSave,
+  onRate,
   onReport,
-  isReporting,
-  onSubmitReport,
-  onCancelReport,
-  isRating,
-  onRequestRate,
-  onSubmitRating,
-  onCancelRate,
-}) => {
-  return (
-    <div className="rounded-xl border border-border/60 bg-card p-4 hover:border-border hover:shadow-sm transition-all">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-semibold text-foreground leading-snug line-clamp-1">
-            {prompt.title}
-          </h4>
-          {prompt.description && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-              {prompt.description}
-            </p>
-          )}
-        </div>
+}: {
+  prompt: PublicPrompt;
+  onUse: () => void;
+  onSave: () => void;
+  onRate: (rating: number) => void;
+  onReport: () => void;
+}) {
+  const [mode, setMode] = useState<"actions" | "rating" | "reporting">("actions");
+  const done = () => setMode("actions");
+  const rateTrigger = useRef<HTMLButtonElement>(null);
+  const reportTrigger = useRef<HTMLButtonElement>(null);
+  const modeControls = useRef<HTMLDivElement>(null);
+  const previousMode = useRef(mode);
+  // Switching modes unmounts the focused button: move focus to the new row's first control, and
+  // back to the Rate or Report button that opened it.
+  useLayoutEffect(() => {
+    const previous = previousMode.current;
+    previousMode.current = mode;
+    if (previous === mode) return;
+    if (mode === "actions") {
+      (previous === "rating" ? rateTrigger : reportTrigger).current?.focus();
+    } else {
+      modeControls.current?.querySelector("button")?.focus();
+    }
+  }, [mode]);
+
+  let footer: React.ReactNode;
+  if (mode === "rating") {
+    footer = (
+      <div ref={modeControls} className="flex flex-wrap items-center gap-1">
+        <span className="mr-1 font-sans text-xs text-muted-foreground">Rate:</span>
+        {[1, 2, 3, 4, 5].map((rating) => (
+          <Button
+            key={rating}
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Rate ${rating} out of 5`}
+            onClick={() => {
+              onRate(rating);
+              done();
+            }}
+          >
+            <Star />
+          </Button>
+        ))}
+        <Button variant="ghost" size="xs" onClick={done}>
+          Cancel
+        </Button>
       </div>
-
-      {/* Prompt preview */}
-      <p className="mt-2 text-xs text-muted-foreground/80 leading-relaxed line-clamp-2 font-mono">
-        {truncate(prompt.promptText, 120)}
-      </p>
-
-      {/* Stats */}
-      <div className="flex items-center gap-3 mt-2.5 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <Bookmark className="w-3 h-3" />
-          {formatCount(prompt.saveCount)}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Star className="w-3 h-3" />
-          {prompt.ratingAverage?.toFixed(1) ?? "—"}
-        </span>
+    );
+  } else if (mode === "reporting") {
+    footer = (
+      <div ref={modeControls} className="flex flex-wrap items-center gap-2">
+        <span className="font-sans text-xs text-muted-foreground">Report this prompt?</span>
+        <Button
+          variant="ghost-destructive"
+          size="xs"
+          onClick={() => {
+            onReport();
+            done();
+          }}
+        >
+          Confirm
+        </Button>
+        <Button variant="ghost" size="xs" onClick={done}>
+          Cancel
+        </Button>
       </div>
-
-      {/* Inline rating row */}
-      {isRating && (
-        <div className="flex items-center gap-1 mt-2.5 pt-2 border-t border-border/30">
-          <span className="text-[11px] text-muted-foreground mr-1">Rate:</span>
-          {[1, 2, 3, 4, 5].map((r) => (
-            <button
-              key={r}
-              onClick={() => onSubmitRating(r)}
-              className="p-0.5 hover:text-yellow-500 transition-colors"
-            >
-              <Star className="w-4 h-4" />
-            </button>
-          ))}
-          <button
-            onClick={onCancelRate}
-            className="ml-auto text-[11px] text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </button>
+    );
+  } else {
+    footer = (
+      <>
+        <div className="flex items-center gap-3 font-sans text-xs tabular-nums text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <Bookmark aria-hidden className="size-3" />
+            {formatCount(prompt.saveCount)}
+            <span className="sr-only"> saves</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Star aria-hidden className="size-3" />
+            {prompt.ratingAverage?.toFixed(1) ?? "—"}
+            <span className="sr-only"> average rating</span>
+          </span>
         </div>
-      )}
-
-      {/* Report confirmation row */}
-      {isReporting && (
-        <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-border/30">
-          <span className="text-[11px] text-muted-foreground">Report this prompt?</span>
-          <button
-            onClick={onSubmitReport}
-            className="text-[11px] font-medium text-destructive hover:underline"
-          >
-            Confirm
-          </button>
-          <button
-            onClick={onCancelReport}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Actions */}
-      {!isReporting && !isRating && (
-        <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-border/30">
-          <button
-            onClick={onUse}
-            className="px-3 py-1.5 text-xs font-semibold bg-primary/10 text-primary rounded-md hover:bg-primary hover:text-primary-foreground transition-all"
-          >
+        <ItemActions>
+          <Button variant="secondary" size="xs" onClick={onUse}>
             Use
-          </button>
-          <button
-            onClick={onSave}
-            className="px-3 py-1.5 text-xs font-medium bg-secondary/50 text-foreground rounded-md hover:bg-secondary/80 transition-colors inline-flex items-center gap-1"
-          >
-            <Bookmark className="w-3 h-3" />
+          </Button>
+          <Button variant="ghost" size="xs" onClick={onSave}>
+            <Bookmark data-icon="inline-start" />
             Save
-          </button>
-          <button
-            onClick={onRequestRate}
-            className="px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+          </Button>
+          <Button
+            ref={rateTrigger}
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Rate this prompt"
+            onClick={() => setMode("rating")}
           >
-            <Star className="w-3 h-3" />
-          </button>
-          <button
-            onClick={onReport}
-            className="ml-auto px-2 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
-            title="Report"
+            <Star />
+          </Button>
+          <Button
+            ref={reportTrigger}
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Report this prompt"
+            onClick={() => setMode("reporting")}
           >
-            <Flag className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-    </div>
+            <Flag />
+          </Button>
+        </ItemActions>
+      </>
+    );
+  }
+
+  return (
+    <Item variant="outline">
+      <ItemContent>
+        <ItemTitle>
+          <span className="line-clamp-1">{prompt.title}</span>
+        </ItemTitle>
+        {prompt.description && <ItemDescription>{prompt.description}</ItemDescription>}
+        <PromptPreview text={prompt.promptText} />
+      </ItemContent>
+      <ItemFooter>{footer}</ItemFooter>
+    </Item>
   );
-};
-
-// ── My Prompts List ────────────────────────────────────────────────────
-
-interface MyPromptsListProps {
-  studioTool: StudioTool;
-  onApplyPrompt: (text: string) => void;
 }
 
-const MyPromptsList: React.FC<MyPromptsListProps> = ({ studioTool, onApplyPrompt }) => {
+function MyPromptsList({
+  studioTool,
+  onApply,
+  tabRef,
+}: {
+  studioTool: StudioTool;
+  onApply: (promptText: string) => void;
+  /** The My Prompts tab: where focus lands after deleting the last prompt. */
+  tabRef: React.RefObject<HTMLButtonElement | null>;
+}) {
   const result = useMyPrompts(studioTool);
   const publishPrompt = usePublishPrompt();
   const unpublishPrompt = useUnpublishPrompt();
   const deletePrompt = useDeletePrompt();
-  const { success, error: showError } = useToast();
+  const run = usePromptAction();
+  // One confirmation for the whole list. `pendingDelete` outlives `confirmOpen` so the title stays
+  // put while the dialog animates out.
+  const [pendingDelete, setPendingDelete] = useState<PublicPrompt | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteButtons = useRef(new Map<string, HTMLButtonElement>());
+  // Where focus goes when the confirmation closes: the row's delete button on Cancel; after a
+  // delete (whose row is about to go), the next row's delete button, or the tab.
+  const returnFocusTo = useRef<HTMLElement | null>(null);
 
-  const prompts: PublicPrompt[] = (result?.page as PublicPrompt[] | undefined) ?? [];
-  const isLoading = result === undefined;
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-        <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading your prompts...</p>
-      </div>
-    );
-  }
-
+  if (result === undefined) return <LoadingPrompts label="Loading your prompts..." />;
+  const prompts = (result.page as PublicPrompt[] | undefined) ?? [];
   if (prompts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center opacity-50">
-        <Bookmark className="w-8 h-8 mb-3" />
-        <p className="text-sm italic">You haven&apos;t saved any prompts yet</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Browse the Public tab to discover and save prompts
-        </p>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Bookmark />
+          </EmptyMedia>
+          <EmptyTitle>You haven&apos;t saved any prompts yet</EmptyTitle>
+          <EmptyDescription>Browse the Public tab to discover and save prompts</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
-
-  const handlePublish = async (id: Id<"studioPrompts">) => {
-    try {
-      await publishPrompt(id);
-      success("Prompt published");
-    } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to publish");
-    }
-  };
-
-  const handleUnpublish = async (id: Id<"studioPrompts">) => {
-    try {
-      await unpublishPrompt(id);
-      success("Prompt unpublished");
-    } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to unpublish");
-    }
-  };
-
-  const handleDelete = async (id: Id<"studioPrompts">) => {
-    try {
-      await deletePrompt(id);
-      success("Prompt deleted");
-    } catch (err) {
-      showError(err instanceof Error ? err.message : "Failed to delete");
-    }
-  };
-
   return (
-    <div className="p-5 space-y-3">
-      {prompts.map((prompt: PublicPrompt) => (
-        <div
-          key={prompt._id}
-          className="rounded-xl border border-border/60 bg-card p-4 hover:border-border hover:shadow-sm transition-all"
+    <>
+      <ul className="flex flex-col gap-3">
+        {prompts.map((prompt) => (
+          <li key={prompt._id}>
+            <Item variant="outline">
+              <ItemContent>
+                <ItemTitle>
+                  <span className="line-clamp-1">{prompt.title}</span>
+                  {prompt.visibility === "public" && <Badge variant="secondary">Public</Badge>}
+                  {prompt.sourcePromptId && <Badge variant="outline">Saved copy</Badge>}
+                </ItemTitle>
+                <PromptPreview text={prompt.promptText} />
+              </ItemContent>
+              <ItemFooter>
+                <ItemActions>
+                  <Button variant="secondary" size="xs" onClick={() => onApply(prompt.promptText)}>
+                    Use
+                  </Button>
+                  {prompt.visibility === "private" ? (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        void run(
+                          () => publishPrompt(prompt._id),
+                          "Prompt published",
+                          "Failed to publish"
+                        )
+                      }
+                    >
+                      <Eye data-icon="inline-start" />
+                      Publish
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        void run(
+                          () => unpublishPrompt(prompt._id),
+                          "Prompt unpublished",
+                          "Failed to unpublish"
+                        )
+                      }
+                    >
+                      <EyeOff data-icon="inline-start" />
+                      Unpublish
+                    </Button>
+                  )}
+                </ItemActions>
+                <Button
+                  ref={(el) => {
+                    if (el) deleteButtons.current.set(prompt._id, el);
+                    else deleteButtons.current.delete(prompt._id);
+                  }}
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  aria-label="Delete prompt"
+                  onClick={(e) => {
+                    returnFocusTo.current = e.currentTarget;
+                    setPendingDelete(prompt);
+                    setConfirmOpen(true);
+                  }}
+                >
+                  <Trash2 />
+                </Button>
+              </ItemFooter>
+            </Item>
+          </li>
+        ))}
+      </ul>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        {/* No `theme`: the only light context is the auth-page preview, which hides the library. */}
+        <AlertDialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            returnFocusTo.current?.focus();
+          }}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-semibold text-foreground leading-snug line-clamp-1">
-                  {prompt.title}
-                </h4>
-                {prompt.visibility === "public" && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                    Public
-                  </span>
-                )}
-                {prompt.sourcePromptId && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
-                    Saved copy
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground/80 mt-1 font-mono line-clamp-2">
-                {truncate(prompt.promptText, 120)}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-border/30">
-            <button
-              onClick={() => onApplyPrompt(prompt.promptText)}
-              className="px-3 py-1.5 text-xs font-semibold bg-primary/10 text-primary rounded-md hover:bg-primary hover:text-primary-foreground transition-all"
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this prompt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{pendingDelete?.title}&rdquo; is removed from your library. This can&apos;t be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (!pendingDelete) return;
+                const index = prompts.findIndex((p) => p._id === pendingDelete._id);
+                const neighbour = prompts[index + 1] ?? prompts[index - 1];
+                returnFocusTo.current =
+                  (neighbour && deleteButtons.current.get(neighbour._id)) ?? tabRef.current;
+                const id = pendingDelete._id;
+                void run(() => deletePrompt(id), "Prompt deleted", "Failed to delete");
+              }}
             >
-              Use
-            </button>
-            {prompt.visibility === "private" ? (
-              <button
-                onClick={() => handlePublish(prompt._id)}
-                className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-              >
-                <Eye className="w-3 h-3" />
-                Publish
-              </button>
-            ) : (
-              <button
-                onClick={() => handleUnpublish(prompt._id)}
-                className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-              >
-                <EyeOff className="w-3 h-3" />
-                Unpublish
-              </button>
-            )}
-            <button
-              onClick={() => handleDelete(prompt._id)}
-              className="ml-auto px-2 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
-};
+}

@@ -1,7 +1,18 @@
-import { AudioLines, Bookmark, X } from "lucide-react";
-import React, { useState } from "react";
-import { SaveAsPromptModal } from "./SaveAsPromptModal";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { FieldLegend, FieldSet } from "@/shared/components/ui/field";
+import type { StudioDialogTheme } from "./customize/dialogContext";
+import { OptionCard } from "./customize/OptionCard";
+import { OptionToggleGroup } from "./customize/OptionToggleGroup";
+import type { ToggleOption } from "./customize/options";
+import { PromptField } from "./customize/PromptField";
+import {
+  StudioCustomizeBody,
+  StudioCustomizeDialog,
+  StudioCustomizeFooter,
+  StudioCustomizeHeader,
+} from "./customize/StudioCustomizeDialog";
 
 interface AudioFormat {
   id: string;
@@ -35,11 +46,29 @@ const FORMATS: AudioFormat[] = [
   },
 ];
 
+const LENGTH_OPTIONS = [
+  { value: "short", label: "Short" },
+  { value: "default", label: "Default" },
+  { value: "long", label: "Long" },
+] as const satisfies readonly ToggleOption<AudioConfig["length"]>[];
+
+const FOCUS_PLACEHOLDER = [
+  "Things to try",
+  '• Focus on a specific source ("only cover the article about Italy")',
+  '• Focus on a specific topic ("just discuss the novel\'s main character")',
+  '• Target a specific audience ("explain to someone new to biology")',
+].join("\n");
+
 interface CustomizeAudioModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (config: AudioConfig) => void;
+  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
   embedded?: boolean;
+  /** Pins light-theme tokens on always-light pages (the auth page). */
+  theme?: StudioDialogTheme;
+  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
+  preview?: boolean;
 }
 
 export interface AudioConfig {
@@ -53,143 +82,66 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
   onClose,
   onGenerate,
   embedded = false,
-}) => {
-  const [selectedFormat, setSelectedFormat] = useState("deep_dive");
+  theme,
+  preview = false,
+}) => (
+  <StudioCustomizeDialog
+    open={isOpen}
+    onClose={onClose}
+    embedded={embedded}
+    theme={theme}
+    preview={preview}
+    wide
+  >
+    <AudioForm onGenerate={onGenerate} />
+  </StudioCustomizeDialog>
+);
+
+// Inside DialogContent, which unmounts on close: every open starts from the defaults.
+function AudioForm({ onGenerate }: { onGenerate: (config: AudioConfig) => void }) {
+  const [formatId, setFormatId] = useState("deep_dive");
   const [length, setLength] = useState<AudioConfig["length"]>("default");
   const [focus, setFocus] = useState("");
-  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
-
-  if (!isOpen) return null;
-
-  const overlayClass = embedded
-    ? "absolute inset-0 z-50 flex min-h-0 items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200"
-    : "fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200";
-
   return (
-    <div className={overlayClass}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="relative flex max-h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-teal-500/10">
-              <AudioLines className="w-5 h-5 text-teal-700 dark:text-teal-400" />
-            </div>
-            <h2 className="text-xl font-bold font-sans tracking-tight">Customize Audio Overview</h2>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="audio" onApplyPrompt={setFocus} />
-            <button
-              type="button"
-              onClick={onClose}
-              className="group rounded-xl p-2 transition-colors hover:bg-secondary/50"
-            >
-              <X className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 md:p-10 space-y-10 overflow-y-auto max-h-[85vh] bg-card/50">
-          {/* Format Selection */}
-          <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
-              Format
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {FORMATS.map((format) => (
-                <button
-                  key={format.id}
-                  onClick={() => setSelectedFormat(format.id)}
-                  className={`
-                    relative flex flex-col p-5 rounded-xl border text-left transition-all h-full
-                    ${
-                      selectedFormat === format.id
-                        ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20"
-                        : "bg-card border-border/50 hover:border-primary/40 hover:bg-secondary/30"
-                    }
-                  `}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <span
-                      className={`font-bold text-sm ${selectedFormat === format.id ? "text-primary" : "text-foreground"}`}
-                    >
-                      {format.title}
-                    </span>
-                  </div>
-                  <p className="text-[13px] text-muted-foreground leading-relaxed font-serif">
-                    {format.description}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
-              Length
-            </label>
-            <div className="flex bg-background border border-border rounded-xl p-1 w-fit">
-              {(["short", "default", "long"] as const).map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setLength(opt)}
-                  className={`
-                    flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
-                    ${
-                      length === opt
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }
-                  `}
-                >
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Focus Area */}
-          <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
-              What should the AI hosts focus on in this episode?
-            </label>
-            <textarea
-              value={focus}
-              onChange={(e) => setFocus(e.target.value)}
-              placeholder='Things to try&#10;• Focus on a specific source ("only cover the article about Italy")&#10;• Focus on a specific topic ("just discuss the novel&apos;s main character")&#10;• Target a specific audience ("explain to someone new to biology")'
-              className="w-full h-44 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
-            />
-            <button
-              type="button"
-              onClick={() => setSaveAsPromptModalOpen(true)}
-              disabled={!focus.trim()}
-              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              Save as reusable prompt
-            </button>
-          </div>
-
-          {/* Footer Button */}
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={() => onGenerate({ formatId: selectedFormat, length, focus })}
-              className="px-10 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-md active:scale-95 text-sm"
-            >
-              Generate Audio
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Save as Prompt Modal */}
-      <SaveAsPromptModal
-        isOpen={saveAsPromptModalOpen}
-        onClose={() => setSaveAsPromptModalOpen(false)}
-        studioTool="audio"
-        initialPromptText={focus}
+    <>
+      <StudioCustomizeHeader
+        kind="audio"
+        title="Customize Audio Overview"
+        description="Pick a format and a length, and tell the hosts what to focus on."
+        promptLibrary={{ studioTool: "audio", onApplyPrompt: setFocus }}
       />
-    </div>
+      <StudioCustomizeBody>
+        <FieldSet>
+          <FieldLegend variant="label">Format</FieldLegend>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {FORMATS.map((format) => (
+              <OptionCard
+                key={format.id}
+                title={format.title}
+                description={format.description}
+                selected={formatId === format.id}
+                onSelect={() => setFormatId(format.id)}
+              />
+            ))}
+          </div>
+        </FieldSet>
+        <OptionToggleGroup
+          label="Length"
+          value={length}
+          options={LENGTH_OPTIONS}
+          onValueChange={setLength}
+        />
+        <PromptField
+          label="What should the AI hosts focus on in this episode?"
+          placeholder={FOCUS_PLACEHOLDER}
+          value={focus}
+          onChange={setFocus}
+          studioTool="audio"
+        />
+      </StudioCustomizeBody>
+      <StudioCustomizeFooter>
+        <Button onClick={() => onGenerate({ formatId, length, focus })}>Generate Audio</Button>
+      </StudioCustomizeFooter>
+    </>
   );
-};
+}

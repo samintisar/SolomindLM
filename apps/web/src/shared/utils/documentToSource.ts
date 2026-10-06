@@ -1,5 +1,15 @@
 import { Source } from "../types";
 
+/** The stored user-facing reason a document failed, if it failed and one was recorded. */
+function failureReasonOf(doc: {
+  status?: string;
+  metadata?: { userMessage?: unknown } | null;
+}): string | undefined {
+  if (doc.status !== "failed") return undefined;
+  const reason = doc.metadata?.userMessage;
+  return typeof reason === "string" && reason.trim() ? reason.trim() : undefined;
+}
+
 // Transform Convex Document type to Source UI type
 export function documentToSource(doc: any): Source {
   let type: Source["type"] = "PDF";
@@ -14,6 +24,7 @@ export function documentToSource(doc: any): Source {
       selected: true,
       content: "",
       status: doc.status,
+      failureReason: failureReasonOf(doc),
       url: doc.fileUrl as string | undefined,
       paper: pr
         ? {
@@ -127,6 +138,7 @@ export function documentToSource(doc: any): Source {
     selected: true,
     content: "",
     status: doc.status,
+    failureReason: failureReasonOf(doc),
     url,
     remoteRefreshKind,
     sourceGuide: doc.sourceGuide,

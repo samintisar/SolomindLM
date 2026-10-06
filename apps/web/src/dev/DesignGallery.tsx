@@ -4,6 +4,8 @@ import {
   CopyIcon,
   DownloadIcon,
   InfoIcon,
+  LayoutGridIcon,
+  ListIcon,
   MicIcon,
   PaperclipIcon,
   PencilIcon,
@@ -86,6 +88,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { Textarea } from "@/shared/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { cn } from "@/shared/utils/cn";
 
 /**
@@ -243,6 +246,64 @@ function TraySection() {
           <Button variant="outline">Previous</Button>
           <Button variant="outline">Next</Button>
         </ButtonGroup>
+      </div>
+    </Section>
+  );
+}
+
+/** Outline option sets: segmented (Customize dialogs), small icon pair, and spaced chips. */
+function TogglesSection() {
+  return (
+    <Section name="Toggles">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        defaultValue="medium"
+        aria-label="Length"
+        className="w-full max-w-md"
+      >
+        <ToggleGroupItem value="short" className="flex-1">
+          Short
+        </ToggleGroupItem>
+        <ToggleGroupItem value="medium" className="flex-1">
+          Medium
+        </ToggleGroupItem>
+        <ToggleGroupItem value="long" className="flex-1">
+          Long
+        </ToggleGroupItem>
+      </ToggleGroup>
+      <div className="flex flex-wrap items-center gap-6">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          defaultValue="grid"
+          aria-label="View"
+        >
+          <ToggleGroupItem value="grid" aria-label="Grid view">
+            <LayoutGridIcon />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" aria-label="List view">
+            <ListIcon />
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          spacing={1}
+          defaultValue="star"
+          aria-label="Icon"
+        >
+          <ToggleGroupItem value="brain" aria-label="Brain icon">
+            <BrainIcon />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="star" aria-label="Star icon">
+            <StarIcon />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="zap" aria-label="Zap icon">
+            <ZapIcon />
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
     </Section>
   );
@@ -579,6 +640,7 @@ export default function DesignGallery() {
           <CardsSection />
           <DialogsSection />
           <BadgesAndAlertsSection />
+          <TogglesSection />
         </>
       )}
     </main>

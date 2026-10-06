@@ -1,21 +1,53 @@
-import { Bookmark, Eye, Globe, Loader2, Lock, X } from "lucide-react";
-import React, { useState } from "react";
+import { Bookmark, Eye, X } from "lucide-react";
+import type React from "react";
+import { useId, useState } from "react";
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+  DialogTrigger,
+} from "@/shared/components/ui/dialog";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/shared/components/ui/field";
+import { Input } from "@/shared/components/ui/input";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { Textarea } from "@/shared/components/ui/textarea";
 import { useToast } from "@/shared/contexts/useToast";
 import { type StudioTool, useCreatePrompt, usePublishPrompt } from "../services/promptsApi";
+import { useStudioDialogTheme } from "./customize/dialogContext";
 
-// ── Props ──────────────────────────────────────────────────────────────
-
-interface SaveAsPromptModalProps {
+interface SaveAsPromptBaseProps {
   isOpen: boolean;
   onClose: () => void;
   studioTool: StudioTool;
-  /** Pre-filled prompt text from the Customize modal */
+  /** Pre-filled prompt text from the Customize dialog. */
   initialPromptText: string;
-  /** Optional notebook ID to associate with the prompt */
+  /** Optional notebook ID to associate with the prompt. */
   notebookId?: string;
 }
 
-// ── Constants ───────────────────────────────────────────────────────────
+/** A `trigger` always comes with the `onOpen` that opens it: the dialog is controlled by `isOpen`. */
+type SaveAsPromptTriggerProps =
+  | {
+      /** The button that opens it. Radix returns focus there when the dialog closes. */
+      trigger: React.ReactElement;
+      /** Called when `trigger` is clicked. */
+      onOpen: () => void;
+    }
+  | { trigger?: never; onOpen?: never };
+
+type SaveAsPromptModalProps = SaveAsPromptBaseProps & SaveAsPromptTriggerProps;
 
 const TOOL_LABELS: Record<StudioTool, string> = {
   report: "Reports",
@@ -28,7 +60,9 @@ const TOOL_LABELS: Record<StudioTool, string> = {
   mindmap: "Mind Maps",
 };
 
-// ── Component ──────────────────────────────────────────────────────────
+const TITLE_MAX = 100;
+const DESCRIPTION_MAX = 300;
+const PROMPT_MAX = 2000;
 
 export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
   isOpen,
@@ -36,23 +70,62 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
   studioTool,
   initialPromptText,
   notebookId,
+  trigger,
+  onOpen,
 }) => {
+  const theme = useStudioDialogTheme();
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (next) onOpen?.();
+        else onClose();
+      }}
+    >
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+      <DialogContent
+        data-testid="save-as-prompt-modal"
+        showCloseButton={false}
+        size="wide"
+        padding="none"
+        theme={theme}
+        className="sm:max-w-lg"
+      >
+        <SavePromptForm
+          studioTool={studioTool}
+          initialPromptText={initialPromptText}
+          notebookId={notebookId}
+          onClose={onClose}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface SavePromptFormProps {
+  studioTool: StudioTool;
+  initialPromptText: string;
+  notebookId?: string;
+  onClose: () => void;
+}
+
+// Lives inside DialogContent, which Radix unmounts on close: every open starts from the Customize
+// dialog's current text, and edits made here stick.
+function SavePromptForm({
+  studioTool,
+  initialPromptText,
+  notebookId,
+  onClose,
+}: SavePromptFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [promptText, setPromptText] = useState(initialPromptText);
   const [makePublic, setMakePublic] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
   const createPrompt = useCreatePrompt();
   const publishPrompt = usePublishPrompt();
   const { success, error: showError } = useToast();
-
-  // Reset form when modal opens with new initial text
-  if (isOpen && promptText !== initialPromptText) {
-    setPromptText(initialPromptText);
-  }
-
-  if (!isOpen) return null;
+  const id = useId();
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -63,10 +136,9 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
       showError("Please enter prompt text");
       return;
     }
-
     setIsSaving(true);
     try {
-      // Create the prompt (always private initially)
+      // Create the prompt (always private at first), then publish it if asked.
       const promptId = await createPrompt({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -74,20 +146,12 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
         studioTool,
         notebookId,
       });
-
-      // If user chose to make it public, publish it
       if (makePublic && promptId) {
         await publishPrompt(promptId);
         success("Prompt saved and published to the library!");
       } else {
         success("Prompt saved to your library!");
       }
-
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setPromptText(initialPromptText);
-      setMakePublic(false);
       onClose();
     } catch (err) {
       showError(err instanceof Error ? err.message : "Failed to save prompt");
@@ -96,172 +160,130 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
     }
   };
 
-  const handleCancel = () => {
-    setTitle("");
-    setDescription("");
-    setPromptText(initialPromptText);
-    setMakePublic(false);
-    onClose();
-  };
-
   return (
-    <div
-      data-testid="save-as-prompt-modal"
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-      onClick={handleCancel}
-    >
-      <div
-        className="relative w-full max-w-lg bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Bookmark className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p data-testid="save-as-prompt-tool-label" className="text-xs text-muted-foreground">
-                {TOOL_LABELS[studioTool]}
-              </p>
-              <h2 className="text-lg font-bold leading-snug tracking-tight">Save as Prompt</h2>
-            </div>
-          </div>
-          <button
-            data-testid="save-as-prompt-close"
-            onClick={handleCancel}
-            aria-label="Close"
-            className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+    <>
+      <div className="flex items-start gap-3 px-6 pt-6 pb-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p
+            data-testid="save-as-prompt-tool-label"
+            className="font-sans text-xs text-muted-foreground"
           >
-            <X className="w-5 h-5" />
-          </button>
+            {TOOL_LABELS[studioTool]}
+          </p>
+          <DialogTitle>Save as Prompt</DialogTitle>
+          <DialogDescription>Keep it in your library to reuse later.</DialogDescription>
         </div>
+        <DialogClose asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close"
+            data-testid="save-as-prompt-close"
+          >
+            <X />
+          </Button>
+        </DialogClose>
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Title */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Title <span className="text-destructive">*</span>
-            </label>
-            <input
-              type="text"
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor={`${id}-title`}>
+              Title{" "}
+              <span aria-hidden className="text-destructive">
+                *
+              </span>
+            </FieldLabel>
+            <Input
+              id={`${id}-title`}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Focus on key concepts for exam prep"
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/50"
-              maxLength={100}
+              maxLength={TITLE_MAX}
+              required
             />
-            <p className="text-[11px] text-muted-foreground text-right">{title.length}/100</p>
-          </div>
-
-          {/* Description (optional) */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Description <span className="text-muted-foreground/50">(optional)</span>
-            </label>
-            <input
-              type="text"
+            <CharacterCount length={title.length} max={TITLE_MAX} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${id}-description`}>Description (optional)</FieldLabel>
+            <Input
+              id={`${id}-description`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Briefly describe what this prompt does..."
-              className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/50"
-              maxLength={300}
+              maxLength={DESCRIPTION_MAX}
             />
-            <p className="text-[11px] text-muted-foreground text-right">{description.length}/300</p>
-          </div>
-
-          {/* Prompt Text */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Prompt Text <span className="text-destructive">*</span>
-            </label>
-            <textarea
+            <CharacterCount length={description.length} max={DESCRIPTION_MAX} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${id}-prompt`}>
+              Prompt text{" "}
+              <span aria-hidden className="text-destructive">
+                *
+              </span>
+            </FieldLabel>
+            <Textarea
+              id={`${id}-prompt`}
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               placeholder="Enter your custom prompt..."
-              className="w-full h-32 px-4 py-3 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors resize-none placeholder:text-muted-foreground/50 font-mono"
-              maxLength={2000}
+              maxLength={PROMPT_MAX}
+              className="h-32 resize-none"
             />
-            <p className="text-[11px] text-muted-foreground text-right">{promptText.length}/2000</p>
-          </div>
-
-          {/* Visibility Toggle */}
-          <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-xl border border-border/50">
-            <div className="flex items-center gap-3">
-              {makePublic ? (
-                <Globe className="w-5 h-5 text-primary" />
-              ) : (
-                <Lock className="w-5 h-5 text-muted-foreground" />
-              )}
-              <div>
-                <p className="text-sm font-medium">{makePublic ? "Public" : "Private"}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {makePublic
-                    ? "Anyone can discover and use this prompt"
-                    : "Only you can see and use this prompt"}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
+            <CharacterCount length={promptText.length} max={PROMPT_MAX} />
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox
+              id={`${id}-public`}
               data-testid="save-as-prompt-visibility-toggle"
-              role="switch"
-              aria-checked={makePublic}
-              aria-label={makePublic ? "Set visibility to private" : "Set visibility to public"}
-              onClick={() => setMakePublic(!makePublic)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                makePublic ? "bg-primary" : "bg-muted"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  makePublic ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Public hint */}
+              checked={makePublic}
+              onCheckedChange={(checked) => setMakePublic(checked === true)}
+            />
+            <FieldContent>
+              <FieldLabel htmlFor={`${id}-public`}>Share in the public library</FieldLabel>
+              <FieldDescription>
+                {makePublic
+                  ? "Anyone can discover and use this prompt"
+                  : "Only you can see and use this prompt"}
+              </FieldDescription>
+            </FieldContent>
+          </Field>
           {makePublic && (
-            <div className="flex items-start gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
-              <Eye className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-              <p className="text-[11px] text-muted-foreground">
+            <Alert>
+              <Eye />
+              <AlertDescription>
                 Your prompt will be visible in the public library. Other users can save and rate it.
                 You can always unpublish it later from the "My Prompts" tab.
-              </p>
-            </div>
+              </AlertDescription>
+            </Alert>
           )}
-        </div>
+        </FieldGroup>
+      </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-5 border-t border-border/50">
-          <button
-            onClick={handleCancel}
-            disabled={isSaving}
-            className="px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          >
+      <div className="px-6 pt-2 pb-6">
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={isSaving}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
+          </Button>
+          <Button
+            onClick={() => void handleSave()}
             disabled={isSaving || !title.trim() || !promptText.trim()}
-            className="px-5 py-2.5 text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
             {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
+              <Spinner data-icon="inline-start" />
             ) : (
-              <>
-                <Bookmark className="w-4 h-4" />
-                Save Prompt
-              </>
+              <Bookmark data-icon="inline-start" />
             )}
-          </button>
-        </div>
+            {isSaving ? "Saving..." : "Save Prompt"}
+          </Button>
+        </DialogFooter>
       </div>
-    </div>
+    </>
   );
-};
+}
+
+function CharacterCount({ length, max }: { length: number; max: number }) {
+  return (
+    <p className="text-right font-sans text-xs tabular-nums text-muted-foreground">{`${length}/${max}`}</p>
+  );
+}

@@ -36,6 +36,8 @@ export function CitationCard({
     () => prepareCitationExcerpt(reference.content, reference.sourceTitle),
     [reference.content, reference.sourceTitle]
   );
+  const previousPreview = reference.metadata?.previousChunkPreview?.trim();
+  const nextPreview = reference.metadata?.nextChunkPreview?.trim();
 
   const handleAdd = async () => {
     if (!onAddToNotebook || isAdding) return;
@@ -85,11 +87,15 @@ export function CitationCard({
         </div>
       </div>
       <div className="max-h-64 min-h-0 overflow-y-auto overscroll-contain border-t border-border/60 px-4 py-3 leading-relaxed wrap-break-word">
+        {/* The answer also read the edges of the neighbouring passages; show them so a claim
+            drawn from there can be checked here. */}
+        {previousPreview && <p className="mb-2 text-muted-foreground">…{previousPreview}</p>}
         <Suspense fallback={<Skeleton className="h-4 w-full" />}>
           <MarkdownRendererLazy components={citationMarkdownComponents}>
             {excerpt}
           </MarkdownRendererLazy>
         </Suspense>
+        {nextPreview && <p className="mt-2 text-muted-foreground">{nextPreview}…</p>}
       </div>
       {onAddToNotebook && (
         <div className="shrink-0 border-t border-border/60 p-3">

@@ -100,6 +100,11 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         status: dbNote.status,
         metadata: {
           error: dbNote.metadata?.error,
+          documentIds: Array.isArray(dbNote.metadata?.documentIds)
+            ? dbNote.metadata.documentIds.filter(
+                (id: unknown): id is string => typeof id === "string"
+              )
+            : undefined,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };

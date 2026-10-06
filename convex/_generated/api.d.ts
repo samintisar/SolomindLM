@@ -204,6 +204,7 @@ import type * as _lib_resolveSmartModel from "../_lib/resolveSmartModel.js";
 import type * as _lib_semanticScholarThrottle from "../_lib/semanticScholarThrottle.js";
 import type * as _lib_serviceErrors from "../_lib/serviceErrors.js";
 import type * as _lib_shareToken from "../_lib/shareToken.js";
+import type * as _lib_sourceFailure from "../_lib/sourceFailure.js";
 import type * as _lib_srsScheduling from "../_lib/srsScheduling.js";
 import type * as _lib_textTitle from "../_lib/textTitle.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
@@ -243,6 +244,7 @@ import type * as _services_extraction_BibliographyParserService from "../_servic
 import type * as _services_extraction_DoiResolverService from "../_services/extraction/DoiResolverService.js";
 import type * as _services_extraction_MistralOCRService from "../_services/extraction/MistralOCRService.js";
 import type * as _services_extraction_WebLoaderService from "../_services/extraction/WebLoaderService.js";
+import type * as _services_extraction_urlSource from "../_services/extraction/urlSource.js";
 import type * as _services_extractors from "../_services/extractors.js";
 import type * as _services_grading_WrittenQuestionsGradingService from "../_services/grading/WrittenQuestionsGradingService.js";
 import type * as _services_processing_DocumentMetadataExtractor from "../_services/processing/DocumentMetadataExtractor.js";
@@ -599,6 +601,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/semanticScholarThrottle": typeof _lib_semanticScholarThrottle;
   "_lib/serviceErrors": typeof _lib_serviceErrors;
   "_lib/shareToken": typeof _lib_shareToken;
+  "_lib/sourceFailure": typeof _lib_sourceFailure;
   "_lib/srsScheduling": typeof _lib_srsScheduling;
   "_lib/textTitle": typeof _lib_textTitle;
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;
@@ -638,6 +641,7 @@ declare const fullApi: ApiFromModules<{
   "_services/extraction/DoiResolverService": typeof _services_extraction_DoiResolverService;
   "_services/extraction/MistralOCRService": typeof _services_extraction_MistralOCRService;
   "_services/extraction/WebLoaderService": typeof _services_extraction_WebLoaderService;
+  "_services/extraction/urlSource": typeof _services_extraction_urlSource;
   "_services/extractors": typeof _services_extractors;
   "_services/grading/WrittenQuestionsGradingService": typeof _services_grading_WrittenQuestionsGradingService;
   "_services/processing/DocumentMetadataExtractor": typeof _services_processing_DocumentMetadataExtractor;
