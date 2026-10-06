@@ -387,3 +387,30 @@ describe("SourceViewer PDF view switch", () => {
     err.mockRestore();
   });
 });
+
+describe("SourceViewer failed source", () => {
+  const failed = {
+    id: "doc1",
+    title: "arxiv.org",
+    type: "WEB" as const,
+    date: "Oct 4",
+    selected: true,
+    status: "failed" as const,
+  };
+
+  test("shows why the source failed when a reason was recorded", () => {
+    renderViewer({
+      source: { ...failed, failureReason: "We couldn't read the PDF at this link." },
+      content: "",
+    });
+
+    expect(screen.getByText("We couldn't read the PDF at this link.")).toBeInTheDocument();
+    expect(screen.queryByText(/Please try uploading it again/)).not.toBeInTheDocument();
+  });
+
+  test("falls back to the generic message for older failures", () => {
+    renderViewer({ source: failed, content: "" });
+
+    expect(screen.getByText(/Please try uploading it again/)).toBeInTheDocument();
+  });
+});

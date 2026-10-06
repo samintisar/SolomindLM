@@ -28,6 +28,8 @@ export interface Source {
   selected: boolean;
   content?: string;
   status?: "pending" | "processing" | "completed" | "failed";
+  /** Why processing failed, written for the user (set only when `status` is "failed"). */
+  failureReason?: string;
   /** Original URL for WEB / YOUTUBE sources; used for embed + open in new tab */
   url?: string;
   /** Kebab Refresh: web page (`url` type, not YouTube) or Google Drive–backed file */
