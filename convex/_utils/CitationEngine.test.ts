@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCitationEngine, generateCitationKey } from "./CitationEngine";
+import {
+  createCitationEngine,
+  generateCitationKey,
+  parseAuthorName,
+  SUPPORTED_STYLES,
+} from "./CitationEngine";
 
 describe("CitationEngine", () => {
   const engine = createCitationEngine();
@@ -851,6 +856,119 @@ describe("CitationEngine", () => {
       const keys = new Set<string>();
       const key = generateCitationKey(noYearCitation, keys);
       expect(key).toBe("Miller");
+    });
+
+    it("keys a surname-first author by surname", () => {
+      const key = generateCitationKey(
+        { ...mockCitation, authors: ["Vaswani, Ashish"], year: 2017 },
+        new Set()
+      );
+      expect(key).toBe("Vaswani2017");
+    });
+
+    it("keys an organisation by its whole name without spaces", () => {
+      const key = generateCitationKey(
+        { ...mockCitation, authors: ["World Health Organization"], year: 2020 },
+        new Set()
+      );
+      expect(key).toBe("WorldHealthOrganization2020");
+    });
+  });
+
+  // ==================== Author name forms ====================
+
+  describe("parseAuthorName", () => {
+    it.each([
+      ["Ashish Vaswani", { family: "Vaswani", given: "Ashish", suffix: "" }],
+      ["Vaswani, Ashish", { family: "Vaswani", given: "Ashish", suffix: "" }],
+      ["Vaswani, A.", { family: "Vaswani", given: "A.", suffix: "" }],
+      ["  Ashish   Vaswani ", { family: "Vaswani", given: "Ashish", suffix: "" }],
+      ["Martin Luther King Jr.", { family: "King", given: "Martin Luther", suffix: "Jr." }],
+      ["King, Martin Luther, Jr.", { family: "King", given: "Martin Luther", suffix: "Jr." }],
+      ["Jinping Xi", { family: "Xi", given: "Jinping", suffix: "" }],
+      ["Plato", { family: "Plato", given: "", suffix: "" }],
+      ["World Health Organization", { family: "World Health Organization", given: "", suffix: "" }],
+      ["Department of Health", { family: "Department of Health", given: "", suffix: "" }],
+      [
+        "Bill & Melinda Gates Foundation",
+        { family: "Bill & Melinda Gates Foundation", given: "", suffix: "" },
+      ],
+      [
+        "Google Research, Brain Team",
+        { family: "Google Research, Brain Team", given: "", suffix: "" },
+      ],
+    ])("parses %j", (author, expected) => {
+      expect(parseAuthorName(author)).toEqual(expected);
+    });
+  });
+
+  describe("author name forms", () => {
+    const givenFirst = {
+      paperId: "paper_0",
+      title: "Attention Is All You Need",
+      authors: ["Ashish Vaswani", "Noam Shazeer"],
+      year: 2017,
+      url: "https://arxiv.org/abs/1706.03762",
+      sourceApi: "arxiv" as const,
+    };
+    const surnameFirst = { ...givenFirst, authors: ["Vaswani, Ashish", "Shazeer, Noam"] };
+
+    it("cites a surname-first author by surname in-text", () => {
+      expect(engine.formatInline(surnameFirst, "apa7")).toBe("(Vaswani & Shazeer, 2017)");
+      expect(engine.formatInline(surnameFirst, "mla9")).toBe("(Vaswani and Shazeer)");
+      expect(engine.formatInline(surnameFirst, "chicago17")).toBe("(Vaswani 2017)");
+      expect(engine.formatInline(surnameFirst, "harvard")).toBe("(Vaswani and Shazeer, 2017)");
+    });
+
+    it("lists a surname-first author by surname and initials in the reference", () => {
+      expect(engine.formatReference(surnameFirst, "apa7")).toBe(
+        "Vaswani, A., & Shazeer, N. (2017). Attention Is All You Need. arXiv. https://arxiv.org/abs/1706.03762"
+      );
+      expect(engine.formatReference(surnameFirst, "ieee", 0)).toBe(
+        '[1] A. Vaswani and N. Shazeer, "Attention Is All You Need," arXiv:1706.03762, 2017.'
+      );
+    });
+
+    it.each(SUPPORTED_STYLES)("formats both name orders identically in %s", (style) => {
+      expect(engine.formatInline(surnameFirst, style, 0)).toBe(
+        engine.formatInline(givenFirst, style, 0)
+      );
+      expect(engine.formatReference(surnameFirst, style, 0)).toBe(
+        engine.formatReference(givenFirst, style, 0)
+      );
+    });
+
+    it("sorts a reference list by surname whichever order names are written in", () => {
+      const list = engine.generateReferenceList(
+        [{ ...givenFirst, authors: ["Bob Wilson"], title: "Other" }, surnameFirst],
+        "apa7"
+      );
+      expect(list.indexOf("Vaswani, A.")).toBeLessThan(list.indexOf("Wilson, B."));
+    });
+
+    it("keeps an organisation author whole", () => {
+      const org = { ...givenFirst, authors: ["World Health Organization"], year: 2020 };
+      expect(engine.formatInline(org, "apa7")).toBe("(World Health Organization, 2020)");
+      expect(engine.formatReference(org, "apa7")).toMatch(/^World Health Organization\. \(2020\)/);
+      expect(engine.formatReference(org, "vancouver", 0)).toMatch(
+        /^1\. World Health Organization\. /
+      );
+    });
+
+    it("cites a single-word author by that word", () => {
+      const single = { ...givenFirst, authors: ["Plato"], year: 2000 };
+      expect(engine.formatInline(single, "apa7")).toBe("(Plato, 2000)");
+      expect(engine.formatReference(single, "apa7")).toMatch(/^Plato\. \(2000\)/);
+    });
+
+    it("does not double the period after an author ending in one", () => {
+      const inc = { ...givenFirst, authors: ["Acme Corporation Inc."], year: 2020 };
+      expect(engine.formatReference(inc, "apa7")).toMatch(/^Acme Corporation Inc\. \(2020\)/);
+    });
+
+    it("takes an initial from each part of run-together initials", () => {
+      const initials = { ...givenFirst, authors: ["Smith, J.R."] };
+      expect(engine.formatReference(initials, "apa7")).toMatch(/^Smith, J\.R\. \(2017\)/);
     });
   });
 });

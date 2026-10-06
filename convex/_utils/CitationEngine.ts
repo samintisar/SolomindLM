@@ -40,13 +40,64 @@ function validateStyle(style: string): asserts style is CitationStyle {
   }
 }
 
-// NOTE: Assumes Western name conventions where the last word is the surname.
-// Non-Western names (e.g., Chinese, Japanese, Korean) may not be handled correctly.
+export interface AuthorName {
+  /** Surname; the whole name for an organisation or a one-word name. */
+  family: string;
+  /** Given names as written ("Ashish", "J. R."); empty when there are none. */
+  given: string;
+  suffix: string;
+}
+
+const NAME_SUFFIX = /^(jr|sr|ii|iii|iv)\.?$/i;
+const ORGANISATION_WORD =
+  /\b(organi[sz]ation|institutes?|institution|university|college|academy|consortium|collaboration|association|society|committee|council|commission|agency|authority|bureau|board|department|ministry|office|foundation|centre|center|group|team|network|alliance|federation|initiative|programme|corporation|company|inc|ltd|llc|laborator(y|ies)|hospital)\b/i;
+const ORGANISATION_CONNECTOR = /&| (of|for|and|on|the) /i;
+
+/**
+ * Authors arrive as plain strings in either "Given Surname" or "Surname, Given" order.
+ * Organisations ("World Health Organization") stay whole. Without a comma the last word is
+ * taken as the surname, so surname-first names written without one (e.g. "Xi Jinping") and
+ * multi-word surnames ("van Gogh") are not split correctly.
+ */
+export function parseAuthorName(author: string): AuthorName {
+  const name = author.trim().replace(/\s+/g, " ");
+  if (ORGANISATION_WORD.test(name) || ORGANISATION_CONNECTOR.test(name)) {
+    return { family: name, given: "", suffix: "" };
+  }
+
+  const [family, given = "", ...rest] = name.split(",").map((part) => part.trim());
+  if (given || rest.length > 0) {
+    return { family, given, suffix: rest.find((part) => NAME_SUFFIX.test(part)) ?? "" };
+  }
+
+  const words = family.split(" ");
+  const suffix =
+    words.length > 2 && NAME_SUFFIX.test(words[words.length - 1]) ? (words.pop() ?? "") : "";
+  return { family: words.pop() ?? "", given: words.join(" "), suffix };
+}
+
+function nameParts(author: string): { family: string; initials: string[] } {
+  const { family, given } = parseAuthorName(author);
+  const initials = given
+    .split(/[\s.]+/)
+    .filter(Boolean)
+    .map((part) => part[0]);
+  return { family, initials };
+}
+
+/** The name in reading order ("Ashish Vaswani"), for styles that print it in full. */
+function displayName(author: string): string {
+  const { family, given, suffix } = parseAuthorName(author);
+  return [given, family, suffix].filter(Boolean).join(" ");
+}
+
+function withPeriod(text: string): string {
+  return text.endsWith(".") ? text : `${text}.`;
+}
+
 function formatAuthorLastNameFirst(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || author;
-  const initials = parts.map((p) => p[0]).join(".");
-  return initials ? `${lastName}, ${initials}.` : `${lastName}.`;
+  const { family, initials } = nameParts(author);
+  return initials.length > 0 ? `${family}, ${initials.join(".")}.` : withPeriod(family);
 }
 
 function formatAPA6Authors(authors: string[] | undefined): string {
@@ -80,7 +131,7 @@ function formatAPA6Authors(authors: string[] | undefined): string {
 }
 
 function formatMLA8Authors(authors: string[] | undefined): string {
-  const safeAuthors = authors || [];
+  const safeAuthors = (authors || []).map(displayName);
   if (safeAuthors.length === 0) return "";
   if (safeAuthors.length === 1) return safeAuthors[0];
   if (safeAuthors.length === 2) return `${safeAuthors[0]}, and ${safeAuthors[1]}`;
@@ -92,10 +143,8 @@ function formatChicago17NotesAuthors(authors: string[] | undefined): string {
 }
 
 function formatAMA11Author(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || "";
-  const initials = parts.map((p) => p[0]).join("");
-  return initials ? `${lastName} ${initials}` : lastName;
+  const { family, initials } = nameParts(author);
+  return initials.length > 0 ? `${family} ${initials.join("")}` : family;
 }
 
 function formatAMA11Authors(authors: string[] | undefined): string {
@@ -108,10 +157,8 @@ function formatAMA11Authors(authors: string[] | undefined): string {
 }
 
 function formatAMA10Author(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || "";
-  const initials = parts.map((p) => p[0]).join(".");
-  return initials ? `${lastName} ${initials}.` : `${lastName}.`;
+  const { family, initials } = nameParts(author);
+  return initials.length > 0 ? `${family} ${initials.join(".")}.` : withPeriod(family);
 }
 
 function formatAMA10Authors(authors: string[] | undefined): string {
@@ -124,10 +171,8 @@ function formatAMA10Authors(authors: string[] | undefined): string {
 }
 
 function formatACSAuthor(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || "";
-  const initials = parts.map((p) => p[0]).join(". ");
-  return initials ? `${lastName}, ${initials}.` : `${lastName}.`;
+  const { family, initials } = nameParts(author);
+  return initials.length > 0 ? `${family}, ${initials.join(". ")}.` : withPeriod(family);
 }
 
 function formatACSAuthors(authors: string[] | undefined): string {
@@ -145,7 +190,7 @@ function toSuperscript(num: number): string {
 }
 
 function getFirstAuthorLastName(author: string): string {
-  return author.split(" ").pop() || "Unknown";
+  return parseAuthorName(author).family || "Unknown";
 }
 
 // ==================== APA 7 ====================
@@ -217,7 +262,7 @@ function formatInlineAPA7(citation: Citation): string {
 // ==================== MLA 9 ====================
 
 function formatMLA9Authors(authors: string[] | undefined): string {
-  const safeAuthors = authors || [];
+  const safeAuthors = (authors || []).map(displayName);
   if (safeAuthors.length === 0) return "";
   if (safeAuthors.length === 1) return safeAuthors[0];
   if (safeAuthors.length === 2) return `${safeAuthors[0]}, and ${safeAuthors[1]}`;
@@ -259,7 +304,7 @@ function formatInlineMLA9(citation: Citation): string {
 // ==================== Chicago 17 ====================
 
 function formatChicago17Authors(authors: string[] | undefined): string {
-  const safeAuthors = authors || [];
+  const safeAuthors = (authors || []).map(displayName);
   if (safeAuthors.length === 0) return "";
   if (safeAuthors.length === 1) return safeAuthors[0];
   if (safeAuthors.length === 2) return `${safeAuthors[0]}, and ${safeAuthors[1]}`;
@@ -299,10 +344,8 @@ function formatInlineChicago17(citation: Citation): string {
 // ==================== IEEE ====================
 
 function formatIEEEInitials(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || "";
-  const initials = parts.map((p) => p[0]).join(". ");
-  return initials ? `${initials}. ${lastName}` : lastName;
+  const { family, initials } = nameParts(author);
+  return initials.length > 0 ? `${initials.join(". ")}. ${family}` : family;
 }
 
 function formatIEEEAuthors(authors: string[] | undefined): string {
@@ -353,10 +396,8 @@ function formatInlineIEEE(_citation: Citation, index: number): string {
 // ==================== Vancouver ====================
 
 function formatVancouverAuthor(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || "";
-  const initials = parts.map((p) => p[0]).join("");
-  return initials ? `${lastName} ${initials}` : lastName;
+  const { family, initials } = nameParts(author);
+  return initials.length > 0 ? `${family} ${initials.join("")}` : family;
 }
 
 function formatVancouverAuthors(authors: string[] | undefined): string {
@@ -391,22 +432,15 @@ function formatInlineVancouver(_citation: Citation, index: number): string {
 
 // ==================== Harvard ====================
 
-function formatHarvardAuthor(author: string): string {
-  const parts = author.split(" ");
-  const lastName = parts.pop() || "";
-  const initials = parts.map((p) => p[0]).join(".");
-  return initials ? `${lastName}, ${initials}.` : `${lastName}.`;
-}
-
 function formatHarvardAuthors(authors: string[] | undefined): string {
   const safeAuthors = authors || [];
   if (safeAuthors.length === 0) return "";
-  if (safeAuthors.length === 1) return formatHarvardAuthor(safeAuthors[0]);
+  if (safeAuthors.length === 1) return formatAuthorLastNameFirst(safeAuthors[0]);
   if (safeAuthors.length === 2) {
-    return `${formatHarvardAuthor(safeAuthors[0])} and ${formatHarvardAuthor(safeAuthors[1])}`;
+    return `${formatAuthorLastNameFirst(safeAuthors[0])} and ${formatAuthorLastNameFirst(safeAuthors[1])}`;
   }
   // 3+
-  return `${formatHarvardAuthor(safeAuthors[0])} et al.`;
+  return `${formatAuthorLastNameFirst(safeAuthors[0])} et al.`;
 }
 
 function formatHarvard(citation: Citation): string {
@@ -583,7 +617,7 @@ export function generateCitationKey(citation: Citation, existingKeys: Set<string
   const safeAuthors = citation.authors || [];
   const base =
     safeAuthors.length > 0
-      ? (safeAuthors[0].split(" ").pop() || "") + (citation.year || "")
+      ? parseAuthorName(safeAuthors[0]).family.replace(/\s/g, "") + (citation.year || "")
       : citation.title.replace(/\s/g, "").slice(0, 3) + (citation.year || "");
 
   let key = base;
@@ -715,8 +749,8 @@ export function createCitationEngine(): CitationEngine {
       // Author-date styles: sort by first author's last name
       return [...citations]
         .sort((a, b) => {
-          const aLastName = (a.authors?.[0]?.split(" ").pop() || "").toLowerCase();
-          const bLastName = (b.authors?.[0]?.split(" ").pop() || "").toLowerCase();
+          const aLastName = parseAuthorName(a.authors?.[0] ?? "").family.toLowerCase();
+          const bLastName = parseAuthorName(b.authors?.[0] ?? "").family.toLowerCase();
           return aLastName.localeCompare(bLastName);
         })
         .map((c) => this.formatReference(c, style))
