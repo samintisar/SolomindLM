@@ -144,20 +144,6 @@
     ]
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Read|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo \"🔒 SERENA RULE: Read/Edit on .ts/.tsx files are FORBIDDEN for discovery. Use get_symbols_overview -> find_symbol. For edits, use replace_symbol_body or replace_content.\"",
-            "if": "Read(*.ts)|Read(*.tsx)|Edit(*.ts)|Edit(*.tsx)",
-            "statusMessage": "Serena enforcement reminder",
-            "async": false
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|mcp__(plugin_serena_)?serena__(replace_symbol_body|insert_before_symbol|insert_after_symbol|replace_content|create_text_file)",

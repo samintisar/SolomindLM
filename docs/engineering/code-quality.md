@@ -43,8 +43,8 @@ Both git hooks are set up automatically by `bun install` (`prepare` →
 `scripts/setup-git-hooks.mjs`). Bypass a work-in-progress commit or push with
 `--no-verify`; CI still enforces everything.
 
-Run deeper suites locally when the change warrants (per `CLAUDE.md` validation
-gates): `test:e2e` before merging UI flows; `eval:rag --case=… / --runner=…` or
+Run deeper suites locally when the change warrants (per `AGENTS.md` validation
+gates): `test:e2e` before merging UI flows; `eval:rag --case … / --runner …` or
 `eval:studio` for agent/prompt changes. Never unit-test prompt outputs.
 
 ## Weekly pass (~15 min)
