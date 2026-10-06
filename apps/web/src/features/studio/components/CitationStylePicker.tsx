@@ -31,7 +31,7 @@ export interface CitationStylePickerProps {
   disabled?: boolean;
   /** Layout classes for the trigger (its width). */
   className?: string;
-  /** For a FieldLabel's htmlFor. */
+  /** For a FieldLabel's htmlFor. Without one the trigger is named "Select citation style". */
   id?: string;
 }
 
@@ -66,7 +66,12 @@ export const CitationStylePicker: React.FC<CitationStylePickerProps> = ({
     onValueChange={(next) => onChange(next as CitationStyle)}
     disabled={disabled}
   >
-    <SelectTrigger id={id} aria-label="Select citation style" className={cn("w-full", className)}>
+    <SelectTrigger
+      id={id}
+      // With an id, a visible FieldLabel names it; an aria-label would override that label.
+      aria-label={id ? undefined : "Select citation style"}
+      className={cn("w-full", className)}
+    >
       <SelectValue />
     </SelectTrigger>
     <SelectContent position="popper" align="end">

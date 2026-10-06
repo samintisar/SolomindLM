@@ -2,7 +2,7 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { FieldGroup, FieldLegend, FieldSet } from "@/shared/components/ui/field";
-import type { StudioDialogTheme } from "./customize/dialogTheme";
+import type { StudioDialogTheme } from "./customize/dialogContext";
 import { InfographicStyleThumbnail } from "./customize/InfographicStyleThumbnail";
 import { OptionCard } from "./customize/OptionCard";
 import { OptionToggleGroup } from "./customize/OptionToggleGroup";

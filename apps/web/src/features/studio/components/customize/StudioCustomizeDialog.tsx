@@ -1,5 +1,5 @@
 import { ChevronLeft, X } from "lucide-react";
-import { createContext, type ReactNode, useContext, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -14,17 +14,12 @@ import { cn } from "@/shared/utils/cn";
 import type { StudioTool } from "../../services/promptsApi";
 import { type StudioTypeKey, studioTypeStyleForKey } from "../../studioTypeStyle";
 import { StudioModalDiscoverPromptsButton } from "../StudioModalDiscoverPromptsButton";
-import { type StudioDialogTheme, StudioDialogThemeContext } from "./dialogTheme";
-
-const PreviewContext = createContext(false);
-
-/**
- * True inside a marketing preview (the landing and sign-in mock-ups). There, the header drops
- * "Discover Prompts" and PromptField drops "Save as reusable prompt": both need a signed-in library.
- */
-export function useStudioCustomizePreview(): boolean {
-  return useContext(PreviewContext);
-}
+import {
+  type StudioDialogTheme,
+  StudioDialogThemeContext,
+  StudioPreviewContext,
+  useStudioCustomizePreview,
+} from "./dialogContext";
 
 /**
  * The Customize dialogs have no DialogTrigger (the Studio panel opens them), so Radix has nothing to
@@ -121,7 +116,9 @@ export function StudioCustomizeDialog({
           className={cn(wide && "sm:max-w-4xl")}
         >
           <StudioDialogThemeContext.Provider value={theme}>
-            <PreviewContext.Provider value={preview}>{children}</PreviewContext.Provider>
+            <StudioPreviewContext.Provider value={preview}>
+              {children}
+            </StudioPreviewContext.Provider>
           </StudioDialogThemeContext.Provider>
         </DialogContent>
       </Dialog>
@@ -135,7 +132,12 @@ interface StudioCustomizeHeaderProps {
   title: string;
   description: string;
   /** Adds "Discover Prompts" (not in previews); a chosen library prompt goes to `onApplyPrompt`. */
-  promptLibrary?: { studioTool: StudioTool; onApplyPrompt: (promptText: string) => void };
+  promptLibrary?: {
+    studioTool: StudioTool;
+    onApplyPrompt: (promptText: string) => void;
+    /** Where focus goes once the library closes after a prompt was applied (default: Discover). */
+    focusAfterApply?: () => HTMLElement | null;
+  };
   /** The second step of a two-step dialog: a Back button before the icon. */
   onBack?: () => void;
 }
@@ -171,6 +173,7 @@ export function StudioCustomizeHeader({
           <StudioModalDiscoverPromptsButton
             studioTool={promptLibrary.studioTool}
             onApplyPrompt={promptLibrary.onApplyPrompt}
+            focusAfterApply={promptLibrary.focusAfterApply}
           />
         )}
         <DialogClose asChild>

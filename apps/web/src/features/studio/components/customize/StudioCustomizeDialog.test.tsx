@@ -8,7 +8,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
-import { useStudioDialogTheme } from "./dialogTheme";
+import { useStudioDialogTheme } from "./dialogContext";
 import {
   StudioCustomizeBody,
   StudioCustomizeDialog,

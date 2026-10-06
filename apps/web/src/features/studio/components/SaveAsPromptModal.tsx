@@ -25,7 +25,7 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { useToast } from "@/shared/contexts/useToast";
 import { type StudioTool, useCreatePrompt, usePublishPrompt } from "../services/promptsApi";
-import { useStudioDialogTheme } from "./customize/dialogTheme";
+import { useStudioDialogTheme } from "./customize/dialogContext";
 
 interface SaveAsPromptBaseProps {
   isOpen: boolean;

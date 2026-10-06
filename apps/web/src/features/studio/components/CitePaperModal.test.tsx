@@ -29,20 +29,16 @@ describe("CitePaperModal", () => {
   it("shows the reference and the in-text citation in APA 7th by default", () => {
     render(<CitePaperModal paper={PAPER} paperIndex={0} isOpen onClose={vi.fn()} />);
     expect(screen.getByRole("dialog", { name: "Cite Paper" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Select citation style" })).toHaveTextContent(
-      "APA 7th"
-    );
+    expect(screen.getByRole("combobox", { name: "Citation style" })).toHaveTextContent("APA 7th");
     expect(screen.getByText(/Attention Is All You Need/)).toBeInTheDocument();
     expect(screen.getByText("(Ashish & Noam, 2017)")).toBeInTheDocument();
   });
 
   it("numbers the in-text citation in a numbered style", async () => {
     render(<CitePaperModal paper={PAPER} paperIndex={0} isOpen onClose={vi.fn()} />);
-    await userEvent.click(screen.getByRole("combobox", { name: "Select citation style" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "Citation style" }));
     await userEvent.click(await screen.findByRole("option", { name: "IEEE" }));
-    expect(screen.getByRole("combobox", { name: "Select citation style" })).toHaveTextContent(
-      "IEEE"
-    );
+    expect(screen.getByRole("combobox", { name: "Citation style" })).toHaveTextContent("IEEE");
     expect(screen.getByText("[1]")).toBeInTheDocument();
     expect(screen.queryByText("(Ashish & Noam, 2017)")).not.toBeInTheDocument();
   });

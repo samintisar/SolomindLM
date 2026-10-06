@@ -2,7 +2,7 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { FieldGroup } from "@/shared/components/ui/field";
-import type { StudioDialogTheme } from "./customize/dialogTheme";
+import type { StudioDialogTheme } from "./customize/dialogContext";
 import { OptionToggleGroup } from "./customize/OptionToggleGroup";
 import { COUNT_OPTIONS, DIFFICULTY_OPTIONS } from "./customize/options";
 import { PromptField } from "./customize/PromptField";

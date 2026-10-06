@@ -12,3 +12,13 @@ export const StudioDialogThemeContext = createContext<StudioDialogTheme>("defaul
 export function useStudioDialogTheme(): StudioDialogTheme {
   return useContext(StudioDialogThemeContext);
 }
+
+export const StudioPreviewContext = createContext(false);
+
+/**
+ * True inside a marketing preview (the landing and sign-in mock-ups). There, the header drops
+ * "Discover Prompts" and PromptField drops "Save as reusable prompt": both need a signed-in library.
+ */
+export function useStudioCustomizePreview(): boolean {
+  return useContext(StudioPreviewContext);
+}

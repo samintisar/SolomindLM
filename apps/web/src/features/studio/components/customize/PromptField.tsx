@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { cn } from "@/shared/utils/cn";
 import type { StudioTool } from "../../services/promptsApi";
 import { SaveAsPromptModal } from "../SaveAsPromptModal";
-import { useStudioCustomizePreview } from "./StudioCustomizeDialog";
+import { useStudioCustomizePreview } from "./dialogContext";
 
 interface PromptFieldProps {
   label: string;

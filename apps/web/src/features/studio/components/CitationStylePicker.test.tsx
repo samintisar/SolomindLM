@@ -18,4 +18,15 @@ describe("CitationStylePicker", () => {
     render(<CitationStylePicker value="ieee" onChange={vi.fn()} disabled />);
     expect(screen.getByRole("combobox", { name: "Select citation style" })).toBeDisabled();
   });
+
+  it("is named by a visible label when given an id, not by its own aria-label", () => {
+    render(
+      <>
+        <label htmlFor="style">Citation style</label>
+        <CitationStylePicker id="style" value="apa7" onChange={vi.fn()} />
+      </>
+    );
+    expect(screen.getByRole("combobox", { name: "Citation style" })).toHaveTextContent("APA 7th");
+    expect(screen.queryByRole("combobox", { name: "Select citation style" })).toBeNull();
+  });
 });

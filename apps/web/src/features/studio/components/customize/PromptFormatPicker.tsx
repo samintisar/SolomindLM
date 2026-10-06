@@ -73,6 +73,8 @@ export function PromptFormatPicker<Id extends string>({
   const formatTitleId = useId();
   const gridRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<Opener<Id> | null>(null);
+  const promptStepRef = useRef<HTMLDivElement>(null);
+  const focusPromptAfterApplyRef = useRef(false);
 
   // Back to the grid: focus the card or Edit button that opened the prompt step. A layout effect,
   // so it runs before Radix's focus scope notices the removed Back button and focuses the dialog.
@@ -99,8 +101,20 @@ export function PromptFormatPicker<Id extends string>({
     studioTool,
     // On the prompt step a library prompt replaces the text and keeps the format (and the opener).
     // On the grid it opens Create Your Own, and Back returns to that card.
-    onApplyPrompt: (text: string) =>
-      configuring ? setPrompt(text) : configure(customFormat, text, "card"),
+    onApplyPrompt: (text: string) => {
+      if (configuring) {
+        setPrompt(text);
+        return;
+      }
+      focusPromptAfterApplyRef.current = true;
+      configure(customFormat, text, "card");
+    },
+    // The library's close would otherwise focus Discover Prompts, over the new prompt box.
+    focusAfterApply: () => {
+      const focusPrompt = focusPromptAfterApplyRef.current;
+      focusPromptAfterApplyRef.current = false;
+      return focusPrompt ? (promptStepRef.current?.querySelector("textarea") ?? null) : null;
+    },
   };
 
   if (configuring) {
@@ -114,7 +128,10 @@ export function PromptFormatPicker<Id extends string>({
           onBack={() => setConfiguring(null)}
         />
         <StudioCustomizeBody>
-          <div className="flex flex-col gap-6 duration-300 ease-out animate-in fade-in-0 slide-in-from-right-4">
+          <div
+            ref={promptStepRef}
+            className="flex flex-col gap-6 duration-300 ease-out animate-in fade-in-0 slide-in-from-right-4"
+          >
             <Item variant="muted">
               <ItemContent>
                 <ItemTitle id={formatTitleId}>{configuring.title}</ItemTitle>

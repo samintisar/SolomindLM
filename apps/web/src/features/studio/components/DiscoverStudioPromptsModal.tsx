@@ -70,7 +70,7 @@ import {
   useSavePublicPrompt,
   useUnpublishPrompt,
 } from "../services/promptsApi";
-import { useStudioDialogTheme } from "./customize/dialogTheme";
+import { useStudioDialogTheme } from "./customize/dialogContext";
 
 interface DiscoverStudioPromptsModalProps {
   studioTool: StudioTool;
@@ -78,6 +78,11 @@ interface DiscoverStudioPromptsModalProps {
   onApplyPrompt: (promptText: string) => void;
   /** The button that opens the library. Radix returns focus to it on close. */
   trigger: React.ReactElement;
+  /**
+   * Asked for after a prompt is applied, once the library has closed: the element that should take
+   * focus instead of the trigger (the prompt box the apply just filled). Null keeps the default.
+   */
+  focusAfterApply?: () => HTMLElement | null;
 }
 
 const SORT_OPTIONS: { value: PromptSortBy; label: string }[] = [
@@ -112,17 +117,36 @@ export function DiscoverStudioPromptsModal({
   studioTool,
   onApplyPrompt,
   trigger,
+  focusAfterApply,
 }: DiscoverStudioPromptsModalProps) {
   const [open, setOpen] = useState(false);
   const theme = useStudioDialogTheme();
+  const appliedRef = useRef(false);
   const apply = (promptText: string) => {
+    appliedRef.current = true;
     onApplyPrompt(promptText);
     setOpen(false);
+  };
+  // Radix focuses the trigger on close, which would override a box the apply wants focused. Only
+  // after an apply: Escape and Close still return focus to the trigger.
+  const handleCloseAutoFocus = (event: Event) => {
+    const applied = appliedRef.current;
+    appliedRef.current = false;
+    const target = applied ? focusAfterApply?.() : null;
+    if (target) {
+      event.preventDefault();
+      target.focus();
+    }
   };
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent size="wide" padding="none" theme={theme}>
+      <DialogContent
+        size="wide"
+        padding="none"
+        theme={theme}
+        onCloseAutoFocus={handleCloseAutoFocus}
+      >
         <div className="flex flex-col gap-1 px-6 pt-6 pr-12">
           <p className="font-sans text-xs text-muted-foreground">{TOOL_LABELS[studioTool]}</p>
           <DialogTitle>Prompt library</DialogTitle>

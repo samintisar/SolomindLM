@@ -1,5 +1,5 @@
 import type React from "react";
-import type { StudioDialogTheme } from "./customize/dialogTheme";
+import type { StudioDialogTheme } from "./customize/dialogContext";
 import { type PromptFormat, PromptFormatPicker } from "./customize/PromptFormatPicker";
 import { StudioCustomizeDialog } from "./customize/StudioCustomizeDialog";
 
