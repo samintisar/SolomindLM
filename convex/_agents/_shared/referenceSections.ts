@@ -1,0 +1,48 @@
+/**
+ * Reference lists (a paper's "References" or "Bibliography" section) name other works without
+ * saying anything about the source itself. Studio outputs that extract entities from a source
+ * read each cited work as an entity of its own (#350), so they can leave these sections out.
+ */
+
+const REFERENCE_SECTION_TITLE =
+  /^(?:[\dA-Z]{1,3}[.)]?\s+)?(?:references?(?:\s+and\s+notes)?|reference\s+list|bibliography|works\s+cited|literature\s+cited|cited\s+literature)$/i;
+
+/** A reference-list heading on the first line of a chunk: `## References`, `**Bibliography**`. */
+const REFERENCE_HEADING_LINE =
+  /^\s*(?:#{1,6}\s*|\*\*)?(?:[\dA-Z]{1,3}[.)]?\s+)?(?:references?(?:\s+and\s+notes)?|reference\s+list|bibliography|works\s+cited|literature\s+cited)(?:\*\*)?:?\s*$/i;
+
+export interface SectionedChunk {
+  /** Heading of the section the chunk belongs to, as recorded at chunking time. */
+  sectionTitle?: string;
+  content: string;
+}
+
+/** True when the chunk is part of a reference list. */
+export function isReferenceListChunk(chunk: SectionedChunk): boolean {
+  const title = chunk.sectionTitle?.trim().replace(/[*:#]/g, "").trim();
+  if (title) return REFERENCE_SECTION_TITLE.test(title);
+  // Chunks stored without a section title: only one that opens with the heading itself.
+  const firstLine = chunk.content.trimStart().split("\n", 1)[0] ?? "";
+  return REFERENCE_HEADING_LINE.test(firstLine);
+}
+
+/**
+ * The chunks without their reference lists, in their original order. A document whose every chunk
+ * is a reference list (an uploaded bibliography) keeps them all, since that list is its content.
+ */
+export function withoutReferenceLists<T extends SectionedChunk & { documentId: string }>(
+  chunks: T[]
+): T[] {
+  const referenceIds = new Set<T>();
+  const keptPerDocument = new Map<string, number>();
+  for (const chunk of chunks) {
+    if (isReferenceListChunk(chunk)) {
+      referenceIds.add(chunk);
+    } else {
+      keptPerDocument.set(chunk.documentId, (keptPerDocument.get(chunk.documentId) ?? 0) + 1);
+    }
+  }
+  return chunks.filter(
+    (chunk) => !referenceIds.has(chunk) || !keptPerDocument.get(chunk.documentId)
+  );
+}

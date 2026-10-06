@@ -25,6 +25,17 @@ export function getMessageContent(response: unknown): string {
  * Removes Markdown code blocks (```csv ... ```) and leading/trailing whitespace.
  * If fields are not properly quoted, attempts to fix them (RFC 4180 compliance).
  */
+/**
+ * The pipeline hands the reduce step "notes", and models echo that word into empty cells
+ * ("Not specified in notes"). Readers only know their sources, so say that instead (#350).
+ */
+const PIPELINE_NOTES_PHRASE =
+  /\b(not (?:specified|mentioned|stated|provided|reported|given|available|found|listed|included|described|detailed)) (?:in|from) (?:the )?(?:research |input |consolidated |source )?notes\b/gi;
+
+export function withoutPipelineWording(text: string): string {
+  return text.replace(PIPELINE_NOTES_PHRASE, "$1 in the sources");
+}
+
 export function cleanCsvOutput(output: string): string {
   let cleaned = output.trim();
 

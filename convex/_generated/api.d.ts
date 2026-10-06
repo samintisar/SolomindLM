@@ -35,6 +35,7 @@ import type * as _agents__shared_markdownMathPrompt from "../_agents/_shared/mar
 import type * as _agents__shared_node_builder from "../_agents/_shared/node_builder.js";
 import type * as _agents__shared_progress from "../_agents/_shared/progress.js";
 import type * as _agents__shared_promptTemplate from "../_agents/_shared/promptTemplate.js";
+import type * as _agents__shared_referenceSections from "../_agents/_shared/referenceSections.js";
 import type * as _agents__shared_retry from "../_agents/_shared/retry.js";
 import type * as _agents__shared_sanitization from "../_agents/_shared/sanitization.js";
 import type * as _agents__shared_stageSpans from "../_agents/_shared/stageSpans.js";
@@ -168,6 +169,7 @@ import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompt
 import type * as _agents_spreadsheet_routing from "../_agents/spreadsheet/routing.js";
 import type * as _agents_spreadsheet_sourcePacking from "../_agents/spreadsheet/sourcePacking.js";
 import type * as _agents_spreadsheet_state from "../_agents/spreadsheet/state.js";
+import type * as _agents_spreadsheet_title from "../_agents/spreadsheet/title.js";
 import type * as _agents_written_questions_WrittenQuestionsGraph from "../_agents/written_questions/WrittenQuestionsGraph.js";
 import type * as _agents_written_questions_chunkHelpers from "../_agents/written_questions/chunkHelpers.js";
 import type * as _agents_written_questions_config from "../_agents/written_questions/config.js";
@@ -429,6 +431,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/node_builder": typeof _agents__shared_node_builder;
   "_agents/_shared/progress": typeof _agents__shared_progress;
   "_agents/_shared/promptTemplate": typeof _agents__shared_promptTemplate;
+  "_agents/_shared/referenceSections": typeof _agents__shared_referenceSections;
   "_agents/_shared/retry": typeof _agents__shared_retry;
   "_agents/_shared/sanitization": typeof _agents__shared_sanitization;
   "_agents/_shared/stageSpans": typeof _agents__shared_stageSpans;
@@ -562,6 +565,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/spreadsheet/routing": typeof _agents_spreadsheet_routing;
   "_agents/spreadsheet/sourcePacking": typeof _agents_spreadsheet_sourcePacking;
   "_agents/spreadsheet/state": typeof _agents_spreadsheet_state;
+  "_agents/spreadsheet/title": typeof _agents_spreadsheet_title;
   "_agents/written_questions/WrittenQuestionsGraph": typeof _agents_written_questions_WrittenQuestionsGraph;
   "_agents/written_questions/chunkHelpers": typeof _agents_written_questions_chunkHelpers;
   "_agents/written_questions/config": typeof _agents_written_questions_config;

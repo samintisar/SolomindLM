@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { withoutReferenceLists } from "../_agents/_shared/referenceSections";
 import {
   chunkTopicSimilarities,
   documentTopicScores,
@@ -110,6 +111,8 @@ export const fetchChunks = internalAction({
     documentIds: v.array(v.id("documents")),
     /** The studio request's topic, focus or custom prompt. */
     topic: v.optional(v.string()),
+    /** Leave out each source's reference list (cited works read as entities of their own; #350). */
+    excludeReferenceLists: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<Array<{ content: string; documentId: Id<"documents"> }>> => {
     // Get all chunks for the specified documents
@@ -120,6 +123,16 @@ export const fetchChunks = internalAction({
         documentId,
       });
       allChunks.push(...chunks);
+    }
+
+    if (args.excludeReferenceLists) {
+      const before = allChunks.length;
+      allChunks = withoutReferenceLists(allChunks);
+      createServiceLogger("documents", "fetchChunks").info("Left out reference lists", {
+        documentCount: args.documentIds.length,
+        chunksDropped: before - allChunks.length,
+        chunksKept: allChunks.length,
+      });
     }
 
     const topic = args.topic?.trim();
