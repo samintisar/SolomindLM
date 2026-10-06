@@ -90,6 +90,7 @@ describe("CustomizeFlashcardsModal", () => {
     await userEvent.type(screen.getByLabelText("Area of focus"), "Exam prep");
     await userEvent.click(screen.getByRole("button", { name: /save as reusable prompt/i }));
     expect(screen.getByRole("dialog", { name: "Save as Prompt" })).toBeInTheDocument();
+    expect(screen.getByTestId("save-as-prompt-tool-label")).toHaveTextContent("Flashcards");
     await userEvent.keyboard("{Escape}");
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Save as Prompt" })).not.toBeInTheDocument()

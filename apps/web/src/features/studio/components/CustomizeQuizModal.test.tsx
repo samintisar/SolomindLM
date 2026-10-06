@@ -73,6 +73,13 @@ describe("CustomizeQuizModal", () => {
     expect(screen.getByRole("radio", { name: "Medium" })).toHaveAttribute("aria-checked", "true");
   });
 
+  it("saves the focus as a Quiz prompt", async () => {
+    renderQuiz();
+    await userEvent.type(screen.getByLabelText("Area of focus"), "Normal forms");
+    await userEvent.click(screen.getByRole("button", { name: /save as reusable prompt/i }));
+    expect(screen.getByTestId("save-as-prompt-tool-label")).toHaveTextContent("Quiz");
+  });
+
   it("closes from Close and from Cancel", async () => {
     const { onClose } = renderQuiz();
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
