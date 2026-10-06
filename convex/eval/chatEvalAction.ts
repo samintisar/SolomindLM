@@ -24,7 +24,11 @@ import { action } from "../_generated/server";
 import { env } from "../_lib/env";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
-import { createRerankFn } from "../chat/_streamSearch";
+import {
+  createChatVectorSearchRunner,
+  createFetchDocumentFn,
+  createRerankFn,
+} from "../chat/_streamSearch";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
 import { buildChatEvalTelemetry } from "./chatEvalTelemetry";
@@ -86,11 +90,6 @@ export interface ChatEvalResult {
   };
 }
 
-interface VectorSearchHit {
-  _id: Id<"documentChunks">;
-  _score: number;
-}
-
 // ─── Action ──────────────────────────────────────────────────
 
 export const runChatEval = action({
@@ -125,8 +124,10 @@ export const runChatEval = action({
     let selectEndedAt: number | undefined;
     let providerUsage: { prompt: number; completion: number; total: number } | undefined;
 
-    // ── Vector search runner (matches convex/chat/stream.ts) ──
+    // ── Vector search runner: production's, so chunk metadata (totalChunks, titles) and
+    // thresholds match what chat sees ──
 
+    const productionVectorSearchRunner = createChatVectorSearchRunner(ctx, notebookIdTyped);
     const vectorSearchRunner = async (
       embedding: number[],
       limit: number,
@@ -134,50 +135,7 @@ export const runChatEval = action({
     ): Promise<VectorSearchRawResult[]> => {
       retrieveClock.markNotebookStart();
       try {
-        const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
-
-        const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
-          vector: embedding,
-          limit: limitToFetch,
-          filter: (q) => q.eq("notebookId", notebookIdTyped),
-        });
-
-        const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
-        if (chunkIds.length === 0) return [];
-
-        const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
-
-        const chunkMap = new Map(
-          (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map(
-            (c) => [c._id, c]
-          ) as [Id<"documentChunks">, Record<string, unknown>][]
-        );
-
-        const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
-        const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
-
-        const rows: VectorSearchRawResult[] = [];
-        for (const r of results as VectorSearchHit[]) {
-          const chunk = chunkMap.get(r._id);
-          if (!chunk) continue;
-
-          // Filter by document IDs if specified
-          if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
-          // Apply threshold
-          const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
-          if (r._score < threshold) continue;
-
-          rows.push({
-            _id: r._id,
-            _score: r._score,
-            content: chunk.content as string,
-            chunkIndex: chunk.chunkIndex as number,
-            documentId: chunk.documentId as Id<"documents">,
-            sourceTitle: "",
-            sourceUrl: "",
-          });
-        }
-        return rows.slice(0, limit);
+        return await productionVectorSearchRunner(embedding, limit, docIds);
       } finally {
         retrieveClock.markNotebookEnd();
       }
@@ -244,9 +202,12 @@ export const runChatEval = action({
       rerankFn
     );
 
+    // Production passes the full-document fetcher too; without it evals never exercised
+    // full-document expansion.
     const agent = new ChatAgent({
       vectorSearchHandler: hybridSearch,
       globalRerankFn: spyGlobalRerankFn,
+      fetchDocumentFn: createFetchDocumentFn(ctx),
     });
 
     // ── Consume the full generator stream ──

@@ -5,7 +5,10 @@ import { countTokens } from "../_shared/tokenizer";
 import {
   CONTEXT_TOKEN_BUDGET,
   MAX_CHUNKS_HARD_LIMIT,
+  MIN_PASSAGES_PER_DOCUMENT,
   MIN_RELEVANCE_THRESHOLD,
+  MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
+  MULTI_SOURCE_MAX_EXTRA_TOKENS,
 } from "./chatConfig.js";
 
 export function chunkDedupKey(c: ReferenceChunk): string {
@@ -53,6 +56,12 @@ export type SelectChunksOptions = {
   lexicalQuery?: string;
   /** Override CONTEXT_TOKEN_BUDGET (e.g. list queries: keep prompt focused on top reranked hits). */
   maxContextTokens?: number;
+  /**
+   * Dedup keys of the passages the global rerank scored. Only these decide which documents are
+   * relevant to the question; without them (rerank failed or skipped) no document gets a
+   * guaranteed share and the budget is not widened.
+   */
+  rerankedKeys?: ReadonlySet<string>;
 };
 
 /** Count significant query tokens appearing in chunk text (cheap lexical grounding signal). */
@@ -73,13 +82,72 @@ function lexicalOverlapScore(chunk: ReferenceChunk, query: string): number {
 }
 
 /**
+ * Documents with at least one reranked passage at or above the relevance floor, ordered by
+ * their best such passage. Passages outside the rerank keep their raw vector similarity (~0.5
+ * even when unrelated, above the floor), so they never make a document count as relevant.
+ */
+export function documentsWithRerankedPassages(
+  chunks: ReferenceChunk[],
+  rerankedKeys: ReadonlySet<string> | undefined,
+  threshold: number = MIN_RELEVANCE_THRESHOLD
+): string[] {
+  if (!rerankedKeys || rerankedKeys.size === 0) return [];
+  const documents: string[] = [];
+  const ranked = [...chunks].sort((a, b) => chunkRankingScore(b) - chunkRankingScore(a));
+  for (const c of ranked) {
+    if (!c.documentId || documents.includes(c.documentId)) continue;
+    if (!rerankedKeys.has(chunkDedupKey(c)) || chunkRankingScore(c) < threshold) continue;
+    documents.push(c.documentId);
+  }
+  return documents;
+}
+
+/**
+ * Reserves each relevant document's best MIN_PASSAGES_PER_DOCUMENT passages, round-robin by
+ * rank, within the token budget and chunk cap. Without this, one document that outscores the
+ * others (it cites them, or matches the question's wording) fills the whole budget and the
+ * answer covers only it.
+ *
+ * @returns Indices into `sorted` that are reserved; empty unless 2+ documents are relevant.
+ */
+function reserveDocumentShares(
+  sorted: ReferenceChunk[],
+  tokens: number[],
+  tokenBudget: number,
+  chunkCap: number,
+  relevantDocuments: string[]
+): Set<number> {
+  const reserved = new Set<number>();
+  if (relevantDocuments.length < 2) return reserved;
+
+  const byDocument = new Map<string, number[]>(relevantDocuments.map((d) => [d, []]));
+  sorted.forEach((c, i) => {
+    if (c.documentId) byDocument.get(c.documentId)?.push(i);
+  });
+
+  let used = 0;
+  for (let round = 0; round < MIN_PASSAGES_PER_DOCUMENT; round++) {
+    for (const indices of byDocument.values()) {
+      const i = indices[round];
+      if (i === undefined || reserved.size >= chunkCap) continue;
+      if (used + tokens[i] > tokenBudget) continue;
+      reserved.add(i);
+      used += tokens[i];
+    }
+  }
+  return reserved;
+}
+
+/**
  * Selects chunks using token-based budgeting with relevance threshold.
  *
  * Strategy:
  * 1. Filter out chunks below minimum relevance threshold (quality floor)
  * 2. Sort remaining chunks by relevance score (descending)
- * 3. Add chunks one-by-one until token budget is exhausted
- * 4. Enforce hard maximum chunk limit as safety cap
+ * 3. When reranked passages show 2+ relevant documents, widen the budget per extra document
+ *    and reserve each one's top passages
+ * 4. Add the rest one-by-one until token budget is exhausted
+ * 5. Enforce hard maximum chunk limit as safety cap
  *
  * @param chunks - All retrieved chunks to select from
  * @param logger - Optional context logger
@@ -137,26 +205,56 @@ export function selectChunksByTokenBudget(
     return cb - ca;
   });
 
-  const selectedChunks: ReferenceChunk[] = [];
-  let usedTokens = 0;
   const chunkCap = Math.min(
     options?.maxSelectedChunks ?? MAX_CHUNKS_HARD_LIMIT,
     MAX_CHUNKS_HARD_LIMIT
   );
-  const tokenBudget = options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET;
+  const relevantDocuments = documentsWithRerankedPassages(
+    relevantChunks,
+    options?.rerankedKeys,
+    threshold
+  );
+  const extraTokens =
+    relevantDocuments.length > 1
+      ? Math.min(
+          (relevantDocuments.length - 1) * MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
+          MULTI_SOURCE_MAX_EXTRA_TOKENS
+        )
+      : 0;
+  const tokenBudget = (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) + extraTokens;
+  const tokens = sortedChunks.map((c) => countTokens(c.content));
 
-  for (const chunk of sortedChunks) {
-    if (selectedChunks.length >= chunkCap) {
+  const selectedIdx = reserveDocumentShares(
+    sortedChunks,
+    tokens,
+    tokenBudget,
+    chunkCap,
+    relevantDocuments
+  );
+  let usedTokens = 0;
+  for (const i of selectedIdx) usedTokens += tokens[i];
+  if (selectedIdx.size > 0) {
+    logger?.info("Reserved passages per relevant document", {
+      relevantDocuments: relevantDocuments.length,
+      reservedChunks: selectedIdx.size,
+      reservedTokens: usedTokens,
+      tokenBudget,
+    });
+  }
+
+  for (let i = 0; i < sortedChunks.length; i++) {
+    if (selectedIdx.has(i)) continue;
+    if (selectedIdx.size >= chunkCap) {
       logger?.info(`Reached selection cap (${chunkCap}), stopping selection`);
       break;
     }
 
-    const chunkTokens = countTokens(chunk.content);
+    const chunkTokens = tokens[i];
 
     if (usedTokens + chunkTokens > tokenBudget) {
-      if (selectedChunks.length > 0) {
+      if (selectedIdx.size > 0) {
         logger?.info(
-          `Token budget exhausted (${usedTokens}/${tokenBudget} tokens), selected ${selectedChunks.length} chunks`
+          `Token budget exhausted (${usedTokens}/${tokenBudget} tokens), selected ${selectedIdx.size} chunks`
         );
         break;
       }
@@ -165,9 +263,11 @@ export function selectChunksByTokenBudget(
       );
     }
 
-    selectedChunks.push(chunk);
+    selectedIdx.add(i);
     usedTokens += chunkTokens;
   }
+
+  const selectedChunks = [...selectedIdx].sort((a, b) => a - b).map((i) => sortedChunks[i]);
 
   const originalCount = chunks.length;
   const filteredCount = relevantChunks.length;
@@ -189,7 +289,7 @@ export function selectChunksByTokenBudget(
  * Prevents external chunks from being starved out by high-scoring notebook chunks.
  *
  * Strategy:
- * 1. Reserve a fixed token budget for top-N external chunks
+ * 1. Reserve up to a fixed token budget for top-N external chunks (none when there are none)
  * 2. Select notebook chunks from the reduced remaining budget
  * 3. Merge both pools (externals appended after notebooks)
  */
@@ -208,8 +308,12 @@ export function selectChunksByTokenBudgetWithReservation(
     .sort((a, b) => chunkRankingScore(b) - chunkRankingScore(a))
     .slice(0, EXTERNAL_TOP_N);
 
-  const reducedBudget =
-    (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) - EXTERNAL_RESERVED_TOKENS;
+  // Reserve only what the externals need: with none, notebook passages get the whole budget.
+  const reservedTokens = Math.min(
+    EXTERNAL_RESERVED_TOKENS,
+    topExternals.reduce((sum, c) => sum + countTokens(c.content), 0)
+  );
+  const reducedBudget = (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) - reservedTokens;
 
   const notebookSelected = selectChunksByTokenBudget(notebookChunks, logger, relevanceThreshold, {
     ...options,
@@ -219,7 +323,7 @@ export function selectChunksByTokenBudgetWithReservation(
   logger?.info("Chunk selection with reservation", {
     notebookSelected: notebookSelected.length,
     externalSelected: topExternals.length,
-    reservedTokens: EXTERNAL_RESERVED_TOKENS,
+    reservedTokens,
   });
 
   return [...notebookSelected, ...topExternals];

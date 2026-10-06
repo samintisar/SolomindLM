@@ -31,6 +31,7 @@ describe("ChatAgent global rerank time budget", () => {
     const logger = createServiceLogger("ChatAgent", "test");
 
     const result = await agent["applyGlobalRerank"]([chunk(0), chunk(1)], undefined, "q", logger);
-    expect(result.map((c) => c.chunkIndex)).toEqual([1, 0]);
+    expect(result.chunks.map((c) => c.chunkIndex)).toEqual([1, 0]);
+    expect(result.rerankedKeys).toEqual(new Set(["doc-1:0", "doc-1:1"]));
   });
 });
