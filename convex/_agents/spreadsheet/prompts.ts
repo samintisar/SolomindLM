@@ -18,7 +18,7 @@ export const COLLAPSE_SYSTEM_PROMPT =
   "You are a Technical Editor. Consolidate fragmented research notes into a Master List of Concepts. Merge details about the same concept into single blocks. Remove exact duplicates.";
 
 export const REDUCE_SYSTEM_PROMPT =
-  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields.";
+  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields. Write every cell for someone reading the original sources: when a value is missing, write 'Not reported', and never mention notes, extracts or how the table was made.";
 
 // ============================================================
 // MAP PROMPTS (Concept Identification)
