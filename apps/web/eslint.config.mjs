@@ -119,6 +119,16 @@ export default defineConfig([
     files: ["src/shared/components/icons/ModelBrandIcon.tsx"],
     rules: { "shadcn/no-raw-colors": "off" },
   },
+  // Infographic style thumbnails illustrate the generated image's palette (kawaii pastels, clay
+  // shadows, anime outlines), not app chrome, like the brand colours in ModelBrandIcon.
+  {
+    files: ["src/features/studio/components/customize/InfographicStyleThumbnail.tsx"],
+    rules: {
+      "shadcn/no-raw-colors": "off",
+      "shadcn/no-arbitrary-values": "off",
+      "solomind/soft-surfaces": "off",
+    },
+  },
   // Primitives own the look; outline exceptions there are reviewed variants (docs/design/principles.md).
   { files: ["src/shared/components/ui/**/*.tsx"], rules: { "solomind/soft-surfaces": "off" } },
 ]);
