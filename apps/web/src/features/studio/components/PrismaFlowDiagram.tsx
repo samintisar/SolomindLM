@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/shared/utils/cn";
 
 export interface PrismaFlowCounts {
   recordsIdentified?: number;
@@ -31,7 +32,7 @@ interface PrismaFlowDiagramProps {
 /**
  * Lightweight PRISMA-style flow diagram for literature review sessions.
  */
-export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, className = "" }) => {
+export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, className }) => {
   const identified = counts.recordsIdentified ?? counts.recordsAfterDedupe;
   const deduped = counts.recordsAfterDedupe ?? identified;
   const screened = counts.recordsScreened ?? deduped;
@@ -46,44 +47,44 @@ export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, cl
 
   if (counts.searchSkipped) {
     return (
-      <div className={`rounded-lg border border-border bg-muted/30 p-4 text-sm ${className}`}>
-        <p className="mb-1 font-semibold text-foreground">PRISMA flow</p>
-        <p className="mb-3 text-xs text-muted-foreground">No database search</p>
+      <div className={cn("rounded-xl bg-muted/40 p-4 text-sm", className)}>
+        <p className="mb-1 font-sans font-semibold">PRISMA flow</p>
+        <p className="mb-3 font-sans text-xs text-muted-foreground">No database search</p>
         <div className="flex flex-col items-center gap-2">
-          <FlowBox label="From your notebook" value={fromNotebook} variant="blue" />
+          <FlowBox label="From your notebook" value={fromNotebook} variant="source" />
           <Arrow />
-          <FlowBox label="Studies included" value={included} variant="green" />
+          <FlowBox label="Studies included" value={included} variant="included" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-lg border border-border bg-muted/30 p-4 text-sm ${className}`}>
-      <p className="mb-3 font-semibold text-foreground">PRISMA flow</p>
+    <div className={cn("rounded-xl bg-muted/40 p-4 text-sm", className)}>
+      <p className="mb-3 font-sans font-semibold">PRISMA flow</p>
       <div className="flex flex-col items-center gap-2">
-        <FlowBox label="Records identified" value={identified} variant="blue" />
+        <FlowBox label="Records identified" value={identified} variant="source" />
         <Arrow />
-        <FlowBox label="After deduplication" value={deduped} variant="blue" />
+        <FlowBox label="After deduplication" value={deduped} variant="source" />
         <Arrow />
         <div className="flex w-full max-w-md flex-wrap items-start justify-center gap-4">
-          <FlowBox label="Records screened" value={screened} variant="purple" />
+          <FlowBox label="Records screened" value={screened} variant="screen" />
           <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-muted-foreground">Excluded</span>
-            <FlowBox label="" value={excluded} variant="red" compact />
+            <span className="font-sans text-xs text-muted-foreground">Excluded</span>
+            <FlowBox label="" value={excluded} variant="excluded" compact />
           </div>
         </div>
         <Arrow />
         {fromNotebook > 0 ? (
           <>
             <div className="flex w-full max-w-md flex-wrap items-start justify-center gap-4">
-              <FlowBox label="Included from search" value={includedFromSearch} variant="purple" />
-              <FlowBox label="From your notebook" value={fromNotebook} variant="blue" />
+              <FlowBox label="Included from search" value={includedFromSearch} variant="screen" />
+              <FlowBox label="From your notebook" value={fromNotebook} variant="source" />
             </div>
             <Arrow />
           </>
         ) : null}
-        <FlowBox label="Studies included" value={included} variant="green" />
+        <FlowBox label="Studies included" value={included} variant="included" />
       </div>
     </div>
   );
@@ -93,6 +94,15 @@ function Arrow() {
   return <div className="h-4 w-px bg-border" aria-hidden />;
 }
 
+type FlowVariant = "source" | "screen" | "excluded" | "included";
+
+const FLOW_BOX_CLASS: Record<FlowVariant, string> = {
+  source: "bg-info-muted ring-1 ring-info-border",
+  screen: "bg-muted ring-1 ring-hairline",
+  excluded: "bg-destructive-muted ring-1 ring-destructive-border",
+  included: "bg-success-muted ring-1 ring-success-border",
+};
+
 function FlowBox({
   label,
   value,
@@ -101,22 +111,19 @@ function FlowBox({
 }: {
   label: string;
   value?: number;
-  variant: "blue" | "purple" | "red" | "green";
+  variant: FlowVariant;
   compact?: boolean;
 }) {
-  const colors = {
-    blue: "border-blue-500/40 bg-blue-500/10",
-    purple: "border-violet-500/40 bg-violet-500/10",
-    red: "border-red-500/40 bg-red-500/10",
-    green: "border-green-600/40 bg-green-600/10",
-  }[variant];
-
   return (
     <div
-      className={`rounded-md border px-4 text-center ${compact ? "min-w-[4rem] py-1.5" : "min-w-[10rem] py-2"} ${colors}`}
+      className={cn(
+        "rounded-lg px-4 text-center",
+        compact ? "min-w-16 py-1.5" : "min-w-40 py-2",
+        FLOW_BOX_CLASS[variant]
+      )}
     >
-      {label ? <div className="text-xs text-muted-foreground">{label}</div> : null}
-      <div className="text-base font-semibold tabular-nums text-foreground">
+      {label ? <div className="font-sans text-xs text-muted-foreground">{label}</div> : null}
+      <div className="font-sans text-base font-semibold tabular-nums">
         {value != null ? value.toLocaleString() : "—"}
       </div>
     </div>
