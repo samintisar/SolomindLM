@@ -1,16 +1,56 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InputValidationError } from "../../_lib/errors";
-import { DoiResolverService } from "./DoiResolverService";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ExternalServiceError, InputValidationError } from "../../_lib/errors";
+import { DoiResolverService, normalizeDoiInput } from "./DoiResolverService";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+type Route = { status: number; body?: unknown };
+
+/** Answers each request by the first route whose key appears in the URL; unrouted URLs 404. */
+function routeFetch(routes: Record<string, Route>) {
+  mockFetch.mockImplementation(async (url: string) => {
+    const key = Object.keys(routes).find((k) => url.includes(k));
+    const route = key ? routes[key] : { status: 404, body: "Not found" };
+    return {
+      ok: route.status >= 200 && route.status < 300,
+      status: route.status,
+      json: async () => route.body,
+      text: async () => (typeof route.body === "string" ? route.body : JSON.stringify(route.body)),
+    };
+  });
+}
+
+function requestedUrls(): string[] {
+  return mockFetch.mock.calls.map(([url]) => String(url));
+}
+
+const ragDatacite = {
+  data: {
+    attributes: {
+      doi: "10.48550/arxiv.2005.11401",
+      titles: [{ title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks" }],
+      creators: [
+        { name: "Lewis, Patrick", givenName: "Patrick", familyName: "Lewis" },
+        { name: "Perez, Ethan", givenName: "Ethan", familyName: "Perez" },
+      ],
+      descriptions: [
+        { description: "Large pre-trained language models...", descriptionType: "Abstract" },
+      ],
+      publicationYear: 2020,
+      publisher: "arXiv",
+      url: "https://arxiv.org/abs/2005.11401",
+      rightsList: [{ rightsUri: "http://arxiv.org/licenses/nonexclusive-distrib/1.0/" }],
+    },
+  },
+};
 
 describe("DoiResolverService", () => {
   let service: DoiResolverService;
 
   beforeEach(() => {
     service = new DoiResolverService();
-    mockFetch.mockClear();
+    mockFetch.mockReset();
   });
 
   describe("resolve", () => {
@@ -67,9 +107,7 @@ describe("DoiResolverService", () => {
 
     it("throws InputValidationError for invalid DOI format", async () => {
       await expect(service.resolve("invalid-doi")).rejects.toThrow(InputValidationError);
-      await expect(service.resolve("invalid-doi")).rejects.toThrow(
-        "Invalid DOI format: invalid-doi"
-      );
+      await expect(service.resolve("invalid-doi")).rejects.toThrow(/DOI .*or an arXiv ID/);
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -108,16 +146,14 @@ describe("DoiResolverService", () => {
       expect(result?.isOa).toBe(false);
     });
 
-    it("returns null when Crossref returns 404", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        text: async () => "Not found",
-      });
+    it("returns null when neither Crossref nor DataCite has the DOI", async () => {
+      routeFetch({});
 
       const result = await service.resolve("10.1234/notfound");
 
       expect(result).toBeNull();
+      expect(requestedUrls().some((u) => u.includes("api.crossref.org"))).toBe(true);
+      expect(requestedUrls().some((u) => u.includes("api.datacite.org"))).toBe(true);
     });
 
     it("falls back gracefully when Semantic Scholar fails", async () => {
@@ -224,16 +260,10 @@ describe("DoiResolverService", () => {
     });
 
     it("continues on individual failures in batch", async () => {
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-          text: async () => "Not found",
-        })
-        .mockResolvedValueOnce({
-          ok: true,
+      routeFetch({
+        "api.crossref.org/works/10.1234%2Ftwo": {
           status: 200,
-          json: async () => ({
+          body: {
             status: "ok",
             message: {
               title: ["Paper Two"],
@@ -241,16 +271,10 @@ describe("DoiResolverService", () => {
               DOI: "10.1234/two",
               URL: "https://doi.org/10.1234/two",
             },
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({
-            paperId: "p2",
-            isOpenAccess: false,
-          }),
-        });
+          },
+        },
+        "api.semanticscholar.org": { status: 200, body: { paperId: "p2", isOpenAccess: false } },
+      });
 
       const results = await service.resolveBatch(["10.1234/notfound", "10.1234/two"]);
 
@@ -291,5 +315,153 @@ describe("DoiResolverService", () => {
 
       expect(result?.abstract).toBe("This is a JATS abstract.");
     });
+  });
+
+  describe("arXiv DOIs", () => {
+    it("resolves an arXiv DOI from DataCite, without asking Crossref", async () => {
+      routeFetch({
+        "api.datacite.org/dois/10.48550%2FarXiv.2005.11401": { status: 200, body: ragDatacite },
+        "api.semanticscholar.org/graph/v1/paper/ARXIV:2005.11401": {
+          status: 200,
+          body: { paperId: "s2rag", externalIds: { ArXiv: "2005.11401", OpenAlex: "W1" } },
+        },
+      });
+
+      const result = await service.resolve("10.48550/arXiv.2005.11401");
+
+      expect(result).toMatchObject({
+        title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+        authors: ["Lewis, Patrick", "Perez, Ethan"],
+        abstract: "Large pre-trained language models...",
+        doi: "10.48550/arXiv.2005.11401",
+        venue: "arXiv",
+        publicationYear: 2020,
+        pdfUrl: "https://arxiv.org/pdf/2005.11401",
+        landingPageUrl: "https://arxiv.org/abs/2005.11401",
+        semanticScholarId: "s2rag",
+        openAlexId: "https://openalex.org/W1",
+        isOa: true,
+        license: "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+        sourceType: "doi",
+      });
+      expect(requestedUrls().some((u) => u.includes("api.crossref.org"))).toBe(false);
+    });
+
+    it("still resolves when Semantic Scholar has no record of the paper", async () => {
+      routeFetch({ "api.datacite.org": { status: 200, body: ragDatacite } });
+
+      const result = await service.resolve("10.48550/arXiv.2005.11401");
+
+      expect(result?.title).toBe(
+        "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"
+      );
+      expect(result?.pdfUrl).toBe("https://arxiv.org/pdf/2005.11401");
+      expect(result?.semanticScholarId).toBeUndefined();
+    });
+
+    it.each([
+      "arXiv:2005.11401",
+      "2005.11401",
+      "2005.11401v4",
+      "https://arxiv.org/abs/2005.11401v2",
+      "https://arxiv.org/pdf/2005.11401.pdf",
+      "https://doi.org/10.48550/arXiv.2005.11401",
+    ])("accepts %s", async (input) => {
+      routeFetch({
+        "api.datacite.org/dois/10.48550%2FarXiv.2005.11401": { status: 200, body: ragDatacite },
+      });
+
+      const result = await service.resolve(input);
+
+      expect(result?.doi).toBe("10.48550/arXiv.2005.11401");
+    });
+  });
+
+  describe("DataCite fallback", () => {
+    it("resolves a DataCite DOI that Crossref does not have", async () => {
+      routeFetch({
+        "api.datacite.org/dois/10.5281%2Fzenodo.42": {
+          status: 200,
+          body: {
+            data: {
+              attributes: {
+                titles: [{ title: "A Dataset" }, { title: "Sub", titleType: "Subtitle" }],
+                creators: [{ name: "Research Group", nameType: "Organizational" }],
+                descriptions: [
+                  { description: "Methods text", descriptionType: "Methods" },
+                  { description: "<p>The abstract.</p>", descriptionType: "Abstract" },
+                ],
+                publicationYear: "2021",
+                publisher: { name: "Zenodo" },
+                url: "https://zenodo.org/record/42",
+              },
+            },
+          },
+        },
+      });
+
+      const result = await service.resolve("10.5281/zenodo.42");
+
+      expect(result).toMatchObject({
+        title: "A Dataset",
+        authors: ["Research Group"],
+        abstract: "The abstract.",
+        venue: "Zenodo",
+        publicationYear: 2021,
+        landingPageUrl: "https://zenodo.org/record/42",
+        isOa: false,
+      });
+      expect(result?.pdfUrl).toBeUndefined();
+    });
+  });
+
+  describe("registry outages", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("reports an outage instead of a bad DOI when Crossref is down", async () => {
+      routeFetch({ "api.crossref.org": { status: 503, body: "Service Unavailable" } });
+
+      const pending = service.resolve("10.1234/whatever");
+      const assertion = expect(pending).rejects.toBeInstanceOf(ExternalServiceError);
+      await vi.runAllTimersAsync();
+      await assertion;
+    });
+
+    it("uses DataCite when Crossref is down but DataCite has the DOI", async () => {
+      routeFetch({
+        "api.crossref.org": { status: 503, body: "Service Unavailable" },
+        "api.datacite.org": { status: 200, body: ragDatacite },
+      });
+
+      const pending = service.resolve("10.9999/registered-at-datacite");
+      await vi.runAllTimersAsync();
+
+      expect((await pending)?.title).toBe(
+        "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"
+      );
+    });
+  });
+});
+
+describe("normalizeDoiInput", () => {
+  it.each([
+    ["10.1038/s41586-020-2649-2", "10.1038/s41586-020-2649-2"],
+    ["  10.1038/x  ", "10.1038/x"],
+    ["https://doi.org/10.1038/x", "10.1038/x"],
+    ["http://dx.doi.org/10.1038/x", "10.1038/x"],
+    ["doi:10.1038/x", "10.1038/x"],
+    ["DOI: 10.1038/x", "10.1038/x"],
+    ["arXiv:2005.11401", "10.48550/arXiv.2005.11401"],
+    ["arxiv:2005.11401v3", "10.48550/arXiv.2005.11401"],
+    ["1501.00001", "10.48550/arXiv.1501.00001"],
+    ["https://arxiv.org/abs/hep-th/9711200", "10.48550/arXiv.hep-th/9711200"],
+    ["10.48550/ARXIV.2005.11401", "10.48550/arXiv.2005.11401"],
+  ])("%s -> %s", (input, expected) => {
+    expect(normalizeDoiInput(input)).toBe(expected);
+  });
+
+  it("leaves text that is neither a DOI nor an arXiv ID for validation to reject", () => {
+    expect(normalizeDoiInput("not a doi")).toBe("not a doi");
   });
 });

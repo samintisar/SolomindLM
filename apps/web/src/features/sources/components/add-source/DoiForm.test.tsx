@@ -1,6 +1,7 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DoiForm } from "./DoiForm";
 
@@ -26,7 +27,7 @@ function setup() {
 }
 
 async function resolvePreview() {
-  await userEvent.type(screen.getByRole("textbox", { name: "DOI" }), "10.1/x{Enter}");
+  await userEvent.type(screen.getByRole("textbox", { name: "DOI or arXiv ID" }), "10.1/x{Enter}");
 }
 
 describe("DoiForm", () => {
@@ -49,7 +50,7 @@ describe("DoiForm", () => {
     setup();
     await resolvePreview();
     expect(await screen.findByRole("button", { name: "Add to notebook" })).toBeInTheDocument();
-    await userEvent.type(screen.getByRole("textbox", { name: "DOI" }), "9");
+    await userEvent.type(screen.getByRole("textbox", { name: "DOI or arXiv ID" }), "9");
     expect(screen.queryByRole("button", { name: "Add to notebook" })).not.toBeInTheDocument();
     expect(screen.queryByText("Paper")).not.toBeInTheDocument();
   });
@@ -61,6 +62,29 @@ describe("DoiForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Could not resolve DOI. Please check the DOI and try again."
     );
+  });
+
+  it("shows the server's message when resolving fails with a typed error", async () => {
+    resolveDoi.mockRejectedValue(
+      new ConvexError({
+        type: "EXTERNAL_SERVICE_ERROR",
+        service: "crossref",
+        retryable: true,
+        detail: "Couldn't reach the DOI registry to look this paper up. Try again in a minute.",
+      })
+    );
+    setup();
+    await resolvePreview();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't reach the DOI registry to look this paper up. Try again in a minute."
+    );
+  });
+
+  it("does not show raw server errors", async () => {
+    resolveDoi.mockRejectedValue(new Error("[CONVEX A(documents/index:resolveDoi)] Server Error"));
+    setup();
+    await resolvePreview();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to resolve DOI. Try again.");
   });
 
   it("adds the previewed paper, then calls onDone", async () => {

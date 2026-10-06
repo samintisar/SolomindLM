@@ -10,6 +10,45 @@ export interface PaperRecord extends BasePaperRecord {
 }
 
 const DOI_REGEX = /^10\.\d{4,}\/.+/;
+const USER_AGENT = "SolomindLM/1.0 (mailto:support@solomindlm.com)";
+
+/** arXiv registers a DOI for every paper under this prefix, with DataCite rather than Crossref. */
+const ARXIV_DOI_REGEX = /^10\.48550\/arxiv\.(.+)$/i;
+/** New-style (2005.11401) and old-style (hep-th/9711200) arXiv identifiers, with an optional version. */
+const ARXIV_ID = String.raw`(\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?\/\d{7})(?:v\d+)?`;
+const ARXIV_INPUT_REGEX = new RegExp(
+  String.raw`^(?:arxiv:\s*|https?:\/\/(?:www\.|export\.)?arxiv\.org\/(?:abs|pdf)\/)?${ARXIV_ID}(?:\.pdf)?$`,
+  "i"
+);
+
+const INVALID_INPUT_MESSAGE =
+  "Enter a DOI (like 10.1038/s41586-020-2649-2) or an arXiv ID (like 2005.11401).";
+
+/**
+ * Turns what people paste into a bare DOI: strips doi.org links and `doi:` prefixes, and maps
+ * arXiv IDs and arxiv.org links to arXiv's DOI. Anything else is returned trimmed, for
+ * validation to reject.
+ */
+export function normalizeDoiInput(input: string): string {
+  const trimmed = input.trim();
+  const arxivId = trimmed.match(ARXIV_INPUT_REGEX)?.[1];
+  if (arxivId) return `10.48550/arXiv.${arxivId}`;
+  const doi = trimmed.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").replace(/^doi:\s*/i, "");
+  const arxivDoiId = doi.match(ARXIV_DOI_REGEX)?.[1];
+  return arxivDoiId ? `10.48550/arXiv.${arxivDoiId}` : doi;
+}
+
+/** Bibliographic fields shared by every registry the resolver reads. */
+interface WorkMetadata {
+  title: string;
+  authors: string[];
+  abstract: string;
+  venue?: string;
+  publicationYear?: number;
+  landingPageUrl: string;
+  pdfUrl?: string;
+  license?: string;
+}
 
 interface CrossrefWork {
   title?: string[];
@@ -33,6 +72,21 @@ interface CrossrefResponse {
   message?: CrossrefWork;
 }
 
+interface DataciteWork {
+  titles?: Array<{ title?: string; titleType?: string }>;
+  creators?: Array<{ name?: string; givenName?: string; familyName?: string }>;
+  descriptions?: Array<{ description?: string; descriptionType?: string }>;
+  publicationYear?: number | string;
+  publisher?: string | { name?: string };
+  container?: { title?: string };
+  url?: string;
+  rightsList?: Array<{ rightsUri?: string }>;
+}
+
+interface DataciteResponse {
+  data?: { attributes?: DataciteWork };
+}
+
 interface SemanticScholarPaper {
   paperId?: string;
   title?: string;
@@ -49,62 +103,85 @@ interface SemanticScholarPaper {
   isOpenAccess?: boolean;
 }
 
+interface Registry {
+  name: string;
+  /** The work's metadata, or null when the registry has no such DOI. Throws when unreachable. */
+  lookup: (doi: string) => Promise<WorkMetadata | null>;
+}
+
 export class DoiResolverService {
   private logger = createServiceLogger("doi_resolver", "DoiResolverService");
 
-  async resolve(doi: string): Promise<PaperRecord | null> {
+  private readonly crossref: Registry = {
+    name: "crossref",
+    lookup: async (doi) => {
+      const work = await this.fetchCrossrefWork(doi);
+      return work ? this.crossrefMetadata(work, doi) : null;
+    },
+  };
+
+  private readonly datacite: Registry = {
+    name: "datacite",
+    lookup: async (doi) => {
+      const work = await this.fetchDataciteWork(doi);
+      return work ? this.dataciteMetadata(work, doi) : null;
+    },
+  };
+
+  /**
+   * The paper record for a DOI or arXiv ID, or null when no registry has it. Throws
+   * ExternalServiceError when a registry that might have it could not be reached, so an outage
+   * does not read as a bad DOI.
+   */
+  async resolve(input: string): Promise<PaperRecord | null> {
+    const doi = normalizeDoiInput(input);
     if (!DOI_REGEX.test(doi)) {
-      throw new InputValidationError(`Invalid DOI format: ${doi}`, { field: "doi" });
+      throw new InputValidationError(INVALID_INPUT_MESSAGE, { field: "doi" });
     }
 
-    // Fetch Crossref metadata
-    const crossrefWork = await this.fetchCrossrefWork(doi);
-    if (!crossrefWork) {
+    const arxivId = doi.match(ARXIV_DOI_REGEX)?.[1];
+    // Crossref never has arXiv's DOIs; most other DOIs are Crossref's, and the rest (datasets,
+    // repositories such as Zenodo) are DataCite's.
+    const metadata = await this.lookupMetadata(
+      doi,
+      arxivId ? [this.datacite] : [this.crossref, this.datacite]
+    );
+    if (!metadata) {
       return null;
     }
 
-    // Fetch Semantic Scholar for PDF and OpenAlex ID
-    const ssPaper = await this.fetchSemanticScholarPaper(doi);
+    // Semantic Scholar adds an open-access PDF and the OpenAlex ID. It does not index arXiv's
+    // DOIs, so arXiv papers are looked up by arXiv ID.
+    const ssPaper = arxivId
+      ? await this.fetchSemanticScholarPaper("ARXIV", arxivId)
+      : await this.fetchSemanticScholarPaper("DOI", doi);
 
-    const title = this.extractTitle(crossrefWork);
-    if (!title) {
-      this.logger.warn("Crossref work has no title", { doi });
-      return null;
-    }
-
-    const authors = this.extractAuthors(crossrefWork);
-    const abstract = this.cleanAbstract(crossrefWork.abstract ?? "");
-    const venue = this.extractVenue(crossrefWork);
-    const year = this.extractYear(crossrefWork);
-
-    const pdfUrl = ssPaper?.openAccessPdf?.url || this.findPdfLink(crossrefWork);
-    const landingPageUrl = crossrefWork.URL || `https://doi.org/${doi}`;
+    const pdfUrl = arxivId
+      ? `https://arxiv.org/pdf/${arxivId}`
+      : ssPaper?.openAccessPdf?.url || metadata.pdfUrl;
     const openAlexId = ssPaper?.externalIds?.OpenAlex
       ? `https://openalex.org/${ssPaper.externalIds.OpenAlex}`
       : undefined;
-    const semanticScholarId = ssPaper?.paperId;
-    const isOa = Boolean(pdfUrl) || Boolean(ssPaper?.isOpenAccess);
-    const license = crossrefWork.license?.[0]?.URL;
 
     return {
-      title,
-      authors,
-      abstract,
+      title: metadata.title,
+      authors: metadata.authors,
+      abstract: metadata.abstract,
       doi,
-      venue,
-      publicationYear: year,
+      venue: metadata.venue,
+      publicationYear: metadata.publicationYear,
       pdfUrl: pdfUrl || undefined,
-      landingPageUrl,
+      landingPageUrl: metadata.landingPageUrl,
       openAlexId,
-      semanticScholarId,
-      isOa,
-      license,
+      semanticScholarId: ssPaper?.paperId,
+      isOa: Boolean(pdfUrl) || Boolean(ssPaper?.isOpenAccess),
+      license: metadata.license,
       sourceType: "doi",
     };
   }
 
   async resolveBatch(dois: string[]): Promise<(PaperRecord | null)[]> {
-    const invalidDois = dois.filter((doi) => !DOI_REGEX.test(doi));
+    const invalidDois = dois.filter((doi) => !DOI_REGEX.test(normalizeDoiInput(doi)));
     if (invalidDois.length > 0) {
       throw new InputValidationError(`Invalid DOI format(s): ${invalidDois.join(", ")}`, {
         field: "doi",
@@ -129,110 +206,173 @@ export class DoiResolverService {
     return results;
   }
 
-  private async fetchCrossrefWork(doi: string): Promise<CrossrefWork | null> {
-    const url = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
-
-    try {
-      return await invokeWithHttpRetry(async () => {
-        const t0 = Date.now();
-        this.logger.apiCall("crossref", "/works", { doi });
-
-        const response = await fetch(url, {
-          headers: {
-            "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
-          },
+  /** Asks each registry in turn; the first that has the DOI wins. */
+  private async lookupMetadata(doi: string, registries: Registry[]): Promise<WorkMetadata | null> {
+    const unreachable: string[] = [];
+    for (const registry of registries) {
+      try {
+        const metadata = await registry.lookup(doi);
+        if (metadata) return metadata;
+      } catch (error) {
+        unreachable.push(registry.name);
+        this.logger.error("DOI registry lookup failed", {
+          doi,
+          registry: registry.name,
+          error: (error as Error).message,
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          this.logger.apiError("crossref", "/works", new Error(`HTTP ${response.status}`), {
-            status: response.status,
-            doi,
-          });
-          if (response.status === 404) {
-            return null;
-          }
-          throw createExternalServiceErrorFromResponse(
-            "crossref",
-            response.status,
-            "/works",
-            errorText.slice(0, 500)
-          );
-        }
-
-        const data = (await response.json()) as CrossrefResponse;
-        this.logger.apiSuccess("crossref", "/works", Date.now() - t0, { doi });
-
-        if (data.status !== "ok" || !data.message) {
-          return null;
-        }
-
-        return data.message;
-      }, "crossref_doi_resolution");
-    } catch (error) {
-      this.logger.error("Crossref resolution failed", { doi, error: (error as Error).message });
-      return null;
+      }
     }
+    if (unreachable.length > 0) {
+      throw new ExternalServiceError(
+        unreachable.join("+"),
+        `DOI lookup failed: ${unreachable.join(", ")} unreachable`,
+        {
+          retryable: true,
+          detail: "Couldn't reach the DOI registry to look this paper up. Try again in a minute.",
+        }
+      );
+    }
+    return null;
   }
 
-  private async fetchSemanticScholarPaper(doi: string): Promise<SemanticScholarPaper | null> {
-    const url = `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(doi)}?fields=title,authors,year,abstract,openAccessPdf,externalIds,url,isOpenAccess`;
+  private async fetchCrossrefWork(doi: string): Promise<CrossrefWork | null> {
+    const url = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
+    const data = await this.fetchJson<CrossrefResponse>("crossref", "/works", url, doi, {
+      "User-Agent": USER_AGENT,
+    });
+    if (data?.status !== "ok" || !data.message) {
+      return null;
+    }
+    return data.message;
+  }
 
-    const headers: Record<string, string> = {
-      "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
-    };
+  private async fetchDataciteWork(doi: string): Promise<DataciteWork | null> {
+    const url = `https://api.datacite.org/dois/${encodeURIComponent(doi)}`;
+    const data = await this.fetchJson<DataciteResponse>("datacite", "/dois", url, doi, {
+      "User-Agent": USER_AGENT,
+      Accept: "application/vnd.api+json",
+    });
+    return data?.data?.attributes ?? null;
+  }
+
+  /** Semantic Scholar paper by DOI or arXiv ID; null when missing or unreachable. */
+  private async fetchSemanticScholarPaper(
+    idType: "DOI" | "ARXIV",
+    id: string
+  ): Promise<SemanticScholarPaper | null> {
+    const paperId = `${idType}:${id}`;
+    const url = `https://api.semanticscholar.org/graph/v1/paper/${idType}:${encodeURIComponent(id)}?fields=title,authors,year,abstract,openAccessPdf,externalIds,url,isOpenAccess`;
+
+    const headers: Record<string, string> = { "User-Agent": USER_AGENT };
     if (env.SEMANTIC_SCHOLAR_API_KEY) {
       headers["x-api-key"] = env.SEMANTIC_SCHOLAR_API_KEY;
     }
 
     try {
-      return await invokeWithHttpRetry(async () => {
-        const t0 = Date.now();
-        this.logger.apiCall("semantic_scholar", "/graph/v1/paper/DOI", { doi });
-
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          this.logger.apiError(
-            "semantic_scholar",
-            "/graph/v1/paper/DOI",
-            new Error(`HTTP ${response.status}`),
-            { status: response.status, doi }
-          );
-          if (response.status === 404) {
-            return null;
-          }
-          throw createExternalServiceErrorFromResponse(
-            "semantic_scholar",
-            response.status,
-            "/graph/v1/paper/DOI",
-            errorText.slice(0, 500)
-          );
-        }
-
-        const data = (await response.json()) as SemanticScholarPaper;
-        this.logger.apiSuccess("semantic_scholar", "/graph/v1/paper/DOI", Date.now() - t0, {
-          doi,
-        });
-
-        return data;
-      }, "semantic_scholar_doi_resolution");
+      return await this.fetchJson<SemanticScholarPaper>(
+        "semantic_scholar",
+        "/graph/v1/paper",
+        url,
+        paperId,
+        headers
+      );
     } catch (error) {
+      // Enrichment only: the record is complete without it.
       this.logger.error("Semantic Scholar resolution failed", {
-        doi,
+        paperId,
         error: (error as Error).message,
       });
       return null;
     }
   }
 
-  private extractTitle(work: CrossrefWork): string | undefined {
-    const title = work.title?.[0];
-    return title?.trim() || undefined;
+  /** GET with HTTP retry. Null on 404; throws ExternalServiceError on any other failure. */
+  private async fetchJson<T>(
+    service: string,
+    endpoint: string,
+    url: string,
+    doi: string,
+    headers: Record<string, string>
+  ): Promise<T | null> {
+    return await invokeWithHttpRetry(async () => {
+      const t0 = Date.now();
+      this.logger.apiCall(service, endpoint, { doi });
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.apiError(service, endpoint, new Error(`HTTP ${response.status}`), {
+          status: response.status,
+          doi,
+        });
+        if (response.status === 404) {
+          return null;
+        }
+        throw createExternalServiceErrorFromResponse(
+          service,
+          response.status,
+          endpoint,
+          errorText.slice(0, 500)
+        );
+      }
+
+      const data = (await response.json()) as T;
+      this.logger.apiSuccess(service, endpoint, Date.now() - t0, { doi });
+      return data;
+    }, `${service}_doi_resolution`);
   }
 
-  private extractAuthors(work: CrossrefWork): string[] {
+  private crossrefMetadata(work: CrossrefWork, doi: string): WorkMetadata | null {
+    const title = work.title?.[0]?.trim();
+    if (!title) {
+      this.logger.warn("Crossref work has no title", { doi });
+      return null;
+    }
+    return {
+      title,
+      authors: this.extractCrossrefAuthors(work),
+      abstract: this.cleanAbstract(work.abstract ?? ""),
+      venue: work["container-title"]?.[0]?.trim() || undefined,
+      publicationYear: this.extractCrossrefYear(work),
+      landingPageUrl: work.URL || `https://doi.org/${doi}`,
+      pdfUrl: this.findPdfLink(work),
+      license: work.license?.[0]?.URL,
+    };
+  }
+
+  private dataciteMetadata(work: DataciteWork, doi: string): WorkMetadata | null {
+    const titles = work.titles ?? [];
+    const title = (titles.find((t) => !t.titleType) ?? titles[0])?.title?.trim();
+    if (!title) {
+      this.logger.warn("DataCite work has no title", { doi });
+      return null;
+    }
+    const descriptions = work.descriptions ?? [];
+    const abstract = descriptions.find((d) => d.descriptionType === "Abstract") ?? descriptions[0];
+    const publisher = typeof work.publisher === "string" ? work.publisher : work.publisher?.name;
+    const year = Number(work.publicationYear);
+    return {
+      title,
+      authors: (work.creators ?? [])
+        .map((c) =>
+          c.familyName
+            ? [c.familyName, c.givenName]
+                .filter(Boolean)
+                .map((p) => p?.trim())
+                .join(", ")
+            : c.name?.trim()
+        )
+        .filter((name): name is string => Boolean(name)),
+      abstract: this.cleanAbstract(abstract?.description ?? ""),
+      venue: work.container?.title?.trim() || publisher?.trim() || undefined,
+      publicationYear: year >= 1000 && year <= 9999 ? year : undefined,
+      landingPageUrl: work.url || `https://doi.org/${doi}`,
+      license: work.rightsList?.[0]?.rightsUri,
+    };
+  }
+
+  private extractCrossrefAuthors(work: CrossrefWork): string[] {
     if (!work.author?.length) return [];
 
     return work.author
@@ -247,11 +387,7 @@ export class DoiResolverService {
       .filter((name): name is string => Boolean(name));
   }
 
-  private extractVenue(work: CrossrefWork): string | undefined {
-    return work["container-title"]?.[0]?.trim() || undefined;
-  }
-
-  private extractYear(work: CrossrefWork): number | undefined {
+  private extractCrossrefYear(work: CrossrefWork): number | undefined {
     const dateParts =
       work["published-print"]?.["date-parts"] ??
       work["published-online"]?.["date-parts"] ??
