@@ -24,8 +24,6 @@ export interface TableColumn {
 interface ColumnManagerProps {
   columns: TableColumn[];
   onChange: (columns: TableColumn[]) => void;
-  suggestedColumns?: TableColumn[];
-  onSavePreset?: (name: string, columns: TableColumn[]) => void;
   onClose?: () => void;
 }
 
@@ -54,8 +52,6 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
       columns.filter((c) => c.type === "custom" && c.isVisible).sort((a, b) => a.order - b.order),
     [columns]
   );
-
-  const suggestedRows = useMemo(() => visibleDataColumns, [visibleDataColumns]);
 
   const defaultCatalogRows = useMemo(() => {
     const inTableNames = new Set(columns.map((c) => c.name.toLowerCase()));
@@ -264,13 +260,13 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
           )}
         </section>
 
-        {suggestedRows.length > 0 && (
+        {visibleDataColumns.length > 0 && (
           <section>
             <h4 className="mb-2 font-sans text-sm font-semibold text-foreground">
               Suggested Columns
             </h4>
             <div className="space-y-0.5">
-              {suggestedRows.map((col) => {
+              {visibleDataColumns.map((col) => {
                 const existing = columns.find((c) => c.id === col.id || c.name === col.name);
                 const isActive = existing?.isVisible ?? col.isVisible;
                 return renderColumnRow(col, {

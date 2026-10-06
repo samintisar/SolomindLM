@@ -97,7 +97,7 @@ function LiteratureTableStudioShell({
   return (
     <PanelShell variant="table">
       {!table ? (
-        <LoadingState />
+        <LoadingState label="Loading table…" />
       ) : (
         <LiteratureTableView
           table={{
@@ -148,7 +148,7 @@ function LiteratureReportStudioShell({
   return (
     <PanelShell>
       {!detail ? (
-        <LoadingState />
+        <LoadingState label="Loading report…" />
       ) : (
         <LiteratureReportView
           report={{
@@ -188,10 +188,14 @@ function PanelShell({
   );
 }
 
-function LoadingState() {
+function LoadingState({ label }: { label: string }) {
   return (
-    <div className="flex flex-1 items-center justify-center text-primary">
-      <Spinner className="size-8" />
+    <div
+      role="status"
+      className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
+    >
+      <Spinner aria-hidden className="size-6" />
+      <p>{label}</p>
     </div>
   );
 }

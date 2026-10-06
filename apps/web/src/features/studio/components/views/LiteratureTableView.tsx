@@ -164,10 +164,6 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
     setTable((prev) => ({ ...prev, columns: newColumns }));
   }, []);
 
-  const handleSavePreset = useCallback((name: string, columns: TableColumn[]) => {
-    console.log("Save preset:", name, columns);
-  }, []);
-
   const addPapersToNotebook = useCallback(
     async (papers: TablePaper[]) => {
       // Papers from the user's notebook are already in it.
@@ -275,7 +271,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   const tableShell = (
     <div className={shellClassName} data-literature-table-shell>
       {onBack && !isFocusMode && (
-        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 bg-background/80 px-2 backdrop-blur-sm md:hidden">
+        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-sm md:hidden">
           <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
             <ArrowLeft />
           </Button>
@@ -361,7 +357,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
           </DropdownMenu>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-md"
             onClick={() => {
               setIsFocusMode((focus) => {
                 const next = !focus;
@@ -377,7 +373,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
           {onBack && (
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon-md"
               onClick={onBack}
               aria-label="Close table"
               title="Close"
@@ -433,7 +429,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
               <TableHeader sticky>
                 <TableRow>
                   <TableHead pinned className="min-w-105">
-                    <div className="flex items-center gap-3 pl-9">
+                    <div className="flex items-center gap-3 pl-9.5">
                       <Checkbox
                         checked={allSelected}
                         onCheckedChange={toggleSelectAll}
@@ -497,7 +493,6 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
           <ColumnManager
             columns={table.columns}
             onChange={handleColumnsChange}
-            onSavePreset={handleSavePreset}
             onClose={() => setShowColumnManager(false)}
           />
         )}

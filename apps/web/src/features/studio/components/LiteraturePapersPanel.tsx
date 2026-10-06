@@ -264,7 +264,7 @@ function PapersPanelHeader({
         </DropdownMenu>
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon-md"
           onClick={onClose}
           aria-label="Close papers panel"
           title="Close"
@@ -302,10 +302,10 @@ function PaperList({
       {isLoading ? (
         <div
           role="status"
-          className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground"
+          className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-muted-foreground"
         >
-          <Spinner aria-hidden className="size-8" />
-          <p className="text-sm">Loading ranked papers…</p>
+          <Spinner aria-hidden className="size-6" />
+          <p>Loading ranked papers…</p>
         </div>
       ) : isEmpty ? (
         <Empty>

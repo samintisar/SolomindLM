@@ -161,7 +161,13 @@ function ScreeningPanelHeader({
           <Download />
           Export
         </Button>
-        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close screening panel">
+        <Button
+          variant="ghost"
+          size="icon-md"
+          onClick={onClose}
+          aria-label="Close screening panel"
+          title="Close"
+        >
           <X />
         </Button>
       </div>
