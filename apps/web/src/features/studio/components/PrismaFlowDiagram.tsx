@@ -98,7 +98,7 @@ type FlowVariant = "source" | "screen" | "excluded" | "included";
 
 const FLOW_BOX_CLASS: Record<FlowVariant, string> = {
   source: "bg-info-muted ring-1 ring-info-border",
-  screen: "bg-muted ring-1 ring-hairline",
+  screen: "bg-card ring-1 ring-hairline",
   excluded: "bg-destructive-muted ring-1 ring-destructive-border",
   included: "bg-success-muted ring-1 ring-success-border",
 };

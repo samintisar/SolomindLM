@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { LiteratureReportView } from "./LiteratureReportView";
@@ -39,7 +39,8 @@ describe("LiteratureReportView", () => {
       screen.getByRole("heading", { name: "Transformers in NLP", level: 1 })
     ).toBeInTheDocument();
     expect(await screen.findByText("Transformers changed NLP.")).toBeInTheDocument();
-    expect(screen.getByText("PRISMA flow")).toBeInTheDocument();
+    const methods = screen.getByRole("heading", { name: "Methods" }).closest("section");
+    expect(within(methods as HTMLElement).getByText("PRISMA flow")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "References" })).toBeInTheDocument();
     expect(screen.getByText(/Ashish Vaswani \(2017\)/)).toBeInTheDocument();
   });
@@ -48,9 +49,22 @@ describe("LiteratureReportView", () => {
     const user = userEvent.setup();
     const onExport = vi.fn();
     render(<LiteratureReportView report={REPORT} onExport={onExport} />);
-    await user.click(screen.getByRole("button", { name: "Export report" }));
+    const trigger = screen.getByRole("button", { name: "Export report" });
+    await user.click(trigger);
+    expect(await screen.findByRole("menu")).toHaveAttribute("aria-labelledby", trigger.id);
     await user.click(await screen.findByRole("menuitem", { name: "Export Markdown (.md)" }));
-    expect(onExport).toHaveBeenCalled();
+    expect(onExport).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints from Export PDF only after the menu has closed", async () => {
+    const user = userEvent.setup();
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    render(<LiteratureReportView report={REPORT} />);
+    await user.click(screen.getByRole("button", { name: "Export report" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Export PDF" }));
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    print.mockRestore();
   });
 
   it("Save and edit shows its saving state until the save resolves", async () => {

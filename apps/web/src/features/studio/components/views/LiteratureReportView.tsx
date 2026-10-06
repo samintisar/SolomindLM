@@ -13,7 +13,7 @@ import {
   Save,
   X,
 } from "lucide-react";
-import React, { lazy, Suspense, useMemo, useState } from "react";
+import React, { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
@@ -264,8 +264,10 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
     window.setTimeout(() => setDidCopyReport(false), 1600);
   };
 
+  // Printing waits for the menu to close, so the open menu is not in the print preview.
+  const pendingPrintRef = useRef(false);
   const handleExportPdf = () => {
-    window.print();
+    pendingPrintRef.current = true;
   };
 
   const handleExportMarkdown = () => {
@@ -331,7 +333,16 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
                 <Download />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(e) => {
+                if (pendingPrintRef.current) {
+                  pendingPrintRef.current = false;
+                  e.preventDefault();
+                  window.print();
+                }
+              }}
+            >
               <DropdownMenuItem onSelect={handleExportPdf}>
                 <Printer />
                 Export PDF
