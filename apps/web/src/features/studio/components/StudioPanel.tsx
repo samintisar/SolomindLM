@@ -43,6 +43,7 @@ interface StudioPanelProps {
   tools: StudioTool[];
   sources?: any[];
   notebookId?: string | null;
+  onAskInChat?: (prompt: string, documentIds?: string[]) => void;
 }
 
 /**
@@ -55,6 +56,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   tools,
   sources = [],
   notebookId,
+  onAskInChat,
 }) => {
   const { notes, onUpdateNote, onUpdateNoteFull, onDeleteNote, onAddNote, onSaveReportContent } =
     useStudioContext();
@@ -64,7 +66,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   // State
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isEditingReportContent, setIsEditingReportContent] = useState(false);
   const [isInfographicFullscreen, setIsInfographicFullscreen] = useState(false);
@@ -325,8 +326,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             ) : (
               <ActiveNoteView
                 activeNote={activeNote}
-                isMindMapExpanded={isMindMapExpanded}
-                onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
                 onUpdateNoteFull={onUpdateNoteFull}
                 isMobile={isMobile}
                 onBack={handleBack}
@@ -335,6 +334,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                 onCancelEditReport={handleCancelEditReport}
                 registerInfographicControls={handleInfographicControlsRegister}
                 onInfographicFullscreenChange={setIsInfographicFullscreen}
+                onAskInChat={onAskInChat}
               />
             )
           ) : (

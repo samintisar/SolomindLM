@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Message } from "@/shared/types/index";
 import { exportAsMarkdown } from "./exportChat";
