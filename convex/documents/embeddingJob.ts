@@ -9,10 +9,12 @@ import {
   RAG_CHUNK_OVERLAP_TOKENS,
   RAG_CHUNK_SIZE_TOKENS,
 } from "../_lib/embeddingConfig";
+import { sourceFailureMessage } from "../_lib/sourceFailure";
 import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
 import { MistralOCRService } from "../_services/extraction/MistralOCRService";
+import { extractUrlSource } from "../_services/extraction/urlSource";
 import {
   extractDocumentMetadata,
   getFileExtension,
@@ -233,14 +235,17 @@ export const docEmbedding = internalAction({
         logger.info("Extracting web page content");
         const rawUrl = docDetails.fileUrl || "";
         effectiveFileUrl = rawUrl;
-        const meta = await ctx.runAction(internal._services.extractors.scrapeWebPageInternal, {
-          url: rawUrl,
+        const page = await extractUrlSource(rawUrl, {
+          scrape: (url) =>
+            ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url }),
+          ocrPdf: (url) => mistralOCR.processDocument(url),
         });
-        extractedText = meta.content;
-        if (meta.title?.trim()) extractedTitle = meta.title.trim();
+        extractedText = page.content;
+        if (page.title?.trim()) extractedTitle = page.title.trim();
         logger.phaseComplete("extraction", {
           contentLength: extractedText.length,
           title: extractedTitle,
+          method: page.method,
         });
       } else if (docDetails.fileType === "paper_record") {
         logger.info(
@@ -517,6 +522,7 @@ export const docEmbedding = internalAction({
         patch: {
           metadata: {
             error: errorMeta.message,
+            userMessage: sourceFailureMessage(error, errorMeta.type),
             errorPhase: currentPhase,
             errorType: errorMeta.type,
             retryable: errorMeta.retryable,
