@@ -6,7 +6,8 @@ import { cn } from "@/shared/utils/cn";
  * Data table on the soft layered look. Borders sit on cells, not rows (`border-separate`), so a
  * `sticky` header and `pinned` first column keep their hairlines while scrolling. The wrapper is
  * the scroll container: give it a bounded height (`containerClassName="min-h-0 flex-1"`) for the
- * sticky header to stick.
+ * sticky header to stick. Pinned cells are opaque `bg-card`, so place the table on a `bg-card`
+ * surface.
  */
 function Table({
   className,
@@ -66,7 +67,7 @@ const tableCellVariants = cva("border-r border-b border-hairline last:border-r-0
   variants: {
     /** Frozen first column: opaque, so scrolled cells pass under it. */
     pinned: {
-      true: "sticky left-0 z-10 bg-card in-data-[state=selected]:bg-muted",
+      true: "sticky left-0 z-10 bg-card in-[tr[data-state=selected]]:bg-muted",
       false: "",
     },
   },

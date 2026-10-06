@@ -344,26 +344,28 @@ function TablesSection() {
   ];
   return (
     <Section name="Tables">
-      <Table containerClassName="max-h-64" aria-label="Papers">
-        <TableHeader sticky>
-          <TableRow>
-            <TableHead pinned className="min-w-60">
-              Papers (2)
-            </TableHead>
-            <TableHead className="min-w-60">Method</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.paper} data-state={row.selected ? "selected" : undefined}>
-              <TableCell pinned className="min-w-60">
-                {row.paper}
-              </TableCell>
-              <TableCell className="min-w-60">{row.method}</TableCell>
+      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
+        <Table containerClassName="max-h-64" aria-label="Papers">
+          <TableHeader sticky>
+            <TableRow>
+              <TableHead pinned className="min-w-60">
+                Papers (2)
+              </TableHead>
+              <TableHead className="min-w-60">Method</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.paper} data-state={row.selected ? "selected" : undefined}>
+                <TableCell pinned className="min-w-60">
+                  {row.paper}
+                </TableCell>
+                <TableCell className="min-w-60">{row.method}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </Section>
   );
 }
