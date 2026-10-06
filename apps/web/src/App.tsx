@@ -58,7 +58,6 @@ import { Toaster } from "./shared/components/ui/sonner";
 import { ThemeProvider } from "./shared/contexts/ThemeContext";
 import { ToastProvider } from "./shared/contexts/ToastContext";
 import { Header } from "./shared/ui/Header";
-import "mind-elixir/style.css";
 
 /** Dev-only ui gallery (/dev/design). Gated on a build-time constant so production builds drop the chunk. */
 const DesignGallery =

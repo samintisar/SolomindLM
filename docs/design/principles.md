@@ -43,10 +43,27 @@ Don't reach for `dark:` utilities: in this app they follow the OS setting, not t
 
 Hairlines (`border-border/50`, `ring-hairline`) are fine where content meets content: list rows, table cells, a card edge.
 
+## Building with the primitives
+
+- Add a primitive with `bunx --bun shadcn@latest add <name>` from `apps/web`. The CLI then writes
+  `import { cn } from "cn"` (rewrite it to `@/shared/utils/cn`) and may add bogus `cn` / `next-themes`
+  dependencies (remove them). Rules: `.agents/skills/shadcn/SKILL.md`.
+- Pages place components with layout classes only; a new look is a new `cva` variant.
+- Colors: semantic tokens (`bg-success-muted`, `text-info`, `border-destructive-border`), never palette
+  colors or `--vintage-*` (those are persisted notebook cover swatches only — see
+  `apps/web/src/shared/notebook/coverColor.ts`).
+- Motion: `tw-animate-css` utilities with the house `ease-out` curve, or `m.*` primitives from
+  `@/shared/components/motion` — never `motion.*` (`LazyMotion strict`).
+- Toasts: `useToast()` (sonner underneath).
+- Layers: ui portal primitives sit at `z-100`, above the `z-70` app header.
+
 ## Checking your work
 
 - `bun run lint:design` must not go up. A brand-new design rule records its first counts with
-  `bun run lint:design:update -- --new-rule=<rule-id>`.
+  `bun run lint:design:update -- --new-rule=<rule-id>`. It runs `@shadcn/lint` (`apps/web/eslint.config.mjs`)
+  against `apps/web/design-lint-baseline.json`; after a cleanup, `bun run lint:design:update` locks in the
+  drop. Dirs listed in `MIGRATED` are errors. A new CLI-generated component that trips
+  `no-arbitrary-values` on upstream idioms goes in `UPSTREAM_ARBITRARY` — never an authored component.
 - Screenshot UI changes in light, dark and at 390px wide, and attach them to the PR.
 - Changing a primitive? Run `bun run test:design` (Docker); if the change is intended, run
   `bun run test:design:update` and commit the new PNGs. Browse every primitive at `/dev/design` in dev.
