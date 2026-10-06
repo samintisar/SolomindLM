@@ -7,7 +7,6 @@ import {
   FileCode2,
   FileText,
   List,
-  Loader2,
   Quote,
   Sheet,
   Sparkles,
@@ -15,8 +14,23 @@ import {
   X,
 } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
-import { DropdownMenu } from "@/shared/ui/DropdownMenu";
 import { useBulkUpload, useGetExistingPapers } from "../../sources/services/documentsApi";
 import { useRankedPapersForSession } from "../services/literatureTablesApi";
 import type { RankedPaper } from "../types/rankedPaper";
@@ -137,7 +151,7 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
 
   return (
     <>
-      <div className="relative h-full w-full min-w-0 bg-sidebar border-l-2 border-border flex flex-col overflow-hidden">
+      <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border/50 bg-sidebar">
         <PapersPanelHeader
           exportDisabled={papers.length === 0}
           exportFilenameBase={exportFilenameBase}
@@ -146,30 +160,26 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
         />
 
         {selectedKeys.size > 0 && (
-          <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-2 shrink-0">
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-muted/40 px-4 py-2">
+            <Button variant="ghost" size="xs" onClick={clearSelection}>
+              <X />
               {selectedKeys.size} selected
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="xs"
               disabled={isBulkAdding}
               onClick={() => void addPapersToNotebook(selectedPapers)}
-              className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-50"
             >
               {isBulkAdding ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <>
+                  <Spinner aria-hidden />
                   Adding…
-                </span>
+                </>
               ) : (
                 `Add ${selectedKeys.size} to notebook`
               )}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -198,12 +208,6 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
   );
 };
 
-const PAPERS_PANEL_HEADER_BTN =
-  "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-normal text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50";
-
-const PAPER_ACTION_CLASS =
-  "inline-flex items-center gap-1.5 rounded-md px-2 py-1 -my-0.5 text-foreground transition-colors hover:bg-secondary active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none disabled:hover:bg-transparent";
-
 function PapersPanelHeader({
   exportDisabled,
   exportFilenameBase,
@@ -216,76 +220,59 @@ function PapersPanelHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-background p-4">
+    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background px-4">
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        <List className="h-4 w-4 shrink-0 text-foreground" strokeWidth={2} aria-hidden />
-        <h2 className="truncate text-sm font-medium text-foreground">
+        <List className="size-4 shrink-0 text-foreground" aria-hidden />
+        <h2 className="truncate font-sans text-sm font-medium text-foreground">
           Selected Papers for Detailed Review
         </h2>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <DropdownMenu
-          trigger={
-            <button
-              type="button"
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
               disabled={exportDisabled}
               title="Export papers"
-              className={PAPERS_PANEL_HEADER_BTN}
+              aria-label="Export papers"
             >
-              <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
+              <Download />
               Export
-            </button>
-          }
-        >
-          <ExportMenuItem
-            icon={<FileCode2 className="h-4 w-4" />}
-            label="BibTeX (.bib)"
-            onClick={() => exportPapersToBibtex(papers, `${exportFilenameBase}.bib`)}
-          />
-          <ExportMenuItem
-            icon={<Sheet className="h-4 w-4" />}
-            label="CSV (.csv)"
-            onClick={() => exportPapersToCsv(papers, `${exportFilenameBase}.csv`)}
-          />
-          <ExportMenuItem
-            icon={<Table2 className="h-4 w-4" />}
-            label="Excel (.xlsx)"
-            onClick={() => exportPapersToExcel(papers, `${exportFilenameBase}.xlsx`)}
-          />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => exportPapersToBibtex(papers, `${exportFilenameBase}.bib`)}
+            >
+              <FileCode2 />
+              BibTeX (.bib)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => exportPapersToCsv(papers, `${exportFilenameBase}.csv`)}
+            >
+              <Sheet />
+              CSV (.csv)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => exportPapersToExcel(papers, `${exportFilenameBase}.xlsx`)}
+            >
+              <Table2 />
+              Excel (.xlsx)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
         </DropdownMenu>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={onClose}
-          className="inline-flex shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           aria-label="Close papers panel"
           title="Close"
         >
-          <X className="h-4 w-4 shrink-0" strokeWidth={2} />
-        </button>
+          <X />
+        </Button>
       </div>
     </div>
-  );
-}
-
-function ExportMenuItem({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 
@@ -313,20 +300,24 @@ function PaperList({
   return (
     <div className="flex-1 overflow-y-auto">
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+          <Spinner className="size-8" />
           <p className="text-sm">Loading ranked papers…</p>
         </div>
       ) : isEmpty ? (
-        <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-muted-foreground">
-          <BookOpen className="h-10 w-10 mb-3 opacity-40" />
-          <p className="text-sm font-medium text-foreground">No ranked papers yet</p>
-          <p className="text-xs mt-1">
-            Papers appear here after the ranking step completes in your literature review.
-          </p>
-        </div>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <BookOpen />
+            </EmptyMedia>
+            <EmptyTitle>No ranked papers yet</EmptyTitle>
+            <EmptyDescription>
+              Papers appear here after the ranking step completes in your literature review.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="divide-y divide-border/50">
           {paperEntries.map(({ paper, index, key }) => (
             <RankedPaperCard
               key={key}
@@ -383,26 +374,25 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
     typeof paper.score === "number" && Number.isFinite(paper.score) ? paper.score.toFixed(2) : null;
 
   return (
-    <article className="px-4 py-4 hover:bg-muted/20 transition-colors">
+    <article className="px-4 py-4 transition-colors hover:bg-muted/30">
       <div className="flex items-start gap-3">
         <span
-          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+          className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted font-sans text-xs font-semibold text-muted-foreground"
           aria-hidden
         >
           {rank}
         </span>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={isSelected}
-          onChange={onToggleSelect}
-          className="mt-1 h-4 w-4 shrink-0 rounded border-border"
+          onCheckedChange={() => onToggleSelect()}
+          className="mt-1"
           aria-label={`Select ${paper.title}`}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="mb-1 flex items-center justify-between gap-2">
             <SourceRow source={sourceLabel(paper.source)} />
             {scoreLabel ? (
-              <span className="shrink-0 text-xs font-medium text-primary tabular-nums">
+              <span className="shrink-0 font-sans text-xs font-medium tabular-nums text-primary">
                 Score {scoreLabel}
               </span>
             ) : null}
@@ -411,46 +401,36 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
             href={paper.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[15px] font-semibold leading-snug text-foreground hover:text-primary hover:underline line-clamp-3"
+            className="line-clamp-3 text-sm font-semibold leading-snug text-foreground hover:text-primary hover:underline"
           >
             {paper.title}
           </a>
-          {meta && <p className="mt-1 text-xs text-muted-foreground">{meta}</p>}
+          {meta && <p className="mt-1 font-sans text-xs text-muted-foreground">{meta}</p>}
         </div>
       </div>
 
       {summary && (
         <div className="mt-3 flex gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
-          <Sparkles className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" strokeWidth={2} />
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-studio-literature" aria-hidden />
           <p>{summary}</p>
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-1 text-sm">
-        <PaperAction icon={<Quote className="h-4 w-4" />} label="Cite" onClick={onCite} />
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        <PaperAction icon={<Quote aria-hidden />} label="Cite" onClick={onCite} />
         <PaperAction
-          icon={
-            isAdding ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CirclePlus className="h-4 w-4" strokeWidth={2} />
-            )
-          }
-          label={isInNotebook ? "In notebook" : "Add to notebook"}
+          icon={isAdding ? <Spinner aria-hidden /> : <CirclePlus aria-hidden />}
+          label={isAdding ? "Adding…" : isInNotebook ? "In notebook" : "Add to notebook"}
           onClick={onAdd}
           disabled={isInNotebook || isAdding}
         />
-        <PaperAction icon={<FileText className="h-4 w-4" />} label="PDF" href={pdfHref} external />
+        <PaperAction icon={<FileText aria-hidden />} label="PDF" href={pdfHref} external />
         {paper.url && (
-          <a
-            href={paper.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto text-orange-500 hover:text-orange-600"
-            aria-label="Open paper"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </a>
+          <Button variant="ghost" size="icon-sm" asChild className="ml-auto">
+            <a href={paper.url} target="_blank" rel="noopener noreferrer" aria-label="Open paper">
+              <ExternalLink className="text-studio-literature" />
+            </a>
+          </Button>
         )}
       </div>
     </article>
@@ -459,8 +439,8 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
 
 function SourceRow({ source }: { source: string }) {
   return (
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-      <BookOpen className="h-3.5 w-3.5 shrink-0" />
+    <div className="mb-1 flex items-center gap-1.5 font-sans text-xs text-muted-foreground">
+      <BookOpen className="size-3.5 shrink-0" aria-hidden />
       <span className="truncate">{source}</span>
     </div>
   );
@@ -483,23 +463,24 @@ function PaperAction({
 }) {
   if (href) {
     return (
-      <a
-        href={href}
-        target={external ? "_blank" : undefined}
-        rel={external ? "noopener noreferrer" : undefined}
-        className={PAPER_ACTION_CLASS}
-        title={label === "PDF" ? "View PDF" : label}
-      >
-        {icon}
-        <span>{label}</span>
-      </a>
+      <Button variant="ghost" size="xs" asChild>
+        <a
+          href={href}
+          target={external ? "_blank" : undefined}
+          rel={external ? "noopener noreferrer" : undefined}
+          title={label === "PDF" ? "View PDF" : label}
+        >
+          {icon}
+          {label}
+        </a>
+      </Button>
     );
   }
 
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={PAPER_ACTION_CLASS}>
+    <Button variant="ghost" size="xs" onClick={onClick} disabled={disabled}>
       {icon}
-      <span>{label}</span>
-    </button>
+      {label}
+    </Button>
   );
 }
