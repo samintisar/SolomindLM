@@ -30,7 +30,7 @@ export function getMessageContent(response: unknown): string {
  * ("Not specified in notes"). Readers only know their sources, so say that instead (#350).
  */
 const PIPELINE_NOTES_PHRASE =
-  /\b(not (?:specified|mentioned|stated|provided|reported|given|available|found|listed|included|described|detailed)) (?:in|from) (?:the )?(?:research |input |consolidated |source )?notes\b/gi;
+  /\b(not (?:specified|mentioned|stated|provided|reported|given|available|found|listed|included|described|detailed)) (?:in|from) (?:the )?(?:provided |available |given |research |input |consolidated |source )?notes\b/gi;
 
 export function withoutPipelineWording(text: string): string {
   return text.replace(PIPELINE_NOTES_PHRASE, "$1 in the sources");

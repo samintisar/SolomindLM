@@ -45,6 +45,8 @@ describe("withoutPipelineWording", () => {
     ["Not specified in notes", "Not specified in the sources"],
     ["not mentioned in the notes", "not mentioned in the sources"],
     ["Not reported in the research notes.", "Not reported in the sources."],
+    ["Not specified in provided notes.", "Not specified in the sources."],
+    ["Not mentioned in the provided notes", "Not mentioned in the sources"],
     ['"Not stated in notes","2020"', '"Not stated in the sources","2020"'],
   ])("rewrites %s", (input, expected) => {
     expect(withoutPipelineWording(input)).toBe(expected);
