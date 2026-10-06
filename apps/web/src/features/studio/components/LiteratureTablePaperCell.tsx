@@ -3,7 +3,6 @@ import {
   CirclePlus,
   FileText,
   FlaskConical,
-  Loader2,
   LockOpen,
   Microscope,
   PieChart,
@@ -13,6 +12,9 @@ import {
 } from "lucide-react";
 import React, { useId } from "react";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import type { TablePaperRow } from "../utils/literatureTablePaper";
 import {
@@ -20,8 +22,8 @@ import {
   formatPaperAuthors,
   formatPaperMetaLine,
   getPaperTitle,
-  getStudyTypePillStyle,
   type StudyTypePillIcon,
+  studyTypeIcon,
 } from "../utils/literatureTablePaper";
 import type { TableColumn } from "./ColumnManager";
 
@@ -37,30 +39,28 @@ interface LiteratureTablePaperCellProps {
   onAddToNotebook: () => void;
 }
 
-function StudyTypePillIcon({ kind, className }: { kind: StudyTypePillIcon; className: string }) {
-  const iconClass = `h-3 w-3 shrink-0 ${className}`;
+function StudyTypePillIcon({ kind }: { kind: StudyTypePillIcon }) {
   switch (kind) {
     case "systematic":
-      return <PieChart className={iconClass} strokeWidth={2} aria-hidden />;
+      return <PieChart aria-hidden />;
     case "literature":
-      return <Search className={iconClass} strokeWidth={2} aria-hidden />;
+      return <Search aria-hidden />;
     case "trial":
     case "observational":
-      return <Microscope className={iconClass} strokeWidth={2} aria-hidden />;
+      return <Microscope aria-hidden />;
     case "empirical":
-      return <FlaskConical className={iconClass} strokeWidth={2} aria-hidden />;
+      return <FlaskConical aria-hidden />;
     default:
-      return <FileText className={iconClass} strokeWidth={2} aria-hidden />;
+      return <FileText aria-hidden />;
   }
 }
 
 function StudyTypeBadge({ label }: { label: string }) {
-  const style = getStudyTypePillStyle(label);
   return (
-    <span className={style.className}>
-      <StudyTypePillIcon kind={style.icon} className={style.iconClassName} />
+    <Badge variant="outline" className="max-w-full">
+      <StudyTypePillIcon kind={studyTypeIcon(label)} />
       <span className="truncate">{label}</span>
-    </span>
+    </Badge>
   );
 }
 
@@ -106,17 +106,16 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
     <div className="relative flex gap-3 pr-10">
       <div className="flex shrink-0 items-start gap-2.5 pt-0.5">
         <span
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-xs font-medium text-neutral-600 dark:bg-muted dark:text-muted-foreground"
           aria-hidden
+          className="flex size-7 items-center justify-center rounded-full bg-muted font-sans text-xs font-medium text-muted-foreground"
         >
           {rank}
         </span>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={isSelected}
-          onChange={onToggleSelect}
-          className="mt-1.5 h-4 w-4 rounded border-neutral-300"
+          onCheckedChange={() => onToggleSelect()}
           aria-label={`Select ${title}`}
+          className="mt-1"
         />
       </div>
 
@@ -128,25 +127,25 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
                 href={citation.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-[15px] font-semibold leading-snug text-foreground hover:text-primary hover:underline"
+                className="block text-sm font-semibold leading-snug text-foreground hover:text-primary hover:underline"
               >
                 {title}
               </a>
             ) : (
               <p className="text-sm font-semibold leading-snug text-foreground">{title}</p>
             )}
-            <p className="text-sm leading-relaxed text-neutral-500">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {formatPaperMetaLine(citation)}
             </p>
-            <p className="text-sm leading-relaxed text-neutral-500">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {formatPaperAuthors(citation)}
             </p>
           </>
         ) : (
           <>
-            <p className="text-[15px] font-semibold leading-snug text-foreground">{title}</p>
+            <p className="text-sm font-semibold leading-snug text-foreground">{title}</p>
             {paper.includeReason && (
-              <p className="text-sm leading-relaxed text-neutral-500">{paper.includeReason}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">{paper.includeReason}</p>
             )}
           </>
         )}
@@ -172,51 +171,43 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
           <span className="text-xs font-medium text-destructive">Excluded from review</span>
         )}
 
-        <div className="flex flex-wrap items-center gap-4 pt-1 text-sm text-neutral-600">
-          <button
-            type="button"
-            onClick={onCite}
-            disabled={!citation}
-            className="inline-flex items-center gap-1.5 hover:text-foreground disabled:opacity-50"
-          >
-            <Quote className="h-4 w-4" strokeWidth={2} />
-            <span>Cite</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-1 pt-1">
+          <Button variant="ghost" size="xs" onClick={onCite} disabled={!citation}>
+            <Quote aria-hidden />
+            Cite
+          </Button>
           {!isNotebookPaper && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={onAddToNotebook}
               disabled={isInNotebook || isAdding || !citation}
-              className="inline-flex items-center gap-1.5 hover:text-foreground disabled:opacity-50"
             >
-              {isAdding ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CirclePlus className="h-4 w-4" strokeWidth={2} />
-              )}
-              <span>{isInNotebook ? "In notebook" : "Add to notebook"}</span>
-            </button>
+              {isAdding ? <Spinner /> : <CirclePlus aria-hidden />}
+              {isInNotebook ? "In notebook" : "Add to notebook"}
+            </Button>
           )}
         </div>
       </div>
 
       <div className="absolute right-0 top-1 flex flex-col items-center gap-2">
         {isOpenAccess && (
-          <span className="text-orange-500" title="Open access">
-            <LockOpen className="h-4 w-4" strokeWidth={2} aria-hidden />
+          <span className="text-studio-literature" title="Open access">
+            <LockOpen className="size-4" aria-hidden />
           </span>
         )}
         {pdfHref && (
-          <a
-            href={pdfHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-red-500 hover:text-red-600"
-            title="View PDF"
-            aria-label="View PDF"
-          >
-            <FileText className="h-4 w-4" strokeWidth={2} />
-          </a>
+          <Button variant="ghost" size="icon-sm" asChild>
+            <a
+              href={pdfHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View PDF"
+              aria-label="View PDF"
+            >
+              <FileText className="text-destructive" />
+            </a>
+          </Button>
         )}
       </div>
     </div>

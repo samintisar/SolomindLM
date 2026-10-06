@@ -23,7 +23,5 @@ export const LiteratureTableExtractionCell: React.FC<{ value: string }> = ({ val
     );
   }
 
-  return (
-    <p className="text-[15px] leading-[1.65] text-foreground whitespace-pre-wrap">{trimmed}</p>
-  );
+  return <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{trimmed}</p>;
 };

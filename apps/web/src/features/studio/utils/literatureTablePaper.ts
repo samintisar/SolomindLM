@@ -179,11 +179,6 @@ export function formatPaperAuthors(citation: TablePaperCitation): string {
   return formatAuthorsLine(citation.authors, 3);
 }
 
-const STUDY_TYPE_PILL_CLASS =
-  "inline-flex max-w-full items-center gap-1 rounded-full border border-border/80 bg-muted/50 px-2 py-0.5 font-sans text-[11px] font-medium leading-tight text-muted-foreground";
-
-const STUDY_TYPE_PILL_ICON_CLASS = "text-muted-foreground";
-
 const STUDY_TYPE_ICON_MATCHERS: Array<{ match: RegExp; kind: StudyTypePillIcon }> = [
   { match: /systematic review|meta-analysis|meta analysis/i, kind: "systematic" },
   { match: /literature review|narrative review|scoping review/i, kind: "literature" },
@@ -200,19 +195,9 @@ export type StudyTypePillIcon =
   | "empirical"
   | "default";
 
-export interface StudyTypePillStyle {
-  className: string;
-  iconClassName: string;
-  icon: StudyTypePillIcon;
-}
-
-export function getStudyTypePillStyle(label: string): StudyTypePillStyle {
-  const kind = STUDY_TYPE_ICON_MATCHERS.find((entry) => entry.match.test(label))?.kind ?? "default";
-  return {
-    className: STUDY_TYPE_PILL_CLASS,
-    iconClassName: STUDY_TYPE_PILL_ICON_CLASS,
-    icon: kind,
-  };
+/** The icon for a study-type badge; the badge's look comes from `Badge`. */
+export function studyTypeIcon(label: string): StudyTypePillIcon {
+  return STUDY_TYPE_ICON_MATCHERS.find((entry) => entry.match.test(label))?.kind ?? "default";
 }
 
 /** System columns rendered inside the Papers column — not as separate grid columns. */

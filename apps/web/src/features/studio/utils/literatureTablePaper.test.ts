@@ -3,8 +3,8 @@ import type { TableColumn } from "../components/ColumnManager";
 import {
   collectStudyTypeLabels,
   formatPaperMetaLine,
-  getStudyTypePillStyle,
   inferStudyTypeLabel,
+  studyTypeIcon,
 } from "./literatureTablePaper";
 
 const basePaper = {
@@ -85,20 +85,14 @@ describe("inferStudyTypeLabel", () => {
   });
 });
 
-describe("getStudyTypePillStyle", () => {
-  it("uses neutral muted styling for all study types", () => {
-    const systematic = getStudyTypePillStyle("Systematic Review");
-    const observational = getStudyTypePillStyle("Observational study");
-    expect(systematic.className).toBe(observational.className);
-    expect(systematic.className).toContain("text-muted-foreground");
-    expect(systematic.className).not.toMatch(/emerald|amber|violet|teal|sky/);
-    expect(systematic.iconClassName).toBe("text-muted-foreground");
-  });
-
+describe("studyTypeIcon", () => {
   it("maps review types to distinct icons", () => {
-    expect(getStudyTypePillStyle("Literature Review").icon).toBe("literature");
-    expect(getStudyTypePillStyle("Systematic Review").icon).toBe("systematic");
-    expect(getStudyTypePillStyle("Empirical study").icon).toBe("empirical");
+    expect(studyTypeIcon("Literature Review")).toBe("literature");
+    expect(studyTypeIcon("Systematic Review")).toBe("systematic");
+    expect(studyTypeIcon("Randomized controlled trial")).toBe("trial");
+    expect(studyTypeIcon("Cohort study")).toBe("observational");
+    expect(studyTypeIcon("Empirical study")).toBe("empirical");
+    expect(studyTypeIcon("Position paper")).toBe("default");
   });
 });
 
