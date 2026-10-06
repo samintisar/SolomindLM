@@ -19,9 +19,13 @@ const BUSY_MESSAGE =
   "The service that reads this source was busy. Try again in a few minutes with Refresh, or re-add it.";
 const GENERIC_MESSAGE = "Something went wrong while processing this source.";
 
-/** The message to show for a failed source, given the error and its job error type. */
+/**
+ * The message to show for a failed source, given the error and its job error type. A busy or
+ * timed-out service wins over a specific message: retrying later is the right advice even when the
+ * failure was wrapped (an OCR call rate-limited inside "couldn't read the PDF").
+ */
 export function sourceFailureMessage(error: unknown, errorType: string): string {
-  if (error instanceof UserFacingSourceError) return error.userMessage;
   if (errorType === "rate_limit" || errorType === "llm_timeout") return BUSY_MESSAGE;
+  if (error instanceof UserFacingSourceError) return error.userMessage;
   return GENERIC_MESSAGE;
 }

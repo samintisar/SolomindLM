@@ -11,6 +11,14 @@ describe("sourceFailureMessage", () => {
     expect(sourceFailureMessage(new Error("HTTP 429"), type)).toMatch(/try again/i);
   });
 
+  it("asks for a retry when a wrapped failure was a rate limit", () => {
+    const error = new UserFacingSourceError(
+      "We couldn't read the PDF at this link.",
+      "PDF OCR failed: mistral HTTP 429: rate limited"
+    );
+    expect(sourceFailureMessage(error, "rate_limit")).toMatch(/try again/i);
+  });
+
   it("never shows internal error text", () => {
     const message = sourceFailureMessage(
       new Error('mistral HTTP 401: {"detail":"Invalid API Key"}'),

@@ -1,7 +1,10 @@
 import { Source } from "../types";
 
 /** The stored user-facing reason a document failed, if it failed and one was recorded. */
-function failureReasonOf(doc: any): string | undefined {
+function failureReasonOf(doc: {
+  status?: string;
+  metadata?: { userMessage?: unknown } | null;
+}): string | undefined {
   if (doc.status !== "failed") return undefined;
   const reason = doc.metadata?.userMessage;
   return typeof reason === "string" && reason.trim() ? reason.trim() : undefined;

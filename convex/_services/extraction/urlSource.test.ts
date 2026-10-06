@@ -11,6 +11,8 @@ describe("pdfUrlForLink", () => {
     ["https://arxiv.org/abs/2310.11511v3", "https://arxiv.org/pdf/2310.11511v3"],
     ["http://www.arxiv.org/abs/hep-th/9711200", "https://arxiv.org/pdf/hep-th/9711200"],
     ["https://export.arxiv.org/abs/2005.11401", "https://arxiv.org/pdf/2005.11401"],
+    ["https://arxiv.org/abs/2310.11511?context=cs", "https://arxiv.org/pdf/2310.11511"],
+    ["https://arxiv.org/abs/2310.11511v2#S3", "https://arxiv.org/pdf/2310.11511v2"],
     ["https://example.org/papers/report.pdf", "https://example.org/papers/report.pdf"],
     ["https://example.org/report.PDF?download=1", "https://example.org/report.PDF?download=1"],
   ])("%s -> %s", (link, expected) => {

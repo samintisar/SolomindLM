@@ -5,9 +5,13 @@ import { UserFacingSourceError } from "../../_lib/sourceFailure";
  * since a scrape of a PDF returns its raw bytes, not its text.
  */
 
-/** arxiv.org abstract and PDF pages, new-style (2310.11511) and old-style (hep-th/9711200) IDs. */
-const ARXIV_LINK_REGEX =
-  /^https?:\/\/(?:www\.|export\.)?arxiv\.org\/(abs|pdf)\/((?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?\/\d{7})(?:v\d+)?(?:\.pdf)?)\/?$/i;
+const ARXIV_HOST_REGEX = /^(?:www\.|export\.)?arxiv\.org$/i;
+/**
+ * Path of an arxiv.org abstract or PDF page, new-style (2310.11511) and old-style
+ * (hep-th/9711200) IDs. Matched against the pathname, so query strings and fragments don't matter.
+ */
+const ARXIV_PATH_REGEX =
+  /^\/(abs|pdf)\/((?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[a-z]{2})?\/\d{7})(?:v\d+)?(?:\.pdf)?)\/?$/i;
 
 /** Share of U+FFFD (undecodable bytes) above which scraped "text" is really a binary file. */
 const BINARY_REPLACEMENT_RATIO = 0.05;
@@ -22,19 +26,18 @@ const BINARY_FILE_MESSAGE =
  * the paper's PDF for an arXiv abstract page, otherwise undefined.
  */
 export function pdfUrlForLink(link: string): string | undefined {
-  const arxiv = link.trim().match(ARXIV_LINK_REGEX);
+  let url: URL;
+  try {
+    url = new URL(link.trim());
+  } catch {
+    return undefined; // Not a URL; the scraper reports it.
+  }
+  if (!/^https?:$/.test(url.protocol)) return undefined;
+  const arxiv = ARXIV_HOST_REGEX.test(url.hostname) ? url.pathname.match(ARXIV_PATH_REGEX) : null;
   if (arxiv) {
     return arxiv[1].toLowerCase() === "abs" ? `https://arxiv.org/pdf/${arxiv[2]}` : link.trim();
   }
-  try {
-    const url = new URL(link.trim());
-    if (/^https?:$/.test(url.protocol) && url.pathname.toLowerCase().endsWith(".pdf")) {
-      return url.toString();
-    }
-  } catch {
-    // Not a URL; the scraper reports it.
-  }
-  return undefined;
+  return url.pathname.toLowerCase().endsWith(".pdf") ? url.toString() : undefined;
 }
 
 export interface UrlSourceDeps {
