@@ -1,5 +1,5 @@
 import type { TableColumn } from "../components/ColumnManager";
-import type { RankedPaper, RankedPaperSource } from "../types/rankedPaper";
+import type { PaperCitationSource, RankedPaper } from "../types/rankedPaper";
 import { formatAuthorsLine, sourceLabel } from "../types/rankedPaper";
 
 export interface TablePaperCitation {
@@ -9,7 +9,9 @@ export interface TablePaperCitation {
   doi?: string;
   url: string;
   pdfUrl?: string;
-  sourceApi: RankedPaperSource;
+  sourceApi: PaperCitationSource;
+  /** The notebook source a "notebook" citation came from. */
+  documentId?: string;
   citationCount?: number;
   abstract?: string;
 }
@@ -19,6 +21,8 @@ export interface TablePaperRow {
   rowData: Record<string, string>;
   includeReason?: string;
   isIncluded: boolean;
+  /** Set on a notebook paper the screening check judged off-topic; it is still included. */
+  offTopicReason?: string;
   citation: TablePaperCitation | null;
 }
 
@@ -30,7 +34,8 @@ export function citationToRankedPaper(citation: TablePaperCitation): RankedPaper
     abstract: citation.abstract ?? "",
     url: citation.url,
     pdfUrl: citation.pdfUrl,
-    source: citation.sourceApi,
+    // Citation styles only treat arXiv differently; a notebook paper is cited as an article.
+    source: citation.sourceApi === "notebook" ? "openalex" : citation.sourceApi,
     citationCount: citation.citationCount,
     doi: citation.doi,
     score: 0,

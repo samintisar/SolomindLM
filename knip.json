@@ -13,7 +13,6 @@
         "!convex/!(_*)/**/_*/**/*.ts!",
         "!convex/**/*.d.ts!",
         "convex/_agents/_shared/cachedLlm.ts!",
-        "convex/_agents/_shared/jobHelpers.ts!",
         "convex/_agents/chat/rerankCache.ts!",
         "convex/_agents/chat/sourceSuggestions.ts!",
         "convex/_lib/arxivThrottle.ts!",
