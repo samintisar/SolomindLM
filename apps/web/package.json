@@ -28,7 +28,6 @@
     "dompurify": "^3.2.3",
     "katex": "^0.16.27",
     "lucide-react": "^0.563.0",
-    "mind-elixir": "^5.3.8",
     "motion": "^13.4.4",
     "pdfjs-dist": "^5.4.296",
     "radix-ui": "^1.6.7",

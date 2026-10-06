@@ -41,6 +41,7 @@ const MIGRATED = [
   "src/features/studio/components/views/ReportView.tsx",
   "src/features/studio/components/views/UserNoteView.tsx",
   "src/features/studio/components/views/MindMapView.tsx",
+  "src/features/studio/components/mindmap/**/*.tsx",
   "src/features/studio/components/views/InfographicView.tsx",
   "src/features/studio/components/views/EditCardModal.tsx",
   "src/features/studio/components/views/ProficiencyBadge.tsx",
