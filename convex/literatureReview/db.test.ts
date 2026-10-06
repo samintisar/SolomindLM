@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
+import { loadNotebookPaperDocuments } from "./db";
 import {
   RANKED_PAPER_SNAPSHOT_ABSTRACT_MAX_CHARS,
   RANKED_PAPERS_SNAPSHOT_MAX_COUNT,
@@ -795,5 +796,93 @@ describe("updateLiteratureReviewSessionStatus", () => {
 
     const session = await t.run(async (ctx) => ctx.db.get(sessionId));
     expect(session!.status).toBe("completed");
+  });
+});
+
+describe("notebook papers in drafts and tables", () => {
+  test("keeps a notebook paper's document link and off-topic reason through to the table", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const sessionId = await seedSession(t, notebookId, userId);
+    const documentId = await t.run(async (ctx) =>
+      ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "cohort.pdf",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      } as never)
+    );
+
+    await t.mutation(internal.literatureReview.db.insertDraftBatch, {
+      sessionId,
+      papers: [
+        {
+          title: "Cohort study",
+          authors: ["Laird E"],
+          year: 2023,
+          abstract: "A cohort.",
+          url: "",
+          source: "notebook",
+          score: 1,
+          isIncluded: true,
+          includeReason: "From your notebook",
+          documentId,
+          offTopicReason: "Studies diabetes, not depression.",
+        },
+      ],
+      columns: [],
+      batchNumber: 0,
+    });
+    const { tableId } = await t.mutation(internal.literatureReview.db.persistTable, {
+      sessionId,
+      columns: [],
+    });
+
+    const { citation, table } = await t.run(async (ctx) => {
+      const table = await ctx.db.get(tableId);
+      const citation = table ? await ctx.db.get(table.papers[0].citationId) : null;
+      return { citation, table };
+    });
+    expect(citation?.sourceApi).toBe("notebook");
+    expect(citation?.documentId).toBe(documentId);
+    expect(table?.papers[0].offTopicReason).toBe("Studies diabetes, not depression.");
+  });
+});
+
+describe("loadNotebookPaperDocuments", () => {
+  test("keeps only this notebook's finished PDFs and saved papers", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const otherNotebookId = await seedNotebook(t, userId);
+    const doc = (fields: Record<string, unknown>) =>
+      t.run(async (ctx) =>
+        ctx.db.insert("documents", {
+          userId,
+          notebookId,
+          status: "completed",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          ...fields,
+        } as never)
+      );
+    const pdf = await doc({ fileName: "paper.pdf", fileType: "file" });
+    const record = await doc({ fileName: "Saved paper", fileType: "paper_record" });
+    const pasted = await doc({ fileName: "Pasted text", fileType: "text" });
+    const processing = await doc({ fileName: "late.pdf", fileType: "file", status: "processing" });
+    const elsewhere = await doc({
+      fileName: "other.pdf",
+      fileType: "file",
+      notebookId: otherNotebookId,
+    });
+
+    const loaded = await t.run(async (ctx) =>
+      loadNotebookPaperDocuments(ctx, notebookId, [pdf, record, pasted, processing, elsewhere])
+    );
+    expect(loaded.map((d) => d._id).sort()).toEqual([pdf, record].sort());
   });
 });

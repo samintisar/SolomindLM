@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
+import { webDevUrl } from "./apps/web/scripts/devPorts";
 
 // Load .env.e2e if present (gitignored — holds E2E_TEST_EMAIL, E2E_TEST_PASSWORD)
 const envPath = resolve(__dirname, ".env.e2e");
@@ -21,7 +22,8 @@ if (existsSync(envPath)) {
  * Playwright E2E test configuration.
  *
  * These tests require:
- *   1. A running web dev server (bun run dev:web)
+ *   1. A running web dev server (bun run dev:web). Tests target this checkout's
+ *      server (a worktree has its own port); PLAYWRIGHT_BASE_URL overrides it.
  *   2. A running Convex dev backend (bun x convex dev)
  *   3. E2E_TEST_EMAIL / E2E_TEST_PASSWORD (GitHub Actions: repository secrets)
  *
@@ -54,7 +56,7 @@ export default defineConfig({
   globalSetup: skipE2EInCI ? undefined : "./e2e/global-setup.ts",
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5173",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || webDevUrl(__dirname),
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     ...(!skipE2EInCI ? { storageState: ".auth/storageState.json" as const } : {}),
