@@ -214,7 +214,7 @@ export async function performNotebookFork(
       title: r.title,
       data: r.data,
       status: r.status,
-      metadata: r.metadata,
+      metadata: remapDocumentIds(r.metadata, "documentIds", docIdMap),
       createdAt: now,
       updatedAt: now,
     });

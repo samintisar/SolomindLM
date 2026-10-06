@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { LIST_QUERY_MAX_SELECTED_CHUNKS } from "./chatConfig.js";
 import {
+  addNeighbourPassages,
   chunkDedupKey,
   chunkRankingScore,
   mergeChunkScores,
@@ -202,5 +203,74 @@ describe("selectChunksByTokenBudgetWithReservation without external sources", ()
     });
 
     expect(selected.length).toBeGreaterThan(20);
+  });
+});
+
+describe("addNeighbourPassages", () => {
+  // ~100 tokens each; positions are (document, chunkIndex).
+  const at = (
+    documentId: string,
+    chunkIndex: number,
+    opts: { prev?: boolean; next?: boolean } = {}
+  ) =>
+    chunk({
+      sourceId: `src-${documentId}`,
+      documentId,
+      chunkIndex,
+      content: `${documentId}${chunkIndex} `.repeat(200).slice(0, 400),
+      similarity: 0.5,
+      metadata: {
+        previousChunkPreview:
+          opts.prev === false ? undefined : `start of ${documentId}${chunkIndex}`,
+        nextChunkPreview: opts.next === false ? undefined : `end of ${documentId}${chunkIndex}`,
+      },
+    });
+  const positions = (chunks: ReferenceChunk[]) =>
+    chunks.map((c) => `${c.documentId}${c.chunkIndex}`);
+
+  it("adds the retrieved neighbours of selected passages next to them, next one first", () => {
+    const selected = [at("A", 5), at("B", 2)];
+    const pool = [...selected, at("A", 6), at("A", 4), at("B", 3), at("C", 9)];
+
+    const out = addNeighbourPassages(selected, pool, { tokenBudget: 2000, maxPassages: 8 });
+
+    expect(positions(out)).toEqual(["A4", "A5", "A6", "B2", "B3"]);
+  });
+
+  it("drops a preview once the passage it previews is in the context", () => {
+    const selected = [at("A", 5)];
+    const out = addNeighbourPassages(selected, [...selected, at("A", 6)], {
+      tokenBudget: 2000,
+      maxPassages: 8,
+    });
+
+    const [a5, a6] = out;
+    expect(a5.metadata?.nextChunkPreview).toBeUndefined();
+    expect(a5.metadata?.previousChunkPreview).toBe("start of A5");
+    expect(a6.metadata?.previousChunkPreview).toBeUndefined();
+    expect(a6.metadata?.nextChunkPreview).toBe("end of A6");
+    // The pool's own objects are left alone.
+    expect(selected[0].metadata?.nextChunkPreview).toBe("end of A5");
+  });
+
+  it("stops at the token budget and the passage cap, best-ranked passages first", () => {
+    const selected = [at("A", 1), at("B", 1), at("C", 1)];
+    const pool = [...selected, at("A", 2), at("B", 2), at("C", 2)];
+
+    expect(
+      positions(addNeighbourPassages(selected, pool, { tokenBudget: 250, maxPassages: 8 }))
+    ).toEqual(["A1", "A2", "B1", "B2", "C1"]);
+    expect(
+      positions(addNeighbourPassages(selected, pool, { tokenBudget: 2000, maxPassages: 1 }))
+    ).toEqual(["A1", "A2", "B1", "C1"]);
+  });
+
+  it("only follows previews that exist and skips neighbours already selected", () => {
+    const selected = [at("A", 5, { next: false }), at("A", 4)];
+    const pool = [...selected, at("A", 6), at("A", 3)];
+
+    expect(
+      positions(addNeighbourPassages(selected, pool, { tokenBudget: 2000, maxPassages: 8 }))
+    ).toEqual(["A5", "A3", "A4"]);
   });
 });
