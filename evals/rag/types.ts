@@ -62,6 +62,8 @@ interface StudioParams {
   smartLlm?: string;
   /** When set, eval resolves only notebook documents whose fileName contains this substring */
   documentTitleHint?: string;
+  /** Literature review: include the fixture's documents with a search (default) or alone (#301) */
+  paperScope?: "papers_and_search" | "papers_only";
 }
 
 /**
