@@ -3,6 +3,15 @@ import { internalMutation } from "../../_generated/server";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
+/** The job replaces `metadata` wholesale; the map's source list must survive every write. */
+function keepDocumentIds(
+  stored: Record<string, unknown> | undefined,
+  next: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  const documentIds = stored?.documentIds;
+  return documentIds === undefined ? { ...next } : { documentIds, ...next };
+}
+
 export const saveMindMapResults = internalMutation({
   args: {
     mindmapId: v.id("mindmaps"),
@@ -20,7 +29,7 @@ export const saveMindMapResults = internalMutation({
       updatedAt: Date.now(),
       title,
       metadata: {
-        ...args.metadata,
+        ...keepDocumentIds(mindmap.metadata, args.metadata),
         completedAt: Date.now(),
       },
     });
@@ -59,7 +68,8 @@ export const updateMindMapStatus = internalMutation({
       updatedAt: Date.now(),
     };
     if (args.metadata) {
-      updates.metadata = args.metadata;
+      const row = await ctx.db.get(args.mindmapId);
+      updates.metadata = keepDocumentIds(row?.metadata, args.metadata);
     }
     await ctx.db.patch(args.mindmapId, updates);
   },
@@ -77,11 +87,12 @@ export const markMindMapFailed = internalMutation({
       args.metadata?.phase || "unknown",
       args.metadata
     );
+    const row = await ctx.db.get(args.mindmapId);
     await ctx.db.patch(args.mindmapId, {
       status: "failed",
       updatedAt: Date.now(),
       metadata: {
-        ...args.metadata,
+        ...keepDocumentIds(row?.metadata, args.metadata),
         ...errorMetadata,
       },
     });
