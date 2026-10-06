@@ -4,9 +4,11 @@ import {
   BRANCH_COLOR_COUNT,
   branchColorVar,
   collectBranchIds,
+  mainBranchId,
   type OutlineNode,
   sanitizeNodeTree,
   toMarkdown,
+  visibleItems,
 } from "./outline";
 
 function node(id: string, children: OutlineNode[] = [], topic = id): OutlineNode {
@@ -301,5 +303,56 @@ describe("collectBranchIds", () => {
 
   it("is empty for a lone root", () => {
     expect(collectBranchIds(node("root"))).toEqual([]);
+  });
+});
+
+describe("visibleItems", () => {
+  const tree = node("root", [
+    node("a", [node("a1", [node("a1x")]), node("a2")]),
+    node("b"),
+    node("c", [node("c1")]),
+  ]);
+
+  it("lists only the main branches when nothing is open", () => {
+    const items = visibleItems(tree, new Set(), "Title");
+    expect(items.map((item) => item.node.id)).toEqual(["a", "b", "c"]);
+    expect(items.map((item) => item.depth)).toEqual([1, 1, 1]);
+    expect(items.every((item) => item.parent === tree && item.parentTopic === "Title")).toBe(true);
+  });
+
+  it("descends depth first into open ids only", () => {
+    const items = visibleItems(tree, new Set(["a", "a1", "c1"]), "Title");
+    expect(items.map((item) => item.node.id)).toEqual(["a", "a1", "a1x", "a2", "b", "c"]);
+    expect(items.map((item) => item.depth)).toEqual([1, 2, 3, 2, 1, 1]);
+  });
+
+  it("gives nested items their parent and its topic as context", () => {
+    const items = visibleItems(tree, new Set(["a", "a1"]), "Title");
+    const a1x = items.find((item) => item.node.id === "a1x");
+    expect(a1x?.parent.id).toBe("a1");
+    expect(a1x?.parentTopic).toBe("a1");
+  });
+
+  it("does not show children of an open branch under a closed one", () => {
+    const items = visibleItems(tree, new Set(["a1"]), "Title");
+    expect(items.map((item) => item.node.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("mainBranchId", () => {
+  const tree = node("root", [node("a", [node("a1", [node("a1x")])]), node("b")]);
+
+  it("returns the main branch that holds a node", () => {
+    expect(mainBranchId(tree, "a1x")).toBe("a");
+    expect(mainBranchId(tree, "a1")).toBe("a");
+  });
+
+  it("returns a main branch itself", () => {
+    expect(mainBranchId(tree, "b")).toBe("b");
+  });
+
+  it("is null for the root or an unknown id", () => {
+    expect(mainBranchId(tree, "root")).toBeNull();
+    expect(mainBranchId(tree, "missing")).toBeNull();
   });
 });

@@ -119,3 +119,39 @@ export function collectBranchIds(root: OutlineNode): string[] {
   if (root.children.length === 0) return [];
   return [root.id, ...root.children.flatMap(collectBranchIds)];
 }
+
+/** One row of the outline that is currently on screen. */
+export interface VisibleOutlineItem {
+  node: OutlineNode;
+  /** 1 for a main branch (a child of the root). */
+  depth: number;
+  /** The node this one hangs from: the root for main branches. */
+  parent: OutlineNode;
+  /** What asking about this node is "in the context of": the map title for main branches. */
+  parentTopic: string;
+}
+
+/** The rows on screen, depth first: main branches always, children only under open ids. */
+export function visibleItems(
+  root: OutlineNode,
+  open: ReadonlySet<string>,
+  title: string
+): VisibleOutlineItem[] {
+  const items: VisibleOutlineItem[] = [];
+  function walk(parent: OutlineNode, depth: number, parentTopic: string): void {
+    for (const node of parent.children) {
+      items.push({ node, depth, parent, parentTopic });
+      if (node.children.length > 0 && open.has(node.id)) walk(node, depth + 1, node.topic);
+    }
+  }
+  walk(root, 1, title);
+  return items;
+}
+
+/** The id of the main branch that holds `id` (itself if it is one), or null for the root or an unknown id. */
+export function mainBranchId(root: OutlineNode, id: string): string | null {
+  function contains(node: OutlineNode): boolean {
+    return node.id === id || node.children.some(contains);
+  }
+  return root.children.find(contains)?.id ?? null;
+}
