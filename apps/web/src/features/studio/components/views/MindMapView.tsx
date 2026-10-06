@@ -1,6 +1,31 @@
-import { ArrowLeft, Maximize2, Minimize2, XCircle, ZoomIn, ZoomOut } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
-import { MindMapNote } from "@/shared/types/index";
+import {
+  ArrowLeft,
+  Maximize2,
+  Minimize2,
+  Network,
+  Scan,
+  XCircle,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import type { MindElixirInstance, NodeObj, Theme } from "mind-elixir";
+import type React from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
+import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
+import type { MindMapNote } from "@/shared/types/index";
+import { cn } from "@/shared/utils/cn";
+import {
+  collapseLargeTree,
+  fitScale,
+  openingScale,
+  SCALE_MAX,
+  SCALE_MIN,
+  sanitizeNodeTree,
+  stepScale,
+} from "../mindmap/mindMapViewport";
 
 export interface MindMapViewProps {
   note: MindMapNote;
@@ -9,34 +34,51 @@ export interface MindMapViewProps {
   onBack?: () => void;
 }
 
-function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any {
-  if (!node || typeof node !== "object") {
-    return {
-      id: isRoot ? "root" : `node-${Math.random().toString(36).slice(2, 9)}`,
-      topic: isRoot ? fallbackTopic : "Untitled",
-      children: [],
-    };
-  }
+/** Branch line colours, as app tokens. Mind Elixir writes them into SVG `stroke` attributes. */
+const BRANCH_TOKENS = ["--studio-mindmap", "--muted-foreground"];
 
-  const rawTopic = typeof node.topic === "string" ? node.topic : "";
-  const topic = rawTopic.trim().length > 0 ? rawTopic : isRoot ? fallbackTopic : "Untitled";
-  const id =
-    typeof node.id === "string" && node.id.trim().length > 0
-      ? node.id
-      : isRoot
-        ? "root"
-        : `node-${Math.random().toString(36).slice(2, 9)}`;
-
-  const children = Array.isArray(node.children)
-    ? node.children.map((child: any) => sanitizeNodeTree(child, fallbackTopic, false))
-    : [];
-
+/**
+ * The map's theme, on the app's tokens so the canvas follows light and dark. The `cssVar` values
+ * are set as custom properties on the map, so `var()` resolves there. The palette can't use
+ * `var()`: an SVG presentation attribute doesn't resolve it, so it reads the tokens' current values.
+ */
+function mindMapTheme(): Theme {
+  const styles = getComputedStyle(document.documentElement);
+  const palette = BRANCH_TOKENS.map(
+    (token) => styles.getPropertyValue(token).trim() || "currentColor"
+  );
   return {
-    ...node,
-    id,
-    topic,
-    children,
+    name: "SolomindLM",
+    palette,
+    cssVar: {
+      "--main-color": "var(--foreground)",
+      "--main-bgcolor": "var(--card)",
+      "--main-bgcolor-transparent": "color-mix(in oklab, var(--card) 80%, transparent)",
+      "--color": "var(--foreground)",
+      // The canvas: topics sit on it as cards (see `.mind-map-container me-tpc` in index.css).
+      "--bgcolor": "var(--background)",
+      "--root-color": "var(--foreground)",
+      "--root-bgcolor": "var(--card)",
+      "--root-border-color": "var(--border)",
+      "--selected": "var(--ring)",
+      "--accent-color": "var(--studio-mindmap)",
+      "--panel-color": "var(--foreground)",
+      "--panel-bgcolor": "var(--background)",
+      "--panel-border-color": "var(--border)",
+      "--root-radius": "calc(var(--radius) * 1.5)",
+      "--main-radius": "var(--radius)",
+    } as Theme["cssVar"],
   };
+}
+
+/** The stored error as text. Metadata isn't validated, so only a non-empty string is shown. */
+function errorMessage(error: unknown): string {
+  if (typeof error === "string" && error) return error;
+  if (typeof error === "object" && error !== null) {
+    const { message } = error as { message?: unknown };
+    if (typeof message === "string" && message) return message;
+  }
+  return "An unknown error occurred";
 }
 
 export const MindMapView: React.FC<MindMapViewProps> = ({
@@ -46,278 +88,239 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
   onBack,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mindRef = useRef<any>(null);
+  const mindRef = useRef<MindElixirInstance | null>(null);
   const [scale, setScale] = useState(1);
+  const [loadFailed, setLoadFailed] = useState(false);
   const mindMapData = note.mindMapData;
 
-  // Initialize Mind Elixir after data is loaded
   useEffect(() => {
-    const containerEl = containerRef.current;
-    if (!containerEl || !mindMapData) return;
+    if (!containerRef.current || !mindMapData) return;
 
-    // Clean up previous instance
-    if (mindRef.current) {
-      mindRef.current = null;
-    }
+    let cancelled = false;
+    let teardown: (() => void) | undefined;
+    setLoadFailed(false);
 
-    // Dynamic import Mind Elixir
-    import("mind-elixir").then(({ default: MindElixir }) => {
-      const el = containerRef.current;
-      if (!el) return;
-      const sanitizedRoot = sanitizeNodeTree(
-        mindMapData?.nodeData,
-        (note.title && note.title.trim()) || "Mind Map",
-        true
-      );
+    import("mind-elixir")
+      .then(({ default: MindElixir }) => {
+        const el = containerRef.current;
+        if (cancelled || !el) return;
 
-      const options = {
-        el,
-        direction: MindElixir.RIGHT, // Right-growing tree (Left-to-Right)
-        draggable: true,
-        contextMenu: false, // Disable right-click context menu
-        toolBar: false, // Disable default toolbar to use custom controls
-        nodeMenu: false, // Disable node menu on right-click
-        keypress: true,
-        locale: "en" as any,
-        overflowHidden: false,
-        mainLinkStyle: 2,
-        // Keep drag-to-pan on left mouse; marquee selection only on right mouse.
-        mouseSelectionButton: 2 as any,
-        before: {
-          insertSibling(_el: any, _obj: any) {
-            return true;
-          },
+        const root = sanitizeNodeTree(
+          mindMapData.nodeData,
+          (note.title && note.title.trim()) || "Mind Map",
+          true
+        );
 
-          async addChild(_el: any, _obj: any) {
-            return true;
-          },
-        },
-        // SolomindLM theme: clean, card-based, minimalist
-        theme: {
-          name: "SolomindLM",
-          // Uniform blue/gray palette - monochrome with blue accents
-          palette: ["#1a73e8", "#5f6368", "#3c4043"],
-          cssVar: {
-            "--main-color": "#1f1f1f", // Dark grey text for root
-            "--main-bgcolor": "#ffffff", // White background for root
-            "--color": "#3c4043", // Dark grey text for nodes
-            "--bgcolor": "#ffffff", // White background for nodes
-            "--panel-color": "#3c4043", // Text color for panel
-            "--panel-bgcolor": "#f8f9fa", // Light grey background for canvas
-            "--panel-border-color": "#dadce0", // Google-style soft border grey
-            // Rounded corners for Material Design look
-            "--root-radius": "12px",
-            "--main-radius": "8px",
-            "--topic-radius": "8px",
-          },
-        } as any,
-      };
+        const mind = new MindElixir({
+          el,
+          direction: MindElixir.RIGHT,
+          // Read-only: the generated map has nowhere to save edits, renames or moved nodes.
+          editable: false,
+          draggable: false,
+          contextMenu: false,
+          toolBar: false,
+          keypress: false,
+          locale: "en",
+          overflowHidden: false,
+          // Keep drag-to-pan on the left button; marquee selection only on the right.
+          mouseSelectionButton: 2,
+          scaleMin: SCALE_MIN,
+          scaleMax: SCALE_MAX,
+          theme: mindMapTheme(),
+        });
+        mind.init({ nodeData: collapseLargeTree(root) as NodeObj });
+        mindRef.current = mind;
 
-      const mind = new MindElixir(options);
-      mind.init({ nodeData: sanitizedRoot });
-      mindRef.current = mind;
+        // Every zoom, the wheel included, reports its scale here.
+        const onScale = (value: number) => setScale(value);
+        mind.bus.addListener("scale", onScale);
 
-      // Fit the whole tree in the container on first render (falls back to
-      // just centering if scaleFit isn't available) so it's never stuck at
-      // 100% zoom showing a single cut-off node on a narrow viewport.
-      requestAnimationFrame(() => {
-        try {
-          if (typeof mind.scaleFit === "function") {
-            mind.scaleFit();
-          } else if (typeof mind.toCenter === "function") {
+        // The palette holds resolved colours, so re-apply the theme when the app's theme class flips.
+        const themeObserver = new MutationObserver(() => mind.changeTheme(mindMapTheme()));
+        themeObserver.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+
+        // Open fitted, but never so small the topics can't be read (#171): scaleFit ignores scaleMin.
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          mind.scaleFit();
+          const fitted = mind.scaleVal;
+          const opening = openingScale(fitted);
+          if (opening !== fitted) {
             mind.toCenter();
+            mind.scale(opening);
           }
-        } catch {
-          // Ignore non-critical fit/centering errors.
-        }
-        setScale(mind.scaleVal || 1);
+          setScale(mind.scaleVal);
+        });
+
+        teardown = () => {
+          themeObserver.disconnect();
+          mind.bus.removeListener("scale", onScale);
+          mind.destroy();
+        };
+      })
+      .catch((error: unknown) => {
+        // The chunk failed to download, or the map couldn't be built from this data.
+        if (cancelled) return;
+        console.error("Couldn't load the mind map:", error);
+        setLoadFailed(true);
       });
 
-      // Track manual zoom changes via Ctrl+Scroll or mouse wheel
-      let lastScale = mind.scaleVal || 1;
-      const pollInterval = setInterval(() => {
-        if (mindRef.current && mindRef.current.scaleVal) {
-          const currentScale = mindRef.current.scaleVal;
-          // Only update if scale has actually changed
-          if (Math.abs(currentScale - lastScale) > 0.001) {
-            lastScale = currentScale;
-            setScale(currentScale);
-          }
-        }
-      }, 100); // Poll every 100ms
-
-      if (containerEl) {
-        (containerEl as any)._cleanupSelection = () => {
-          clearInterval(pollInterval);
-        };
-      }
-    });
-
     return () => {
-      // Clean up selection prevention
-      if (containerEl && (containerEl as any)._cleanupSelection) {
-        (containerEl as any)._cleanupSelection();
-        delete (containerEl as any)._cleanupSelection;
-      }
-      if (mindRef.current) {
-        mindRef.current = null;
-      }
+      cancelled = true;
+      teardown?.();
+      mindRef.current = null;
     };
   }, [mindMapData, note.title]);
 
-  // Control functions
-  const handleZoomIn = () => {
-    if (mindRef.current) {
-      const newScale = Math.min(scale + 0.2, 2);
-      mindRef.current.scale(newScale);
-      setScale(newScale);
+  // Escape leaves full screen. The notebook also mounts a hidden copy of the Studio panel, so only
+  // the visible map answers.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const exitOnEscape = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    const root = rootRef.current;
+    if (!root || (typeof root.checkVisibility === "function" && !root.checkVisibility())) return;
+    onToggleExpanded?.();
+  });
+  useEffect(() => {
+    if (!isExpanded) return;
+    window.addEventListener("keydown", exitOnEscape);
+    return () => window.removeEventListener("keydown", exitOnEscape);
+  }, [isExpanded]);
+
+  const zoom = (direction: "in" | "out") => {
+    mindRef.current?.scale(stepScale(scale, direction));
+  };
+
+  const fitToView = () => {
+    const mind = mindRef.current;
+    if (!mind) return;
+    mind.scaleFit();
+    const target = fitScale(mind.scaleVal);
+    if (target !== mind.scaleVal) {
+      mind.toCenter();
+      mind.scale(target);
     }
   };
 
-  const handleZoomOut = () => {
-    if (mindRef.current) {
-      const newScale = Math.max(scale - 0.2, 0.3);
-      mindRef.current.scale(newScale);
-      setScale(newScale);
-    }
-  };
-
-  // Generating/loading state
-  const isFailed = note.status === "failed";
-
-  if (isFailed) {
+  if (note.status === "failed") {
     return (
-      <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300">
-        <div className="p-4 border-b border-border bg-destructive/10">
-          <div className="flex items-center gap-3">
-            <XCircle className="w-5 h-5 text-destructive shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">Mind map generation failed</p>
-              <p className="text-xs text-destructive/70 mt-1">
-                {typeof note.metadata?.error === "object"
-                  ? (note.metadata.error as { message?: string }).message ||
-                    "An unknown error occurred"
-                  : note.metadata?.error || "An unknown error occurred"}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-muted-foreground">Failed to generate mind map</p>
-        </div>
+      <div className="flex h-full flex-col gap-4 bg-background p-4 duration-300 ease-out animate-in fade-in slide-in-from-right-4">
+        <Alert variant="destructive">
+          <XCircle />
+          <AlertTitle>Mind map generation failed</AlertTitle>
+          <AlertDescription>{errorMessage(note.metadata?.error)}</AlertDescription>
+        </Alert>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <XCircle />
+            </EmptyMedia>
+            <EmptyTitle>Failed to generate mind map</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
 
   if (!mindMapData) {
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-muted-foreground">No mind map data available</p>
-        </div>
+      <div className="flex h-full flex-col bg-background">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Network />
+            </EmptyMedia>
+            <EmptyTitle>No mind map data available</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
 
-  const containerClasses = isExpanded
-    ? "fixed inset-0 z-50 flex flex-col h-screen bg-background"
-    : "flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300";
-
   return (
-    <div className={containerClasses}>
-      {/* Custom Control Bar */}
-      <div className="relative z-30 shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-card/85 backdrop-blur supports-backdrop-filter:bg-card/75">
-        <div className="flex items-center gap-2">
-          {/* Mobile Back Button */}
+    <div
+      ref={rootRef}
+      className={cn(
+        "flex flex-col bg-background",
+        // Full screen sits on the portal layer, above the z-70 app header, so its toolbar shows.
+        isExpanded
+          ? "fixed inset-0 z-100 h-screen"
+          : "h-full duration-300 ease-out animate-in fade-in slide-in-from-right-4"
+      )}
+    >
+      <div className="relative z-30 flex shrink-0 items-center justify-between gap-2 bg-surface-raised px-3 py-2 shadow-xs">
+        <div className="flex min-w-0 items-center gap-2">
           {onBack && !isExpanded && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="md:hidden"
               onClick={onBack}
-              className="md:hidden p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
               aria-label="Back to Studio"
             >
-              <ArrowLeft className="w-5 h-5 shrink-0" />
-            </button>
+              <ArrowLeft />
+            </Button>
           )}
-          {isExpanded && <h2 className="text-sm font-bold text-foreground mr-4">{note.title}</h2>}
-          <button
-            onClick={handleZoomOut}
-            className="p-2 rounded-md hover:bg-secondary transition-colors"
-            title="Zoom Out"
+          {isExpanded && (
+            <h2 className="truncate font-display text-base text-foreground">{note.title}</h2>
+          )}
+          <ButtonGroup variant="tray" aria-label="Zoom">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Zoom out"
+              onClick={() => zoom("out")}
+            >
+              <ZoomOut />
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Fit to view" onClick={fitToView}>
+              <Scan />
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Zoom in" onClick={() => zoom("in")}>
+              <ZoomIn />
+            </Button>
+          </ButtonGroup>
+          <span
+            role="status"
+            aria-live="polite"
+            className="font-sans text-xs text-muted-foreground tabular-nums"
           >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleZoomIn}
-            className="p-2 rounded-md hover:bg-secondary transition-colors"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-mono text-muted-foreground ml-2">
             {Math.round(scale * 100)}%
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <button
-              onClick={onToggleExpanded}
-              className="p-2 rounded-md hover:bg-secondary transition-colors"
-              title="Exit Full Screen"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              onClick={onToggleExpanded}
-              className="p-2 rounded-md hover:bg-secondary transition-colors"
-              title="Expand to Full Screen"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={isExpanded ? "Exit full screen" : "Expand to full screen"}
+          onClick={onToggleExpanded}
+        >
+          {isExpanded ? <Minimize2 /> : <Maximize2 />}
+        </Button>
       </div>
 
-      {/* Mind Map Container */}
-      <div className="flex-1 relative overflow-hidden">
-        {isExpanded && (
-          <div className="absolute top-3 right-3 z-40 flex items-center gap-1 rounded-md border border-border bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/85 p-1 shadow-sm">
-            <button
-              onClick={handleZoomOut}
-              className="p-2 rounded-md hover:bg-secondary transition-colors"
-              title="Zoom Out"
-              aria-label="Zoom Out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleZoomIn}
-              className="p-2 rounded-md hover:bg-secondary transition-colors"
-              title="Zoom In"
-              aria-label="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onToggleExpanded}
-              className="p-2 rounded-md hover:bg-secondary transition-colors"
-              title="Exit Full Screen"
-              aria-label="Exit Full Screen"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </button>
+      <div className="relative flex-1 overflow-hidden">
+        <div ref={containerRef} className="mind-map-container size-full" />
+        {loadFailed && (
+          <div className="absolute inset-0 flex bg-background">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <XCircle />
+                </EmptyMedia>
+                <EmptyTitle>Couldn't load the mind map</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           </div>
         )}
-        <div ref={containerRef} className="mind-map-container w-full h-full" />
       </div>
 
-      {/* Keyboard shortcuts hint */}
       {!isExpanded && (
-        <div className="px-4 py-2 border-t border-border bg-muted/20">
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium">Tip:</span> Drag to pan, use controls to zoom.
-          </p>
-        </div>
+        <p className="px-4 py-2 font-sans text-xs text-muted-foreground">
+          Drag to pan, use the controls or Ctrl + scroll to zoom.
+        </p>
       )}
     </div>
   );

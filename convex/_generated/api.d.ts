@@ -310,6 +310,7 @@ import type * as http from "../http.js";
 import type * as literatureReview_batchSizes from "../literatureReview/batchSizes.js";
 import type * as literatureReview_db from "../literatureReview/db.js";
 import type * as literatureReview_llmTuning from "../literatureReview/llmTuning.js";
+import type * as literatureReview_notebookPapers from "../literatureReview/notebookPapers.js";
 import type * as literatureReview_rankedPapersSnapshot from "../literatureReview/rankedPapersSnapshot.js";
 import type * as literatureReview_reportContext from "../literatureReview/reportContext.js";
 import type * as literatureReview_titles from "../literatureReview/titles.js";
@@ -702,6 +703,7 @@ declare const fullApi: ApiFromModules<{
   "literatureReview/batchSizes": typeof literatureReview_batchSizes;
   "literatureReview/db": typeof literatureReview_db;
   "literatureReview/llmTuning": typeof literatureReview_llmTuning;
+  "literatureReview/notebookPapers": typeof literatureReview_notebookPapers;
   "literatureReview/rankedPapersSnapshot": typeof literatureReview_rankedPapersSnapshot;
   "literatureReview/reportContext": typeof literatureReview_reportContext;
   "literatureReview/titles": typeof literatureReview_titles;
