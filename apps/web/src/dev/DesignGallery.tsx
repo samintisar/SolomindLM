@@ -72,6 +72,7 @@ import {
   InputGroupText,
   InputGroupTextarea,
 } from "@/shared/components/ui/input-group";
+import { Label } from "@/shared/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -87,6 +88,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { Switch } from "@/shared/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/components/ui/table";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { cn } from "@/shared/utils/cn";
@@ -305,6 +315,55 @@ function TogglesSection() {
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
+      <div className="flex flex-wrap items-center gap-6">
+        <div className="flex items-center gap-2">
+          <Switch id="gallery-switch-on" defaultChecked />
+          <Label htmlFor="gallery-switch-on">Year</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch id="gallery-switch-off" />
+          <Label htmlFor="gallery-switch-off">Sample size</Label>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function TablesSection() {
+  const rows = [
+    {
+      paper: "Attention Is All You Need",
+      method: "Transformer architecture, trained on WMT 2014",
+      selected: false,
+    },
+    {
+      paper: "BERT: Pre-training of Deep Bidirectional Transformers",
+      method: "Masked language modelling",
+      selected: true,
+    },
+  ];
+  return (
+    <Section name="Tables">
+      <Table containerClassName="max-h-64" aria-label="Papers">
+        <TableHeader sticky>
+          <TableRow>
+            <TableHead pinned className="min-w-60">
+              Papers (2)
+            </TableHead>
+            <TableHead className="min-w-60">Method</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.paper} data-state={row.selected ? "selected" : undefined}>
+              <TableCell pinned className="min-w-60">
+                {row.paper}
+              </TableCell>
+              <TableCell className="min-w-60">{row.method}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Section>
   );
 }
@@ -641,6 +700,7 @@ export default function DesignGallery() {
           <DialogsSection />
           <BadgesAndAlertsSection />
           <TogglesSection />
+          <TablesSection />
         </>
       )}
     </main>

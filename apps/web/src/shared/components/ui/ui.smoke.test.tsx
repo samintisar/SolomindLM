@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SearchIcon } from "lucide-react";
 import type { ReactElement } from "react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ThemeContext } from "@/shared/contexts/useTheme";
 import { Alert, AlertDescription, AlertTitle } from "./alert";
 import {
@@ -57,6 +57,8 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet";
 import { Skeleton } from "./skeleton";
 import { Toaster } from "./sonner";
 import { Spinner } from "./spinner";
+import { Switch } from "./switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./table";
 import { Textarea } from "./textarea";
 import { Toggle } from "./toggle";
 import { ToggleGroup, ToggleGroupItem } from "./toggle-group";
@@ -798,5 +800,48 @@ describe("item rows", () => {
     const indicator = bar.querySelector("[data-slot=progress-indicator]");
     expect(indicator?.className).toContain("after:animate-progress-glint");
     expect(indicator?.className).toContain("motion-reduce:after:hidden");
+  });
+});
+
+describe("Table", () => {
+  it("renders a pinned, sticky-header table inside its scroll container", () => {
+    render(
+      <Table containerClassName="h-40" aria-label="Papers">
+        <TableHeader sticky>
+          <TableRow>
+            <TableHead pinned>Paper</TableHead>
+            <TableHead>Method</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow data-state="selected">
+            <TableCell pinned>Attention</TableCell>
+            <TableCell>Survey</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    );
+    const table = screen.getByRole("table", { name: "Papers" });
+    expect(table.parentElement).toHaveAttribute("data-slot", "table-container");
+    expect(table.parentElement).toHaveClass("overflow-auto", "h-40");
+    expect(screen.getByRole("columnheader", { name: "Paper" })).toHaveClass(
+      "sticky",
+      "left-0",
+      "bg-muted"
+    );
+    expect(screen.getByRole("cell", { name: "Attention" })).toHaveClass("sticky", "bg-card");
+    expect(table.querySelector("thead")).toHaveClass("sticky", "top-0");
+  });
+});
+
+describe("Switch", () => {
+  it("is a switch that toggles", async () => {
+    const user = userEvent.setup();
+    const onCheckedChange = vi.fn();
+    render(<Switch aria-label="Show year" onCheckedChange={onCheckedChange} />);
+    const toggle = screen.getByRole("switch", { name: "Show year" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await user.click(toggle);
+    expect(onCheckedChange).toHaveBeenCalledWith(true);
   });
 });

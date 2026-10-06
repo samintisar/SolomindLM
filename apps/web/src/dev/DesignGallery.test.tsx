@@ -13,6 +13,7 @@ test("gallery renders a section per primitive group", () => {
     "Dialogs",
     "Badges and alerts",
     "Toggles",
+    "Tables",
   ]) {
     expect(screen.getByRole("region", { name })).toBeInTheDocument();
   }
