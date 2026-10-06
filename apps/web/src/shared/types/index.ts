@@ -303,7 +303,8 @@ export interface MindMapNote extends BaseNote {
   type: "mindmap";
   mindMapData: MindMapNodeData;
   content: string; // JSON string representation
-  metadata?: { error?: string } & StudioGenerationMetadata & Record<string, unknown>;
+  metadata?: { error?: string; documentIds?: string[] } & StudioGenerationMetadata &
+    Record<string, unknown>;
 }
 
 // Written questions note - open-ended questions with LLM grading

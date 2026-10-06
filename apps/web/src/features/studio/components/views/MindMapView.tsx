@@ -32,6 +32,7 @@ export interface MindMapViewProps {
   isExpanded?: boolean;
   onToggleExpanded?: () => void;
   onBack?: () => void;
+  onAskInChat?: (prompt: string, documentIds?: string[]) => void;
 }
 
 /** Branch line colours, as app tokens. Mind Elixir writes them into SVG `stroke` attributes. */

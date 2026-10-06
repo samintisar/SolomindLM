@@ -85,6 +85,7 @@ interface ActiveNoteViewProps {
   onCancelEditReport?: () => void;
   registerInfographicControls?: (controls: InfographicViewControls | null) => void;
   onInfographicFullscreenChange?: (isFullscreen: boolean) => void;
+  onAskInChat?: (prompt: string, documentIds?: string[]) => void;
 }
 
 /**
@@ -103,6 +104,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
   onCancelEditReport,
   registerInfographicControls,
   onInfographicFullscreenChange,
+  onAskInChat,
 }) => {
   // Report view or report markdown editor
   if (isReportNote(activeNote)) {
@@ -142,6 +144,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         isExpanded={isMindMapExpanded}
         onToggleExpanded={onToggleMindMap}
         onBack={undefined}
+        onAskInChat={onAskInChat}
       />
     );
   }

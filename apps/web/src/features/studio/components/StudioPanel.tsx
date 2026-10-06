@@ -43,6 +43,7 @@ interface StudioPanelProps {
   tools: StudioTool[];
   sources?: any[];
   notebookId?: string | null;
+  onAskInChat?: (prompt: string, documentIds?: string[]) => void;
 }
 
 /**
@@ -55,6 +56,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   tools,
   sources = [],
   notebookId,
+  onAskInChat,
 }) => {
   const { notes, onUpdateNote, onUpdateNoteFull, onDeleteNote, onAddNote, onSaveReportContent } =
     useStudioContext();
@@ -335,6 +337,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                 onCancelEditReport={handleCancelEditReport}
                 registerInfographicControls={handleInfographicControlsRegister}
                 onInfographicFullscreenChange={setIsInfographicFullscreen}
+                onAskInChat={onAskInChat}
               />
             )
           ) : (

@@ -7,6 +7,7 @@ import { useAuth } from "@/features/auth/useAuth";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
 import { useNotebookContext } from "@/features/notebooks/useNotebookContext";
+import { resolveAskSources } from "@/features/notebooks/utils/askSources";
 import {
   SourcesPanel,
   type SourcesPanelFocusRequest,
@@ -153,6 +154,30 @@ export function NotebookView() {
 
   const toggleStudio = useCallback(() => setIsStudioOpen((isOpen) => !isOpen), []);
 
+  const handleAskInChat = useCallback(
+    (prompt: string, documentIds?: string[]) => {
+      if (!urlNotebookId || isChatStreaming || remoteGenerationBlocksSend) return;
+
+      const choice = resolveAskSources(sources, documentIds);
+
+      if (choice.kind === "none") {
+        toastError("Please select at least one source before asking a question");
+
+        return;
+      }
+
+      setMobileActiveTab("chat");
+
+      onSendMessage(
+        prompt,
+        undefined,
+        { channels: ["notebook"] },
+        choice.kind === "override" ? { documentIdsOverride: choice.documentIds } : undefined
+      );
+    },
+    [isChatStreaming, onSendMessage, remoteGenerationBlocksSend, sources, toastError, urlNotebookId]
+  );
+
   const renderRightPanel = useCallback(() => {
     if (!isStudioOpen || !urlNotebookId) return null;
 
@@ -194,11 +219,13 @@ export function NotebookView() {
         tools={STUDIO_TOOLS}
         sources={sources}
         notebookId={urlNotebookId}
+        onAskInChat={handleAskInChat}
       />
     );
   }, [
     activeLiteratureView,
 
+    handleAskInChat,
     handleCloseLiteratureView,
     handleOpenSavedReport,
     handleOpenSavedSpreadsheet,
@@ -373,10 +400,12 @@ export function NotebookView() {
         tools={STUDIO_TOOLS}
         sources={sources}
         notebookId={urlNotebookId}
+        onAskInChat={handleAskInChat}
       />
     );
   }, [
     activeLiteratureView,
+    handleAskInChat,
     handleCloseLiteratureView,
     handleOpenSavedReport,
     handleOpenSavedSpreadsheet,

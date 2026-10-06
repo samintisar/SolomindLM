@@ -81,6 +81,29 @@ describe("mapDatabaseNoteToNote", () => {
     }
   });
 
+  it("keeps the source ids a mind map was built from, ignoring non-strings", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "mindmap",
+      data: { topic: "My Map", id: "root", children: [] },
+      metadata: { documentIds: ["doc1", 7, "doc2"] },
+    });
+    if (result.type === "mindmap") {
+      expect(result.metadata?.documentIds).toEqual(["doc1", "doc2"]);
+    }
+  });
+
+  it("leaves mind map documentIds undefined when the row has none", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "mindmap",
+      data: { topic: "My Map", id: "root", children: [] },
+    });
+    if (result.type === "mindmap") {
+      expect(result.metadata?.documentIds).toBeUndefined();
+    }
+  });
+
   it("maps audioOverview type", () => {
     const result = mapDatabaseNoteToNote({
       ...baseNote,
