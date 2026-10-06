@@ -15,6 +15,7 @@ const SECTIONS = [
   "Dialogs",
   "Badges and alerts",
   "Toggles",
+  "Tables",
 ] as const;
 
 const LAYERS = [

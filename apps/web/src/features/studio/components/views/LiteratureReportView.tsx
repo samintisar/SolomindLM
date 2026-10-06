@@ -9,14 +9,22 @@ import {
   Download,
   FileDown,
   FileText,
-  Loader2,
   Printer,
   Save,
   X,
 } from "lucide-react";
-import React, { lazy, Suspense, useMemo, useState } from "react";
-import { DropdownMenu } from "@/shared/ui/DropdownMenu";
-import { cn, sanitizeMarkdown } from "@/shared/utils";
+import React, { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
+import { Skeleton } from "@/shared/components/ui/skeleton";
+import { Spinner } from "@/shared/components/ui/spinner";
+import { sanitizeMarkdown } from "@/shared/utils";
 import { CitationStyle, CitationStylePicker } from "../CitationStylePicker";
 import { hasPrismaCounts, type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
 
@@ -67,14 +75,14 @@ const SectionRenderer: React.FC<SectionRendererProps> = ({ section, workflowProv
 
   return (
     <section className="mb-8">
-      <h2 className="text-xl font-semibold text-foreground mb-3 pb-2 border-b border-border">
+      <h2 className="mb-3 border-b border-border/50 pb-2 font-display text-xl font-semibold">
         {section.heading}
       </h2>
       {showPrismaDiagram ? (
         <PrismaFlowDiagram counts={workflowProvenance} className="mb-6" />
       ) : null}
-      <div className="prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground">
-        <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
+      <div className="prose max-w-none font-serif">
+        <Suspense fallback={<Skeleton className="h-4 w-full" />}>
           <MarkdownRenderer>
             {sanitizeMarkdown(
               normalizeLiteratureReportSectionContent(
@@ -93,13 +101,13 @@ const SectionRenderer: React.FC<SectionRendererProps> = ({ section, workflowProv
 
 interface ReferencesSectionProps {
   citations: Record<string, { title: string; authors: string[]; year?: number; url: string }>;
-  style: CitationStyle;
+  citationStyle: CitationStyle;
   onStyleChange: (style: CitationStyle) => void;
 }
 
 const ReferencesSection: React.FC<ReferencesSectionProps> = ({
   citations,
-  style,
+  citationStyle,
   onStyleChange,
 }) => {
   const [didCopy, setDidCopy] = useState(false);
@@ -115,7 +123,7 @@ const ReferencesSection: React.FC<ReferencesSectionProps> = ({
   if (sortedCitations.length === 0) return null;
 
   const formattedReferences = sortedCitations.map(([, citation], index) =>
-    formatReference(citation, style, index)
+    formatReference(citation, citationStyle, index)
   );
 
   const handleCopyReferences = async () => {
@@ -125,29 +133,25 @@ const ReferencesSection: React.FC<ReferencesSectionProps> = ({
   };
 
   return (
-    <section className="mt-12 pt-8 border-t-2 border-border">
+    <section className="mt-12 border-t border-border/50 pt-8">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-foreground">References</h2>
+        <h2 className="font-display text-xl font-semibold">References</h2>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon-sm"
             onClick={handleCopyReferences}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             title={didCopy ? "Copied citations" : "Copy all citations"}
             aria-label={didCopy ? "Copied citations" : "Copy all citations"}
           >
-            {didCopy ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          </button>
-          <CitationStylePicker
-            value={style}
-            onChange={onStyleChange}
-            className="w-35 @min-[720px]/report-toolbar:w-42"
-          />
+            {didCopy ? <Check /> : <Copy />}
+          </Button>
+          <CitationStylePicker value={citationStyle} onChange={onStyleChange} className="w-42" />
         </div>
       </div>
       <ul className="space-y-4">
         {sortedCitations.map(([key], index) => (
-          <li key={key} className="pl-4 -indent-4 text-sm text-foreground leading-relaxed">
+          <li key={key} className="pl-4 -indent-4 text-sm leading-relaxed">
             {formattedReferences[index]}
           </li>
         ))}
@@ -241,33 +245,6 @@ function exportToMarkdown(report: LiteratureReport, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-const REPORT_TOOLBAR_BTN = cn(
-  "inline-flex shrink-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-normal text-foreground transition-colors",
-  "hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-);
-
-function ExportMenuItem({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
 export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
   report,
   toolbarLabel = "Literature Report",
@@ -287,8 +264,10 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
     window.setTimeout(() => setDidCopyReport(false), 1600);
   };
 
+  // Printing waits for the menu to close, so the open menu is not in the print preview.
+  const pendingPrintRef = useRef(false);
   const handleExportPdf = () => {
-    window.print();
+    pendingPrintRef.current = true;
   };
 
   const handleExportMarkdown = () => {
@@ -310,109 +289,102 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full min-w-0 bg-background animate-in fade-in slide-in-from-right-4 duration-300">
+    <div className="flex h-full min-w-0 animate-in flex-col bg-background duration-300 fade-in slide-in-from-right-4">
       {/* Mobile Back Button */}
       {onBack && (
-        <div className="md:hidden flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-          <button
-            onClick={onBack}
-            className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition text-foreground flex items-center justify-center shrink-0 touch-manipulation"
-            aria-label="Back to Studio"
-          >
-            <ArrowLeft className="w-5 h-5 shrink-0" />
-          </button>
-          <span className="text-sm font-semibold text-foreground truncate">{toolbarLabel}</span>
+        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-sm md:hidden">
+          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+            <ArrowLeft />
+          </Button>
+          <span className="truncate text-sm font-semibold">{toolbarLabel}</span>
         </div>
       )}
 
       {/* Top Bar — @container/report-toolbar sizes controls from panel width */}
-      <div className="@container/report-toolbar flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-card min-w-0 overflow-hidden">
+      <div className="@container/report-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-          <FileText className="hidden @min-[420px]/report-toolbar:block w-5 h-5 text-muted-foreground shrink-0" />
-          <h2
-            className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
-            title={report.title}
-          >
+          <FileText className="hidden size-5 shrink-0 text-muted-foreground @sm/report-toolbar:block" />
+          <h2 className="min-w-0 flex-1 truncate text-sm font-medium" title={report.title}>
             {toolbarLabel}
           </h2>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm-adaptive"
             onClick={handleCopyReport}
-            className={REPORT_TOOLBAR_BTN}
             title={didCopyReport ? "Copied report" : "Copy with citations"}
             aria-label={didCopyReport ? "Copied report" : "Copy with citations"}
           >
-            {didCopyReport ? (
-              <Check className="h-4 w-4 shrink-0" strokeWidth={2} />
-            ) : (
-              <Copy className="h-4 w-4 shrink-0" strokeWidth={2} />
-            )}
-            <span className="hidden @min-[520px]/report-toolbar:inline">
+            {didCopyReport ? <Check /> : <Copy />}
+            <span className="hidden @lg/report-toolbar:inline">
               {didCopyReport ? "Copied" : "Copy with citations"}
             </span>
-          </button>
-          <DropdownMenu
-            trigger={
-              <button
-                type="button"
-                className={REPORT_TOOLBAR_BTN}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-md"
                 title="Export report"
                 aria-label="Export report"
               >
-                <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
-              </button>
-            }
-          >
-            <ExportMenuItem
-              icon={<Printer className="h-4 w-4" />}
-              label="Export PDF"
-              onClick={handleExportPdf}
-            />
-            <ExportMenuItem
-              icon={<FileDown className="h-4 w-4" />}
-              label="Export Markdown (.md)"
-              onClick={handleExportMarkdown}
-            />
+                <Download />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(e) => {
+                if (pendingPrintRef.current) {
+                  pendingPrintRef.current = false;
+                  e.preventDefault();
+                  window.print();
+                }
+              }}
+            >
+              <DropdownMenuItem onSelect={handleExportPdf}>
+                <Printer />
+                Export PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportMarkdown}>
+                <FileDown />
+                Export Markdown (.md)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
           </DropdownMenu>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm-adaptive"
             onClick={handleSaveAndEdit}
             disabled={!onSaveAndEdit || isSaving}
-            className={REPORT_TOOLBAR_BTN}
             title="Save & Edit Document"
             aria-label={isSaving ? "Saving document" : "Save and edit document"}
           >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" strokeWidth={2} />
-            ) : (
-              <Save className="h-4 w-4 shrink-0" strokeWidth={2} />
-            )}
-            <span className="hidden @min-[700px]/report-toolbar:inline">
+            {isSaving ? <Spinner aria-hidden /> : <Save />}
+            <span className="hidden @2xl/report-toolbar:inline">
               {isSaving ? "Saving..." : "Save & Edit Document"}
             </span>
-          </button>
+          </Button>
           {onBack && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-md"
               onClick={onBack}
-              className={REPORT_TOOLBAR_BTN}
               aria-label={`Close ${toolbarLabel.toLowerCase()}`}
               title="Close"
             >
-              <X className="h-4 w-4 shrink-0" strokeWidth={2} />
-            </button>
+              <X />
+            </Button>
           )}
         </div>
       </div>
 
       {/* Report Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8 md:px-12 md:py-12">
+        <div className="mx-auto max-w-4xl px-6 py-8 md:px-12 md:py-12">
           {/* Title */}
-          <h1 className="text-3xl font-bold text-foreground mb-8 text-center">{report.title}</h1>
+          <h1 className="mb-8 text-center font-display text-3xl font-bold">{report.title}</h1>
 
           {/* Sections */}
           {report.sections.length > 0 ? (
@@ -426,24 +398,26 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
                 />
               ))
           ) : report.content ? (
-            <div className="prose prose-stone dark:prose-invert max-w-none leading-relaxed text-foreground">
-              <Suspense
-                fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}
-              >
+            <div className="prose max-w-none font-serif">
+              <Suspense fallback={<Skeleton className="h-4 w-full" />}>
                 <MarkdownRenderer>{sanitizeMarkdown(report.content)}</MarkdownRenderer>
               </Suspense>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12">
-              <FileText className="w-12 h-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No content available</p>
-            </div>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FileText />
+                </EmptyMedia>
+                <EmptyTitle>No content available</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           )}
 
           {/* References */}
           <ReferencesSection
             citations={citations}
-            style={currentStyle}
+            citationStyle={currentStyle}
             onStyleChange={setCurrentStyle}
           />
         </div>

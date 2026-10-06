@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { describe, expect, test, vi } from "vitest";
 import type { TablePaperRow } from "../utils/literatureTablePaper";
 import { LiteratureTablePaperCell } from "./LiteratureTablePaperCell";
@@ -27,7 +28,10 @@ const notebookPaper: TablePaperRow = {
   },
 };
 
-function renderCell(paper: TablePaperRow) {
+function renderCell(
+  paper: TablePaperRow,
+  props: Partial<ComponentProps<typeof LiteratureTablePaperCell>> = {}
+) {
   return render(
     <LiteratureTablePaperCell
       rank={1}
@@ -39,6 +43,7 @@ function renderCell(paper: TablePaperRow) {
       onToggleSelect={vi.fn()}
       onCite={vi.fn()}
       onAddToNotebook={vi.fn()}
+      {...props}
     />
   );
 }
@@ -60,6 +65,36 @@ describe("LiteratureTablePaperCell", () => {
   test("a notebook paper without a link shows its title as plain text", () => {
     renderCell(notebookPaper);
     expect(screen.getByText("My uploaded study").closest("a")).toBeNull();
+  });
+
+  test("selects the paper from its checkbox", async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+    renderCell(searchPaper, { onToggleSelect });
+    await user.click(screen.getByRole("checkbox", { name: /^Select / }));
+    expect(onToggleSelect).toHaveBeenCalledTimes(1);
+  });
+
+  test("shows the paper as selected", () => {
+    renderCell(searchPaper, { isSelected: true });
+    expect(screen.getByRole("checkbox", { name: /^Select / })).toBeChecked();
+  });
+
+  test("links to the paper's PDF", () => {
+    renderCell({
+      ...searchPaper,
+      citation: { ...searchPaper.citation!, pdfUrl: "https://example.com/paper.pdf" },
+    });
+    expect(screen.getByRole("link", { name: "View PDF" })).toHaveAttribute(
+      "href",
+      "https://example.com/paper.pdf"
+    );
+  });
+
+  test("while adding, the button reads Adding… and is disabled", () => {
+    renderCell(searchPaper, { isAdding: true });
+    expect(screen.getByRole("button", { name: "Adding…" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Loading/ })).not.toBeInTheDocument();
   });
 
   test("an off-topic notebook paper is flagged with the reason", async () => {

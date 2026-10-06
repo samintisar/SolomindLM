@@ -23,37 +23,8 @@ const MIGRATED = [
   "src/features/audio/**/*.tsx",
   "src/features/feedback/**/*.tsx",
   "src/features/legal/**/*.tsx",
-  // Studio (#264), migrated PR by PR; PR 8 replaces these with src/features/studio/**/*.tsx.
-  "src/features/studio/components/StudioPanel.tsx",
-  "src/features/studio/components/StudioPanelHeader.tsx",
-  "src/features/studio/components/ToolGrid.tsx",
-  "src/features/studio/components/NoteItem.tsx",
-  "src/features/studio/components/NoteIcon.tsx",
-  "src/features/studio/components/NoteListView.tsx",
-  "src/features/studio/components/ActiveNoteView.tsx",
-  "src/features/studio/motion/**/*.tsx",
-  "src/features/studio/components/practice/**/*.tsx",
-  "src/features/studio/components/views/QuizView.tsx",
-  "src/features/studio/components/views/WrittenQuestionsView.tsx",
-  "src/features/studio/components/flashcards/**/*.tsx",
-  "src/features/studio/components/views/FlashcardView.tsx",
-  "src/features/studio/components/views/StudyMode.tsx",
-  "src/features/studio/components/views/ReportView.tsx",
-  "src/features/studio/components/views/UserNoteView.tsx",
-  "src/features/studio/components/views/MindMapView.tsx",
-  "src/features/studio/components/mindmap/**/*.tsx",
-  "src/features/studio/components/views/InfographicView.tsx",
-  "src/features/studio/components/views/EditCardModal.tsx",
-  "src/features/studio/components/views/ProficiencyBadge.tsx",
-  "src/features/studio/components/views/SpreadsheetView.tsx",
-  "src/features/studio/components/spreadsheet/**/*.tsx",
-  "src/features/studio/components/customize/**/*.tsx",
-  "src/features/studio/components/Customize*Modal.tsx",
-  "src/features/studio/components/DiscoverStudioPromptsModal.tsx",
-  "src/features/studio/components/SaveAsPromptModal.tsx",
-  "src/features/studio/components/StudioModalDiscoverPromptsButton.tsx",
-  "src/features/studio/components/CitePaperModal.tsx",
-  "src/features/studio/components/CitationStylePicker.tsx",
+  // Studio (#264).
+  "src/features/studio/**/*.tsx",
 ];
 
 const UPSTREAM_ARBITRARY = [
@@ -104,9 +75,6 @@ export default defineConfig([
     rules: rules("warn"),
   },
   { files: MIGRATED, rules: rules("error") },
-  // Legacy hand-rolled menu, used only by Studio literature views; #264 replaces it with the shadcn
-  // DropdownMenu and deletes it.
-  { files: ["src/shared/ui/DropdownMenu.tsx"], rules: rules("warn") },
   // Upstream shadcn CLI markup that predates the linter (arbitrary values like ring-[3px], top-[50%],
   // transition-[color,box-shadow]). Stays at warn until each file is regenerated/adapted; all other rules
   // remain errors for these files. Do not add authored components here.
