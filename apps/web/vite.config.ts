@@ -163,11 +163,6 @@ export default defineConfig(({ mode }) => {
             // testing — similar circular-init issues have occurred with markdown stacks
             // when split (see https://github.com/vitejs/vite/issues/3592)
 
-            // Mind mapping
-            if (id.includes("node_modules/mind-elixir")) {
-              return "mindmap";
-            }
-
             // Virtual DOM diffing
             if (id.includes("node_modules/react-virtuoso")) {
               return "virtuoso";
