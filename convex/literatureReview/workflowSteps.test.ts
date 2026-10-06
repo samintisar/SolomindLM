@@ -715,13 +715,21 @@ describe("extractDataHandler with LLM extraction", () => {
   });
 
   it("asks for every extraction column id in the structured schema, with reasoning off", async () => {
-    const withStructuredOutput = vi.fn().mockReturnValue({
-      invoke: vi.fn().mockResolvedValue({ extractedData: { dose_metric: "MET-h/week" } }),
-    });
-    (createLLM as any).mockReturnValue({ withStructuredOutput } as any);
-    (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
-    (mockCtx.runQuery as any).mockResolvedValue([]);
-    (mockCtx.runMutation as any).mockResolvedValue(null);
+    // The mock answers through the schema it is given, as structured output does.
+    const withStructuredOutput = vi.fn((schema: z.ZodType) => ({
+      invoke: vi.fn(async () =>
+        schema.parse({
+          extractedData: { dose_metric: "MET-h/week", outcome_measure: "PHQ-9" },
+        })
+      ),
+    }));
+    vi.mocked(createLLM).mockReturnValue({ withStructuredOutput } as unknown as ReturnType<
+      typeof createLLM
+    >);
+    vi.mocked(invokeWithHttpRetry).mockImplementation(((fn: () => Promise<unknown>) =>
+      fn()) as typeof invokeWithHttpRetry);
+    vi.mocked(mockCtx.runQuery).mockResolvedValue([]);
+    vi.mocked(mockCtx.runMutation).mockResolvedValue(null);
 
     await extractDataHandler(mockCtx, {
       papers: [
@@ -753,6 +761,14 @@ describe("extractDataHandler with LLM extraction", () => {
       "dose_metric",
       "outcome_measure",
     ]);
+    // Both custom columns reach the stored draft, keyed by column id.
+    const draft = vi.mocked(mockCtx.runMutation).mock.calls[0][1] as {
+      papers: Array<{ extractedData?: Record<string, string> }>;
+    };
+    expect(draft.papers[0].extractedData).toEqual({
+      dose_metric: "MET-h/week",
+      outcome_measure: "PHQ-9",
+    });
     // Reasoning shares max_tokens on hybrid models; with it on, extraction ran out of tokens.
     expect(createLLM).toHaveBeenCalledWith(expect.objectContaining({ phase: "fast" }));
   });
