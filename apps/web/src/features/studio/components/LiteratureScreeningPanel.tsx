@@ -12,7 +12,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -47,6 +47,12 @@ type ScreeningCriterion = {
 const SCREENING_GRID_STYLE = {
   "--screening-cols": "minmax(300px, 0.95fr) minmax(420px, 1fr)",
 } as React.CSSProperties;
+
+const CRITERION_STATUS_LABEL: Record<CriterionStatus, string> = {
+  met: "Met: ",
+  partial: "Partly met: ",
+  missed: "Not met: ",
+};
 
 const GENERIC_SCREENING_CRITERIA = [
   "Research Question Focus",
@@ -165,8 +171,11 @@ function ScreeningPanelHeader({
 
 function LoadingState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-muted-foreground">
-      <Spinner className="size-6" />
+    <div
+      role="status"
+      className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-muted-foreground"
+    >
+      <Spinner aria-hidden className="size-6" />
       <p>Loading screening decisions…</p>
     </div>
   );
@@ -296,6 +305,7 @@ function ScreeningResultCell({
   onToggleExpanded: () => void;
 }) {
   const isIncluded = decision.decision === "included";
+  const criteriaId = useId();
 
   return (
     <div className="px-4 py-4">
@@ -312,13 +322,16 @@ function ScreeningResultCell({
           size="xs"
           onClick={onToggleExpanded}
           aria-expanded={isExpanded}
+          aria-controls={isExpanded ? criteriaId : undefined}
         >
-          {isExpanded ? "Hide screening criteria" : "View screening criteria"}
-          <ChevronDown className={cn("transition-transform", isExpanded && "rotate-180")} />
+          <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+            {isExpanded ? "Hide screening criteria" : "View screening criteria"}
+            <ChevronDown className={cn("transition-transform", isExpanded && "rotate-180")} />
+          </span>
         </Button>
       </div>
       {isExpanded ? (
-        <div className="mt-4 space-y-2.5">
+        <div id={criteriaId} className="mt-4 space-y-2.5">
           {criteria.map((criterion) => (
             <CriterionDetail key={criterion.label} criterion={criterion} />
           ))}
@@ -332,6 +345,7 @@ function CriterionChip({ criterion }: { criterion: ScreeningCriterion }) {
   return (
     <span className="inline-flex items-center gap-1.5 font-sans text-xs leading-none text-muted-foreground">
       <CriterionIcon status={criterion.status} />
+      <span className="sr-only">{CRITERION_STATUS_LABEL[criterion.status]}</span>
       {criterion.label}
     </span>
   );
@@ -344,7 +358,10 @@ function CriterionDetail({ criterion }: { criterion: ScreeningCriterion }) {
         <CriterionIcon status={criterion.status} />
       </span>
       <div className="min-w-0">
-        <p className="font-medium text-foreground">{criterion.label}</p>
+        <p className="font-medium text-foreground">
+          <span className="sr-only">{CRITERION_STATUS_LABEL[criterion.status]}</span>
+          {criterion.label}
+        </p>
         <p className="text-muted-foreground">{criterion.explanation}</p>
       </div>
     </div>

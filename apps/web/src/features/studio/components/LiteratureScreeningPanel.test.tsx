@@ -54,17 +54,43 @@ describe("LiteratureScreeningPanel", () => {
     renderPanel();
     const [toggle] = screen.getAllByRole("button", { name: "View screening criteria" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/screening rationale/)).not.toBeInTheDocument();
     await user.click(toggle);
-    expect(screen.getByRole("button", { name: "Hide screening criteria" })).toHaveAttribute(
-      "aria-expanded",
-      "true"
-    );
+    const hide = screen.getByRole("button", { name: "Hide screening criteria" });
+    expect(hide).toHaveAttribute("aria-expanded", "true");
+    const controlsId = hide.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    const details = document.getElementById(controlsId as string);
+    expect(details).not.toBeNull();
+    expect(details?.textContent).toMatch(/screening rationale/);
+  });
+
+  it("exports the decisions as a CSV blob", async () => {
+    const user = userEvent.setup();
+    const createObjectURL = vi.fn((_blob: Blob) => "blob:screening");
+    const revokeObjectURL = vi.fn();
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      renderPanel();
+      await user.click(screen.getByRole("button", { name: "Export" }));
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(createObjectURL.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:screening");
+    } finally {
+      click.mockRestore();
+      URL.createObjectURL = original.create;
+      URL.revokeObjectURL = original.revoke;
+    }
   });
 
   it("shows loading and empty states", () => {
     api.decisions = undefined;
     const { rerender } = renderPanel();
-    expect(screen.getByText("Loading screening decisions…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading screening decisions…");
     api.decisions = [];
     rerender(<LiteratureScreeningPanel sessionId={"s1" as never} onClose={vi.fn()} />);
     expect(screen.getByText("No screening decisions yet")).toBeInTheDocument();
