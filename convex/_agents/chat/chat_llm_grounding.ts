@@ -1,5 +1,6 @@
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
+import { passageTextForModel } from "./passageContext.js";
 
 /**
  * Builds grounding prompt optimized for research/learning contexts.
@@ -51,20 +52,7 @@ export function buildGroundingPrompt(
       }
 
       const sanitizedContent = chunk.content.replace(/\[\d+\]/g, "");
-
-      let contentWithContext = "";
-
-      if (meta?.previousChunkPreview) {
-        contentWithContext += `...${meta.previousChunkPreview}\n\n`;
-      }
-
-      contentWithContext += sanitizedContent;
-
-      if (meta?.nextChunkPreview) {
-        contentWithContext += `\n\n${meta.nextChunkPreview}...`;
-      }
-
-      const formatted = `${contextHeader}:\n${contentWithContext}`;
+      const formatted = `${contextHeader}:\n${passageTextForModel(chunk)}`;
 
       console.log(`[ChatLLMWrapper] Chunk [${index + 1}] (db chunkIndex=${chunk.chunkIndex}):`, {
         sourceTitle: chunk.sourceTitle,

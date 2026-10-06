@@ -68,7 +68,7 @@ export function formatChunks(
   let used = 0;
   let cut = false;
   for (const c of chunks) {
-    const part = `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.content}`;
+    const part = `[${c.id}]${c.sourceTitle ? ` ${c.sourceTitle}` : ""}\n${c.contextText ?? c.content}`;
     const cost = (parts.length > 0 ? CHUNK_SEPARATOR.length : 0) + part.length;
     if (parts.length === 0 && part.length > limit) {
       cut = true;

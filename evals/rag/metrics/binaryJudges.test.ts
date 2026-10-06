@@ -134,6 +134,18 @@ describe("chat judges", () => {
     expect(grounding).toContain("Some retrieved passages were cut off for judging");
   });
 
+  it("shows judges the passage as the model saw it, neighbour previews included", () => {
+    const { text } = formatChunks([
+      {
+        id: "1",
+        sourceTitle: "Paper",
+        content: "Thresholds were applied.",
+        contextText: "Thresholds were applied.\n\nMVPA was self-reported with the IPAQ...",
+      },
+    ]);
+    expect(text).toContain("self-reported with the IPAQ");
+  });
+
   it("skips a passage that does not fit and keeps later ones that do", () => {
     const { text, truncated } = formatChunks([
       { id: "1", sourceTitle: "", content: "a".repeat(24_000) },
