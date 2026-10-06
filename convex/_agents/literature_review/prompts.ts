@@ -52,13 +52,19 @@ PAPER TEXT:
 {text}`;
 
 /**
- * Schema for data extraction output.
+ * Schema for data extraction output: one required string per extraction column id.
+ *
+ * Not `z.record`: its JSON schema carries `propertyNames`, which Together's structured-output
+ * grammar rejects with a 400 ("Unimplemented keys"), so every extraction call failed. Naming
+ * the column ids also keeps the model from keying cells by display name.
  */
-export const ExtractDataOutputSchema = z.object({
-  extractedData: z.record(z.string(), z.string()),
-});
+export function buildExtractDataOutputSchema(columnIds: string[]) {
+  return z.object({
+    extractedData: z.object(Object.fromEntries(columnIds.map((id) => [id, z.string()]))),
+  });
+}
 
-export type ExtractDataOutput = z.infer<typeof ExtractDataOutputSchema>;
+export type ExtractDataOutput = { extractedData: Record<string, string> };
 
 /**
  * Schema for plan review output (search queries + suggested columns).

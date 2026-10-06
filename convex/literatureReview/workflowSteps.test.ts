@@ -1,6 +1,7 @@
 "use node";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import {
@@ -711,6 +712,49 @@ describe("extractDataHandler with LLM extraction", () => {
     expect(callArgs.papers[0].extractedData["key_findings"]).toBe(
       "30% improvement in primary outcome"
     );
+  });
+
+  it("asks for every extraction column id in the structured schema, with reasoning off", async () => {
+    const withStructuredOutput = vi.fn().mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({ extractedData: { dose_metric: "MET-h/week" } }),
+    });
+    (createLLM as any).mockReturnValue({ withStructuredOutput } as any);
+    (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
+    (mockCtx.runQuery as any).mockResolvedValue([]);
+    (mockCtx.runMutation as any).mockResolvedValue(null);
+
+    await extractDataHandler(mockCtx, {
+      papers: [
+        {
+          title: "Paper One",
+          authors: ["Smith, J."],
+          year: 2023,
+          abstract: "Abstract one",
+          url: "http://example.com/1",
+          source: "arxiv" as const,
+          score: 0.9,
+          isIncluded: true,
+        },
+      ],
+      columns: [
+        { id: "title", name: "Title", isVisible: true },
+        { id: "dose_metric", name: "Dose Metric", isVisible: true },
+        { id: "outcome_measure", name: "Outcome Measure", isVisible: true },
+      ],
+      sessionId: "test-session" as Id<"literatureReviewSessions">,
+    });
+
+    const schema = withStructuredOutput.mock.calls[0][0];
+    const json = z.toJSONSchema(schema) as {
+      properties: { extractedData: { properties: Record<string, unknown> } };
+    };
+    expect(JSON.stringify(json)).not.toContain("propertyNames");
+    expect(Object.keys(json.properties.extractedData.properties)).toEqual([
+      "dose_metric",
+      "outcome_measure",
+    ]);
+    // Reasoning shares max_tokens on hybrid models; with it on, extraction ran out of tokens.
+    expect(createLLM).toHaveBeenCalledWith(expect.objectContaining({ phase: "fast" }));
   });
 
   it("falls back to basic metadata when LLM extraction fails", async () => {

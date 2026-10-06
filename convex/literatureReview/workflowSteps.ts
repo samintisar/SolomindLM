@@ -12,9 +12,9 @@ import {
   PLAN_REVIEW_COLUMN_RETRY_APPENDIX,
 } from "../_agents/literature_review/planReviewColumns.js";
 import {
+  buildExtractDataOutputSchema,
   EXTRACT_DATA_PROMPT,
   EXTRACT_DATA_SYSTEM_PROMPT,
-  ExtractDataOutputSchema,
   GENERATE_FULL_REPORT_PROMPT,
   GENERATE_FULL_REPORT_SYSTEM_PROMPT,
   GENERATE_REPORT_SECTION_PROMPT,
@@ -745,12 +745,15 @@ async function extractPaperFieldsWithLlm(
     mapModel: mapModelForLiteratureReview(smartModel),
     temperatures: 0.2,
     maxTokens: 1_600,
-    phase: "smart",
+    // Reasoning off: on hybrid models it shares max_tokens with the answer, and with it on
+    // DeepSeek-V4.1-Flash spent the whole 1,600-token budget thinking (finish_reason=length).
+    phase: "fast",
   });
 
-  const structuredLlm = llm.withStructuredOutput(ExtractDataOutputSchema, {
-    name: "extract_data",
-  });
+  const structuredLlm = llm.withStructuredOutput(
+    buildExtractDataOutputSchema(extractionColumns.map((col) => col.id)),
+    { name: "extract_data" }
+  );
 
   const columnsText = extractionColumns
     .map(
