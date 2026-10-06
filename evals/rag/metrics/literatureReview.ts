@@ -1157,7 +1157,8 @@ export function lrPrismaConsistency(
   if (screened > deduplicated && deduplicated > 0) arithmeticOk = false;
   if (deduplicated > found && found > 0) arithmeticOk = false;
 
-  const mentionsIncluded = methods.includes(String(included));
+  // The whole number, so a small count isn't found inside a year or a scale name ("2014", "PHQ-4").
+  const mentionsIncluded = new RegExp(String.raw`(?<![\d.-])${included}(?![\d.])`).test(methods);
   const provMatchesCounts =
     prov?.recordsIncluded == null || prov.recordsIncluded === (raw?.counts.included ?? 0);
   const score =

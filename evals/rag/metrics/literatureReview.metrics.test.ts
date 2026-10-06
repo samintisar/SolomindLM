@@ -220,6 +220,14 @@ describe("literatureReview metrics with notebook papers", () => {
     expect(statusOf("lr_screening_inclusion_rate")).toBe("info");
   });
 
+  it("lr_prisma_consistency doesn't take a number inside another for the included count", () => {
+    const result = lrPrismaConsistency(
+      fixture,
+      stubArtifact(notebookReview({ methods: "Data were collected in 2014 using the PHQ-9." }))
+    );
+    expect(result.breakdown).toMatchObject({ mentionsIncluded: false });
+  });
+
   it("lr_prisma_consistency counts notebook papers when no search ran", () => {
     const result = lrPrismaConsistency(
       fixture,
