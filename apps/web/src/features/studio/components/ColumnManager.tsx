@@ -1,5 +1,5 @@
 import { GripVertical, Plus, X } from "lucide-react";
-import React, { useCallback, useId, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
@@ -36,6 +36,18 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const nameId = useId();
   const instructionsId = useId();
+  const headingId = useId();
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const formWasOpen = useRef(false);
+
+  // The opener is unmounted while the form is open, so hand focus back to it once it returns.
+  useEffect(() => {
+    if (showCustomForm) formWasOpen.current = true;
+    else if (formWasOpen.current) {
+      formWasOpen.current = false;
+      openerRef.current?.focus();
+    }
+  }, [showCustomForm]);
 
   const visibleDataColumns = useMemo(
     () =>
@@ -176,11 +188,13 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
 
   return (
     <aside
-      aria-label="Manage columns"
+      aria-labelledby={headingId}
       className="flex h-full w-88 max-w-full shrink-0 flex-col border-l border-border/50 bg-card shadow-lg"
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 px-5">
-        <h3 className="font-sans text-sm font-semibold text-foreground">Manage Columns</h3>
+        <h3 id={headingId} className="font-sans text-sm font-semibold text-foreground">
+          Manage Columns
+        </h3>
         {onClose && (
           <Button
             variant="ghost"
@@ -197,12 +211,19 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
         <section>
           <p className="mb-3 font-sans text-sm font-medium text-foreground">Create custom column</p>
           {showCustomForm ? (
-            <div className="rounded-xl bg-muted/40 p-4">
+            <form
+              className="rounded-xl bg-muted/40 p-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                addCustomColumn();
+              }}
+            >
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor={nameId}>Column name</FieldLabel>
                   <Input
                     id={nameId}
+                    autoFocus
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     placeholder="e.g. Sample size"
@@ -222,16 +243,21 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
                 </Field>
               </FieldGroup>
               <div className="mt-3 flex gap-2">
-                <Button size="sm" className="flex-1" onClick={addCustomColumn}>
+                <Button size="sm" type="submit" className="flex-1" disabled={!customName.trim()}>
                   Add column
                 </Button>
-                <Button size="sm" variant="ghost" onClick={cancelCustomForm}>
+                <Button size="sm" type="button" variant="ghost" onClick={cancelCustomForm}>
                   Cancel
                 </Button>
               </div>
-            </div>
+            </form>
           ) : (
-            <Button variant="outline" className="w-full" onClick={() => setShowCustomForm(true)}>
+            <Button
+              ref={openerRef}
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowCustomForm(true)}
+            >
               <Plus />
               Add Column
             </Button>

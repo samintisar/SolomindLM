@@ -37,6 +37,47 @@ describe("ColumnManager", () => {
     });
   });
 
+  it("focuses the name field when the form opens", async () => {
+    const user = userEvent.setup();
+    render(<ColumnManager columns={COLUMNS} onChange={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Add Column" }));
+    expect(screen.getByLabelText("Column name")).toHaveFocus();
+  });
+
+  it("adds the column when Enter is pressed in the name field", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ColumnManager columns={COLUMNS} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Add Column" }));
+    await user.type(screen.getByLabelText("Column name"), "Sample size{Enter}");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].at(-1)).toMatchObject({ name: "Sample size" });
+    expect(screen.getByRole("button", { name: "Add Column" })).toHaveFocus();
+  });
+
+  it("disables Add column for a whitespace-only name", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ColumnManager columns={COLUMNS} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: "Add Column" }));
+    await user.type(screen.getByLabelText("Column name"), "   {Enter}");
+    expect(screen.getByRole("button", { name: "Add column" })).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("clears the form on Cancel and returns focus to Add Column", async () => {
+    const user = userEvent.setup();
+    render(<ColumnManager columns={COLUMNS} onChange={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Add Column" }));
+    await user.type(screen.getByLabelText("Column name"), "Draft");
+    await user.type(screen.getByLabelText(/Instructions/), "Some notes");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Add Column" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Add Column" }));
+    expect(screen.getByLabelText("Column name")).toHaveValue("");
+    expect(screen.getByLabelText(/Instructions/)).toHaveValue("");
+  });
+
   it("closes from its close button", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
