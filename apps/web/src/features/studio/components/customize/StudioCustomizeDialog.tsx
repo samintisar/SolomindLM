@@ -1,5 +1,5 @@
 import { ChevronLeft, X } from "lucide-react";
-import { createContext, type ReactNode, useContext, useState } from "react";
+import { createContext, type ReactNode, useContext, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -24,6 +24,33 @@ const PreviewContext = createContext(false);
  */
 export function useStudioCustomizePreview(): boolean {
   return useContext(PreviewContext);
+}
+
+/**
+ * The Customize dialogs have no DialogTrigger (the Studio panel opens them), so Radix has nothing to
+ * focus on close and focus would fall to <body>. This remembers what had focus when the dialog
+ * opened (Radix calls onOpenAutoFocus before it moves focus in) and gives focus back on close,
+ * unless the user has since put focus somewhere else, such as a control clicked outside a
+ * non-modal embedded dialog.
+ */
+function useReturnFocusToOpener() {
+  const openerRef = useRef<HTMLElement | null>(null);
+  return {
+    onOpenAutoFocus: () => {
+      const active = document.activeElement;
+      openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    },
+    onCloseAutoFocus: (event: Event) => {
+      const opener = openerRef.current;
+      openerRef.current = null;
+      const active = document.activeElement;
+      const focusIsFree = active === null || active === document.body;
+      if (opener?.isConnected && focusIsFree) {
+        event.preventDefault();
+        opener.focus();
+      }
+    },
+  };
 }
 
 interface StudioCustomizeDialogProps {
@@ -60,8 +87,11 @@ export function StudioCustomizeDialog({
   // Embedded: a frame over the mock-up that the dialog portals into. Its translate makes it the
   // containing block for the content's `position: fixed`, so the dialog centres in the mock-up
   // (the /dev/design Frame trick). It paints the scrim itself, since non-modal Radix dialogs draw
-  // none, and stays mounted so the closing fade has somewhere to render.
+  // none, and stays mounted so the closing fade has somewhere to render. The scrim transitions its
+  // fill and blur (not the frame's opacity, which would also fade the dialog inside it), so it fades
+  // out in step with the content.
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
+  const returnFocus = useReturnFocusToOpener();
   return (
     <>
       {embedded && (
@@ -69,10 +99,8 @@ export function StudioCustomizeDialog({
           ref={setFrame}
           data-slot="studio-customize-frame"
           className={cn(
-            "absolute inset-0 z-50 translate-x-0",
-            open
-              ? "bg-overlay backdrop-blur-xs duration-200 animate-in fade-in-0"
-              : "pointer-events-none"
+            "absolute inset-0 z-50 translate-x-0 transition duration-200 ease-out",
+            open ? "bg-overlay backdrop-blur-xs" : "pointer-events-none"
           )}
         />
       )}
@@ -85,6 +113,7 @@ export function StudioCustomizeDialog({
       >
         <DialogContent
           container={embedded ? frame : undefined}
+          {...returnFocus}
           showCloseButton={false}
           size="wide"
           padding="none"
