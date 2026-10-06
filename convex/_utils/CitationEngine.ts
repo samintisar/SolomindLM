@@ -65,24 +65,30 @@ export function parseAuthorName(author: string): AuthorName {
     return { family: name, given: "", suffix: "" };
   }
 
-  const [family, given = "", ...rest] = name.split(",").map((part) => part.trim());
-  if (given || rest.length > 0) {
-    return { family, given, suffix: rest.find((part) => NAME_SUFFIX.test(part)) ?? "" };
-  }
+  const [head, ...tail] = name.split(",").map((part) => part.trim());
+  const commaSuffix = tail.find((part) => NAME_SUFFIX.test(part)) ?? "";
+  const given = tail.filter((part) => part && !NAME_SUFFIX.test(part)).join(" ");
+  if (given) return { family: head, given, suffix: commaSuffix };
 
-  const words = family.split(" ");
-  const suffix =
+  // "Given Surname", optionally followed by a suffix ("Martin Luther King Jr.", "… King, Jr.")
+  const words = head.split(" ");
+  const wordSuffix =
     words.length > 2 && NAME_SUFFIX.test(words[words.length - 1]) ? (words.pop() ?? "") : "";
-  return { family: words.pop() ?? "", given: words.join(" "), suffix };
+  return { family: words.pop() ?? "", given: words.join(" "), suffix: commaSuffix || wordSuffix };
 }
 
-function nameParts(author: string): { family: string; initials: string[] } {
-  const { family, given } = parseAuthorName(author);
+function nameParts(author: string): { family: string; initials: string[]; suffix: string } {
+  const { family, given, suffix } = parseAuthorName(author);
+  // Hyphens separate initials too, so "J.-P." and "Jean-Paul" both give J and P.
   const initials = given
-    .split(/[\s.]+/)
+    .split(/[\s.-]+/)
     .filter(Boolean)
     .map((part) => part[0]);
-  return { family, initials };
+  return { family, initials, suffix };
+}
+
+function appendSuffix(name: string, suffix: string, separator = ", "): string {
+  return suffix ? `${name}${separator}${suffix}` : name;
 }
 
 /** The name in reading order ("Ashish Vaswani"), for styles that print it in full. */
@@ -96,8 +102,9 @@ function withPeriod(text: string): string {
 }
 
 function formatAuthorLastNameFirst(author: string): string {
-  const { family, initials } = nameParts(author);
-  return initials.length > 0 ? `${family}, ${initials.join(".")}.` : withPeriod(family);
+  const { family, initials, suffix } = nameParts(author);
+  const name = initials.length > 0 ? `${family}, ${initials.join(".")}.` : withPeriod(family);
+  return appendSuffix(name, suffix);
 }
 
 function formatAPA6Authors(authors: string[] | undefined): string {
@@ -143,8 +150,9 @@ function formatChicago17NotesAuthors(authors: string[] | undefined): string {
 }
 
 function formatAMA11Author(author: string): string {
-  const { family, initials } = nameParts(author);
-  return initials.length > 0 ? `${family} ${initials.join("")}` : family;
+  const { family, initials, suffix } = nameParts(author);
+  const name = initials.length > 0 ? `${family} ${initials.join("")}` : family;
+  return appendSuffix(name, suffix.replace(/\.$/, ""), " ");
 }
 
 function formatAMA11Authors(authors: string[] | undefined): string {
@@ -157,8 +165,9 @@ function formatAMA11Authors(authors: string[] | undefined): string {
 }
 
 function formatAMA10Author(author: string): string {
-  const { family, initials } = nameParts(author);
-  return initials.length > 0 ? `${family} ${initials.join(".")}.` : withPeriod(family);
+  const { family, initials, suffix } = nameParts(author);
+  const name = initials.length > 0 ? `${family} ${initials.join(".")}.` : withPeriod(family);
+  return appendSuffix(name, suffix, " ");
 }
 
 function formatAMA10Authors(authors: string[] | undefined): string {
@@ -171,8 +180,9 @@ function formatAMA10Authors(authors: string[] | undefined): string {
 }
 
 function formatACSAuthor(author: string): string {
-  const { family, initials } = nameParts(author);
-  return initials.length > 0 ? `${family}, ${initials.join(". ")}.` : withPeriod(family);
+  const { family, initials, suffix } = nameParts(author);
+  const name = initials.length > 0 ? `${family}, ${initials.join(". ")}.` : withPeriod(family);
+  return appendSuffix(name, suffix);
 }
 
 function formatACSAuthors(authors: string[] | undefined): string {
@@ -344,8 +354,9 @@ function formatInlineChicago17(citation: Citation): string {
 // ==================== IEEE ====================
 
 function formatIEEEInitials(author: string): string {
-  const { family, initials } = nameParts(author);
-  return initials.length > 0 ? `${initials.join(". ")}. ${family}` : family;
+  const { family, initials, suffix } = nameParts(author);
+  const name = initials.length > 0 ? `${initials.join(". ")}. ${family}` : family;
+  return appendSuffix(name, suffix);
 }
 
 function formatIEEEAuthors(authors: string[] | undefined): string {
@@ -396,8 +407,9 @@ function formatInlineIEEE(_citation: Citation, index: number): string {
 // ==================== Vancouver ====================
 
 function formatVancouverAuthor(author: string): string {
-  const { family, initials } = nameParts(author);
-  return initials.length > 0 ? `${family} ${initials.join("")}` : family;
+  const { family, initials, suffix } = nameParts(author);
+  const name = initials.length > 0 ? `${family} ${initials.join("")}` : family;
+  return appendSuffix(name, suffix.replace(/\.$/, ""), " ");
 }
 
 function formatVancouverAuthors(authors: string[] | undefined): string {

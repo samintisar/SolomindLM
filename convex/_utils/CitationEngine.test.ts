@@ -885,6 +885,8 @@ describe("CitationEngine", () => {
       ["  Ashish   Vaswani ", { family: "Vaswani", given: "Ashish", suffix: "" }],
       ["Martin Luther King Jr.", { family: "King", given: "Martin Luther", suffix: "Jr." }],
       ["King, Martin Luther, Jr.", { family: "King", given: "Martin Luther", suffix: "Jr." }],
+      ["Martin Luther King, Jr.", { family: "King", given: "Martin Luther", suffix: "Jr." }],
+      ["Vaswani,", { family: "Vaswani", given: "", suffix: "" }],
       ["Jinping Xi", { family: "Xi", given: "Jinping", suffix: "" }],
       ["Plato", { family: "Plato", given: "", suffix: "" }],
       ["World Health Organization", { family: "World Health Organization", given: "", suffix: "" }],
@@ -969,6 +971,22 @@ describe("CitationEngine", () => {
     it("takes an initial from each part of run-together initials", () => {
       const initials = { ...givenFirst, authors: ["Smith, J.R."] };
       expect(engine.formatReference(initials, "apa7")).toMatch(/^Smith, J\.R\. \(2017\)/);
+    });
+
+    it.each([["Smith, J.-P."], ["Jean-Paul Smith"]])(
+      "keeps both initials of the hyphenated given name in %j",
+      (author) => {
+        const hyphenated = { ...givenFirst, authors: [author] };
+        expect(engine.formatReference(hyphenated, "apa7")).toMatch(/^Smith, J\.P\. \(2017\)/);
+      }
+    );
+
+    it("keeps a suffix in the reference", () => {
+      const king = { ...givenFirst, authors: ["Martin Luther King, Jr."], year: 1963 };
+      expect(engine.formatReference(king, "apa7")).toMatch(/^King, M\.L\., Jr\. \(1963\)/);
+      expect(engine.formatReference(king, "ieee", 0)).toMatch(/^\[1\] M\. L\. King, Jr\., "/);
+      expect(engine.formatReference(king, "vancouver", 0)).toMatch(/^1\. King ML Jr\. /);
+      expect(engine.formatInline(king, "apa7")).toBe("(King, 1963)");
     });
   });
 });
