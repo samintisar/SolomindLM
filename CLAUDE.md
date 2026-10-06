@@ -1,306 +1,47 @@
 # CLAUDE.md
 
-Guidance for AI agents working in this repository. **Serena + Superpowers is the default workflow.**
-
-## Default Workflow (Serena + Superpowers)
-
-**Every session starts with Serena activation, then use superpowers skills for process steps.**
-
-### 1. Serena (Primary Tooling)
-
-Serena is the default for all code navigation, editing, and refactoring. **Prefer Serena tools over built-in Read/Edit/Write/Grep for `.ts` / `.tsx` files.**
-
-**Session start:**
-
-```
-serena_get_current_config                    # Verify project activation
-serena_activate_project project="SolomindLM" # If not activated
-serena_check_onboarding_performed            # Verify onboarding
-serena_list_memories                         # Review existing memories
-```
-
-**Code work:**
-
-- `serena_get_symbols_overview` — Understand file structure first
-- `serena_find_symbol` — Locate definitions by name path
-- `serena_find_referencing_symbols` — Check impact before changes
-- `serena_replace_symbol_body` — Replace function/class implementations
-- `serena_insert_before_symbol` / `serena_insert_after_symbol` — Add code
-- `serena_rename_symbol` — Rename across all references
-- `serena_safe_delete_symbol` — Delete if no references
-
-**Memory management (for continuity):**
-
-- `serena_read_memory` — Load context from prior sessions
-- `serena_write_memory` — Store new project knowledge
-- `serena_edit_memory` — Update existing memories (preferred over creating new)
-- `serena_list_memories` — Check what exists before writing
-
-**Built-in tools are fallback** for: `.md`, `.json`, `.yaml`, `.css`, `.html`, or when Serena is out of sync.
-
-### 2. Superpowers Skills (Process Steps)
-
-**Invoke these skills at the start of the relevant phase. Do not skip.**
-
-| Skill                                        | Trigger                                                                                                                | When to Use                                                |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `superpowers:brainstorming`                  | Before any new feature, component, or behavior change                                                                  | Required before planning                                   |
-| `superpowers:writing-plans`                  | Multi-step task, before touching code                                                                                  | Output goes in plan, not memory                            |
-| `superpowers:test-driven-development`        | Deterministic logic: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new queries/mutations | vitest + `convex-test`; pattern `*.test.ts` next to source |
-| `superpowers:dispatching-parallel-agents`    | 2+ independent tasks, no shared state                                                                                  | Pair with subagent-driven-development                      |
-| `superpowers:subagent-driven-development`    | Plan with independent tasks, current session                                                                           | Use Explore subagent for >3-query searches                 |
-| `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior                                                                          | Before proposing fixes                                     |
-| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR                                                                    | typecheck:web + typecheck:convex + lint + test:convex      |
-| `superpowers:requesting-code-review`         | Before merging significant work                                                                                        | —                                                          |
-| `superpowers:receiving-code-review`          | When handling review feedback                                                                                          | —                                                          |
-| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup                                                                     | —                                                          |
-| `superpowers:using-git-worktrees`            | Feature work needing isolation                                                                                         | Worktrees live under `.worktrees/`                         |
-
-**Skip TDD for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing.
-
-### 3. Domain Skills (When Triggered)
-
-| Skill                                                                                                                                        | Trigger                                                           |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `convex-migration-helper`                                                                                                                    | Schema or table change (widen-migrate-narrow)                     |
-| `convex-performance-audit`                                                                                                                   | Read amplification, OCC conflicts, `npx convex insights` warnings |
-| `convex-create-component`                                                                                                                    | New isolated table-owning module                                  |
-| `langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`                                                                          | Anything under `convex/_agents/`                                  |
-| `together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`            | Modifying `convex/_services/ai/` or `convex/studio/audio/`        |
-| `vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing` | Frontend work as triggers describe                                |
-| `serena-usage`                                                                                                                               | Memory management, cross-file refactors, code navigation          |
-
----
-
-## Hard Requirements (Non-Negotiable)
-
-You **MUST** use the following tools. Using built-in alternatives (`Grep`, `Read`, `Edit`, `Write`, `Glob`) for code work is **incorrect** and wastes tokens.
-
-1. **Serena (MCP)** — For every `.ts` / `.tsx` file operation (read, search, edit, refactor, rename, insert). Built-in file tools are only acceptable for `.md`, `.json`, `.yaml`, `.css`, `.html`.
-2. **Superpowers (Skills)** — For every task category listed below. Invoking `Skill` is **required** before you write, edit, or debug code in those domains.
-
-If you are unsure which skill applies, invoke `superpowers:brainstorming` first. **Do not guess.**
-
-## Prompt authoring (production agents)
-
-**Production prompts must be generalized.** Prompt text in `convex/_agents/`, `convex/studio/`, and any user-facing generation path must work for arbitrary user-uploaded sources—any topic, length, or format.
-
-**Strictly forbidden:**
-
-- Tuning prompts to pass RAG eval metrics (`expected_item_recall`, `written_questions_count_match`, LLM judge scores, etc.)
-- Referencing eval fixtures, golden notebooks, canonical expected-item lists, or test source filenames in prompts
-- Eval-specific examples in prompt copy (benchmark datasets, named pattern lists, notebook IDs, etc.)
-
-**When evals fail**, fix with pipeline engineering—chunking, buffer multipliers, multi-round map/recovery, deduplication, selection logic, padding, timeouts, retrieval scope—not eval-targeted instructions. Evals measure general behavior; they must not drive prompt content.
-
-## Quick Start
-
-```bash
-bun install                    # Install dependencies
-bun run dev                    # All dev servers (workspace)
-bun run dev:web                # Web dev server: :5173 in the main checkout, own port per worktree
-bun run dev:mobile             # Expo mobile dev server
-bun run dev:convex             # Convex dev watcher (separate terminal); one per dev deployment across worktrees
-```
-
-**Build & typecheck** (typechecks must run separately — cannot parallelize):
-
-```bash
-bun run build                  # Build all workspaces
-bun run build:prod             # Production web build
-bun run typecheck:convex       # Convex typecheck
-bun run typecheck:evals        # evals/ typecheck (bun run doesn't check types)
-bun run typecheck:web          # Web typecheck
-bun run typecheck:mobile       # Expo mobile typecheck
-```
-
-**Lint & format:**
-
-```bash
-bun run lint                   # Biome (lint + format check)
-bun run lint:fix               # Biome auto-fix
-bun run format                 # Biome format write
-bun run format:check           # Biome format check
-```
-
-**Convex env sync:**
-
-```bash
-bun run convex:env:pull:dev    # Pull Convex dev → .env.local
-bun run convex:env:pull:prod   # Pull Convex prod → .env
-bun run convex:env:push        # Push .env.local → Convex dev
-bun run convex:env:push:prod   # Push .env → Convex prod
-bun run convex:env:push:dry    # Dry run
-```
-
-**RAG eval (`bun run eval:rag`):** One-shot bootstrap: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). Push script does NOT upload `RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case` / `--runner` for scoped runs; `eval:studio` is for cross-cutting work. Use-case packs (`evals/rag/usecases/`): `bun run eval:seed` then `bun run eval:usecases` (needs `RAG_EVAL_OWNER_EMAIL` on the dev deployment).
-
----
-
-## Project Architecture
-
-Bun workspaces monorepo:
-
-- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4; React Router 7, Mind Elixir 5, Streamdown + KaTeX, DOMPurify, Stripe SDK
-- `apps/mobile/` — Expo 55 + React Native 0.83 WebView shell (loads web routes; native auth, file upload, push notifications)
-- `convex/` — Convex backend (auth, schema, functions, agents)
-
-**Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/` (incl. output language), `billing/`, `chat/` (RAG, deep research, literature review, @mentions), `landing/`, `legal/`, `notebooks/`, `onboarding/`, `sources/` (paper import, academic discovery), `studio/` (`components/views/` — ReportView, FlashcardView, QuizView, MindMapView, InfographicView, LiteratureTableView, etc.).
-
-**Path aliases** (`tsconfig.json`): `@/*` → `./src/*`, `@convex/*` → `../../convex/*`.
-
-**Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workflow`.
-
-**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors, OpenAI `text-embedding-3-small`; see `_lib/embeddingConfig.ts`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripeWebhookEvents`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
-
-**Convex directory layout** (every module under `convex/` except `_generated/` is in the generated API; a leading `_` is a naming convention for helpers, not an exclusion — see Gotchas):
-
-- `_agents/` — per-feature agent logic: prompts, state types, routing, heuristics, LLM helpers (`chat/`, `report/`, `flashcard/`, `quiz/`, `mindmap/`, `spreadsheet/`, `written_questions/`, `audio_overview/`, `research/`, `literature_review/`); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization. Not where jobs run — see **Agent execution** below
-- `_lib/` — errors, limits, env helpers
-- `_model/` — data models
-- `_services/` — `ai/`, `search/`, `extraction/`, `processing/`, `grading/`, `cache/`
-- `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/`, `literatureReview/`, `research/`, `onboarding/`, `push/`, `userPreferences/` — domain functions
-- `studio/` — content generation per type (audio, flashcards, infographic, literature_tables, mindmaps, quizzes, reports, spreadsheets, writtenQuestions); `studio/_job/` shared job helpers, `studio/jobMutations/` status writes + stuck-job sweep, `studio/scheduling/` job entry points
-- `storage/` — vector store, chat history
-- root `auth.ts`, `schema.ts`, `http.ts` — auth config (must be at root), schema, HTTP actions
-
-**AI services:** LLMs `deepseek-ai/DeepSeek-V4.1-Flash` (smart) / `Qwen/Qwen3.5-9B` (fast). Embeddings: OpenAI `text-embedding-3-small` (`_services/ai/embeddingClient.ts`, `OPENAI_API_KEY`). Reranking: Voyage AI `rerank-3`. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
-
-**Pipelines:**
-
-- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim, `text-embedding-3-small`) → Voyage rerank
-- _Generation:_ how a request starts depends on the execution model below. Studio: the entry mutation/action writes the row and schedules the first phase via `ctx.scheduler.runAfter()` (no jobs table). Deep research and literature review: `workflow.start` launches a durable workflow. Chat: the `/chat/stream` HTTP action. Results are written to the type's table and delivered by reactive queries (chat and deep research also stream tokens via `@convex-dev/persistent-text-streaming`)
-
-**Agent execution** (none of these run a LangGraph graph):
-
-- _Studio_ (reports, flashcards, quizzes, mind maps, spreadsheets, written questions, audio overviews) — phased Convex actions. `studio/<type>/job.ts` registers the `internalAction`s; the logic lives in `studio/<type>/*JobPhases.ts`. The first phase fetches chunks and picks a mode (`_agents/_shared/studioExecutionMode.ts`): small inputs run single-pass; otherwise it fans out one map-chunk action per chunk via `ctx.scheduler.runAfter(0, …)`, then a finalize phase reduces/collapses and saves. LLM calls go straight through LangChain (`ChatTogetherAI`) using prompts, routing, heuristics and state types from `_agents/<type>/`. Every action must finish inside Convex's 600s limit (`studio/_job/jobDeadline.ts`); a cron (`studio/jobMutations/stuckJobs.ts`) fails rows whose action was killed. Audio TTS runs after the script phase as up to six parallel chunk actions (`studio/audio/synthesisChunks.ts`), then an assemble phase joins the audio. Infographics are a single action (`studio/infographic/generate.ts`).
-- _Deep research & literature review_ — `@convex-dev/workflow` durable workflows in `_agents/research/DeepResearchGraph.ts` and `_agents/literature_review/LiteratureReviewGraph.ts` (despite the names, not LangGraph). They pause for user approval (research plan / table columns) via workflow events.
-- _Chat_ — `ChatAgent` (`_agents/chat/ChatAgent.ts`), a plain class that retrieves, reranks, grounds and generates; `chat/_streamChatResponse.ts` drives it and streams the reply.
-- _Legacy LangGraph_ — the seven `StateGraph` classes in `_agents/<type>/*Graph.ts` (report, flashcard, quiz, mindmap, spreadsheet, written_questions, audio_overview) are no longer on any production path; only tests (`_agents/agentGraphs.smoke.test.ts`, per-graph tests) run them. Change the `*JobPhases.ts` path, not the graph. The top-level `_agents/*Graph.ts` files are re-export barrels that some phases still import helpers through (e.g. `packChunks` via `_agents/FlashcardGraph.ts`), and `@langchain/langgraph` is still imported by `_agents/*/state.ts` and routing helpers.
-
----
-
-## Observability
-
-- **Logs:** [`convex/_lib/logging/serviceLogger.ts`](convex/_lib/logging/serviceLogger.ts) emits one-JSON-per-line. Pass `requestId` so exports correlate with Convex `function.request_id`. Prefer a [Convex Log Stream](https://stack.convex.dev/log-streams-common-uses) (Axiom/Datadog) in prod — dashboard history is limited.
-- **Errors:** [`convex/_lib/errors.ts`](convex/_lib/errors.ts) (`ExternalServiceError`, `StorageError`, `InputValidationError`); map to `ConvexError` via [`convex/_lib/serviceErrors.ts`](convex/_lib/serviceErrors.ts) `toConvexError`. Web parsing: [`apps/web/src/shared/utils/errorParser.ts`](apps/web/src/shared/utils/errorParser.ts) (`parseServiceError`, `parseAppError`); optional [`useServiceErrorToast`](apps/web/src/shared/hooks/useServiceErrorToast.ts).
-- **HTTP retry:** [`convex/_agents/_shared/retry.ts`](convex/_agents/_shared/retry.ts) — `RetryPolicies.http`, `invokeWithHttpRetry`, `isHttpAwareRetryableError`.
-
----
-
-## Environment
-
-Bun 1.2+ required. Required env vars: `CONVEX_DEPLOYMENT` plus AI service keys (Together AI, Mistral, Tavily, Supadata, Voyage AI, …). Dev backend env lives in `.env.local`; prod in `.env`.
-
-**Dev vs prod Convex URLs differ.** Local `apps/web/.env.local` uses dev URL; production hosting (Vercel) uses prod URL.
-
----
-
-## Git Workflow
-
-GitHub Flow: feature branches → PR to `main` (protected, requires PR + CI). Branch prefixes: `feature/`, `fix/`, `refactor/`, `docs/`, `chore/`. Conventional commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`). Squash merge.
-
-CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `VITE_CONVEX_URL`, no second `convex deploy` — avoids racing Vercel).
-
-## Claude Code Hooks
-
-`.claude/settings.json` (tracked — personal overrides go in the ignored `.claude/settings.local.json`) runs [`.claude/hooks/on-edit.mjs`](.claude/hooks/on-edit.mjs) after every single-file edit, built-in `Edit`/`Write` and Serena's edit tools alike:
-
-- **format** (sync) — `biome check --write` on the edited file only. Errors Biome can't auto-fix are fed back to the agent immediately.
-- **typecheck** (async) — `typecheck:web` / `typecheck:convex` / `typecheck:mobile` for the edited file's workspace. A burst of edits coalesces into one run; failures (and the later recovery) reach the agent on its next turn.
-
-Multi-file Serena tools (`rename_symbol`, `replace_in_files`) aren't formatted per edit — the `.githooks/pre-commit` hook (Biome-fixes and re-stages staged files) is the backstop.
-
-Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.cmd` on Windows). Ensure `Bash(bun run typecheck:*)` is in `permissions.allow`. Restart Cursor after hook changes; check **Settings → Hooks** and the **Hooks** output channel. Disable `security-guidance` on Windows if `python3` is missing.
-
----
-
-## Gotchas
-
-- **File path = API path; `_` does not hide a module.** Functions in `convex/notebooks/index.ts` become `api.notebooks.index.*` (no `convex/domain/` module). Underscore paths are registered too: `api._services.search.DiscoveryService.discover`, `internal._migration.*`, `internal._agents._shared.cachedLlm.llmInternal`, `chat/_researchPlan.ts`. Only `_generated/` is excluded. Keep a function off the public API with `internalQuery`/`internalMutation`/`internalAction`, not with a `_` name.
-- **Auth file location.** `@convex-dev/auth` requires `convex/auth.ts` at root, not in a subdirectory.
-- **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
-- **Validation gates** (in order):
-  1. `bun run typecheck:web` + `typecheck:convex` — always; `typecheck:evals` when touching `evals/` or Convex types it imports
-  2. `bun run test:convex` — vitest + `convex-test`, ~990+ tests. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
-  3. `bun run test:web` — vitest for web utilities
-  4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
-  5. `bun run eval:rag --case=… / --runner=…` or `eval:studio` / `eval:literature-review` — agent or prompt changes (do NOT unit-test prompt outputs)
-- **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves — no new `any` in files you're already editing; ratchet per-directory (see `docs/engineering/code-quality.md`).
-- **Git hooks** (auto-enabled by `bun install`): `.githooks/pre-commit` Biome-fixes and re-stages the staged files; `.githooks/pre-push` runs typecheck + lint + design-lint. Bypass a WIP commit/push with `--no-verify`.
-- **Design system (shadcn):** UI primitives live in `apps/web/src/shared/components/ui` — add with `bunx --bun shadcn@latest add <name>` from `apps/web`. After every `add`, the CLI writes `import { cn } from "cn"` (rewrite to `@/shared/utils/cn`) and may add bogus `cn` / `next-themes` deps (remove them). Pages place components (layout classes only); a new look is a new `cva` variant. Look: **soft layered**, fill and shadow, not outlines (no thick or loud borders, no hand-rolled shadows, theme differences via tokens like `ring-hairline` / `bg-surface-raised`, not `dark:`), per docs/design/principles.md and enforced by `solomind/soft-surfaces`. Use semantic tokens (`bg-success-muted`, `text-info`, `border-destructive-border`), never palette colors or `--vintage-*` (those are persisted cover swatches only — see `apps/web/src/shared/notebook/coverColor.ts`). Motion: `tw-animate-css` utilities with the house `ease-out` curve, or `m.*` primitives from `@/shared/components/motion` (never `motion.*` — `LazyMotion strict`). Toasts: `useToast()` (sonner underneath). Type: content in the serif body face (Lora; headings `font-display`), controls in sans (buttons, tabs, selects, toggles and menus already carry `font-sans`). Layers: ui portal primitives sit at `z-100`, above the `z-70` app header. Rules: `.agents/skills/shadcn/SKILL.md`.
-- **Design lint ratchet:** `bun run lint:design` runs `@shadcn/lint` (ESLint, `apps/web/eslint.config.mjs`) and fails if any count in `apps/web/design-lint-baseline.json` goes up; after a cleanup run `bun run lint:design:update` to lock in the drop. Dirs listed in `MIGRATED` are errors. A new CLI-generated shadcn component that trips `no-arbitrary-values` on upstream idioms goes in `UPSTREAM_ARBITRARY` — never add authored components there.
-- **Design snapshots:** primitive changes: `bun run test:design` (Docker screenshot baselines in `e2e/design/__screenshots__`); `bun run test:design:update` to accept an intended change.
-- **Code-quality cadence & ADRs:** [`docs/engineering/code-quality.md`](docs/engineering/code-quality.md) (weekly/monthly passes, metrics) and [`docs/adr/`](docs/adr/) (architecture decisions — write one in the PR that makes a hard-to-reverse or contested change).
-- **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
-- **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.
-- **Dev server ports (worktrees):** `dev:web` / `dev:mobile` go through `apps/web/scripts/dev-server.ts`. The main checkout gets :5173 / :8081; each worktree gets a stable port of its own (web 5174-5199, Metro 8082-8107, hashed from its path) and the launcher prints it. It only ever stops this checkout's own leftover server (PID recorded in `.dev-servers/`), never another worktree's. Pin with `WEB_PORT` / `PORT` / `METRO_PORT`. The web range is mirrored in `convex/_lib/allowedOrigins.ts` (CORS); widen both together. Playwright targets the current checkout's server. Google/Apple sign-in always returns to `SITE_URL` (:5173), so use email/password in a worktree.
-- **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
-- **Reranking is best-effort.** `cachedRerank` (`convex/_agents/chat/rerankCache.ts`) calls Voyage through `callVoyageRerank` with one hard `RERANK_TIMEOUT_MS` deadline and no retries except a single one after a 429 with a short `Retry-After`; on any failure chat and literature review fall back to the un-reranked order instead of stalling (a provider outage answering `Retry-After: 86400` once hung every chat reply). Change the model in `convex/_lib/rerankConfig.ts` and bump the cache `name` in `rerankCache.ts` so old-model scores are not served. Voyage scores are not calibrated like the previous reranker's: passages unrelated to the query score ~0.25-0.29 (p99 0.31) and useful ones mostly 0.5-0.94, so `CHAT_MIN_RELEVANCE_THRESHOLD` is 0.35 (re-tuned 2026-10-04 on 61 chat fixtures; see ADR 0002). Chat reranks the whole candidate pool (`createRerankFn` in `convex/chat/_streamSearch.ts`) so every chunk is on Voyage's scale; don't reintroduce a top-N cut there, or unscored chunks keep their vector similarity (~0.5) and slip past the floor. Re-run the sweep if the model changes.
-- **One `convex dev` watcher per dev deployment.** Every worktree's `.env.local` points at the same cloud dev deployment, and each watcher pushes its own checkout's functions on save, so two watchers overwrite each other. `bun run dev:convex` (`scripts/convex-dev.ts`) refuses to start a second watcher while another checkout holds the lock (in the shared git dir, `convex-dev/`); push from other worktrees with `bun run dev:convex --once`. `--force` takes over a stale lock. Local/anonymous deployments aren't locked. Plain `bun x convex dev` bypasses the guard. Don't create a cloud dev deployment per worktree to get around it: the team's Convex deployment quota is 40, and PR previews already use it (see `.github/BRANCHING.md` → PR previews).
-- **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.
-
-## Process Skills (superpowers)
-
-Plugin `superpowers@claude-plugins-official` is installed. **Invoke via `Skill` tool before touching code.** Project-specific triggers and overrides:
-
-| Skill                                        | When                                                                                                                                                                                                                                                                                                         | Project notes                                                                                                                               |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `superpowers:brainstorming`                  | Before any new feature, component, or behavior change                                                                                                                                                                                                                                                        | **Required** before `EnterPlanMode`                                                                                                         |
-| `superpowers:writing-plans`                  | Multi-step task, before touching code                                                                                                                                                                                                                                                                        | Output goes in plan, not memory                                                                                                             |
-| `superpowers:executing-plans`                | Executing a written plan in a separate session                                                                                                                                                                                                                                                               | —                                                                                                                                           |
-| `superpowers:subagent-driven-development`    | Plan with independent tasks, current session                                                                                                                                                                                                                                                                 | Pair with `dispatching-parallel-agents` for 2+ independent tasks                                                                            |
-| `superpowers:dispatching-parallel-agents`    | 2+ independent tasks, no shared state                                                                                                                                                                                                                                                                        | Use `Explore` subagent for >3-query codebase searches                                                                                       |
-| `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior, before proposing fixes                                                                                                                                                                                                                                        | —                                                                                                                                           |
-| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR                                                                                                                                                                                                                                                          | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
-| `superpowers:requesting-code-review`         | Before merging significant work                                                                                                                                                                                                                                                                              | —                                                                                                                                           |
-| `superpowers:receiving-code-review`          | When handling review feedback                                                                                                                                                                                                                                                                                | —                                                                                                                                           |
-| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup                                                                                                                                                                                                                                                           | —                                                                                                                                           |
-| `superpowers:using-git-worktrees`            | Feature work needing isolation                                                                                                                                                                                                                                                                               | Worktrees live under `.worktrees/`                                                                                                          |
-| `superpowers:writing-skills`                 | Creating or editing a skill                                                                                                                                                                                                                                                                                  | Edit canonical copy under `.agents/skills/<name>/SKILL.md`                                                                                  |
-| `superpowers:test-driven-development`        | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
-
-## Project-Specific Skill Triggers
-
-Skill descriptions are loaded automatically; below are _project_ triggers, not generic descriptions.
-
-**Convex** (`convex-create-component`, `convex-migration-helper`, `convex-performance-audit`, `convex-quickstart`, `convex-setup-auth`):
-
-- Schema or table change → `convex-migration-helper` (widen-migrate-narrow)
-- Read amplification, OCC conflicts, `npx convex insights` warnings → `convex-performance-audit`
-- New isolated table-owning module → `convex-create-component`
-
-**LangChain / LangGraph** (`langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`): touching anything under `convex/_agents/` or a `studio/*/*JobPhases.ts`, especially RAG retrieval, agent state/routing, or new agent types. Production jobs are Convex phases/workflows, not LangGraph graphs (see **Agent execution**), so `langgraph-fundamentals` applies only to the shared state types and the legacy graph classes.
-
-**Together AI** (`together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`): when modifying `convex/_services/ai/` or `convex/studio/audio/`.
-
-**Frontend** (`vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `bun`): **MUST invoke** when working on React components, Vite config, types, or any new UI surface.
-
-**Serena**: see MCP section below.
-
-## MCP Servers
-
-- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. **MUST use** `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file`. **Never use** `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
-
-## Skills Installation
-
-Canonical skill source: `.agents/skills/<name>/SKILL.md` (in git). Claude Code reads from `.claude/skills/` (gitignored). After cloning, run **once**:
-
-```bash
-bun run link:claude-skills     # Junction (Windows) / symlink (Unix)
-ls .claude/skills              # Should list 40+ skills
-```
-
-<!-- convex-ai-start -->
-
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
-
-<!-- convex-ai-end -->
+@AGENTS.md
+
+## Claude Code specifics
+
+### Code navigation and editing
+
+- **Serena (MCP)** is preferred for symbol work on `.ts` / `.tsx` when it is active *on this checkout*:
+  `get_symbols_overview`, `find_symbol`, `find_referencing_symbols`, `rename_symbol`, `replace_symbol_body`.
+  Serena edits the project it was activated on, so in a worktree either activate it on the worktree path
+  or use the built-in `Read` / `Edit` / `Grep` — and confirm edits landed with `git status`.
+- Use an `Explore` subagent for searches that need more than ~3 queries.
+- After Serena edits, run `bun x biome format --write` on the changed files (Serena can leave CRLF).
+
+### Process skills (superpowers)
+
+Invoke the skill at the start of the phase it covers:
+
+| Skill | When | Project notes |
+| --- | --- | --- |
+| `superpowers:brainstorming` | Before a new feature, component, or behavior change | Required before `EnterPlanMode` |
+| `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in the plan, not memory |
+| `superpowers:test-driven-development` | Deterministic logic: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new queries/mutations | `*.test.ts` next to source. Skip for prompt outputs (evals), UI (Playwright), streaming/scheduler timing |
+| `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior | Before proposing fixes |
+| `superpowers:dispatching-parallel-agents` / `subagent-driven-development` | 2+ independent tasks | — |
+| `superpowers:verification-before-completion` | Before claiming done / committing / opening a PR | The validation gates in AGENTS.md |
+| `superpowers:requesting-code-review` / `receiving-code-review` | Before merging significant work / handling feedback | — |
+| `superpowers:finishing-a-development-branch` | Implementation complete | — |
+| `superpowers:writing-skills` | Creating or editing a skill | Edit `.agents/skills/<name>/SKILL.md` |
+
+### Domain skills
+
+| Trigger | Skills |
+| --- | --- |
+| Schema or table change | `convex-migration-helper` (widen-migrate-narrow) |
+| Read amplification, OCC conflicts, `npx convex insights` warnings | `convex-performance-audit` |
+| New isolated table-owning module | `convex-create-component` |
+| `convex/_agents/` or `studio/*/*JobPhases.ts` | `langchain-fundamentals`, `langchain-rag` (`langgraph-fundamentals` only for state types / legacy graphs) |
+| `convex/_services/ai/`, `convex/studio/audio/` | `together-*` (audio, chat-completions, embeddings, evaluations, images, video) |
+| React components, Vite config, types, new UI | `vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `shadcn` |
+
+### Hooks
+
+`.claude/settings.json` runs [`.claude/hooks/on-edit.mjs`](.claude/hooks/on-edit.mjs) after every
+single-file edit: Biome `--write` on that file (sync; unfixable errors come back to you) and the workspace
+typecheck (async; failures arrive on your next turn). Details: [`docs/engineering/dev-environment.md`](docs/engineering/dev-environment.md#editor-and-agent-hooks).
