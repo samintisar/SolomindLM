@@ -103,4 +103,11 @@ describe("CustomizeWrittenQuestionsModal", () => {
     await userEvent.click(screen.getByRole("button", { name: "Generate Written Questions" }));
     expect(onGenerate).toHaveBeenCalledOnce();
   });
+
+  it("saves the focus as a Written Questions prompt", async () => {
+    renderWrittenQuestions();
+    await userEvent.type(screen.getByLabelText("Area of focus"), "Normalization");
+    await userEvent.click(screen.getByRole("button", { name: /save as reusable prompt/i }));
+    expect(screen.getByTestId("save-as-prompt-tool-label")).toHaveTextContent("Written Questions");
+  });
 });
