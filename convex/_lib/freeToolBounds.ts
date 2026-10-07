@@ -7,8 +7,14 @@
 
 export const FREE_FLASHCARD_MIN_WORDS = 80;
 export const FREE_FLASHCARD_MAX_WORDS = 12_000;
-/** Request body cap. ~12k words of prose is ~80 KB; this leaves room for long words and JSON. */
+/** Request body cap in characters (the real cap). ~12k words of prose is ~80 KB; this leaves room for long words and JSON. */
 export const FREE_FLASHCARD_MAX_BODY_BYTES = 200_000;
+/**
+ * Ceiling for the `content-length` precheck, which counts UTF-8 bytes (up to 4 per character), while
+ * `FREE_FLASHCARD_MAX_BODY_BYTES` is a character budget. Without the 4x, ~10k words of Hindi, Tamil or
+ * Bengali (3 bytes/char) would be refused before the real character check and word cap run.
+ */
+export const FREE_FLASHCARD_MAX_BODY_UTF8_BYTES = 4 * FREE_FLASHCARD_MAX_BODY_BYTES;
 export const FREE_FLASHCARD_MAX_PDF_PAGES = 40;
 export const FREE_FLASHCARD_CARD_COUNTS = [10, 20, 30] as const;
 export type FreeFlashcardCardCount = (typeof FREE_FLASHCARD_CARD_COUNTS)[number];

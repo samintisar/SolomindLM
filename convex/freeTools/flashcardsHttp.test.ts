@@ -9,6 +9,7 @@ import {
   FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
   FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
   FREE_FLASHCARD_LLM_PHASE,
+  FREE_FLASHCARD_MAX_BODY_BYTES,
   FREE_FLASHCARD_MIN_WORDS,
 } from "../_lib/freeToolBounds";
 import { rateLimiter } from "../_lib/rateLimits";
@@ -50,13 +51,19 @@ function siteverifyReturns(body: unknown) {
   siteverify.mockImplementation(async () => new Response(JSON.stringify(body), { status: 200 }));
 }
 
-function post(t: ReturnType<typeof makeT>, body: unknown, ip = "203.0.113.9"): Promise<Response> {
+function post(
+  t: ReturnType<typeof makeT>,
+  body: unknown,
+  ip = "203.0.113.9",
+  extraHeaders: Record<string, string> = {}
+): Promise<Response> {
   return t.fetch("/tools/flashcards", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Origin: "http://localhost:5173",
       "x-forwarded-for": ip,
+      ...extraHeaders,
     },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
@@ -117,6 +124,19 @@ describe("POST /tools/flashcards", () => {
     const t = makeT();
     const res = await post(t, { ...validBody, text: "x".repeat(250_000) });
     expect(res.status).toBe(413);
+  });
+
+  test("accepts ~11k words of a 3-byte-per-character script: the byte header cap is not the real cap", async () => {
+    const text = "नमस्ते दुनिया ".repeat(5_500);
+    // Sanity: it would have tripped a header precheck sized in characters.
+    expect(new TextEncoder().encode(text).length).toBeGreaterThan(FREE_FLASHCARD_MAX_BODY_BYTES);
+    const t = makeT();
+    const body = JSON.stringify({ ...validBody, text });
+    // Real clients send content-length; the precheck must not 413 on bytes alone.
+    const res = await post(t, body, "203.0.113.9", {
+      "content-length": String(new TextEncoder().encode(body).length),
+    });
+    expect(res.status).toBe(200);
   });
 
   test("403 when Turnstile rejects the token, without generating", async () => {

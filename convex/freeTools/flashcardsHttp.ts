@@ -6,6 +6,7 @@ import {
   countWords,
   FREE_FLASHCARD_LLM_PHASE,
   FREE_FLASHCARD_MAX_BODY_BYTES,
+  FREE_FLASHCARD_MAX_BODY_UTF8_BYTES,
   parseFreeFlashcardRequest,
 } from "../_lib/freeToolBounds";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
@@ -50,8 +51,9 @@ export async function handleFreeFlashcardsPost(
   const logger = createServiceLogger("free_tools", "flashcards");
 
   const declaredBytes = Number(request.headers.get("content-length") ?? 0);
-  if (declaredBytes > FREE_FLASHCARD_MAX_BODY_BYTES) return json(413, { error: "too_large" });
+  if (declaredBytes > FREE_FLASHCARD_MAX_BODY_UTF8_BYTES) return json(413, { error: "too_large" });
   const raw = await request.text();
+  // `raw.length` counts characters, so this is the real cap regardless of script.
   if (raw.length > FREE_FLASHCARD_MAX_BODY_BYTES) return json(413, { error: "too_large" });
 
   let body: unknown;
