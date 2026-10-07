@@ -43,7 +43,13 @@ describe("useClaimPendingDeck", () => {
 
   it("explains the notebook limit and drops the deck", async () => {
     claimDeck.mockRejectedValue(
-      new ConvexError({ code: "NOTEBOOK_LIMIT", limit: 3, current: 3, limitType: "notebook" })
+      new ConvexError({
+        code: "NOTEBOOK_LIMIT_REACHED",
+        limit: 5,
+        current: 5,
+        limitType: "notebook",
+        isPro: false,
+      })
     );
     renderHook(() => useClaimPendingDeck());
     await waitFor(() => expect(toastError).toHaveBeenCalledOnce());
