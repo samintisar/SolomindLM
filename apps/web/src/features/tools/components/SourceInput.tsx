@@ -39,12 +39,17 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
   const [dragging, setDragging] = useState(false);
   // dragenter/dragleave also fire for the button's children; count to know when the file truly left.
   const dragDepth = useRef(0);
+  // A slow extraction must not overwrite a newer drop, or the pasted source after a tab switch.
+  const readSeq = useRef(0);
+  const activeTab = useRef<Tab>("pdf");
 
   const readPdf = async (file: File) => {
+    const seq = ++readSeq.current;
     setPdfStatus({ kind: "reading" });
-    onChange(null);
+    if (activeTab.current === "pdf") onChange(null);
     try {
       const { text, pagesRead, totalPages } = await extractPdfText(file);
+      if (seq !== readSeq.current) return;
       if (countWords(text) < FREE_FLASHCARD_MIN_WORDS) {
         setPdfStatus({
           kind: "error",
@@ -57,8 +62,9 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
       const note =
         totalPages > pagesRead ? `Read the first ${pagesRead} of ${totalPages} pages.` : undefined;
       setPdfStatus({ kind: "ready", source, note });
-      onChange(source);
+      if (activeTab.current === "pdf") onChange(source);
     } catch {
+      if (seq !== readSeq.current) return;
       setPdfStatus({ kind: "error", message: "That file couldn't be opened as a PDF." });
     }
   };
@@ -70,6 +76,7 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
 
   // Switching tabs hands back the source the newly shown tab already holds.
   const switchTab = (tab: string) => {
+    activeTab.current = tab as Tab;
     if ((tab as Tab) === "pdf") onChange(pdfStatus.kind === "ready" ? pdfStatus.source : null);
     else onChange(pastedSource(pasted));
   };

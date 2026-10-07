@@ -170,6 +170,7 @@ describe("freeTools.claimDeck.claimDeck", () => {
       current: 5,
       limitType: "notebook",
       isPro: false,
+      message: "Notebook limit reached (5/5). Please upgrade to create more notebooks.",
     });
   });
 });

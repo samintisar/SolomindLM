@@ -20,7 +20,11 @@ import { normalizeMathMarkdownDeep } from "../_shared/mathMarkdown";
 import { buildFreeDeck, cardsToRequest } from "./deck";
 import { freeDeckCardValidator } from "./validators";
 
-/** One structured call over the whole (already bounded) text: the studio single-chunk path. */
+/**
+ * One structured call over the whole (already bounded) text: the studio single-chunk path.
+ * `maxAttempts: 1` keeps it to exactly one LLM call, so the reserved attempt windows bound spend;
+ * a malformed response surfaces as a failed run the visitor can retry against their own attempts.
+ */
 export const generate = internalAction({
   args: { text: v.string(), cardCount: v.number() },
   returns: v.object({ title: v.string(), cards: v.array(freeDeckCardValidator) }),
@@ -39,6 +43,7 @@ export const generate = internalAction({
           schemaName: "flashcards",
           model: env.FAST_LLM,
           maxTokens: 8192,
+          maxAttempts: 1,
           logPrefix: "FreeFlashcards",
         }),
       FREE_FLASHCARD_LLM_TIMEOUT_MS,
