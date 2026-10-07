@@ -27,8 +27,14 @@ function loadTurnstile(): Promise<TurnstileApi> {
     const script = document.createElement("script");
     script.src = SCRIPT_SRC;
     script.async = true;
-    script.onload = () =>
-      window.turnstile ? resolve(window.turnstile) : reject(new Error("turnstile_missing"));
+    script.onload = () => {
+      if (window.turnstile) {
+        resolve(window.turnstile);
+      } else {
+        scriptPromise = null;
+        reject(new Error("turnstile_missing"));
+      }
+    };
     script.onerror = () => {
       scriptPromise = null;
       reject(new Error("turnstile_load_failed"));
@@ -50,6 +56,8 @@ export function useTurnstile(containerRef: RefObject<HTMLDivElement | null>) {
 
   useEffect(
     () => () => {
+      pending.current?.reject(new Error("turnstile_unmounted"));
+      pending.current = null;
       if (widgetId.current && window.turnstile) window.turnstile.remove(widgetId.current);
       widgetId.current = null;
     },
@@ -61,9 +69,14 @@ export function useTurnstile(containerRef: RefObject<HTMLDivElement | null>) {
     const container = containerRef.current;
     if (!container) throw new Error("turnstile_no_container");
 
+    // A newer call supersedes an older one still waiting on the same widget.
+    pending.current?.reject(new Error("turnstile_superseded"));
+    const entry = {} as Pending;
     const token = new Promise<string>((resolve, reject) => {
-      pending.current = { resolve, reject };
+      entry.resolve = resolve;
+      entry.reject = reject;
     });
+    pending.current = entry;
 
     if (widgetId.current === null) {
       widgetId.current = turnstile.render(container, {
@@ -87,7 +100,7 @@ export function useTurnstile(containerRef: RefObject<HTMLDivElement | null>) {
       return await Promise.race([token, timeout]);
     } finally {
       clearTimeout(timer);
-      pending.current = null;
+      if (pending.current === entry) pending.current = null;
     }
   }, [containerRef]);
 
