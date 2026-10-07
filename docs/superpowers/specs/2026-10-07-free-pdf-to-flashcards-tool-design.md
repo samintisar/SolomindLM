@@ -75,9 +75,9 @@ keep anonymous LLM spend bounded.
 | 200 | Cards generated | Show deck |
 | 400 | Bad body / too short / too long | Inline validation message |
 | 403 | Turnstile failed | Reset widget, retry once automatically |
-| 429 `ip` | Per-IP limit hit | "You've used today's 3 free decks" + reset time + signup CTA |
+| 429 `ip` | Per-IP limit hit (3 decks or 6 attempts a day) | "You've reached today's free limit" + reset time + signup CTA |
 | 429 `global` | Global cap hit | "The free tool is busy today" + signup CTA |
-| 502 / 504 | LLM error / timeout, or zero usable cards | Retry button; limit not consumed |
+| 502 / 504 | LLM error / timeout, or zero usable cards | Retry button; does not use up a free deck (it does use one of the 6 daily attempts) |
 
 ## Frontend units (`apps/web/src/features/tools/`)
 
