@@ -41,6 +41,15 @@ describe("toCsv", () => {
     expect(csv.startsWith("﻿Front,Back\r\n")).toBe(true);
     expect(csv).toContain('"Define ""osmosis""\n(short)","Water moves\tacross a membrane"');
   });
+
+  it("opens formula-like cells as text and keeps signed numbers", () => {
+    const csv = toCsv([
+      { front: '=HYPERLINK("http://x","y")', back: "+ve charge" },
+      { front: "Absolute zero in °C?", back: "-273.15" },
+    ]);
+    expect(csv).toContain(`"'=HYPERLINK(""http://x"",""y"")","'+ve charge"`);
+    expect(csv).toContain('"Absolute zero in °C?","-273.15"');
+  });
 });
 
 describe("exportFileName", () => {

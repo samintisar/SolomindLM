@@ -25,6 +25,31 @@ function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
+/** The body as text, or null once it passes `maxBytes`: stops reading rather than buffering it all. */
+async function readBodyCapped(request: Request, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export async function handleFreeFlashcardsOptions(
   _ctx: ActionCtx,
   request: Request
@@ -52,9 +77,12 @@ export async function handleFreeFlashcardsPost(
 
   const declaredBytes = Number(request.headers.get("content-length") ?? 0);
   if (declaredBytes > FREE_FLASHCARD_MAX_BODY_UTF8_BYTES) return json(413, { error: "too_large" });
-  const raw = await request.text();
+  // The header can be missing or wrong (chunked uploads), so the read itself is capped too.
+  const raw = await readBodyCapped(request, FREE_FLASHCARD_MAX_BODY_UTF8_BYTES);
   // `raw.length` counts characters, so this is the real cap regardless of script.
-  if (raw.length > FREE_FLASHCARD_MAX_BODY_BYTES) return json(413, { error: "too_large" });
+  if (raw === null || raw.length > FREE_FLASHCARD_MAX_BODY_BYTES) {
+    return json(413, { error: "too_large" });
+  }
 
   let body: unknown;
   try {
@@ -76,13 +104,18 @@ export async function handleFreeFlashcardsPost(
 
   const ip = clientIpFromHeaders(request.headers);
   const hops = forwardedForHopCount(request.headers);
+  if (ip === null) {
+    // Without an address every caller would share one per-IP bucket; refuse loudly instead.
+    logger.error("client_ip_unknown", undefined, { xffHops: hops });
+    return json(503, { error: "unavailable" });
+  }
   const turnstile = await verifyTurnstileToken({ token: turnstileToken, secret, remoteIp: ip });
   if (!turnstile.ok) {
     logger.warn("turnstile_rejected", { codes: turnstile.codes });
     return json(403, { error: "captcha_failed" });
   }
 
-  const ipKey = await hashClientIp(ip ?? "unknown", salt);
+  const ipKey = await hashClientIp(ip, salt);
   const limit = await ctx.runMutation(internal.freeTools.rateLimit.reserveFreeFlashcardRun, {
     ipKey,
   });
@@ -105,7 +138,6 @@ export async function handleFreeFlashcardsPost(
       words: countWords(text),
       durationMs: Date.now() - startedAt,
       xffHops: hops,
-      ipKnown: ip !== null,
     });
     return json(200, deck);
   } catch (error) {

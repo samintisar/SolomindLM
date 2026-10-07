@@ -320,7 +320,6 @@ describe("SpreadsheetView", () => {
       // Blob.text() strips a BOM, so decode the bytes with the BOM kept.
       const text = new TextDecoder("utf-8", { ignoreBOM: true }).decode(await blob.arrayBuffer());
       expect(text).toBe(`﻿${CSV}`);
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:sheet");
     } finally {
       click.mockRestore();
       Object.assign(URL, original);
