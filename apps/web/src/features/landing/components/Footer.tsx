@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { FREE_TOOL_PAGES } from "@/features/tools/toolPages";
 import { getIntentPagesByCluster } from "../intentLandingPages";
 import { getComparisonPages, getGuidePages } from "../seoContentPages";
 
@@ -142,6 +143,15 @@ export const Footer: React.FC = () => {
                 </FooterLink>
               ))}
             </FooterLinkColumn>
+            <div className="mt-10">
+              <FooterLinkColumn title="Free tools">
+                {FREE_TOOL_PAGES.map((page) => (
+                  <FooterLink key={page.path} to={page.path}>
+                    {page.navLabel}
+                  </FooterLink>
+                ))}
+              </FooterLinkColumn>
+            </div>
           </div>
 
           <div className="lg:col-span-2">

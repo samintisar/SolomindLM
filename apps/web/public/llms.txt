@@ -38,6 +38,9 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 - Student study tools (hub): https://www.solomindlm.com/students
 - Research tools (hub): https://www.solomindlm.com/research
 
+### Free tools
+- Free PDF to flashcards maker (no signup; Anki, Quizlet and CSV export): https://www.solomindlm.com/tools/pdf-to-flashcards
+
 ### Compare and guides
 - SolomindLM vs NotebookLM: https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
 - How to study from PDFs with AI: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai

@@ -207,4 +207,13 @@ describe("free tool pages", () => {
     expect(body).toContain(PDF_TO_FLASHCARDS_PAGE.faqs[0]!.question);
     expect(body).toContain('href="/students/ai-flashcards"');
   });
+
+  it("cross-links the flashcards intent page to the tool with its own anchor text", () => {
+    const intentPage = getIntentLandingPageByPath("/students/ai-flashcards");
+    const body = buildIntentLandingPrerenderBody(intentPage!);
+    expect(body).toContain(
+      `<a href="${PDF_TO_FLASHCARDS_PAGE.path}">Free PDF to flashcards maker</a>`
+    );
+    expect(body).not.toContain("Written questions with feedback");
+  });
 });
