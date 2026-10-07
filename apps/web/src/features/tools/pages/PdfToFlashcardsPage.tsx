@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/aler
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
+import { useToast } from "@/shared/contexts/useToast";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { isNativeShell } from "@/utils/platformDetection";
 import { DeckPreview } from "../components/DeckPreview";
@@ -28,6 +29,7 @@ import {
   generateFreeDeck,
 } from "../lib/freeToolClient";
 import { savePendingDeck } from "../lib/pendingDeck";
+import { isTurnstileChallengeFailure } from "../lib/turnstileErrors";
 import { PDF_TO_FLASHCARDS_PAGE as PAGE } from "../toolPages";
 
 type Status =
@@ -72,8 +74,8 @@ function statusForResult(result: Exclude<GenerateFreeDeckResult, { kind: "ok" }>
 }
 
 /** Saves a pending deck once signed in; remounted (new key) to retry for an already signed-in visitor. */
-function PendingDeckClaimer() {
-  useClaimPendingDeck();
+function PendingDeckClaimer({ onSettled }: { onSettled: () => void }) {
+  useClaimPendingDeck(onSettled);
   return null;
 }
 
@@ -88,6 +90,8 @@ export default function PdfToFlashcardsPage() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [authOpen, setAuthOpen] = useState(false);
   const [claimRun, setClaimRun] = useState(0);
+  const [claiming, setClaiming] = useState(false);
+  const toast = useToast();
 
   if (isNativeShell()) {
     if (isLoading) return <div className="min-h-screen bg-background" />;
@@ -105,12 +109,21 @@ export default function PdfToFlashcardsPage() {
       let turnstileToken: string;
       try {
         turnstileToken = await getToken();
-      } catch {
-        setStatus({
-          kind: "error",
-          title: "We couldn't verify your browser",
-          message: "Check that nothing is blocking challenges.cloudflare.com, then try again.",
-        });
+      } catch (error) {
+        setStatus(
+          isTurnstileChallengeFailure(error)
+            ? {
+                kind: "error",
+                title: "Security check failed",
+                message: "Try refreshing the page or using a different browser.",
+              }
+            : {
+                kind: "error",
+                title: "We couldn't verify your browser",
+                message:
+                  "Check that nothing is blocking challenges.cloudflare.com, then try again.",
+              }
+        );
         return;
       }
       result = await generateFreeDeck({ text, cardCount, turnstileToken });
@@ -125,14 +138,22 @@ export default function PdfToFlashcardsPage() {
   };
 
   const saveDeck = () => {
-    if (status.kind !== "done") return;
-    savePendingDeck({
+    if (status.kind !== "done" || claiming) return;
+    const saved = savePendingDeck({
       title: status.deck.title,
       sourceText: status.sourceText,
       cards: status.deck.cards,
     });
-    if (isAuthenticated) setClaimRun((run) => run + 1);
-    else setAuthOpen(true);
+    if (!saved) {
+      toast.error("Couldn't save this deck in your browser. Export it instead.");
+      return;
+    }
+    if (isAuthenticated) {
+      setClaiming(true);
+      setClaimRun((run) => run + 1);
+    } else {
+      setAuthOpen(true);
+    }
   };
 
   return (
@@ -143,7 +164,7 @@ export default function PdfToFlashcardsPage() {
         description={PAGE.description}
         keywords={PAGE.keywords}
       />
-      <PendingDeckClaimer key={claimRun} />
+      <PendingDeckClaimer key={claimRun} onSettled={() => setClaiming(false)} />
       <div className="min-h-screen landing-grid-pattern">
         <header className="sticky top-0 z-50 border-b border-border/60 bg-card/40 backdrop-blur-sm">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
@@ -251,7 +272,7 @@ export default function PdfToFlashcardsPage() {
                   Save it to a free notebook: spaced repetition picks the cards you're about to
                   forget.
                 </p>
-                <Button variant="secondary" className="mt-4" onClick={saveDeck}>
+                <Button variant="secondary" className="mt-4" disabled={claiming} onClick={saveDeck}>
                   Save &amp; study with spaced repetition
                 </Button>
               </div>

@@ -87,6 +87,7 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
             type="file"
             accept="application/pdf,.pdf"
             className="sr-only"
+            tabIndex={-1}
             aria-label="Choose a PDF"
             onChange={(event) => {
               const file = event.target.files?.[0];

@@ -35,6 +35,29 @@ describe("useClaimPendingDeck", () => {
     expect(readPendingDeck()).toBeNull();
   });
 
+  it("claims once when two claimers run at the same time", async () => {
+    let resolveClaim: (value: { notebookId: string; flashcardId: string }) => void = () => {};
+    claimDeck.mockReturnValue(
+      new Promise((resolve) => {
+        resolveClaim = resolve;
+      })
+    );
+    const onSettled = vi.fn();
+    renderHook(() => useClaimPendingDeck(onSettled));
+    renderHook(() => useClaimPendingDeck(onSettled));
+    expect(claimDeck).toHaveBeenCalledOnce();
+    resolveClaim({ notebookId: "nb1", flashcardId: "fc1" });
+    await waitFor(() => expect(onSettled).toHaveBeenCalledOnce());
+    expect(navigate).toHaveBeenCalledOnce();
+  });
+
+  it("reports when a failed claim settles", async () => {
+    claimDeck.mockRejectedValue(new Error("Network error"));
+    const onSettled = vi.fn();
+    renderHook(() => useClaimPendingDeck(onSettled));
+    await waitFor(() => expect(onSettled).toHaveBeenCalledOnce());
+  });
+
   it("does nothing without a pending deck", () => {
     localStorage.clear();
     renderHook(() => useClaimPendingDeck());
