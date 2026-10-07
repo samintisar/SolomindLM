@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { getIntentPagesByCluster } from "../intentLandingPages";
-import { getComparisonPages, getGuidePages } from "../seoContentPages";
+import { COMPARE_HUB_PATH, getComparisonPages, getGuidePages } from "../seoContentPages";
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -96,8 +96,8 @@ export const Footer: React.FC = () => {
   return (
     <footer className="border-t border-border/50 px-6 pt-16 pb-10">
       <div className="mx-auto max-w-280">
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-4 lg:grid-cols-12">
-          <div className="col-span-2 md:col-span-4 lg:col-span-4">
+        <div className="flex flex-col gap-6 border-b border-border/50 pb-10 md:flex-row md:items-end md:justify-between">
+          <div>
             <Link
               to="/"
               className="inline-flex items-center gap-2.5 font-display text-lg font-bold text-foreground"
@@ -105,76 +105,74 @@ export const Footer: React.FC = () => {
               <img src="/SolomindLM_logo.png" alt="" className="size-8 shrink-0 object-contain" />
               SolomindLM
             </Link>
-            <p className="mt-4 max-w-xs font-serif text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-4 max-w-sm font-serif text-sm leading-relaxed text-muted-foreground">
               {FOOTER_TAGLINE}
             </p>
-            <div className="mt-5 flex items-center gap-4">
-              {SOCIAL_LINKS.map(({ label, href, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Icon className="size-5" />
-                </a>
-              ))}
-            </div>
           </div>
+          <div className="flex items-center gap-4">
+            {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={label}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Icon className="size-5" />
+              </a>
+            ))}
+          </div>
+        </div>
 
-          <div className="lg:col-span-2">
-            <FooterLinkColumn title="Product">
-              {PRODUCT_LINKS.map((link) => (
-                <FooterLink key={link.to} to={link.to}>
-                  {link.label}
-                </FooterLink>
-              ))}
-              {comparisonPages.map((page) => (
-                <FooterLink key={page.path} to={page.path}>
-                  {page.navLabel}
-                </FooterLink>
-              ))}
-            </FooterLinkColumn>
-          </div>
+        <div className="mt-10 grid grid-cols-2 gap-10 md:grid-cols-3 lg:grid-cols-5">
+          <FooterLinkColumn title="Product">
+            {PRODUCT_LINKS.map((link) => (
+              <FooterLink key={link.to} to={link.to}>
+                {link.label}
+              </FooterLink>
+            ))}
+          </FooterLinkColumn>
 
-          <div className="lg:col-span-2">
-            <FooterLinkColumn title="For students">
-              <FooterLink to="/students">All student tools</FooterLink>
-              {studentPages.map((page) => (
-                <FooterLink key={page.path} to={page.path}>
-                  {page.navLabel}
-                </FooterLink>
-              ))}
-            </FooterLinkColumn>
-          </div>
+          <FooterLinkColumn title="For students">
+            <FooterLink to="/students">All student tools</FooterLink>
+            {studentPages.map((page) => (
+              <FooterLink key={page.path} to={page.path}>
+                {page.navLabel}
+              </FooterLink>
+            ))}
+          </FooterLinkColumn>
 
-          <div className="lg:col-span-2">
-            <FooterLinkColumn title="For research">
-              <FooterLink to="/research">All research tools</FooterLink>
-              {researchPages.map((page) => (
-                <FooterLink key={page.path} to={page.path}>
-                  {page.navLabel}
-                </FooterLink>
-              ))}
-            </FooterLinkColumn>
-          </div>
+          <FooterLinkColumn title="For research">
+            <FooterLink to="/research">All research tools</FooterLink>
+            {researchPages.map((page) => (
+              <FooterLink key={page.path} to={page.path}>
+                {page.navLabel}
+              </FooterLink>
+            ))}
+          </FooterLinkColumn>
 
-          <div className="lg:col-span-2">
-            <FooterLinkColumn title="Company">
-              {guidePages.map((page) => (
-                <FooterLink key={page.path} to={page.path}>
-                  {page.navLabel}
-                </FooterLink>
-              ))}
-              {LEGAL_LINKS.map((link) => (
-                <FooterLink key={link.to} to={link.to}>
-                  {link.label}
-                </FooterLink>
-              ))}
-            </FooterLinkColumn>
-          </div>
+          <FooterLinkColumn title="Compare">
+            <FooterLink to={COMPARE_HUB_PATH}>All comparisons</FooterLink>
+            {comparisonPages.map((page) => (
+              <FooterLink key={page.path} to={page.path}>
+                {page.navLabel}
+              </FooterLink>
+            ))}
+          </FooterLinkColumn>
+
+          <FooterLinkColumn title="Company">
+            {guidePages.map((page) => (
+              <FooterLink key={page.path} to={page.path}>
+                {page.navLabel}
+              </FooterLink>
+            ))}
+            {LEGAL_LINKS.map((link) => (
+              <FooterLink key={link.to} to={link.to}>
+                {link.label}
+              </FooterLink>
+            ))}
+          </FooterLinkColumn>
         </div>
 
         <div className="mt-14 flex flex-col gap-2 border-t border-border/50 pt-8 font-sans text-sm text-muted-foreground sm:flex-row sm:justify-between">

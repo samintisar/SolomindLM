@@ -6,6 +6,7 @@ import {
 } from "@/features/landing/intentLandingPages";
 import {
   getSeoContentBreadcrumbItems,
+  getSeoContentLastUpdated,
   SEO_CONTENT_LAST_UPDATED,
   SEO_CONTENT_PAGES,
 } from "@/features/landing/seoContentPages";
@@ -69,7 +70,7 @@ const SEO_CONTENT_SEO_PAGES: PublicSeoPage[] = SEO_CONTENT_PAGES.map((page) => (
   ogType: "article",
   changefreq: page.changefreq ?? "monthly",
   priority: page.priority ?? 0.8,
-  lastmod: SEO_CONTENT_LAST_UPDATED,
+  lastmod: getSeoContentLastUpdated(page),
   structuredData: [
     generateBreadcrumbStructuredData(getSeoContentBreadcrumbItems(page)),
     generateArticleStructuredData({
@@ -77,7 +78,7 @@ const SEO_CONTENT_SEO_PAGES: PublicSeoPage[] = SEO_CONTENT_PAGES.map((page) => (
       description: page.description,
       path: page.path,
       datePublished: SEO_CONTENT_LAST_UPDATED,
-      dateModified: SEO_CONTENT_LAST_UPDATED,
+      dateModified: getSeoContentLastUpdated(page),
       articleType: page.articleType,
     }),
     generateFAQStructuredData(page.faqs),
