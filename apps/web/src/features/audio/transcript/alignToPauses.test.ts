@@ -261,6 +261,10 @@ describe("alignTranscriptToAudio", () => {
     expect(within / errors.length).toBeGreaterThanOrEqual(0.85);
   });
 
+  // Synthesises and analyses two ten-minute files of its own, so it is the slowest test here. A
+  // shorter file would be faster but too easy: at 30-40 lines the same-voice case aligns every
+  // line, and the bound below would stop measuring anything. Pitch tracking dominates and V8
+  // coverage slows it about eightfold (near 5 s in CI), hence a timeout above Vitest's 5 s default.
   it("with the real pause mix, aligns every start with the voice cue and most without", () => {
     const accuracy = (options: SynthOptions) => {
       const synthetic = synthesize({ ...realShaped, ...options });
@@ -275,7 +279,7 @@ describe("alignTranscriptToAudio", () => {
     );
     expect(voiceCue).toBe(1);
     expect(noVoiceCue).toBeGreaterThanOrEqual(0.85);
-  });
+  }, 20_000);
 
   it("keeps each line's text and speaker and ends lines where the next pause starts", () => {
     const estimate = estimateLines(voiced.transcript, voiced.samples.length / SAMPLE_RATE).map(
