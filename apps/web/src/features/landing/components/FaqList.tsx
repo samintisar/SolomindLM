@@ -15,7 +15,7 @@ export type FaqListItem = FAQItem & { learnMorePath?: string; learnMoreLabel?: s
 
 /**
  * One question. Closed answers stay in the HTML (forceMount + the hidden attribute), as the FAQ
- * structured data lists every answer and find-in-page should reach them.
+ * structured data lists every answer and crawlers should find them in the page.
  */
 function FaqRow({ faq, defaultOpen }: { faq: FaqListItem; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);

@@ -1,13 +1,17 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-/** Resets scroll position on route changes (React Router does not do this by default). */
+/**
+ * Resets scroll position on route changes (React Router does not do this by default). A `#hash`
+ * scrolls to the element with that id instead, e.g. `/#pricing` from the content pages' nav.
+ */
 export function ScrollToTop() {
   const { pathname, hash } = useLocation();
 
   useEffect(() => {
     if (hash) {
-      const target = document.querySelector(hash);
+      // By id, not querySelector: a hash need not be a valid CSS selector.
+      const target = document.getElementById(decodeURIComponent(hash.slice(1)));
       if (target) {
         target.scrollIntoView();
         return;

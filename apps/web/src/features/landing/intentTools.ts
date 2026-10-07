@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import type { Tone } from "./components/home/tone";
 
-export interface IntentTool {
+interface IntentTool {
   icon: LucideIcon;
   tone: Tone;
 }

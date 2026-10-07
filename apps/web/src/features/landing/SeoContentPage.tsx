@@ -129,7 +129,7 @@ function ComparisonTable({ page }: { page: SeoContentPageConfig }) {
         </h2>
         {/* The table keeps a min width and scrolls sideways inside the card on phones. */}
         <Card variant="flush" className="mt-6">
-          <Table className="min-w-160">
+          <Table aria-labelledby="table-title" className="min-w-160">
             <TableHeader>
               <TableRow>
                 <TableHead scope="col" className="w-44">

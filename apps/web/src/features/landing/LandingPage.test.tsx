@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { ScrollToTop } from "@/shared/components/ScrollToTop";
 import { NAV_ITEMS } from "./components/home/landingHomeContent";
 import { LandingPage } from "./LandingPage";
 
@@ -37,15 +38,22 @@ describe("LandingPage", () => {
     expect(container.querySelector(".auth-form-light")).not.toBeNull();
   });
 
-  it("scrolls to the section named in the URL hash", () => {
+  it("scrolls to the section named in the URL hash (the content pages' nav links)", () => {
+    // jsdom has no scrollIntoView; stub it for this test only.
+    const original = Element.prototype.scrollIntoView;
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
-    render(
-      <MemoryRouter initialEntries={["/#pricing"]}>
-        <LandingPage onGetStarted={vi.fn()} />
-      </MemoryRouter>
-    );
-    expect(scrollIntoView).toHaveBeenCalled();
-    expect(scrollIntoView.mock.contexts[0]).toHaveProperty("id", "pricing");
+    try {
+      render(
+        <MemoryRouter initialEntries={["/#pricing"]}>
+          <ScrollToTop />
+          <LandingPage onGetStarted={vi.fn()} />
+        </MemoryRouter>
+      );
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toHaveProperty("id", "pricing");
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 });

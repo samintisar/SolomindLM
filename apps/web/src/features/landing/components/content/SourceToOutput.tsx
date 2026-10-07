@@ -23,7 +23,7 @@ const sourceTilt = cva("flex items-center gap-3 px-3.5 py-3", {
   },
 });
 
-/** One side of the stage: a readable label, the decorative picture, then the readable caption. */
+/** One side of the stage: a readable label, the decorative picture (if any), then the readable caption. */
 function StageSide({
   label,
   icon: Icon,
@@ -33,7 +33,7 @@ function StageSide({
   label: string;
   icon: LucideIcon;
   caption: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-4 md:col-span-5">
@@ -41,9 +41,11 @@ function StageSide({
         <Icon aria-hidden className="size-3.5" />
         {label}
       </p>
-      <div aria-hidden inert className="relative flex flex-col gap-3">
-        {children}
-      </div>
+      {children ? (
+        <div aria-hidden inert className="relative flex flex-col gap-3">
+          {children}
+        </div>
+      ) : null}
       <p className="font-serif text-sm text-foreground/70">{caption}</p>
     </div>
   );
@@ -51,15 +53,14 @@ function StageSide({
 
 /** Tool-page stage: the files you bring → what the tool makes from them, with the page's captions. */
 export function SourceToOutput({ intentKey, caption }: SourceToOutputProps) {
+  // Without a scene the captions still render: they are the page's own words.
   const scene = getIntentScene(intentKey);
-  if (!scene) return null;
-  const { sources, output } = scene;
 
   return (
     <Stage>
       <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-12">
         <StageSide label="Your source" icon={FileText} caption={caption.source}>
-          {sources.map((source, index) => (
+          {scene?.sources.map((source, index) => (
             <DemoSurface
               key={source.name}
               className={sourceTilt({ tilt: index % 2 === 0 ? "left" : "right" })}
@@ -88,15 +89,15 @@ export function SourceToOutput({ intentKey, caption }: SourceToOutputProps) {
         </div>
 
         <StageSide label="What you get" icon={Sparkles} caption={caption.output}>
-          {output.kind === "demo" ? (
-            output.render("w-full")
+          {!scene ? null : scene.output.kind === "demo" ? (
+            scene.output.render("w-full")
           ) : (
             <OutputCard
               intentKey={intentKey}
-              title={output.title}
-              meta={output.meta}
-              rows={output.rows}
-              shape={output.shape}
+              title={scene.output.title}
+              meta={scene.output.meta}
+              rows={scene.output.rows}
+              shape={scene.output.shape}
               className="w-full"
             />
           )}

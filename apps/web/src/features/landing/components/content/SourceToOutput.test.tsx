@@ -43,10 +43,15 @@ describe("SourceToOutput", () => {
     expect(pictures[1]).toHaveTextContent(/flashcard/i);
   });
 
-  it("renders nothing for a tool without a scene", () => {
+  it("keeps the captions, without pictures, for a tool without a scene", () => {
     const { container } = render(
-      <SourceToOutput intentKey="notATool" caption={{ source: "a", output: "b" }} />
+      <SourceToOutput
+        intentKey="notATool"
+        caption={{ source: "Source text", output: "Output text" }}
+      />
     );
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText("Source text")).toBeInTheDocument();
+    expect(screen.getByText("Output text")).toBeInTheDocument();
+    expect(container.querySelector("[inert]")).toBeNull();
   });
 });

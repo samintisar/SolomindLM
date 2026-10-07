@@ -70,8 +70,11 @@ const tableCellVariants = cva("border-r border-b border-hairline last:border-r-0
       true: "sticky left-0 z-10 bg-card in-[tr[data-state=selected]]:bg-muted",
       false: "",
     },
-    /** highlight: the column the page is about (e.g. ours in a comparison). `link` is the brand colour that reads in both themes. */
-    highlight: { true: "bg-link/5", false: "" },
+    /**
+     * highlight: the column the page is about (e.g. ours in a comparison). `link` is the brand colour
+     * that reads in both themes. The tint is a gradient over a solid fill, so a pinned cell stays opaque.
+     */
+    highlight: { true: "bg-card bg-linear-to-b from-link/5 to-link/5", false: "" },
   },
   defaultVariants: { pinned: false, highlight: false },
 });
@@ -83,8 +86,8 @@ const tableHeadVariants = cva("px-5 text-left font-sans font-semibold", {
       true: "py-4 align-top text-sm text-foreground",
       false: "h-12 bg-muted align-middle text-xs whitespace-nowrap text-muted-foreground",
     },
-    /** highlight: the column the page is about; replaces the header band's muted fill. */
-    highlight: { true: "bg-link/8 text-link", false: "" },
+    /** highlight: the column the page is about; a tint over the band's solid fill, so a sticky header stays opaque. */
+    highlight: { true: "bg-linear-to-b from-link/8 to-link/8 text-link", false: "" },
   },
   defaultVariants: { rowHeader: false, highlight: false },
 });
