@@ -9,6 +9,7 @@ import { isNativeShell } from "@/utils/platformDetection";
 import { Footer } from "./components/Footer";
 import {
   getSeoContentBreadcrumbItems,
+  getSeoContentLastUpdated,
   getSeoContentPageByPath,
   type SeoContentPageConfig,
 } from "./seoContentPages";
@@ -115,7 +116,8 @@ function SeoContentHero({ page, onSignup }: { page: SeoContentPageConfig; onSign
             </p>
             {page.quickAnswer.chooseCompetitor ? (
               <p className="text-sm text-foreground leading-relaxed">
-                <span className="font-medium">NotebookLM:</span> {page.quickAnswer.chooseCompetitor}
+                <span className="font-medium">{page.competitorName}:</span>{" "}
+                {page.quickAnswer.chooseCompetitor}
               </p>
             ) : null}
             <p className="text-sm text-foreground leading-relaxed">
@@ -137,7 +139,15 @@ function SeoContentBody({ page }: { page: SeoContentPageConfig }) {
   return (
     <section className="px-6 md:px-8 pb-16 md:pb-20">
       <div className="max-w-3xl mx-auto space-y-12">
-        {page.comparisonTable ? <SeoContentComparisonTable rows={page.comparisonTable} /> : null}
+        {page.comparisonTable ? (
+          <div className="space-y-4">
+            <SeoContentComparisonTable
+              rows={page.comparisonTable}
+              competitorName={page.competitorName ?? "Alternative"}
+            />
+            <SeoContentSources page={page} />
+          </div>
+        ) : null}
         {page.sections.map((section) => (
           <article key={section.h2} className="space-y-4">
             <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
@@ -166,8 +176,10 @@ function SeoContentBody({ page }: { page: SeoContentPageConfig }) {
 
 function SeoContentComparisonTable({
   rows,
+  competitorName,
 }: {
   rows: NonNullable<SeoContentPageConfig["comparisonTable"]>;
+  competitorName: string;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
@@ -181,7 +193,7 @@ function SeoContentComparisonTable({
               SolomindLM
             </th>
             <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
-              NotebookLM
+              {competitorName}
             </th>
           </tr>
         </thead>
@@ -202,6 +214,34 @@ function SeoContentComparisonTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function SeoContentSources({ page }: { page: SeoContentPageConfig }) {
+  if (!page.sources || page.sources.length === 0) return null;
+  const checked = new Date(`${getSeoContentLastUpdated(page)}T00:00:00Z`).toLocaleDateString(
+    "en-US",
+    { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }
+  );
+
+  return (
+    <p className="text-xs text-muted-foreground leading-relaxed">
+      {page.competitorName} details checked {checked} against:{" "}
+      {page.sources.map((source, index) => (
+        <span key={source.url}>
+          {index > 0 ? ", " : null}
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            {source.label}
+          </a>
+        </span>
+      ))}
+      . Plans and features change; check their site before you decide.
+    </p>
   );
 }
 

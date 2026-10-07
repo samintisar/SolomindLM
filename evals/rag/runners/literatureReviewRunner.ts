@@ -19,6 +19,8 @@ export interface LiteratureReviewEvalResult {
     /** Selected notebook papers, included without screening (#301). Absent in older results. */
     fromNotebook?: number;
     extractedRows: number;
+    /** Rows whose extraction call failed (#398). Absent in older results. */
+    extractionFailedRows?: number;
   };
   stagePapers: {
     search: Array<{
@@ -166,6 +168,9 @@ function serializeLiteratureReview(result: LiteratureReviewEvalResult): string {
     `Found: ${result.counts.found}`,
     `Included: ${result.counts.included}`,
     ...(result.counts.fromNotebook ? [`From your notebook: ${result.counts.fromNotebook}`] : []),
+    ...(result.counts.extractionFailedRows
+      ? [`Extraction failed: ${result.counts.extractionFailedRows}`]
+      : []),
     "",
     result.table.columns.map((c) => c.name).join(" | "),
     ...result.table.papers.map((paper) =>

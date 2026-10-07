@@ -121,6 +121,8 @@ const literaturePaperFields = {
   documentId: v.optional(v.id("documents")),
   /** Set when a notebook paper looks off-topic for the question; it is still included. */
   offTopicReason: v.optional(v.string()),
+  /** Set when the extraction call failed, so its columns are empty for that reason (#398). */
+  extractionFailed: v.optional(v.boolean()),
 };
 
 const literaturePaperValidator = v.object(literaturePaperFields);
@@ -839,7 +841,7 @@ export async function extractDataBatchHandler(
         return extractedData ? { ...paper, extractedData } : paper;
       } catch (error) {
         logger.error(`Extraction failed for paper: ${paper.title}`, error);
-        return paper;
+        return { ...paper, extractionFailed: true };
       }
     }),
     LITERATURE_BULK_LLM_CONCURRENCY
@@ -856,6 +858,7 @@ export async function extractDataBatchHandler(
     sessionId: args.sessionId,
     batchNumber: args.batchNumber,
     paperCount: batchSize,
+    extractionFailedCount: papersWithExtractedData.filter((p) => p.extractionFailed).length,
   });
   return null;
 }
@@ -1061,7 +1064,9 @@ export async function generateReportHandler(
               }`,
             ]
           : []),
-        `- Extracted Data:`,
+        draft.extractionFailed
+          ? `- Extracted Data (could not be extracted from this paper; only the fields below are known):`
+          : `- Extracted Data:`,
       ];
 
       for (const [colId, value] of Object.entries(draft.rowData)) {
@@ -1098,6 +1103,7 @@ export async function generateReportHandler(
         rowData: draft.rowData,
         ...(citation.fromNotebook ? { fromNotebook: true } : {}),
         ...(draft.offTopicReason ? { offTopicReason: draft.offTopicReason } : {}),
+        ...(draft.extractionFailed ? { extractionFailed: true } : {}),
       });
     }
 

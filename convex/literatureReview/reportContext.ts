@@ -19,6 +19,8 @@ export type ReportPaperRow = {
   fromNotebook?: boolean;
   /** Set when a notebook paper looks off-topic for the question; it is still included. */
   offTopicReason?: string;
+  /** Set when the extraction call failed, so the paper's columns are empty for that reason. */
+  extractionFailed?: boolean;
 };
 
 /** Citation-backed row keys; excluded from custom-column extraction prompts and alignment. */
@@ -364,7 +366,8 @@ export function buildStudyCharacteristicsTable(
 
   const rows = papers.map((p) => {
     const authorLabel = p.authors.split(",")[0]?.trim() ?? "Unknown";
-    const studyCell = `${authorLabel} et al. [${p.citationKey}]${p.fromNotebook ? " †" : ""}`;
+    const marks = `${p.fromNotebook ? " †" : ""}${p.extractionFailed ? " ‡" : ""}`;
+    const studyCell = `${authorLabel} et al. [${p.citationKey}]${marks}`;
     const cells = [
       studyCell,
       p.year || "N/A",
@@ -379,7 +382,11 @@ export function buildStudyCharacteristicsTable(
   });
 
   const table = `| ${headers.join(" | ")} |\n| ${headers.map(() => "---").join(" | ")} |\n${rows.join("\n")}`;
-  return papers.some((p) => p.fromNotebook) ? `${table}\n\n† From the user's notebook.` : table;
+  const footnotes = [
+    papers.some((p) => p.fromNotebook) && "† From the user's notebook.",
+    papers.some((p) => p.extractionFailed) && "‡ Data could not be extracted from this paper.",
+  ].filter(Boolean);
+  return footnotes.length > 0 ? `${table}\n\n${footnotes.join("\n")}` : table;
 }
 
 /**

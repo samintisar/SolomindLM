@@ -23,6 +23,8 @@ export interface TablePaperRow {
   isIncluded: boolean;
   /** Set on a notebook paper the screening check judged off-topic; it is still included. */
   offTopicReason?: string;
+  /** Set when the extraction call failed, so the row's columns are empty for that reason. */
+  extractionFailed?: boolean;
   citation: TablePaperCitation | null;
 }
 
