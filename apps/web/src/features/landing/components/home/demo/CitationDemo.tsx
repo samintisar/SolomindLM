@@ -32,10 +32,22 @@ function Highlight({ children }: { children: React.ReactNode }) {
 }
 
 /** Hover card for citation [1] in the hero chat: file, slide, quoted passage. */
-export function CitationTooltip({ className }: { className?: string }) {
+export function CitationTooltip({
+  className,
+  arrowClassName,
+}: {
+  className?: string;
+  /** Moves the arrow when the tooltip is shifted, so it keeps pointing at its number. */
+  arrowClassName?: string;
+}) {
   return (
     <DemoSurface elevation="floating" className={cn("w-60 p-3 font-sans", className)}>
-      <span className="absolute -top-1.5 left-2.5 size-3 rotate-45 border-t border-l border-border/50 bg-card" />
+      <span
+        className={cn(
+          "absolute -top-1.5 left-2.5 size-3 rotate-45 border-t border-l border-border/50 bg-card",
+          arrowClassName
+        )}
+      />
       <div className="flex items-center gap-2 text-xs">
         <span className={toneIcon({ tone: "pdf", className: "size-5 rounded-md" })}>
           <FileText className="size-3" />
@@ -81,8 +93,8 @@ export function SourceSlideDemo({ className }: { className?: string }) {
         <span className={toneIcon({ tone: "pdf", className: "size-5.5 rounded-md" })}>
           <FileText className="size-3" />
         </span>
-        Lecture 12 – Beta blockers.pdf
-        <span className="ml-auto font-medium text-muted-foreground">Slide 15</span>
+        <span className="min-w-0 truncate">Lecture 12 – Beta blockers.pdf</span>
+        <span className="ml-auto shrink-0 font-medium text-muted-foreground">Slide 15</span>
       </div>
       <div className="m-3.5 rounded-xl bg-background p-4 ring-1 ring-hairline ring-inset">
         <h4 className="font-display text-sm font-bold">β-blockers: choosing an agent</h4>

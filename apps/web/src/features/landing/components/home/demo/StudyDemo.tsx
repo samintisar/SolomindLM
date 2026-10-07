@@ -46,7 +46,7 @@ export function QuizDemo({ className }: { className?: string }) {
     <DemoSurface elevation="floating" className={cn("p-4", className)}>
       <div className="flex items-center justify-between">
         <DemoLabel>Quiz · 4 of 15</DemoLabel>
-        <span className="font-sans text-xs font-bold text-primary">3 / 3</span>
+        <span className="font-sans text-xs font-bold text-primary">4 / 4</span>
       </div>
       <p className="mt-2.5 font-display text-sm leading-snug font-bold">
         Which beta blocker is the safer choice in asthma?

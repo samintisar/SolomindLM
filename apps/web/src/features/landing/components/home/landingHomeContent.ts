@@ -262,7 +262,7 @@ export interface Plan {
   featured: boolean;
 }
 
-/** Limits mirror today's plans (billing config); update both together. */
+/** Limits mirror FREE_DAILY_LIMITS / PRO_DAILY_LIMITS (convex/_lib/errors.ts) and BillingPage; change them together. */
 export const PLANS: Plan[] = [
   {
     id: "free",

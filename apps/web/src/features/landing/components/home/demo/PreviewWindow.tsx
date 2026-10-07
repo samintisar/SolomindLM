@@ -33,7 +33,7 @@ interface Row {
 
 const SOURCES: Row[] = [
   { title: "Lecture 12 – Beta blockers.pdf", meta: "PDF · 38 slides", icon: FileText, tone: "pdf" },
-  { title: "Katzung, ch. 10", meta: "PDF · pp. 151–168", icon: BookOpen, tone: "book" },
+  { title: "Pharmacology textbook, ch. 10", meta: "PDF · 18 pages", icon: BookOpen, tone: "book" },
   { title: "Dr. Patel – Autonomic pharm", meta: "YouTube · 52 min", icon: Youtube, tone: "video" },
   { title: "NICE asthma guideline", meta: "Web page", icon: Globe, tone: "web" },
   { title: "Tutorial recording", meta: "Audio · 41 min", icon: Mic, tone: "audioFile" },
@@ -137,16 +137,19 @@ export function ChatColumn({ className }: { className?: string }) {
         Why are beta blockers avoided in patients with asthma?
       </p>
       <div className="mt-4 space-y-2 font-serif text-sm leading-relaxed">
-        <p>
+        <div>
           Non-selective beta blockers such as propranolol also block β<sub>2</sub> receptors in the
           airways, which relax bronchial smooth muscle. Blocking them{" "}
           <strong>can trigger bronchospasm</strong>{" "}
           <span className="relative">
             <CitationChip n={1} active />
-            <CitationTooltip className="absolute top-full left-0 z-10 mt-2.5 max-md:-left-24" />
+            <CitationTooltip
+              className="absolute top-full left-0 z-10 mt-2.5 max-md:-left-24"
+              arrowClassName="max-md:left-26.5"
+            />
           </span>
           .
-        </p>
+        </div>
         <p>
           Cardioselective agents like bisoprolol act mainly on β<sub>1</sub> receptors in the heart,
           so they carry less risk, but guidelines still advise caution <CitationChip n={2} />{" "}

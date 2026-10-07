@@ -354,6 +354,9 @@
   --spacing-auth-hero: min(93svh, 65rem);
   --text-display: 2.75rem;
   --text-display--line-height: 1.25;
+  /* Landing home headline at xl (text-hero). */
+  --text-hero: 3.5rem;
+  --text-hero--line-height: 1.08;
 
   --animate-route-in: route-in 320ms var(--ease-out);
 

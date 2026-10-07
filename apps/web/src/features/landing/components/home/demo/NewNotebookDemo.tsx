@@ -22,7 +22,7 @@ export function NewNotebookDemo() {
         <div className="p-5">
           <p className="flex items-center gap-1 font-display text-xl font-bold">
             Your course
-            <span className="h-6 w-0.5 animate-pulse bg-primary" />
+            <span className="h-6 w-0.5 motion-safe:animate-pulse bg-primary" />
           </p>
           <p className="mt-1 font-sans text-xs text-muted-foreground">0 sources · start with one</p>
           <div className="mt-4 grid grid-cols-2 gap-2 font-sans text-xs text-muted-foreground">

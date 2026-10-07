@@ -1,4 +1,3 @@
-import { useReducedMotion } from "motion/react";
 import Marquee from "react-fast-marquee";
 import { STUDIO_TILES, type StudioTile } from "./landingHomeContent";
 import { Accent, SectionHeading } from "./SectionHeading";
@@ -20,9 +19,12 @@ function TileCard({ tile }: { tile: StudioTile }) {
   );
 }
 
-/** The Studio band: two rows scrolling in opposite directions (#231), paused on hover and under reduced motion. */
+/**
+ * The Studio band: two rows scrolling in opposite directions (#231). It keeps moving under reduced
+ * motion (a slow, decorative drift, as before the redesign) and pauses on hover; autoFill repeats the
+ * tiles so wide screens never show a gap.
+ */
 export function StudioMarquee() {
-  const reduceMotion = useReducedMotion();
   return (
     <section
       aria-labelledby="studio-title"
@@ -47,7 +49,7 @@ export function StudioMarquee() {
             speed={32}
             direction={index === 0 ? "left" : "right"}
             pauseOnHover
-            play={!reduceMotion}
+            autoFill
           >
             {row.map((tile) => (
               <TileCard key={tile.title} tile={tile} />

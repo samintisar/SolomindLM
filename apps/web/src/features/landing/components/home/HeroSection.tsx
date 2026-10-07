@@ -12,8 +12,11 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       <div aria-hidden className="landing-paper pointer-events-none absolute inset-0" />
       <div className="relative mx-auto grid max-w-300 items-start gap-14 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-5 lg:pt-8">
-          <h1 className="font-display text-4xl leading-tight font-bold tracking-tight sm:text-5xl xl:text-6xl">
-            AI that makes you think, <Accent>not thinks for you.</Accent>
+          <h1 className="font-display text-4xl leading-tight font-bold tracking-tight sm:text-5xl xl:text-hero">
+            AI that makes you think,{" "}
+            <span className="lg:block">
+              <Accent>not thinks for you.</Accent>
+            </span>
           </h1>
           <p className="mt-6 max-w-md font-serif text-lg leading-relaxed text-foreground/75">
             SolomindLM won't write your essay. It reads your sources with you, answers with
