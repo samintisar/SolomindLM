@@ -1029,23 +1029,6 @@
   color: var(--foreground);
 }
 
-/* Landing page: dot grid background — theme-aware, visible across full page */
-.landing-grid-pattern {
-  background-color: var(--background);
-  background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.12) 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
-  background-position: 0 0;
-  background-attachment: scroll;
-}
-
-.dark .landing-grid-pattern {
-  background-image: radial-gradient(
-    circle at center,
-    rgba(255, 255, 255, 0.12) 1.5px,
-    transparent 1.5px
-  );
-}
-
 /* Landing hero: faint graph paper (the chat panel's grid) that fades out from the upper left.
    Put it on an absolutely positioned, aria-hidden layer: the mask would hide real content. */
 .landing-paper {
