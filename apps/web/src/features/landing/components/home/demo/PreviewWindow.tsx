@@ -149,8 +149,8 @@ export function ChatColumn({ className }: { className?: string }) {
           <span className="relative">
             <CitationChip n={1} active />
             <CitationTooltip
-              className="absolute top-full left-0 z-10 mt-2.5 max-md:-left-24"
-              arrowClassName="max-md:left-26.5"
+              className="absolute top-full -left-24 z-10 mt-2.5 md:left-auto md:-right-3"
+              arrowClassName="left-26.5 md:left-auto md:right-4"
             />
           </span>
           .
@@ -229,7 +229,7 @@ function PreviewHeader() {
   );
 }
 
-/** The notebook window at app size. Place it in an 860 × 640 box and scale it at the call site. */
+/** The notebook window at app size. Place it in a 960 × 640 box and scale it at the call site. */
 export function PreviewWindow({ className }: { className?: string }) {
   return (
     <div
