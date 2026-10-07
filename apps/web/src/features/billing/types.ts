@@ -3,6 +3,8 @@ type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid";
 
 export interface SubscriptionStatusResponse {
   hasSubscription: boolean;
+  /** True while the subscription query hasn't returned; the other fields are Free defaults. */
+  isLoading?: boolean;
   status?: SubscriptionStatus;
   plan?: "free" | "premium";
   notebookLimit?: number;

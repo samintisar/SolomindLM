@@ -1,6 +1,7 @@
 import { type Infer, v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, type MutationCtx } from "../../_generated/server";
+import { consumeDailyLimit } from "../../_lib/limits";
 import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
@@ -49,6 +50,8 @@ export const saveAudioOverviewResults = internalMutation({
       kind: "audioOverview",
       title,
     });
+    // Consume rate limit token on success
+    await consumeDailyLimit(ctx, audioOverview.userId, "audio");
   },
 });
 
