@@ -2,7 +2,6 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { FieldGroup } from "@/shared/components/ui/field";
-import type { StudioDialogTheme } from "./customize/dialogContext";
 import { OptionToggleGroup } from "./customize/OptionToggleGroup";
 import { COUNT_OPTIONS, DIFFICULTY_OPTIONS, type ToggleOption } from "./customize/options";
 import { PromptField } from "./customize/PromptField";
@@ -11,19 +10,10 @@ import {
   StudioCustomizeDialog,
   StudioCustomizeFooter,
   StudioCustomizeHeader,
+  type StudioCustomizeModalProps,
 } from "./customize/StudioCustomizeDialog";
 
-interface CustomizeWrittenQuestionsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onGenerate: (config: WrittenQuestionsConfig) => void;
-  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
-  embedded?: boolean;
-  /** Pins light-theme tokens on always-light pages (the auth page). */
-  theme?: StudioDialogTheme;
-  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
-  preview?: boolean;
-}
+type CustomizeWrittenQuestionsModalProps = StudioCustomizeModalProps<WrittenQuestionsConfig>;
 
 export interface WrittenQuestionsConfig {
   count: "fewer" | "standard" | "more";
@@ -39,20 +29,10 @@ const QUESTION_TYPE_OPTIONS = [
 
 export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsModalProps> = ({
   isOpen,
-  onClose,
   onGenerate,
-  embedded = false,
-  theme,
-  preview = false,
+  ...dialogProps
 }) => (
-  <StudioCustomizeDialog
-    open={isOpen}
-    onClose={onClose}
-    embedded={embedded}
-    theme={theme}
-    preview={preview}
-    wide
-  >
+  <StudioCustomizeDialog open={isOpen} {...dialogProps} wide>
     <WrittenQuestionsForm onGenerate={onGenerate} />
   </StudioCustomizeDialog>
 );

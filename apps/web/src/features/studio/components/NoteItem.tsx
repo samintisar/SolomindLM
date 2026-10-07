@@ -11,7 +11,7 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { Input } from "@/shared/components/ui/input";
 import { Progress } from "@/shared/components/ui/progress";
-import { isAudioNote, isAudioOverviewNote, type Note } from "@/shared/types/index";
+import { isAudioOverviewNote, type Note } from "@/shared/types/index";
 import { cn } from "@/shared/utils/cn";
 import { useJustFinished } from "../hooks/useJustFinished";
 import { studioTypeStyle } from "../studioTypeStyle";
@@ -114,8 +114,8 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   const canPlayInline =
     Boolean(onPlayAudio) &&
     !isGenerating &&
-    ((isAudioOverviewNote(note) && Boolean(note.audioUrl?.trim())) ||
-      (note.type === "audio" && isAudioNote(note) && Boolean(note.metadata.audioUrl?.trim())));
+    isAudioOverviewNote(note) &&
+    Boolean(note.audioUrl?.trim());
 
   return (
     <Card

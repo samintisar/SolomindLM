@@ -1,3 +1,4 @@
+import { downloadFile } from "@/shared/utils/download";
 import type { RankedPaper } from "../types/rankedPaper";
 
 function escapeBibtex(value: string): string {
@@ -31,7 +32,7 @@ export function exportPapersToBibtex(papers: RankedPaper[], filename: string) {
     return lines.join("\n");
   });
 
-  downloadText(entries.join("\n\n"), filename, "application/x-bibtex");
+  downloadFile(entries.join("\n\n"), filename, "application/x-bibtex");
 }
 
 export function exportPapersToCsv(papers: RankedPaper[], filename: string) {
@@ -69,22 +70,10 @@ export function exportPapersToCsv(papers: RankedPaper[], filename: string) {
       .join(",")
   );
 
-  downloadText([headers.join(","), ...rows].join("\n"), filename, "text/csv;charset=utf-8");
+  downloadFile([headers.join(","), ...rows].join("\n"), filename, "text/csv;charset=utf-8");
 }
 
 /** Excel-compatible CSV with .xlsx extension (no sheetjs dependency). */
 export function exportPapersToExcel(papers: RankedPaper[], filename: string) {
   exportPapersToCsv(papers, filename.replace(/\.xlsx$/i, ".csv"));
-}
-
-function downloadText(content: string, filename: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }

@@ -39,7 +39,6 @@ import {
 export interface DiscoverSourcesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddSource: (source: Source) => void;
   /** Current notebook sources: results already in the notebook show as added. */
   notebookSources: Source[];
   userId?: string | null;
@@ -67,7 +66,6 @@ const withoutIds = (ids: Set<string>, remove: Iterable<string>) => {
 export function DiscoverSourcesDialog({
   open,
   onOpenChange,
-  onAddSource,
   notebookSources,
   userId,
   noteId,
@@ -157,64 +155,33 @@ export function DiscoverSourcesDialog({
     }
   };
 
+  // The notebook's reactive document list picks up the new source; no local insert needed.
   const addResult = async (result: UnifiedDiscoveryResult) => {
-    if (result.sourceType === "academic") {
-      const response = await createDocument({
-        notebookId: noteId!,
-        type: "paper_record",
-        fileName: result.title || "Paper",
-        paperRecord: {
-          abstract: result.snippet || "",
-          authors: result.metadata.authors ?? [],
-          doi: result.metadata.doi,
-          venue: result.metadata.venue,
-          publicationYear: result.metadata.publicationYear,
-          openAlexId: result.metadata.openAlexId,
-          isOa: result.metadata.openAccess ?? false,
-          pdfUrl: result.metadata.pdfUrl,
-          landingPageUrl: result.metadata.landingPageUrl,
-          license: result.metadata.license,
-        },
-      });
-
-      const newSource: Source = {
-        id: response.documentId,
-        title: result.title,
-        type: "PAPER",
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        selected: true,
-        status: "pending",
-        url: result.metadata.landingPageUrl || result.url,
-        paper: {
-          doi: result.metadata.doi,
-          openAlexId: result.metadata.openAlexId,
-        },
-      };
-
-      onAddSource(newSource);
-      onDocumentUploaded?.(response.documentId);
-      return;
-    }
-
-    const response = await createDocument({
-      notebookId: noteId!,
-      type: "url",
-      source: result.url,
-      fileName: result.title || result.url,
-    });
-
-    const newSource: Source = {
-      id: response.documentId,
-      title: result.title,
-      type: "WEB",
-      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      selected: true,
-      status: "pending",
-      url: result.url,
-      remoteRefreshKind: "url",
-    };
-
-    onAddSource(newSource);
+    const response =
+      result.sourceType === "academic"
+        ? await createDocument({
+            notebookId: noteId!,
+            type: "paper_record",
+            fileName: result.title || "Paper",
+            paperRecord: {
+              abstract: result.snippet || "",
+              authors: result.metadata.authors ?? [],
+              doi: result.metadata.doi,
+              venue: result.metadata.venue,
+              publicationYear: result.metadata.publicationYear,
+              openAlexId: result.metadata.openAlexId,
+              isOa: result.metadata.openAccess ?? false,
+              pdfUrl: result.metadata.pdfUrl,
+              landingPageUrl: result.metadata.landingPageUrl,
+              license: result.metadata.license,
+            },
+          })
+        : await createDocument({
+            notebookId: noteId!,
+            type: "url",
+            source: result.url,
+            fileName: result.title || result.url,
+          });
     onDocumentUploaded?.(response.documentId);
   };
 

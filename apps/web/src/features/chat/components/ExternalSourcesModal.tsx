@@ -13,15 +13,8 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { Spinner } from "@/shared/components/ui/spinner";
+import type { ExternalSource } from "@/shared/types/index";
 import { cn } from "@/shared/utils/cn";
-
-export interface ExternalSource {
-  title: string;
-  url: string;
-  snippet: string;
-  sourceType: string;
-  score?: number;
-}
 
 const SOURCE_TYPE_ICON: Record<string, React.ElementType> = {
   web: Globe,

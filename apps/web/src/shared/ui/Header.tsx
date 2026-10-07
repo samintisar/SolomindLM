@@ -8,7 +8,7 @@ import { useAuth } from "../../features/auth/useAuth";
 import { canOfferPurchases } from "../../utils/platformDetection";
 import { Button } from "../components/ui/button";
 import { useTheme } from "../contexts/useTheme";
-import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
+import { useErrorToast } from "../hooks/useErrorToast";
 
 interface HeaderProps {
   title: string;
@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   const spanRef = useRef<HTMLSpanElement>(null);
   const [inputWidth, setInputWidth] = useState(0);
 
-  const { showError } = useServiceErrorToast();
+  const { showError } = useErrorToast();
   const logOnboardingError = (action: string, error: unknown) => {
     console.error(`[onboarding] ${action}`, error);
   };

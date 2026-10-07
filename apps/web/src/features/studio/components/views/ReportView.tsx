@@ -1,60 +1,27 @@
-import { ArrowLeft, FileText, XCircle } from "lucide-react";
-import React, { lazy, Suspense } from "react";
+import { FileText, XCircle } from "lucide-react";
+import type React from "react";
+import { LazyMarkdown } from "@/shared/components/LazyMarkdown";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
-import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
-import { Skeleton } from "@/shared/components/ui/skeleton";
 import { ReportNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
+import { studioErrorMessage } from "../../utils/studioErrorMessage";
 
 export interface ReportViewProps {
   note: ReportNote;
-  onBack?: () => void;
 }
 
-/** The stored error as text. Metadata isn't validated, so only a non-empty string is shown. */
-function errorMessage(error: unknown): string {
-  if (typeof error === "string" && error) return error;
-  if (typeof error === "object" && error !== null) {
-    const { message } = error as { message?: unknown };
-    if (typeof message === "string" && message) return message;
-  }
-  return "An unknown error occurred";
-}
-
-/** Generated reports must not link out or embed media, so those render as nothing or plain text. */
-const reportComponents = {
-  img: () => null,
-  a: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
-  video: () => null,
-  audio: () => null,
-  iframe: () => null,
-};
-
-export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
+export const ReportView: React.FC<ReportViewProps> = ({ note }) => {
   const isFailed = note.status === "failed";
 
   return (
     <div className="flex h-full flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
-      {onBack && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 bg-background/80 px-2 py-2 backdrop-blur-sm md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-          <span className="truncate text-sm font-semibold">{note.title}</span>
-        </div>
-      )}
-
       {isFailed && (
         <div className="px-4 pt-4">
           <Alert variant="destructive">
             <XCircle />
             <AlertTitle>Report generation failed</AlertTitle>
-            <AlertDescription>{errorMessage(note.metadata?.error)}</AlertDescription>
+            <AlertDescription>{studioErrorMessage(note.metadata?.error)}</AlertDescription>
           </Alert>
         </div>
       )}
@@ -63,22 +30,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
       <div className="min-h-0 flex-1 overflow-y-auto bg-card p-6 md:p-8">
         {note.content ? (
           <div className="animate-in fade-in duration-300 ease-out">
-            <Suspense
-              fallback={
-                <div className="mx-auto max-w-prose space-y-3">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              }
-            >
-              <MarkdownRenderer
-                className="prose mx-auto font-serif select-text"
-                components={reportComponents}
-              >
-                {sanitizeMarkdown(note.content)}
-              </MarkdownRenderer>
-            </Suspense>
+            <LazyMarkdown className="prose mx-auto font-serif select-text" generated>
+              {sanitizeMarkdown(note.content)}
+            </LazyMarkdown>
           </div>
         ) : (
           <Empty>

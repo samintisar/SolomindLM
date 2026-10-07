@@ -1,8 +1,8 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import type { MindMapNote } from "@/shared/types/index";
-import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
+import { useCallback } from "react";
+import { removeFromNotesCache, renameInNotesCache, useOptimisticMutation } from "./notesCache";
 
 export interface CreateMindMapParams {
   notebookId: string;
@@ -12,127 +12,50 @@ export interface CreateMindMapParams {
   customPrompt?: string;
 }
 
-export interface CreateMindMapResponse {
-  mindMapId: string;
-  status: string;
-  mindmap: MindMapNote;
-}
-
-function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
-  const maybeWrapped = rawData?.nodeData?.nodeData ?? rawData?.nodeData ?? rawData;
-  const normalized = maybeWrapped && typeof maybeWrapped === "object" ? { ...maybeWrapped } : {};
-
-  if (typeof normalized.topic !== "string" || normalized.topic.trim().length === 0) {
-    normalized.topic = fallbackTitle || "Mind Map";
-  }
-  if (typeof normalized.id !== "string" || normalized.id.trim().length === 0) {
-    normalized.id = "root";
-  }
-
-  return { nodeData: normalized };
-}
-
-/**
- * Map a database mindmap response to the frontend MindMapNote interface
- */
-function mapMindMapToNote(dbMindMap: any): MindMapNote {
-  let preview: string;
-
-  // Align with `notesApi.getMindMapPreview` (unified studio list).
-  if (
-    dbMindMap.status === "generating" ||
-    dbMindMap.status === "mapping" ||
-    dbMindMap.status === "collapsing" ||
-    dbMindMap.status === "reducing"
-  ) {
-    preview = "Mind Map";
-  } else if (dbMindMap.status === "completed") {
-    preview = "Mind Map";
-  } else if (dbMindMap.status === "failed") {
-    preview = "Mind Map · Failed";
-  } else {
-    preview = "Mind Map";
-  }
-
-  // Parse data if it's a string
-  let rawMindMapData = dbMindMap.data;
-  if (typeof dbMindMap.data === "string") {
-    try {
-      rawMindMapData = JSON.parse(dbMindMap.data);
-    } catch {
-      rawMindMapData = null;
-    }
-  }
-  const mindMapData = normalizeMindMapNodeData(rawMindMapData, dbMindMap.title);
-
-  return {
-    id: dbMindMap._id,
-    title: dbMindMap.title,
-    preview,
-    type: "mindmap" as const,
-    content:
-      typeof dbMindMap.data === "string" ? dbMindMap.data : JSON.stringify(dbMindMap.data, null, 2),
-    status: dbMindMap.status as MindMapNote["status"],
-    metadata: dbMindMap.metadata || {},
-    mindMapData,
-  };
-}
-
 /**
  * Create a new mind map and queue generation
  */
 export function useCreateMindMap() {
   const generate = useMutation(api.studio.mindmaps.index.generateMindMap);
 
-  return async (params: CreateMindMapParams): Promise<CreateMindMapResponse> => {
-    const result = await generate({
-      notebookId: params.notebookId as Id<"notebooks">,
-      documentIds: params.documentIds as Id<"documents">[],
-      title: params.title,
-      customPrompt: params.customPrompt,
-    });
-
-    return {
-      mindMapId: result,
-      status: "pending",
-      mindmap: mapMindMapToNote({
-        _id: result,
-        status: "pending",
-        title: params.title || "Mind Map",
-      }),
-    };
-  };
+  return useCallback(
+    async (params: CreateMindMapParams) => {
+      const id = await generate({
+        notebookId: params.notebookId as Id<"notebooks">,
+        documentIds: params.documentIds as Id<"documents">[],
+        title: params.title,
+        customPrompt: params.customPrompt,
+      });
+      return { id, status: "pending" };
+    },
+    [generate]
+  );
 }
 
 /**
  * Rename a mind map by ID with optimistic update
  */
 export function useRenameMindMap() {
-  const update = useMutation(api.studio.mindmaps.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-    }
-  );
+  const update = useOptimisticMutation(api.studio.mindmaps.index.update, renameInNotesCache);
 
-  return async (mindMapId: string, newTitle: string) => {
-    return await update({
-      id: mindMapId as Id<"mindmaps">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (mindMapId: string, newTitle: string) => {
+      await update({ id: mindMapId as Id<"mindmaps">, title: newTitle });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a mind map by ID with optimistic update
  */
 export function useDeleteMindMap() {
-  const remove = useMutation(api.studio.mindmaps.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
-  );
+  const remove = useOptimisticMutation(api.studio.mindmaps.index.remove, removeFromNotesCache);
 
-  return async (mindMapId: string) => {
-    await remove({ id: mindMapId as Id<"mindmaps"> });
-  };
+  return useCallback(
+    async (mindMapId: string) => {
+      await remove({ id: mindMapId as Id<"mindmaps"> });
+    },
+    [remove]
+  );
 }

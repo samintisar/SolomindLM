@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import type { MessageToolCall } from "@/shared/types/index";
 import type { SendMessageCallbacks } from "../services/chatApi";
 import { consumePersistentTextStream } from "../services/chatApi";
 
@@ -58,6 +59,77 @@ function createStreamResponse(lines: string[]): Response {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }
+
+/** Enqueues each chunk exactly as given, so lines can be split across reads. */
+function createRawStreamResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+  let index = 0;
+
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (index >= chunks.length) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(encoder.encode(chunks[index]));
+      index++;
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+describe("consumePersistentTextStream — lines split across chunks", () => {
+  const refs = [{ documentId: "d1", sourceTitle: "Source 1", content: "chunk", similarity: 0.9 }];
+
+  it("streams a text line split mid-word as its full text", async () => {
+    const response = createRawStreamResponse(["Hel", "lo wor", "ld\n", "__DONE\n"]);
+    const callbacks = createMockCallbacks();
+
+    await consumePersistentTextStream(response, callbacks);
+
+    expect(callbacks.calls.onToken.map((c) => c[0]).join("")).toBe("Hello world");
+    expect(callbacks.calls.onComplete).toHaveLength(1);
+  });
+
+  it("parses marker lines split mid-payload once complete, without leaking them into tokens", async () => {
+    const refsLine = `__REFERENCES:${JSON.stringify(refs)}`;
+    const response = createRawStreamResponse([
+      `Answer\n${refsLine.slice(0, 25)}`,
+      `${refsLine.slice(25)}\n__STATUS:thin`,
+      "king:Analyzing\nmore\n",
+      "__DONE\n",
+    ]);
+    const callbacks = createMockCallbacks();
+
+    await consumePersistentTextStream(response, callbacks);
+
+    const tokens = callbacks.calls.onToken.map((c) => c[0] as string);
+    expect(tokens.join("")).toBe("Answer\nmore");
+    expect(tokens.some((t) => t.includes("__"))).toBe(false);
+    expect(callbacks.calls.onReferences).toEqual([[refs]]);
+    expect(callbacks.calls.onStatus).toEqual([["thinking", "Analyzing"]]);
+  });
+
+  it("fires onReferences once across many later chunks", async () => {
+    const words = Array.from({ length: 50 }, (_, i) => `word${i} `);
+    const response = createRawStreamResponse([
+      `__REFERENCES:${JSON.stringify(refs)}\n`,
+      ...words,
+      "\n__DONE\n",
+    ]);
+    const callbacks = createMockCallbacks();
+
+    await consumePersistentTextStream(response, callbacks);
+
+    expect(callbacks.calls.onReferences).toEqual([[refs]]);
+    expect(callbacks.calls.onToken.map((c) => c[0]).join("")).toBe(words.join("").trimEnd());
+    expect(callbacks.calls.onComplete).toHaveLength(1);
+  });
+});
 
 describe("consumePersistentTextStream", () => {
   it("calls onToken with streamed text", async () => {
@@ -132,7 +204,7 @@ describe("consumePersistentTextStream", () => {
 
     const lastToolCalls = callbacks.calls.onToolCalls[
       callbacks.calls.onToolCalls.length - 1
-    ][0] as any[];
+    ][0] as MessageToolCall[];
     expect(lastToolCalls).toHaveLength(1);
     expect(lastToolCalls[0].status).toBe("done");
     expect(lastToolCalls[0].resultCount).toBe(3);

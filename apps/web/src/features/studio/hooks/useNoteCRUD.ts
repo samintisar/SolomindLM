@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useDeleteUserNote, useUpdateUserNote } from "@/features/chat/services/userNotesApi";
+import { useToast } from "@/shared/contexts/useToast";
 import { Note } from "@/shared/types/index";
 import { useDeleteAudioOverview, useUpdateAudioOverview } from "../services/audioApi";
 import { useDeleteFlashcard, useRenameFlashcard } from "../services/flashcardsApi";
@@ -20,11 +21,6 @@ interface UseNoteCRUDProps {
 
 type RenameFn = (id: string, title: string) => Promise<void>;
 type DeleteFn = (id: string) => Promise<void>;
-
-function alertError(error: unknown, fallback: string) {
-  console.error(fallback, error);
-  alert(error instanceof Error ? error.message : fallback);
-}
 
 export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
   const notes = useNotes(activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null);
@@ -47,6 +43,15 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
   const deleteSpreadsheet = useDeleteSpreadsheet();
   const updateUserNote = useUpdateUserNote();
   const deleteUserNote = useDeleteUserNote();
+  const { error: showErrorToast } = useToast();
+
+  const reportError = useCallback(
+    (error: unknown, fallback: string) => {
+      console.error(fallback, error);
+      showErrorToast(error instanceof Error ? error.message : fallback);
+    },
+    [showErrorToast]
+  );
 
   const handleUpdateNote = useCallback(
     async (id: string, newTitle: string) => {
@@ -71,7 +76,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
       try {
         await rename(id, newTitle.trim());
       } catch (error) {
-        alertError(error, "Failed to update note");
+        reportError(error, "Failed to update note");
       }
     },
     [
@@ -85,6 +90,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
       renameInfographic,
       renameSpreadsheet,
       updateUserNote,
+      reportError,
     ]
   );
 
@@ -111,7 +117,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
       try {
         await del(id);
       } catch (error) {
-        alertError(error, "Failed to delete note");
+        reportError(error, "Failed to delete note");
       }
     },
     [
@@ -125,6 +131,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
       deleteInfographic,
       deleteSpreadsheet,
       deleteUserNote,
+      reportError,
     ]
   );
 

@@ -8,7 +8,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Input } from "@/shared/components/ui/input";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import type { Message } from "@/shared/types/index";
 import {
   useConfirmLiteratureReviewColumns,
@@ -33,28 +33,12 @@ import {
   type ResearchStep,
 } from "./researchStepTypes";
 
-/** Steps shown in the chat timeline (matches reference UI). */
-const VISIBLE_LITERATURE_STEP_TYPES = new Set([
-  "searching",
-  "ranking",
-  "screening",
-  "extracting",
-  "populating",
-]);
-
-const stepConfig: Record<string, { title: string; description: string }> = {
-  planning: {
-    title: "Planning Research",
-    description: "Defining search strategy and sub-questions...",
-  },
+/** Steps shown in the chat timeline (matches reference UI); other step types are hidden. */
+const STEP_CONFIG: Record<string, { title: string; description: string }> = {
   searching: {
     title: "Searching relevant studies",
     description:
       "Run structured searches based on the question to gather high-quality and relevant studies.",
-  },
-  deduplicating: {
-    title: "Removing Duplicates",
-    description: "Consolidating results across searches...",
   },
   ranking: {
     title: "Ranking candidate papers",
@@ -76,18 +60,13 @@ const stepConfig: Record<string, { title: string; description: string }> = {
     description:
       "Analyze each study and extract key insights to fill in the table cells with relevant information.",
   },
-  generating_report: {
-    title: "Generating Report",
-    description: "Writing literature review and synthesis...",
-  },
-  awaiting_user_input: {
-    title: "Awaiting Input",
-    description: "Waiting for user approval or guidance...",
-  },
-  awaiting_columns: {
-    title: "Confirming Columns",
-    description: "Review and customize the suggested extraction columns",
-  },
+};
+
+type ColumnRow = {
+  id: string;
+  name: string;
+  instructions?: string;
+  isVisible: boolean;
 };
 
 interface LiteratureReviewMessageProps {
@@ -115,63 +94,42 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
     session?.notebookId ?? null
   );
 
-  const tableId = (session?.tableId ?? lr?.tableId) as string | undefined;
-  const reportId = (session?.reportId ?? lr?.reportId) as string | undefined;
+  const tableId = (session?.tableId ?? lr?.tableId) as Id<"literatureTables"> | undefined;
+  const reportId = (session?.reportId ?? lr?.reportId) as Id<"literatureReports"> | undefined;
 
   const table = useLiteratureTable(tableId ?? null);
 
   const report = useLiteratureReport(reportId ?? null);
 
   const { error: toastError } = useToast();
-  const { handleLimitError } = useLimitErrorToast();
+  const { handleLimitError } = useErrorToast();
   const confirmColumnsMutation = useConfirmLiteratureReviewColumns();
   const retryMutation = useRetryLiteratureReview();
 
-  const [editingColumns, setEditingColumns] = useState<Array<{
-    id: string;
-    name: string;
-    instructions?: string;
-    isVisible: boolean;
-  }> | null>(null);
+  const [editingColumns, setEditingColumns] = useState<ColumnRow[] | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isConfirmingColumns, setIsConfirmingColumns] = useState(false);
 
-  type EditableColumn = {
-    id: string;
-    name: string;
-    instructions?: string;
-    isVisible: boolean;
-  };
-
-  const defaultColumnsFromSession = useCallback((): EditableColumn[] => {
-    const cols = session?.suggestedColumns ?? lr?.suggestedColumns;
-    if (!cols) return [];
-    return cols.map((col: { id: string; name: string; instructions?: string }) => ({
-      id: col.id,
-      name: col.name,
-      instructions: col.instructions,
-      isVisible: true,
-    }));
-  }, [session?.suggestedColumns, lr?.suggestedColumns]);
-
-  const patchEditingColumns = useCallback(
-    (updater: (columns: EditableColumn[]) => EditableColumn[]) => {
-      setEditingColumns((prev) => updater(prev ?? defaultColumnsFromSession()));
-    },
-    [defaultColumnsFromSession]
+  const sessionColumns = session?.suggestedColumns ?? lr?.suggestedColumns;
+  const defaultColumns = useMemo(
+    (): ColumnRow[] | null =>
+      sessionColumns?.map((col: { id: string; name: string; instructions?: string }) => ({
+        id: col.id,
+        name: col.name,
+        instructions: col.instructions,
+        isVisible: true,
+      })) ?? null,
+    [sessionColumns]
   );
 
-  const suggestedColumns = useMemo(() => {
-    if (editingColumns) return editingColumns;
-    const cols = session?.suggestedColumns ?? lr?.suggestedColumns;
-    if (!cols) return null;
-    return cols.map((col: { id: string; name: string; instructions?: string }) => ({
-      id: col.id,
-      name: col.name,
-      instructions: col.instructions,
-      isVisible: true,
-    }));
-  }, [session?.suggestedColumns, lr?.suggestedColumns, editingColumns]);
+  const patchEditingColumns = useCallback(
+    (updater: (columns: ColumnRow[]) => ColumnRow[]) => {
+      setEditingColumns((prev) => updater(prev ?? defaultColumns ?? []));
+    },
+    [defaultColumns]
+  );
+
+  const suggestedColumns = editingColumns ?? defaultColumns;
 
   const steps: ResearchStep[] = useMemo(() => {
     if (!stepsData) return [];
@@ -185,7 +143,7 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
       : undefined;
 
     return stepsData
-      .filter((step: { stepType: string }) => VISIBLE_LITERATURE_STEP_TYPES.has(step.stepType))
+      .filter((step: { stepType: string }) => Object.hasOwn(STEP_CONFIG, step.stepType))
       .map((step: { stepType: string; status: string; details?: string; metadata?: unknown }) => {
         const { searchQueries, papersFound, prismaCounts } = parseResearchStepMetadata(
           step.metadata
@@ -205,8 +163,8 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
         return {
           type: step.stepType,
           status: step.status as ResearchStep["status"],
-          title: stepConfig[step.stepType]?.title || step.stepType,
-          description: stepConfig[step.stepType]?.description || "",
+          title: STEP_CONFIG[step.stepType].title,
+          description: STEP_CONFIG[step.stepType].description,
           details: step.details,
           searchQueries: resolvedQueries,
           papersFound: resolvedPapersFound,
@@ -256,8 +214,6 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
   if (!lr) return null;
 
   const status = session?.status ?? lr.status;
-  const tableIdResolved = session?.tableId ?? lr.tableId;
-  const reportIdResolved = session?.reportId ?? lr.reportId;
   const error = session?.error ?? lr.error;
   const notebookId = session?.notebookId;
 
@@ -302,22 +258,22 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
       )}
 
       {/* Artifact cards — real titles, table then document */}
-      {isComplete && (tableIdResolved || reportIdResolved) && (
+      {isComplete && (tableId || reportId) && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-          {tableIdResolved && notebookId && (
+          {tableId && notebookId && (
             <ResultCard
               icon={FileSpreadsheet}
               title={table?.title ?? "Literature Table"}
               description="Table"
-              onOpen={() => onOpenTable?.(tableIdResolved)}
+              onOpen={() => onOpenTable?.(tableId)}
             />
           )}
-          {reportIdResolved && notebookId && (
+          {reportId && notebookId && (
             <ResultCard
               icon={FileText}
               title={report?.title ?? "Literature Report"}
               description="Document"
-              onOpen={() => onOpenReport?.(reportIdResolved)}
+              onOpen={() => onOpenReport?.(reportId)}
             />
           )}
         </div>
@@ -370,13 +326,6 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
 };
 
 // ── Column confirmation ────────────────────────────────────────────────────
-
-type ColumnRow = {
-  id: string;
-  name: string;
-  instructions?: string;
-  isVisible: boolean;
-};
 
 interface ColumnConfirmationCardProps {
   columns: ColumnRow[];

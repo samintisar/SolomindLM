@@ -77,7 +77,6 @@ function renderDialog(over: Partial<Props> = {}) {
   const props: Props = {
     open: true,
     onOpenChange: vi.fn(),
-    onAddSource: vi.fn(),
     notebookSources: [],
     userId: "u1",
     noteId: "nb1",
@@ -220,9 +219,6 @@ describe("DiscoverSourcesDialog", () => {
         paperRecord: expect.objectContaining({ doi: "10.1/p", isOa: true }),
       })
     );
-    expect(props.onAddSource).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "doc1", type: "PAPER", title: "A paper" })
-    );
     expect(props.onDocumentUploaded).toHaveBeenCalledWith("doc1");
   });
 
@@ -236,15 +232,6 @@ describe("DiscoverSourcesDialog", () => {
       source: "https://ex.com/a",
       fileName: "Web page",
     });
-    expect(props.onAddSource).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "doc1",
-        type: "WEB",
-        title: "Web page",
-        url: "https://ex.com/a",
-        status: "pending",
-      })
-    );
     expect(props.onDocumentUploaded).toHaveBeenCalledWith("doc1");
   });
 

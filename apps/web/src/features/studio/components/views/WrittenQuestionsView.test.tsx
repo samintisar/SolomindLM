@@ -9,14 +9,17 @@ import { WrittenQuestionsView } from "./WrittenQuestionsView";
 const submitAnswer = vi.fn();
 const saveDraft = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn();
-let latestNote: WrittenQuestionsNote | null = null;
 
 vi.mock("../../services/writtenQuestionsApi", () => ({
   useSubmitWrittenAnswer: () => submitAnswer,
   useSaveWrittenAnswerDraft: () => saveDraft,
   useResetWrittenAnswers: () => resetAnswers,
-  useUpdateWrittenQuestionsProgress: () => undefined,
-  useWrittenQuestionSet: () => latestNote,
+}));
+vi.mock("@/features/studio/services/studioProgressApi", () => ({
+  usePersistLastViewedIndex: () => undefined,
+}));
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: vi.fn() }),
 }));
 
 vi.mock("@/shared/components/MarkdownRenderer", () => ({
@@ -48,7 +51,6 @@ function makeNote(overrides: Partial<WrittenQuestionsNote> = {}): WrittenQuestio
 
 beforeEach(() => {
   vi.clearAllMocks();
-  latestNote = null;
 });
 
 // --- Results coverage ------------------------------------------------------
@@ -59,7 +61,6 @@ describe("WrittenQuestionsView results coverage", () => {
         q1: { answer: "a", graded: true, score: 4, maxScore: 5 },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -87,7 +88,6 @@ describe("WrittenQuestionsView results coverage", () => {
       },
       metadata: { questionCount: 1, difficulty: "medium", questionType: "short" },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -114,7 +114,6 @@ describe("WrittenQuestionsView draft autosave", () => {
     vi.useFakeTimers();
     try {
       const note = makeNote();
-      latestNote = note;
       render(<WrittenQuestionsView note={note} />);
 
       // fireEvent (not userEvent) because userEvent's internal scheduling
@@ -142,7 +141,6 @@ describe("WrittenQuestionsView draft autosave", () => {
       const note = makeNote({
         userAnswers: { q1: { answer: "done", graded: true, score: 5, maxScore: 5 } },
       });
-      latestNote = note;
       render(<WrittenQuestionsView note={note} />);
 
       vi.advanceTimersByTime(2000);
@@ -158,7 +156,6 @@ describe("WrittenQuestionsView draft autosave", () => {
       const note = makeNote({
         userAnswers: { q1: { answer: "cats", graded: false } },
       });
-      latestNote = note;
       render(<WrittenQuestionsView note={note} />);
 
       const textarea = screen.getByPlaceholderText(/Type your short answer/i);
@@ -190,7 +187,6 @@ describe("WrittenQuestionsView draft autosave", () => {
     vi.useFakeTimers();
     try {
       const note = makeNote();
-      latestNote = note;
       render(<WrittenQuestionsView note={note} />);
 
       const textarea = screen.getByPlaceholderText(/Type your short answer/i);
@@ -218,7 +214,6 @@ describe("WrittenQuestionsView draft autosave", () => {
     vi.useFakeTimers();
     try {
       const note = makeNote();
-      latestNote = note;
       render(<WrittenQuestionsView note={note} />);
 
       fireEvent.change(screen.getByPlaceholderText(/Type your short answer/i), {
@@ -254,7 +249,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: false },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -284,7 +278,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: false },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -300,7 +293,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
     const note = makeNote({
       userAnswers: { q1: { answer: "a", graded: true, score: 5, maxScore: 5 } },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -323,7 +315,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: false },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     const { rerender } = render(<WrittenQuestionsView note={note} />);
 
@@ -341,7 +332,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: true, score: 4, maxScore: 5 },
       },
     });
-    latestNote = gradedNote;
     rerender(<WrittenQuestionsView note={gradedNote} />);
 
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -368,7 +358,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: false },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -418,7 +407,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: false },
       },
     });
-    latestNote = note;
     render(<WrittenQuestionsView note={note} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -451,7 +439,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
         q2: { answer: "answer two", graded: false },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
 
@@ -471,61 +458,6 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
     // Let the parked call resolve so the loop can exit cleanly.
     resolveFirst({ success: true, score: 4, maxScore: 5 });
     expect(await screen.findByText(/You scored/)).toBeInTheDocument();
-  });
-
-  it("does not strand the view when notifying the parent after grading throws", async () => {
-    submitAnswer.mockImplementation(async () => ({ success: true, score: 4, maxScore: 5 }));
-    const onNoteUpdate = vi.fn(() => {
-      throw new Error("parent boom");
-    });
-    const note = makeNote({
-      userAnswers: {
-        q1: { answer: "answer one", graded: false },
-        q2: { answer: "answer two", graded: false },
-      },
-    });
-    latestNote = note;
-    const user = userEvent.setup();
-    render(<WrittenQuestionsView note={note} onNoteUpdate={onNoteUpdate} />);
-
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Finish" }));
-
-    // The grade-on-Finish flow must reach the results screen regardless of what
-    // the parent callback does, and must not get stuck on the grading spinner.
-    expect(await screen.findByText("Assessment Complete!")).toBeInTheDocument();
-    expect(screen.getByText(/You scored/)).toBeInTheDocument();
-    expect(screen.queryByText(/Grading your answers/)).not.toBeInTheDocument();
-  });
-
-  it("does not push a stale pre-grading note snapshot to the parent on Finish", async () => {
-    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => ({
-      success: true,
-      score: questionId === "q1" ? 4 : 3,
-      maxScore: 5,
-    }));
-    const note = makeNote({
-      userAnswers: {
-        q1: { answer: "answer one", graded: false },
-        q2: { answer: "answer two", graded: false },
-      },
-    });
-    latestNote = note;
-    const onNoteUpdate = vi.fn();
-    const user = userEvent.setup();
-    render(<WrittenQuestionsView note={note} onNoteUpdate={onNoteUpdate} />);
-
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Finish" }));
-    expect(await screen.findByText("You scored 7 out of 10 points")).toBeInTheDocument();
-
-    // The reactive useWrittenQuestionSet query already propagates freshly-persisted
-    // grades; Finish must not hand the parent a note captured before grading (its
-    // userAnswers still show graded !== true).
-    const staleCalls = onNoteUpdate.mock.calls.filter(
-      ([n]) => n && (n as WrittenQuestionsNote).userAnswers?.q1?.graded !== true
-    );
-    expect(staleCalls).toEqual([]);
   });
 });
 
@@ -559,7 +491,6 @@ describe("WrittenQuestionsView redesign", () => {
         q2: { answer: "b", graded: true, score: 2, maxScore: 5 },
       },
     });
-    latestNote = note;
     const user = userEvent.setup();
     render(<WrittenQuestionsView note={note} />);
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -625,17 +556,19 @@ describe("WrittenQuestionsView redesign", () => {
           resolveGrade = resolve;
         })
     );
-    latestNote = makeNote();
     const user = userEvent.setup();
     const { rerender } = render(<WrittenQuestionsView note={makeNote()} />);
     await user.type(screen.getByPlaceholderText(/Type your short answer/i), "a");
     await user.click(screen.getByRole("button", { name: "Submit" }));
 
     // The server write lands (reactive echo) while the submit promise is still pending.
-    latestNote = makeNote({
-      userAnswers: { q1: { answer: "a", graded: true, score: 4, maxScore: 5 } },
-    });
-    rerender(<WrittenQuestionsView note={makeNote()} />);
+    rerender(
+      <WrittenQuestionsView
+        note={makeNote({
+          userAnswers: { q1: { answer: "a", graded: true, score: 4, maxScore: 5 } },
+        })}
+      />
+    );
     expect(await screen.findByText("Answer Graded")).toBeInTheDocument();
     expect(screen.getByText("0 / 5")).toBeInTheDocument();
 

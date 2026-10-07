@@ -114,13 +114,6 @@ describe("ReportView", () => {
     render(<ReportView note={reportNote({ content: "", status: "failed" })} />);
     expect(screen.getAllByText("Report generation failed").length).toBeGreaterThan(0);
   });
-
-  it("goes back from the mobile bar", async () => {
-    const onBack = vi.fn();
-    render(<ReportView note={reportNote()} onBack={onBack} />);
-    await userEvent.click(screen.getByRole("button", { name: "Back to Studio" }));
-    expect(onBack).toHaveBeenCalledOnce();
-  });
 });
 
 describe("UserNoteView", () => {

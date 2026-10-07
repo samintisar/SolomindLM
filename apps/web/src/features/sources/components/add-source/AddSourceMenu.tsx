@@ -12,7 +12,7 @@ import {
   Youtube,
 } from "lucide-react";
 import type React from "react";
-import { useId } from "react";
+import { useId, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -23,11 +23,16 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/shared/components/ui/item";
+import { useToast } from "@/shared/contexts/useToast";
+import {
+  ACCEPTED_FILE_TYPE_LABELS,
+  ACCEPTED_FILE_TYPES,
+  isAcceptedFile,
+} from "../../constants/acceptedFileTypes";
 import { isGoogleDrivePickerConfigured } from "../GoogleDrivePicker";
 import type { AddSourceStep } from "./types";
 
-const ACCEPTED_FILES =
-  ".pdf,.docx,.pptx,.txt,.md,.json,.csv,.png,.jpg,.jpeg,.avif,.wav,.mp3,.m4a,.webm,.flac";
+const ACCEPTED_FILES = ACCEPTED_FILE_TYPES.join(",");
 
 interface MenuOption {
   key: string;
@@ -42,13 +47,8 @@ interface AddSourceMenuProps {
   showAuthWarning: boolean;
   limitReached: boolean;
   maxSources: number;
-  isDragging: boolean;
-  onDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  fileInputRef?: React.RefObject<HTMLInputElement | null>;
-  onFileSelect?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Upload files picked or dropped on the drop zone. */
+  onFiles: (files: File[]) => Promise<void>;
   /** Key of the option to focus when the menu mounts (the one that opened the previous step). */
   focusKey?: string | null;
   onSelect: (step: AddSourceStep) => void;
@@ -61,19 +61,55 @@ export function AddSourceMenu({
   showAuthWarning,
   limitReached,
   maxSources,
-  isDragging,
-  onDragEnter,
-  onDragLeave,
-  onDragOver,
-  onDrop,
-  fileInputRef,
-  onFileSelect,
+  onFiles,
   focusKey,
   onSelect,
   onDiscover,
   onGoogleDrive,
 }: AddSourceMenuProps) {
-  const openFilePicker = () => fileInputRef?.current?.click();
+  const { info: showInfo } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Lives here so it resets whenever the menu unmounts (dialog closed or a step opened).
+  const [isDragging, setIsDragging] = useState(false);
+  const openFilePicker = () => fileInputRef.current?.click();
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    await onFiles(Array.from(input.files ?? []));
+    // Clear so picking the same file again still fires a change.
+    input.value = "";
+  };
+
+  const stopEvent = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    stopEvent(e);
+    if (canUpload) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    stopEvent(e);
+    // Only clear when leaving the drop zone itself, not one of its children.
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    stopEvent(e);
+    setIsDragging(false);
+    if (!canUpload) return;
+
+    const files = Array.from(e.dataTransfer.files).filter(isAcceptedFile);
+    if (files.length === 0) {
+      showInfo(
+        `No supported files found. Supported types: ${ACCEPTED_FILE_TYPES.map((t) => t.slice(1)).join(", ")}`
+      );
+      return;
+    }
+    await onFiles(files);
+  };
 
   const linkOptions: MenuOption[] = [
     {
@@ -151,26 +187,24 @@ export function AddSourceMenu({
         </Button>
       </div>
 
-      {fileInputRef && onFileSelect && (
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          onChange={onFileSelect}
-          accept={ACCEPTED_FILES}
-          multiple
-        />
-      )}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={handleFileSelect}
+        accept={ACCEPTED_FILES}
+        multiple
+      />
 
       <div
         data-testid="source-dropzone"
         data-state={isDragging ? "dragging" : "idle"}
         aria-disabled={!canUpload || undefined}
         onClick={() => canUpload && openFilePicker()}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={stopEvent}
+        onDrop={handleDrop}
         className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-hairline bg-muted/40 px-4 py-6 text-center sm:px-6 sm:py-10 transition-colors hover:bg-muted/60 aria-disabled:hover:bg-muted/40 data-[state=dragging]:border-primary data-[state=dragging]:bg-primary/10 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       >
         <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -195,8 +229,7 @@ export function AddSourceMenu({
           Choose files
         </Button>
         <p className="max-w-xl font-sans text-xs text-muted-foreground">
-          PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF, WAV, MP3, M4A, WebM,
-          FLAC
+          {ACCEPTED_FILE_TYPE_LABELS}
         </p>
       </div>
 

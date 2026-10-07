@@ -1,7 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { toast as sonner } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider } from "@/shared/contexts/ToastContext";
 import { useToast } from "@/shared/contexts/useToast";
 
 vi.mock("sonner", () => {
@@ -19,20 +18,19 @@ vi.mock("sonner", () => {
 });
 
 function renderToastHook() {
-  return renderHook(() => useToast(), { wrapper: ToastProvider });
+  return renderHook(() => useToast());
 }
 
-describe("ToastProvider (sonner adapter)", () => {
+describe("useToast (sonner adapter)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("throws when useToast is used outside provider", () => {
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(() => renderHook(() => useToast())).toThrow(
-      "useToast must be used within a ToastProvider"
-    );
-    spy.mockRestore();
+  it("works without a provider and returns the same object on every render", () => {
+    const { result, rerender } = renderToastHook();
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
   });
 
   it("success uses the default 4000ms duration and returns the id it passed", () => {

@@ -18,18 +18,18 @@ vi.mock("@/utils/platformDetection", () => ({
   canOfferPurchases: () => !mockIsNativeShell,
 }));
 
-const { useLimitErrorToast } = await import("./useLimitErrorToast");
+const { useErrorToast } = await import("./useErrorToast");
 
 const dailyLimitError = new Error("Daily quiz limit reached (2/2). Upgrade for higher limits.");
 
-describe("useLimitErrorToast", () => {
+describe("useErrorToast", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsNativeShell = false;
   });
 
   it("offers an Upgrade to Pro action on the web", async () => {
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderHook(() => useErrorToast());
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError);
@@ -42,7 +42,7 @@ describe("useLimitErrorToast", () => {
 
   it("shows no upgrade copy or action inside the native app", async () => {
     mockIsNativeShell = true;
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderHook(() => useErrorToast());
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError);
@@ -55,7 +55,7 @@ describe("useLimitErrorToast", () => {
 
   it("drops a caller's upgrade message inside the native app", async () => {
     mockIsNativeShell = true;
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderHook(() => useErrorToast());
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError, {
@@ -64,5 +64,15 @@ describe("useLimitErrorToast", () => {
     });
 
     expect(mockShowError.mock.calls[0][0]).toBe("Daily quiz limit reached (2/2).");
+  });
+
+  it("showError toasts a plain error's message", () => {
+    const { result } = renderHook(() => useErrorToast());
+
+    act(() => {
+      result.current.showError(new Error("Network down"));
+    });
+
+    expect(mockShowError).toHaveBeenCalledWith("Network down");
   });
 });

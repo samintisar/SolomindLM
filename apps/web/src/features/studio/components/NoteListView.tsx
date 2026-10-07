@@ -1,5 +1,6 @@
 import { PenTool, Search } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/shared/components/ui/empty";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shared/components/ui/input-group";
 import { Note, StudioTool } from "@/shared/types/index";
 import { NoteItem } from "./NoteItem";
@@ -8,7 +9,6 @@ import { ToolGrid } from "./ToolGrid";
 interface NoteListViewProps {
   tools: StudioTool[];
   notes: Note[];
-  activeNoteId: string | null;
   onToolClick: (toolId: string) => void;
   onNoteClick: (note: Note) => void;
   onDeleteNote: (note: Note) => void;
@@ -28,7 +28,6 @@ interface NoteListViewProps {
 export const NoteListView: React.FC<NoteListViewProps> = ({
   tools,
   notes,
-  activeNoteId: _activeNoteId,
   onToolClick,
   onNoteClick,
   onDeleteNote,
@@ -93,14 +92,18 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
               />
             ))}
             {filteredNotes.length === 0 && (
-              <div className="text-center py-8">
-                <PenTool className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-sm text-muted-foreground">
-                  {searchQuery.trim()
-                    ? "No notes match your search."
-                    : "No saved notes yet. Create one to get started!"}
-                </p>
-              </div>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <PenTool />
+                  </EmptyMedia>
+                  <EmptyDescription>
+                    {searchQuery.trim()
+                      ? "No notes match your search."
+                      : "No saved notes yet. Create one to get started!"}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             )}
           </div>
         </div>

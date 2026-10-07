@@ -21,8 +21,6 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
   const navigate = useNavigate();
   const redeemCollaborate = useMutation(api.notebooks.sharing.redeemCollaborateLink);
 
-  useQuery(api.auth.getCurrentUser);
-
   const notebookId = useMemo(() => {
     if (requireNotebookAccess) {
       const match = location.pathname.match(/^\/notebook\/([^/]+)/);

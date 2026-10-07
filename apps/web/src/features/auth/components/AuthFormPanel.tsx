@@ -2,7 +2,7 @@ import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
 import { AlertCircle, Eye, EyeOff } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { requestNativePasswordSignIn } from "@/features/auth/nativeShellAuth";
 import { useAuth } from "@/features/auth/useAuth";
@@ -117,17 +117,11 @@ function AuthFormPanelContent({
   // Sign in with Apple appears only once it's configured on the backend.
   const appleEnabled = useQuery(api.auth.getSignInOptions)?.apple ?? false;
   const [step, setStep] = useState<AuthStep>(initialMode);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(authError ?? "");
   const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-
-  useEffect(() => {
-    if (authError) {
-      setError(authError);
-    }
-  }, [authError]);
 
   const handleOAuthSignIn = async (provider: "google" | "apple") => {
     try {
@@ -147,80 +141,26 @@ function AuthFormPanelContent({
     }
   };
 
-  const runPasswordSignIn = async (
-    formData: FormData,
-    onSuccess: (authenticated: boolean) => void
+  /**
+   * Submit a password-provider form. When the user isn't fully signed in yet, `nextStep` (if any)
+   * asks for the code that was just emailed.
+   */
+  const submitPassword = (
+    event: React.FormEvent<HTMLFormElement>,
+    fallback: string,
+    nextStep?: "emailVerification" | "resetVerification"
   ) => {
-    const authenticated = await signInPassword(formData);
-    onSuccess(authenticated);
-  };
-
-  const handleEmailPasswordSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     setError("");
     setPasswordLoading(true);
-    void runPasswordSignIn(formData, (authenticated) => {
-      if (authenticated) {
-        onAuthenticated();
-        return;
-      }
-      setStep({
-        kind: "emailVerification",
-        email: formData.get("email") as string,
-      });
-    })
-      .catch((err) => {
-        setError(getConvexAuthUserMessage(err, "Sign-in failed"));
+    void signInPassword(formData)
+      .then((authenticated) => {
+        if (authenticated) onAuthenticated();
+        else if (nextStep) setStep({ kind: nextStep, email: formData.get("email") as string });
       })
-      .finally(() => setPasswordLoading(false));
-  };
-
-  const handleEmailVerificationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setError("");
-    setPasswordLoading(true);
-    void runPasswordSignIn(formData, (authenticated) => {
-      if (authenticated) onAuthenticated();
-    })
       .catch((err) => {
-        setError(getConvexAuthUserMessage(err, "Verification failed"));
-      })
-      .finally(() => setPasswordLoading(false));
-  };
-
-  const handleForgotSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setError("");
-    setPasswordLoading(true);
-    void runPasswordSignIn(formData, (authenticated) => {
-      if (authenticated) {
-        onAuthenticated();
-        return;
-      }
-      setStep({
-        kind: "resetVerification",
-        email: formData.get("email") as string,
-      });
-    })
-      .catch((err) => {
-        setError(getConvexAuthUserMessage(err, "Could not send reset code"));
-      })
-      .finally(() => setPasswordLoading(false));
-  };
-
-  const handleResetVerificationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setError("");
-    setPasswordLoading(true);
-    void runPasswordSignIn(formData, (authenticated) => {
-      if (authenticated) onAuthenticated();
-    })
-      .catch((err) => {
-        setError(getConvexAuthUserMessage(err, "Could not reset password"));
+        setError(getConvexAuthUserMessage(err, fallback));
       })
       .finally(() => setPasswordLoading(false));
   };
@@ -289,7 +229,10 @@ function AuthFormPanelContent({
             <Separator className="flex-1" />
           </div>
 
-          <form className="flex flex-col gap-3" onSubmit={handleEmailPasswordSubmit}>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => submitPassword(e, "Sign-in failed", "emailVerification")}
+          >
             <Field>
               <FieldLabel htmlFor={`${id}-email`} className="sr-only">
                 Email
@@ -371,7 +314,10 @@ function AuthFormPanelContent({
             <span className="font-medium text-foreground">{step.email}</span>. Enter it below to
             continue.
           </p>
-          <form className="flex flex-col gap-3" onSubmit={handleEmailVerificationSubmit}>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => submitPassword(e, "Verification failed")}
+          >
             <input name="email" type="hidden" value={step.email} />
             <input name="flow" type="hidden" value="email-verification" />
             <Field>
@@ -415,7 +361,10 @@ function AuthFormPanelContent({
           <p className="font-sans text-sm leading-relaxed text-muted-foreground">
             Enter your email and we will send you a code to reset your password.
           </p>
-          <form className="flex flex-col gap-3" onSubmit={handleForgotSubmit}>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => submitPassword(e, "Could not send reset code", "resetVerification")}
+          >
             <Field>
               <FieldLabel htmlFor={`${id}-reset-email`} className="sr-only">
                 Email
@@ -459,7 +408,10 @@ function AuthFormPanelContent({
             <span className="font-medium text-foreground">{step.email}</span> and choose a new
             password.
           </p>
-          <form className="flex flex-col gap-3" onSubmit={handleResetVerificationSubmit}>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => submitPassword(e, "Could not reset password")}
+          >
             <input name="email" type="hidden" value={step.email} />
             <input name="flow" type="hidden" value="reset-verification" />
             <Field>

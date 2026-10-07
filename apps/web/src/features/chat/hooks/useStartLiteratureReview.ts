@@ -37,12 +37,10 @@ export interface UseStartLiteratureReviewReturn {
     notebookPapers?: LiteratureReviewNotebookPapers
   ) => Promise<StartLiteratureReviewResult>;
   isStarting: boolean;
-  error: string | null;
 }
 
 export function useStartLiteratureReview(): UseStartLiteratureReviewReturn {
   const [isStarting, setIsStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const startMutation = useMutation(api.studio.literature_tables.index.startLiteratureReview);
 
@@ -56,7 +54,6 @@ export function useStartLiteratureReview(): UseStartLiteratureReviewReturn {
       notebookPapers?: LiteratureReviewNotebookPapers
     ): Promise<StartLiteratureReviewResult> => {
       setIsStarting(true);
-      setError(null);
       try {
         const result = await startMutation({
           query,
@@ -70,10 +67,6 @@ export function useStartLiteratureReview(): UseStartLiteratureReviewReturn {
           sessionId: result.sessionId as Id<"literatureReviewSessions">,
           conversationId: result.conversationId as Id<"conversations">,
         };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to start literature review";
-        setError(message);
-        throw err;
       } finally {
         setIsStarting(false);
       }
@@ -81,5 +74,5 @@ export function useStartLiteratureReview(): UseStartLiteratureReviewReturn {
     [startMutation]
   );
 
-  return { startLiteratureReview, isStarting, error };
+  return { startLiteratureReview, isStarting };
 }

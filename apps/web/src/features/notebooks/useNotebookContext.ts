@@ -4,17 +4,14 @@ import { useSubscriptionStatus } from "../billing/services/subscriptionApi";
 
 export interface NotebookContextType {
   // Derived data
-  notebookList: NotebookItem[];
   featuredNotebooks: NotebookItem[];
   recentNotebooks: NotebookItem[];
   activeNotebook: NotebookItem | undefined;
   /** True until the notebooks and folders queries have returned. */
   notebooksLoading: boolean;
 
-  // URL helpers
+  // URL helper
   urlNotebookId: string | null;
-  urlFolderId: string | null;
-  currentView: string;
 
   // Folders
   folders: FolderItem[];
@@ -33,15 +30,8 @@ export interface NotebookContextType {
   deleteFolder: (id: string) => Promise<void>;
   moveNotebookToFolder: (notebookId: string, folderId: string | null) => Promise<void>;
 
-  // Navigation
-  logoClick: () => void;
-  getStarted: () => void;
-  billingClick: () => void;
-  billingBack: () => void;
-
-  // Notebook title (for Header rename)
+  // Notebook title (Header shows and renames it)
   notebookTitle: string;
-  setNotebookTitle: (title: string) => void;
 
   // Subscription
   subscriptionStatus: ReturnType<typeof useSubscriptionStatus>;

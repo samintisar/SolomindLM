@@ -1,5 +1,8 @@
 import { api } from "@convex/_generated/api";
-import type { OptimisticLocalStore } from "convex/browser";
+import type { OptimisticLocalStore, OptimisticUpdate } from "convex/browser";
+import { type ReactMutation, useMutation } from "convex/react";
+import type { FunctionArgs, FunctionReference } from "convex/server";
+import { useMemo } from "react";
 
 /**
  * Optimistic-update helpers for the notes queries the Studio panel reads.
@@ -66,4 +69,32 @@ export function removeNoteFromNotesCache(localStore: OptimisticLocalStore, id: s
       value.filter((row: NotesListRow) => row._id !== id)
     );
   }
+}
+
+/** Optimistic update for a rename mutation (`{ id, title }`): the new title shows at once. */
+export function renameInNotesCache(
+  localStore: OptimisticLocalStore,
+  { id, title }: { id: string; title?: string }
+): void {
+  patchNoteInNotesCache(localStore, id, { title });
+}
+
+/** Optimistic update for a delete mutation (`{ id }`): the item leaves the panel at once. */
+export function removeFromNotesCache(
+  localStore: OptimisticLocalStore,
+  { id }: { id: string }
+): void {
+  removeNoteFromNotesCache(localStore, id);
+}
+
+/**
+ * `useMutation(mutation).withOptimisticUpdate(optimisticUpdate)`, kept stable across renders
+ * (`withOptimisticUpdate` returns a new function on every call). Pass a module-level update.
+ */
+export function useOptimisticMutation<Mutation extends FunctionReference<"mutation">>(
+  mutation: Mutation,
+  optimisticUpdate: OptimisticUpdate<FunctionArgs<Mutation>>
+): ReactMutation<Mutation> {
+  const base = useMutation(mutation);
+  return useMemo(() => base.withOptimisticUpdate(optimisticUpdate), [base, optimisticUpdate]);
 }

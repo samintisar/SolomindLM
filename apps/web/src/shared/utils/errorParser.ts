@@ -114,28 +114,27 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
   const fromConvexData = parseLimitFromConvexErrorData(error);
   if (fromConvexData) return fromConvexData;
 
-  // Handle Error objects
+  // Legacy errors carry the limit only in the message text.
   if (error instanceof Error) {
-    // Try to parse the error message for legacy errors
     const legacyParse = parseLegacyLimitError(error.message);
     if (legacyParse) {
       return legacyParse;
     }
+  }
 
-    // Check if error has structured data attached
-    const err = error as any;
-    if (err.data && isLimitError(err.data)) {
-      const raw = err.data as Record<string, unknown>;
-      return {
-        isLimitError: true,
-        code: String(raw.code),
-        limit: Number(raw.limit),
-        current: Number(raw.current),
-        limitType: raw.limitType as ParsedLimitError["limitType"],
-        feature: raw.feature as DailyFeature | undefined,
-        isPro: Boolean(raw.isPro),
-      };
-    }
+  // Structured data attached to an Error or a plain object.
+  const data = typeof error === "object" ? (error as { data?: unknown }).data : undefined;
+  if (data && isLimitError(data)) {
+    const raw = data as unknown as Record<string, unknown>;
+    return {
+      isLimitError: true,
+      code: String(raw.code),
+      limit: Number(raw.limit),
+      current: Number(raw.current),
+      limitType: raw.limitType as ParsedLimitError["limitType"],
+      feature: raw.feature as DailyFeature | undefined,
+      isPro: Boolean(raw.isPro),
+    };
   }
 
   // Check if it's already a structured error
@@ -149,23 +148,6 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
       feature: error.feature,
       isPro: error.isPro,
     };
-  }
-
-  // Handle plain objects with error data
-  if (typeof error === "object" && error !== null) {
-    const err = error as any;
-    if (err.data && isLimitError(err.data)) {
-      const raw = err.data as Record<string, unknown>;
-      return {
-        isLimitError: true,
-        code: String(raw.code),
-        limit: Number(raw.limit),
-        current: Number(raw.current),
-        limitType: raw.limitType as ParsedLimitError["limitType"],
-        feature: raw.feature as DailyFeature | undefined,
-        isPro: Boolean(raw.isPro),
-      };
-    }
   }
 
   return null;

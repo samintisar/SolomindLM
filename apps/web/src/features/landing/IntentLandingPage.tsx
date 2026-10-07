@@ -1,12 +1,14 @@
-import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
-import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
-import { AuthModal } from "@/features/auth/components/AuthModal";
-import { useAuth } from "@/features/auth/useAuth";
+import { ChevronRight } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
-import { isNativeShell } from "@/utils/platformDetection";
-import { Footer } from "./components/Footer";
+import {
+  MarketingBreadcrumb,
+  MarketingFaqSection,
+  MarketingFinalCta,
+  MarketingLinkCard,
+  MarketingPageShell,
+} from "./components/MarketingPageShell";
 import {
   getIntentBreadcrumbItems,
   getIntentLandingPageByPath,
@@ -20,88 +22,41 @@ type IntentLandingPageProps = {
 
 export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
   const page = getIntentLandingPageByPath(pagePath);
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   if (!page) {
     return <Navigate to="/" replace />;
   }
 
-  if (isNativeShell()) {
-    if (isLoading) {
-      return <div className="min-h-screen bg-background" />;
-    }
-    return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
-  }
-
-  const openSignup = () => setAuthModalOpen(true);
-
   return (
-    <>
-      <SEOMeta
-        pagePath={page.path}
-        title={page.title}
-        description={page.description}
-        keywords={page.keywords}
-      />
-      <div className="min-h-screen landing-grid-pattern">
-        <IntentHeader />
-        <main>
+    <MarketingPageShell>
+      {(openSignup) => (
+        <>
+          <SEOMeta
+            pagePath={page.path}
+            title={page.title}
+            description={page.description}
+            keywords={page.keywords}
+          />
           <IntentHero page={page} onSignup={openSignup} />
-          <IntentFaqSection
-            page={page}
-            openFaqIndex={openFaqIndex}
-            onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-          />
+          <MarketingFaqSection faqs={page.faqs} className="bg-card/30" />
           <IntentRelatedFeaturesSection page={page} />
-          <IntentFinalCta page={page} onSignup={openSignup} />
-        </main>
-        <Footer />
-      </div>
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onAuthenticated={() => navigate("/home", { replace: true })}
-      />
-    </>
-  );
-}
-
-function IntentHeader() {
-  return (
-    <header className="border-b border-border/60 bg-card/40 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-[1500px] mx-auto px-6 sm:px-8 lg:px-12 h-16 flex items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2.5">
-          <img
-            src="/SolomindLM_logo.png"
-            alt="SolomindLM"
-            className="w-8 h-8 shrink-0 object-contain"
+          <MarketingFinalCta
+            title={page.conversionPromise}
+            ctaLabel={page.ctaLabel}
+            onSignup={openSignup}
           />
-          <span className="text-lg font-display font-bold text-foreground tracking-tight">
-            SolomindLM
-          </span>
-        </Link>
-        <Link
-          to="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Back to home
-        </Link>
-      </div>
-    </header>
+        </>
+      )}
+    </MarketingPageShell>
   );
 }
 
 function IntentHero({ page, onSignup }: { page: IntentLandingPageConfig; onSignup: () => void }) {
-  const breadcrumbItems = getIntentBreadcrumbItems(page);
-
   return (
     <section className="px-6 md:px-8 pt-16 pb-20 md:pt-24 md:pb-28">
       <div className="max-w-5xl mx-auto space-y-12">
         <div className="max-w-3xl mx-auto text-center space-y-8">
-          <IntentBreadcrumb items={breadcrumbItems} />
+          <MarketingBreadcrumb items={getIntentBreadcrumbItems(page)} />
           <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-tight">
             {page.h1}
           </h1>
@@ -125,7 +80,7 @@ function IntentHero({ page, onSignup }: { page: IntentLandingPageConfig; onSignu
               </Link>
             </div>
           ) : null}
-          <Button size="lg" onClick={onSignup} className="font-semibold px-8">
+          <Button size="lg" onClick={onSignup}>
             {page.ctaLabel}
           </Button>
         </div>
@@ -169,34 +124,6 @@ function IntentHero({ page, onSignup }: { page: IntentLandingPageConfig; onSignu
   );
 }
 
-function IntentBreadcrumb({ items }: { items: ReturnType<typeof getIntentBreadcrumbItems> }) {
-  return (
-    <nav aria-label="Breadcrumb" className="flex justify-center">
-      <ol className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          return (
-            <li key={item.path} className="inline-flex items-center gap-2">
-              {index > 0 ? (
-                <span aria-hidden className="text-border">
-                  /
-                </span>
-              ) : null}
-              {isLast ? (
-                <span className="font-medium text-foreground">{item.name}</span>
-              ) : (
-                <Link to={item.path} className="hover:text-foreground transition-colors">
-                  {item.name}
-                </Link>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
 function IntentRelatedFeaturesSection({ page }: { page: IntentLandingPageConfig }) {
   const relatedPages = getRelatedIntentPages(page);
   if (relatedPages.length === 0) return null;
@@ -216,97 +143,14 @@ function IntentRelatedFeaturesSection({ page }: { page: IntentLandingPageConfig 
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {relatedPages.map((relatedPage) => (
             <li key={relatedPage.path}>
-              <Link
+              <MarketingLinkCard
                 to={relatedPage.path}
-                className="group flex flex-col h-full rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-sm transition-all"
-              >
-                <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                  {relatedPage.navLabel}
-                </span>
-                <span className="mt-2 text-sm text-muted-foreground leading-relaxed flex-1">
-                  {relatedPage.subheadline}
-                </span>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                  Learn more
-                  <ChevronRight className="w-4 h-4" aria-hidden />
-                </span>
-              </Link>
+                title={relatedPage.navLabel}
+                description={relatedPage.subheadline}
+              />
             </li>
           ))}
         </ul>
-      </div>
-    </section>
-  );
-}
-
-function IntentFaqSection({
-  page,
-  openFaqIndex,
-  onToggleFaq,
-}: {
-  page: IntentLandingPageConfig;
-  openFaqIndex: number | null;
-  onToggleFaq: (index: number) => void;
-}) {
-  if (page.faqs.length === 0) return null;
-
-  return (
-    <section className="px-6 md:px-8 py-16 md:py-20 border-t border-border/60 bg-card/30">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-8 text-center">
-          Frequently asked questions
-        </h2>
-        <div className="space-y-3">
-          {page.faqs.map((faq, index) => {
-            const isOpen = openFaqIndex === index;
-            return (
-              <div
-                key={faq.question}
-                className="rounded-xl border border-border bg-card overflow-hidden"
-              >
-                <button
-                  type="button"
-                  onClick={() => onToggleFaq(index)}
-                  className="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-secondary/30 transition-colors"
-                  aria-expanded={isOpen}
-                >
-                  <span className="font-medium text-foreground">{faq.question}</span>
-                  {isOpen ? (
-                    <ChevronUp className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  )}
-                </button>
-                {isOpen ? (
-                  <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed border-t border-border/50 pt-4">
-                    {faq.answer}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function IntentFinalCta({
-  page,
-  onSignup,
-}: {
-  page: IntentLandingPageConfig;
-  onSignup: () => void;
-}) {
-  return (
-    <section className="px-6 md:px-8 py-16 md:py-20">
-      <div className="max-w-2xl mx-auto text-center space-y-6">
-        <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-          {page.conversionPromise}
-        </h2>
-        <Button size="lg" onClick={onSignup} className="font-semibold px-8">
-          {page.ctaLabel}
-        </Button>
       </div>
     </section>
   );

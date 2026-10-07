@@ -1,7 +1,8 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SourceUpload } from "../../hooks/useSourceUpload";
 import { AddSourceDialog } from "./AddSourceDialog";
 
 const limits = { sourceLimit: 100, isLoading: false };
@@ -11,7 +12,7 @@ vi.mock("@/features/billing/services/subscriptionApi", () => ({
 vi.mock("../GoogleDrivePicker", () => ({ isGoogleDrivePickerConfigured: true }));
 vi.mock("../../services/documentsApi", () => ({
   useResolveDoi: vi.fn(),
-  useUpload: vi.fn(),
+  useCreateDocument: vi.fn(),
   useParseBibliography: vi.fn(),
   useBulkUpload: vi.fn(),
   useGetExistingPapers: () => undefined,
@@ -32,31 +33,46 @@ const OPTION_NAMES = [
   "Add manually",
 ];
 
-function renderDialog(over: Partial<Props> = {}) {
+type Overrides = Partial<Props> & {
+  onTextUpload?: SourceUpload["handleTextUpload"];
+  isUploading?: boolean;
+};
+
+function withUpload(upload: SourceUpload, { onTextUpload, isUploading }: Overrides): SourceUpload {
+  return {
+    ...upload,
+    ...(onTextUpload && { handleTextUpload: onTextUpload }),
+    ...(isUploading !== undefined && { isUploading }),
+  };
+}
+
+function renderDialog(over: Overrides = {}) {
+  const { onTextUpload: _text, isUploading: _uploading, ...rest } = over;
+  const baseUpload: SourceUpload = {
+    isUploading: false,
+    processFiles: vi.fn().mockResolvedValue(undefined),
+    handleUrlUpload: vi.fn().mockResolvedValue(undefined),
+    handleSocialMediaUpload: vi.fn().mockResolvedValue(undefined),
+    handleTextUpload: vi.fn().mockResolvedValue(undefined),
+  };
   const props: Props = {
     open: true,
     onOpenChange: vi.fn(),
     sourcesCount: 3,
     userId: "u1",
     noteId: "nb1",
-    isUploading: false,
-    isDragging: false,
-    onDragEnter: vi.fn(),
-    onDragLeave: vi.fn(),
-    onDragOver: vi.fn(),
-    onDrop: vi.fn(),
-    fileInputRef: { current: null },
-    onFileSelect: vi.fn(),
-    onUrlUpload: vi.fn().mockResolvedValue(undefined),
-    onVideoUpload: vi.fn().mockResolvedValue(undefined),
-    onTextUpload: vi.fn().mockResolvedValue(undefined),
+    upload: withUpload(baseUpload, over),
     onDiscoverClick: vi.fn(),
     onGoogleDriveClick: vi.fn(),
-    ...over,
+    ...rest,
   };
   const utils = render(<AddSourceDialog {...props} />);
-  const rerenderWith = (next: Partial<Props>) =>
-    utils.rerender(<AddSourceDialog {...props} {...next} />);
+  const rerenderWith = (next: Overrides) => {
+    const { onTextUpload: _t, isUploading: _u, ...nextRest } = next;
+    utils.rerender(
+      <AddSourceDialog {...props} {...nextRest} upload={withUpload(props.upload, next)} />
+    );
+  };
   return { props, rerenderWith, ...utils };
 }
 
@@ -259,10 +275,25 @@ describe("AddSourceDialog", () => {
     expect(dialogNamed("Paste text")).toBeInTheDocument();
   });
 
-  it("resets dragging once when the dialog closes", () => {
-    const { props, rerenderWith } = renderDialog();
-    expect(props.onDragLeave).not.toHaveBeenCalled();
-    rerenderWith({ open: false });
-    expect(props.onDragLeave).toHaveBeenCalledTimes(1);
+  it("highlights the drop zone while dragging and uploads only supported dropped files", () => {
+    const { props } = renderDialog();
+    const zone = screen.getByTestId("source-dropzone");
+    fireEvent.dragEnter(zone);
+    expect(zone).toHaveAttribute("data-state", "dragging");
+
+    const pdf = new File(["%PDF"], "paper.PDF", { type: "application/pdf" });
+    const exe = new File(["MZ"], "tool.exe");
+    fireEvent.drop(zone, { dataTransfer: { files: [pdf, exe] } });
+    expect(zone).toHaveAttribute("data-state", "idle");
+    expect(props.upload.processFiles).toHaveBeenCalledWith([pdf]);
+  });
+
+  it("does not highlight or upload on drop when uploads are blocked", () => {
+    const { props } = renderDialog({ userId: null });
+    const zone = screen.getByTestId("source-dropzone");
+    fireEvent.dragEnter(zone);
+    expect(zone).toHaveAttribute("data-state", "idle");
+    fireEvent.drop(zone, { dataTransfer: { files: [new File(["x"], "a.pdf")] } });
+    expect(props.upload.processFiles).not.toHaveBeenCalled();
   });
 });

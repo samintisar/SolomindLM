@@ -20,6 +20,8 @@ type AdvanceTourStepArgs =
   | { expectedCurrentStepId: StepId }
   | { expectedCurrentStepId: StepId; tourNotebookId: Id<"notebooks"> };
 
+const MAX_RETRIES = 3;
+
 function isStepMismatchError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("Step mismatch:");
 }
@@ -63,6 +65,16 @@ export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children 
   const [retryNonce, setRetryNonce] = useState(0);
   const [initFailed, setInitFailed] = useState(false);
 
+  /** Re-run the effects up to MAX_RETRIES times for one operation, then give up on onboarding. */
+  const retryOrFail = useCallback((attemptsRef: React.RefObject<number>) => {
+    if (attemptsRef.current < MAX_RETRIES) {
+      attemptsRef.current += 1;
+      setRetryNonce((n) => n + 1);
+    } else {
+      setInitFailed(true);
+    }
+  }, []);
+
   const tourStatus: TourStatus =
     onboardingState && "tourStatus" in onboardingState
       ? (onboardingState.tourStatus as TourStatus)
@@ -72,6 +84,7 @@ export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children 
       ? ((onboardingState.currentStepId as StepId | undefined) ?? null)
       : null;
   const hasOnboardingRow = !!onboardingState && "_id" in onboardingState;
+  const checklistDismissed = Boolean(onboardingState?.checklistDismissed);
 
   // 1. Ensure a userOnboarding row exists (idempotent client-side via ref).
   useEffect(() => {
@@ -90,14 +103,16 @@ export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children 
       .catch((error) => {
         ensuredRowRef.current = false;
         logOnboardingError("failed to create onboarding row", error);
-        if (createRowRetryAttemptsRef.current < 3) {
-          createRowRetryAttemptsRef.current += 1;
-          setRetryNonce((n) => n + 1);
-        } else {
-          setInitFailed(true);
-        }
+        retryOrFail(createRowRetryAttemptsRef);
       });
-  }, [isAuthenticated, onboardingState, getOrCreateOnboardingRow, hasOnboardingRow, retryNonce]);
+  }, [
+    isAuthenticated,
+    onboardingState,
+    getOrCreateOnboardingRow,
+    hasOnboardingRow,
+    retryNonce,
+    retryOrFail,
+  ]);
 
   // 2. Auto-launch the tour for pending users.
   useEffect(() => {
@@ -112,14 +127,9 @@ export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children 
       .catch((error) => {
         startedRef.current = false;
         logOnboardingError("failed to start tour", error);
-        if (startTourRetryAttemptsRef.current < 3) {
-          startTourRetryAttemptsRef.current += 1;
-          setRetryNonce((n) => n + 1);
-        } else {
-          setInitFailed(true);
-        }
+        retryOrFail(startTourRetryAttemptsRef);
       });
-  }, [isAuthenticated, hasOnboardingRow, tourStatus, startTour, retryNonce]);
+  }, [isAuthenticated, hasOnboardingRow, tourStatus, startTour, retryNonce, retryOrFail]);
 
   // 2b. Navigate to /home when step 1 is active so the create-notebook tooltip is visible.
   useEffect(() => {
@@ -158,17 +168,12 @@ export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children 
           return;
         }
         logOnboardingError("failed to advance tour step", error);
-        if (advanceTourRetryAttemptsRef.current < 3) {
-          advanceTourRetryAttemptsRef.current += 1;
-          setRetryNonce((n) => n + 1);
-        } else {
-          setInitFailed(true);
-        }
+        retryOrFail(advanceTourRetryAttemptsRef);
       })
       .finally(() => {
         advancingRef.current = false;
       });
-  }, [tourStatus, currentStepId, tourProgress, advanceTourStep, retryNonce]);
+  }, [tourStatus, currentStepId, tourProgress, advanceTourStep, retryNonce, retryOrFail]);
 
   // 4. Cross-route navigation only on the transition out of createNotebook.
   useEffect(() => {
@@ -198,22 +203,17 @@ export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children 
       .catch((error) => {
         completedAllRef.current = false;
         logOnboardingError("failed to complete tour", error);
-        if (completeTourRetryAttemptsRef.current < 3) {
-          completeTourRetryAttemptsRef.current += 1;
-          setRetryNonce((n) => n + 1);
-        } else {
-          setInitFailed(true);
-        }
+        retryOrFail(completeTourRetryAttemptsRef);
       });
-  }, [checklist, tourStatus, completeTour, retryNonce]);
+  }, [checklist, tourStatus, completeTour, retryNonce, retryOrFail]);
 
   const skip = useCallback(async () => {
     await skipTourMutation({});
   }, [skipTourMutation]);
 
   const value = useMemo<OnboardingContextValue>(
-    () => ({ tourStatus, currentStepId, initFailed, skip }),
-    [tourStatus, currentStepId, initFailed, skip]
+    () => ({ tourStatus, currentStepId, initFailed, checklist, checklistDismissed, skip }),
+    [tourStatus, currentStepId, initFailed, checklist, checklistDismissed, skip]
   );
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;

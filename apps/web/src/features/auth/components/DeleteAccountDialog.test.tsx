@@ -24,8 +24,8 @@ vi.mock("@/features/billing/services/subscriptionApi", () => ({
   useSubscriptionStatus: () => ({ hasSubscription: mockHasSubscription }),
 }));
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError: mockShowError }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: mockShowError }),
 }));
 
 const { DeleteAccountDialog } = await import("./DeleteAccountDialog");

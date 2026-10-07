@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-import { useSourceContent } from "../hooks/useSourceContent";
 import { useSourceSearch } from "../hooks/useSourceSearch";
 import { useSourceUpload } from "../hooks/useSourceUpload";
 import {
@@ -13,6 +12,7 @@ import {
 } from "../services/documentsApi";
 import { useSourcesContext } from "../useSourcesContext";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
+import { copySourceMarkdown, downloadSourceMarkdown } from "../utils/sourceMarkdown";
 import { AddSourceDialog } from "./add-source/AddSourceDialog";
 import { DiscoverSourcesDialog } from "./discover/DiscoverSourcesDialog";
 import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
@@ -20,6 +20,9 @@ import { GoogleDrivePicker, isGoogleDrivePickerConfigured } from "./GoogleDriveP
 import { SourceList } from "./SourceList";
 import { SourcesPanelHeader } from "./SourcesPanelHeader";
 import { SourceViewer } from "./SourceViewer";
+
+/** Normalize newlines so markdown parses correctly (\r\n and lone \r become \n). */
+const normalizeNewlines = (raw: string) => raw.replace(/\r\n?/g, "\n");
 
 export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
@@ -49,7 +52,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     sources,
     onToggleSource,
     onToggleAll,
-    onAddSource,
     onDeleteSource,
     onDeleteSelectedSources,
     onRenameSource,
@@ -107,37 +109,20 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const { searchQuery, setSearchQuery, filteredSources } = useSourceSearch(sources);
 
-  const sourceContent = useSourceContent();
-
   // Fetch document content using the reactive hook
   const viewingSource = useMemo(
     () => sources.find((s) => s.id === viewingSourceId) || null,
     [sources, viewingSourceId]
   );
 
-  const documentContent = useDocumentContent(
-    viewingSource && viewingSource.status === "completed" ? viewingSourceId : null
-  );
+  const contentReady = viewingSource?.status === "completed";
+  const documentContent = useDocumentContent(contentReady ? viewingSourceId : null);
   const viewingDocument = useDocument(viewingSourceId);
-
-  // Refs to avoid effect depending on sourceContent (which is a new object every render and would cause infinite loop)
-  const onContentUpdateRef = useRef(sourceContent.onContentUpdate);
-  const onLoadingStartRef = useRef(sourceContent.onLoadingStart);
-  onContentUpdateRef.current = sourceContent.onContentUpdate;
-  onLoadingStartRef.current = sourceContent.onLoadingStart;
-
-  // Update content cache when documentContent changes
-  useEffect(() => {
-    if (viewingSourceId && documentContent?.content) {
-      onContentUpdateRef.current(viewingSourceId, documentContent.content);
-    } else if (
-      viewingSourceId &&
-      viewingSource?.status === "completed" &&
-      documentContent === undefined
-    ) {
-      onLoadingStartRef.current(viewingSourceId);
-    }
-  }, [viewingSourceId, documentContent, viewingSource?.status]);
+  const markdownContent = useMemo(
+    () => (documentContent?.content ? normalizeNewlines(documentContent.content) : undefined),
+    [documentContent]
+  );
+  const isContentLoading = contentReady && documentContent === undefined;
 
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
@@ -156,10 +141,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const allSelected = filteredSources.length > 0 && filteredSources.every((s) => s.selected);
   const selectedCount = sources.filter((s) => s.selected).length;
 
-  const markdownContent = viewingSourceId ? sourceContent.getContent(viewingSourceId) : undefined;
-  const canCopyOrDownload = Boolean(
-    markdownContent && !sourceContent.hasError(viewingSourceId ?? "")
-  );
+  const canCopyOrDownload = Boolean(markdownContent);
 
   // Handlers
   const handleDeleteSource = async (sourceId: string, sourceTitle: string) => {
@@ -317,14 +299,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   const handleCopy = async () => {
-    if (viewingSource) {
-      await sourceContent.handleCopySourceMarkdown(viewingSource.id, viewingSource.title);
-    }
+    if (markdownContent) await copySourceMarkdown(markdownContent);
   };
 
   const handleDownload = () => {
-    if (viewingSource) {
-      sourceContent.handleDownloadSourceMarkdown(viewingSource.id, viewingSource.title);
+    if (viewingSource && markdownContent) {
+      downloadSourceMarkdown(markdownContent, viewingSource.title);
     }
   };
 
@@ -359,10 +339,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               source={viewingSource}
               content={markdownContent}
               pdfStorageId={viewingSource?.type === "PDF" ? viewingDocument?.storageId : undefined}
-              isLoading={sourceContent.isLoading(viewingSourceId ?? "")}
-              error={
-                sourceContent.hasError(viewingSourceId ?? "") ? "Failed to load content" : undefined
-              }
+              isLoading={isContentLoading}
               onDiscussTopic={onDiscussTopic}
             />
           ) : (
@@ -404,17 +381,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         sourcesCount={sources.length}
         userId={userId}
         noteId={noteId}
-        isUploading={sourceUpload.isUploading}
-        isDragging={sourceUpload.isDragging}
-        onDragEnter={sourceUpload.handleDragEnter}
-        onDragLeave={sourceUpload.handleDragLeave}
-        onDragOver={sourceUpload.handleDragOver}
-        onDrop={sourceUpload.handleDrop}
-        fileInputRef={sourceUpload.fileInputRef}
-        onFileSelect={sourceUpload.handleFileSelect}
-        onUrlUpload={sourceUpload.handleUrlUpload}
-        onVideoUpload={sourceUpload.handleSocialMediaUpload}
-        onTextUpload={sourceUpload.handleTextUpload}
+        upload={sourceUpload}
         onDiscoverClick={() => setIsDiscoverOpen(true)}
         onGoogleDriveClick={() => googleDriveRef.current?.open()}
       />
@@ -422,7 +389,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       <DiscoverSourcesDialog
         open={isDiscoverOpen}
         onOpenChange={setIsDiscoverOpen}
-        onAddSource={onAddSource}
         notebookSources={sources}
         userId={userId}
         noteId={noteId}

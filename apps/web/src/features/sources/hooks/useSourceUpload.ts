@@ -1,61 +1,48 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useUserLimits } from "@/features/billing/services/subscriptionApi";
 import { useToast } from "@/shared/contexts/useToast";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { canOfferPurchases } from "@/utils/platformDetection";
 import { useCreateDocument, useUploadDocument } from "../services/documentsApi";
-
-const ACCEPTED_FILE_TYPES = [
-  ".pdf",
-  ".docx",
-  ".pptx",
-  ".txt",
-  ".md",
-  ".json",
-  ".csv",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".avif",
-  ".wav",
-  ".mp3",
-  ".m4a",
-  ".webm",
-  ".flac",
-];
 
 interface UseSourceUploadProps {
   sourcesCount: number;
   userId?: string | null;
   noteId?: string | null;
   onDocumentUploaded?: (documentId: string) => void;
-  sourceLimit?: number;
 }
 
-interface UseSourceUploadResult {
-  // State
+export interface SourceUpload {
   isUploading: boolean;
-  isDragging: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-
-  // File upload handlers
-  handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   processFiles: (files: File[]) => Promise<void>;
-
-  // URL/Social/Text upload handlers
   handleUrlUpload: (urls: string[]) => Promise<void>;
   handleSocialMediaUpload: (urls: string[]) => Promise<void>;
   handleTextUpload: (text: string, title?: string) => Promise<void>;
-
-  // Drag and drop handlers
-  handleDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
-  handleDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
-  handleDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  handleDrop: (e: React.DragEvent<HTMLDivElement>) => Promise<void>;
-
-  // Helper
-  parseUrls: (input: string) => string[];
 }
+
+interface LinkUpload {
+  type: "url" | "youtube";
+  /** What the sign-in prompt says the user is uploading. */
+  noun: string;
+  /** Prefix for console errors. */
+  logLabel: string;
+  fileName: (url: string) => string;
+}
+
+const WEBSITE_LINKS: LinkUpload = {
+  type: "url",
+  noun: "URLs",
+  logLabel: "URL",
+  fileName: (url) => url,
+};
+
+// YouTube, TikTok, Instagram and X all go through the transcript pipeline.
+const VIDEO_LINKS: LinkUpload = {
+  type: "youtube",
+  noun: "social media content",
+  logLabel: "Social media",
+  fileName: () => "YouTube Video",
+};
 
 /**
  * Custom hook for handling source uploads (files, URLs, social media, text)
@@ -65,20 +52,18 @@ export function useSourceUpload({
   userId,
   noteId,
   onDocumentUploaded,
-  sourceLimit,
-}: UseSourceUploadProps): UseSourceUploadResult {
+}: UseSourceUploadProps): SourceUpload {
   const uploadDocument = useUploadDocument();
   const createDocument = useCreateDocument();
   const userLimits = useUserLimits();
-  const { handleLimitError } = useLimitErrorToast();
+  const { handleLimitError } = useErrorToast();
   const { error: showError, info: showInfo } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Use provided limit or get from subscription
-  const maxSources = sourceLimit ?? userLimits.sourceLimit;
+  const maxSources = userLimits.sourceLimit;
   // Until the subscription resolves the cap isn't known; don't block client-side
   // (the server still enforces it) so a Pro user isn't gated on the free cap.
-  const limitKnown = sourceLimit !== undefined || !userLimits.isLoading;
-  const atSourceLimit = limitKnown && sourcesCount >= maxSources;
+  const atSourceLimit = !userLimits.isLoading && sourcesCount >= maxSources;
 
   // Shared "source limit reached" toast. Upgrading to Pro raises the per-notebook
   // source cap 20 -> 200, so free users are told that; Pro users only hear the
@@ -100,199 +85,95 @@ export function useSourceUpload({
     );
   };
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  /** The notebook to upload into, or null after telling the user why they can't. */
+  const guard = async (noun: string): Promise<string | null> => {
+    if (!userId || !noteId) {
+      showInfo(`Please log in and select a notebook before uploading ${noun}.`);
+      return null;
+    }
+    if (atSourceLimit) {
+      await emitSourceLimitReached();
+      return null;
+    }
+    return noteId;
+  };
 
-  // Reset dragging state when modal closes
-  useEffect(() => {
-    return () => {
-      setIsDragging(false);
-    };
-  }, []);
-
-  // Helper function to parse multiple URLs from input
-  const parseUrls = (input: string): string[] => {
-    return input
-      .split(/\s+/)
-      .map((url) => url.trim())
-      .filter((url) => url.length > 0 && (url.startsWith("http://") || url.startsWith("https://")));
+  const showUploadError = async (err: unknown) => {
+    const handled = await handleLimitError(err);
+    if (!handled.isLimitError) {
+      showError(err instanceof Error ? err.message : "Upload failed");
+    }
   };
 
   // Process files (used by both file input and drag & drop)
   const processFiles = async (files: File[]) => {
     if (files.length === 0) return;
-
-    if (!userId || !noteId) {
-      showInfo("Please log in and select a notebook before uploading files.");
-      return;
-    }
-
-    if (atSourceLimit) {
-      await emitSourceLimitReached();
-      return;
-    }
+    const notebookId = await guard("files");
+    if (!notebookId) return;
 
     setIsUploading(true);
     try {
       for (const file of files) {
-        const response = await uploadDocument(file, noteId);
+        const response = await uploadDocument(file, notebookId);
         onDocumentUploaded?.(response.documentId);
       }
     } catch (err) {
       console.error("Upload failed:", err);
-      const handled = await handleLimitError(err);
-      if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : "Upload failed");
-      }
+      await showUploadError(err);
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
-  // File upload handler
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    await processFiles(files);
-  };
-
-  // URL upload handler
-  const handleUrlUpload = async (urls: string[]) => {
-    if (!userId || !noteId) {
-      showInfo("Please log in and select a notebook before uploading URLs.");
-      return;
-    }
-
-    if (atSourceLimit) {
-      await emitSourceLimitReached();
-      return;
-    }
+  const uploadLinks = async (urls: string[], link: LinkUpload) => {
+    const notebookId = await guard(link.noun);
+    if (!notebookId) return;
 
     if (urls.length === 0) {
       showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;
     }
 
-    // Set when every URL fails. The toast is already shown, so this rejects after the try block
-    // instead of throwing inside it, where the outer catch would toast a second time.
-    let allFailed = false;
+    const errors: string[] = [];
     setIsUploading(true);
     try {
-      const errors: string[] = [];
       for (const url of urls) {
         try {
           const result = await createDocument({
-            notebookId: noteId,
-            type: "url",
+            notebookId,
+            type: link.type,
             source: url,
-            fileName: url,
+            fileName: link.fileName(url),
           });
           onDocumentUploaded?.(result.documentId);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : "Upload failed";
           errors.push(`${url}: ${errorMsg}`);
-          console.error(`URL upload failed for ${url}:`, err);
+          console.error(`${link.logLabel} upload failed for ${url}:`, err);
         }
       }
-
-      if (errors.length > 0 && errors.length === urls.length) {
-        showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
-        allFailed = true;
-      } else if (errors.length > 0) {
-        showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
-      }
-    } catch (err) {
-      console.error("URL upload failed:", err);
-      const handled = await handleLimitError(err);
-      if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : "Upload failed");
-      }
-      throw err;
     } finally {
       setIsUploading(false);
     }
-    // Rejecting lets the link form keep the user's input instead of closing.
-    if (allFailed) throw new Error("No URLs could be added");
+
+    if (errors.length > 0 && errors.length === urls.length) {
+      showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
+      // Rejecting lets the link form keep the user's input instead of closing.
+      throw new Error("No URLs could be added");
+    }
+    if (errors.length > 0) {
+      showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
+    }
   };
 
-  // Social Media upload handler (YouTube, TikTok, Instagram, X)
-  const handleSocialMediaUpload = async (urls: string[]) => {
-    if (!userId || !noteId) {
-      showInfo("Please log in and select a notebook before uploading social media content.");
-      return;
-    }
-
-    if (atSourceLimit) {
-      await emitSourceLimitReached();
-      return;
-    }
-
-    if (urls.length === 0) {
-      showError("Please enter at least one valid URL (starting with http:// or https://).");
-      return;
-    }
-
-    // Set when every URL fails. The toast is already shown, so this rejects after the try block
-    // instead of throwing inside it, where the outer catch would toast a second time.
-    let allFailed = false;
-    setIsUploading(true);
-    try {
-      const errors: string[] = [];
-      for (const url of urls) {
-        try {
-          const result = await createDocument({
-            notebookId: noteId,
-            type: "youtube",
-            source: url,
-            fileName: "YouTube Video",
-          });
-          onDocumentUploaded?.(result.documentId);
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : "Upload failed";
-          errors.push(`${url}: ${errorMsg}`);
-          console.error(`Social media upload failed for ${url}:`, err);
-        }
-      }
-
-      if (errors.length > 0 && errors.length === urls.length) {
-        showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
-        allFailed = true;
-      } else if (errors.length > 0) {
-        showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
-      }
-    } catch (err) {
-      console.error("Social media upload failed:", err);
-      const handled = await handleLimitError(err);
-      if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : "Upload failed");
-      }
-      throw err;
-    } finally {
-      setIsUploading(false);
-    }
-    // Rejecting lets the link form keep the user's input instead of closing.
-    if (allFailed) throw new Error("No URLs could be added");
-  };
-
-  // Text upload handler
   const handleTextUpload = async (text: string, title?: string) => {
-    if (!userId || !noteId) {
-      showInfo("Please log in and select a notebook before uploading text.");
-      return;
-    }
-
-    if (atSourceLimit) {
-      await emitSourceLimitReached();
-      return;
-    }
+    const notebookId = await guard("text");
+    if (!notebookId) return;
 
     setIsUploading(true);
     try {
       const result = await createDocument({
-        notebookId: noteId,
+        notebookId,
         type: "text",
         source: text,
         // A blank title keeps the placeholder; processing then writes one from the text.
@@ -301,81 +182,18 @@ export function useSourceUpload({
       onDocumentUploaded?.(result.documentId);
     } catch (err) {
       console.error("Text upload failed:", err);
-      const handled = await handleLimitError(err);
-      if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : "Upload failed");
-      }
+      await showUploadError(err);
       throw err;
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Drag and drop handlers
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (userId && noteId && !atSourceLimit) {
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Only set dragging to false if we're leaving the drop zone itself
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragging(false);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (!userId || !noteId || atSourceLimit) {
-      return;
-    }
-
-    const files = Array.from(e.dataTransfer.files).filter((file) => {
-      const extension = "." + file.name.split(".").pop()?.toLowerCase();
-      return ACCEPTED_FILE_TYPES.includes(extension);
-    });
-
-    if (files.length === 0) {
-      showInfo(
-        `No supported files found. Supported types: ${ACCEPTED_FILE_TYPES.map((t) => t.slice(1)).join(", ")}`
-      );
-      return;
-    }
-
-    await processFiles(files);
-  };
-
   return {
-    // State
     isUploading,
-    isDragging,
-    fileInputRef,
-
-    // Handlers
-    handleFileSelect,
     processFiles,
-    handleUrlUpload,
-    handleSocialMediaUpload,
+    handleUrlUpload: (urls) => uploadLinks(urls, WEBSITE_LINKS),
+    handleSocialMediaUpload: (urls) => uploadLinks(urls, VIDEO_LINKS),
     handleTextUpload,
-    handleDragEnter,
-    handleDragLeave,
-    handleDragOver,
-    handleDrop,
-
-    // Helper
-    parseUrls,
   };
 }

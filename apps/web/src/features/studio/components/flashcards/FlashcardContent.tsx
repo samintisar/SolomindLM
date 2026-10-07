@@ -1,19 +1,8 @@
-import { lazy, Suspense } from "react";
+import { LazyMarkdown } from "@/shared/components/LazyMarkdown";
 import type { Flashcard } from "@/shared/types";
 import { sanitizeMarkdown } from "@/shared/utils";
 
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
-
 const answerMarkdownComponents = {
-  img: () => null,
-  a: ({ children }: { children?: React.ReactNode }) => (
-    <span className="text-foreground">{children}</span>
-  ),
-  video: () => null,
-  audio: () => null,
-  iframe: () => null,
   table: ({ children }: { children?: React.ReactNode }) => (
     <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
       {children}
@@ -46,9 +35,7 @@ export function FlashcardFront({ card }: { card: Flashcard }) {
   const body = (
     <div className="w-full min-w-0 overflow-x-auto">
       <div className="prose max-w-none text-center">
-        <Suspense fallback={<Skeleton />}>
-          <MarkdownRenderer>{sanitizeMarkdown(text)}</MarkdownRenderer>
-        </Suspense>
+        <LazyMarkdown fallback={<Skeleton />}>{sanitizeMarkdown(text)}</LazyMarkdown>
       </div>
     </div>
   );
@@ -73,11 +60,9 @@ export function FlashcardBack({ card }: { card: Flashcard }) {
   return (
     <div className="w-full min-w-0 overflow-x-auto">
       <div className="prose w-full min-w-0 max-w-none text-center leading-relaxed text-foreground">
-        <Suspense fallback={<Skeleton />}>
-          <MarkdownRenderer components={answerMarkdownComponents}>
-            {sanitizeMarkdown(card.back)}
-          </MarkdownRenderer>
-        </Suspense>
+        <LazyMarkdown generated components={answerMarkdownComponents} fallback={<Skeleton />}>
+          {sanitizeMarkdown(card.back)}
+        </LazyMarkdown>
       </div>
     </div>
   );

@@ -1,5 +1,13 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Group, Panel, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
@@ -13,15 +21,22 @@ import {
   type SourcesPanelFocusRequest,
 } from "@/features/sources/components/SourcesPanel";
 import { useSourcesContext } from "@/features/sources/useSourcesContext";
-import { LiteraturePapersPanel } from "@/features/studio/components/LiteraturePapersPanel";
-import { LiteratureScreeningPanel } from "@/features/studio/components/LiteratureScreeningPanel";
-import { LiteratureStudioView } from "@/features/studio/components/LiteratureStudioView";
-import { StudioPanel } from "@/features/studio/components/StudioPanel";
 import type { ActiveLiteratureView } from "@/features/studio/types/literatureStudio";
 import { useStudioContext } from "@/features/studio/useStudioContext";
-import { STUDIO_TOOLS } from "@/shared/constants";
 import { useToast } from "@/shared/contexts/useToast";
+import { cn } from "@/shared/utils/cn";
 import { NotebookPanelSeparator } from "./NotebookPanelSeparator";
+import { NotebookRightPanel } from "./NotebookRightPanel";
+
+type MobileTab = "sources" | "chat" | "studio";
+
+const MOBILE_TABS: Array<{ id: MobileTab; label: string; onboarding?: string }> = [
+  { id: "sources", label: "Sources" },
+  { id: "chat", label: "Chat" },
+  { id: "studio", label: "Studio", onboarding: "studio-panel-toggle" },
+];
+
+const noop = () => undefined;
 
 export function NotebookView() {
   const { user } = useAuth();
@@ -48,7 +63,7 @@ export function NotebookView() {
 
   const sourcesPanelRef = usePanelRef();
 
-  const [mobileActiveTab, setMobileActiveTab] = useState<"sources" | "chat" | "studio">("sources");
+  const [mobileActiveTab, setMobileActiveTab] = useState<MobileTab>("sources");
 
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
 
@@ -70,77 +85,59 @@ export function NotebookView() {
   const [activeLiteratureView, setActiveLiteratureView] = useState<ActiveLiteratureView | null>(
     null
   );
+  /** Show a literature view (or Studio, for `null`) in the right panel and bring it into view. */
+  const openStudio = useCallback((view: ActiveLiteratureView | null) => {
+    setActiveLiteratureView(view);
+    setIsStudioOpen(true);
+    setMobileActiveTab("studio");
+  }, []);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-
     const tableId = params.get("literatureTable");
-
     const reportId = params.get("literatureReport");
-
     if (!tableId && !reportId) return;
 
-    if (tableId) {
-      setActiveLiteratureView({ kind: "table", tableId: tableId as Id<"literatureTables"> });
-    } else if (reportId) {
-      setActiveLiteratureView({ kind: "report", reportId: reportId as Id<"literatureReports"> });
-    }
-
-    setIsStudioOpen(true);
-
-    setMobileActiveTab("studio");
-
+    openStudio(
+      tableId
+        ? { kind: "table", tableId: tableId as Id<"literatureTables"> }
+        : { kind: "report", reportId: reportId as Id<"literatureReports"> }
+    );
     navigate(location.pathname, { replace: true });
-  }, [location.pathname, location.search, navigate]);
+  }, [location.pathname, location.search, navigate, openStudio]);
 
-  const handleOpenLiteratureTable = useCallback((tableId: Id<"literatureTables">) => {
-    setActiveLiteratureView({ kind: "table", tableId });
+  const handleOpenLiteratureTable = useCallback(
+    (tableId: Id<"literatureTables">) => openStudio({ kind: "table", tableId }),
+    [openStudio]
+  );
 
-    setIsStudioOpen(true);
+  const handleOpenLiteratureReport = useCallback(
+    (reportId: Id<"literatureReports">) => openStudio({ kind: "report", reportId }),
+    [openStudio]
+  );
 
-    setMobileActiveTab("studio");
-  }, []);
+  const handleOpenRankedPapers = useCallback(
+    (sessionId: Id<"literatureReviewSessions">) => openStudio({ kind: "papers", sessionId }),
+    [openStudio]
+  );
 
-  const handleOpenLiteratureReport = useCallback((reportId: Id<"literatureReports">) => {
-    setActiveLiteratureView({ kind: "report", reportId });
-
-    setIsStudioOpen(true);
-
-    setMobileActiveTab("studio");
-  }, []);
-
-  const handleOpenRankedPapers = useCallback((sessionId: Id<"literatureReviewSessions">) => {
-    setActiveLiteratureView({ kind: "papers", sessionId });
-
-    setIsStudioOpen(true);
-
-    setMobileActiveTab("studio");
-  }, []);
-
-  const handleOpenScreeningDecisions = useCallback((sessionId: Id<"literatureReviewSessions">) => {
-    setActiveLiteratureView({ kind: "screening", sessionId });
-
-    setIsStudioOpen(true);
-
-    setMobileActiveTab("studio");
-  }, []);
+  const handleOpenScreeningDecisions = useCallback(
+    (sessionId: Id<"literatureReviewSessions">) => openStudio({ kind: "screening", sessionId }),
+    [openStudio]
+  );
 
   const handleCloseLiteratureView = useCallback(() => {
     setActiveLiteratureView(null);
   }, []);
 
-  const handleOpenSavedReport = useCallback((reportId: Id<"reports">) => {
-    window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId: reportId } }));
-    setActiveLiteratureView(null);
-    setIsStudioOpen(true);
-    setMobileActiveTab("studio");
-  }, []);
-
-  const handleOpenSavedSpreadsheet = useCallback((spreadsheetId: Id<"spreadsheets">) => {
-    window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId: spreadsheetId } }));
-    setActiveLiteratureView(null);
-    setIsStudioOpen(true);
-    setMobileActiveTab("studio");
-  }, []);
+  /** Saved reports and spreadsheets open as notes in Studio (StudioPanel listens for setActiveNote). */
+  const openSavedNote = useCallback(
+    (noteId: Id<"reports"> | Id<"spreadsheets">) => {
+      window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId } }));
+      openStudio(null);
+    },
+    [openStudio]
+  );
 
   const toggleSources = () => {
     if (isSourcesOpen) {
@@ -178,78 +175,18 @@ export function NotebookView() {
     [isChatStreaming, onSendMessage, remoteGenerationBlocksSend, sources, toastError, urlNotebookId]
   );
 
-  const renderRightPanel = useCallback(() => {
-    if (!isStudioOpen || !urlNotebookId) return null;
-
-    if (activeLiteratureView?.kind === "papers") {
-      return (
-        <LiteraturePapersPanel
-          sessionId={activeLiteratureView.sessionId}
-          notebookId={urlNotebookId as Id<"notebooks">}
-          onClose={handleCloseLiteratureView}
-        />
-      );
-    }
-
-    if (activeLiteratureView?.kind === "screening") {
-      return (
-        <LiteratureScreeningPanel
-          sessionId={activeLiteratureView.sessionId}
-          onClose={handleCloseLiteratureView}
-        />
-      );
-    }
-
-    if (activeLiteratureView?.kind === "table" || activeLiteratureView?.kind === "report") {
-      return (
-        <LiteratureStudioView
-          view={activeLiteratureView}
-          notebookId={urlNotebookId as Id<"notebooks">}
-          onClose={handleCloseLiteratureView}
-          onOpenSavedReport={handleOpenSavedReport}
-          onOpenSavedSpreadsheet={handleOpenSavedSpreadsheet}
-        />
-      );
-    }
-
-    return (
-      <StudioPanel
-        isOpen={isStudioOpen}
-        onClose={toggleStudio}
-        tools={STUDIO_TOOLS}
-        sources={sources}
-        notebookId={urlNotebookId}
-        onAskInChat={handleAskInChat}
-      />
-    );
-  }, [
-    activeLiteratureView,
-    handleAskInChat,
-    handleCloseLiteratureView,
-    handleOpenSavedReport,
-    handleOpenSavedSpreadsheet,
-
-    isStudioOpen,
-
-    sources,
-    toggleStudio,
-
-    urlNotebookId,
-  ]);
-
   // Mini Audio Player state
 
   const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
 
   const [miniPlayerData, setMiniPlayerData] = useState<{
     audioUrl: string;
-
     title: string;
-
     transcript?: string;
-
     audioOverviewId?: string;
   } | null>(null);
+  /** Studio note behind the mini player, so "expand" can reopen it. */
+  const playingAudioNoteIdRef = useRef<string | null>(null);
 
   const clearSourceFocusRequest = useCallback(() => {
     setSourceFocusRequest(null);
@@ -305,11 +242,9 @@ export function NotebookView() {
       audioOverviewId?: string
     ) => {
       setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
-
       setMiniPlayerVisible(true);
-
       if (noteId) {
-        (window as any).__currentPlayingAudioNoteId = noteId;
+        playingAudioNoteIdRef.current = noteId;
       }
     },
 
@@ -323,16 +258,9 @@ export function NotebookView() {
   const handleExpandAudioPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
 
-    const noteId = (window as any).__currentPlayingAudioNoteId;
-
-    if (noteId) {
-      const note = notes.find((n) => n.id === noteId);
-
-      if (note) {
-        const event = new CustomEvent("setActiveNote", { detail: { noteId } });
-
-        window.dispatchEvent(event);
-      }
+    const noteId = playingAudioNoteIdRef.current;
+    if (noteId && notes.some((n) => n.id === noteId)) {
+      window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId } }));
     }
   }, [notes]);
 
@@ -358,102 +286,64 @@ export function NotebookView() {
     ]
   );
 
-  const mobileRightPanel = useMemo(() => {
-    if (!urlNotebookId) return null;
-
-    if (activeLiteratureView?.kind === "papers") {
-      return (
-        <LiteraturePapersPanel
-          sessionId={activeLiteratureView.sessionId}
-          notebookId={urlNotebookId as Id<"notebooks">}
-          onClose={handleCloseLiteratureView}
-        />
-      );
-    }
-
-    if (activeLiteratureView?.kind === "screening") {
-      return (
-        <LiteratureScreeningPanel
-          sessionId={activeLiteratureView.sessionId}
-          onClose={handleCloseLiteratureView}
-        />
-      );
-    }
-
-    if (activeLiteratureView?.kind === "table" || activeLiteratureView?.kind === "report") {
-      return (
-        <LiteratureStudioView
-          view={activeLiteratureView}
-          notebookId={urlNotebookId as Id<"notebooks">}
-          onClose={handleCloseLiteratureView}
-          onOpenSavedReport={handleOpenSavedReport}
-          onOpenSavedSpreadsheet={handleOpenSavedSpreadsheet}
-        />
-      );
-    }
-
-    return (
-      <StudioPanel
-        isOpen={true}
-        onClose={() => undefined}
-        tools={STUDIO_TOOLS}
-        sources={sources}
+  const renderRightPanel = (onCloseStudio: () => void) =>
+    urlNotebookId ? (
+      <NotebookRightPanel
         notebookId={urlNotebookId}
+        sources={sources}
+        activeLiteratureView={activeLiteratureView}
+        onCloseLiteratureView={handleCloseLiteratureView}
+        onOpenSavedReport={openSavedNote}
+        onOpenSavedSpreadsheet={openSavedNote}
+        onCloseStudio={onCloseStudio}
         onAskInChat={handleAskInChat}
       />
-    );
-  }, [
-    activeLiteratureView,
-    handleAskInChat,
-    handleCloseLiteratureView,
-    handleOpenSavedReport,
-    handleOpenSavedSpreadsheet,
-    sources,
-    urlNotebookId,
-  ]);
+    ) : null;
+
+  const chatPanelProps = {
+    notebookId: urlNotebookId as Id<"notebooks"> | null,
+    notebookTitle,
+    notebookIcon: activeNotebook?.icon,
+    notebookCoverColor: activeNotebook?.coverColor,
+    chatSettings: activeNotebook?.chatSettings,
+    onOpenNotebookSource: handleOpenNotebookSourceFromChat,
+    onOpenLiteratureTable: handleOpenLiteratureTable,
+    onOpenLiteratureReport: handleOpenLiteratureReport,
+    onOpenRankedPapers: handleOpenRankedPapers,
+    onOpenScreeningDecisions: handleOpenScreeningDecisions,
+  } satisfies Partial<ComponentProps<typeof ChatPanel>>;
+
+  const sourcesPanelProps = {
+    userId: user?.id,
+    noteId: urlNotebookId,
+    onDocumentUploaded: noop,
+    focusSourceRequest: sourceFocusRequest,
+    onFocusSourceHandled: clearSourceFocusRequest,
+    onDiscussTopic: handleDiscussSourceTopic,
+  } satisfies Partial<ComponentProps<typeof SourcesPanel>>;
 
   return (
     <AudioPlayerProvider value={audioPlayerContextValue}>
       <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
         {/* Mobile panel tabs (below app header on all viewports) */}
         <div className="md:hidden sticky top-0 z-60 flex h-12 items-center justify-around gap-1 border-b border-border bg-background px-2">
-          <button
-            onClick={() => setMobileActiveTab("sources")}
-            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === "sources"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            Sources
-          </button>
-
-          <div className="w-px h-6 bg-border"></div>
-
-          <button
-            onClick={() => setMobileActiveTab("chat")}
-            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === "chat"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            Chat
-          </button>
-
-          <div className="w-px h-6 bg-border"></div>
-
-          <button
-            data-onboarding="studio-panel-toggle"
-            onClick={() => setMobileActiveTab("studio")}
-            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === "studio"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            Studio
-          </button>
+          {MOBILE_TABS.map((tab, index) => (
+            <Fragment key={tab.id}>
+              {index > 0 && <div className="w-px h-6 bg-border"></div>}
+              <button
+                data-onboarding={tab.onboarding}
+                onClick={() => setMobileActiveTab(tab.id)}
+                className={cn(
+                  "flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors",
+                  mobileActiveTab === tab.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            </Fragment>
+          ))}
         </div>
 
         {/* Desktop Layout */}
@@ -480,16 +370,7 @@ export function NotebookView() {
                 setIsSourcesOpen(!collapsed);
               }}
             >
-              <SourcesPanel
-                isOpen={isSourcesOpen}
-                onClose={toggleSources}
-                userId={user?.id}
-                noteId={urlNotebookId}
-                onDocumentUploaded={() => undefined}
-                focusSourceRequest={sourceFocusRequest}
-                onFocusSourceHandled={clearSourceFocusRequest}
-                onDiscussTopic={handleDiscussSourceTopic}
-              />
+              <SourcesPanel isOpen={isSourcesOpen} onClose={toggleSources} {...sourcesPanelProps} />
             </Panel>
 
             <NotebookPanelSeparator
@@ -504,16 +385,7 @@ export function NotebookView() {
                   isRightOpen={isStudioOpen}
                   toggleLeft={toggleSources}
                   toggleRight={toggleStudio}
-                  notebookId={urlNotebookId as Id<"notebooks"> | null}
-                  notebookTitle={notebookTitle}
-                  notebookIcon={activeNotebook?.icon}
-                  notebookCoverColor={activeNotebook?.coverColor}
-                  chatSettings={activeNotebook?.chatSettings}
-                  onOpenNotebookSource={handleOpenNotebookSourceFromChat}
-                  onOpenLiteratureTable={handleOpenLiteratureTable}
-                  onOpenLiteratureReport={handleOpenLiteratureReport}
-                  onOpenRankedPapers={handleOpenRankedPapers}
-                  onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                  {...chatPanelProps}
                 />
               </div>
             </Panel>
@@ -528,7 +400,7 @@ export function NotebookView() {
                   maxSize="70%"
                   className="min-h-0 min-w-0"
                 >
-                  {renderRightPanel()}
+                  {renderRightPanel(toggleStudio)}
                 </Panel>
               </>
             ) : null}
@@ -540,16 +412,7 @@ export function NotebookView() {
         <div className="md:hidden flex flex-1 w-full flex-col overflow-hidden">
           {mobileActiveTab === "sources" && (
             <div className="flex-1 w-full overflow-hidden">
-              <SourcesPanel
-                isOpen={true}
-                onClose={() => undefined}
-                userId={user?.id}
-                noteId={urlNotebookId}
-                onDocumentUploaded={() => undefined}
-                focusSourceRequest={sourceFocusRequest}
-                onFocusSourceHandled={clearSourceFocusRequest}
-                onDiscussTopic={handleDiscussSourceTopic}
-              />
+              <SourcesPanel isOpen={true} onClose={noop} {...sourcesPanelProps} />
             </div>
           )}
 
@@ -558,24 +421,15 @@ export function NotebookView() {
               <ChatPanel
                 isLeftOpen={false}
                 isRightOpen={false}
-                toggleLeft={() => undefined}
-                toggleRight={() => undefined}
-                notebookId={urlNotebookId}
-                notebookTitle={notebookTitle}
-                notebookIcon={activeNotebook?.icon}
-                notebookCoverColor={activeNotebook?.coverColor}
-                chatSettings={activeNotebook?.chatSettings}
-                onOpenNotebookSource={handleOpenNotebookSourceFromChat}
-                onOpenLiteratureTable={handleOpenLiteratureTable}
-                onOpenLiteratureReport={handleOpenLiteratureReport}
-                onOpenRankedPapers={handleOpenRankedPapers}
-                onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                toggleLeft={noop}
+                toggleRight={noop}
+                {...chatPanelProps}
               />
             </div>
           )}
 
           {mobileActiveTab === "studio" && (
-            <div className="flex-1 w-full overflow-hidden">{mobileRightPanel}</div>
+            <div className="flex-1 w-full overflow-hidden">{renderRightPanel(noop)}</div>
           )}
         </div>
       </main>

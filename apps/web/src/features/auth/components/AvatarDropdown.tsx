@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
-import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
@@ -59,7 +59,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   showChecklistDismissed,
 }) => {
   const navigate = useNavigate();
-  const { showError } = useServiceErrorToast();
+  const { showError } = useErrorToast();
   const { open: openFeedback } = useFeedback();
   // Only the "Feedback triage" item needs this, and it's staff-only — don't open
   // the subscription for signed-out menus.

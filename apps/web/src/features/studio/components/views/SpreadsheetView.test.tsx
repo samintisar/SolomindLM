@@ -13,8 +13,8 @@ vi.mock("../../services/spreadsheetsApi", () => ({
   useSaveSpreadsheetData: () => saveData,
 }));
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError }),
 }));
 
 const CSV = "Name,Score\nApple,3\nPear,5";
@@ -325,12 +325,5 @@ describe("SpreadsheetView", () => {
       click.mockRestore();
       Object.assign(URL, original);
     }
-  });
-
-  it("calls onBack from the mobile back button", () => {
-    const onBack = vi.fn();
-    render(<SpreadsheetView note={makeNote()} onBack={onBack} />);
-    fireEvent.click(screen.getByRole("button", { name: "Back to Studio" }));
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

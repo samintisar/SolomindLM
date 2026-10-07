@@ -3,7 +3,6 @@ import type { Note, Source } from "@/shared/types/index";
 
 /** Shared context passed to all create-flow hooks. */
 export interface CreateFlowContext {
-  notes: Note[];
   sources: Source[];
   isAuthenticated: boolean;
   notebookId: string | null | undefined;
@@ -19,10 +18,4 @@ export interface CreateFlowContext {
       variant?: "danger" | "warning" | "default";
     }
   ) => Promise<boolean>;
-  toast?: {
-    success: (message: string) => void;
-    error: (message: string) => void;
-    info: (message: string) => void;
-    loading: (message: string) => void;
-  };
 }

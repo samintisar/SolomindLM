@@ -20,8 +20,8 @@ vi.mock("../services/notebooksApi", () => ({
   useDeleteNotebook: () => mockDeleteNotebook,
 }));
 
-vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
-  useLimitErrorToast: () => ({ handleLimitError: mockHandleLimitError }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ handleLimitError: mockHandleLimitError }),
 }));
 
 vi.mock("@/utils/platformDetection", () => ({

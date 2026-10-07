@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test, vi } from "vitest";
+import { OnboardingContext, type TourStatus } from "../OnboardingContext";
 import { ChecklistCard } from "./ChecklistCard";
 
 const mockDismiss = vi.fn(async () => {});
@@ -11,39 +12,38 @@ const mockProgress = {
   askQuestion: false,
   generateArtifact: false,
 };
-const mockState: { tourStatus: string; checklistDismissed: boolean } = {
+const mockState: { tourStatus: TourStatus; checklistDismissed: boolean } = {
   tourStatus: "active",
   checklistDismissed: false,
 };
 
 vi.mock("convex/react", () => ({
-  useQuery: (fn: { name?: string } | string) => {
-    const name = typeof fn === "string" ? fn : String(fn.name ?? fn);
-    if (name.includes("getChecklistProgress")) return mockProgress;
-    if (name.includes("getOnboardingState")) return mockState;
-    return undefined;
-  },
   useMutation: () => mockDismiss,
 }));
 
 vi.mock("@convex/_generated/api", () => ({
-  api: {
-    onboarding: {
-      progress: { getChecklistProgress: { name: "getChecklistProgress" } },
-      state: { getOnboardingState: { name: "getOnboardingState" } },
-      mutations: { dismissChecklist: { name: "dismissChecklist" } },
-    },
-  },
+  api: { onboarding: { mutations: { dismissChecklist: { name: "dismissChecklist" } } } },
 }));
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError: vi.fn() }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: vi.fn() }),
 }));
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <ChecklistCard />
+      <OnboardingContext.Provider
+        value={{
+          tourStatus: mockState.tourStatus,
+          currentStepId: null,
+          initFailed: false,
+          checklist: mockProgress,
+          checklistDismissed: mockState.checklistDismissed,
+          skip: vi.fn(async () => {}),
+        }}
+      >
+        <ChecklistCard />
+      </OnboardingContext.Provider>
     </MemoryRouter>
   );
 }
@@ -85,11 +85,7 @@ describe("ChecklistCard", () => {
 
   test("renders on /notebook routes", () => {
     mockState.tourStatus = "active";
-    render(
-      <MemoryRouter initialEntries={["/notebook/abc"]}>
-        <ChecklistCard />
-      </MemoryRouter>
-    );
+    renderAt("/notebook/abc");
     expect(screen.getByText(/Get started/i)).toBeInTheDocument();
   });
 

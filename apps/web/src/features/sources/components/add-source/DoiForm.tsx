@@ -19,7 +19,7 @@ import {
 } from "@/shared/components/ui/input-group";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
-import { useResolveDoi, useUpload } from "../../services/documentsApi";
+import { useCreateDocument, useResolveDoi } from "../../services/documentsApi";
 import { type StepFormProps, useReportBusy } from "./types";
 
 interface ResolvedPaper {
@@ -48,7 +48,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
   const id = useId();
 
   const resolveDoi = useResolveDoi();
-  const upload = useUpload();
+  const createDocument = useCreateDocument();
   useReportBusy(isResolving || isUploading, onBusyChange);
 
   const handleResolve = useCallback(async () => {
@@ -79,7 +79,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
 
     try {
       const { title, ...paperRecordFields } = preview;
-      await upload({
+      await createDocument({
         notebookId,
         type: "paper_record",
         fileName: title || doi.trim(),
@@ -91,7 +91,7 @@ export function DoiForm({ notebookId, onDone, onBusyChange }: DoiFormProps) {
     } finally {
       setIsUploading(false);
     }
-  }, [preview, doi, notebookId, upload, onDone]);
+  }, [preview, doi, notebookId, createDocument, onDone]);
 
   const meta = [preview?.venue, preview?.publicationYear, preview?.doi && `DOI ${preview.doi}`]
     .filter(Boolean)

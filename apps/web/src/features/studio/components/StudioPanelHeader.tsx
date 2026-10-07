@@ -10,6 +10,8 @@ import {
   PenTool,
 } from "lucide-react";
 import React, { useEffect, useRef } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { ButtonGroup } from "@/shared/components/ui/button-group";
 import {
   isFlashcardNote,
   isInfographicNote,
@@ -40,25 +42,123 @@ interface StudioPanelHeaderProps {
   isInfographicFullscreen: boolean;
   canCopyOrDownload: boolean;
   canCopyOrDownloadUserNote: boolean;
-  canExportFlashcards: boolean;
   isExporting: boolean;
-  isMobile: boolean;
 }
 
-/**
- * StudioPanelHeader component renders the header for the Studio panel.
- * Shows different layouts for mobile vs desktop, and for list view vs active note view.
- */
-export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
-  activeNote,
+type HeaderTitleProps = Pick<
+  StudioPanelHeaderProps,
+  | "onBack"
+  | "editingId"
+  | "editTitle"
+  | "onEditTitleChange"
+  | "onRenameSubmit"
+  | "onEditStart"
+  | "onEditCancel"
+> & { note: Note };
+
+/** Back button plus the note title; the title renames inline (click-to-rename from md up). */
+function HeaderTitle({
+  note,
   onBack,
-  onClose,
   editingId,
   editTitle,
   onEditTitleChange,
   onRenameSubmit,
   onEditStart,
   onEditCancel,
+}: HeaderTitleProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isEditing = editingId === note.id;
+
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus();
+  }, [isEditing]);
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-foreground md:text-sidebar-foreground">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={onBack}
+        aria-label="Back to Studio"
+        className="md:-ml-1"
+      >
+        <ArrowLeft className="size-5" />
+      </Button>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editTitle}
+          spellCheck={false}
+          onChange={(e) => onEditTitleChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && editTitle.trim()) {
+              onRenameSubmit(note.id, editTitle.trim());
+            } else if (e.key === "Escape") {
+              onEditTitleChange(note.title);
+              onEditCancel();
+            }
+          }}
+          onBlur={() => {
+            if (editTitle.trim()) {
+              onRenameSubmit(note.id, editTitle.trim());
+            } else {
+              onEditTitleChange(note.title);
+            }
+            onEditCancel();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="min-w-0 flex-1 rounded-none border-0 border-b border-border bg-transparent px-0 py-0.5 font-display text-sm font-bold tracking-wide text-foreground focus:border-primary focus:ring-0 focus:outline-none md:text-sidebar-foreground"
+          aria-label="Rename"
+          autoFocus
+        />
+      ) : (
+        <>
+          <span className="truncate font-display text-sm font-bold tracking-wide text-foreground md:hidden">
+            {note.title}
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEditStart();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onEditStart();
+              }
+            }}
+            className="hidden min-w-0 flex-1 cursor-text truncate bg-transparent text-left font-display text-sm font-bold tracking-wide outline-none transition-opacity hover:underline hover:decoration-dotted hover:underline-offset-2 hover:opacity-80 focus:opacity-80 focus:outline-none md:block"
+            title="Click to rename"
+          >
+            {note.title}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+type NoteHeaderActionsProps = Omit<
+  StudioPanelHeaderProps,
+  | "activeNote"
+  | "onBack"
+  | "onClose"
+  | "editingId"
+  | "editTitle"
+  | "onEditTitleChange"
+  | "onRenameSubmit"
+  | "onEditStart"
+  | "onEditCancel"
+> & { note: Note };
+
+/** The open note's icon actions (copy, download, edit, fullscreen), by note type. */
+function NoteHeaderActions({
+  note,
   onEditReport,
   onCopyReport,
   onDownloadReport,
@@ -71,366 +171,166 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   isInfographicFullscreen,
   canCopyOrDownload,
   canCopyOrDownloadUserNote,
-  canExportFlashcards: _canExportFlashcards,
   isExporting,
-  isMobile,
-}) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editingId === activeNote?.id && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [editingId, activeNote]);
-
-  // Mobile header
-  if (isMobile) {
+}: NoteHeaderActionsProps) {
+  if (isReportNote(note)) {
     return (
-      <div className="flex md:hidden items-center justify-between gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0">
-        {activeNote ? (
-          <>
-            <div className="flex items-center gap-2 text-foreground overflow-hidden min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={onBack}
-                className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
-                aria-label="Back to Studio"
-              >
-                <ArrowLeft className="w-5 h-5 shrink-0" />
-              </button>
-              {editingId === activeNote.id ? (
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={editTitle}
-                  spellCheck={false}
-                  onChange={(e) => onEditTitleChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && editTitle.trim()) {
-                      onRenameSubmit(activeNote.id, editTitle.trim());
-                    } else if (e.key === "Escape") {
-                      onEditTitleChange(activeNote.title);
-                      onEditCancel();
-                    }
-                  }}
-                  onBlur={() => {
-                    if (editTitle.trim()) {
-                      onRenameSubmit(activeNote.id, editTitle.trim());
-                    } else {
-                      onEditTitleChange(activeNote.title);
-                    }
-                    onEditCancel();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                  aria-label="Rename"
-                  autoFocus
-                />
-              ) : (
-                <span className="font-display font-bold text-sm tracking-wide truncate text-foreground">
-                  {activeNote.title}
-                </span>
-              )}
-            </div>
-            {isReportNote(activeNote) && (
-              <div className="flex items-center gap-1 shrink-0">
-                {onEditReport && (
-                  <button
-                    type="button"
-                    onClick={onEditReport}
-                    className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground"
-                    title="Edit report"
-                    aria-label="Edit report"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onCopyReport}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Copy report as Markdown"
-                  aria-label="Copy report as Markdown"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onDownloadReport}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download report as Markdown file"
-                  aria-label="Download report as Markdown file"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            {isUserNote(activeNote) && (
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={onCopyUserNote}
-                  disabled={!canCopyOrDownloadUserNote}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Copy note"
-                  aria-label="Copy note"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onDownloadUserNote}
-                  disabled={!canCopyOrDownloadUserNote}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download as Markdown"
-                  aria-label="Download as Markdown"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            {isFlashcardNote(activeNote) && (
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={onExportFlashcards}
-                  disabled={isExporting}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download flashcards as CSV"
-                  aria-label="Download flashcards as CSV"
-                >
-                  {isExporting ? (
-                    <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
-                  ) : (
-                    <Download className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            )}
-            {isInfographicNote(activeNote) && (
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={onDownloadInfographic}
-                  disabled={!canDownloadInfographic}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download infographic"
-                  aria-label="Download infographic"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onToggleInfographicFullscreen}
-                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground"
-                  title={isInfographicFullscreen ? "Exit fullscreen" : "Full screen"}
-                  aria-label={isInfographicFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                >
-                  {isInfographicFullscreen ? (
-                    <Minimize2 className="w-4 h-4" />
-                  ) : (
-                    <Maximize2 className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex items-center gap-2 text-foreground">
-            <PenTool className="w-4 h-4 shrink-0" />
-            <span className="font-display font-bold text-sm tracking-wide uppercase">Studio</span>
-          </div>
+      <ButtonGroup variant="tray" className="shrink-0">
+        {onEditReport && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onEditReport}
+            title="Edit report"
+            aria-label="Edit report"
+          >
+            <Pencil />
+          </Button>
         )}
-      </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onCopyReport}
+          disabled={!canCopyOrDownload}
+          title="Copy report as Markdown"
+          aria-label="Copy report as Markdown"
+        >
+          <Copy />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onDownloadReport}
+          disabled={!canCopyOrDownload}
+          title="Download report as Markdown file"
+          aria-label="Download report as Markdown file"
+        >
+          <Download />
+        </Button>
+      </ButtonGroup>
     );
   }
 
-  // Desktop header
-  return (
-    <div className="hidden md:flex items-center justify-between p-4 border-b border-border bg-sidebar/50 backdrop-blur-sm sticky top-0 z-10 h-14">
-      {activeNote ? (
-        <>
-          <div className="flex items-center gap-2 text-sidebar-foreground overflow-hidden min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={onBack}
-              className="p-1 -ml-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0"
-              aria-label="Back to Studio"
-            >
-              <ArrowLeft className="w-5 h-5 shrink-0" />
-            </button>
-            {editingId === activeNote.id ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={editTitle}
-                spellCheck={false}
-                onChange={(e) => onEditTitleChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && editTitle.trim()) {
-                    onRenameSubmit(activeNote.id, editTitle.trim());
-                  } else if (e.key === "Escape") {
-                    onEditTitleChange(activeNote.title);
-                    onEditCancel();
-                  }
-                }}
-                onBlur={() => {
-                  if (editTitle.trim()) {
-                    onRenameSubmit(activeNote.id, editTitle.trim());
-                  } else {
-                    onEditTitleChange(activeNote.title);
-                  }
-                  onEditCancel();
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                aria-label="Rename"
-                autoFocus
-              />
-            ) : (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onEditStart();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onEditStart();
-                  }
-                }}
-                className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
-                title="Click to rename"
-              >
-                {activeNote.title}
-              </span>
-            )}
-          </div>
-          {isReportNote(activeNote) && (
-            <div className="flex items-center gap-1 shrink-0">
-              {onEditReport && (
-                <button
-                  type="button"
-                  onClick={onEditReport}
-                  className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
-                  title="Edit report"
-                  aria-label="Edit report"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onCopyReport}
-                disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Copy report as Markdown"
-                aria-label="Copy report as Markdown"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onDownloadReport}
-                disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download report as Markdown file"
-                aria-label="Download report as Markdown file"
-              >
-                <Download className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-          {isUserNote(activeNote) && (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={onCopyUserNote}
-                disabled={!canCopyOrDownloadUserNote}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Copy note"
-                aria-label="Copy note"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onDownloadUserNote}
-                disabled={!canCopyOrDownloadUserNote}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download as Markdown"
-                aria-label="Download as Markdown"
-              >
-                <Download className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-          {isFlashcardNote(activeNote) && (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={onExportFlashcards}
-                disabled={isExporting}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download flashcards as CSV"
-                aria-label="Download flashcards as CSV"
-              >
-                {isExporting ? (
-                  <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          )}
-          {isInfographicNote(activeNote) && (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={onDownloadInfographic}
-                disabled={!canDownloadInfographic}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download infographic"
-                aria-label="Download infographic"
-              >
-                <Download className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onToggleInfographicFullscreen}
-                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
-                title={isInfographicFullscreen ? "Exit fullscreen" : "Full screen"}
-                aria-label={isInfographicFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              >
-                {isInfographicFullscreen ? (
-                  <Minimize2 className="w-4 h-4" />
-                ) : (
-                  <Maximize2 className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <button
-            onClick={onClose}
-            className="hidden md:flex p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground items-center justify-center shrink-0"
-            aria-label="Close Studio panel"
-          >
-            <ChevronRight className="w-5 h-5 shrink-0" />
-          </button>
-          <div className="flex items-center gap-2 text-sidebar-foreground">
-            <PenTool className="w-4 h-4 shrink-0" />
-            <span className="font-display font-bold text-sm tracking-wide uppercase">Studio</span>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+  if (isUserNote(note)) {
+    return (
+      <ButtonGroup variant="tray" className="shrink-0">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onCopyUserNote}
+          disabled={!canCopyOrDownloadUserNote}
+          title="Copy note"
+          aria-label="Copy note"
+        >
+          <Copy />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onDownloadUserNote}
+          disabled={!canCopyOrDownloadUserNote}
+          title="Download as Markdown"
+          aria-label="Download as Markdown"
+        >
+          <Download />
+        </Button>
+      </ButtonGroup>
+    );
+  }
+
+  if (isFlashcardNote(note)) {
+    return (
+      <ButtonGroup variant="tray" className="shrink-0">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onExportFlashcards}
+          disabled={isExporting}
+          title="Download flashcards as CSV"
+          aria-label="Download flashcards as CSV"
+        >
+          {isExporting ? <Loader2 className="animate-spin" aria-hidden /> : <Download />}
+        </Button>
+      </ButtonGroup>
+    );
+  }
+
+  if (isInfographicNote(note)) {
+    return (
+      <ButtonGroup variant="tray" className="shrink-0">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onDownloadInfographic}
+          disabled={!canDownloadInfographic}
+          title="Download infographic"
+          aria-label="Download infographic"
+        >
+          <Download />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onToggleInfographicFullscreen}
+          title={isInfographicFullscreen ? "Exit fullscreen" : "Full screen"}
+          aria-label={isInfographicFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isInfographicFullscreen ? <Minimize2 /> : <Maximize2 />}
+        </Button>
+      </ButtonGroup>
+    );
+  }
+
+  return null;
+}
+
+/**
+ * StudioPanelHeader renders the header for the Studio panel: the "Studio" label in list view,
+ * or the open note's title and actions. One layout; breakpoint classes adapt it for mobile.
+ */
+export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
+  activeNote,
+  onBack,
+  onClose,
+  editingId,
+  editTitle,
+  onEditTitleChange,
+  onRenameSubmit,
+  onEditStart,
+  onEditCancel,
+  ...actions
+}) => (
+  <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm md:z-10 md:bg-sidebar/50">
+    {activeNote ? (
+      <>
+        <HeaderTitle
+          note={activeNote}
+          onBack={onBack}
+          editingId={editingId}
+          editTitle={editTitle}
+          onEditTitleChange={onEditTitleChange}
+          onRenameSubmit={onRenameSubmit}
+          onEditStart={onEditStart}
+          onEditCancel={onEditCancel}
+        />
+        <NoteHeaderActions note={activeNote} {...actions} />
+      </>
+    ) : (
+      <>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onClose}
+          aria-label="Close Studio panel"
+          className="hidden md:inline-flex"
+        >
+          <ChevronRight className="size-5" />
+        </Button>
+        <div className="flex items-center gap-2 text-foreground md:text-sidebar-foreground">
+          <PenTool className="size-4 shrink-0" />
+          <span className="font-display text-sm font-bold tracking-wide uppercase">Studio</span>
+        </div>
+      </>
+    )}
+  </div>
+);

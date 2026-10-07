@@ -1,28 +1,22 @@
-import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Eye,
-  MessageSquareText,
-  RotateCcw,
-} from "lucide-react";
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, Eye, MessageSquareText, RotateCcw } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { usePersistLastViewedIndex } from "@/features/studio/services/studioProgressApi";
 import {
   useResetWrittenAnswers,
   useSaveWrittenAnswerDraft,
   useSubmitWrittenAnswer,
-  useUpdateWrittenQuestionsProgress,
-  useWrittenQuestionSet,
 } from "@/features/studio/services/writtenQuestionsApi";
 import {
   selectPendingGradeIds,
   summarizeWrittenQuestions,
 } from "@/features/studio/utils/writtenQuestionsScore";
+import { LazyMarkdown } from "@/shared/components/LazyMarkdown";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Progress } from "@/shared/components/ui/progress";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
@@ -34,14 +28,8 @@ import { ResultsSummary } from "../practice/ResultsSummary";
 import { StreakChip } from "../practice/StreakChip";
 import type { QuestionState } from "../practice/types";
 
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
-
 export interface WrittenQuestionsViewProps {
   note: WrittenQuestionsNote;
-  onNoteUpdate?: (note: WrittenQuestionsNote) => void;
-  onBack?: () => void;
 }
 
 // Idle value for the grade-on-Finish progress state. Must be reset between runs
@@ -66,16 +54,11 @@ function GradedScore({
   );
 }
 
-export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
-  note,
-  onNoteUpdate,
-  onBack,
-}) => {
-  // Initialize currentIndex from note.metadata.lastViewedIndex if available
+export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note }) => {
+  // Resume where the learner left off (the note carries the saved index)
   const questions = note.questions || [];
-  const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
-  const [currentIndex, setCurrentIndex] = useState(
-    Math.min(initialIndex, Math.max(0, questions.length - 1))
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    Math.min(note.metadata.lastViewedIndex ?? 0, Math.max(0, questions.length - 1))
   );
   const [userAnswers, setUserAnswers] = useState<Record<string, WrittenQuestionAnswer>>(
     note.userAnswers || {}
@@ -96,7 +79,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const submitAnswerMutation = useSubmitWrittenAnswer();
   const resetAnswersMutation = useResetWrittenAnswers();
   const saveDraftMutation = useSaveWrittenAnswerDraft();
-  const latestNote = useWrittenQuestionSet(note.id);
+  const toast = useToast();
   const { streak, record, reset: resetStreak } = useStreak();
   // The question whose grade just arrived: its score counts up, and bursts on full marks.
   const [justGraded, setJustGraded] = useState<{ id: string; fullMarks: boolean } | null>(null);
@@ -108,8 +91,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Track if we've initialized the index from saved progress
-  const hasInitializedIndex = useRef(false);
   // Set by the "Stop grading" button to end the grade-on-Finish loop early.
   const gradingCancelledRef = useRef(false);
   // Real re-entrancy guard for runGradeAllThenShowResults. A ref (not the
@@ -126,35 +107,21 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const currentQuestionIdRef = useRef<string | undefined>(questions[currentIndex]?.id);
   currentQuestionIdRef.current = questions[currentIndex]?.id;
   // Latest server note, readable from the async grade-on-Finish loop (whose
-  // closure captured a pre-grading `latestNote`) so freshly-graded feedback can
+  // closure captured a pre-grading `note`) so freshly-graded feedback can
   // be merged instead of leaving empty feedback panels until the reactive echo.
-  const latestNoteRef = useRef(latestNote);
-  latestNoteRef.current = latestNote;
+  const noteRef = useRef(note);
+  noteRef.current = note;
 
-  // Restore saved index on mount (from latestNote which has the latest data from server)
+  usePersistLastViewedIndex("writtenQuestions", note.id, currentIndex);
+
+  // Sync userAnswers from server only when the answers actually change (e.g. after submit/reset).
+  // Keying on their content keeps other echoes of the note (a saved index, a rename) from
+  // overwriting local typing with server state.
+  const serverUserAnswersKey = JSON.stringify(note.userAnswers ?? {});
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the answers' content, see above
   useEffect(() => {
-    if (!hasInitializedIndex.current && latestNote) {
-      const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
-      const boundedIndex = Math.min(savedIndex, Math.max(0, questions.length - 1));
-      if (savedIndex > 0) {
-        setCurrentIndex(boundedIndex);
-      }
-      hasInitializedIndex.current = true;
-    }
-  }, [latestNote, questions.length]);
-
-  // Persist progress - track last viewed index
-  // Use useMemo to prevent re-initializing when other state changes
-  const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateWrittenQuestionsProgress(note.id, stableCurrentIndex);
-
-  // Sync userAnswers from server only when server data actually changes (e.g. after submit/reset).
-  // Using a serialized key prevents the effect from running on every render (latestNote?.userAnswers
-  // can get a new reference each time), which would overwrite local typing with server state.
-  const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
-  useEffect(() => {
-    if (latestNote?.userAnswers) {
-      const serverAnswers = latestNote.userAnswers;
+    if (note.userAnswers) {
+      const serverAnswers = note.userAnswers;
       // Apply server state, but keep the local answer text for the question the
       // user is currently on, so the autosave's own server echo can't revert the
       // textarea / jump the cursor mid-typing. Grade fields still come from the
@@ -178,7 +145,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   }, [serverUserAnswersKey]);
 
   // Debounced autosave of the current question's typed answer (ungraded only),
-  // so unsubmitted answers survive a reload. Mirrors useUpdateWrittenQuestionsProgress.
+  // so unsubmitted answers survive a reload. Mirrors usePersistLastViewedIndex.
   const currentQuestionId = questions[currentIndex]?.id;
   const currentDraft = currentQuestionId ? (userAnswers[currentQuestionId]?.answer ?? "") : "";
   const currentDraftGraded = currentQuestionId
@@ -327,15 +294,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
           nextButtonRef.current?.focus({ preventScroll: true });
         }
       }
-
-      // The useEffect will sync userAnswers from latestNote when the database updates
-      // Just notify parent of the update
-      if (latestNote && onNoteUpdate) {
-        onNoteUpdate(latestNote);
-      }
+      // The answers effect above adopts the graded result when the note updates.
     } catch (error) {
       console.error("Failed to submit answer:", error);
-      alert(error instanceof Error ? error.message : "Failed to submit answer");
+      toast.error(error instanceof Error ? error.message : "Failed to submit answer");
     } finally {
       setIsSubmitting(false);
       setGradingId(null);
@@ -381,7 +343,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             // improvements) server-side before returning, so prefer the server
             // echo for this question when it has already landed; fall back to any
             // prior grade fields, then apply the fresh score.
-            const serverEntry = latestNoteRef.current?.userAnswers?.[qid];
+            const serverEntry = noteRef.current.userAnswers?.[qid];
             return {
               ...prev,
               [qid]: {
@@ -401,10 +363,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
         setGradingAll((s) => ({ ...s, done: i + 1, failed }));
       }
 
-      // No onNoteUpdate call here: the reactive useWrittenQuestionSet query
-      // already propagates the freshly-persisted grades to this view and to any
-      // parent that subscribes. Passing `latestNote` would ship a stale
-      // pre-grading snapshot captured when Finish was pressed.
+      // The reactive note query propagates the freshly-persisted grades.
       setShowResults(true);
     } finally {
       // Always clear the spinner and release the run guard, even if something
@@ -457,13 +416,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       resetStreak();
       setJustGraded(null);
       setAnnouncement("");
-      // Notify parent to refresh note
-      if (latestNote && onNoteUpdate) {
-        onNoteUpdate(latestNote);
-      }
     } catch (error) {
       console.error("Failed to reset answers:", error);
-      alert(error instanceof Error ? error.message : "Failed to reset answers");
+      toast.error(error instanceof Error ? error.message : "Failed to reset answers");
     } finally {
       setIsResetting(false);
     }
@@ -578,15 +533,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
 
   return (
     <div className="relative flex h-full flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300">
-      {/* Mobile Back Button */}
-      {onBack && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-          <span className="truncate text-sm font-semibold text-foreground">{note.title}</span>
-        </div>
-      )}
       <div className="min-h-0 flex-1 overflow-y-auto bg-card">
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col p-8 md:p-12">
           {/* Review Mode Banner */}
@@ -635,39 +581,32 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
           >
             {/* Question */}
             <div className="prose mb-6 w-full max-w-none font-serif text-lg leading-relaxed text-foreground md:text-xl">
-              <Suspense
+              <LazyMarkdown
+                generated
                 fallback={<div className="h-5 w-full animate-pulse rounded bg-secondary/30" />}
+                components={{
+                  table: ({ children }) => (
+                    <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
+                      {children}
+                    </table>
+                  ),
+                  thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                  tbody: ({ children }) => <tbody>{children}</tbody>,
+                  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                  th: ({ children }) => (
+                    <th className="border-r border-border px-4 py-2 text-left font-semibold text-foreground last:border-r-0">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="border-r border-border px-4 py-2 text-foreground last:border-r-0">
+                      {children}
+                    </td>
+                  ),
+                }}
               >
-                <MarkdownRenderer
-                  components={{
-                    img: () => null,
-                    a: ({ children }) => <span className="text-foreground">{children}</span>,
-                    video: () => null,
-                    audio: () => null,
-                    iframe: () => null,
-                    table: ({ children }) => (
-                      <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
-                        {children}
-                      </table>
-                    ),
-                    thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                    th: ({ children }) => (
-                      <th className="border-r border-border px-4 py-2 text-left font-semibold text-foreground last:border-r-0">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="border-r border-border px-4 py-2 text-foreground last:border-r-0">
-                        {children}
-                      </td>
-                    ),
-                  }}
-                >
-                  {sanitizeMarkdown(currentQuestion.question)}
-                </MarkdownRenderer>
-              </Suspense>
+                {sanitizeMarkdown(currentQuestion.question)}
+              </LazyMarkdown>
             </div>
 
             {/* Answer Input or Graded Result */}

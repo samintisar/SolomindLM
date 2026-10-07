@@ -22,7 +22,6 @@ export function useSubmitFeedback() {
         route: input.route,
         surface: input.surface,
         appVersion: input.appVersion,
-        lastRequestId: input.lastRequestId,
       }),
     [submit]
   );

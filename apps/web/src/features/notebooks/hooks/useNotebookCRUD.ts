@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import { DEFAULT_NOTEBOOK_ICON } from "@/shared/notebook/notebookIcons";
 import { NotebookItem } from "@/shared/types/index";
@@ -31,7 +31,7 @@ export function useNotebookCRUD({
   const createNotebook = useCreateNotebook();
   const updateNotebook = useUpdateNotebook();
   const deleteNotebook = useDeleteNotebook();
-  const { handleLimitError } = useLimitErrorToast();
+  const { handleLimitError } = useErrorToast();
 
   const handleCreateNotebook = useCallback(async () => {
     if (!isAuthenticated || !user) {

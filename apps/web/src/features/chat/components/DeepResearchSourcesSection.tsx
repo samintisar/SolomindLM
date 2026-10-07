@@ -1,4 +1,3 @@
-import type { Id } from "@convex/_generated/dataModel";
 import {
   BookOpen,
   ChevronRight,
@@ -19,8 +18,7 @@ import {
   CollapsibleTrigger,
 } from "@/shared/components/ui/collapsible";
 import { Spinner } from "@/shared/components/ui/spinner";
-import { useToast } from "@/shared/contexts/useToast";
-import { useAddExternalSources } from "../../sources/services/documentsApi";
+import { useAddToNotebook } from "../hooks/useAddToNotebook";
 import { useResearchRunEvidence } from "../services/researchApi";
 import {
   buildDeepResearchDisplaySources,
@@ -61,11 +59,10 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [addingKey, setAddingKey] = useState<string | null>(null);
-  const { success, error: toastError } = useToast();
 
   const evidence = useResearchRunEvidence(researchRunId);
 
-  const addExternalSources = useAddExternalSources();
+  const addToNotebook = useAddToNotebook(notebookId);
 
   const sources = useMemo(() => {
     if (!evidence?.length) return [];
@@ -90,26 +87,18 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
   const handleAddToNotebook = async (source: (typeof sources)[0]) => {
     if (!notebookId || !source.sourceUrl) return;
     setAddingKey(source.key);
-    try {
-      const ids = await addExternalSources({
-        notebookId: notebookId as Id<"notebooks">,
-        sources: [
-          {
-            title: source.sourceTitle,
-            url: source.sourceUrl,
-            snippet: source.contentSnippet.slice(0, 500),
-            sourceType: source.sourceType === "academic" ? "academic" : "web",
-          },
-        ],
-      });
-      // The mutation skips URLs already in the notebook, so ids can be shorter than the input.
-      success(ids.length === 0 ? "Already in this notebook" : "Added to sources");
-    } catch (e) {
-      console.error("Failed to add research source:", e);
-      toastError("Couldn't add this source. Please try again.");
-    } finally {
-      setAddingKey(null);
-    }
+    await addToNotebook(
+      [
+        {
+          title: source.sourceTitle,
+          url: source.sourceUrl,
+          snippet: source.contentSnippet.slice(0, 500),
+          sourceType: source.sourceType === "academic" ? "academic" : "web",
+        },
+      ],
+      { added: () => "Added to sources", failed: "Couldn't add this source. Please try again." }
+    );
+    setAddingKey(null);
   };
 
   return (

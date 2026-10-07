@@ -18,8 +18,8 @@ vi.mock("@/shared/contexts/useToast", () => ({
   useToast: () => ({ error: mocks.toastError }),
 }));
 
-vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
-  useLimitErrorToast: () => ({ handleLimitError: mocks.handleLimitError }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ handleLimitError: mocks.handleLimitError }),
 }));
 
 vi.mock("../services/literatureReviewApi", () => ({

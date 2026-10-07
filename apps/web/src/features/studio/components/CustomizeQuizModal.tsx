@@ -2,7 +2,6 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { FieldGroup } from "@/shared/components/ui/field";
-import type { StudioDialogTheme } from "./customize/dialogContext";
 import { OptionToggleGroup } from "./customize/OptionToggleGroup";
 import { COUNT_OPTIONS, DIFFICULTY_OPTIONS } from "./customize/options";
 import { PromptField } from "./customize/PromptField";
@@ -11,19 +10,10 @@ import {
   StudioCustomizeDialog,
   StudioCustomizeFooter,
   StudioCustomizeHeader,
+  type StudioCustomizeModalProps,
 } from "./customize/StudioCustomizeDialog";
 
-interface CustomizeQuizModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onGenerate: (config: QuizConfig) => void;
-  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
-  embedded?: boolean;
-  /** Pins light-theme tokens on always-light pages (the auth page). */
-  theme?: StudioDialogTheme;
-  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
-  preview?: boolean;
-}
+type CustomizeQuizModalProps = StudioCustomizeModalProps<QuizConfig>;
 
 export interface QuizConfig {
   count: "fewer" | "standard" | "more";
@@ -33,19 +23,10 @@ export interface QuizConfig {
 
 export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
   isOpen,
-  onClose,
   onGenerate,
-  embedded = false,
-  theme,
-  preview = false,
+  ...dialogProps
 }) => (
-  <StudioCustomizeDialog
-    open={isOpen}
-    onClose={onClose}
-    embedded={embedded}
-    theme={theme}
-    preview={preview}
-  >
+  <StudioCustomizeDialog open={isOpen} {...dialogProps}>
     <QuizForm onGenerate={onGenerate} />
   </StudioCustomizeDialog>
 );

@@ -10,17 +10,10 @@ import {
   Search,
   Send,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { type ComponentType, lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { type AuthFormInitialMode, AuthFormPanel } from "@/features/auth/components/AuthFormPanel";
 import { useAuth } from "@/features/auth/useAuth";
-import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
-import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
-import { CustomizeInfographicModal } from "@/features/studio/components/CustomizeInfographicModal";
-import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
-import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
-import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
-import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
@@ -31,15 +24,76 @@ import { isNativeShell } from "@/utils/platformDetection";
 
 type HeroMode = "chat" | "studio";
 
-type AuthStudioPreviewModal =
-  | null
-  | "reports"
-  | "flashcards"
-  | "quiz"
-  | "infographic"
-  | "audio"
-  | "writtenQuestions"
-  | "spreadsheets";
+interface PreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  /** The modal's generate / pick-format action; the preview only prompts sign-in. */
+  onAction: () => void;
+}
+
+// Each studio tool's customize modal, loaded only when the visitor opens it so the studio
+// modals stay out of the sign-in bundle.
+const PREVIEW_MODALS = {
+  reports: lazy(() =>
+    import("@/features/studio/components/CustomizeReportModal").then((m) => ({
+      default: ({ isOpen, onClose, onAction }: PreviewModalProps) => (
+        <m.CustomizeReportModal
+          theme="light"
+          preview
+          isOpen={isOpen}
+          onClose={onClose}
+          onSelectFormat={onAction}
+        />
+      ),
+    }))
+  ),
+  flashcards: lazy(() =>
+    import("@/features/studio/components/CustomizeFlashcardsModal").then((m) => ({
+      default: ({ onAction, ...props }: PreviewModalProps) => (
+        <m.CustomizeFlashcardsModal theme="light" preview {...props} onGenerate={onAction} />
+      ),
+    }))
+  ),
+  quiz: lazy(() =>
+    import("@/features/studio/components/CustomizeQuizModal").then((m) => ({
+      default: ({ onAction, ...props }: PreviewModalProps) => (
+        <m.CustomizeQuizModal theme="light" preview {...props} onGenerate={onAction} />
+      ),
+    }))
+  ),
+  audio: lazy(() =>
+    import("@/features/studio/components/CustomizeAudioModal").then((m) => ({
+      default: ({ onAction, ...props }: PreviewModalProps) => (
+        <m.CustomizeAudioModal theme="light" preview {...props} onGenerate={onAction} />
+      ),
+    }))
+  ),
+  writtenQuestions: lazy(() =>
+    import("@/features/studio/components/CustomizeWrittenQuestionsModal").then((m) => ({
+      default: ({ onAction, ...props }: PreviewModalProps) => (
+        <m.CustomizeWrittenQuestionsModal theme="light" preview {...props} onGenerate={onAction} />
+      ),
+    }))
+  ),
+  infographic: lazy(() =>
+    import("@/features/studio/components/CustomizeInfographicModal").then((m) => ({
+      default: ({ onAction, ...props }: PreviewModalProps) => (
+        <m.CustomizeInfographicModal theme="light" preview {...props} onGenerate={onAction} />
+      ),
+    }))
+  ),
+  spreadsheets: lazy(() =>
+    import("@/features/studio/components/CustomizeSpreadsheetsModal").then((m) => ({
+      default: ({ onAction, ...props }: PreviewModalProps) => (
+        <m.CustomizeSpreadsheetsModal theme="light" preview {...props} onGenerate={onAction} />
+      ),
+    }))
+  ),
+} satisfies Record<string, ComponentType<PreviewModalProps>>;
+
+type AuthStudioPreviewModal = keyof typeof PREVIEW_MODALS;
+
+const isPreviewModal = (id: string): id is AuthStudioPreviewModal => id in PREVIEW_MODALS;
 
 function AuthHeroMockup() {
   const { info } = useToast();
@@ -47,7 +101,9 @@ function AuthHeroMockup() {
   const [sourceId, setSourceId] = useState<string>("s1");
   const [refKey, setRefKey] = useState<1 | 2 | null>(1);
   const [activityOpen, setActivityOpen] = useState(true);
-  const [studioModal, setStudioModal] = useState<AuthStudioPreviewModal>(null);
+  const [studioModal, setStudioModal] = useState<AuthStudioPreviewModal | null>(null);
+  // Modals opened so far stay mounted, so closing one still plays its exit animation.
+  const [openedModals, setOpenedModals] = useState<AuthStudioPreviewModal[]>([]);
   const [inputFlash, setInputFlash] = useState(false);
 
   const sources = useMemo(
@@ -67,14 +123,9 @@ function AuthHeroMockup() {
   }, [closeStudioModal, info]);
 
   const handleStudioToolClick = useCallback((id: string) => {
-    if (id === "mindmap") return;
-    if (id === "reports") setStudioModal("reports");
-    else if (id === "flashcards") setStudioModal("flashcards");
-    else if (id === "quiz") setStudioModal("quiz");
-    else if (id === "infographic") setStudioModal("infographic");
-    else if (id === "audio") setStudioModal("audio");
-    else if (id === "writtenQuestions") setStudioModal("writtenQuestions");
-    else if (id === "spreadsheets") setStudioModal("spreadsheets");
+    if (!isPreviewModal(id)) return;
+    setStudioModal(id);
+    setOpenedModals((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }, []);
 
   const flashInput = useCallback(() => {
@@ -371,75 +422,19 @@ function AuthHeroMockup() {
         </div>
       </div>
 
-      <CustomizeReportModal
-        theme="light"
-        preview
-        isOpen={studioModal === "reports"}
-        onClose={closeStudioModal}
-        onSelectFormat={() => {
-          afterPreviewAction();
-        }}
-      />
-
-      <CustomizeFlashcardsModal
-        theme="light"
-        preview
-        isOpen={studioModal === "flashcards"}
-        onClose={closeStudioModal}
-        onGenerate={() => {
-          afterPreviewAction();
-        }}
-      />
-
-      <CustomizeQuizModal
-        theme="light"
-        preview
-        isOpen={studioModal === "quiz"}
-        onClose={closeStudioModal}
-        onGenerate={() => {
-          afterPreviewAction();
-        }}
-      />
-
-      <CustomizeAudioModal
-        theme="light"
-        preview
-        isOpen={studioModal === "audio"}
-        onClose={closeStudioModal}
-        onGenerate={() => {
-          afterPreviewAction();
-        }}
-      />
-
-      <CustomizeWrittenQuestionsModal
-        theme="light"
-        preview
-        isOpen={studioModal === "writtenQuestions"}
-        onClose={closeStudioModal}
-        onGenerate={() => {
-          afterPreviewAction();
-        }}
-      />
-
-      <CustomizeInfographicModal
-        theme="light"
-        preview
-        isOpen={studioModal === "infographic"}
-        onClose={closeStudioModal}
-        onGenerate={() => {
-          afterPreviewAction();
-        }}
-      />
-
-      <CustomizeSpreadsheetsModal
-        theme="light"
-        preview
-        isOpen={studioModal === "spreadsheets"}
-        onClose={closeStudioModal}
-        onGenerate={() => {
-          afterPreviewAction();
-        }}
-      />
+      <Suspense fallback={null}>
+        {openedModals.map((id) => {
+          const Modal = PREVIEW_MODALS[id];
+          return (
+            <Modal
+              key={id}
+              isOpen={studioModal === id}
+              onClose={closeStudioModal}
+              onAction={afterPreviewAction}
+            />
+          );
+        })}
+      </Suspense>
     </div>
   );
 }
@@ -530,6 +525,8 @@ export function AuthPage() {
                     )}
                   >
                     <AuthFormPanel
+                      // The banner seeds the form's error; a new banner starts a fresh form.
+                      key={bannerMessage ?? ""}
                       authError={bannerMessage}
                       onAuthenticated={handleAuthenticated}
                       initialMode={initialMode}
