@@ -4,12 +4,14 @@ import { LANDING_FAQS } from "@/features/landing/faqRegistry";
 import { getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
 import { getSeoContentPageByPath } from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
+import { getToolPageByPath } from "@/features/tools/toolPages";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
 import { buildSeoContentPrerenderBody } from "./seoContentPrerenderHtml";
 import { escapeHtml } from "./seoHtml";
+import { buildToolPrerenderBody } from "./toolPrerenderHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
 export function buildHomePrerenderBody(): string {
@@ -96,6 +98,11 @@ export function buildPublicSeoPrerenderBody(path: string): string | undefined {
   const seoContentPage = getSeoContentPageByPath(path);
   if (seoContentPage) {
     return buildSeoContentPrerenderBody(seoContentPage);
+  }
+
+  const toolPage = getToolPageByPath(path);
+  if (toolPage) {
+    return buildToolPrerenderBody(toolPage);
   }
 
   return undefined;

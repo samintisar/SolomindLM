@@ -120,7 +120,7 @@ function IntentHero({ page, onSignup }: { page: IntentLandingPageConfig; onSignu
                 to={page.heroCrossLink.path}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
               >
-                Written questions with feedback
+                {page.heroCrossLink.linkLabel}
                 <ChevronRight className="w-4 h-4" aria-hidden />
               </Link>
             </div>

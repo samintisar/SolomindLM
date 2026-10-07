@@ -16,7 +16,7 @@ export type IntentLandingPageConfig = {
   proofBullets: string[];
   sourceToOutput: { source: string; output: string };
   /** Prominent hero cross-link to a related intent page (e.g. quizzes → written questions). */
-  heroCrossLink?: { path: string; label: string; description: string };
+  heroCrossLink?: { path: string; label: string; description: string; linkLabel: string };
   faqs: FAQItem[];
   ctaLabel: string;
   navLabel: string;
@@ -204,6 +204,12 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       source: "A chapter PDF and lecture slides",
       output: "A draft flashcard deck with front and back pairs",
     },
+    heroCrossLink: {
+      path: "/tools/pdf-to-flashcards",
+      label: "Try the free PDF to flashcards tool",
+      description: "No account needed: make a deck from a PDF and export it to Anki or Quizlet.",
+      linkLabel: "Free PDF to flashcards maker",
+    },
     faqs: [
       {
         question: "Can I make AI flashcards from a PDF for free?",
@@ -252,6 +258,7 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       label: "Practicing for essay or short-answer exams?",
       description:
         "Written Questions generates prompts from your sources and gives AI feedback on responses you submit—not multiple choice.",
+      linkLabel: "Written questions with feedback",
     },
     conversionPromise: "Start free and build a practice quiz from your next reading assignment.",
     proofBullets: [

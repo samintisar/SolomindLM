@@ -11,6 +11,7 @@ import {
   SEO_CONTENT_PAGES,
 } from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
+import { FREE_TOOL_PAGES, getToolBreadcrumbItems } from "@/features/tools/toolPages";
 import {
   SEO_DEFAULT_DESCRIPTION,
   SEO_DEFAULT_KEYWORDS,
@@ -21,8 +22,10 @@ import {
   generateArticleStructuredData,
   generateBreadcrumbStructuredData,
   generateFAQStructuredData,
+  generateHowToStructuredData,
   generateOrganizationStructuredData,
   generateSoftwareApplicationStructuredData,
+  generateWebApplicationStructuredData,
   generateWebSiteStructuredData,
 } from "./structuredData";
 
@@ -98,6 +101,25 @@ const INTENT_SEO_PAGES: PublicSeoPage[] = INTENT_LANDING_PAGES.map((page) => ({
   ],
 }));
 
+const TOOL_SEO_PAGES: PublicSeoPage[] = FREE_TOOL_PAGES.map((page) => ({
+  path: page.path,
+  title: page.title,
+  description: page.description,
+  keywords: page.keywords,
+  changefreq: "weekly",
+  priority: 0.9,
+  structuredData: [
+    generateBreadcrumbStructuredData(getToolBreadcrumbItems(page)),
+    generateWebApplicationStructuredData({
+      name: page.h1,
+      description: page.description,
+      path: page.path,
+    }),
+    generateHowToStructuredData({ name: page.h1, description: page.intro, steps: page.steps }),
+    generateFAQStructuredData(page.faqs),
+  ],
+}));
+
 const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
   {
     path: "/",
@@ -141,6 +163,7 @@ const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
   },
   ...CLUSTER_HUB_SEO_PAGES,
   ...INTENT_SEO_PAGES,
+  ...TOOL_SEO_PAGES,
   ...SEO_CONTENT_SEO_PAGES,
 ];
 

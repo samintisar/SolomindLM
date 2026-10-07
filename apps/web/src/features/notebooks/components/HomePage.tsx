@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { useClaimPendingDeck } from "@/features/tools/hooks/useClaimPendingDeck";
 import { Tabs, TabsContent } from "@/shared/components/ui/tabs";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
@@ -23,6 +24,8 @@ interface FolderCreateData {
 }
 
 export const HomePage: React.FC = () => {
+  // OAuth sign-in from the free flashcard tool lands here: save the deck the visitor made.
+  useClaimPendingDeck();
   const ctx = useNotebookContext();
   const featuredNotebooks = ctx.featuredNotebooks;
   const recentNotebooks = ctx.recentNotebooks;
