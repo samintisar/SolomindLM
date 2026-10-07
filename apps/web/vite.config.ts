@@ -119,12 +119,9 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            // React ecosystem
-            if (
-              id.includes("node_modules/react") ||
-              id.includes("node_modules/react-dom") ||
-              id.includes("node_modules/react-router")
-            ) {
+            // React ecosystem. Whole package names only: a bare "node_modules/react" prefix also
+            // caught react-pdf (pulling pdfjs into every page load) and react-virtuoso.
+            if (/node_modules\/(react|react-dom|react-router|react-router-dom)\//.test(id)) {
               return "react-vendor";
             }
 
@@ -150,8 +147,10 @@ export default defineConfig(({ mode }) => {
 
             // Don't put zod in its own chunk - it can become empty (tree-shaken) and trigger useless requests
 
-            // PDF.js (heavy — keep separate from main bundle)
-            if (id.includes("node_modules/pdfjs-dist") || id.includes("node_modules/react-pdf")) {
+            // PDF.js (heavy — keep separate from main bundle). Not react-pdf: Rollup folds a manual
+            // chunk's dependencies into it, so react-pdf would drag clsx in and every page that
+            // uses cn() would statically import pdfjs. react-pdf stays with its only importer.
+            if (id.includes("node_modules/pdfjs-dist")) {
               return "pdfjs";
             }
 
