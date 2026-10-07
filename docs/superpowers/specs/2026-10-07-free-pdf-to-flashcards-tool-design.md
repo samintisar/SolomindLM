@@ -36,7 +36,7 @@ keep anonymous LLM spend bounded.
   ├─ results: FlipCard preview + full list
   ├─ export: Anki .txt, Quizlet clipboard text, CSV
   └─ "Save & study with spaced repetition"
-       → sessionStorage { title, sourceText, cards } → AuthModal
+       → localStorage { title, sourceText, cards, savedAt } (24 h expiry) → AuthModal
        → after sign-in: mutation freeTools.claimDeck → navigate to /notebook/:id
 ```
 
@@ -62,6 +62,7 @@ keep anonymous LLM spend bounded.
 - Input: `MIN_WORDS = 80`, `MAX_WORDS = 12_000` (client truncates and tells the user; server rejects above
   `MAX_WORDS * 1.1` and above a 200 KB body). PDFs: first 40 pages read.
 - Output: `cardCount ∈ {10, 20, 30}`, default 20.
+- Client IP = last `x-forwarded-for` entry (not spoofable whether the edge appends or overwrites); verified on dev in the manual check.
 - Worst-case daily spend = global cap × one FAST_LLM call on ≤ 12k words. Nothing stored for anonymous runs.
 
 ### Responses
@@ -91,7 +92,7 @@ keep anonymous LLM spend bounded.
   - CSV: `Front,Back`, quoted, `""` escaping, UTF-8 BOM.
 - `lib/textBounds.ts` — word counting and truncation.
 - `lib/freeToolClient.ts` — `fetch` to the HTTP endpoint, typed result union.
-- `lib/pendingDeck.ts` — sessionStorage read/write/clear (try/catch).
+- `lib/pendingDeck.ts` — localStorage read/write/clear (try/catch), 24 h expiry.
 - `hooks/useTurnstile.ts` — loads `challenges.cloudflare.com/turnstile/v0/api.js` on demand, invisible widget.
 - After sign-in, the page (and `/home` as a fallback) checks `pendingDeck` and calls `claimDeck`.
 
@@ -112,7 +113,7 @@ Convex/auth code beyond what the shell already loads.
 ## Configuration
 
 - Convex env (dev + prod): `TURNSTILE_SECRET_KEY`, `FREE_TOOL_IP_SALT`.
-- Vercel / web env: `VITE_TURNSTILE_SITE_KEY`.
+- Web: site key `0x4AAAAAAFQDDSV1WRFKhINF` is the code default; `VITE_TURNSTILE_SITE_KEY` overrides it (e.g. Cloudflare's test key `1x00000000000000000000BB`).
 - Dev and tests use Cloudflare's published always-pass test keys.
 
 ## Testing
