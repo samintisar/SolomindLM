@@ -29,6 +29,21 @@ export const WINDOW_PERIOD_MS: Record<LimitWindow, number> = {
 };
 
 type FixedWindow = { kind: "fixed window"; rate: number; period: number };
+type TokenBucket = { kind: "token bucket"; rate: number; period: number; capacity: number };
+type LimitConfig = FixedWindow | TokenBucket;
+
+/**
+ * Daily limits keep the original fixed windows. Weekly and 30-day limits use a
+ * token bucket instead: a fixed window with no `start` begins at a random point
+ * per user, so a 30-day window could roll over minutes after a run and allow a
+ * second one at once. A bucket refills one run every `period / rate`.
+ */
+function windowConfig(limit: FeatureLimit): LimitConfig {
+  const period = WINDOW_PERIOD_MS[limit.window];
+  return limit.window === "day"
+    ? { kind: "fixed window", rate: limit.rate, period }
+    : { kind: "token bucket", rate: limit.rate, period, capacity: limit.rate };
+}
 
 /**
  * Build `{ chatFree: {...}, flashcardFree: {...}, ... }` from a limit map.
@@ -38,30 +53,19 @@ type FixedWindow = { kind: "fixed window"; rate: number; period: number };
 function tierWindows<S extends string>(
   limits: Record<DailyFeature, FeatureLimit | null>,
   suffix: S
-): Partial<Record<`${DailyFeature}${S}`, FixedWindow>> {
+): Partial<Record<`${DailyFeature}${S}`, LimitConfig>> {
   return Object.fromEntries(
     Object.entries(limits).flatMap(([feature, limit]) =>
-      limit
-        ? [
-            [
-              `${feature}${suffix}`,
-              {
-                kind: "fixed window",
-                rate: limit.rate,
-                period: WINDOW_PERIOD_MS[limit.window],
-              } satisfies FixedWindow,
-            ],
-          ]
-        : []
+      limit ? [[`${feature}${suffix}`, windowConfig(limit)]] : []
     )
-  ) as Partial<Record<`${DailyFeature}${S}`, FixedWindow>>;
+  ) as Partial<Record<`${DailyFeature}${S}`, LimitConfig>>;
 }
 
 /**
  * Full rate-limiter config. Exported so tests can assert every window is
  * derived from the canonical limit maps.
  */
-export const RATE_LIMIT_CONFIG: Record<string, FixedWindow> = {
+export const RATE_LIMIT_CONFIG: Record<string, LimitConfig> = {
   // Free + Pro content-generation limits, derived from the canonical maps.
   ...tierWindows(FREE_FEATURE_LIMITS, "Free"),
   ...tierWindows(PRO_FEATURE_LIMITS, "Pro"),

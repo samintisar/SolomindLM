@@ -183,12 +183,14 @@ async function countActiveRuns(
   cap: number
 ): Promise<number> {
   const freshSince = Date.now() - STALE_RUN_MS;
+  // Newest first, so dead rows left in an active status can't crowd out live runs.
   let count = 0;
   if (feature === "literatureReview") {
     for (const status of ACTIVE_LITERATURE_REVIEW_STATUSES) {
       const rows = await ctx.db
         .query("literatureReviewSessions")
         .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", status))
+        .order("desc")
         .take(cap + 1);
       count += rows.filter((row) => row.updatedAt >= freshSince).length;
     }
@@ -197,6 +199,7 @@ async function countActiveRuns(
       const rows = await ctx.db
         .query("researchPlans")
         .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", status))
+        .order("desc")
         .take(cap + 1);
       count += rows.filter((row) => row.updatedAt >= freshSince).length;
     }

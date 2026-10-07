@@ -533,8 +533,3 @@ export interface UnifiedDiscoveryResult {
     relevanceLabel?: "high" | "medium" | "low";
   };
 }
-
-/**
- * Features that have usage limits (defined by the backend's limit tables)
- */
-export type { DailyFeature } from "@convex/_lib/errors";

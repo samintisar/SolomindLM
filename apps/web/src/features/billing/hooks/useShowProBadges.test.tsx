@@ -7,8 +7,10 @@ import { useShowProBadges } from "./useShowProBadges";
 const platform = vi.hoisted(() => ({ canOfferPurchases: vi.fn(() => true) }));
 vi.mock("@/utils/platformDetection", () => platform);
 
-function wrapperFor(hasSubscription: boolean) {
-  const value = { subscriptionStatus: { hasSubscription } } as unknown as NotebookContextType;
+function wrapperFor(hasSubscription: boolean, isLoading = false) {
+  const value = {
+    subscriptionStatus: { hasSubscription, isLoading },
+  } as unknown as NotebookContextType;
   return ({ children }: { children: ReactNode }) => (
     <NotebookContext.Provider value={value}>{children}</NotebookContext.Provider>
   );
@@ -24,6 +26,11 @@ describe("useShowProBadges", () => {
 
   it("hides the marks for a Pro user", () => {
     const { result } = renderHook(useShowProBadges, { wrapper: wrapperFor(true) });
+    expect(result.current).toBe(false);
+  });
+
+  it("hides the marks while the subscription is still loading", () => {
+    const { result } = renderHook(useShowProBadges, { wrapper: wrapperFor(false, true) });
     expect(result.current).toBe(false);
   });
 

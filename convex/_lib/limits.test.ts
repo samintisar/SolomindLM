@@ -271,14 +271,40 @@ describe("daily limit tables — single source of truth", () => {
 
   test("Free audio is weekly and the Free literature review is once per 30 days", () => {
     const day = 24 * 60 * 60 * 1000;
-    expect(rateLimitsModule.RATE_LIMIT_CONFIG.audioFree).toMatchObject({
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.audioFree).toEqual({
+      kind: "token bucket",
       rate: 3,
       period: 7 * day,
+      capacity: 3,
     });
-    expect(rateLimitsModule.RATE_LIMIT_CONFIG.literatureReviewFree).toMatchObject({
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.literatureReviewFree).toEqual({
+      kind: "token bucket",
       rate: 1,
       period: 30 * day,
+      capacity: 1,
     });
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.chatFree.kind).toBe("fixed window");
+  });
+
+  test("a used 30-day run only comes back once the full 30 days have passed", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setupWithRateLimiter();
+      const userId = await seedUser(t);
+      const day = 24 * 60 * 60 * 1000;
+
+      await t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"));
+      vi.advanceTimersByTime(29 * day);
+      await expect(t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"))).rejects.toThrow(
+        "30-day literature review limit"
+      );
+      vi.advanceTimersByTime(day + 1000);
+      await expect(
+        t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"))
+      ).resolves.toEqual({ isPro: false });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -556,6 +582,21 @@ describe("assertConcurrentRunCapacity", () => {
     await expect(
       t.run((ctx) => assertConcurrentRunCapacity(ctx, userId, "literatureReview", false))
     ).resolves.toBeNull();
+  });
+
+  test("old stuck runs don't hide the user's live ones", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    for (let i = 0; i < 4; i++) {
+      await seedReviewSession(t, userId, "processing", Date.now() - STALE_RUN_MS - 1000);
+    }
+    for (let i = 0; i < 3; i++) {
+      await seedReviewSession(t, userId, "processing");
+    }
+
+    await expect(
+      t.run((ctx) => assertConcurrentRunCapacity(ctx, userId, "literatureReview", true))
+    ).rejects.toThrow("3 literature review runs in progress");
   });
 
   test("a Free user can have one run in progress", async () => {
