@@ -24,6 +24,8 @@ export const FREE_FLASHCARD_GLOBAL_DAILY_LIMIT = 300;
 export const FREE_FLASHCARD_IP_DAILY_ATTEMPTS = 6;
 export const FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS = 600;
 export const FREE_FLASHCARD_LLM_TIMEOUT_MS = 90_000;
+/** `invokeWithTimeout` phase label; its timeout error reads "<phase> timeout after <ms>ms". */
+export const FREE_FLASHCARD_LLM_PHASE = "free_flashcards";
 
 const TITLE_MAX_CHARS = 80;
 /** Generous for a Turnstile token (they are ~1–2 KB); stops the field being used to carry payload. */

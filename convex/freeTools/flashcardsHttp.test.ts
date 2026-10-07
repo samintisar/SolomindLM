@@ -8,6 +8,7 @@ import {
   FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
   FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
   FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
+  FREE_FLASHCARD_LLM_PHASE,
   FREE_FLASHCARD_MIN_WORDS,
 } from "../_lib/freeToolBounds";
 import { rateLimiter } from "../_lib/rateLimits";
@@ -194,11 +195,20 @@ describe("POST /tools/flashcards", () => {
 
   test("a timeout returns 504", async () => {
     vi.mocked(invokeStructuredOutput).mockRejectedValueOnce(
-      new Error("free_flashcards timeout after 90000ms")
+      new Error(`${FREE_FLASHCARD_LLM_PHASE} timeout after 90000ms`)
     );
     const t = makeT();
     const res = await post(t, validBody);
     expect(res.status).toBe(504);
+    expect(await res.json()).toEqual({ error: "timeout" });
+  });
+
+  test("an unrelated error that mentions a timeout is a 502, not a 504", async () => {
+    vi.mocked(invokeStructuredOutput).mockRejectedValueOnce(new Error("upstream socket timeout"));
+    const t = makeT();
+    const res = await post(t, validBody);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "generation_failed" });
   });
 
   test("503 when the server is not configured", async () => {

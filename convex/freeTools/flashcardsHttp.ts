@@ -4,6 +4,7 @@ import type { ActionCtx } from "../_generated/server";
 import { allowedOrigins } from "../_lib/allowedOrigins";
 import {
   countWords,
+  FREE_FLASHCARD_LLM_PHASE,
   FREE_FLASHCARD_MAX_BODY_BYTES,
   parseFreeFlashcardRequest,
 } from "../_lib/freeToolBounds";
@@ -107,7 +108,8 @@ export async function handleFreeFlashcardsPost(
     return json(200, deck);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const timedOut = message.includes("timeout");
+    // Only our own deadline (invokeWithTimeout's sentinel) is a 504; other errors are upstream failures.
+    const timedOut = message.includes(`${FREE_FLASHCARD_LLM_PHASE} timeout after`);
     logger.warn("generation_failed", { message, timedOut, durationMs: Date.now() - startedAt });
     return json(timedOut ? 504 : 502, { error: timedOut ? "timeout" : "generation_failed" });
   }

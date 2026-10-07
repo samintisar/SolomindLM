@@ -11,7 +11,11 @@ import {
 } from "../_agents/flashcard/prompts";
 import { internalAction } from "../_generated/server";
 import { env } from "../_lib/env";
-import { deriveDeckTitle, FREE_FLASHCARD_LLM_TIMEOUT_MS } from "../_lib/freeToolBounds";
+import {
+  deriveDeckTitle,
+  FREE_FLASHCARD_LLM_PHASE,
+  FREE_FLASHCARD_LLM_TIMEOUT_MS,
+} from "../_lib/freeToolBounds";
 import { normalizeMathMarkdownDeep } from "../_shared/mathMarkdown";
 import { buildFreeDeck, cardsToRequest } from "./deck";
 import { freeDeckCardValidator } from "./validators";
@@ -38,7 +42,7 @@ export const generate = internalAction({
           logPrefix: "FreeFlashcards",
         }),
       FREE_FLASHCARD_LLM_TIMEOUT_MS,
-      "free_flashcards"
+      FREE_FLASHCARD_LLM_PHASE
     );
 
     const cards = normalizeMathMarkdownDeep(buildFreeDeck(response.flashcards, cardCount));
