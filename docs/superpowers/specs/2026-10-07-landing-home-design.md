@@ -45,12 +45,12 @@ Copy is final; implement it verbatim (straight from the mockup).
    - H1: "AI that makes you think, *not thinks for you.*"
    - Lede: "SolomindLM won't write your essay. It reads your sources with you, answers with citations, and
      quizzes you until it sticks — so what you know at the exam is actually yours."
-   - Buttons: **Start free** (`onGetStarted`), **How it works** (outline, scrolls to `#how`).
+   - Buttons: **Start free** (`onGetStarted`), **How it works** (outline, scrolls to `#features`).
    - Fine print with check icons: "Free plan, no card" · "Works with any course".
    - Right: the **notebook preview** (below).
 2. **Source strip:** italic "Bring what you already have", then icon + label: PDFs, Slides & docs, YouTube,
    Web pages, Audio, Scans, Research papers, Google Drive. Hairlines above and below.
-3. **How it works** (`id="how"`, nav "Features" scrolls here): eyebrow "How it works", H2 "Read it.
+3. **How it works** (`id="features"`, so existing `/#features` links keep working; nav "Features" scrolls here): eyebrow "How it works", H2 "Read it.
    Practise it. *Go deeper.*", sub "One notebook per course or project. Every step stays tied to the sources
    you put in it." Then three alternating beats (text / visual), each with a numbered label, H3, paragraph
    and check-list:
@@ -106,13 +106,12 @@ Studio modal imports (today's `LandingHeroMockup` imports seven Studio modals; i
 ## Building with the system
 
 - Primitives at call sites take layout classes only. New looks are new `cva` variants in
-  `src/shared/components/ui`: expected `Card` `floating` (`shadow-xl`, for callouts and the Pro plan),
-  plus whatever the plan finds missing (e.g. a segmented `ToggleGroup`/`Tabs` look, `Badge` tones).
+  `src/shared/components/ui`: `Card` `featured` (Pro plan) and `Badge` `success`. Decorative
+  product pictures use a feature-local `DemoSurface`, not a primitive.
 - Plain elements (headings, paragraphs, the decorative preview's inner markup) use tokens and the spacing
   scale; no arbitrary values, raw colours, inline styles (custom properties only) or hand-rolled shadows.
 - FAQ rows: `Collapsible` inside `Card variant="flush"` (the variant already handles the trigger's ring).
-- Audience switcher: `Tabs`. Billing switch: `ToggleGroup` (or `Tabs`), whichever reads as a segmented
-  control without restyling.
+- Audience switcher and billing switch: `Tabs`.
 - `index.css`: add a `landing-paper` background utility; drop `.hero-search-glass`. `.landing-grid-pattern`
   stays until PR 2 (templates use it).
 - Split the home page into focused files under `features/landing/components/home/` (nav, hero, preview,
