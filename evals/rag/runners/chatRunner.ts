@@ -1,6 +1,5 @@
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
-import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
-import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
+import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
 import { computeConfigHash } from "../configHash";
 import { inferSourceChannel } from "../metrics/sourceAware";
 import type { ChunkSnapshot, EvalFixture, EvalRunArtifact, EvidenceChannel } from "../types";

@@ -22,7 +22,6 @@ import {
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
 import { cleanCsvOutput, withoutPipelineWording } from "../../_agents/spreadsheet/csvHelpers";
 import {
   COLLAPSE_PROMPTS,
@@ -42,6 +41,9 @@ import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
 import { planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
 import { type InvokeStudioLlmOptions, invokeStudioLlm } from "../_job/invokeStudioLlm";
 import { createJobDeadline, type JobDeadline } from "../_job/jobDeadline";
+import { createStudioChunkHelpers } from "../_job/studioChunks";
+
+const { packChunks, validateChunks } = createStudioChunkHelpers("SpreadsheetGraph");
 
 // ============================================================
 // CONFIGURATION
@@ -103,8 +105,6 @@ export async function runSpreadsheetGenerationPhase(
   ctx: ActionCtx,
   args: SpreadsheetGenerationPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { spreadsheetId, userId, notebookId, documentIds, spreadsheetType, customPrompt } = args;
 
   // Initialize structured logger
@@ -288,8 +288,6 @@ export async function runProcessSpreadsheetMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessSpreadsheetMapChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const {
     spreadsheetId,
     userId,
@@ -498,8 +496,6 @@ export async function runFinalizeSpreadsheetPhase(
   ctx: ActionCtx,
   args: FinalizeSpreadsheetPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { spreadsheetId, userId, notebookId, spreadsheetType, customPrompt } = args;
 
   const logger = createJobLogger({

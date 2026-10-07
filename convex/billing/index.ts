@@ -13,25 +13,6 @@ export {
 } from "./actions";
 
 /**
- * Get subscription for the current user (from custom table)
- */
-export const get = query({
-  args: {},
-  returns: v.union(v.null(), v.any()),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-
-    const subscription = await ctx.db
-      .query("stripeSubscriptions")
-      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
-      .first();
-
-    return subscription;
-  },
-});
-
-/**
  * Get current subscription (alias for get, used by frontend)
  */
 export const getCurrent = query({
@@ -47,25 +28,6 @@ export const getCurrent = query({
       .first();
 
     return subscription;
-  },
-});
-
-/**
- * Check if user has premium subscription
- */
-export const isPremium = query({
-  args: {},
-  returns: v.boolean(),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return false;
-
-    const subscription = await ctx.db
-      .query("stripeSubscriptions")
-      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
-      .first();
-
-    return !!subscription;
   },
 });
 
