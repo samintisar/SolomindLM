@@ -243,6 +243,20 @@ describe("daily limit tables — single source of truth", () => {
       );
     }
   });
+
+  test("free-tool windows come from freeToolBounds", async () => {
+    const bounds = await import("./freeToolBounds");
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.freeToolFlashcardsIp).toEqual({
+      kind: "fixed window",
+      rate: bounds.FREE_FLASHCARD_IP_DAILY_LIMIT,
+      period: 24 * 60 * 60 * 1000,
+    });
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.freeToolFlashcardsGlobal).toEqual({
+      kind: "fixed window",
+      rate: bounds.FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+      period: 24 * 60 * 60 * 1000,
+    });
+  });
 });
 
 describe("checkDailyLimit", () => {

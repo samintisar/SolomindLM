@@ -10,6 +10,7 @@
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 import { type DailyFeature, FREE_DAILY_LIMITS, PRO_DAILY_LIMITS } from "./errors";
+import { FREE_FLASHCARD_GLOBAL_DAILY_LIMIT, FREE_FLASHCARD_IP_DAILY_LIMIT } from "./freeToolBounds";
 
 export type { DailyFeature } from "./errors";
 export { getFreeLimit, getProLimit } from "./errors";
@@ -46,6 +47,14 @@ export const RATE_LIMIT_CONFIG = {
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
   /** In-app feedback submissions (per user, per hour) */
   feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
+  /** Free no-signup flashcard tool: runs per salted-hash IP per day */
+  freeToolFlashcardsIp: { kind: "fixed window", rate: FREE_FLASHCARD_IP_DAILY_LIMIT, period: DAY },
+  /** Free no-signup flashcard tool: all anonymous runs per day (cost circuit breaker, single key) */
+  freeToolFlashcardsGlobal: {
+    kind: "fixed window",
+    rate: FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+    period: DAY,
+  },
 } satisfies Record<string, FixedWindow>;
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, RATE_LIMIT_CONFIG);
