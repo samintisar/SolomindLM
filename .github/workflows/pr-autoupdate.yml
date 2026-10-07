@@ -1,0 +1,69 @@
+# Keeps auto-merge PRs up to date with main.
+#
+# main requires branches to be up to date before merging, and GitHub's auto-merge does not
+# update a branch itself: after one PR merges, every other auto-merge PR sits "behind" until
+# someone presses "Update branch". A merge queue would do this, but it is only offered on
+# organization-owned repos. This job merges main into each open, non-draft PR that has
+# auto-merge on, right after main moves (or when auto-merge is turned on); CI then reruns and
+# auto-merge merges it once green.
+#
+# Auth: the Renovate GitHub App (see renovate.yml), which has Contents and Pull requests
+# write. Its token is needed rather than GITHUB_TOKEN because a branch update made with
+# GITHUB_TOKEN does not trigger the PR's CI, so the PR would never go green.
+# Renovate's own PRs are not touched: they don't use GitHub auto-merge (platformAutomerge is
+# off) and Renovate rebases them itself.
+
+name: PR auto-update
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [auto_merge_enabled]
+  workflow_dispatch:
+
+# A newer push to main supersedes a run that is still updating branches.
+concurrency:
+  group: pr-autoupdate
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  update:
+    name: Update auto-merge PRs
+    # Fork PRs get no secrets on pull_request events; their branches aren't ours to update anyway.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.RENOVATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+
+      - name: Merge main into behind auto-merge PRs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          prs=$(gh pr list --repo "$REPO" --base main --state open --limit 100 \
+            --json number,isDraft,isCrossRepository,autoMergeRequest \
+            --jq '.[] | select(.autoMergeRequest != null and (.isDraft | not) and (.isCrossRepository | not)) | .number')
+          if [ -z "$prs" ]; then
+            echo "No open auto-merge PRs."
+            exit 0
+          fi
+          for pr in $prs; do
+            # Up-to-date PRs answer 422 "no new commits"; a conflicting one fails to merge.
+            # Neither should stop the others, so report and carry on.
+            if out=$(gh api --method PUT "repos/$REPO/pulls/$pr/update-branch" 2>&1); then
+              echo "#$pr: merged main in"
+            elif printf '%s' "$out" | grep -qi "no new commits"; then
+              echo "#$pr: already up to date"
+            else
+              echo "::warning title=PR #$pr not updated::$out"
+            fi
+          done
