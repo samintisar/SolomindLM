@@ -1,0 +1,51 @@
+/** Exports for the free flashcard tool. Pure string builders + one DOM download helper. */
+
+export type ExportCard = { front: string; back: string };
+
+/** Anki/Quizlet text imports split fields on tabs and cards on newlines. */
+const flatten = (value: string) =>
+  value
+    .replace(/[\t\r\n]+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+
+const tabLine = (card: ExportCard) => `${flatten(card.front)}\t${flatten(card.back)}`;
+
+/** Anki "Import File" plain text with file headers (Anki 2.1.55+). */
+export function toAnkiText(cards: ExportCard[]): string {
+  return `${["#separator:tab", "#html:false", "#columns:Front\tBack", ...cards.map(tabLine)].join("\n")}\n`;
+}
+
+/** Paste into Quizlet's "Import" box with "Between term and definition: Tab" and "Between rows: New line". */
+export function toQuizletText(cards: ExportCard[]): string {
+  return cards.map(tabLine).join("\n");
+}
+
+const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+/** BOM so Excel reads UTF-8; CRLF rows per RFC 4180. */
+export function toCsv(cards: ExportCard[]): string {
+  const rows = cards.map((c) => `${csvCell(c.front)},${csvCell(c.back)}`);
+  return `﻿${["Front,Back", ...rows].join("\r\n")}`;
+}
+
+export function exportFileName(title: string, extension: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return slug ? `${slug}-flashcards.${extension}` : `flashcards.${extension}`;
+}
+
+export function downloadTextFile(fileName: string, content: string, mimeType: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type: `${mimeType};charset=utf-8` }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
