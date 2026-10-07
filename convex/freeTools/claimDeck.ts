@@ -1,8 +1,8 @@
 // convex/freeTools/claimDeck.ts
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { mutation } from "../_generated/server";
-import { InputValidationError } from "../_lib/errors";
+import { InputValidationError, LimitError } from "../_lib/errors";
 import {
   countWords,
   FREE_FLASHCARD_CARD_COUNTS,
@@ -60,7 +60,17 @@ export const claimDeck = mutation({
       throw invalid("A card is too long", "cards");
     }
 
-    await checkNotebookLimit(ctx);
+    try {
+      await checkNotebookLimit(ctx);
+    } catch (error) {
+      // A plain Error subclass is redacted to "Server Error" at the client; a ConvexError keeps
+      // its data so the web app can show the notebook-limit message (parseLimitError).
+      if (error instanceof LimitError) {
+        const { feature, ...data } = error.data;
+        throw new ConvexError(feature === undefined ? data : { ...data, feature });
+      }
+      throw error;
+    }
 
     const title = (args.title.trim() || "Flashcards").slice(0, TEXT_TITLE_MAX_LENGTH);
     const notebookId = await Notebooks.createNotebook(ctx, { userId, title });

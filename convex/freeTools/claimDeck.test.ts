@@ -142,4 +142,34 @@ describe("freeTools.claimDeck.claimDeck", () => {
       detail: "Source text is too long",
     });
   });
+
+  test("a user at the free notebook limit gets structured limit data the client can parse", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    for (let i = 0; i < 5; i++) {
+      await t.run(async (ctx) =>
+        ctx.db.insert("notebooks", {
+          userId,
+          title: `Notebook ${i}`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+      );
+    }
+    const asUser = t.withIdentity({ subject: `${userId}|s1` });
+    const data = await rejectionData(
+      asUser.mutation(api.freeTools.claimDeck.claimDeck, {
+        title: "D",
+        sourceText: SOURCE,
+        cards: CARDS,
+      })
+    );
+    expect(data).toEqual({
+      code: "NOTEBOOK_LIMIT_REACHED",
+      limit: 5,
+      current: 5,
+      limitType: "notebook",
+      isPro: false,
+    });
+  });
 });
