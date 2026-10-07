@@ -18,7 +18,7 @@ type Violation = {
   disposition: string;
 };
 
-const PUBLIC_ROUTES = ["/", "/sign-in", "/faq", "/privacy"];
+const PUBLIC_ROUTES = ["/", "/sign-in", "/faq", "/privacy", "/tools/pdf-to-flashcards"];
 
 async function recordViolations(page: Page) {
   // addInitScript runs via CDP, so it is not subject to the page's CSP.

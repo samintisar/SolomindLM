@@ -16,6 +16,12 @@ import {
   type LimitWindow,
   PRO_FEATURE_LIMITS,
 } from "./errors";
+import {
+  FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
+  FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+  FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
+  FREE_FLASHCARD_IP_DAILY_LIMIT,
+} from "./freeToolBounds";
 
 export type { DailyFeature } from "./errors";
 export { getFreeLimit, getProLimit } from "./errors";
@@ -76,6 +82,26 @@ export const RATE_LIMIT_CONFIG: Record<string, LimitConfig> = {
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
   /** In-app feedback submissions (per user, per hour) */
   feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
+  /** Free no-signup flashcard tool: runs per salted-hash IP per day */
+  freeToolFlashcardsIp: { kind: "fixed window", rate: FREE_FLASHCARD_IP_DAILY_LIMIT, period: DAY },
+  /** Free no-signup flashcard tool: all anonymous runs per day (cost circuit breaker, single key) */
+  freeToolFlashcardsGlobal: {
+    kind: "fixed window",
+    rate: FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+    period: DAY,
+  },
+  /** Free flashcard tool: LLM calls (failures included) per salted-hash IP per day */
+  freeToolFlashcardsIpAttempts: {
+    kind: "fixed window",
+    rate: FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
+    period: DAY,
+  },
+  /** Free flashcard tool: all anonymous LLM calls per day (the hard cost bound, single key) */
+  freeToolFlashcardsGlobalAttempts: {
+    kind: "fixed window",
+    rate: FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
+    period: DAY,
+  },
 };
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, RATE_LIMIT_CONFIG);
