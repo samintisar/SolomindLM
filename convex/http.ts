@@ -6,6 +6,7 @@ import { allowedOrigins } from "./_lib/allowedOrigins";
 import { MAX_CSP_REPORT_BYTES, parseCspReport } from "./_lib/cspReport";
 import { createServiceLogger } from "./_lib/logging/serviceLogger";
 import { auth } from "./auth";
+import { handleFreeFlashcardsOptions, handleFreeFlashcardsPost } from "./freeTools/flashcardsHttp";
 
 const http = httpRouter();
 
@@ -552,6 +553,22 @@ http.route({
       return errorResponse(error instanceof Error ? error.message : "Internal server error", 500);
     }
   }),
+});
+
+// ============================================================
+// Free tools (anonymous, Turnstile + per-IP/global rate limits)
+// ============================================================
+
+http.route({
+  path: "/tools/flashcards",
+  method: "OPTIONS",
+  handler: httpAction(handleFreeFlashcardsOptions),
+});
+
+http.route({
+  path: "/tools/flashcards",
+  method: "POST",
+  handler: httpAction(handleFreeFlashcardsPost),
 });
 
 export default http;

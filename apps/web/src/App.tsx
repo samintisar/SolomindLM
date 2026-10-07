@@ -50,6 +50,7 @@ import { LiteratureReportPage } from "./features/studio/components/LiteratureRep
 import { LiteratureTablePage } from "./features/studio/components/LiteratureTablePage";
 import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
 import { StudioProvider } from "./features/studio/StudioContext";
+import { getToolPageByPath } from "./features/tools/toolPages";
 import { MotionProvider } from "./shared/components/motion";
 import { ProtectedRoute } from "./shared/components/ProtectedRoute";
 import { RouteTransition } from "./shared/components/RouteTransition";
@@ -64,6 +65,9 @@ const DesignGallery =
   import.meta.env.DEV || import.meta.env.VITE_DESIGN_GALLERY === "1"
     ? lazy(() => import("./dev/DesignGallery"))
     : null;
+
+// Free tools: own chunk so the marketing shell doesn't ship pdfjs or the tool UI.
+const PdfToFlashcardsPage = lazy(() => import("./features/tools/pages/PdfToFlashcardsPage"));
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -176,6 +180,7 @@ const AppContent: React.FC = () => {
     location.pathname === "/sign-in" ||
     location.pathname === "/faq" ||
     (DesignGallery !== null && location.pathname === "/dev/design") ||
+    getToolPageByPath(location.pathname) !== undefined ||
     isIntentLandingPath(location.pathname) ||
     isClusterHubPath(location.pathname) ||
     isSeoContentPath(location.pathname);
@@ -415,6 +420,14 @@ const AppContent: React.FC = () => {
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/faq" element={<FaqPage />} />
+              <Route
+                path="/tools/pdf-to-flashcards"
+                element={
+                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                    <PdfToFlashcardsPage />
+                  </Suspense>
+                }
+              />
               {DesignGallery && (
                 <Route
                   path="/dev/design"
