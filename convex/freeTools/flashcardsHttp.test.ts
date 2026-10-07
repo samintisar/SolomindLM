@@ -10,6 +10,7 @@ import {
   FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
   FREE_FLASHCARD_LLM_PHASE,
   FREE_FLASHCARD_MAX_BODY_BYTES,
+  FREE_FLASHCARD_MAX_BODY_UTF8_BYTES,
   FREE_FLASHCARD_MIN_WORDS,
 } from "../_lib/freeToolBounds";
 import { rateLimiter } from "../_lib/rateLimits";
@@ -231,11 +232,31 @@ describe("POST /tools/flashcards", () => {
     expect(await res.json()).toEqual({ error: "generation_failed" });
   });
 
-  test("413 for an oversized body even when content-length is missing", async () => {
+  test("413 for an oversized streamed body without content-length, and stops reading it", async () => {
+    let cancelled = false;
+    const chunk = new TextEncoder().encode("x".repeat(FREE_FLASHCARD_MAX_BODY_UTF8_BYTES + 1));
+    // Left open: a handler that buffers the whole body would wait on it forever.
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
     const t = makeT();
-    const body = JSON.stringify({ ...validBody, text: "x ".repeat(450_000) });
-    const res = await post(t, body, "203.0.113.9", { "content-length": "10" });
+    const res = await t.fetch("/tools/flashcards", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+        "x-forwarded-for": "203.0.113.9",
+      },
+      body,
+      duplex: "half",
+    } as RequestInit);
     expect(res.status).toBe(413);
+    expect(cancelled).toBe(true);
     expect(siteverify).not.toHaveBeenCalled();
   });
 

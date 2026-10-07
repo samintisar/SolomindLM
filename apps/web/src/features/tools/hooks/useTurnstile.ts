@@ -20,24 +20,31 @@ declare global {
 
 let scriptPromise: Promise<TurnstileApi> | null = null;
 
+/**
+ * Loads api.js once. A failed or stalled load (no load/error event within the timeout) drops the
+ * cached promise and the tag, so the next call starts a fresh load instead of reusing a dead one.
+ */
 function loadTurnstile(): Promise<TurnstileApi> {
   if (window.turnstile) return Promise.resolve(window.turnstile);
   scriptPromise ??= new Promise<TurnstileApi>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = SCRIPT_SRC;
     script.async = true;
-    script.onload = () => {
-      if (window.turnstile) {
-        resolve(window.turnstile);
-      } else {
-        scriptPromise = null;
-        reject(new Error("turnstile_missing"));
-      }
-    };
-    script.onerror = () => {
+    const fail = (message: string) => {
+      clearTimeout(timer);
+      script.onload = null;
+      script.onerror = null;
+      script.remove();
       scriptPromise = null;
-      reject(new Error("turnstile_load_failed"));
+      reject(new Error(message));
     };
+    const timer = setTimeout(() => fail("turnstile_load_timeout"), TOKEN_TIMEOUT_MS);
+    script.onload = () => {
+      if (!window.turnstile) return fail("turnstile_missing");
+      clearTimeout(timer);
+      resolve(window.turnstile);
+    };
+    script.onerror = () => fail("turnstile_load_failed");
     document.head.appendChild(script);
   });
   return scriptPromise;
@@ -45,7 +52,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
 
 type Pending = { resolve: (token: string) => void; reject: (error: Error) => void };
 
-/** Rejects with `message` after `ms`; a stalled script or challenge must not hang the caller. */
+/** Rejects with `message` after `ms`; a stalled challenge must not hang the caller. */
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -77,11 +84,7 @@ export function useTurnstile(containerRef: RefObject<HTMLDivElement | null>) {
   );
 
   const getToken = useCallback(async (): Promise<string> => {
-    const turnstile = await withTimeout(
-      loadTurnstile(),
-      TOKEN_TIMEOUT_MS,
-      "turnstile_load_timeout"
-    );
+    const turnstile = await loadTurnstile();
     const container = containerRef.current;
     if (!container) throw new Error("turnstile_no_container");
 
