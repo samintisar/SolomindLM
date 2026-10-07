@@ -24,7 +24,7 @@ export type IntentLandingPageConfig = {
   priority?: number;
 };
 
-export const FEATURE_INTENT_PATHS: Partial<Record<string, string>> = {
+const FEATURE_INTENT_PATHS: Partial<Record<string, string>> = {
   audio: "/students/ai-audio-overview",
   mindmap: "/students/ai-mind-maps",
   reports: "/students/ai-reports",
