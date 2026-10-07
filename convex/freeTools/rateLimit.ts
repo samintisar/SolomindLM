@@ -1,6 +1,7 @@
 // convex/freeTools/rateLimit.ts
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { rateLimiter } from "../_lib/rateLimits";
 
 const reserveResult = v.union(
@@ -62,7 +63,10 @@ export const consumeFreeFlashcardLimits = internalMutation({
     const global = await rateLimiter.limit(ctx, "freeToolFlashcardsGlobal");
     if (!ip.ok || !global.ok) {
       // A concurrent request took the last slot between reserve and consume; the work is done.
-      console.warn("[FreeTools] limit consumed past the window", { ip: ip.ok, global: global.ok });
+      createServiceLogger("free_tools", "consume_limits").warn("limit_consumed_past_window", {
+        ip: ip.ok,
+        global: global.ok,
+      });
     }
     return null;
   },
