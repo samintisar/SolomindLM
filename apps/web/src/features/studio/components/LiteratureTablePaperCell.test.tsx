@@ -104,4 +104,20 @@ describe("LiteratureTablePaperCell", () => {
     await userEvent.hover(flag);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Studies diet, not sleep");
   });
+
+  // Its columns are empty because extraction failed, not because the paper lacks the data (#398).
+  test("a paper whose extraction failed is flagged, for search and notebook papers alike", () => {
+    for (const paper of [searchPaper, notebookPaper]) {
+      const { unmount } = renderCell({ ...paper, extractionFailed: true });
+      expect(screen.getByText("Extraction failed")).toHaveAccessibleDescription(
+        /columns are empty/i
+      );
+      unmount();
+    }
+  });
+
+  test("a paper whose extraction worked has no failure flag", () => {
+    renderCell(searchPaper);
+    expect(screen.queryByText("Extraction failed")).not.toBeInTheDocument();
+  });
 });

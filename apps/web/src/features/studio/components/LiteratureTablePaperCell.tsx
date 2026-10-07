@@ -64,24 +64,27 @@ function StudyTypeBadge({ label }: { label: string }) {
   );
 }
 
-/** A notebook paper the screening check judged off-topic; the reason shows on hover and focus. */
-function OffTopicBadge({ reason }: { reason: string }) {
-  const reasonId = useId();
+/** A warning on the paper; the detail shows on hover and focus. */
+function WarningBadge({ label, detail }: { label: string; detail: string }) {
+  const detailId = useId();
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant="outline" tabIndex={0} aria-describedby={reasonId}>
+        <Badge variant="outline" tabIndex={0} aria-describedby={detailId}>
           <TriangleAlert aria-hidden className="text-warning" />
-          Off-topic?
+          {label}
         </Badge>
       </TooltipTrigger>
-      <span id={reasonId} className="sr-only">
-        {reason}
+      <span id={detailId} className="sr-only">
+        {detail}
       </span>
-      <TooltipContent className="max-w-72">{reason}</TooltipContent>
+      <TooltipContent className="max-w-72">{detail}</TooltipContent>
     </Tooltip>
   );
 }
+
+const EXTRACTION_FAILED_DETAIL =
+  "We couldn't extract this paper's details, so its columns are empty. The paper may still report them.";
 
 export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> = ({
   rank,
@@ -150,7 +153,7 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
           </>
         )}
 
-        {(studyBadges.length > 0 || isNotebookPaper) && (
+        {(studyBadges.length > 0 || isNotebookPaper || paper.extractionFailed) && (
           <div className="flex flex-wrap gap-2 pt-0.5">
             {isNotebookPaper && (
               <Badge variant="secondary">
@@ -159,7 +162,10 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
               </Badge>
             )}
             {isNotebookPaper && paper.offTopicReason && (
-              <OffTopicBadge reason={paper.offTopicReason} />
+              <WarningBadge label="Off-topic?" detail={paper.offTopicReason} />
+            )}
+            {paper.extractionFailed && (
+              <WarningBadge label="Extraction failed" detail={EXTRACTION_FAILED_DETAIL} />
             )}
             {studyBadges.map((label) => (
               <StudyTypeBadge key={label} label={label} />

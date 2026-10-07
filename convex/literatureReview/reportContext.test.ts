@@ -374,6 +374,34 @@ describe("notebook papers in the report", () => {
     expect(table).toContain("† From the user's notebook.");
   });
 
+  it("marks papers whose data could not be extracted in the study table (#398)", () => {
+    const table = buildStudyCharacteristicsTable(
+      [
+        {
+          citationKey: "Kim2019",
+          title: "K",
+          authors: "Kim S",
+          year: "2019",
+          rowData: {},
+          extractionFailed: true,
+        },
+        { citationKey: "Lee2020", title: "L", authors: "Lee J", year: "2020", rowData: {} },
+      ],
+      []
+    );
+    expect(table).toContain("Kim S et al. [Kim2019] ‡");
+    expect(table).toContain("Lee J et al. [Lee2020] |");
+    expect(table).toContain("‡ Data could not be extracted from this paper.");
+  });
+
+  it("leaves the extraction footnote out when every extraction succeeded", () => {
+    const table = buildStudyCharacteristicsTable(
+      [{ citationKey: "Lee2020", title: "L", authors: "Lee J", year: "2020", rowData: {} }],
+      []
+    );
+    expect(table).not.toContain("‡");
+  });
+
   it("lists notebook papers flagged as off-topic, with the reason", () => {
     const note = buildNotebookPapersNote([
       {
