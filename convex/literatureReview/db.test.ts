@@ -853,6 +853,48 @@ describe("notebook papers in drafts and tables", () => {
   });
 });
 
+describe("papers whose extraction failed", () => {
+  test("keep the failure mark through drafts to the table (#398)", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const sessionId = await seedSession(t, notebookId, userId);
+    const paper = {
+      authors: ["Kim S"],
+      year: 2019,
+      abstract: "An abstract.",
+      source: "arxiv" as const,
+      score: 1,
+      isIncluded: true,
+    };
+
+    await t.mutation(internal.literatureReview.db.insertDraftBatch, {
+      sessionId,
+      papers: [
+        { ...paper, title: "Failed", url: "http://example.com/a", extractionFailed: true },
+        { ...paper, title: "Extracted", url: "http://example.com/b", extractedData: { n: "40" } },
+      ],
+      columns: [{ id: "n", name: "Sample size", isVisible: true }],
+      batchNumber: 0,
+    });
+    const drafts = await t.query(internal.literatureReview.db.getDraftsBySession, { sessionId });
+    const { tableId } = await t.mutation(internal.literatureReview.db.persistTable, {
+      sessionId,
+      columns: [{ id: "n", name: "Sample size", isVisible: true }],
+    });
+    const table = await t.run(async (ctx) => ctx.db.get(tableId));
+
+    const flagOf = (
+      rows: Array<{ rowData: Record<string, string>; extractionFailed?: boolean }>,
+      title: string
+    ) => rows.find((r) => r.rowData.title === title)?.extractionFailed;
+    expect(flagOf(drafts, "Failed")).toBe(true);
+    expect(flagOf(drafts, "Extracted")).toBeUndefined();
+    expect(flagOf(table?.papers ?? [], "Failed")).toBe(true);
+    expect(flagOf(table?.papers ?? [], "Extracted")).toBeUndefined();
+  });
+});
+
 describe("loadNotebookPaperDocuments", () => {
   test("keeps only this notebook's finished PDFs and saved papers", async () => {
     const t = convexTest(schema, modules);

@@ -159,6 +159,8 @@ interface LiteratureReviewEvalResult {
     /** The selected notebook papers, included without screening (#301). */
     fromNotebook: number;
     extractedRows: number;
+    /** Rows whose extraction call failed, so their columns are empty (#398). */
+    extractionFailedRows: number;
   };
   stagePapers: {
     notebook: LiteraturePaper[];
@@ -364,6 +366,7 @@ export const runLiteratureReviewEval = action({
       included: v.number(),
       fromNotebook: v.number(),
       extractedRows: v.number(),
+      extractionFailedRows: v.number(),
     }),
     stagePapers: v.object({
       notebook: v.array(stagePaperValidator),
@@ -476,6 +479,7 @@ export const runLiteratureReviewEval = action({
         rowData: Record<string, string>;
         includeReason?: string;
         isIncluded: boolean;
+        extractionFailed?: boolean;
       }>;
     } | null = await ctx.runQuery(internal.literatureReview.db.getTableById, {
       tableId: tableResult.tableId,
@@ -569,6 +573,7 @@ export const runLiteratureReviewEval = action({
         included: screenedIncluded.length,
         fromNotebook: notebookPapers.length,
         extractedRows: table.papers.length,
+        extractionFailedRows: table.papers.filter((p) => p.extractionFailed).length,
       },
       workflowProvenance,
       stagePapers: {
