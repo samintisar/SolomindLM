@@ -11,7 +11,7 @@ function TileCard({ tile }: { tile: StudioTile }) {
       <span className={toneIcon({ tone: tile.tone, className: "size-10 rounded-xl" })}>
         <tile.icon aria-hidden className="size-5" />
       </span>
-      <h3 className="mt-4 font-display text-base font-bold">{tile.title}</h3>
+      <p className="mt-4 font-display text-base font-bold">{tile.title}</p>
       <p className="mt-1 font-serif text-sm leading-normal text-muted-foreground">
         {tile.description}
       </p>
@@ -42,7 +42,15 @@ export function StudioMarquee() {
           sub="Everything Studio makes is built from your sources and saved right next to them."
         />
       </div>
-      <div className="mt-14 flex flex-col gap-4 mask-x-from-90%">
+      <ul aria-label="Studio tools" className="sr-only">
+        {STUDIO_TILES.map((tile) => (
+          <li key={tile.title}>
+            {tile.title}: {tile.description}
+          </li>
+        ))}
+      </ul>
+      {/* The marquee repeats every tile (and autoFill adds more), so it is hidden from assistive tech. */}
+      <div aria-hidden inert className="mt-14 flex flex-col gap-4 mask-x-from-90%">
         {ROWS.map((row, index) => (
           <Marquee
             key={row[0].title}

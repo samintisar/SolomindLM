@@ -12,7 +12,7 @@ export function NotebookPreview() {
     <div aria-hidden inert className="relative mx-auto w-full max-w-180 lg:mx-0">
       <div className="flex flex-col items-center gap-4 md:hidden">
         <div className="w-full overflow-hidden rounded-2xl bg-background shadow-2xl ring-1 ring-hairline">
-          <ChatColumn className="h-112" />
+          <ChatColumn />
         </div>
         <WrittenQuestionDemo className="w-11/12" />
       </div>

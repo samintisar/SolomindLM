@@ -356,7 +356,6 @@
   --text-display--line-height: 1.25;
   /* Landing home headline at xl (text-hero). */
   --text-hero: 3.5rem;
-  --text-hero--line-height: 1.08;
 
   --animate-route-in: route-in 320ms var(--ease-out);
 
@@ -1028,62 +1027,6 @@
 .dark .prose blockquote {
   border-left-color: var(--border);
   color: var(--foreground);
-}
-
-/* Hero Input Animations */
-@keyframes float-glow {
-  0%,
-  100% {
-    transform: translateY(0px) scale(1);
-  }
-  50% {
-    transform: translateY(-2px) scale(1.02);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
-.animate-float-glow {
-  animation: float-glow 3s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite;
-}
-
-/* Hero animated mesh gradient */
-@keyframes mesh-gradient {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1) translate(0, 0);
-  }
-  33% {
-    opacity: 0.9;
-    transform: scale(1.05) translate(2%, 1%);
-  }
-  66% {
-    opacity: 0.95;
-    transform: scale(0.98) translate(-1%, 2%);
-  }
-}
-
-.animate-mesh-gradient {
-  animation: mesh-gradient 18s ease-in-out infinite;
 }
 
 /* Landing page: dot grid background — theme-aware, visible across full page */

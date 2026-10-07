@@ -30,7 +30,7 @@ export function LiteratureTableDemo({ className }: { className?: string }) {
           <thead>
             <tr className="bg-muted text-left text-muted-foreground">
               <th className="px-3.5 py-2 font-semibold">Paper</th>
-              <th className="px-3.5 py-2 font-semibold">Study type</th>
+              <th className="px-3.5 py-2 font-semibold max-sm:hidden">Study type</th>
               <th className="px-3.5 py-2 font-semibold">Decision</th>
             </tr>
           </thead>
@@ -38,7 +38,7 @@ export function LiteratureTableDemo({ className }: { className?: string }) {
             {PAPERS.map((paper) => (
               <tr key={paper.title} className="border-b border-border/50 align-top last:border-b-0">
                 <td className="px-3.5 py-2.5 font-serif text-xs leading-snug">{paper.title}</td>
-                <td className="px-3.5 py-2.5 whitespace-nowrap text-foreground/75">
+                <td className="px-3.5 py-2.5 whitespace-nowrap text-foreground/75 max-sm:hidden">
                   <span className="inline-flex items-center gap-1">
                     <paper.icon className="size-3.5 text-info" />
                     {paper.type}

@@ -3,7 +3,7 @@ export interface FAQItem {
   answer: string;
 }
 
-/** Shared with the homepage prerender body (publicSeoPrerenderHtml.ts) — keep both in sync. */
+/** Resource links in the homepage prerender body (publicSeoPrerenderHtml.ts); the live page links them from the footer. */
 export const HOME_RESOURCE_LINKS = [
   { path: "/students", label: "Study tools for students" },
   { path: "/research", label: "Research tools" },

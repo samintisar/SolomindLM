@@ -10,9 +10,9 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <section className="relative overflow-hidden px-6 pt-32 pb-20 lg:pt-36 lg:pb-28">
       <div aria-hidden className="landing-paper pointer-events-none absolute inset-0" />
-      <div className="relative mx-auto grid max-w-300 items-start gap-14 lg:grid-cols-12 lg:gap-10">
+      <div className="relative mx-auto grid max-w-300 grid-cols-1 items-start gap-14 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-5 lg:pt-8">
-          <h1 className="font-display text-4xl leading-tight font-bold tracking-tight sm:text-5xl xl:text-hero">
+          <h1 className="font-display text-4xl leading-tight font-bold tracking-tight text-balance sm:text-5xl xl:text-hero">
             AI that makes you think,{" "}
             <span className="lg:block">
               <Accent>not thinks for you.</Accent>

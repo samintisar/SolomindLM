@@ -81,7 +81,7 @@ export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
           </Tabs>
           <Badge variant="success">Save 50%</Badge>
         </Reveal>
-        <Reveal className="mx-auto mt-10 grid max-w-215 gap-6 md:grid-cols-2">
+        <Reveal className="mx-auto mt-10 grid max-w-215 grid-cols-1 gap-6 md:grid-cols-2">
           {PLANS.map((plan) => (
             <PlanCard key={plan.id} plan={plan} billing={billing} onGetStarted={onGetStarted} />
           ))}

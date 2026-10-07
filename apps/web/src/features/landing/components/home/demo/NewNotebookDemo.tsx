@@ -4,7 +4,7 @@ import { DemoSurface } from "./DemoSurface";
 /** Closing section: the brand-new notebook the visitor is about to make, over two ghost cards. */
 export function NewNotebookDemo() {
   return (
-    <div aria-hidden className="relative mx-auto h-96 w-full max-w-90 lg:mx-0">
+    <div aria-hidden inert className="relative mx-auto h-96 w-full max-w-90 lg:mx-0">
       <div className="absolute top-0 left-16 hidden h-75 w-82 rotate-6 rounded-3xl bg-card opacity-55 shadow-md ring-1 ring-hairline sm:block" />
       <div className="absolute top-3.5 left-10 hidden h-75 w-82 rotate-3 rounded-3xl bg-card opacity-80 shadow-md ring-1 ring-hairline sm:block" />
       <DemoSurface

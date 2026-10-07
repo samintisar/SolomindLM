@@ -45,7 +45,8 @@ export function LandingNav({ onGetStarted, onLogin }: LandingNavProps) {
       <div className="mx-auto flex h-18 max-w-300 items-center justify-between gap-4 px-6">
         <Link to="/" className="flex items-center gap-2.5 font-display text-lg font-bold">
           <img src="/SolomindLM_logo.png" alt="" className="size-8 object-contain" />
-          SolomindLM
+          {/* Logo only on small phones, so the nav fits beside Get started; still read out. */}
+          <span className="max-sm:sr-only">SolomindLM</span>
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
@@ -67,7 +68,7 @@ export function LandingNav({ onGetStarted, onLogin }: LandingNavProps) {
                 <Menu />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" theme="light">
+            <SheetContent side="right" theme="light" aria-describedby={undefined}>
               <SheetHeader>
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>

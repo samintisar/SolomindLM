@@ -12,6 +12,7 @@ function ReadVisual() {
   return (
     <div
       aria-hidden
+      inert
       className="relative flex flex-col gap-4 md:mx-auto md:block md:h-134 md:max-w-125"
     >
       <AnswerDemo className="md:absolute md:top-0 md:left-0 md:w-80" />
@@ -24,6 +25,7 @@ function PractiseVisual() {
   return (
     <div
       aria-hidden
+      inert
       className="relative flex flex-col gap-4 md:mx-auto md:block md:h-160 md:max-w-125"
     >
       <FlashcardDemo className="md:absolute md:top-0 md:left-0 md:w-64 md:-rotate-2" />
@@ -38,6 +40,7 @@ function DeeperVisual() {
   return (
     <div
       aria-hidden
+      inert
       className="relative flex flex-col gap-4 md:mx-auto md:block md:h-122 md:max-w-125"
     >
       <LiteratureTableDemo className="md:absolute md:top-0 md:left-0 md:w-full" />

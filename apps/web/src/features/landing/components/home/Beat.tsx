@@ -17,7 +17,7 @@ interface BeatProps {
 /** One "How it works" row: copy beside a product picture that sits on its own soft stage. */
 export function Beat({ number, label, title, body, points, visual, flip = false }: BeatProps) {
   return (
-    <div className="grid items-center gap-10 py-14 md:py-20 lg:grid-cols-12 lg:gap-16">
+    <div className="grid grid-cols-1 items-center gap-10 py-14 md:py-20 lg:grid-cols-12 lg:gap-16">
       <Reveal className={cn("lg:col-span-5", flip && "lg:order-2")}>
         <p className="flex items-center gap-2.5 font-sans text-sm font-semibold text-primary">
           <span className="grid size-7 place-items-center rounded-lg bg-primary text-xs text-primary-foreground">

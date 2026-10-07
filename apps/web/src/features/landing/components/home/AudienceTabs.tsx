@@ -12,6 +12,7 @@ function SampleNotebook({ notebook }: { notebook: Audience["notebook"] }) {
   return (
     <DemoSurface
       aria-hidden
+      inert
       elevation="floating"
       className="mx-auto w-full max-w-90 overflow-hidden"
     >
@@ -44,7 +45,7 @@ function SampleNotebook({ notebook }: { notebook: Audience["notebook"] }) {
 function AudiencePanel({ audience }: { audience: Audience }) {
   return (
     <Card variant="flush">
-      <div className="grid gap-10 p-6 md:p-12 lg:grid-cols-2 lg:items-center lg:gap-16">
+      <div className="grid grid-cols-1 gap-10 p-6 md:p-12 lg:grid-cols-2 lg:items-center lg:gap-16">
         <div>
           <h3 className="font-display text-3xl leading-tight font-bold tracking-tight">
             {audience.heading}
@@ -95,8 +96,11 @@ export function AudienceTabs() {
         />
         <Reveal>
           <Tabs defaultValue={AUDIENCES[0].id} className="mt-8 items-center">
-            <div className="max-w-full overflow-x-auto">
-              <TabsList aria-label="Audience">
+            <div className="w-full sm:w-auto">
+              <TabsList
+                aria-label="Audience"
+                className="max-sm:grid max-sm:w-full max-sm:grid-cols-2 max-sm:group-data-[orientation=horizontal]/tabs:h-auto"
+              >
                 {AUDIENCES.map((audience) => (
                   <TabsTrigger key={audience.id} value={audience.id}>
                     {audience.tab}

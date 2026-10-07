@@ -130,7 +130,10 @@ function SourcesColumn({ className }: { className?: string }) {
   );
 }
 
-/** The chat column with the citation tooltip open under [1]. Also the phone hero on its own. */
+/**
+ * The chat column with the citation tooltip open under [1] (anchored at [1] from md up; in the flow
+ * below the answer on phones). Also the phone hero on its own.
+ */
 export function ChatColumn({ className }: { className?: string }) {
   return (
     <div className={cn("chat-panel-graph-grid flex flex-col p-4", className)}>
@@ -149,19 +152,21 @@ export function ChatColumn({ className }: { className?: string }) {
           <span className="relative">
             <CitationChip n={1} active />
             <CitationTooltip
-              className="absolute top-full -left-24 z-10 mt-2.5 md:left-auto md:-right-3"
-              arrowClassName="left-26.5 md:left-auto md:right-4"
+              className="absolute top-full -right-3 z-10 mt-2.5 max-md:hidden"
+              arrowClassName="left-auto right-4"
             />
           </span>
           .
         </div>
+        {/* Phones: the hover card sits in the flow under the answer, so nothing is clipped. */}
+        <CitationTooltip className="mt-3 w-full md:hidden" arrowClassName="hidden" />
         <p>
           Cardioselective agents like bisoprolol act mainly on β<sub>1</sub> receptors in the heart,
           so they carry less risk, but guidelines still advise caution <CitationChip n={2} />{" "}
           <CitationChip n={3} />.
         </p>
       </div>
-      <div className="mt-auto rounded-2xl bg-card p-3 shadow-lg ring-1 ring-hairline">
+      <div className="mt-4 rounded-2xl bg-card p-3 shadow-lg ring-1 ring-hairline md:mt-auto">
         <p className="font-serif text-sm text-muted-foreground">Ask about your sources…</p>
         <div className="mt-3 flex items-center justify-between">
           <span className="inline-flex items-center gap-1 rounded-lg bg-card px-2 py-1 font-sans text-xs font-semibold shadow-xs ring-1 ring-hairline">

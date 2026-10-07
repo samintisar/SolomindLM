@@ -1,4 +1,5 @@
 import { ArrowRight, Plus } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
@@ -12,10 +13,15 @@ import { LANDING_FAQS } from "../../faqRegistry";
 import { Reveal } from "./Reveal";
 import { Accent, SectionHeading } from "./SectionHeading";
 
+/**
+ * One question. Closed answers stay in the HTML (forceMount + the hidden attribute), as the FAQ
+ * structured data lists every answer and find-in-page should reach them.
+ */
 function FaqRow({ faq, defaultOpen }: { faq: FAQItem; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <Card variant="flush">
-      <Collapsible defaultOpen={defaultOpen}>
+      <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="disclosure" size="chip" className="group/faq w-full justify-between">
             {faq.question}
@@ -25,7 +31,7 @@ function FaqRow({ faq, defaultOpen }: { faq: FAQItem; defaultOpen: boolean }) {
             />
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent>
+        <CollapsibleContent forceMount hidden={!open}>
           <p className="px-4 pt-1 pb-5 font-serif text-base leading-relaxed text-foreground/75">
             {faq.answer}
           </p>
@@ -39,7 +45,7 @@ function FaqRow({ faq, defaultOpen }: { faq: FAQItem; defaultOpen: boolean }) {
 export function FaqSection() {
   return (
     <section id="faq" aria-labelledby="faq-title" className="scroll-mt-20 px-6 py-16 md:py-24">
-      <div className="mx-auto grid max-w-280 gap-10 lg:grid-cols-12 lg:gap-20">
+      <div className="mx-auto grid max-w-280 grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-20">
         <div className="lg:col-span-4">
           <SectionHeading
             id="faq-title"

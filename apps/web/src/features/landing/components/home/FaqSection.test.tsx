@@ -20,7 +20,7 @@ describe("FaqSection", () => {
       expect(screen.getByRole("button", { name: faq.question })).toBeInTheDocument();
     }
     expect(screen.getByText(LANDING_FAQS[0].answer)).toBeVisible();
-    expect(screen.queryByText(LANDING_FAQS[1].answer)).not.toBeInTheDocument();
+    expect(screen.getByText(LANDING_FAQS[1].answer)).not.toBeVisible();
   });
 
   it("opens and closes a question", async () => {
@@ -30,7 +30,7 @@ describe("FaqSection", () => {
     expect(screen.getByText(LANDING_FAQS[1].answer)).toBeVisible();
     expect(second).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(second);
-    expect(screen.queryByText(LANDING_FAQS[1].answer)).not.toBeInTheDocument();
+    expect(screen.getByText(LANDING_FAQS[1].answer)).not.toBeVisible();
   });
 
   it("links to support and to the full FAQ", () => {

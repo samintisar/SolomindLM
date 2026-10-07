@@ -7,7 +7,7 @@ import { Accent, SectionHeading } from "./SectionHeading";
 export function FirstNotebookCta({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <section aria-labelledby="cta-title" className="px-6 pt-8 pb-28 md:pb-32">
-      <div className="mx-auto grid max-w-280 items-center gap-14 lg:grid-cols-12 lg:gap-20">
+      <div className="mx-auto grid max-w-280 grid-cols-1 items-center gap-14 lg:grid-cols-12 lg:gap-20">
         <div className="lg:col-span-7">
           <SectionHeading
             id="cta-title"
