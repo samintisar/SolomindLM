@@ -310,6 +310,7 @@ import type * as eval_studioEvalTelemetry from "../eval/studioEvalTelemetry.js";
 import type * as feedback_github from "../feedback/github.js";
 import type * as feedback_index from "../feedback/index.js";
 import type * as folders_index from "../folders/index.js";
+import type * as freeTools_claimDeck from "../freeTools/claimDeck.js";
 import type * as freeTools_clientIp from "../freeTools/clientIp.js";
 import type * as freeTools_deck from "../freeTools/deck.js";
 import type * as freeTools_flashcards from "../freeTools/flashcards.js";
@@ -715,6 +716,7 @@ declare const fullApi: ApiFromModules<{
   "feedback/github": typeof feedback_github;
   "feedback/index": typeof feedback_index;
   "folders/index": typeof folders_index;
+  "freeTools/claimDeck": typeof freeTools_claimDeck;
   "freeTools/clientIp": typeof freeTools_clientIp;
   "freeTools/deck": typeof freeTools_deck;
   "freeTools/flashcards": typeof freeTools_flashcards;
