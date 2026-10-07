@@ -9,10 +9,19 @@ interface LinkCardProps {
   description: string;
   icon?: LucideIcon;
   tone?: Tone;
+  /** The title's heading level: h3 by default, h4 when the cards sit under an h3 group heading. */
+  headingLevel?: "h3" | "h4";
 }
 
 /** A card that is one link: hub tools, related pages and guides. The inner link carries the focus ring. */
-export function LinkCard({ to, title, description, icon: Icon, tone }: LinkCardProps) {
+export function LinkCard({
+  to,
+  title,
+  description,
+  icon: Icon,
+  tone,
+  headingLevel: Heading = "h3",
+}: LinkCardProps) {
   return (
     <Card variant="interactive" className="h-full">
       <Link
@@ -24,7 +33,7 @@ export function LinkCard({ to, title, description, icon: Icon, tone }: LinkCardP
             <Icon className="size-4.5" />
           </span>
         ) : null}
-        <h3 className="font-sans text-base font-semibold">{title}</h3>
+        <Heading className="font-sans text-base font-semibold">{title}</Heading>
         <p className="flex-1 font-sans text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>

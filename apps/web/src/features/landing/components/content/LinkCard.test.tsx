@@ -28,4 +28,19 @@ describe("LinkCard", () => {
     expect(icon).toHaveAttribute("aria-hidden", "true");
     expect(icon?.querySelector("svg")).not.toBeNull();
   });
+
+  it("renders the title at the requested heading level", () => {
+    render(
+      <MemoryRouter>
+        <LinkCard
+          to="/ai-quizzes"
+          title="Quizzes"
+          description="Multiple choice."
+          headingLevel="h4"
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("heading", { level: 4, name: "Quizzes" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+  });
 });
