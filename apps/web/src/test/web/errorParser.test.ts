@@ -1,9 +1,11 @@
+import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import {
   getLimitErrorMessage,
   getServiceErrorMessage,
   getUpgradeMessage,
   isLimitError,
+  isUpgradeableLimit,
   parseAppError,
   parseLimitError,
   parseServiceError,
@@ -395,7 +397,7 @@ describe("getUpgradeMessage", () => {
       feature: "audio",
       isPro: false,
     });
-    expect(msg).toContain("100 audio overviews/day");
+    expect(msg).toContain("20 audio overviews/day");
   });
 
   it("returns daily pro limits for free daily limit (writtenQuestion)", () => {
@@ -434,7 +436,7 @@ describe("getUpgradeMessage", () => {
       feature: "infographic",
       isPro: false,
     });
-    expect(msg).toContain("100 infographics/day");
+    expect(msg).toContain("10 infographics/day");
   });
 
   it("returns generic upgrade message when feature is missing", () => {
@@ -677,5 +679,86 @@ describe("parseAppError", () => {
     const result = parseAppError(err);
     expect(result).not.toBeNull();
     expect("isLimitError" in result! && result!.isLimitError).toBe(true);
+  });
+});
+
+describe("plan, window, and run limits", () => {
+  it("parses a Pro-required ConvexError from the server", () => {
+    const err = new ConvexError({
+      code: "FEATURE_REQUIRES_PRO",
+      message: "Deep research is a Pro feature. Upgrade to Pro to use it.",
+      limit: 0,
+      current: 0,
+      limitType: "plan",
+      feature: "deepResearch",
+      isPro: false,
+    });
+    const parsed = parseLimitError(err);
+    expect(parsed).toMatchObject({ limitType: "plan", feature: "deepResearch", isPro: false });
+    expect(getLimitErrorMessage(parsed!)).toBe("Deep research is a Pro feature.");
+    expect(getUpgradeMessage(parsed!)).toBe("Upgrade to Pro to use it.");
+    expect(isUpgradeableLimit(parsed!)).toBe(true);
+  });
+
+  it("names the window of a weekly or 30-day limit", () => {
+    const err = new ConvexError({
+      code: "DAILY_LIMIT_REACHED",
+      message: "Weekly audio overview limit reached (3/3). Upgrade for higher limits.",
+      limit: 3,
+      current: 3,
+      limitType: "daily",
+      feature: "audio",
+      window: "week",
+      isPro: false,
+    });
+    const parsed = parseLimitError(err)!;
+    expect(getLimitErrorMessage(parsed)).toBe("Weekly audio overview limit reached (3/3).");
+
+    const review = parseLimitError(
+      new ConvexError({
+        code: "DAILY_LIMIT_REACHED",
+        message: "",
+        limit: 10,
+        current: 10,
+        limitType: "daily",
+        feature: "literatureReview",
+        window: "day",
+        isPro: true,
+      })
+    )!;
+    expect(getLimitErrorMessage(review)).toBe("Daily literature review limit reached (10/10).");
+    expect(getUpgradeMessage(review)).toContain("refreshes on a rolling day");
+  });
+
+  it("offers Pro's literature review allowance to a Free user", () => {
+    const msg = getUpgradeMessage({
+      isLimitError: true,
+      code: "DAILY_LIMIT_REACHED",
+      limit: 1,
+      current: 1,
+      limitType: "daily",
+      feature: "literatureReview",
+      window: "month",
+      isPro: false,
+    });
+    expect(msg).toBe("Upgrade for 10 literature reviews/day.");
+  });
+
+  it("shows the server's message and no upgrade for in-progress and retry caps", () => {
+    const parsed = parseLimitError(
+      new ConvexError({
+        code: "CONCURRENT_RUN_LIMIT_REACHED",
+        message:
+          "You already have 3 literature review runs in progress (limit 3). Wait for one to finish before starting another.",
+        limit: 3,
+        current: 3,
+        limitType: "concurrent",
+        feature: "literatureReview",
+        isPro: true,
+      })
+    )!;
+    expect(getLimitErrorMessage(parsed)).toContain("3 literature review runs in progress");
+    expect(getUpgradeMessage(parsed)).toBe("");
+    expect(isUpgradeableLimit(parsed)).toBe(false);
   });
 });

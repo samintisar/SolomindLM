@@ -3,24 +3,30 @@
  * Parses both new structured errors and legacy string-based errors.
  */
 
+import {
+  type DailyFeature,
+  type LimitType,
+  type LimitWindow,
+  PRO_FEATURE_LIMITS,
+} from "@convex/_lib/errors";
 import { ConvexError } from "convex/values";
-import type { DailyFeature } from "@/shared/types/index";
 
-/** Pro-tier daily caps (must match convex/_lib/rateLimits.ts getProLimit). */
-const PRO_DAILY_CAP: Record<DailyFeature, number> = {
-  chat: 500,
-  flashcard: 100,
-  quiz: 100,
-  report: 100,
-  audio: 100,
-  writtenQuestion: 100,
-  spreadsheet: 100,
-  infographic: 100,
-};
+const LIMIT_TYPES: readonly LimitType[] = [
+  "notebook",
+  "source",
+  "daily",
+  "plan",
+  "concurrent",
+  "retry",
+];
+
+function isLimitType(value: unknown): value is LimitType {
+  return LIMIT_TYPES.includes(value as LimitType);
+}
 
 function inferIsProFromDailyCap(feature: DailyFeature | undefined, limit: number): boolean {
   if (!feature) return false;
-  return PRO_DAILY_CAP[feature] === limit;
+  return PRO_FEATURE_LIMITS[feature]?.rate === limit;
 }
 
 function parseLimitFromConvexErrorData(error: unknown): ParsedLimitError | null {
@@ -33,7 +39,7 @@ function parseLimitFromConvexErrorData(error: unknown): ParsedLimitError | null 
     typeof o.code !== "string" ||
     typeof o.limit !== "number" ||
     typeof o.current !== "number" ||
-    (limitType !== "notebook" && limitType !== "source" && limitType !== "daily")
+    !isLimitType(limitType)
   ) {
     return null;
   }
@@ -44,6 +50,8 @@ function parseLimitFromConvexErrorData(error: unknown): ParsedLimitError | null 
     current: o.current,
     limitType,
     feature: o.feature as DailyFeature | undefined,
+    window: o.window as LimitWindow | undefined,
+    message: typeof o.message === "string" ? o.message : undefined,
     isPro: Boolean(o.isPro),
   };
 }
@@ -56,9 +64,18 @@ export interface ParsedLimitError {
   code: string;
   limit: number;
   current: number;
-  limitType: "notebook" | "source" | "daily";
+  limitType: LimitType;
   feature?: DailyFeature;
+  /** Usage window for "daily" limits; absent on errors from older servers (treated as a day). */
+  window?: LimitWindow;
+  /** The server's readable message, when it sent one. */
+  message?: string;
   isPro: boolean;
+}
+
+/** Limits that upgrading to Pro raises or removes. */
+export function isUpgradeableLimit(parsed: ParsedLimitError): boolean {
+  return parsed.limitType !== "concurrent" && parsed.limitType !== "retry";
 }
 
 /**
@@ -233,6 +250,9 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
     else if (lowerMessage.includes("written question")) feature = "writtenQuestion";
     else if (lowerMessage.includes("spreadsheet")) feature = "spreadsheet";
     else if (lowerMessage.includes("infographic")) feature = "infographic";
+    else if (lowerMessage.includes("mind map")) feature = "mindmap";
+    else if (lowerMessage.includes("literature review")) feature = "literatureReview";
+    else if (lowerMessage.includes("deep research")) feature = "deepResearch";
 
     const match = message.match(/(\d+)\/(\d+)/);
     if (match) {
@@ -253,6 +273,31 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
   return null;
 }
 
+const FEATURE_NAMES: Record<DailyFeature, { one: string; many: string }> = {
+  chat: { one: "chat message", many: "messages" },
+  flashcard: { one: "flashcard set", many: "flashcard sets" },
+  quiz: { one: "quiz", many: "quizzes" },
+  report: { one: "report", many: "reports" },
+  audio: { one: "audio overview", many: "audio overviews" },
+  writtenQuestion: { one: "written question set", many: "question sets" },
+  spreadsheet: { one: "spreadsheet", many: "spreadsheets" },
+  infographic: { one: "infographic", many: "infographics" },
+  sourceGuide: { one: "source guide", many: "source guides" },
+  mindmap: { one: "mind map", many: "mind maps" },
+  literatureReview: { one: "literature review", many: "literature reviews" },
+  deepResearch: { one: "deep research", many: "deep research runs" },
+};
+
+const WINDOW_LABELS: Record<LimitWindow, { adjective: string; per: string; rolling: string }> = {
+  day: { adjective: "Daily", per: "day", rolling: "rolling day" },
+  week: { adjective: "Weekly", per: "week", rolling: "rolling week" },
+  month: { adjective: "30-day", per: "30 days", rolling: "rolling 30 days" },
+};
+
+function capitalize(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
 /**
  * Get a user-friendly error message for a limit error
  */
@@ -267,19 +312,20 @@ export function getLimitErrorMessage(parsedError: ParsedLimitError): string {
     return `You've reached your source limit (${current}/${limit}).`;
   }
 
+  if (limitType === "plan") {
+    return feature
+      ? `${capitalize(FEATURE_NAMES[feature]?.one ?? feature)} is a Pro feature.`
+      : "This is a Pro feature.";
+  }
+
+  if (limitType === "concurrent" || limitType === "retry") {
+    return parsedError.message ?? `You've reached a limit (${current}/${limit}).`;
+  }
+
   if (limitType === "daily" && feature) {
-    const featureNames: Record<DailyFeature, string> = {
-      chat: "chat message",
-      flashcard: "flashcard set",
-      quiz: "quiz",
-      report: "report",
-      audio: "audio overview",
-      writtenQuestion: "written question set",
-      spreadsheet: "spreadsheet",
-      infographic: "infographic",
-    };
-    const featureName = featureNames[feature] || feature;
-    return `Daily ${featureName} limit reached (${current}/${limit}).`;
+    const featureName = FEATURE_NAMES[feature]?.one ?? feature;
+    const window = WINDOW_LABELS[parsedError.window ?? "day"];
+    return `${window.adjective} ${featureName} limit reached (${current}/${limit}).`;
   }
 
   return `You've reached a limit (${current}/${limit}).`;
@@ -291,11 +337,18 @@ export function getLimitErrorMessage(parsedError: ParsedLimitError): string {
 export function getUpgradeMessage(parsedError: ParsedLimitError): string {
   const { limitType, feature, isPro } = parsedError;
 
+  if (!isUpgradeableLimit(parsedError)) return "";
+
   if (isPro) {
     if (limitType === "daily") {
-      return "This limit refreshes on a rolling day—try again later, or contact support if you need a higher cap.";
+      const window = WINDOW_LABELS[parsedError.window ?? "day"];
+      return `This limit refreshes on a ${window.rolling}—try again later, or contact support if you need a higher cap.`;
     }
     return "Contact support to increase your limits.";
+  }
+
+  if (limitType === "plan") {
+    return "Upgrade to Pro to use it.";
   }
 
   if (limitType === "notebook") {
@@ -306,18 +359,9 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
     return "Upgrade to Pro for up to 200 sources per notebook, or remove a source from this notebook to add another.";
   }
 
-  if (limitType === "daily" && feature) {
-    const proLimits: Record<DailyFeature, string> = {
-      chat: "500 messages/day",
-      flashcard: "100 flashcard sets/day",
-      quiz: "100 quizzes/day",
-      report: "100 reports/day",
-      audio: "100 audio overviews/day",
-      writtenQuestion: "100 question sets/day",
-      spreadsheet: "100 spreadsheets/day",
-      infographic: "100 infographics/day",
-    };
-    return `Upgrade for ${proLimits[feature]}.`;
+  if (limitType === "daily" && feature && PRO_FEATURE_LIMITS[feature]) {
+    const pro = PRO_FEATURE_LIMITS[feature];
+    return `Upgrade for ${pro.rate} ${FEATURE_NAMES[feature].many}/${WINDOW_LABELS[pro.window].per}.`;
   }
 
   return "Upgrade to Pro for higher limits.";

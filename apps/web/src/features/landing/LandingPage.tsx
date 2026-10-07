@@ -4,14 +4,16 @@ import { AuthModal } from "@/features/auth/components/AuthModal";
 import { useAuth } from "@/features/auth/useAuth";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { isNativeShell } from "@/utils/platformDetection";
-import { ContentShowcase } from "./components/ContentShowcase";
-import { FAQSection } from "./components/FAQSection";
-import { FeaturesGrid } from "./components/FeaturesGrid";
 import { Footer } from "./components/Footer";
-import { HeroSection } from "./components/HeroSection";
-import { NavigationHeader } from "./components/NavigationHeader";
-import { PricingSection } from "./components/PricingSection";
-import { UseCasesSection } from "./components/UseCasesSection";
+import { AudienceTabs } from "./components/home/AudienceTabs";
+import { FaqSection } from "./components/home/FaqSection";
+import { FirstNotebookCta } from "./components/home/FirstNotebookCta";
+import { HeroSection } from "./components/home/HeroSection";
+import { HowItWorks } from "./components/home/HowItWorks";
+import { LandingNav } from "./components/home/LandingNav";
+import { PricingSection } from "./components/home/PricingSection";
+import { SourceStrip } from "./components/home/SourceStrip";
+import { StudioMarquee } from "./components/home/StudioMarquee";
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -24,7 +26,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
   if (isNativeShell()) {
     if (isLoading) {
-      return <div className="min-h-screen bg-[#FDFBF7]" />;
+      return <div className="auth-form-light min-h-screen bg-background" />;
     }
     return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
   }
@@ -32,15 +34,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
   return (
     <>
       <SEOMeta pagePath="/" />
-      <div className="min-h-screen landing-grid-pattern">
-        <NavigationHeader onGetStarted={onGetStarted} onLogin={() => setAuthModalOpen(true)} />
+      {/* Pinned light, like sign-in: the marketing pages don't follow the app theme. */}
+      <div className="auth-form-light min-h-screen bg-background font-serif text-foreground antialiased">
+        <LandingNav onGetStarted={onGetStarted} onLogin={() => setAuthModalOpen(true)} />
         <main>
           <HeroSection onGetStarted={onGetStarted} />
-          <FeaturesGrid />
-          <UseCasesSection />
-          <ContentShowcase />
+          <SourceStrip />
+          <HowItWorks />
+          <StudioMarquee />
+          <AudienceTabs />
           <PricingSection onGetStarted={onGetStarted} />
-          <FAQSection />
+          <FaqSection />
+          <FirstNotebookCta onGetStarted={onGetStarted} />
         </main>
         <Footer />
       </div>

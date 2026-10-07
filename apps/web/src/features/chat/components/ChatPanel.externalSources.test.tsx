@@ -68,6 +68,9 @@ vi.mock("react-virtuoso", () => ({
 vi.mock("../useChatStreaming", () => ({ useChatStreamingContext: () => chat }));
 vi.mock("../../sources/useSourcesContext", () => ({ useSourcesContext: () => ({ sources: [] }) }));
 vi.mock("@/features/auth/hooks/useHttpAuthToken", () => ({ useHttpAuthToken: () => null }));
+vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
+  useLimitErrorToast: () => ({ handleLimitError: async () => ({ isLimitError: false }) }),
+}));
 vi.mock("@/features/sources/components/AcademicDiscoveryFiltersSection", () => ({
   buildAcademicDiscoveryApiFilters: () => ({}),
 }));

@@ -4,6 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent } from "@/shared/components/ui/card";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { canOfferPurchases } from "@/utils/platformDetection";
+import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "../planFeatures";
 import {
   useCancelSubscription,
   useCreateCheckout,
@@ -15,28 +16,6 @@ import { PlanCard } from "./PlanCard";
 interface BillingPageProps {
   onBack: () => void;
 }
-
-const freeFeatures = [
-  "5 notebooks per account",
-  "20 sources per notebook",
-  "10 chat messages/day",
-  "2 flashcards/day",
-  "2 quizzes/day",
-  "2 reports/day",
-  "2 audio overviews/day",
-  "2 written questions/day",
-];
-
-const proFeatures = [
-  "200 notebooks per account",
-  "200 sources per notebook",
-  "500 chat messages/day",
-  "100 flashcards/day",
-  "100 quizzes/day",
-  "100 reports/day",
-  "100 audio overviews/day",
-  "100 written questions/day",
-];
 
 export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
   const status = useSubscriptionStatus();
@@ -180,7 +159,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   </h2>
                   <p className="text-sm text-muted-foreground mb-6">Your current plan</p>
                   <ul className="flex flex-col gap-3">
-                    {freeFeatures.map((feature) => (
+                    {FREE_PLAN_FEATURES.map((feature) => (
                       <li key={feature} className="flex items-start gap-3">
                         <Check
                           aria-hidden
@@ -202,7 +181,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   subtitle={status?.hasSubscription ? "Your previous plan" : "Get started today"}
                   price="$0"
                   featuresLabel="Included:"
-                  features={freeFeatures}
+                  features={FREE_PLAN_FEATURES}
                   action={
                     status?.hasSubscription ? (
                       <Button variant="outline" size="lg" onClick={onBack} className="w-full">
@@ -223,7 +202,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   badge="Save 50%"
                   highlighted
                   featuresLabel="Everything included:"
-                  features={proFeatures}
+                  features={PRO_PLAN_FEATURES}
                   action={
                     status?.hasSubscription && status.interval === "year" ? (
                       <Button variant="secondary" size="lg" disabled className="w-full">
@@ -248,7 +227,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   price="$15"
                   proChecks
                   featuresLabel="Everything included:"
-                  features={proFeatures}
+                  features={PRO_PLAN_FEATURES}
                   action={
                     status?.hasSubscription && status.interval === "month" ? (
                       <Button variant="secondary" size="lg" disabled className="w-full">
