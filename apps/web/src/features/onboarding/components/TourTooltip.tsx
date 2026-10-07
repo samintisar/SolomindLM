@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/shared/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/shared/components/ui/popover";
-import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { useOnboarding } from "../OnboardingContext";
 import { findStep, STEP_IDS, type StepDefinition, TOTAL_STEPS } from "../steps";
 
@@ -79,7 +79,7 @@ function logOnboardingError(action: string, error: unknown) {
 
 export const TourTooltip: React.FC = () => {
   const { tourStatus, currentStepId, skip } = useOnboarding();
-  const { showError } = useServiceErrorToast();
+  const { showError } = useErrorToast();
   const [rect, setRect] = useState<Rect | null>(null);
   const rafRef = useRef<number | null>(null);
   const spotlightMaskId = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");

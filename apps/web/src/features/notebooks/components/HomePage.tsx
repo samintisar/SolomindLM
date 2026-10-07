@@ -1,27 +1,12 @@
 import React, { useCallback, useState } from "react";
 import { useClaimPendingDeck } from "@/features/tools/hooks/useClaimPendingDeck";
 import { Tabs, TabsContent } from "@/shared/components/ui/tabs";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
-import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
-import { useCreateFolder } from "../services/foldersApi";
-import { useCreateNotebook } from "../services/notebooksApi";
+import { useNotebookDialogs, useNotebookSorting } from "../hooks";
 import { useNotebookContext } from "../useNotebookContext";
 import type { ViewMode } from "./home/CardGrid";
 import { HomeHeader, type HomeTab } from "./home/HomeHeader";
 import { CustomizeFolderModal, CustomizeNotebookModal, MoveToFolderModal } from "./modals";
 import { FeaturedSection, RecentSection } from "./views";
-
-interface NotebookCreateData {
-  title: string;
-  coverColor: string;
-  icon: string;
-}
-
-interface FolderCreateData {
-  name: string;
-  color: string;
-  icon: string;
-}
 
 export const HomePage: React.FC = () => {
   // OAuth sign-in from the free flashcard tool lands here: save the deck the visitor made.
@@ -31,10 +16,8 @@ export const HomePage: React.FC = () => {
   const recentNotebooks = ctx.recentNotebooks;
   const onSelectNotebook = ctx.selectNotebook;
   const onSelectFolder = ctx.selectFolder;
-  const onUpdateNotebook = ctx.updateNotebook;
   const onDeleteNotebook = ctx.deleteNotebook;
   const folders = ctx.folders;
-  const onUpdateFolder = ctx.updateFolder;
   const onDeleteFolder = ctx.deleteFolder;
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const onRequireAuth = ctx.onRequireAuth;
@@ -43,102 +26,24 @@ export const HomePage: React.FC = () => {
   const [tab, setTab] = useState<HomeTab>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
-  // Limit error handling
-  const { handleLimitError } = useLimitErrorToast();
-
-  // Custom hooks for state and handlers
-  const notebookHandlers = useNotebookHandlers({
-    notebooks: recentNotebooks,
-    onUpdateNotebook,
-    onDeleteNotebook,
-  });
-
-  const folderHandlers = useFolderHandlers({
-    onUpdateFolder,
-    onDeleteFolder,
-  });
+  const dialogs = useNotebookDialogs();
+  const { openCreateNotebook, openCreateFolder } = dialogs;
 
   const handleCreateNotebookClick = useCallback(() => {
     if (!isAuthenticated) {
       onRequireAuth("Sign in to create a notebook.");
       return;
     }
-    notebookHandlers.openCreateNotebook();
-  }, [isAuthenticated, onRequireAuth, notebookHandlers.openCreateNotebook]);
+    openCreateNotebook();
+  }, [isAuthenticated, onRequireAuth, openCreateNotebook]);
 
   const handleCreateFolderClick = useCallback(() => {
     if (!isAuthenticated) {
       onRequireAuth("Sign in to create a folder.");
       return;
     }
-    folderHandlers.openCreateFolder();
-  }, [isAuthenticated, onRequireAuth, folderHandlers.openCreateFolder]);
-
-  // Convex hooks for mutations
-  const createNotebookHook = useCreateNotebook();
-  const createFolderHook = useCreateFolder();
-
-  // Handlers for creating notebooks and folders via modal
-  const handleCreateNotebookFromModal = async (data: NotebookCreateData) => {
-    try {
-      await createNotebookHook({
-        title: data.title,
-        coverColor: data.coverColor,
-        icon: data.icon,
-      });
-      notebookHandlers.closeCustomize();
-      // Optimistic updates handle the UI update automatically
-    } catch (error) {
-      console.error("Failed to create notebook:", error);
-      const handled = await handleLimitError(error);
-
-      if (!handled.isLimitError) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-        if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
-          notebookHandlers.closeCustomize();
-          onRequireAuth("You need to sign in to create a notebook.");
-          return;
-        }
-        // Anything else is reported by the dialog.
-        throw error;
-      }
-    }
-  };
-
-  // Failures propagate to the dialog, which reports them and stays open for a retry.
-  const handleUpdateNotebookFromModal = async (id: string, data: NotebookCreateData) => {
-    await onUpdateNotebook(id, data);
-    notebookHandlers.closeCustomize();
-  };
-
-  const handleCreateFolderFromModal = async (data: FolderCreateData) => {
-    try {
-      await createFolderHook({
-        name: data.name,
-        color: data.color,
-        icon: data.icon,
-      });
-      folderHandlers.closeFolderCustomize();
-      // Optimistic updates handle the UI update automatically
-    } catch (error) {
-      console.error("Failed to create folder:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-      if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
-        folderHandlers.closeFolderCustomize();
-        onRequireAuth("You need to sign in to create a folder.");
-        return;
-      }
-      // Anything else is reported by the dialog.
-      throw error;
-    }
-  };
-
-  const handleUpdateFolderFromModal = async (id: string, data: FolderCreateData) => {
-    await onUpdateFolder(id, data);
-    folderHandlers.closeFolderCustomize();
-  };
+    openCreateFolder();
+  }, [isAuthenticated, onRequireAuth, openCreateFolder]);
 
   const { sortOption, setSortOption, getSortedNotebooks } = useNotebookSorting();
 
@@ -148,7 +53,7 @@ export const HomePage: React.FC = () => {
 
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
     onMoveNotebookToFolder(notebookId, folderId);
-    notebookHandlers.closeMoveToFolder();
+    dialogs.closeMoveToFolder();
   };
 
   const featuredSection = (
@@ -170,10 +75,10 @@ export const HomePage: React.FC = () => {
       onCreateNotebook={handleCreateNotebookClick}
       onSelectNotebook={onSelectNotebook}
       onSelectFolder={onSelectFolder}
-      onOpenCustomize={notebookHandlers.openCustomize}
-      onOpenMoveToFolder={notebookHandlers.openMoveToFolder}
+      onOpenCustomize={dialogs.openCustomize}
+      onOpenMoveToFolder={dialogs.openMoveToFolder}
       onDeleteNotebook={onDeleteNotebook}
-      onOpenFolderCustomize={folderHandlers.openFolderCustomize}
+      onOpenFolderCustomize={dialogs.openFolderCustomize}
       onDeleteFolder={onDeleteFolder}
     />
   );
@@ -204,52 +109,40 @@ export const HomePage: React.FC = () => {
       </div>
 
       {/* CUSTOMIZE NOTEBOOK MODAL */}
-      {(notebookHandlers.customizingId || notebookHandlers.isCreatingNotebook) && (
+      {(dialogs.customizingId || dialogs.isCreatingNotebook) && (
         <CustomizeNotebookModal
           notebook={
-            notebookHandlers.isCreatingNotebook
+            dialogs.isCreatingNotebook
               ? undefined
               : [...featuredNotebooks, ...recentNotebooks].find(
-                  (n) => n.id === notebookHandlers.customizingId
+                  (n) => n.id === dialogs.customizingId
                 )
           }
-          onClose={notebookHandlers.closeCustomize}
-          onSave={async (data) => {
-            if (notebookHandlers.isCreatingNotebook) {
-              await handleCreateNotebookFromModal(data);
-            } else {
-              await handleUpdateNotebookFromModal(notebookHandlers.customizingId!, data);
-            }
-          }}
+          onClose={dialogs.closeCustomize}
+          onSave={dialogs.saveNotebook}
         />
       )}
 
       {/* MOVE TO FOLDER MODAL */}
-      {notebookHandlers.movingNotebookId && (
+      {dialogs.movingNotebookId && (
         <MoveToFolderModal
-          notebookId={notebookHandlers.movingNotebookId}
+          notebookId={dialogs.movingNotebookId}
           folders={folders}
-          onClose={notebookHandlers.closeMoveToFolder}
+          onClose={dialogs.closeMoveToFolder}
           onMove={handleMoveNotebook}
         />
       )}
 
       {/* FOLDER CUSTOMIZE MODAL */}
-      {(folderHandlers.folderCustomizingId || folderHandlers.isCreatingFolder) && (
+      {(dialogs.folderCustomizingId || dialogs.isCreatingFolder) && (
         <CustomizeFolderModal
           folder={
-            folderHandlers.isCreatingFolder
+            dialogs.isCreatingFolder
               ? undefined
-              : folders.find((f) => f.id === folderHandlers.folderCustomizingId)
+              : folders.find((f) => f.id === dialogs.folderCustomizingId)
           }
-          onClose={folderHandlers.closeFolderCustomize}
-          onSave={async (data) => {
-            if (folderHandlers.isCreatingFolder) {
-              await handleCreateFolderFromModal(data);
-            } else {
-              await handleUpdateFolderFromModal(folderHandlers.folderCustomizingId!, data);
-            }
-          }}
+          onClose={dialogs.closeFolderCustomize}
+          onSave={dialogs.saveFolder}
         />
       )}
     </div>

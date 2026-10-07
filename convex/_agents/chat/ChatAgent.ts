@@ -10,7 +10,6 @@ import type { ServiceLogger } from "../../_lib/logging/serviceLogger";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel";
 import { EmbeddingService } from "../../_services/ai/embeddingClient";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { countTokens } from "../_shared/tokenizer";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
@@ -37,7 +36,13 @@ import {
 } from "./chunkContext.js";
 import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
 import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
-import type { ChatAgentContext, ChatAgentOptions, GlobalRerankFn, StreamChunk } from "./types.js";
+import type {
+  ChatAgentContext,
+  ChatAgentOptions,
+  GlobalRerankFn,
+  ReferenceChunk,
+  StreamChunk,
+} from "./types.js";
 import { VectorSearchHandler } from "./vector_search.js";
 import { withTimeout } from "./withTimeout.js";
 

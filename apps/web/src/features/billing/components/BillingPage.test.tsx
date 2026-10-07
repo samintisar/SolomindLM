@@ -15,6 +15,10 @@ vi.mock("../services/subscriptionApi", () => ({
   useCancelSubscription: () => vi.fn(),
 }));
 
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: vi.fn() }),
+}));
+
 vi.mock("@/shared/ui/useConfirmDialog", () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), ConfirmDialogComponent: () => null }),
 }));

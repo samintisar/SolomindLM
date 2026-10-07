@@ -25,7 +25,6 @@ export const flashcardGeneration = internalAction({
     smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFlashcardGenerationPhase(ctx, args);
   },
 });
@@ -45,7 +44,6 @@ export const processFlashcardMapChunk = internalAction({
     smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessFlashcardMapChunkPhase(ctx, args);
   },
 });
@@ -61,7 +59,6 @@ export const finalizeFlashcardPhase = internalAction({
     smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeFlashcardPhase(ctx, args);
   },
 });

@@ -2,7 +2,6 @@ import type { Doc } from "@convex/_generated/dataModel";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { ToastProvider } from "@/shared/contexts/ToastContext";
 import type { Message } from "@/shared/types/index";
 import type { useChatStreamingContext } from "../useChatStreaming";
 import { ChatPanel } from "./ChatPanel";
@@ -32,13 +31,16 @@ const chat = {
   onRenameConversation: vi.fn(),
   onDeleteConversation: vi.fn(),
   consumeResearchExecuteStream: vi.fn(),
-} satisfies Partial<ReturnType<typeof useChatStreamingContext>>;
+} satisfies Partial<ReturnType<typeof useChatStreamingContext>> & { messages: Message[] };
 
-vi.mock("../useChatStreaming", () => ({ useChatStreamingContext: () => chat }));
+vi.mock("../useChatStreaming", () => ({
+  useChatStreamingContext: () => chat,
+  useChatMessages: () => chat.messages,
+}));
 vi.mock("../../sources/useSourcesContext", () => ({ useSourcesContext: () => ({ sources: [] }) }));
 vi.mock("@/features/auth/hooks/useHttpAuthToken", () => ({ useHttpAuthToken: () => null }));
-vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
-  useLimitErrorToast: () => ({ handleLimitError: async () => ({ isLimitError: false }) }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ handleLimitError: async () => ({ isLimitError: false }) }),
 }));
 vi.mock("@/features/sources/components/AcademicDiscoveryFiltersSection", () => ({
   buildAcademicDiscoveryApiFilters: () => ({}),
@@ -70,15 +72,13 @@ vi.mock("./LiteratureReviewMessage", () => ({ LiteratureReviewMessage: () => nul
 
 function setup() {
   render(
-    <ToastProvider>
-      <ChatPanel
-        isLeftOpen={false}
-        isRightOpen={false}
-        toggleLeft={vi.fn()}
-        toggleRight={vi.fn()}
-        notebookId={"n1" as never}
-      />
-    </ToastProvider>
+    <ChatPanel
+      isLeftOpen={false}
+      isRightOpen={false}
+      toggleLeft={vi.fn()}
+      toggleRight={vi.fn()}
+      notebookId={"n1" as never}
+    />
   );
 }
 

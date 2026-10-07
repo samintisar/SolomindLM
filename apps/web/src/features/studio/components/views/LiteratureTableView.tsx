@@ -42,6 +42,7 @@ import {
 } from "@/shared/components/ui/table";
 import { useToast } from "@/shared/contexts/useToast";
 import { cn } from "@/shared/utils/cn";
+import { downloadFile } from "@/shared/utils/download";
 import type { TablePaperRow } from "../../utils/literatureTablePaper";
 import {
   citationToRankedPaper,
@@ -97,15 +98,7 @@ function exportToCSV(table: LiteratureTable, filename: string) {
     ...rows.map((row) => row.map(escapeCSV).join(",")),
   ].join("\n");
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadFile(csvContent, filename, "text/csv;charset=utf-8;");
 }
 
 function exportToExcel(table: LiteratureTable, filename: string) {

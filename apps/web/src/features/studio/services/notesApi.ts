@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "convex/react";
+import { useMemo } from "react";
 import type { Note } from "@/shared/types/index";
 import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
@@ -64,6 +65,8 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
           cardCount,
           topic: dbNote.metadata?.topic,
           error: dbNote.metadata?.error,
+          lastViewedIndex: dbNote.metadata?.lastViewedIndex,
+          showMastered: dbNote.metadata?.showMastered,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
@@ -77,12 +80,14 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         preview: getQuizPreview(dbNote),
         type: "quiz",
         questions: dbNote.questionsData || [],
+        userAnswers: dbNote.metadata?.userAnswers || {},
         status: dbNote.status,
         metadata: {
           questionCount,
           difficulty: dbNote.metadata?.difficulty || "medium",
           focusArea: dbNote.metadata?.focusArea,
           error: dbNote.metadata?.error,
+          lastViewedIndex: dbNote.metadata?.lastViewedIndex,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
@@ -168,6 +173,7 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         preview: getWrittenQuestionsPreview(dbNote),
         type: "writtenQuestions",
         questions: dbNote.questionsData || [],
+        userAnswers: dbNote.metadata?.userAnswers || {},
         status: dbNote.status,
         metadata: {
           questionCount,
@@ -176,6 +182,7 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
           focusArea: dbNote.metadata?.focusArea,
           totalPoints: dbNote.metadata?.totalPoints,
           error: dbNote.metadata?.error,
+          lastViewedIndex: dbNote.metadata?.lastViewedIndex,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
@@ -312,18 +319,19 @@ export function useNotes(notebookId: string | null, types?: string[]): Note[] {
     notebookId ? { notebookId: notebookId as Id<"notebooks">, types } : "skip"
   );
 
-  // Map raw database notes to frontend Note interfaces
-  // No useMemo needed - useQuery already memoizes the result
-  return notes?.map(mapDatabaseNoteToNote) ?? [];
+  // Map once per query result so consumers get stable note objects between renders.
+  return useMemo(() => notes?.map(mapDatabaseNoteToNote) ?? [], [notes]);
 }
 
 /**
  * Load full studio note content when opening a saved item from the list.
+ * The note carries live progress too (answers, last viewed index), so views read it directly.
  */
 export function useNoteDetail(type: string | null, noteId: string | null) {
   const note = useQuery(api.notes.index.get, type && noteId ? { type, id: noteId as any } : "skip");
+  const mapped = useMemo(() => (note ? mapDatabaseNoteToNote(note) : null), [note]);
   return {
-    note: note ? mapDatabaseNoteToNote(note) : null,
+    note: mapped,
     isLoading: note === undefined && Boolean(type && noteId),
   };
 }

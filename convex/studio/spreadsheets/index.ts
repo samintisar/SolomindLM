@@ -131,47 +131,6 @@ export const remove = mutation({
   },
 });
 
-export const generateSpreadsheet = mutation({
-  args: {
-    notebookId: v.id("notebooks"),
-    documentIds: v.array(v.id("documents")),
-    title: v.optional(v.string()),
-    spreadsheetType: v.optional(v.string()),
-    customPrompt: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const { notebookId, documentIds, title, spreadsheetType, customPrompt } = args;
-    if (documentIds.length === 0) {
-      throw new Error(
-        "Please select at least one source. Content generation uses only your selected sources."
-      );
-    }
-    await assertCanEditNotebook(ctx, notebookId, userId);
-    const spreadsheetId = await Spreadsheets.createSpreadsheet(ctx, {
-      userId,
-      notebookId,
-      title: title || "Spreadsheet",
-      data: {},
-      metadata: {
-        spreadsheetType: spreadsheetType || "custom",
-        customPrompt: customPrompt || "",
-      },
-      status: "generating",
-    });
-    await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.spreadsheetGeneration, {
-      spreadsheetId,
-      userId,
-      notebookId,
-      documentIds,
-      spreadsheetType: spreadsheetType || "custom",
-      customPrompt: customPrompt || "",
-    });
-    return spreadsheetId;
-  },
-});
-
 export const deleteSpreadsheet = mutation({
   args: { spreadsheetId: v.id("spreadsheets") },
   handler: async (ctx, args) => {

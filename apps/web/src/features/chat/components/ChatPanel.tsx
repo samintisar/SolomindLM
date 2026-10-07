@@ -13,7 +13,7 @@ import {
   Settings2,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
 import {
   buildAcademicDiscoveryApiFilters,
@@ -33,14 +33,20 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
+import type {
+  ChatSettings,
+  ExternalSource,
+  Message,
+  Note,
+  ReferenceChunk,
+} from "@/shared/types/index";
 import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
-import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
+import { useAddToNotebook } from "../hooks/useAddToNotebook";
 import { useComposerClearance } from "../hooks/useComposerClearance";
 import { usePersistedComposerPrefs } from "../hooks/usePersistedComposerPrefs";
 import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
@@ -48,7 +54,7 @@ import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useLiteratureReviewSession } from "../services/literatureReviewApi";
 import { useApproveResearchPlan, useRejectResearchPlan } from "../services/researchApi";
 import { useSaveChat } from "../services/userNotesApi";
-import { useChatStreamingContext } from "../useChatStreaming";
+import { useChatMessages, useChatStreamingContext } from "../useChatStreaming";
 import { exportAsMarkdown } from "../utils/exportChat";
 import { selectedNotebookPaperIds } from "../utils/literatureReviewPapers";
 import { stripReferencesSection } from "../utils/messageRendering.utils";
@@ -63,7 +69,7 @@ import {
   type ChatComposerMode,
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
 } from "./composer/constants";
-import { type ExternalSource, ExternalSourcesModal } from "./ExternalSourcesModal";
+import { ExternalSourcesModal } from "./ExternalSourcesModal";
 import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
 import { MessageBubble } from "./MessageBubble";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
@@ -116,8 +122,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onOpenRankedPapers,
   onOpenScreeningDecisions,
 }) => {
+  const messages = useChatMessages();
   const {
-    messages,
     isChatStreaming: isLoading,
     remoteGenerationBlocksSend,
     onSendMessage,
@@ -203,7 +209,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [channelsForChatSend, chatAcademicFilters, composerMode, researchDatabase]);
 
   const { success, error: toastError } = useToast();
-  const { handleLimitError } = useLimitErrorToast();
+  const { handleLimitError } = useErrorToast();
   const saveChat = useSaveChat();
 
   const authToken = useHttpAuthToken();
@@ -230,7 +236,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const approvePlanMutation = useApproveResearchPlan();
   const rejectPlanMutation = useRejectResearchPlan();
-  const addExternalSourcesMutation = useAddExternalSources();
+  const addToNotebook = useAddToNotebook(notebookId);
   // One external-sources dialog for the whole panel (not one per message bubble). The sources
   // are kept while the dialog closes so its exit animation doesn't flash an empty list.
   const [externalSourcesFor, setExternalSourcesFor] = useState<ExternalSource[] | null>(null);
@@ -246,33 +252,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleAddExternalSources = useCallback(
     async (selectedSources: ExternalSource[]) => {
-      if (!notebookId) {
-        toastError("Couldn't add sources. Please try again.");
-        return;
-      }
       setIsAddingExternalSources(true);
-      try {
-        const ids = await addExternalSourcesMutation({
-          notebookId: notebookId as Id<"notebooks">,
-          sources: selectedSources.map((s) => ({
-            title: s.title,
-            url: s.url,
-            snippet: s.snippet,
-            sourceType: s.sourceType,
-          })),
-        });
-        // The mutation skips URLs already in the notebook, so ids can be shorter than the input.
-        const n = ids.length;
-        success(n === 0 ? "Already in this notebook" : `Added ${n} source${n === 1 ? "" : "s"}`);
-        setIsExternalSourcesOpen(false);
-      } catch (e) {
-        console.error("Failed to add external sources:", e);
-        toastError("Couldn't add sources. Please try again.");
-      } finally {
-        setIsAddingExternalSources(false);
-      }
+      const added = await addToNotebook(selectedSources, {
+        added: (n) => `Added ${n} source${n === 1 ? "" : "s"}`,
+        failed: "Couldn't add sources. Please try again.",
+      });
+      if (added) setIsExternalSourcesOpen(false);
+      setIsAddingExternalSources(false);
     },
-    [notebookId, addExternalSourcesMutation, success, toastError]
+    [addToNotebook]
   );
   const { startLiteratureReview, isStarting: isStartingLiteratureReview } =
     useStartLiteratureReview();
@@ -323,7 +311,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const waitingOnRemoteGeneration = remoteGenerationBlocksSend && !isLoading && !isSending;
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const virtuosoRef = useRef<any>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const messageScrollerRef = useRef<HTMLElement | null>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   useComposerClearance(messagesContainerRef, composerRef, messageScrollerRef);
@@ -429,27 +417,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const isExternal = !reference.documentId && !!sourceUrl;
       if (!isExternal || !notebookId) return undefined;
       return async () => {
-        try {
-          const ids = await addExternalSourcesMutation({
-            notebookId: notebookId as Id<"notebooks">,
-            sources: [
-              {
-                title: reference.sourceTitle,
-                url: sourceUrl,
-                snippet: reference.content.slice(0, 500),
-                sourceType: "web",
-              },
-            ],
-          });
-          // The mutation skips URLs already in the notebook.
-          success(ids.length === 0 ? "Already in this notebook" : "Added to notebook");
-        } catch (e) {
-          console.error("Failed to add external source:", e);
-          toastError("Couldn't add this source. Please try again.");
-        }
+        await addToNotebook(
+          [
+            {
+              title: reference.sourceTitle,
+              url: sourceUrl,
+              snippet: reference.content.slice(0, 500),
+              sourceType: "web",
+            },
+          ],
+          {
+            added: () => "Added to notebook",
+            failed: "Couldn't add this source. Please try again.",
+          }
+        );
       };
     },
-    [notebookId, addExternalSourcesMutation, success, toastError]
+    [notebookId, addToNotebook]
   );
 
   const citation = useCitationPopover({
@@ -653,8 +637,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     ]
   );
 
-  // Memoized bubbles compare callbacks by identity. `onRetry` is rebuilt on every streamed token
-  // and `handleSendChip` whenever send state changes, so bubbles get stable wrappers instead.
+  // Memoized bubbles compare callbacks by identity. `onRetry` and `handleSendChip` change whenever
+  // send state does, so bubbles get stable wrappers instead.
   const handleRetryStable = useStableCallback(onRetry);
   const handleSendFollowUp = useStableCallback(handleSendChip);
 
@@ -671,8 +655,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }, 100);
     }
   }, [messages.length]);
-
-  const memoizedMessages = useMemo(() => messages, [messages]);
 
   // Literature review session polling
   const literatureSession = useLiteratureReviewSession(activeLiteratureSessionId);
@@ -851,7 +833,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               <Virtuoso
                 ref={virtuosoRef}
                 className="h-full min-h-0 w-full min-w-0"
-                data={memoizedMessages}
+                data={messages}
                 itemContent={(_index, message) => (
                   <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
                     {message.researchPlan ? (
@@ -872,30 +854,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         onOpenScreeningDecisions={onOpenScreeningDecisions}
                       />
                     ) : (
-                      <>
-                        <MessageBubble
-                          message={message}
-                          isAssistantStreamActive={
-                            message.id === "__streaming__" ? isLoading : false
-                          }
-                          refHandlers={citation.handlers}
-                          onCopyMessage={copyMessageAsMarkdown}
-                          isCopied={copiedMessageId === message.id}
-                          onSetFeedback={onSetFeedback}
-                          onSendFollowUp={handleSendFollowUp}
-                          onRetry={handleRetryStable}
-                          externalSources={message.externalSources}
-                          onOpenExternalSources={handleOpenExternalSources}
-                          showSourcesButton={
-                            message.role === "assistant" &&
-                            !!message.externalSources &&
-                            message.externalSources.length > 0
-                          }
-                          notebookId={notebookId ?? undefined}
-                          onOpenNotebookSource={onOpenNotebookSource}
-                          notebookDocumentIds={notebookDocumentIds}
-                        />
-                      </>
+                      <MessageBubble
+                        message={message}
+                        isAssistantStreamActive={message.id === "__streaming__" ? isLoading : false}
+                        refHandlers={citation.handlers}
+                        onCopyMessage={copyMessageAsMarkdown}
+                        isCopied={copiedMessageId === message.id}
+                        onSetFeedback={onSetFeedback}
+                        onSendFollowUp={handleSendFollowUp}
+                        onRetry={handleRetryStable}
+                        onOpenExternalSources={handleOpenExternalSources}
+                        notebookId={notebookId ?? undefined}
+                        onOpenNotebookSource={onOpenNotebookSource}
+                        notebookDocumentIds={notebookDocumentIds}
+                      />
                     )}
                   </div>
                 )}

@@ -23,7 +23,6 @@ export const spreadsheetGeneration = internalAction({
     customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runSpreadsheetGenerationPhase(ctx, args);
   },
 });
@@ -41,7 +40,6 @@ export const processSpreadsheetMapChunk = internalAction({
     sourceTitle: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessSpreadsheetMapChunkPhase(ctx, args);
   },
 });
@@ -55,7 +53,6 @@ export const finalizeSpreadsheetPhase = internalAction({
     customPrompt: v.string(),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeSpreadsheetPhase(ctx, args);
   },
 });

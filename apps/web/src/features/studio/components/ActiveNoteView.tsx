@@ -2,9 +2,15 @@ import { Loader2, Save, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { AudioPlayer } from "@/features/audio/components/AudioPlayer";
 import { Button } from "@/shared/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/shared/components/ui/empty";
 import type { ReportNote } from "@/shared/types/index";
 import {
-  isAudioNote,
   isAudioOverviewNote,
   isFlashcardNote,
   isInfographicNote,
@@ -16,6 +22,7 @@ import {
   isWrittenQuestionsNote,
   Note,
 } from "@/shared/types/index";
+import { studioErrorMessage } from "../utils/studioErrorMessage";
 import { FlashcardView } from "./views/FlashcardView";
 import type { InfographicViewControls } from "./views/InfographicView";
 import { InfographicView } from "./views/InfographicView";
@@ -75,8 +82,7 @@ const ReportMarkdownEditor: React.FC<ReportMarkdownEditorProps> = ({ note, onSav
 
 interface ActiveNoteViewProps {
   activeNote: Note;
-  onUpdateNoteFull?: (id: string, note: Note) => void;
-  isMobile: boolean;
+  /** Back to the note list; only the user-note view shows its own (mobile) back bar. */
   onBack: () => void;
   isEditingReportContent?: boolean;
   onSaveReportContent?: (reportId: string, content: string) => void | Promise<void>;
@@ -86,14 +92,33 @@ interface ActiveNoteViewProps {
   onAskInChat?: (prompt: string, documentIds?: string[]) => void;
 }
 
+/** A centred status screen (no audio file, failed, generating, unsupported). */
+function StatusScreen({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Empty className="h-full">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">{icon}</EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
 /**
  * ActiveNoteView component displays the currently active note.
  * Conditionally renders the appropriate view component based on note type.
  */
 export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
   activeNote,
-  onUpdateNoteFull,
-  isMobile,
   onBack,
   isEditingReportContent,
   onSaveReportContent,
@@ -113,64 +138,19 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         />
       );
     }
-    return <ReportView note={activeNote} onBack={undefined} />;
+    return <ReportView note={activeNote} />;
   }
 
-  // Flashcard view
   if (isFlashcardNote(activeNote)) {
-    return <FlashcardView note={activeNote} onBack={undefined} />;
+    return <FlashcardView note={activeNote} />;
   }
 
-  // Quiz view (no onBack on mobile - StudioPanelHeader provides single header)
   if (isQuizNote(activeNote)) {
-    return (
-      <QuizView
-        note={activeNote}
-        onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
-        onBack={undefined}
-      />
-    );
+    return <QuizView note={activeNote} />;
   }
 
-  // MindMap view
   if (isMindMapNote(activeNote)) {
-    return <MindMapView note={activeNote} onBack={undefined} onAskInChat={onAskInChat} />;
-  }
-
-  // Audio view
-  if (isAudioNote(activeNote)) {
-    // Completed state with audio player
-    if (activeNote.status === "completed" && activeNote.metadata.audioUrl) {
-      return (
-        <AudioPlayer
-          audioUrl={activeNote.metadata.audioUrl}
-          transcript={activeNote.content}
-          title={activeNote.title}
-          onBack={undefined}
-        />
-      );
-    }
-
-    // Failed state
-    if (activeNote.status === "failed") {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
-            <X className="w-6 h-6 text-destructive" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-destructive">Generation Failed</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {typeof activeNote.metadata.error === "object"
-                ? (activeNote.metadata.error as { message?: string }).message ||
-                  "An error occurred while generating the audio overview"
-                : activeNote.metadata.error ||
-                  "An error occurred while generating the audio overview"}
-            </p>
-          </div>
-        </div>
-      );
-    }
+    return <MindMapView note={activeNote} onAskInChat={onAskInChat} />;
   }
 
   // Studio audio overview (Convex audioOverviews — top-level audioUrl / transcript)
@@ -179,17 +159,11 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     if (activeNote.status === "completed") {
       if (!url) {
         return (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-4">
-            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-              <X className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">Audio unavailable</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                This overview finished without an audio file. Try generating it again.
-              </p>
-            </div>
-          </div>
+          <StatusScreen
+            icon={<X />}
+            title="Audio unavailable"
+            description="This overview finished without an audio file. Try generating it again."
+          />
         );
       }
       return (
@@ -204,86 +178,54 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
       );
     }
     if (activeNote.status === "failed") {
-      const metaErr = activeNote.metadata?.error;
-      const message =
-        typeof metaErr === "object" && metaErr !== null && "message" in metaErr
-          ? String((metaErr as { message?: unknown }).message ?? "")
-          : typeof metaErr === "string"
-            ? metaErr
-            : "";
       return (
-        <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
-            <X className="w-6 h-6 text-destructive" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-destructive">Generation Failed</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {message || "An error occurred while generating the audio overview"}
-            </p>
-          </div>
-        </div>
+        <StatusScreen
+          icon={<X className="text-destructive" />}
+          title="Generation Failed"
+          description={studioErrorMessage(
+            activeNote.metadata?.error,
+            "An error occurred while generating the audio overview"
+          )}
+        />
       );
     }
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-4">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold">Generating audio overview</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            This can take a few minutes. You can keep this notebook open; the player will appear
-            when it is ready.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Written questions view (no onBack on mobile - StudioPanelHeader provides single header)
-  if (isWrittenQuestionsNote(activeNote)) {
-    return (
-      <WrittenQuestionsView
-        note={activeNote}
-        onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
-        onBack={undefined}
+      <StatusScreen
+        icon={<Loader2 className="animate-spin text-primary" />}
+        title="Generating audio overview"
+        description="This can take a few minutes. You can keep this notebook open; the player will appear when it is ready."
       />
     );
   }
 
-  // Infographic view
+  if (isWrittenQuestionsNote(activeNote)) {
+    return <WrittenQuestionsView note={activeNote} />;
+  }
+
   if (isInfographicNote(activeNote)) {
     return (
       <InfographicView
         note={activeNote}
-        onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
         registerControls={registerInfographicControls}
         onFullscreenChange={onInfographicFullscreenChange}
       />
     );
   }
 
-  // Spreadsheet view (no onBack on mobile - StudioPanelHeader provides single header)
   if (isSpreadsheetNote(activeNote)) {
-    return <SpreadsheetView note={activeNote} onBack={undefined} />;
+    return <SpreadsheetView note={activeNote} />;
   }
 
   // User note view (saved chats and manual notes)
   if (isUserNote(activeNote)) {
-    return <UserNoteView note={activeNote} onBack={isMobile ? onBack : undefined} />;
+    return <UserNoteView note={activeNote} onBack={onBack} />;
   }
 
-  // Fallback for unknown note types
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-        <X className="w-6 h-6 text-muted-foreground" />
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold">Unknown Note Type</h3>
-        <p className="text-sm text-muted-foreground mt-1">This note type is not supported yet.</p>
-      </div>
-    </div>
+    <StatusScreen
+      icon={<X />}
+      title="Unknown Note Type"
+      description="This note type is not supported yet."
+    />
   );
 };

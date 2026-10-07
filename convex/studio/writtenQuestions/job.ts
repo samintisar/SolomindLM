@@ -25,7 +25,6 @@ export const writtenQuestionsGeneration = internalAction({
     focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runWrittenQuestionsGenerationPhase(ctx, args);
   },
 });
@@ -45,7 +44,6 @@ export const processWrittenQuestionsMapChunk = internalAction({
     focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessWrittenQuestionsMapChunkPhase(ctx, args);
   },
 });
@@ -61,7 +59,6 @@ export const finalizeWrittenQuestionsPhase = internalAction({
     focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeWrittenQuestionsPhase(ctx, args);
   },
 });

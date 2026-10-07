@@ -10,7 +10,6 @@ import {
   canReadNotebook,
   getNotebookAccess,
   getNotebookMember,
-  isNotebookOwner,
 } from "./notebookAccess";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -286,21 +285,5 @@ describe("assertNotebookOwner", () => {
     await expect(
       t.run(async (ctx) => assertNotebookOwner(ctx, "non-existent" as Id<"notebooks">, userId))
     ).rejects.toThrow("Notebook not found");
-  });
-});
-
-describe("isNotebookOwner", () => {
-  test("returns true when userId matches notebook owner", () => {
-    const notebook = { userId: "user-123" } as unknown as {
-      userId: Id<"users">;
-    };
-    expect(isNotebookOwner(notebook, "user-123" as Id<"users">)).toBe(true);
-  });
-
-  test("returns false when userId does not match", () => {
-    const notebook = { userId: "user-123" } as unknown as {
-      userId: Id<"users">;
-    };
-    expect(isNotebookOwner(notebook, "user-456" as Id<"users">)).toBe(false);
   });
 });

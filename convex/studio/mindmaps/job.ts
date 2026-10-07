@@ -22,7 +22,6 @@ export const mindmapGeneration = internalAction({
     customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runMindmapGenerationPhase(ctx, args);
   },
 });
@@ -38,7 +37,6 @@ export const processMindMapMapChunk = internalAction({
     customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessMindMapMapChunkPhase(ctx, args);
   },
 });
@@ -51,7 +49,6 @@ export const finalizeMindMapPhase = internalAction({
     customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeMindMapPhase(ctx, args);
   },
 });

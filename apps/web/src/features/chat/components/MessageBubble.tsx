@@ -1,9 +1,14 @@
 import React from "react";
-import type { ChatActivityPhase, Message } from "@/shared/types/index";
+import type {
+  AgentGroundingCheck,
+  ChatActivityPhase,
+  Message,
+  MessageToolCall,
+} from "@/shared/types/index";
 import { cn } from "@/shared/utils/cn";
-import { renderMessageWithReferences } from "../utils/messageRendering";
 import { AgentActivityPanel } from "./AgentActivityPanel";
 import { DeepResearchSourcesSection } from "./DeepResearchSourcesSection";
+import { MessageMarkdown } from "./MessageMarkdown";
 import { ActionBar } from "./message/ActionBar";
 import { areMessageBubblePropsEqual, type MessageBubbleProps } from "./message/bubbleProps";
 import { FollowUpChips } from "./message/FollowUpChips";
@@ -16,6 +21,10 @@ const PENDING_ROW_IDS = new Set(["__streaming__", "__remote_generating__"]);
 const FRESH_USER_MESSAGE_MS = 10_000;
 
 const ENTRANCE = "animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out";
+
+const NO_TOOL_CALLS: MessageToolCall[] = [];
+const NO_GROUNDING_CHECKS: AgentGroundingCheck[] = [];
+const NO_PHASES: Array<{ status: string; message: string }> = [];
 
 /**
  * Entrance animation, decided per render. tw-animate-css plays on mount (or when the class is
@@ -40,9 +49,7 @@ function MessageBubbleImpl({
   onSetFeedback,
   onSendFollowUp,
   onRetry,
-  externalSources,
   onOpenExternalSources,
-  showSourcesButton = false,
   notebookId,
   onOpenNotebookSource,
   notebookDocumentIds,
@@ -65,33 +72,24 @@ function MessageBubbleImpl({
         )}
         data-message-id={message.id}
       >
-        <div
-          className="min-w-0 max-w-prose rounded-2xl bg-secondary px-4 py-2.5 text-lg leading-relaxed text-secondary-foreground wrap-break-word"
-          data-quotable="message"
-          data-quotable-id={message.id}
-          data-quotable-title="Your message"
-        >
-          {renderMessageWithReferences(
-            message.id,
-            message.content,
-            message.references,
-            refHandlers,
-            {
-              isStreamingVisual,
-            }
-          )}
+        <div className="min-w-0 max-w-prose rounded-2xl bg-secondary px-4 py-2.5 text-lg leading-relaxed text-secondary-foreground wrap-break-word">
+          <MessageMarkdown
+            messageId={message.id}
+            content={message.content}
+            handlers={refHandlers}
+            streaming={isStreamingVisual}
+          />
         </div>
         <ActionBar copied={isCopied} onCopy={handleCopy} />
       </div>
     );
   }
 
-  const toolCalls = message.toolCalls ?? message.agentTrace?.toolCalls ?? [];
-  const groundingChecks = message.groundingChecks ?? message.agentTrace?.grounding ?? [];
-  const activityPhases = message.agentTrace?.phases ?? [];
-  const tracePhases = message.agentTrace?.phases;
-  const lastTracePhase =
-    tracePhases && tracePhases.length > 0 ? tracePhases[tracePhases.length - 1] : undefined;
+  const toolCalls = message.toolCalls ?? message.agentTrace?.toolCalls ?? NO_TOOL_CALLS;
+  const groundingChecks =
+    message.groundingChecks ?? message.agentTrace?.grounding ?? NO_GROUNDING_CHECKS;
+  const activityPhases = message.agentTrace?.phases ?? NO_PHASES;
+  const lastTracePhase = activityPhases.at(-1);
   const rawHistoricalPhase = (lastTracePhase?.status as ChatActivityPhase) ?? null;
   const rawHistoricalDetail = lastTracePhase?.message ?? null;
   /** Older saves ended phases on "generating"; panel would show spinner + "Generating response…" with full content below. */
@@ -112,7 +110,8 @@ function MessageBubbleImpl({
     !!message.agentTrace;
 
   const canRetry = !!onRetry && !PENDING_ROW_IDS.has(message.id);
-  const hasSourcesPill = showSourcesButton && !!externalSources && externalSources.length > 0;
+  const externalSources = message.externalSources;
+  const hasSourcesPill = !!externalSources && externalSources.length > 0;
 
   return (
     <div
@@ -140,21 +139,13 @@ function MessageBubbleImpl({
         />
       )}
       {message.content && (
-        <div
-          className="w-full min-w-0 max-w-4xl text-lg leading-relaxed text-foreground"
-          data-quotable="message"
-          data-quotable-id={message.id}
-          data-quotable-title="AI Response"
-        >
-          {renderMessageWithReferences(
-            message.id,
-            message.content,
-            message.references,
-            refHandlers,
-            {
-              isStreamingVisual,
-            }
-          )}
+        <div className="w-full min-w-0 max-w-4xl text-lg leading-relaxed text-foreground">
+          <MessageMarkdown
+            messageId={message.id}
+            content={message.content}
+            handlers={refHandlers}
+            streaming={isStreamingVisual}
+          />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {hasSourcesPill ? (
               <SourcesPill sources={externalSources} onOpen={onOpenExternalSources} />

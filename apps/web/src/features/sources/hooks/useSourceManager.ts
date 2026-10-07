@@ -9,6 +9,13 @@ import {
   useUpdateDocument,
 } from "../services/documentsApi";
 
+/** The fields a source row shows; the list rebuilds only when one of them changes. */
+function documentSignature(d: Doc<"documents">): string {
+  const sourceGuide = (d as Record<string, unknown>).sourceGuide ? "1" : "0";
+  const userMessage = (d.metadata as { userMessage?: string } | undefined)?.userMessage ?? "";
+  return `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${sourceGuide}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${userMessage}`;
+}
+
 interface UseSourceManagerProps {
   documents: Doc<"documents">[];
   notebookId: string | null;
@@ -20,36 +27,22 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   useEffect(() => {
     sourcesRef.current = sources;
   }, [sources]);
-  const prevDocumentsRef = useRef<any[]>([]);
+  const prevSignatureRef = useRef("");
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();
   const removeManyDocuments = useRemoveManyDocuments(notebookId);
   const { error: showError } = useToast();
 
   useEffect(() => {
-    const currentSignature = documents
-      .map(
-        (d: Doc<"documents">) =>
-          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${(d as Record<string, unknown>).sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${(d.metadata as { userMessage?: string } | undefined)?.userMessage ?? ""}`
-      )
-      .join(",");
-    const prevSignature = prevDocumentsRef.current
-      .map(
-        (d: Doc<"documents">) =>
-          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${(d as Record<string, unknown>).sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${(d.metadata as { userMessage?: string } | undefined)?.userMessage ?? ""}`
-      )
-      .join(",");
-
-    if (currentSignature !== prevSignature) {
-      setSources((prev) => {
-        const newSources = documents.map(documentToSource);
-        return newSources.map((source: Source) => ({
-          ...source,
-          selected: prev.find((s) => s.id === source.id)?.selected ?? true,
-        }));
-      });
-      prevDocumentsRef.current = documents;
-    }
+    const signature = documents.map(documentSignature).join(",");
+    if (signature === prevSignatureRef.current) return;
+    prevSignatureRef.current = signature;
+    setSources((prev) =>
+      documents.map(documentToSource).map((source: Source) => ({
+        ...source,
+        selected: prev.find((s) => s.id === source.id)?.selected ?? true,
+      }))
+    );
   }, [documents]);
 
   const handleToggleSource = useCallback((id: string) => {
@@ -71,6 +64,7 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     });
   }, []);
 
+  /** @deprecated Discover no longer inserts sources locally; remove once App.tsx stops wiring it. */
   const handleAddSource = useCallback((source: Source) => {
     setSources((prev) => [source, ...prev]);
   }, []);

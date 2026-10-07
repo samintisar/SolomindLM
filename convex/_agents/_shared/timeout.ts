@@ -42,24 +42,3 @@ export function invokeWithTimeout<T>(
     clearTimeout(timeoutId);
   });
 }
-
-/**
- * Creates a timeout wrapper with a fixed timeout duration.
- * Useful for creating reusable timeout functions.
- *
- * @param timeoutMs - Fixed timeout in milliseconds
- * @returns A function that wraps any async operation with the fixed timeout
- *
- * @example
- * ```typescript
- * const with30sTimeout = createTimeoutWrapper(30000);
- * const response = await with30sTimeout(() => llm.invoke(messages), 'map_phase');
- * ```
- */
-export function createTimeoutWrapper(
-  timeoutMs: number
-): <T>(invokeFn: () => Promise<T>, phase: string) => Promise<T> {
-  return <T>(invokeFn: () => Promise<T>, phase: string): Promise<T> => {
-    return invokeWithTimeout(invokeFn, timeoutMs, phase);
-  };
-}

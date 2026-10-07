@@ -6,21 +6,12 @@
  *   const results = await runEval(fixture, { dryRun: true });
  */
 
-export { type ChatAgentInvoker, runChatEval } from "./chatRunner";
-export { snapshotRetrievalConfig } from "./config";
 export { createConvexChatInvoker } from "./convexChatInvoker";
 export { createConvexLiteratureReviewInvoker } from "./convexLiteratureReviewInvoker";
-export {
-  createConvexStudioInvokers,
-  STUDIO_INVOKER_FACTORIES,
-  type StudioInvoker,
-} from "./convexStudioInvoker";
-export { type LiteratureReviewInvoker, runLiteratureReviewEval } from "./literatureReviewRunner";
-export { type ResearchAgentInvoker, runResearchEval } from "./researchRunner";
-export { runStudioEval } from "./studioRunner";
-export type { EvalRunnerOptions, EvalRunnerResult } from "./types";
+export { createConvexResearchInvoker } from "./convexResearchInvoker";
+export { createConvexStudioInvokers } from "./convexStudioInvoker";
 
-import type { EvalFixture, StudioRunnerKind } from "../types";
+import { type EvalFixture, isStudioRunner, type StudioRunnerKind } from "../types";
 import type { ChatAgentInvoker } from "./chatRunner";
 import { runChatEval } from "./chatRunner";
 import { snapshotRetrievalConfig } from "./config";
@@ -38,22 +29,6 @@ export interface RunEvalOptions {
   researchInvoker?: ResearchAgentInvoker;
   literatureReviewInvoker?: LiteratureReviewInvoker;
   studioInvokers?: Partial<Record<StudioRunnerKind, StudioInvoker>>;
-}
-
-const STUDIO_RUNNER_KINDS: ReadonlySet<StudioRunnerKind> = new Set<StudioRunnerKind>([
-  "report",
-  "flashcards",
-  "quiz",
-  "mindmap",
-  "infographic",
-  "spreadsheet",
-  "writtenQuestions",
-  "audioScript",
-  "audioScriptOnly",
-]);
-
-function isStudioRunner(runner: EvalFixture["runner"]): runner is StudioRunnerKind {
-  return STUDIO_RUNNER_KINDS.has(runner as StudioRunnerKind);
 }
 
 /**

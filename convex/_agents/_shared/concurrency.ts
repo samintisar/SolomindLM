@@ -39,7 +39,7 @@ const limiters = new Map<number, LimitFunction>();
  * const result = await limiter(() => someAsyncOperation());
  * ```
  */
-export function getConcurrencyLimiter(concurrency: number): LimitFunction {
+function getConcurrencyLimiter(concurrency: number): LimitFunction {
   if (!limiters.has(concurrency)) {
     limiters.set(concurrency, pLimit(concurrency));
   }
@@ -71,21 +71,3 @@ export async function allWithConcurrency<T>(
   const limiter = getConcurrencyLimiter(concurrency);
   return Promise.all(tasks.map((task) => limiter(task)));
 }
-
-/**
- * Execute async tasks with bounded concurrency and access to active/pending counts.
- *
- * Provides visibility into the limiter state for debugging and monitoring.
- *
- * @param tasks - Array of async task functions
- * @param concurrency - Maximum number of tasks to run concurrently
- * @returns Promise that resolves with all task results in order
- *
- * @example
- * ```typescript
- * const limiter = getConcurrencyLimiter(5);
- * console.log(limiter.activeCount); // Currently running tasks
- * console.log(limiter.pendingCount); // Queued tasks waiting to run
- * ```
- */
-export { getConcurrencyLimiter as createLimiter };

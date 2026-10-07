@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  calculateOptimalChunkSize,
-  getChunkPreview,
-  packChunks,
-  splitBySentenceBoundaries,
-  validateChunks,
-} from "./chunk_operations";
+import { packChunks, validateChunks } from "./chunk_operations";
 
 describe("packChunks", () => {
   it("returns empty array for empty input", () => {
@@ -83,74 +77,5 @@ describe("validateChunks", () => {
   it("uses default minChunkLength of 50", () => {
     expect(validateChunks(["a".repeat(49)], { targetSize: 100 })).toHaveLength(0);
     expect(validateChunks(["a".repeat(50)], { targetSize: 100 })).toHaveLength(1);
-  });
-});
-
-describe("calculateOptimalChunkSize", () => {
-  it("divides total by count", () => {
-    expect(calculateOptimalChunkSize(100000, 5)).toBe(20000);
-  });
-
-  it("rounds up", () => {
-    expect(calculateOptimalChunkSize(101, 3)).toBe(34); // ceil(101/3) = 34
-  });
-
-  it("throws for targetChunkCount <= 0", () => {
-    expect(() => calculateOptimalChunkSize(100, 0)).toThrow(
-      "targetChunkCount must be greater than 0"
-    );
-    expect(() => calculateOptimalChunkSize(100, -1)).toThrow(
-      "targetChunkCount must be greater than 0"
-    );
-  });
-});
-
-describe("splitBySentenceBoundaries", () => {
-  it("splits at sentence-ending punctuation", () => {
-    const result = splitBySentenceBoundaries("Hello world. How are you? Fine!", 1000);
-    expect(result.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("respects maxChunkSize", () => {
-    const text = "This is sentence one. This is sentence two. This is sentence three.";
-    const result = splitBySentenceBoundaries(text, 30);
-    for (const chunk of result) {
-      expect(chunk.length).toBeLessThanOrEqual(30 + 30); // Some tolerance for current sentence
-    }
-  });
-
-  it("returns single chunk for short content", () => {
-    const result = splitBySentenceBoundaries("Short text.", 1000);
-    expect(result).toHaveLength(1);
-  });
-
-  it("handles content without sentence boundaries", () => {
-    const result = splitBySentenceBoundaries("no punctuation here just words", 1000);
-    expect(result).toHaveLength(1);
-  });
-
-  it("trims output chunks", () => {
-    const result = splitBySentenceBoundaries("  Hello.  ", 1000);
-    expect(result[0]).toBe(result[0].trim());
-  });
-});
-
-describe("getChunkPreview", () => {
-  it("shows full chunk when short", () => {
-    const preview = getChunkPreview("hello", 100);
-    expect(preview).toContain("hello");
-    expect(preview).toContain("5 chars");
-  });
-
-  it("truncates long chunks", () => {
-    const long = "a".repeat(200);
-    const preview = getChunkPreview(long, 50);
-    expect(preview).toContain("200 chars");
-    expect(preview).toContain("...");
-  });
-
-  it("replaces newlines with spaces", () => {
-    const preview = getChunkPreview("line1\nline2", 100);
-    expect(preview).toContain("line1 line2");
   });
 });

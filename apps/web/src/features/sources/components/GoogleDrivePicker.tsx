@@ -1,27 +1,23 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import {
+  DRIVE_READONLY_SCOPE,
+  GOOGLE_CLIENT_ID,
+  isGoogleClientIdValid,
+  loadGoogleIdentityServices,
+  loadScript,
+} from "../utils/googleIdentity";
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_BROWSER_API_KEY = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY as string | undefined;
 const GOOGLE_APP_ID = import.meta.env.VITE_GOOGLE_APP_ID as string | undefined;
-const SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 const GOOGLE_API_KEY_PATTERN = /^AIza[0-9A-Za-z_-]+$/;
-const GOOGLE_CLIENT_ID_SUFFIX = ".apps.googleusercontent.com";
 const GOOGLE_APP_ID_PATTERN = /^\d+$/;
 
 function isGooglePickerConfigValid() {
-  if (!GOOGLE_BROWSER_API_KEY || !GOOGLE_API_KEY_PATTERN.test(GOOGLE_BROWSER_API_KEY)) {
-    return false;
-  }
-
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_ID.endsWith(GOOGLE_CLIENT_ID_SUFFIX)) {
-    return false;
-  }
-
-  if (!GOOGLE_APP_ID || !GOOGLE_APP_ID_PATTERN.test(GOOGLE_APP_ID)) {
-    return false;
-  }
-
-  return true;
+  return (
+    Boolean(GOOGLE_BROWSER_API_KEY && GOOGLE_API_KEY_PATTERN.test(GOOGLE_BROWSER_API_KEY)) &&
+    isGoogleClientIdValid &&
+    Boolean(GOOGLE_APP_ID && GOOGLE_APP_ID_PATTERN.test(GOOGLE_APP_ID))
+  );
 }
 
 /** True when all VITE_GOOGLE_* env vars required for the Drive picker are set. */
@@ -139,52 +135,50 @@ export function GoogleDrivePicker({
   useEffect(() => {
     if (scriptsLoadedRef.current || !isGoogleDrivePickerConfigured) return;
 
-    const gisScript = document.createElement("script");
-    gisScript.src = "https://accounts.google.com/gsi/client";
-    gisScript.async = true;
-    gisScript.onload = () => {
-      if (typeof google === "undefined" || !google.accounts?.oauth2) {
-        console.error("Google Identity Services failed to load.");
-        return;
-      }
+    loadGoogleIdentityServices().then(
+      () => {
+        if (typeof google === "undefined" || !google.accounts?.oauth2) {
+          console.error("Google Identity Services failed to load.");
+          return;
+        }
 
-      tokenClientRef.current = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID!,
-        scope: SCOPES,
-        callback: (response) => {
-          if ("error" in response && response.error) {
-            console.error("Google Drive OAuth failed.", response);
-            return;
-          }
+        tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID!,
+          scope: DRIVE_READONLY_SCOPE,
+          callback: (response) => {
+            if ("error" in response && response.error) {
+              console.error("Google Drive OAuth failed.", response);
+              return;
+            }
 
-          if (response.access_token) {
-            accessTokenRef.current = response.access_token;
-            openPicker(response.access_token);
-          }
-        },
-      });
+            if (response.access_token) {
+              accessTokenRef.current = response.access_token;
+              openPicker(response.access_token);
+            }
+          },
+        });
 
-      gisInitedRef.current = true;
-      maybeOpenPicker();
-    };
-    document.body.appendChild(gisScript);
-
-    const gapiScript = document.createElement("script");
-    gapiScript.src = "https://apis.google.com/js/api.js";
-    gapiScript.async = true;
-    gapiScript.onload = () => {
-      if (typeof gapi === "undefined") {
-        console.error("Google API loader failed to initialize.");
-        return;
-      }
-
-      gapi.load("client:picker", async () => {
-        await gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest");
-        pickerInitedRef.current = true;
+        gisInitedRef.current = true;
         maybeOpenPicker();
-      });
-    };
-    document.body.appendChild(gapiScript);
+      },
+      (error) => console.error(error)
+    );
+
+    loadScript("https://apis.google.com/js/api.js").then(
+      () => {
+        if (typeof gapi === "undefined") {
+          console.error("Google API loader failed to initialize.");
+          return;
+        }
+
+        gapi.load("client:picker", async () => {
+          await gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest");
+          pickerInitedRef.current = true;
+          maybeOpenPicker();
+        });
+      },
+      (error) => console.error(error)
+    );
 
     scriptsLoadedRef.current = true;
   }, [maybeOpenPicker, openPicker]);

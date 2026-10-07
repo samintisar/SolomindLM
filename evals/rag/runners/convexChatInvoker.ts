@@ -6,10 +6,9 @@
  * matching Convex deployment env (`RAG_EVALS_ENABLED=true`, `RAG_EVAL_SECRET`).
  */
 import { ConvexHttpClient } from "convex/browser";
-import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
+import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
 import { toEvalSourcePolicy } from "../sourceChannels";
 import type { ChatAgentInvoker } from "./chatRunner";
 

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
+import { useToast } from "@/shared/contexts/useToast";
 import { isFlashcardNote, isReportNote, isUserNote, Note } from "@/shared/types/index";
+import { downloadFile, safeFileName } from "@/shared/utils/download";
 import { exportFlashcardsCSV } from "../services/flashcardsApi";
 
 interface ConfirmOptions {
@@ -10,7 +12,6 @@ interface ConfirmOptions {
 
 interface UseNoteActionsProps {
   activeNote: Note | null;
-  notes: Note[];
   onUpdateNote: (id: string, newTitle: string) => void;
   onDeleteNote: (id: string) => void;
   confirm: (title: string, message: string, options?: ConfirmOptions) => Promise<boolean>;
@@ -26,7 +27,6 @@ interface UseNoteActionsResult {
   // Capabilities
   canCopyOrDownloadReport: boolean;
   canCopyOrDownloadUserNote: boolean;
-  canExportFlashcards: boolean;
   // Actions
   handleStartEdit: (note: Note) => void;
   handleSaveEdit: () => void;
@@ -46,7 +46,6 @@ interface UseNoteActionsResult {
  */
 export const useNoteActions = ({
   activeNote,
-  notes: _notes,
   onUpdateNote,
   onDeleteNote,
   confirm,
@@ -54,15 +53,11 @@ export const useNoteActions = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const toast = useToast();
 
   // Check if current note can have report copied/downloaded
   const canCopyOrDownloadReport = useMemo(() => {
     return Boolean(activeNote && isReportNote(activeNote) && activeNote.content);
-  }, [activeNote]);
-
-  // Check if current note can export flashcards
-  const canExportFlashcards = useMemo(() => {
-    return Boolean(activeNote && isFlashcardNote(activeNote));
   }, [activeNote]);
 
   // Check if current user note has copyable/downloadable content (content or messages)
@@ -116,15 +111,11 @@ export const useNoteActions = ({
   const handleDownloadReport = useCallback(() => {
     if (!activeNote || !isReportNote(activeNote) || !activeNote.content) return;
 
-    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, "_").trim() || "report";
-    const filename = `${safeName}.md`;
-    const blob = new Blob([activeNote.content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(
+      activeNote.content,
+      `${safeFileName(activeNote.title, "report")}.md`,
+      "text/markdown;charset=utf-8"
+    );
   }, [activeNote]);
 
   // Get user note body as plain text (content or messages formatted)
@@ -156,15 +147,11 @@ export const useNoteActions = ({
     if (!activeNote || !isUserNote(activeNote)) return;
     const body = getUserNoteBody(activeNote);
     if (!body) return;
-    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, "_").trim() || "note";
-    const filename = `${safeName}.md`;
-    const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(
+      body,
+      `${safeFileName(activeNote.title, "note")}.md`,
+      "text/markdown;charset=utf-8"
+    );
   }, [activeNote, getUserNoteBody]);
 
   // Delete note with confirmation
@@ -188,14 +175,14 @@ export const useNoteActions = ({
 
     try {
       setIsExporting(true);
-      await exportFlashcardsCSV(activeNote.id, activeNote.title, activeNote.flashcards);
+      exportFlashcardsCSV(activeNote.title, activeNote.flashcards);
     } catch (error) {
       console.error("Failed to export flashcards:", error);
-      alert("Failed to export flashcards. Please try again.");
+      toast.error("Failed to export flashcards. Please try again.");
     } finally {
       setIsExporting(false);
     }
-  }, [activeNote]);
+  }, [activeNote, toast]);
 
   return {
     editingId,
@@ -204,7 +191,6 @@ export const useNoteActions = ({
     isExporting,
     canCopyOrDownloadReport,
     canCopyOrDownloadUserNote,
-    canExportFlashcards,
     handleStartEdit,
     handleSaveEdit,
     handleEditCancel,

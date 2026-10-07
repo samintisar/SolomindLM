@@ -1,12 +1,7 @@
 "use node";
 
-import { randomUUID } from "crypto";
-
-import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
-import type { JobLogger } from "../_shared/logging.js";
 import type { WrittenQuestion } from "./prompts.js";
 import { extractTopic } from "./questionHeuristics.js";
-import type { OverallStateType } from "./state.js";
 
 export function getSelectionPrompt(params: {
   questions: WrittenQuestion[];
@@ -262,56 +257,4 @@ export function applySelectedQuestionIds(
   }
 
   return resolvedQuestions;
-}
-
-export function finalizeQuestions(
-  questions: WrittenQuestion[],
-  state: OverallStateType,
-  logger: JobLogger
-): Partial<OverallStateType> {
-  const questionsWithIds = questions.map((q) => ({
-    ...q,
-    id: q.id && q.id.trim() ? q.id : randomUUID(),
-    questionType: state.questionType as "short" | "essay",
-  }));
-
-  logger.info("Written questions reduce final summary", {
-    agent: "WrittenQuestionsGraph",
-    phase: "reduce_final",
-    finalQuestionCount: questionsWithIds.length,
-    finalQuestions: questionsWithIds.map((q, idx) => ({
-      index: idx + 1,
-      id: q.id,
-      question: q.question,
-      questionType: q.questionType,
-      maxPoints: q.rubric.maxPoints,
-    })),
-  });
-
-  logger.info("GENERATION COMPLETE", {
-    agent: "WrittenQuestionsGraph",
-    phase: "generation_complete",
-    finalQuestionCount: questionsWithIds.length,
-    targetQuestionCount: state.questionCount,
-    milestone: true,
-  });
-
-  const collapsedOutputsSize =
-    state.collapsedOutputs?.reduce((sum, s) => sum + s.length * 2, 0) ?? 0;
-  const chunksSize = (state.chunks || []).reduce((sum, s) => sum + s.length * 2, 0);
-  logger.info(
-    `Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`,
-    {
-      agent: "WrittenQuestionsGraph",
-      phase: "reduce_cleanup",
-      memoryFreedKB: ((collapsedOutputsSize + chunksSize) / 1024).toFixed(2),
-    }
-  );
-
-  return {
-    ...withoutMapOutputs(state),
-    finalOutput: questionsWithIds,
-    status: "completed",
-    ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),
-  };
 }

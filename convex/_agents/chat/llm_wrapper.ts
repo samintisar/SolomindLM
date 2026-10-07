@@ -9,8 +9,6 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 
 import Together from "together-ai";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
-
 import { uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
@@ -37,6 +35,7 @@ import {
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
 } from "./chat_retrieval_subqueries.js";
+import type { ReferenceChunk } from "./types";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
 export { ChatResponseSchema } from "./chat_llm_types.js";

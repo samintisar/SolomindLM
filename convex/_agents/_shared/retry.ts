@@ -190,27 +190,6 @@ export async function invokeWithRetry<T>(
 }
 
 /**
- * Creates a retry wrapper with fixed retry configuration.
- * Useful for creating reusable retry functions.
- *
- * @param config - Fixed retry configuration
- * @returns A function that wraps any async operation with the fixed retry behavior
- *
- * @example
- * ```typescript
- * const withRetry3 = createRetryWrapper({ maxAttempts: 3, baseDelayMs: 1000 });
- * const response = await withRetry3(() => llm.invoke(messages), 'map_phase');
- * ```
- */
-export function createRetryWrapper(
-  config: RetryConfig
-): <T>(fn: () => Promise<T>, phase: string) => Promise<T> {
-  return <T>(fn: () => Promise<T>, phase: string): Promise<T> => {
-    return invokeWithRetry(fn, config, phase);
-  };
-}
-
-/**
  * Predefined retry policies for common scenarios.
  */
 export const RetryPolicies = {

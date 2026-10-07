@@ -16,12 +16,13 @@ import { sanitizeMarkdown } from "@/shared/utils";
 import { extractYouTubeVideoId } from "@/shared/utils/youtubeEmbed";
 import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
 import { isYouTubeSource } from "../utils/sourceTypes";
-import { PdfViewer } from "./PdfViewer";
 import { YouTubeEmbedUnavailable, YouTubeVideoPreview } from "./YouTubeVideoPreview";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
+// pdf.js is heavy and only needed once the user switches to the Original PDF tab.
+const PdfViewer = lazy(() => import("./PdfViewer").then((m) => ({ default: m.PdfViewer })));
 
 type PdfViewMode = "pdf" | "markdown";
 
@@ -35,7 +36,6 @@ interface SourceViewerProps {
   /** Storage ID for the PDF file; when set, enables PDF/Markdown toggle. URL is fetched only when user switches to PDF tab. */
   pdfStorageId?: string | null;
   isLoading: boolean;
-  error: string | undefined;
   onDiscussTopic?: (topic: string) => void;
 }
 
@@ -44,7 +44,6 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   content,
   pdfStorageId,
   isLoading,
-  error,
   onDiscussTopic,
 }) => {
   const isPdfSource = source.type === "PDF";
@@ -221,22 +220,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         </div>
       )}
 
-      {/* Error State for Content Loading */}
-      {error && !isLoading && (
-        <Alert variant="destructive">
-          <XCircle aria-hidden />
-          <AlertTitle>Failed to load content</AlertTitle>
-          <AlertDescription>
-            <p>{error}</p>
-            <p>
-              The content will automatically reload when available. Please ensure you are logged in.
-            </p>
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* PDF / Markdown view toggle (PDF sources only when pdfUrl is available) */}
-      {canShowPdf && !isLoading && !error && (
+      {canShowPdf && !isLoading && (
         <ToggleGroup
           type="single"
           variant="outline"
@@ -258,19 +243,15 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       )}
 
       {/* Content Display */}
-      {!isLoading && !error && (
+      {!isLoading && (
         <>
           {canShowPdf && viewMode === "pdf" ? (
             pdfUrlLoading ? (
-              <div
-                role="status"
-                className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"
-              >
-                <Spinner className="size-6" aria-hidden />
-                Loading PDF…
-              </div>
+              <PdfLoading />
             ) : pdfUrl ? (
-              <PdfViewer file={pdfUrl} />
+              <Suspense fallback={<PdfLoading />}>
+                <PdfViewer file={pdfUrl} />
+              </Suspense>
             ) : (
               <Alert variant="destructive">
                 <XCircle aria-hidden />
@@ -317,3 +298,15 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     </div>
   );
 };
+
+function PdfLoading() {
+  return (
+    <div
+      role="status"
+      className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"
+    >
+      <Spinner className="size-6" aria-hidden />
+      Loading PDF…
+    </div>
+  );
+}

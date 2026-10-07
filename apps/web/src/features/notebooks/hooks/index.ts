@@ -1,3 +1,2 @@
-export { useFolderHandlers } from "./useFolderHandlers";
-export { useNotebookHandlers } from "./useNotebookHandlers";
+export { useNotebookDialogs } from "./useNotebookDialogs";
 export { useNotebookSorting } from "./useNotebookSorting";

@@ -53,8 +53,8 @@ vi.mock("../../features/auth/components/AvatarDropdown", () => ({
   },
 }));
 
-vi.mock("../hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError: vi.fn() }),
+vi.mock("../hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: vi.fn() }),
 }));
 
 describe("Header onboarding action wiring", () => {

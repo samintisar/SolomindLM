@@ -69,23 +69,6 @@ export const getLatestRunForPlan = query({
   },
 });
 
-export const getRunStatus = query({
-  args: { runId: v.id("researchRuns") },
-  returns: v.union(v.null(), v.any()),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const run = await ctx.db.get(args.runId);
-    if (!run) return null;
-    try {
-      await assertCanReadNotebook(ctx, run.notebookId, userId);
-    } catch {
-      return null;
-    }
-    return run;
-  },
-});
-
 export const getResearchSteps = query({
   args: {
     researchId: v.string(),

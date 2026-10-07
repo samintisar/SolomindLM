@@ -16,7 +16,6 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { packChunks, validateChunks } from "../../_agents/QuizGraph";
 import {
   applySelectedCandidateIndices,
   EXPAND_QUESTION_SYSTEM_PROMPT,
@@ -41,6 +40,9 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { createStudioChunkHelpers } from "../_job/studioChunks";
+
+const { packChunks, validateChunks } = createStudioChunkHelpers("QuizGraph");
 
 // ============================================================
 // CONFIGURATION
@@ -120,8 +122,6 @@ export async function runQuizGenerationPhase(
   ctx: ActionCtx,
   args: QuizGenerationPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { quizId, userId, notebookId, documentIds, questionCount, difficulty, focus } = args;
 
   // Initialize structured logger
@@ -274,8 +274,6 @@ export async function runProcessQuizMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessQuizMapChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const {
     quizId,
     userId,
@@ -554,8 +552,6 @@ export async function runFinalizeQuizPhase(
   ctx: ActionCtx,
   args: FinalizeQuizPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { quizId, userId, notebookId, questionCount, difficulty, focus } = args;
 
   const logger = createJobLogger({

@@ -34,7 +34,6 @@ function renderViewer(overrides: Partial<ComponentProps<typeof SourceViewer>> = 
     },
     content: "Test content",
     isLoading: false,
-    error: undefined,
     ...overrides,
   };
   return { ...render(<SourceViewer {...props} />), props };
@@ -319,7 +318,6 @@ describe("SourceViewer source guide", () => {
         }}
         content="Test content"
         isLoading={false}
-        error={undefined}
       />
     );
 

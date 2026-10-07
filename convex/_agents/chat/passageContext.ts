@@ -1,4 +1,4 @@
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
+import type { ReferenceChunk } from "./types";
 
 /**
  * A passage's text exactly as chat's grounding prompt shows it: the source's own citation

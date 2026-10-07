@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { passageTextForModel } from "./passageContext";
+import type { ReferenceChunk } from "./types";
 
 const passage = (content: string, metadata?: ReferenceChunk["metadata"]): ReferenceChunk => ({
   id: "1",

@@ -108,51 +108,6 @@ export function sanitizeUserInput(input: string, config: SanitizeConfig = {}): s
 }
 
 /**
- * Sanitizes a filename/path to prevent directory traversal.
- *
- * @param filename - Filename to sanitize
- * @returns Sanitized filename safe for filesystem operations
- *
- * @example
- * ```typescript
- * const safeFilename = sanitizeFilename('../../etc/passwd');
- * // Returns: 'etc_passwd'
- * ```
- */
-export function sanitizeFilename(filename: string): string {
-  if (!filename) return "";
-
-  return filename
-    .replace(/[/\\]/g, "_") // Replace path separators
-    .replace(/\.\./g, "") // Remove parent directory references
-    .replace(/[<>:"|?*]/g, "_") // Remove invalid Windows characters
-    .replace(/[\x00-\x1f\x80-\x9f]/g, "") // Remove control characters
-    .replace(/^\.+/, "") // Remove leading dots
-    .substring(0, 255); // Limit length
-}
-
-/**
- * Sanitizes markdown content while preserving formatting.
- *
- * @param markdown - Markdown content to sanitize
- * @param config - Optional sanitization configuration
- * @returns Sanitized markdown
- *
- * @example
- * ```typescript
- * const safeMarkdown = sanitizeMarkdown(userContent);
- * ```
- */
-export function sanitizeMarkdown(markdown: string, config: SanitizeConfig = {}): string {
-  const baseConfig = {
-    ...config,
-    escapeHtml: false, // Don't escape HTML in markdown (might be intentional)
-  };
-
-  return sanitizeUserInput(markdown, baseConfig);
-}
-
-/**
  * Detects potentially malicious input patterns.
  *
  * @param input - Input to check
@@ -166,7 +121,7 @@ export function sanitizeMarkdown(markdown: string, config: SanitizeConfig = {}):
  * }
  * ```
  */
-export function detectThreats(input: string): string[] {
+function detectThreats(input: string): string[] {
   const threats: string[] = [];
 
   if (!input) return threats;
@@ -206,54 +161,6 @@ export function detectThreats(input: string): string[] {
   }
 
   return threats;
-}
-
-/**
- * Masks sensitive information in logs.
- *
- * @param input - Input that may contain sensitive info
- * @param patterns - Array of regex patterns to mask (default: common patterns)
- * @returns Input with sensitive info masked
- *
- * @example
- * ```typescript
- * const masked = maskSensitiveInfo('API key: sk-1234567890');
- * // Returns: 'API key: sk-************'
- * ```
- */
-export function maskSensitiveInfo(input: string, patterns?: RegExp[]): string {
-  let result = input;
-
-  const defaultPatterns = [
-    // API keys
-    /sk-[a-zA-Z0-9]{20,}/g,
-    /Bearer\s+[a-zA-Z0-9]{20,}/gi,
-    // Email addresses
-    /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g,
-    // Phone numbers
-    /\b\d{3}-\d{3}-\d{4}\b/g,
-    /\b\d{10,}\b/g,
-    // Credit cards (basic pattern)
-    /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
-    // URLs with potential sensitive data
-    /https?:\/\/[^\s<>"]+?token=[^\s<>"]+/gi,
-  ];
-
-  const maskPatterns = patterns || defaultPatterns;
-
-  for (const pattern of maskPatterns) {
-    result = result.replace(pattern, (match) => {
-      // Keep first 4 and last 4 characters, mask the rest
-      if (match.length <= 8) {
-        return "*".repeat(match.length);
-      }
-      return (
-        match.substring(0, 4) + "*".repeat(match.length - 8) + match.substring(match.length - 4)
-      );
-    });
-  }
-
-  return result;
 }
 
 /**

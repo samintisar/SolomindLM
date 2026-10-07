@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
+import type { Doc, Id } from "@convex/_generated/dataModel";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useQuery } from "convex/react";
@@ -8,16 +8,12 @@ import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-ro
 import { NotebookItem } from "@/shared/types/index";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthProvider } from "./features/auth/AuthContext";
-import { AuthPage } from "./features/auth/AuthPage";
 import { useAuthGuard } from "./features/auth/hooks/useAuthGuard";
 import { useStripeRedirect } from "./features/auth/hooks/useStripeRedirect";
 import { useAuth } from "./features/auth/useAuth";
-import { BillingPage } from "./features/billing/components/BillingPage";
 import { useSubscriptionStatus } from "./features/billing/services/subscriptionApi";
 import { ChatStreamingProvider } from "./features/chat/ChatStreamingContext";
-import { useChatStream } from "./features/chat/hooks/useChatStream";
 import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
-import { AdminFeedbackPage } from "./features/feedback/components/AdminFeedbackPage";
 import { FeedbackModal } from "./features/feedback/components/FeedbackModal";
 import { FeedbackProvider } from "./features/feedback/FeedbackContext";
 import { ClusterHubLandingPage } from "./features/landing/ClusterHubLandingPage";
@@ -30,11 +26,7 @@ import { SeoContentPage } from "./features/landing/SeoContentPage";
 import { isSeoContentPath, SEO_CONTENT_PAGES } from "./features/landing/seoContentPages";
 import { PrivacyPolicy } from "./features/legal/components/PrivacyPolicy";
 import { TermsOfService } from "./features/legal/components/TermsOfService";
-import { HomePage } from "./features/notebooks/components/HomePage";
 import { ShareNotebookModal } from "./features/notebooks/components/modals/ShareNotebookModal";
-import { FolderView } from "./features/notebooks/components/views/FolderView";
-import { ForkNotebookPage } from "./features/notebooks/components/views/ForkNotebookPage";
-import { NotebookView } from "./features/notebooks/components/views/NotebookView";
 import { useFolderCRUD } from "./features/notebooks/hooks/useFolderCRUD";
 import { useNotebookCRUD } from "./features/notebooks/hooks/useNotebookCRUD";
 import { NotebookProvider } from "./features/notebooks/NotebookContext";
@@ -45,10 +37,8 @@ import { TourTooltip } from "./features/onboarding/components/TourTooltip";
 import { OnboardingProvider } from "./features/onboarding/OnboardingProvider";
 import { useSourceManager } from "./features/sources/hooks/useSourceManager";
 import { SourcesProvider } from "./features/sources/SourcesContext";
-import { useCreateDocument, useGenerateUploadUrl } from "./features/sources/services/documentsApi";
-import { LiteratureReportPage } from "./features/studio/components/LiteratureReportPage";
-import { LiteratureTablePage } from "./features/studio/components/LiteratureTablePage";
 import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
+import { useStudioNoteOverlay } from "./features/studio/hooks/useStudioNoteOverlay";
 import { StudioProvider } from "./features/studio/StudioContext";
 import { getToolPageByPath } from "./features/tools/toolPages";
 import { MotionProvider } from "./shared/components/motion";
@@ -56,8 +46,8 @@ import { ProtectedRoute } from "./shared/components/ProtectedRoute";
 import { RouteTransition } from "./shared/components/RouteTransition";
 import { ScrollToTop } from "./shared/components/ScrollToTop";
 import { Toaster } from "./shared/components/ui/sonner";
+import { Spinner } from "./shared/components/ui/spinner";
 import { ThemeProvider } from "./shared/contexts/ThemeContext";
-import { ToastProvider } from "./shared/contexts/ToastContext";
 import { Header } from "./shared/ui/Header";
 
 /** Dev-only ui gallery (/dev/design). Gated on a build-time constant so production builds drop the chunk. */
@@ -68,6 +58,55 @@ const DesignGallery =
 
 // Free tools: own chunk so the marketing shell doesn't ship pdfjs or the tool UI.
 const PdfToFlashcardsPage = lazy(() => import("./features/tools/pages/PdfToFlashcardsPage"));
+
+// App and auth routes load on demand; landing and SEO pages stay in the entry for first paint.
+const AuthPage = lazy(() =>
+  import("./features/auth/AuthPage").then((m) => ({ default: m.AuthPage }))
+);
+const HomePage = lazy(() =>
+  import("./features/notebooks/components/HomePage").then((m) => ({ default: m.HomePage }))
+);
+const FolderView = lazy(() =>
+  import("./features/notebooks/components/views/FolderView").then((m) => ({
+    default: m.FolderView,
+  }))
+);
+const NotebookView = lazy(() =>
+  import("./features/notebooks/components/views/NotebookView").then((m) => ({
+    default: m.NotebookView,
+  }))
+);
+const ForkNotebookPage = lazy(() =>
+  import("./features/notebooks/components/views/ForkNotebookPage").then((m) => ({
+    default: m.ForkNotebookPage,
+  }))
+);
+const BillingPage = lazy(() =>
+  import("./features/billing/components/BillingPage").then((m) => ({ default: m.BillingPage }))
+);
+const AdminFeedbackPage = lazy(() =>
+  import("./features/feedback/components/AdminFeedbackPage").then((m) => ({
+    default: m.AdminFeedbackPage,
+  }))
+);
+const LiteratureTablePage = lazy(() =>
+  import("./features/studio/components/LiteratureTablePage").then((m) => ({
+    default: m.LiteratureTablePage,
+  }))
+);
+const LiteratureReportPage = lazy(() =>
+  import("./features/studio/components/LiteratureReportPage").then((m) => ({
+    default: m.LiteratureReportPage,
+  }))
+);
+
+const routeFallback = (
+  <div className="flex flex-1 items-center justify-center py-24 text-primary">
+    <Spinner className="size-8" aria-hidden />
+  </div>
+);
+
+const NO_DOCUMENTS: Doc<"documents">[] = [];
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -117,54 +156,46 @@ const AppContent: React.FC = () => {
     useQuery(
       api.documents.index.list,
       dataNotebookId ? { notebookId: dataNotebookId as Id<"notebooks"> } : "skip"
-    ) ?? [];
-  useGenerateUploadUrl();
-  useCreateDocument();
+    ) ?? NO_DOCUMENTS;
 
   const sourceManager = useSourceManager({
     documents,
     notebookId: dataNotebookId,
   });
-  const noteCRUD = useNoteCRUD({ activeNotebookId: dataNotebookId });
-  const conversationCRUD = useConversationCRUD(dataNotebookId);
-  const chatStream = useChatStream({
+  const { notes, handleUpdateNote, handleDeleteNote, handleSaveReportContent } = useNoteCRUD({
     activeNotebookId: dataNotebookId,
-    activeConversationId,
-    sources: sourceManager.sources,
-    notes: noteCRUD.notes,
-    documents,
-    onConversationEnsured: setActiveConversationId,
   });
-  const notebookCRUD = useNotebookCRUD({
+  const {
+    displayNotes,
+    addPendingStudioNote,
+    updatePendingStudioNote,
+    removePendingStudioNote,
+    setOptimisticSaveNote,
+  } = useStudioNoteOverlay(dataNotebookId, notes);
+  const {
+    conversations,
+    handleCreate: handleCreateConversation,
+    handleRename: handleRenameConversation,
+    handleDelete: handleDeleteConversation,
+  } = useConversationCRUD(dataNotebookId);
+  const { handleCreateNotebook, handleUpdateNotebook, handleDeleteNotebook } = useNotebookCRUD({
     isAuthenticated,
     user,
     activeNotebookId,
     setNotebookTitle,
     onRequireAuth,
   });
-  const folderCRUD = useFolderCRUD({ isAuthenticated, user, onRequireAuth });
+  const { handleCreateFolder, handleUpdateFolder, handleDeleteFolder, handleMoveNotebookToFolder } =
+    useFolderCRUD({ isAuthenticated, user, onRequireAuth });
 
   const subscriptionStatus = useSubscriptionStatus();
 
   // Auto-select the most recently updated conversation when the list loads
   useEffect(() => {
-    if (
-      !activeConversationId &&
-      conversationCRUD.conversations &&
-      conversationCRUD.conversations.length > 0
-    ) {
-      setActiveConversationId(conversationCRUD.conversations[0]._id);
+    if (!activeConversationId && conversations && conversations.length > 0) {
+      setActiveConversationId(conversations[0]._id);
     }
-  }, [activeConversationId, conversationCRUD.conversations]);
-
-  const currentView = useMemo(() => {
-    if (location.pathname === "/") return "landing";
-    if (location.pathname === "/home") return "home";
-    if (location.pathname === "/billing") return "billing";
-    if (location.pathname.startsWith("/folder/")) return "folder";
-    if (location.pathname.startsWith("/notebook/")) return "notebook";
-    return "landing";
-  }, [location.pathname]);
+  }, [activeConversationId, conversations]);
 
   const urlFolderId = useMemo(() => {
     if (location.pathname.startsWith("/folder/")) {
@@ -209,11 +240,11 @@ const AppContent: React.FC = () => {
       setActiveNotebookId(urlNotebookId);
       setActiveConversationId(null);
     }
-    if (!urlNotebookId && currentView !== "notebook") {
+    if (!urlNotebookId) {
       setActiveNotebookId(null);
       setActiveConversationId(null);
     }
-  }, [urlNotebookId, currentView, activeNotebookId]);
+  }, [urlNotebookId, activeNotebookId]);
 
   useEffect(() => {
     if (urlNotebookId && notebookList.length > 0) {
@@ -250,128 +281,123 @@ const AppContent: React.FC = () => {
     [navigate]
   );
 
+  const goHome = useCallback(() => navigate("/home"), [navigate]);
+  const goBilling = useCallback(() => navigate("/billing"), [navigate]);
+
   const notebookContextValue = useMemo(
     () => ({
-      notebookList,
       featuredNotebooks,
       recentNotebooks,
       activeNotebook,
       notebooksLoading: notebooks === undefined || folders === undefined,
       urlNotebookId,
-      urlFolderId,
-      currentView,
       folders: folderList,
       selectNotebook: handleSelectNotebook,
-      createNotebook: notebookCRUD.handleCreateNotebook,
-      updateNotebook: notebookCRUD.handleUpdateNotebook,
-      deleteNotebook: notebookCRUD.handleDeleteNotebook,
+      createNotebook: handleCreateNotebook,
+      updateNotebook: handleUpdateNotebook,
+      deleteNotebook: handleDeleteNotebook,
       selectFolder: handleSelectFolder,
-      folderBack: () => navigate("/home"),
-      createFolder: folderCRUD.handleCreateFolder,
-      updateFolder: folderCRUD.handleUpdateFolder,
-      deleteFolder: folderCRUD.handleDeleteFolder,
-      moveNotebookToFolder: folderCRUD.handleMoveNotebookToFolder,
-      logoClick: handleLogoClick,
-      getStarted: () => navigate("/home"),
-      billingClick: () => navigate("/billing"),
-      billingBack: () => navigate("/home"),
+      folderBack: goHome,
+      createFolder: handleCreateFolder,
+      updateFolder: handleUpdateFolder,
+      deleteFolder: handleDeleteFolder,
+      moveNotebookToFolder: handleMoveNotebookToFolder,
       notebookTitle,
-      setNotebookTitle,
       subscriptionStatus,
       isAuthenticated,
       onRequireAuth,
     }),
     [
-      notebookList,
       featuredNotebooks,
       recentNotebooks,
       activeNotebook,
       notebooks,
       folders,
       urlNotebookId,
-      urlFolderId,
-      currentView,
       folderList,
       handleSelectNotebook,
+      handleCreateNotebook,
+      handleUpdateNotebook,
+      handleDeleteNotebook,
       handleSelectFolder,
-      notebookCRUD,
-      folderCRUD,
-      handleLogoClick,
+      goHome,
+      handleCreateFolder,
+      handleUpdateFolder,
+      handleDeleteFolder,
+      handleMoveNotebookToFolder,
       notebookTitle,
       subscriptionStatus,
-      navigate,
       isAuthenticated,
       onRequireAuth,
     ]
   );
 
-  const chatStreamingContextValue = useMemo(
-    () => ({
-      messages: chatStream.chatDisplayMessages,
-      isChatStreaming: chatStream.isChatStreaming,
-      remoteChatGenerating: chatStream.remoteChatGenerating,
-      remoteGenerationBlocksSend: chatStream.remoteGenerationBlocksSend,
-      onSendMessage: chatStream.handleSendMessage,
-      onStopChat: chatStream.stopChat,
-      consumeResearchExecuteStream: chatStream.consumeResearchExecuteStream,
-      onClearHistory: chatStream.handleClearChatHistory,
-      onSetFeedback: chatStream.setMessageFeedback,
-      onRetry: chatStream.handleRetryMessage,
-      onSaveChatOptimistic: chatStream.setOptimisticSaveNote,
-      externalSources: chatStream.externalSources,
-      clearExternalSources: chatStream.clearExternalSources,
-      sourceCount: chatStream.sourceCount,
-      sourceSummary: chatStream.sourceSummary,
-      suggestions: chatStream.suggestions,
-      isLoadingSuggestions: chatStream.isLoadingSuggestions,
-      activeConversationId,
-      conversations: conversationCRUD.conversations,
-      onSelectConversation: setActiveConversationId,
-      onCreateConversation: conversationCRUD.handleCreate,
-      onRenameConversation: conversationCRUD.handleRename,
-      onDeleteConversation: async (id: string) => {
-        const list = conversationCRUD.conversations;
-        const wasOnlyThread = list != null && list.length === 1 && list[0]._id === id;
-        await conversationCRUD.handleDelete(id);
-        if (wasOnlyThread) {
-          const newId = await conversationCRUD.handleCreate();
-          setActiveConversationId(newId ?? null);
-          return;
-        }
-        if (activeConversationId === id) {
-          setActiveConversationId(null);
-        }
-      },
-    }),
-    [chatStream, activeConversationId, conversationCRUD]
+  const handleDeleteConversationAndReselect = useCallback(
+    async (id: string) => {
+      const wasOnlyThread =
+        conversations != null && conversations.length === 1 && conversations[0]._id === id;
+      await handleDeleteConversation(id);
+      if (wasOnlyThread) {
+        const newId = await handleCreateConversation();
+        setActiveConversationId(newId ?? null);
+        return;
+      }
+      setActiveConversationId((current) => (current === id ? null : current));
+    },
+    [conversations, handleDeleteConversation, handleCreateConversation]
   );
 
+  const {
+    sources,
+    handleToggleSource,
+    handleToggleAll,
+    handleAddSource,
+    handleDeleteSource,
+    handleDeleteSelectedSources,
+    handleRenameSource,
+  } = sourceManager;
   const sourcesContextValue = useMemo(
     () => ({
-      sources: sourceManager.sources,
-      onToggleSource: sourceManager.handleToggleSource,
-      onToggleAll: sourceManager.handleToggleAll,
-      onAddSource: sourceManager.handleAddSource,
-      onDeleteSource: sourceManager.handleDeleteSource,
-      onDeleteSelectedSources: sourceManager.handleDeleteSelectedSources,
-      onRenameSource: sourceManager.handleRenameSource,
+      sources,
+      onToggleSource: handleToggleSource,
+      onToggleAll: handleToggleAll,
+      onAddSource: handleAddSource,
+      onDeleteSource: handleDeleteSource,
+      onDeleteSelectedSources: handleDeleteSelectedSources,
+      onRenameSource: handleRenameSource,
     }),
-    [sourceManager]
+    [
+      sources,
+      handleToggleSource,
+      handleToggleAll,
+      handleAddSource,
+      handleDeleteSource,
+      handleDeleteSelectedSources,
+      handleRenameSource,
+    ]
   );
 
   const studioContextValue = useMemo(
     () => ({
-      notes: chatStream.displayNotes,
-      onUpdateNote: noteCRUD.handleUpdateNote,
-      onUpdateNoteFull: chatStream.updatePendingStudioNote,
+      notes: displayNotes,
+      onUpdateNote: handleUpdateNote,
+      onUpdateNoteFull: updatePendingStudioNote,
       onDeleteNote: async (id: string) => {
-        chatStream.removePendingStudioNote(id);
-        await noteCRUD.handleDeleteNote(id);
+        removePendingStudioNote(id);
+        await handleDeleteNote(id);
       },
-      onAddNote: chatStream.addPendingStudioNote,
-      onSaveReportContent: noteCRUD.handleSaveReportContent,
+      onAddNote: addPendingStudioNote,
+      onSaveReportContent: handleSaveReportContent,
     }),
-    [chatStream, noteCRUD]
+    [
+      displayNotes,
+      handleUpdateNote,
+      updatePendingStudioNote,
+      removePendingStudioNote,
+      handleDeleteNote,
+      addPendingStudioNote,
+      handleSaveReportContent,
+    ]
   );
 
   return (
@@ -389,12 +415,12 @@ const AppContent: React.FC = () => {
             onRename={(newTitle: string) => {
               setNotebookTitle(newTitle);
               if (activeNotebookId && activeNotebookId !== "new" && isAuthenticated) {
-                notebookCRUD.handleUpdateNotebook(activeNotebookId, { title: newTitle });
+                handleUpdateNotebook(activeNotebookId, { title: newTitle });
               }
             }}
             isHome={isHomePage}
             onLogoClick={handleLogoClick}
-            onBillingClick={() => navigate("/billing")}
+            onBillingClick={goBilling}
             hasSubscription={subscriptionStatus.hasSubscription}
             notebookRenamable={
               location.pathname.startsWith("/notebook/") &&
@@ -414,139 +440,152 @@ const AppContent: React.FC = () => {
 
         <NotebookProvider value={notebookContextValue}>
           <RouteTransition fill={!isPublicPage}>
-            <Routes>
-              <Route path="/" element={<LandingPage onGetStarted={() => navigate("/home")} />} />
-              <Route path="/sign-in" element={<AuthPage />} />
-              <Route path="/privacy" element={<PrivacyPolicy />} />
-              <Route path="/terms" element={<TermsOfService />} />
-              <Route path="/faq" element={<FaqPage />} />
-              <Route
-                path="/tools/pdf-to-flashcards"
-                element={
-                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
-                    <PdfToFlashcardsPage />
-                  </Suspense>
-                }
-              />
-              {DesignGallery && (
+            <Suspense fallback={routeFallback}>
+              <Routes>
+                <Route path="/" element={<LandingPage onGetStarted={goHome} />} />
+                <Route path="/sign-in" element={<AuthPage />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/faq" element={<FaqPage />} />
                 <Route
-                  path="/dev/design"
+                  path="/tools/pdf-to-flashcards"
                   element={
-                    <Suspense fallback={null}>
-                      <DesignGallery />
+                    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                      <PdfToFlashcardsPage />
                     </Suspense>
                   }
                 />
-              )}
+                {DesignGallery && (
+                  <Route
+                    path="/dev/design"
+                    element={
+                      <Suspense fallback={null}>
+                        <DesignGallery />
+                      </Suspense>
+                    }
+                  />
+                )}
 
-              {CLUSTER_HUB_PAGES.map((page) => (
+                {CLUSTER_HUB_PAGES.map((page) => (
+                  <Route
+                    key={page.path}
+                    path={page.path}
+                    element={<ClusterHubLandingPage pagePath={page.path} />}
+                  />
+                ))}
+
+                {INTENT_LANDING_PAGES.map((page) => (
+                  <Route
+                    key={page.path}
+                    path={page.path}
+                    element={<IntentLandingPage pagePath={page.path} />}
+                  />
+                ))}
+
+                {SEO_CONTENT_PAGES.map((page) => (
+                  <Route
+                    key={page.path}
+                    path={page.path}
+                    element={<SeoContentPage pagePath={page.path} />}
+                  />
+                ))}
+
                 <Route
-                  key={page.path}
-                  path={page.path}
-                  element={<ClusterHubLandingPage pagePath={page.path} />}
+                  path="/home"
+                  element={
+                    <ProtectedRoute>
+                      <HomePage />
+                    </ProtectedRoute>
+                  }
                 />
-              ))}
 
-              {INTENT_LANDING_PAGES.map((page) => (
                 <Route
-                  key={page.path}
-                  path={page.path}
-                  element={<IntentLandingPage pagePath={page.path} />}
+                  path="/folder/:folderId"
+                  element={
+                    <ProtectedRoute>
+                      <main className="flex-1 overflow-auto">
+                        <FolderView folderId={urlFolderId || ""} viewMode="grid" />
+                      </main>
+                    </ProtectedRoute>
+                  }
                 />
-              ))}
 
-              {SEO_CONTENT_PAGES.map((page) => (
                 <Route
-                  key={page.path}
-                  path={page.path}
-                  element={<SeoContentPage pagePath={page.path} />}
+                  path="/billing"
+                  element={
+                    <ProtectedRoute>
+                      <main className="flex-1 overflow-auto">
+                        <BillingPage onBack={goHome} />
+                      </main>
+                    </ProtectedRoute>
+                  }
                 />
-              ))}
 
-              <Route
-                path="/home"
-                element={
-                  <ProtectedRoute>
-                    <HomePage />
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/admin/feedback"
+                  element={
+                    <ProtectedRoute>
+                      <AdminFeedbackPage />
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route
-                path="/folder/:folderId"
-                element={
-                  <ProtectedRoute>
-                    <main className="flex-1 overflow-auto">
-                      <FolderView folderId={urlFolderId || ""} viewMode="grid" />
-                    </main>
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/share/fork/:token"
+                  element={
+                    <ProtectedRoute>
+                      <main className="flex-1 overflow-auto">
+                        <ForkNotebookPage />
+                      </main>
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route
-                path="/billing"
-                element={
-                  <ProtectedRoute>
-                    <main className="flex-1 overflow-auto">
-                      <BillingPage onBack={() => navigate("/home")} />
-                    </main>
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/notebook/:id"
+                  element={
+                    <ProtectedRoute requireNotebookAccess={true}>
+                      <ChatStreamingProvider
+                        activeNotebookId={dataNotebookId}
+                        sources={sources}
+                        documents={documents}
+                        activeConversationId={activeConversationId}
+                        conversations={conversations}
+                        onSelectConversation={setActiveConversationId}
+                        onCreateConversation={handleCreateConversation}
+                        onRenameConversation={handleRenameConversation}
+                        onDeleteConversation={handleDeleteConversationAndReselect}
+                        onSaveChatOptimistic={setOptimisticSaveNote}
+                      >
+                        <SourcesProvider value={sourcesContextValue}>
+                          <StudioProvider value={studioContextValue}>
+                            <NotebookView />
+                          </StudioProvider>
+                        </SourcesProvider>
+                      </ChatStreamingProvider>
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route
-                path="/admin/feedback"
-                element={
-                  <ProtectedRoute>
-                    <AdminFeedbackPage />
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/notebook/:id/table/:tableId"
+                  element={
+                    <ProtectedRoute requireNotebookAccess={true}>
+                      <LiteratureTablePage />
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route
-                path="/share/fork/:token"
-                element={
-                  <ProtectedRoute>
-                    <main className="flex-1 overflow-auto">
-                      <ForkNotebookPage />
-                    </main>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/notebook/:id"
-                element={
-                  <ProtectedRoute requireNotebookAccess={true}>
-                    <ChatStreamingProvider value={chatStreamingContextValue}>
-                      <SourcesProvider value={sourcesContextValue}>
-                        <StudioProvider value={studioContextValue}>
-                          <NotebookView />
-                        </StudioProvider>
-                      </SourcesProvider>
-                    </ChatStreamingProvider>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/notebook/:id/table/:tableId"
-                element={
-                  <ProtectedRoute requireNotebookAccess={true}>
-                    <LiteratureTablePage />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/notebook/:id/report/:reportId"
-                element={
-                  <ProtectedRoute requireNotebookAccess={true}>
-                    <LiteratureReportPage />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
+                <Route
+                  path="/notebook/:id/report/:reportId"
+                  element={
+                    <ProtectedRoute requireNotebookAccess={true}>
+                      <LiteratureReportPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </Suspense>
           </RouteTransition>
         </NotebookProvider>
       </div>
@@ -567,13 +606,11 @@ const App: React.FC = () => {
         <ThemeProvider>
           <MotionProvider>
             <AuthProvider>
-              <ToastProvider>
-                <FeedbackProvider>
-                  <AppContent />
-                  <FeedbackModal />
-                </FeedbackProvider>
-                <Toaster position="bottom-right" />
-              </ToastProvider>
+              <FeedbackProvider>
+                <AppContent />
+                <FeedbackModal />
+              </FeedbackProvider>
+              <Toaster position="bottom-right" />
             </AuthProvider>
           </MotionProvider>
         </ThemeProvider>

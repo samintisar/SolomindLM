@@ -116,13 +116,13 @@ describe("parseStreamBody — __TOOL_CALL merging", () => {
     expect(result.toolCalls).toHaveLength(2);
   });
 
-  it("sets toolCall to last entry (backward compat)", () => {
+  it("keeps first-seen order, with the newest tool last", () => {
     const tool1 = { tool: "web_search", query: "a", status: "done" };
     const tool2 = { tool: "academic_search", query: "b", status: "done" };
     const result = parseStreamBody(
       `__TOOL_CALL:${JSON.stringify(tool1)}\n__TOOL_CALL:${JSON.stringify(tool2)}`
     );
-    expect(result.toolCall!.tool).toBe("academic_search");
+    expect(result.toolCalls.map((tc) => tc.tool)).toEqual(["web_search", "academic_search"]);
   });
 
   it("ignores malformed __TOOL_CALL JSON", () => {
@@ -153,13 +153,13 @@ describe("parseStreamBody — __GROUNDING parsing", () => {
     expect(result.groundingChecks![0].soft).toBe(true);
   });
 
-  it("sets groundingCheck to last entry (backward compat)", () => {
+  it("appends grounding lines in stream order", () => {
     const check1 = { passed: true, issues: [], message: "First" };
     const check2 = { passed: false, issues: ["x"], message: "Second" };
     const result = parseStreamBody(
       `__GROUNDING:${JSON.stringify(check1)}\n__GROUNDING:${JSON.stringify(check2)}`
     );
-    expect(result.groundingCheck!.message).toBe("Second");
+    expect(result.groundingChecks.map((g) => g.message)).toEqual(["First", "Second"]);
   });
 
   it("ignores malformed grounding JSON", () => {

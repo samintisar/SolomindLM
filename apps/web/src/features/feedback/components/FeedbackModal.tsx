@@ -1,4 +1,4 @@
-import { Bug, Lightbulb, Loader2 } from "lucide-react";
+import { Bug, Lightbulb } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
+import { Spinner } from "@/shared/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { useToast } from "@/shared/contexts/useToast";
@@ -137,7 +138,7 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
           Cancel
         </Button>
         <Button type="button" onClick={onSubmit} disabled={submitting}>
-          {submitting && <Loader2 className="size-4 animate-spin" />}
+          {submitting && <Spinner aria-hidden />}
           {submitting ? "Sending…" : "Send"}
         </Button>
       </DialogFooter>

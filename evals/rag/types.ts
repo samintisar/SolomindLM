@@ -11,36 +11,42 @@ import type { Scorecard } from "./reports/scorecard";
 // ─── Fixtures ────────────────────────────────────────────────
 
 /** Studio agent kinds that can be evaluated. Each corresponds to a Convex eval action. */
-export type StudioRunnerKind =
-  | "report"
-  | "flashcards"
-  | "quiz"
-  | "mindmap"
-  | "infographic"
-  | "spreadsheet"
-  | "writtenQuestions"
-  | "audioScript"
-  | "audioScriptOnly";
+export const STUDIO_RUNNER_KINDS = [
+  "report",
+  "flashcards",
+  "quiz",
+  "mindmap",
+  "infographic",
+  "spreadsheet",
+  "writtenQuestions",
+  "audioScript",
+  "audioScriptOnly",
+] as const;
+
+export type StudioRunnerKind = (typeof STUDIO_RUNNER_KINDS)[number];
 
 type LiteratureReviewRunnerKind = "literatureReview";
 
-/** Dataset split for offline eval loops (smoke = fast gate, train = iterate, holdout = rare confirm). */
-export type EvalSplit = "smoke" | "train" | "holdout";
-
 /** All runner kinds (RAG + studio). `"both"` is a fixture-side directive that expands into multiple runs. */
-export type RunnerKind =
-  | "chat"
-  | "research"
-  | "both"
-  | StudioRunnerKind
-  | LiteratureReviewRunnerKind;
+export const RUNNER_KINDS = [
+  "chat",
+  "research",
+  "literatureReview",
+  "both",
+  ...STUDIO_RUNNER_KINDS,
+] as const;
+
+export type RunnerKind = (typeof RUNNER_KINDS)[number];
 
 /** Concrete runner emitted on artifacts/metrics (no `"both"`). */
-export type ConcreteRunnerKind =
-  | "chat"
-  | "research"
-  | StudioRunnerKind
-  | LiteratureReviewRunnerKind;
+export type ConcreteRunnerKind = Exclude<RunnerKind, "both">;
+
+export function isStudioRunner(runner: string): runner is StudioRunnerKind {
+  return (STUDIO_RUNNER_KINDS as readonly string[]).includes(runner);
+}
+
+/** Dataset split for offline eval loops (smoke = fast gate, train = iterate, holdout = rare confirm). */
+export type EvalSplit = "smoke" | "train" | "holdout";
 
 /**
  * Optional studio-specific generation parameters threaded through to the

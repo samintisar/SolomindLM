@@ -3,8 +3,7 @@
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { findFlashcardDefect } from "./flashcardDefects.js";
-import { PROBLEMATIC_PHRASES } from "./prompts.js";
-import type { Flashcard } from "./state.js";
+import { type Flashcard, PROBLEMATIC_PHRASES } from "./prompts.js";
 import { cleanBackText, cleanFrontText } from "./textCleanup.js";
 
 export interface SimilarFlashcardGroup {

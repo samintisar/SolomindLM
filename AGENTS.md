@@ -31,7 +31,7 @@ bun run lint                   # Biome (lint:fix to auto-fix); lint:design = sha
 bun run test:convex            # vitest + convex-test (~1,800 tests, ~20s)
 bun run test:web               # vitest for web utilities, hooks and components
 bun run test:e2e               # Playwright
-bun run eval:rag --case <id>   # or --runner <name> (space, not `=`); eval:studio only for cross-cutting work
+bun run eval:rag --case <id>   # or --runner <name>; eval:studio only for cross-cutting work
 ```
 
 ## Validation gates (in order)

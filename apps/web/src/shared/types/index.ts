@@ -137,13 +137,16 @@ export interface Message {
     error?: string;
   };
   /** External sources discovered during chat (web, academic, news, finance) */
-  externalSources?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    sourceType: string;
-    score?: number;
-  }>;
+  externalSources?: ExternalSource[];
+}
+
+/** A web/academic/news/finance result surfaced by chat search, addable to the notebook. */
+export interface ExternalSource {
+  title: string;
+  url: string;
+  snippet: string;
+  sourceType: string;
+  score?: number;
 }
 
 export interface StudioTool {
@@ -278,7 +281,7 @@ export interface QuizNote extends BaseNote {
 }
 
 // Audio note - audio overview with transcript
-export interface AudioNote extends BaseNote {
+interface AudioNote extends BaseNote {
   type: "audio";
   content: string; // transcript
   metadata: {
@@ -404,10 +407,6 @@ export function isQuizNote(note: Note): note is QuizNote {
   return note.type === "quiz";
 }
 
-export function isAudioNote(note: Note): note is AudioNote {
-  return note.type === "audio";
-}
-
 export function isAudioOverviewNote(note: Note): note is AudioOverviewNote {
   return note.type === "audioOverview";
 }
@@ -465,41 +464,6 @@ export interface FolderItem {
   notebookCount: number;
   created_at: string | number;
   updated_at: string | number;
-}
-
-export interface Document {
-  id: string;
-  user_id: string;
-  note_id: string;
-  title?: string;
-  file_name: string;
-  file_type: "file" | "url" | "youtube";
-  file_url?: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface UploadResponse {
-  message: string;
-  documentId: string;
-  status: string;
-}
-
-/** Payload for `documents.upload` with `type: "paper_record"` */
-export interface PaperRecordInput {
-  abstract: string;
-  authors: string[];
-  doi?: string;
-  venue?: string;
-  publicationYear?: number;
-  openAlexId?: string;
-  semanticScholarId?: string;
-  isOa: boolean;
-  pdfUrl?: string;
-  landingPageUrl?: string;
-  license?: string;
 }
 
 /**

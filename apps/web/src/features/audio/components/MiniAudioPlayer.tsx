@@ -2,8 +2,7 @@ import { ChevronUp, Download, X } from "lucide-react";
 import React, { useEffect, useRef } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
-import { useAudioPlayer } from "../hooks/useAudioPlayer";
-import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
+import { useResolvedAudioPlayer } from "../hooks/useResolvedAudioPlayer";
 import { PlayButton } from "./controls/PlayButton";
 import { SkipButton } from "./controls/SkipButton";
 import { SpeedPill } from "./controls/SpeedPill";
@@ -16,6 +15,7 @@ interface MiniAudioPlayerProps {
   /** When set, `audioUrl` is resolved on the server via `storage.getUrl` (handles legacy `/audio/...`). */
   audioOverviewId?: string;
   title?: string;
+  /** @deprecated Unused: the mini player shows no transcript. Kept until Studio stops passing it. */
   transcript?: string;
   isVisible: boolean;
   onClose: () => void;
@@ -26,30 +26,28 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
   audioUrl,
   audioOverviewId,
   title = "Audio Overview",
-  transcript: _transcript,
   isVisible,
   onClose,
   onExpand,
 }) => {
-  const resolvedPlayback = useResolvedAudioPlaybackUrl(audioUrl, audioOverviewId);
-  const audioSource = typeof resolvedPlayback === "string" ? resolvedPlayback : null;
   const {
     audioRef,
+    audioSource,
+    canPlay,
     canSeek,
     currentTime,
     cyclePlaybackRate,
     duration,
     error,
     isPlaying,
+    isResolving,
+    isUnavailable,
     play,
     playbackRate,
     seekTo,
     skipBy,
     togglePlay,
-  } = useAudioPlayer(audioSource);
-  const isResolving = resolvedPlayback === undefined;
-  const isUnavailable = resolvedPlayback === null;
-  const canPlay = !!audioSource && !error;
+  } = useResolvedAudioPlayer(audioUrl, audioOverviewId);
 
   /** Autoplay once per visible session / source — must not depend on `isPlaying` or pause immediately resumes. */
   const lastAutoplaySourceRef = useRef<string | null>(null);

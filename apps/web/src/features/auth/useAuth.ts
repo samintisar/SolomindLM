@@ -12,11 +12,9 @@ export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  authError: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
-  clearAuthError: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

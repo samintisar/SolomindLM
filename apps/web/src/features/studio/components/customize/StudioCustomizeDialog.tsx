@@ -48,6 +48,19 @@ function useReturnFocusToOpener() {
   };
 }
 
+/** Props every Studio Customize modal takes; `onGenerate` hands back the form's settings. */
+export interface StudioCustomizeModalProps<TConfig> {
+  isOpen: boolean;
+  onClose: () => void;
+  onGenerate: (config: TConfig) => void;
+  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
+  embedded?: boolean;
+  /** Pins light-theme tokens on always-light pages (the auth page). */
+  theme?: StudioDialogTheme;
+  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
+  preview?: boolean;
+}
+
 interface StudioCustomizeDialogProps {
   open: boolean;
   onClose: () => void;

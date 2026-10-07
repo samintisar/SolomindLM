@@ -1,7 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "convex/react";
-import { useMemo } from "react";
 
 /**
  * Resolves an audio playback URL server-side to a signed, time-limited Convex
@@ -32,12 +31,7 @@ export function useResolvedAudioPlaybackUrl(
     !audioOverviewId && audioUrl ? { audioUrl } : "skip"
   );
 
-  return useMemo((): string | undefined | null => {
-    if (audioOverviewId) {
-      if (overviewResolved === undefined) return undefined;
-      return overviewResolved?.url ?? null;
-    }
-    if (rawResolved === undefined) return undefined;
-    return rawResolved?.url ?? null;
-  }, [audioOverviewId, overviewResolved, rawResolved]);
+  const resolved = audioOverviewId ? overviewResolved : rawResolved;
+  if (resolved === undefined) return undefined;
+  return resolved?.url ?? null;
 }

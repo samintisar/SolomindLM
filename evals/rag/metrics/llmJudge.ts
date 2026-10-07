@@ -7,6 +7,7 @@
  */
 
 import type { EvalFixture, EvalRunArtifact, MetricResult, MetricStatus } from "../types";
+import { metricResult } from "./metricResult";
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -109,27 +110,6 @@ Respond in JSON:
 }`;
 
 // ─── Helpers ───────────────────────────────────────────────────────
-
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  status: MetricStatus,
-  score: number,
-  detail: string,
-  breakdown?: Record<string, unknown>
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status,
-    score,
-    detail,
-    ...(breakdown ? { breakdown } : {}),
-  };
-}
 
 function statusFromScore(score: number): "pass" | "warn" | "fail" {
   if (score >= 0.8) return "pass";
@@ -274,7 +254,7 @@ export async function llmJudgeCorrectness(
   options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   if (!fixture.expectedAnswer) {
-    return baseMetric(
+    return metricResult(
       "llm_judge_correctness",
       fixture,
       artifact,
@@ -319,13 +299,13 @@ export async function llmJudgeCorrectness(
       detail += `\nHallucinations: ${hallucinations.join(", ")}`;
     }
 
-    return baseMetric("llm_judge_correctness", fixture, artifact, status, score, detail, {
+    return metricResult("llm_judge_correctness", fixture, artifact, status, score, detail, {
       model,
       hallucinations,
       missing,
     });
   } catch (err) {
-    return baseMetric(
+    return metricResult(
       "llm_judge_correctness",
       fixture,
       artifact,
@@ -352,7 +332,7 @@ async function llmJudgeFaithfulness(
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   if (retrievedContext.length < 50) {
-    return baseMetric(
+    return metricResult(
       "llm_judge_faithfulness",
       fixture,
       artifact,
@@ -389,13 +369,13 @@ async function llmJudgeFaithfulness(
       detail += `\nUnsupported claims: ${hallucinations.join(", ")}`;
     }
 
-    return baseMetric("llm_judge_faithfulness", fixture, artifact, status, score, detail, {
+    return metricResult("llm_judge_faithfulness", fixture, artifact, status, score, detail, {
       model,
       hallucinations,
       supportedClaims: supportedClaims.length,
     });
   } catch (err) {
-    return baseMetric(
+    return metricResult(
       "llm_judge_faithfulness",
       fixture,
       artifact,
@@ -446,12 +426,12 @@ async function llmJudgeCompleteness(
       detail += `\nMissing aspects: ${missingAspects.join(", ")}`;
     }
 
-    return baseMetric("llm_judge_completeness", fixture, artifact, status, score, detail, {
+    return metricResult("llm_judge_completeness", fixture, artifact, status, score, detail, {
       model,
       missingAspects,
     });
   } catch (err) {
-    return baseMetric(
+    return metricResult(
       "llm_judge_completeness",
       fixture,
       artifact,
@@ -470,16 +450,12 @@ export async function scoreAllLlmJudgeMetrics(
   artifact: EvalRunArtifact,
   options: LlmJudgeOptions = {}
 ): Promise<MetricResult[]> {
-  const results: MetricResult[] = [];
-
-  // Only run if expectedAnswer is set (otherwise LLM judge has nothing to compare to)
-  if (fixture.expectedAnswer) {
-    results.push(await llmJudgeCorrectness(fixture, artifact, options));
-  }
-
-  // Faithfulness and completeness don't require expectedAnswer
-  results.push(await llmJudgeFaithfulness(fixture, artifact, options));
-  results.push(await llmJudgeCompleteness(fixture, artifact, options));
-
-  return results;
+  // Independent judges run concurrently; results keep this order.
+  return Promise.all([
+    // Only run if expectedAnswer is set (otherwise LLM judge has nothing to compare to)
+    ...(fixture.expectedAnswer ? [llmJudgeCorrectness(fixture, artifact, options)] : []),
+    // Faithfulness and completeness don't require expectedAnswer
+    llmJudgeFaithfulness(fixture, artifact, options),
+    llmJudgeCompleteness(fixture, artifact, options),
+  ]);
 }

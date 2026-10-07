@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useToast } from "@/shared/contexts/useToast";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 
 export interface StudioGenerationCatchOptions {
   placeholderId: string;
@@ -16,7 +16,7 @@ export interface StudioGenerationCatchOptions {
  * other errors → generic toast (no browser alert, minimal console noise).
  */
 export function useStudioGenerationCatch() {
-  const { handleLimitError } = useLimitErrorToast();
+  const { handleLimitError } = useErrorToast();
   const { error: showErrorToast } = useToast();
 
   return useCallback(

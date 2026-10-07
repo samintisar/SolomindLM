@@ -9,7 +9,7 @@ const resolveDoi = vi.fn();
 const upload = vi.fn();
 vi.mock("../../services/documentsApi", () => ({
   useResolveDoi: () => resolveDoi,
-  useUpload: () => upload,
+  useCreateDocument: () => upload,
 }));
 
 const notebookId = "nb1" as Id<"notebooks">;

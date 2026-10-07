@@ -51,12 +51,3 @@ export async function resolveResearchTitle(
     return fallbackResearchTitleFromQuery(q);
   }
 }
-
-/** Base title for literature table/report rows (report variant strips report prefixes). */
-export async function resolveResearchReportTitle(
-  ctx: ActionCtx,
-  args: { query: string; researchTitle?: string; finalResponse?: string }
-): Promise<string> {
-  const base = await resolveResearchTitle(ctx, args);
-  return deepResearchReportTitle(base);
-}

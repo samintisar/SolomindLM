@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowLeft,
   BookOpen,
   Brain,
   ChevronLeft,
@@ -9,7 +8,7 @@ import {
   Plus,
   RotateCw,
 } from "lucide-react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FlashcardBack,
   FlashcardFront,
@@ -20,11 +19,10 @@ import {
   useCardReview,
   useDeleteCard,
   useDueCards,
-  useFlashcard,
   useUpdateCard,
   useUpdateFlashcardPreferences,
-  useUpdateFlashcardProgress,
 } from "@/features/studio/services/flashcardsApi";
+import { usePersistLastViewedIndex } from "@/features/studio/services/studioProgressApi";
 import { Button } from "@/shared/components/ui/button";
 import { ButtonGroup } from "@/shared/components/ui/button-group";
 import {
@@ -40,22 +38,23 @@ import { Toggle } from "@/shared/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { cn } from "@/shared/utils/cn";
+import { studioErrorMessage } from "../../utils/studioErrorMessage";
 import { EditCardModal } from "./EditCardModal";
 import { ProficiencyBadge } from "./ProficiencyBadge";
 import { type DueFlashcard, StudyMode } from "./StudyMode";
 
 export interface FlashcardViewProps {
   note: FlashcardNote;
-  onBack?: () => void;
 }
 
 type ViewMode = "browse" | "study" | "edit";
 
-export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
+export const FlashcardView: React.FC<FlashcardViewProps> = ({ note }) => {
   // State
   const [mode, setMode] = useState<ViewMode>("browse");
-  const [showMastered, setShowMastered] = useState((note.metadata as any)?.showMastered ?? false);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showMastered, setShowMastered] = useState(note.metadata.showMastered ?? false);
+  // Resume where the learner left off; the clamp effect below bounds it to the visible cards.
+  const [currentIndex, setCurrentIndex] = useState(() => note.metadata.lastViewedIndex ?? 0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | undefined>(undefined);
@@ -63,9 +62,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   const [studySessionCards, setStudySessionCards] = useState<DueFlashcard[]>([]);
 
   // Hooks
-  const latestNote = useFlashcard(note.id);
-  const displayNote = latestNote ?? note;
-  const allCards = displayNote.flashcards;
+  const allCards = note.flashcards;
   const updateCard = useUpdateCard();
   const addCard = useAddCard();
   const deleteCard = useDeleteCard();
@@ -90,37 +87,21 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
     return allCards;
   }, [allCards, showMastered]);
 
-  // Initialize currentIndex from note.metadata.lastViewedIndex
-  const hasInitializedIndex = useRef(false);
-
-  useEffect(() => {
-    if (!hasInitializedIndex.current && displayNote) {
-      const savedIndex = (displayNote.metadata as any)?.lastViewedIndex ?? 0;
-      const boundedIndex = Math.min(savedIndex, Math.max(0, filteredCards.length - 1));
-      if (savedIndex > 0) {
-        setCurrentIndex(boundedIndex);
-      }
-      hasInitializedIndex.current = true;
-    }
-  }, [displayNote, filteredCards.length]);
-
   useEffect(() => {
     setCurrentIndex((prev) =>
       filteredCards.length === 0 ? 0 : Math.min(prev, filteredCards.length - 1)
     );
   }, [filteredCards.length]);
 
-  // Persist progress
-  const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateFlashcardProgress(note.id, stableCurrentIndex);
+  usePersistLastViewedIndex("flashcard", note.id, currentIndex);
 
   // Sync showMastered with server
   useEffect(() => {
-    const serverShowMastered = (latestNote?.metadata as any)?.showMastered;
+    const serverShowMastered = note.metadata.showMastered;
     if (serverShowMastered !== undefined && serverShowMastered !== showMastered) {
       setShowMastered(serverShowMastered);
     }
-  }, [latestNote, showMastered]);
+  }, [note, showMastered]);
 
   // Handlers
   const handleNext = () => {
@@ -219,22 +200,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   ] as const;
 
   return (
-    <div
-      className={cn(
-        "relative flex h-full min-h-0 flex-col gap-4 bg-background p-4 animate-in fade-in duration-300 sm:gap-6 sm:p-6 lg:p-8",
-        onBack && "pt-16 md:pt-0"
-      )}
-    >
-      {/* Mobile Back Button */}
-      {onBack && (mode === "browse" || mode === "study") && (
-        <div className="absolute top-0 right-0 left-0 z-20 flex items-center gap-2 border-b border-border bg-background px-4 py-3 md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-          <span className="truncate text-sm font-medium">{note.title}</span>
-        </div>
-      )}
-
+    <div className="relative flex h-full min-h-0 flex-col gap-4 bg-background p-4 animate-in fade-in duration-300 sm:gap-6 sm:p-6 lg:p-8">
       {/* Header Controls */}
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -334,7 +300,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
 
         {(mode === "browse" || mode === "edit") &&
           filteredCards.length === 0 &&
-          displayNote.status === "failed" && (
+          note.status === "failed" && (
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -342,21 +308,18 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                 </EmptyMedia>
                 <EmptyTitle>Generation failed</EmptyTitle>
                 <EmptyDescription>
-                  {displayNote.metadata?.error ||
-                    "Something went wrong while generating these flashcards."}
+                  {studioErrorMessage(
+                    note.metadata?.error,
+                    "Something went wrong while generating these flashcards."
+                  )}
                 </EmptyDescription>
               </EmptyHeader>
-              {onBack && (
-                <EmptyContent>
-                  <Button onClick={onBack}>Back to Studio to try again</Button>
-                </EmptyContent>
-              )}
             </Empty>
           )}
 
         {(mode === "browse" || mode === "edit") &&
           filteredCards.length === 0 &&
-          displayNote.status !== "failed" && (
+          note.status !== "failed" && (
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">

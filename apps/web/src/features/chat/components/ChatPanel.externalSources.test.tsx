@@ -65,11 +65,14 @@ vi.mock("react-virtuoso", () => ({
     itemContent: (index: number, item: unknown) => React.ReactNode;
   }) => <div>{data.map((item, i) => itemContent(i, item))}</div>,
 }));
-vi.mock("../useChatStreaming", () => ({ useChatStreamingContext: () => chat }));
+vi.mock("../useChatStreaming", () => ({
+  useChatStreamingContext: () => chat,
+  useChatMessages: () => chat.messages,
+}));
 vi.mock("../../sources/useSourcesContext", () => ({ useSourcesContext: () => ({ sources: [] }) }));
 vi.mock("@/features/auth/hooks/useHttpAuthToken", () => ({ useHttpAuthToken: () => null }));
-vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
-  useLimitErrorToast: () => ({ handleLimitError: async () => ({ isLimitError: false }) }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ handleLimitError: async () => ({ isLimitError: false }) }),
 }));
 vi.mock("@/features/sources/components/AcademicDiscoveryFiltersSection", () => ({
   buildAcademicDiscoveryApiFilters: () => ({}),
@@ -99,16 +102,16 @@ vi.mock("@/shared/components/MarkdownRenderer", () => ({
 }));
 vi.mock("./MessageBubble", () => ({
   MessageBubble: ({
-    externalSources: sources,
+    message,
     onOpenExternalSources,
     refHandlers,
   }: {
-    externalSources: unknown[];
+    message: Message;
     onOpenExternalSources: (sources: unknown[]) => void;
     refHandlers: RefHandlers;
   }) => (
     <>
-      <button type="button" onClick={() => onOpenExternalSources(sources)}>
+      <button type="button" onClick={() => onOpenExternalSources(message.externalSources ?? [])}>
         open sources
       </button>
       <button type="button" onClick={(e) => refHandlers.onRefToggle(1, "m1", e.currentTarget)}>

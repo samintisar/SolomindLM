@@ -7,6 +7,7 @@
 
 import Together from "together-ai";
 import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
+import { metricResult } from "./metricResult";
 
 // ============================================================
 // Configuration
@@ -67,25 +68,6 @@ interface VisionJudgeResult {
   overall: { score: number; reasoning: string };
 }
 
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  status: "pass" | "warn" | "fail" | "info",
-  score: number,
-  detail: string
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status,
-    score,
-    detail,
-  };
-}
-
 /**
  * Evaluate an infographic using a vision-capable LLM.
  * The image URL is extracted from the artifact's studio output.
@@ -106,7 +88,7 @@ export async function evaluateInfographicWithVision(
 
   if (!imageUrl) {
     return [
-      baseMetric(
+      metricResult(
         "vision_judge",
         fixture,
         artifact,
@@ -166,7 +148,7 @@ export async function evaluateInfographicWithVision(
     } catch (_parseErr) {
       // Metric could not be computed — return fail with score 0 to avoid polluting aggregates
       return [
-        baseMetric(
+        metricResult(
           "vision_judge",
           fixture,
           artifact,
@@ -184,7 +166,7 @@ export async function evaluateInfographicWithVision(
     const overallStatus = overallScore >= 0.7 ? "pass" : overallScore >= 0.4 ? "warn" : "fail";
 
     metrics.push(
-      baseMetric(
+      metricResult(
         "vision_judge_overall",
         fixture,
         artifact,
@@ -208,7 +190,7 @@ export async function evaluateInfographicWithVision(
         const score = dimResult.score ?? 0;
         const status = score >= 0.7 ? "pass" : score >= 0.4 ? "warn" : "fail";
         metrics.push(
-          baseMetric(
+          metricResult(
             `vision_judge_${dim}`,
             fixture,
             artifact,
@@ -224,7 +206,7 @@ export async function evaluateInfographicWithVision(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return [
-      baseMetric("vision_judge", fixture, artifact, "fail", 0, `Vision judge failed: ${message}`),
+      metricResult("vision_judge", fixture, artifact, "fail", 0, `Vision judge failed: ${message}`),
     ];
   }
 }

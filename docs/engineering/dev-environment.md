@@ -21,8 +21,8 @@ bun run convex:env:push:dry    # Dry run
 One-shot bootstrap: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`,
 appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Template:
 [`evals/rag/env.eval.example`](../../evals/rag/env.eval.example). The push script does NOT upload
-`RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case <id>` / `--runner <name>` for scoped runs (space, not `=`);
-`eval:studio` is for cross-cutting work. Use-case packs (`evals/rag/usecases/`): `bun run eval:seed`
+`RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case <id>` / `--runner <name>` for scoped runs (`--runner studio` selects the
+studio kinds); `eval:studio` is for cross-cutting work. Use-case packs (`evals/rag/usecases/`): `bun run eval:seed`
 then `bun run eval:usecases` (needs `RAG_EVAL_OWNER_EMAIL` on the dev deployment).
 
 ## Dev servers and worktrees
@@ -69,7 +69,8 @@ Canonical skill source: `.agents/skills/<name>/SKILL.md` (in git). Claude Code r
 (gitignored). After cloning, run once:
 
 ```bash
-bun run link:claude-skills     # Junction (Windows) / symlink (Unix)
+ln -s ../.agents/skills .claude/skills              # Unix
+cmd /c mklink /J .claude\skills .agents\skills      # Windows (junction)
 ```
 
 Convex agent skills can be installed with `npx convex ai-files install`.

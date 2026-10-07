@@ -4,7 +4,6 @@ import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
 import type { UnifiedDiscoveryResult } from "./DiscoveryService";
 import {
   discoverHandler,
-  discoverSourcesHandler,
   distributeResults,
   getRelevanceLabel,
   normalizeScore,
@@ -345,11 +344,6 @@ describe("DiscoveryService", () => {
 
 const hasTavilyKey = !!env.TAVILY_API_KEY;
 
-function isRateLimitOrCreditError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
-  return msg.includes("Insufficient credits") || msg.includes("rate limit") || msg.includes("429");
-}
-
 // Create a real runAction that calls the actual handlers
 const createRealRunAction = (): RunActionFn => {
   return async (_action, args) => {
@@ -525,43 +519,6 @@ describeIfKey("DiscoveryService - REAL Integration Tests", () => {
         if (source.metadata?.openAccess !== undefined) {
           expect(source.metadata.openAccess).toBe(true);
         }
-      }
-    }, 30000);
-  });
-
-  describe("discoverSourcesHandler - REAL Tavily API", () => {
-    it("calls Tavily with default parameters", async () => {
-      try {
-        const result = await discoverSourcesHandler({ query: "test query" }, createRealRunAction());
-
-        expect(Array.isArray(result)).toBe(true);
-        if (result.length > 0) {
-          expect(result[0].title).toBeTruthy();
-          expect(result[0].url).toBeTruthy();
-        }
-      } catch (error) {
-        if (isRateLimitOrCreditError(error)) {
-          console.log("Skipping test: Tavily API rate limited or out of credits");
-          return;
-        }
-        throw error;
-      }
-    }, 30000);
-
-    it("passes custom maxResults", async () => {
-      try {
-        const result = await discoverSourcesHandler(
-          { query: "test", maxResults: 3 },
-          createRealRunAction()
-        );
-
-        expect(result.length).toBeLessThanOrEqual(3);
-      } catch (error) {
-        if (isRateLimitOrCreditError(error)) {
-          console.log("Skipping test: Tavily API rate limited or out of credits");
-          return;
-        }
-        throw error;
       }
     }, 30000);
   });

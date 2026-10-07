@@ -1,5 +1,5 @@
 import { ArrowRight, Plus } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
@@ -17,7 +17,16 @@ import { Accent, SectionHeading } from "./SectionHeading";
  * One question. Closed answers stay in the HTML (forceMount + the hidden attribute), as the FAQ
  * structured data lists every answer and find-in-page should reach them.
  */
-function FaqRow({ faq, defaultOpen }: { faq: FAQItem; defaultOpen: boolean }) {
+export function FaqRow({
+  faq,
+  defaultOpen,
+  children,
+}: {
+  faq: FAQItem;
+  defaultOpen: boolean;
+  /** Shown under the answer, e.g. a "learn more" link. */
+  children?: ReactNode;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Card variant="flush">
@@ -35,6 +44,7 @@ function FaqRow({ faq, defaultOpen }: { faq: FAQItem; defaultOpen: boolean }) {
           <p className="px-4 pt-1 pb-5 font-serif text-base leading-relaxed text-foreground/75">
             {faq.answer}
           </p>
+          {children ? <div className="px-4 pb-5">{children}</div> : null}
         </CollapsibleContent>
       </Collapsible>
     </Card>

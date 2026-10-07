@@ -13,7 +13,8 @@ import {
   Save,
   X,
 } from "lucide-react";
-import React, { lazy, Suspense, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { LazyMarkdown } from "@/shared/components/LazyMarkdown";
 import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
@@ -25,12 +26,9 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { sanitizeMarkdown } from "@/shared/utils";
+import { downloadFile } from "@/shared/utils/download";
 import { CitationStyle, CitationStylePicker } from "../CitationStylePicker";
 import { hasPrismaCounts, type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -82,16 +80,14 @@ const SectionRenderer: React.FC<SectionRendererProps> = ({ section, workflowProv
         <PrismaFlowDiagram counts={workflowProvenance} className="mb-6" />
       ) : null}
       <div className="prose max-w-none font-serif">
-        <Suspense fallback={<Skeleton className="h-4 w-full" />}>
-          <MarkdownRenderer>
-            {sanitizeMarkdown(
-              normalizeLiteratureReportSectionContent(
-                stripLeadingSectionHeadingLine(section.content, section.heading),
-                section.heading
-              )
-            )}
-          </MarkdownRenderer>
-        </Suspense>
+        <LazyMarkdown fallback={<Skeleton className="h-4 w-full" />}>
+          {sanitizeMarkdown(
+            normalizeLiteratureReportSectionContent(
+              stripLeadingSectionHeadingLine(section.content, section.heading),
+              section.heading
+            )
+          )}
+        </LazyMarkdown>
       </div>
     </section>
   );
@@ -233,16 +229,7 @@ function buildReportMarkdown(
 }
 
 function exportToMarkdown(report: LiteratureReport, filename: string) {
-  const content = buildReportMarkdown(report, {}, report.citationStyle);
-  const blob = new Blob([content], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadFile(buildReportMarkdown(report, {}, report.citationStyle), filename, "text/markdown");
 }
 
 export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
@@ -399,9 +386,9 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
               ))
           ) : report.content ? (
             <div className="prose max-w-none font-serif">
-              <Suspense fallback={<Skeleton className="h-4 w-full" />}>
-                <MarkdownRenderer>{sanitizeMarkdown(report.content)}</MarkdownRenderer>
-              </Suspense>
+              <LazyMarkdown fallback={<Skeleton className="h-4 w-full" />}>
+                {sanitizeMarkdown(report.content)}
+              </LazyMarkdown>
             </div>
           ) : (
             <Empty>

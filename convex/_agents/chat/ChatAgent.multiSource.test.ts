@@ -7,10 +7,10 @@ vi.hoisted(() => {
 });
 
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { ChatAgent } from "./ChatAgent";
 import { CONTEXT_TOKEN_BUDGET } from "./chatConfig";
 import { chunkDedupKey, selectChunksByTokenBudgetWithReservation } from "./chunkContext";
+import type { ReferenceChunk } from "./types";
 
 // Passages are chunked at up to ~1000 tokens; a full paper is ~20k tokens.
 const PASSAGE_TEXT = "word ".repeat(800);

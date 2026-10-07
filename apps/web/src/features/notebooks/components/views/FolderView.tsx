@@ -3,9 +3,8 @@ import React, { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/shared/components/ui/empty";
-import { useNotebookHandlers, useNotebookSorting } from "../../hooks";
+import { useNotebookDialogs, useNotebookSorting } from "../../hooks";
 import { useFolderNotebooks } from "../../services/foldersApi";
-import { useCreateNotebook } from "../../services/notebooksApi";
 import { useNotebookContext } from "../../useNotebookContext";
 import { NotebookCard } from "../cards/NotebookCard";
 import { CardGrid, CardGridItem, type ViewMode } from "../home/CardGrid";
@@ -23,17 +22,14 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   const ctx = useNotebookContext();
   const onBack = ctx.folderBack;
   const onSelectNotebook = ctx.selectNotebook;
-  const onUpdateNotebook = ctx.updateNotebook;
   const onDeleteNotebook = ctx.deleteNotebook;
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const folders = ctx.folders;
-  const onRequireAuth = ctx.onRequireAuth;
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
   // Use Convex hooks - undefined means loading, empty array means no results
   const folderNotebooks = useFolderNotebooks(folderId);
-  const createNotebook = useCreateNotebook();
 
   // Find folder from props - use useMemo to avoid recalculating
   const folder = useMemo(() => {
@@ -43,12 +39,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
     return null;
   }, [folders, folderId]);
 
-  // Custom hooks for state and handlers
-  const notebookHandlers = useNotebookHandlers({
-    notebooks: folderNotebooks ?? [],
-    onUpdateNotebook,
-    onDeleteNotebook,
-  });
+  const dialogs = useNotebookDialogs({ folderId });
 
   const { sortOption, setSortOption, getSortedNotebooks } = useNotebookSorting();
 
@@ -65,7 +56,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   const handleMoveNotebook = async (notebookId: string, targetFolderId: string | null) => {
     await onMoveNotebookToFolder(notebookId, targetFolderId);
     // Optimistic updates handle the UI update automatically
-    notebookHandlers.closeMoveToFolder();
+    dialogs.closeMoveToFolder();
   };
 
   // Loading state
@@ -130,7 +121,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
                 onSortChange={setSortOption}
               />
             </div>
-            <Button onClick={notebookHandlers.openCreateNotebook}>
+            <Button onClick={dialogs.openCreateNotebook}>
               <Plus />
               New notebook
             </Button>
@@ -156,8 +147,8 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
                     notebook={nb}
                     viewMode={viewMode}
                     onSelectNotebook={onSelectNotebook}
-                    onOpenCustomize={() => notebookHandlers.openCustomize(nb.id)}
-                    onOpenMoveToFolder={() => notebookHandlers.openMoveToFolder(nb.id)}
+                    onOpenCustomize={() => dialogs.openCustomize(nb.id)}
+                    onOpenMoveToFolder={() => dialogs.openMoveToFolder(nb.id)}
                     onDeleteNotebook={handleDeleteNotebook}
                   />
                 </CardGridItem>
@@ -168,55 +159,24 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
       </div>
 
       {/* CUSTOMIZE NOTEBOOK MODAL */}
-      {(notebookHandlers.customizingId || notebookHandlers.isCreatingNotebook) && (
+      {(dialogs.customizingId || dialogs.isCreatingNotebook) && (
         <CustomizeNotebookModal
           notebook={
-            notebookHandlers.isCreatingNotebook
+            dialogs.isCreatingNotebook
               ? undefined
-              : sortedNotebooks.find((n) => n.id === notebookHandlers.customizingId)
+              : sortedNotebooks.find((n) => n.id === dialogs.customizingId)
           }
-          onClose={notebookHandlers.closeCustomize}
-          onSave={async (data) => {
-            if (notebookHandlers.isCreatingNotebook) {
-              try {
-                // Create notebook using hook
-                await createNotebook({
-                  title: data.title,
-                  coverColor: data.coverColor,
-                  icon: data.icon,
-                  folderId: folderId,
-                });
-                notebookHandlers.closeCustomize();
-                // Optimistic updates handle the UI update automatically
-              } catch (error) {
-                console.error("Failed to create notebook:", error);
-                const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                if (
-                  errorMessage.includes("Unauthorized") ||
-                  errorMessage.includes("Unauthenticated")
-                ) {
-                  notebookHandlers.closeCustomize();
-                  onRequireAuth("You need to sign in to create a notebook.");
-                  return;
-                }
-                // Anything else is reported by the dialog.
-                throw error;
-              }
-            } else {
-              await onUpdateNotebook(notebookHandlers.customizingId!, data);
-              notebookHandlers.closeCustomize();
-              // Optimistic updates handle the UI update automatically
-            }
-          }}
+          onClose={dialogs.closeCustomize}
+          onSave={dialogs.saveNotebook}
         />
       )}
 
       {/* MOVE TO FOLDER MODAL */}
-      {notebookHandlers.movingNotebookId && (
+      {dialogs.movingNotebookId && (
         <MoveToFolderModal
-          notebookId={notebookHandlers.movingNotebookId}
+          notebookId={dialogs.movingNotebookId}
           folders={folders}
-          onClose={notebookHandlers.closeMoveToFolder}
+          onClose={dialogs.closeMoveToFolder}
           onMove={handleMoveNotebook}
         />
       )}

@@ -2,7 +2,6 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { FieldGroup, FieldLegend, FieldSet } from "@/shared/components/ui/field";
-import type { StudioDialogTheme } from "./customize/dialogContext";
 import { InfographicStyleThumbnail } from "./customize/InfographicStyleThumbnail";
 import { OptionCard } from "./customize/OptionCard";
 import { OptionToggleGroup } from "./customize/OptionToggleGroup";
@@ -13,6 +12,7 @@ import {
   StudioCustomizeDialog,
   StudioCustomizeFooter,
   StudioCustomizeHeader,
+  type StudioCustomizeModalProps,
 } from "./customize/StudioCustomizeDialog";
 
 interface VisualStyle {
@@ -54,17 +54,7 @@ const DETAIL_OPTIONS = [
   { value: "standard", label: "Standard" },
 ] as const satisfies readonly ToggleOption<InfographicConfig["detailLevel"]>[];
 
-interface CustomizeInfographicModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onGenerate: (config: InfographicConfig) => void;
-  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
-  embedded?: boolean;
-  /** Pins light-theme tokens on always-light pages (the auth page). */
-  theme?: StudioDialogTheme;
-  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
-  preview?: boolean;
-}
+type CustomizeInfographicModalProps = StudioCustomizeModalProps<InfographicConfig>;
 
 export interface InfographicConfig {
   orientation: "landscape" | "portrait" | "square";
@@ -75,20 +65,10 @@ export interface InfographicConfig {
 
 export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps> = ({
   isOpen,
-  onClose,
   onGenerate,
-  embedded = false,
-  theme,
-  preview = false,
+  ...dialogProps
 }) => (
-  <StudioCustomizeDialog
-    open={isOpen}
-    onClose={onClose}
-    embedded={embedded}
-    theme={theme}
-    preview={preview}
-    wide
-  >
+  <StudioCustomizeDialog open={isOpen} {...dialogProps} wide>
     <InfographicForm onGenerate={onGenerate} />
   </StudioCustomizeDialog>
 );

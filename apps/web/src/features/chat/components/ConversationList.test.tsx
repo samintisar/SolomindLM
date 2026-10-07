@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import type * as React from "react";
 import { toast as sonner } from "sonner";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { ToastProvider } from "@/shared/contexts/ToastContext";
 import { ConversationList } from "./ConversationList";
 
 const conversations = [
@@ -25,11 +24,7 @@ function setup(over: Partial<React.ComponentProps<typeof ConversationList>> = {}
     onTogglePin: vi.fn(),
     ...over,
   };
-  render(
-    <ToastProvider>
-      <ConversationList {...props} />
-    </ToastProvider>
-  );
+  render(<ConversationList {...props} />);
   return props;
 }
 
