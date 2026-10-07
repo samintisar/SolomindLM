@@ -84,7 +84,8 @@ describe("intent landing SEO registry", () => {
 
       const structuredData = page!.structuredData as Record<string, unknown>[];
       expect(structuredData.some((item) => item["@type"] === "BreadcrumbList")).toBe(true);
-      expect(structuredData.some((item) => item["@type"] === "TechArticle")).toBe(true);
+      const articleType = getSeoContentPageByPath(path)!.articleType;
+      expect(structuredData.some((item) => item["@type"] === articleType)).toBe(true);
       expect(structuredData.some((item) => item["@type"] === "FAQPage")).toBe(true);
     }
   });

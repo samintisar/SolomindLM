@@ -1,5 +1,6 @@
 import {
   getSeoContentBreadcrumbItems,
+  getSeoContentLastUpdated,
   type SeoContentPageConfig,
 } from "@/features/landing/seoContentPages";
 import { escapeHtml } from "./seoHtml";
@@ -20,17 +21,27 @@ export function buildSeoContentPrerenderBody(page: SeoContentPageConfig): string
   const quickAnswer = page.quickAnswer
     ? `      <section aria-labelledby="seo-prerender-quick-answer">
         <h2 id="seo-prerender-quick-answer">Quick answer</h2>
-        ${page.quickAnswer.chooseCompetitor ? `<p><strong>NotebookLM:</strong> ${escapeHtml(page.quickAnswer.chooseCompetitor)}</p>` : ""}
+        ${page.quickAnswer.chooseCompetitor ? `<p><strong>${escapeHtml(page.competitorName ?? "Alternative")}:</strong> ${escapeHtml(page.quickAnswer.chooseCompetitor)}</p>` : ""}
         <p><strong>SolomindLM:</strong> ${escapeHtml(page.quickAnswer.chooseSolomindlm)}</p>
       </section>`
     : "";
+
+  const sources =
+    page.sources && page.sources.length > 0
+      ? `        <p>${escapeHtml(page.competitorName ?? "Alternative")} details checked ${escapeHtml(getSeoContentLastUpdated(page))} against: ${page.sources
+          .map(
+            (source) =>
+              `<a href="${escapeHtml(source.url)}" rel="noopener noreferrer">${escapeHtml(source.label)}</a>`
+          )
+          .join(", ")}.</p>`
+      : "";
 
   const comparisonTable = page.comparisonTable
     ? `      <section aria-labelledby="seo-prerender-comparison">
         <h2 id="seo-prerender-comparison">Comparison</h2>
         <table>
           <thead>
-            <tr><th>Topic</th><th>SolomindLM</th><th>NotebookLM</th></tr>
+            <tr><th>Topic</th><th>SolomindLM</th><th>${escapeHtml(page.competitorName ?? "Alternative")}</th></tr>
           </thead>
           <tbody>
 ${page.comparisonTable
@@ -41,6 +52,7 @@ ${page.comparisonTable
   .join("\n")}
           </tbody>
         </table>
+${sources}
       </section>`
     : "";
 
