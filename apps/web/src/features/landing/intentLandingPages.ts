@@ -10,6 +10,10 @@ export type IntentLandingPageConfig = {
   description: string;
   keywords: string;
   h1: string;
+  /** Phrase inside `h1` shown in the accent colour. */
+  h1Accent?: string;
+  /** One-line description shown on link cards (60 characters at most). */
+  cardBlurb: string;
   subheadline: string;
   conversionPromise: string;
   proofBullets: string[];
@@ -54,6 +58,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     keywords:
       "upload PDF, study sources, YouTube transcript, Google Drive, paste text, course materials",
     h1: "Upload all your study sources in one place",
+    h1Accent: "in one place",
+    cardBlurb: "PDFs, slides, audio, YouTube, Drive or pasted text.",
     subheadline:
       "Bring lectures, readings, and media into a notebook so you can search, chat, and generate study materials from your own content.",
     conversionPromise:
@@ -99,6 +105,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Find web and news articles to add to your notebook. Search general web or finance-focused channels and import up to 20 results per search.",
     keywords: "discover sources, web search, news articles, study research, finance news",
     h1: "Discover web and news sources for your notebook",
+    h1Accent: "for your notebook",
+    cardBlurb: "Find web and news articles to add beside your uploads.",
     subheadline:
       "Search the web or news channels, preview results, and add relevant pages to your notebook for reading and generation.",
     conversionPromise:
@@ -144,6 +152,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Share notebooks with coworkers via view links or let others fork a copy. Revoke access when you no longer want to share.",
     keywords: "share notebook, study group, fork notebook, collaborate, revoke link",
     h1: "Share notebooks with classmates or study groups",
+    h1Accent: "or study groups",
+    cardBlurb: "Give classmates a link to view or fork your notebook.",
     subheadline:
       "Send a link for view-only access or let others fork their own copy. You stay in control and can revoke sharing anytime.",
     conversionPromise: "Sign up free to create a notebook and generate your first share link.",
@@ -189,6 +199,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     keywords:
       "AI flashcards from PDF, pdf to flashcards free, ai flashcard generator free, make ai flashcards from pdf, ai generate flashcards from pdf",
     h1: "Make AI flashcards from your PDF in minutes",
+    h1Accent: "from your PDF",
+    cardBlurb: "Spaced repetition from your own PDF.",
     subheadline:
       "Upload a PDF or lecture notes, generate flashcards online, review the draft deck, and study with spaced repetition inside your notebook.",
     conversionPromise:
@@ -244,6 +256,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Create multiple-choice quizzes from your sources. Set question count, difficulty, and focus areas. Separate from the Written Questions tool for short and essay answers.",
     keywords: "AI quiz, multiple choice, practice test, exam prep, study quiz",
     h1: "Multiple-choice quizzes from your study materials",
+    h1Accent: "from your study materials",
+    cardBlurb: "Multiple choice that explains every answer.",
     subheadline:
       "Generate practice quizzes with configurable count, difficulty, and topic focus—all multiple-choice. For essay or short-answer exams, use Written Questions instead.",
     heroCrossLink: {
@@ -294,6 +308,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Listen to AI-narrated overviews of your sources. Choose format—deep dive, brief, critique, or debate—plus length and focus.",
     keywords: "audio study, podcast summary, listen to notes, AI narration, deep dive",
     h1: "Audio overviews you can listen to on the go",
+    h1Accent: "on the go",
+    cardBlurb: "A spoken recap of your sources to play anywhere.",
     subheadline:
       "Generate narrated summaries from your notebook sources with format, length, and focus options.",
     conversionPromise:
@@ -338,6 +354,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Build visual mind maps from your uploaded sources. See how concepts connect across readings and lectures.",
     keywords: "mind map, concept map, visual study, AI mind map, study diagram",
     h1: "Visual mind maps from your sources",
+    h1Accent: "from your sources",
+    cardBlurb: "See how the ideas in a chapter connect.",
     subheadline:
       "Map concepts and relationships from your notebook materials in an interactive diagram you can explore and adjust.",
     conversionPromise: "Sign up free and map your first chapter or lecture in a mind map.",
@@ -381,6 +399,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Generate reports from your sources: study guide, summary, briefing, concept explainer, or custom. Grounded in the materials you select.",
     keywords: "study guide, AI summary, briefing, concept explainer, report generator",
     h1: "Reports and study guides from your materials",
+    h1Accent: "from your materials",
+    cardBlurb: "Study guides and briefings with clear sections.",
     subheadline:
       "Pick a report type—study guide, summary, briefing, concept explainer, or custom—and generate a draft from your sources.",
     conversionPromise:
@@ -426,6 +446,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Create infographic images from your sources. Choose style, orientation, and detail level for visual study aids.",
     keywords: "infographic, visual summary, study poster, AI image, learning visual",
     h1: "Infographics that visualize your study content",
+    h1Accent: "your study content",
+    cardBlurb: "A one-page visual summary of a process or topic.",
     subheadline:
       "Turn key ideas from your sources into an image with controls for style, orientation, and detail.",
     conversionPromise: "Start free and generate a visual summary of your next topic.",
@@ -470,6 +492,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Practice short-answer and essay questions from your sources. Submit responses for feedback—separate from multiple-choice Quizzes.",
     keywords: "essay practice, short answer, written response, study feedback, exam practice",
     h1: "Written questions with feedback on your answers",
+    h1Accent: "on your answers",
+    cardBlurb: "Short answers and essays with graded feedback.",
     subheadline:
       "Generate short-answer and essay prompts from your sources, write responses, and submit for AI feedback—not multiple-choice.",
     conversionPromise:
@@ -515,6 +539,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Extract structured data from your sources into spreadsheets. Modes include data extraction, comparison, timeline, financial, and custom layouts.",
     keywords: "spreadsheet, data extraction, comparison table, timeline, study data",
     h1: "Spreadsheets that organize data from your sources",
+    h1Accent: "from your sources",
+    cardBlurb: "Pull figures from several sources into one table.",
     subheadline:
       "Pull structured tables from readings—comparison, timeline, financial, or custom formats—for analysis and review.",
     conversionPromise: "Sign up free and extract your first table from a reading set.",
@@ -559,6 +585,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Search academic literature with filters for year, citations, open access, and field. Import paper records with deduplication by DOI and OpenAlex.",
     keywords: "paper discovery, academic search, OpenAlex, DOI, literature search",
     h1: "Discover academic papers for your research notebook",
+    h1Accent: "for your research notebook",
+    cardBlurb: "Search OpenAlex, Semantic Scholar, arXiv and more.",
     subheadline:
       "Search the academic channel, filter by year, citations, open access, and field, then import deduplicated paper records.",
     conversionPromise:
@@ -603,6 +631,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Import papers by DOI, BibTeX, RIS, Zotero, Mendeley, or manual entry. Build your reading list inside a research notebook.",
     keywords: "import papers, DOI, BibTeX, RIS, Zotero, Mendeley, reference manager",
     h1: "Import papers from DOI, BibTeX, and reference managers",
+    h1Accent: "and reference managers",
+    cardBlurb: "Bring papers in by DOI, BibTeX or reference manager.",
     subheadline:
       "Bring literature in via DOI, BibTeX, RIS, Zotero, Mendeley, or manual metadata—then read and work with them in one notebook.",
     conversionPromise: "Start free and import your first paper by DOI or from a reference file.",
@@ -646,6 +676,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Format citations in 12 styles including APA, MLA, Chicago, AMA, ACS, IEEE, Vancouver, and Harvard. Use in literature reviews, reports, and the Cite Paper modal.",
     keywords: "citation styles, APA, MLA, Chicago, IEEE, Vancouver, Harvard, cite paper",
     h1: "Twelve citation styles for your research output",
+    h1Accent: "for your research output",
+    cardBlurb: "APA, MLA, Chicago and nine more, formatted for you.",
     subheadline:
       "Apply APA, MLA, Chicago, AMA, ACS, IEEE, Vancouver, Harvard, and more in literature reviews, reports, and when citing papers—then verify before submitting.",
     conversionPromise:
@@ -692,6 +724,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     keywords:
       "ai literature review tool, ai literature review generator, ai for literature review, ai tools for literature review, free ai literature review",
     h1: "AI literature review tool for your paper set",
+    h1Accent: "for your paper set",
+    cardBlurb: "Search, screen and synthesize a set of papers.",
     subheadline:
       "Import papers, screen and rank sources, and use AI to draft literature review synthesis—grounded in the documents you add to your notebook.",
     conversionPromise:
@@ -748,6 +782,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Ask questions across notebook sources and get answers that reference your materials. Grounded chat for research reading—not a guarantee of completeness.",
     keywords: "chat with PDF, research chat, grounded answers, paper Q&A, notebook chat",
     h1: "Chat with papers across your notebook",
+    h1Accent: "across your notebook",
+    cardBlurb: "Ask your papers questions; every answer is cited.",
     subheadline:
       "Ask questions over your sources and see responses tied to your uploaded and imported materials.",
     conversionPromise: "Create a free account to chat with your first paper or reading set.",
@@ -792,6 +828,8 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       "Run multi-step research that combines web search with your notebook sources and produces a report draft for you to refine.",
     keywords: "deep research, research report, web search, multi-step research, draft report",
     h1: "Deep research that combines web and your sources",
+    h1Accent: "and your sources",
+    cardBlurb: "A multi-step report from the web and your sources.",
     subheadline:
       "Multi-step workflows search the web and your notebook, then assemble a report draft you can edit and verify.",
     conversionPromise:

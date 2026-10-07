@@ -29,6 +29,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "NotebookLM alternative, best NotebookLM alternative, Gemini Notebook alternative, NotebookLM alternative free, NotebookLM alternative for research, SolomindLM vs NotebookLM",
     h1: "SolomindLM vs NotebookLM, now Gemini Notebook",
+    h1Accent: "now Gemini Notebook",
     intro:
       "Google renamed NotebookLM to Gemini Notebook on July 16, 2026. It is still the best-known way to chat with your own sources, with a generous free tier and the widest range of Studio outputs, from audio and video overviews to slide decks and data tables. SolomindLM shares the same source-grounded core and goes further on academic research: paper search, DOI and BibTeX import, literature review with screening, and references in twelve citation styles, plus folders and spaced-repetition flashcards.",
     quickAnswer: {
@@ -229,6 +230,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "Elicit alternative, free Elicit alternative, Elicit vs SolomindLM, Elicit alternative for students, AI literature review tool, cheaper Elicit alternative",
     h1: "SolomindLM vs Elicit: which fits your literature review?",
+    h1Accent: "which fits your literature review?",
     intro:
       "Elicit is built for evidence synthesis at scale: systematic reviews that screen thousands of papers and extract data into large tables. SolomindLM is a notebook for your own sources that also runs literature reviews, with visible screening counts, an evidence table, and a written review in twelve citation styles, plus study tools for the same material. This page compares both so you can pick by the size of your review and your budget.",
     quickAnswer: {
@@ -397,6 +399,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "Consensus alternative, Consensus app alternative, Consensus vs SolomindLM, free Consensus alternative, AI academic search engine, Consensus AI alternative for students",
     h1: "SolomindLM vs Consensus: evidence search or research notebook?",
+    h1Accent: "evidence search or research notebook?",
     intro:
       "Consensus is an AI search engine over more than 400 million papers: ask a research question and get a cited answer, with a meter showing how studies lean on yes/no questions. SolomindLM starts from a notebook of your own sources, then adds academic search, literature review, and study tools on top. If you mostly need quick evidence answers, Consensus is fast; if you need to work with a fixed reading list over weeks, read on.",
     quickAnswer: {
@@ -547,6 +550,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "ChatPDF alternative, free ChatPDF alternative, ChatPDF vs SolomindLM, chat with PDF AI, ChatPDF alternative for research, AI PDF reader for students",
     h1: "SolomindLM vs ChatPDF: chatting with PDFs, and what comes after",
+    h1Accent: "and what comes after",
     intro:
       "ChatPDF made chatting with a PDF simple: drop in a file and ask questions, with clickable citations back to the page. It has since added flashcards, slides, an AI writer, and open-access paper search. SolomindLM covers the same chat-with-your-files core and goes further on research: academic search across four databases, literature review with screening, and references in twelve citation styles.",
     quickAnswer: {
@@ -689,6 +693,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "SciSpace alternative, free SciSpace alternative, SciSpace vs SolomindLM, SciSpace Copilot alternative, AI research assistant, SciSpace pricing alternative",
     h1: "SolomindLM vs SciSpace: research assistant or research notebook?",
+    h1Accent: "research assistant or research notebook?",
     intro:
       "SciSpace is a broad research platform: an index of over 280 million works, agents for literature reviews and systematic research, chat with PDF, an AI writer, a paraphraser, an AI detector, and a citation generator, paid for with monthly credits on its lower plan. SolomindLM is narrower and cheaper: a notebook for your own sources with academic search, literature review, formatted citations, and study tools.",
     quickAnswer: {
@@ -829,6 +834,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "Humata alternative, Humata AI alternative, Humata vs SolomindLM, free Humata alternative, chat with documents AI, Humata alternative for students",
     h1: "SolomindLM vs Humata: document Q&A for teams or for study?",
+    h1Accent: "document Q&A for teams or for study?",
     intro:
       "Humata answers questions across a library of files with citations, aimed at professionals and teams, and bills by pages processed each month. SolomindLM answers from your sources too, but is built for students and researchers: academic search, literature review, formatted citations, and study tools sit next to the chat.",
     quickAnswer: {
@@ -958,6 +964,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "Stanford STORM alternative, STORM AI alternative, STORM vs SolomindLM, Co-STORM, AI research report generator, Wikipedia-style article generator",
     h1: "SolomindLM vs Stanford STORM: who writes the research report?",
+    h1Accent: "who writes the research report?",
     intro:
       "STORM is a Stanford research project that writes Wikipedia-style articles with citations by searching the web, asking questions from several perspectives, and building an outline first. Stanford runs it as a hosted research preview, and the code is open source. SolomindLM's deep research also plans before it writes, but you approve the plan, and it can draw on your notebook and academic databases as well as the web.",
     quickAnswer: {
@@ -1096,6 +1103,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "Quizlet alternative, free Quizlet alternative, Quizlet vs SolomindLM, Quizlet Learn alternative, AI flashcard maker from PDF, Quizlet alternative for college",
     h1: "SolomindLM vs Quizlet: a Quizlet alternative built on your own notes",
+    h1Accent: "built on your own notes",
     intro:
       "Quizlet is the default for flashcards: a huge library of public sets, study modes like Learn and Test, games, and now AI study guides and practice tests. SolomindLM starts from your own course material instead. Upload lecture PDFs or slides, and it generates flashcards with spaced repetition, quizzes, and written questions graded against those sources, alongside chat that cites them.",
     quickAnswer: {
@@ -1249,6 +1257,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "Perplexity alternative for research, Perplexity vs SolomindLM, Perplexity alternative for students, Perplexity Spaces alternative, AI research assistant with citations",
     h1: "SolomindLM vs Perplexity: web answers or a notebook of your sources?",
+    h1Accent: "web answers or a notebook of your sources?",
     intro:
       "Perplexity is an AI search engine: it answers from the web with citations, runs multi-step Research reports, and lets you pick among leading models. SolomindLM answers from a notebook of your own sources first, with web and academic search when you want them, and adds literature review, formatted citations, and study tools.",
     quickAnswer: {

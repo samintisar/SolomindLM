@@ -42,6 +42,8 @@ export type SeoContentPageConfig = {
   description: string;
   keywords: string;
   h1: string;
+  /** Phrase inside `h1` shown in the accent colour. */
+  h1Accent?: string;
   intro: string;
   /** Competitor named in the quick answer and comparison table header (compare pages). */
   competitorName?: string;
@@ -75,6 +77,7 @@ const GUIDE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "how to study from PDFs with AI, AI flashcards from PDF, turn lecture slides into quizzes, chat with PDF study guide",
     h1: "How to Study From PDFs With AI",
+    h1Accent: "With AI",
     intro:
       "The best AI study workflow starts with your own material: textbook chapters, lecture slides, reading packets, and notes. SolomindLM is built for this workflow by letting you upload sources into a notebook, chat with them, and turn them into flashcards, quizzes, written questions with feedback, mind maps, reports, and audio overviews—all grounded in the documents you provide.",
     sections: [
@@ -202,6 +205,7 @@ const GUIDE_PAGES: SeoContentPageConfig[] = [
     keywords:
       "ai for literature review, how to do literature review with AI, ai for research literature review, AI literature review from papers, import DOI BibTeX Zotero",
     h1: "How to use AI for literature review with your papers",
+    h1Accent: "with your papers",
     intro:
       "Using AI for literature review works best when you start with a real paper set, not a blank prompt. This guide walks through a practical workflow—discover and import papers, chat across your reading list, run literature review mode, and format citations—while you stay responsible for rigor, inclusion criteria, and final claims. For the product overview, see our AI literature review tool page.",
     sections: [
@@ -329,6 +333,7 @@ const COMPARE_HUB_PAGE: SeoContentPageConfig = {
   keywords:
     "NotebookLM alternatives, Elicit alternatives, best AI tools for literature review, AI study tool comparison, ChatPDF alternative, Quizlet alternative",
   h1: "How SolomindLM compares with other AI research and study tools",
+  h1Accent: "other AI research and study tools",
   intro:
     "Each comparison below puts SolomindLM next to one other tool, with a feature table, the cases where the other tool is the better pick, and links to the public pages we checked. Use them to match a tool to the job: studying from your own course material, reviewing academic literature, chatting with a few PDFs, or answering questions from the web.",
   sections: [
