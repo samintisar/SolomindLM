@@ -209,7 +209,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)`, `Convex codegen (generated API)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)`, `Convex codegen (generated API)`, `CSP smoke test` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -235,6 +235,7 @@ The `.github/workflows/ci.yml` runs on:
 9. **Coverage Report** - the `test:web` vitest suite with coverage (`test:web:coverage`): fails on a failing web test or a drop below the coverage floor
 10. **Knip (unused code)** - `bun run knip` (default mode) finds no unused files, exports, dependencies or duplicate exports. A finding fails the PR: delete the dead code, or if it's a false positive add an ignore with a reason to `knip.json` (`ignoreIssues` for a path, `ignoreDependencies`/`ignoreBinaries` for a package). Every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name. Add yours there, or Knip reports it as unused.
 11. **Convex codegen (generated API)** - `bun run check:convex-codegen` fails when `convex/_generated/api.d.ts` is missing a module under `convex/` (underscore dirs included) or still lists a deleted one. Typecheck passes either way, which is how #306 and #331 merged with a stale file. Fix it by running `npx convex codegen` against your dev deployment and committing `convex/_generated`.
+12. **CSP smoke test** - builds the web app, serves it with the headers from `apps/web/vercel.json` and loads it in Chromium (`bun run test:csp`); fails on any Content-Security-Policy violation. Needs no secrets or backend, so it runs on every PR.
 
 **Advisory** (run on PRs, not merge-blocking):
 
