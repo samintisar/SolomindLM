@@ -832,6 +832,39 @@ describe("Table", () => {
     expect(screen.getByRole("cell", { name: "Attention" })).toHaveClass("sticky", "bg-card");
     expect(table.querySelector("thead")).toHaveClass("sticky", "top-0");
   });
+
+  it("tints a highlighted column and styles row headers like cells", () => {
+    render(
+      <Table aria-label="Compare">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Topic</TableHead>
+            <TableHead highlight>Ours</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableHead scope="row">Search</TableHead>
+            <TableCell highlight>Four databases</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    );
+    const ours = screen.getByRole("columnheader", { name: "Ours" });
+    expect(ours).toHaveAttribute("data-highlight", "true");
+    expect(ours).toHaveClass("bg-link/8", "text-link");
+    expect(ours).not.toHaveClass("bg-muted");
+    expect(screen.getByRole("columnheader", { name: "Topic" })).not.toHaveAttribute(
+      "data-highlight"
+    );
+    expect(screen.getByRole("cell", { name: "Four databases" })).toHaveAttribute(
+      "data-highlight",
+      "true"
+    );
+    const rowHeader = screen.getByRole("rowheader", { name: "Search" });
+    expect(rowHeader).toHaveClass("align-top");
+    expect(rowHeader).not.toHaveClass("bg-muted", "whitespace-nowrap");
+  });
 });
 
 describe("Switch", () => {

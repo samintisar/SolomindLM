@@ -70,21 +70,40 @@ const tableCellVariants = cva("border-r border-b border-hairline last:border-r-0
       true: "sticky left-0 z-10 bg-card in-[tr[data-state=selected]]:bg-muted",
       false: "",
     },
+    /** highlight: the column the page is about (e.g. ours in a comparison). `link` is the brand colour that reads in both themes. */
+    highlight: { true: "bg-link/5", false: "" },
   },
-  defaultVariants: { pinned: false },
+  defaultVariants: { pinned: false, highlight: false },
+});
+
+const tableHeadVariants = cva("px-5 text-left font-sans font-semibold", {
+  variants: {
+    /** `scope="row"` (set from the prop): a body row's label, top-aligned and wrapping like its cells. */
+    rowHeader: {
+      true: "py-4 align-top text-sm text-foreground",
+      false: "h-12 bg-muted align-middle text-xs whitespace-nowrap text-muted-foreground",
+    },
+    /** highlight: the column the page is about; replaces the header band's muted fill. */
+    highlight: { true: "bg-link/8 text-link", false: "" },
+  },
+  defaultVariants: { rowHeader: false, highlight: false },
 });
 
 function TableHead({
   className,
   pinned,
+  highlight,
+  scope,
   ...props
 }: React.ComponentProps<"th"> & VariantProps<typeof tableCellVariants>) {
   return (
     <th
       data-slot="table-head"
+      data-highlight={highlight ? "true" : undefined}
+      scope={scope}
       className={cn(
         tableCellVariants({ pinned }),
-        "h-12 bg-muted px-5 text-left align-middle font-sans text-xs font-semibold whitespace-nowrap text-muted-foreground",
+        tableHeadVariants({ rowHeader: scope === "row", highlight }),
         className
       )}
       {...props}
@@ -95,12 +114,14 @@ function TableHead({
 function TableCell({
   className,
   pinned,
+  highlight,
   ...props
 }: React.ComponentProps<"td"> & VariantProps<typeof tableCellVariants>) {
   return (
     <td
       data-slot="table-cell"
-      className={cn(tableCellVariants({ pinned }), "px-5 py-4 align-top", className)}
+      data-highlight={highlight ? "true" : undefined}
+      className={cn(tableCellVariants({ pinned, highlight }), "px-5 py-4 align-top", className)}
       {...props}
     />
   );
