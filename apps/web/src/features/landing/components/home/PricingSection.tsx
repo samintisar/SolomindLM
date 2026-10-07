@@ -3,10 +3,12 @@ import { useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { type Billing, PLANS, type Plan } from "./landingHomeContent";
 import { Reveal } from "./Reveal";
 import { Accent, SectionHeading } from "./SectionHeading";
+
+const BILLING_PERIODS: Billing[] = ["annual", "monthly"];
 
 function PlanCard({
   plan,
@@ -72,19 +74,35 @@ export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
             </>
           }
         />
-        <Reveal className="mt-8 flex items-center justify-center gap-3">
-          <Tabs value={billing} onValueChange={(value) => setBilling(value as Billing)}>
-            <TabsList aria-label="Billing period">
-              <TabsTrigger value="annual">Annual</TabsTrigger>
-              <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            </TabsList>
+        {/* The billing switch is a real tablist: each period's plans are its panel. */}
+        <Reveal>
+          <Tabs
+            value={billing}
+            onValueChange={(value) => setBilling(value as Billing)}
+            className="mt-8 items-center"
+          >
+            <div className="flex items-center justify-center gap-3">
+              <TabsList aria-label="Billing period">
+                <TabsTrigger value="annual">Annual</TabsTrigger>
+                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+              </TabsList>
+              <Badge variant="success">Save 50%</Badge>
+            </div>
+            {BILLING_PERIODS.map((period) => (
+              <TabsContent key={period} value={period} className="mt-8 w-full">
+                <div className="mx-auto grid max-w-215 grid-cols-1 gap-6 md:grid-cols-2">
+                  {PLANS.map((plan) => (
+                    <PlanCard
+                      key={plan.id}
+                      plan={plan}
+                      billing={period}
+                      onGetStarted={onGetStarted}
+                    />
+                  ))}
+                </div>
+              </TabsContent>
+            ))}
           </Tabs>
-          <Badge variant="success">Save 50%</Badge>
-        </Reveal>
-        <Reveal className="mx-auto mt-10 grid max-w-215 grid-cols-1 gap-6 md:grid-cols-2">
-          {PLANS.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} billing={billing} onGetStarted={onGetStarted} />
-          ))}
         </Reveal>
       </div>
     </section>
