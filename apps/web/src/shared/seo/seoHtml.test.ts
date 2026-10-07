@@ -5,11 +5,16 @@ import {
   getIntentLandingPaths,
 } from "@/features/landing/intentLandingPages";
 import { getSeoContentPageByPath, getSeoContentPaths } from "@/features/landing/seoContentPages";
+import { PDF_TO_FLASHCARDS_PAGE } from "@/features/tools/toolPages";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { getPublicSeoPageByPath } from "./publicSeoPages";
-import { buildHomePrerenderBody, buildLegalPrerenderBody } from "./publicSeoPrerenderHtml";
+import {
+  buildHomePrerenderBody,
+  buildLegalPrerenderBody,
+  buildPublicSeoPrerenderBody,
+} from "./publicSeoPrerenderHtml";
 import { SEO_BASE_URL } from "./seoConstants";
 import { buildSeoContentPrerenderBody } from "./seoContentPrerenderHtml";
 import { applySeoToHtml, canonicalUrl, injectPrerenderBody, seoPageToHeadInput } from "./seoHtml";
@@ -182,5 +187,24 @@ describe("injectPrerenderBody", () => {
     expect(html).toContain('href="/guides/how-to-study-from-pdfs-with-ai"');
     expect(html).toContain('href="/compare/solomindlm-vs-notebooklm"');
     expect(html).toContain(hubPage!.faqs[0]!.answer);
+  });
+});
+
+describe("free tool pages", () => {
+  it("registers /tools/pdf-to-flashcards with tool, how-to, FAQ and breadcrumb data", () => {
+    const page = getPublicSeoPageByPath(PDF_TO_FLASHCARDS_PAGE.path);
+    expect(page).toBeDefined();
+    const types = (page!.structuredData as Record<string, unknown>[]).map((item) => item["@type"]);
+    expect(types).toEqual(
+      expect.arrayContaining(["WebApplication", "HowTo", "FAQPage", "BreadcrumbList"])
+    );
+  });
+
+  it("prerenders the H1, steps and FAQ for crawlers", () => {
+    const body = buildPublicSeoPrerenderBody(PDF_TO_FLASHCARDS_PAGE.path);
+    expect(body).toContain(`<h1>${PDF_TO_FLASHCARDS_PAGE.h1}</h1>`);
+    expect(body).toContain(PDF_TO_FLASHCARDS_PAGE.steps[0]!.name);
+    expect(body).toContain(PDF_TO_FLASHCARDS_PAGE.faqs[0]!.question);
+    expect(body).toContain('href="/students/ai-flashcards"');
   });
 });
