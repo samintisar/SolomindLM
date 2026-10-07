@@ -4,6 +4,9 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ShellAwareConvexAuthProvider } from "./features/auth/components/ShellAwareConvexAuthProvider";
 import "streamdown/styles.css";
+// Imported here, not via @import in index.css: PostCSS inlines CSS @imports before Vite sees
+// them, so KaTeX's relative font url()s would never be resolved and emitted.
+import "katex/dist/katex.min.css";
 import "./index.css";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
