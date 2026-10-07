@@ -1,8 +1,7 @@
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 
 /** Public site key ("SolomindLM free tools" widget, invisible mode). Not a secret. */
-export const TURNSTILE_SITE_KEY =
-  import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAAFQDDSV1WRFKhINF";
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAAFQDDSV1WRFKhINF";
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 const TOKEN_TIMEOUT_MS = 30_000;
 

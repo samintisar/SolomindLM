@@ -7,7 +7,7 @@ const CONVEX_SITE_URL =
   import.meta.env.VITE_CONVEX_SITE_URL ||
   import.meta.env.VITE_CONVEX_URL?.replace(".cloud", ".site");
 
-export const FREE_FLASHCARDS_URL = `${CONVEX_SITE_URL ?? ""}/tools/flashcards`;
+const FREE_FLASHCARDS_URL = `${CONVEX_SITE_URL ?? ""}/tools/flashcards`;
 
 export type FreeDeckCard = Pick<Flashcard, "type" | "front" | "back" | "topic">;
 export type FreeDeck = { title: string; cards: FreeDeckCard[] };
