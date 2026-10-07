@@ -1127,6 +1127,24 @@
   );
 }
 
+/* Landing hero: faint graph paper (the chat panel's grid) that fades out from the upper left.
+   Put it on an absolutely positioned, aria-hidden layer: the mask would hide real content. */
+.landing-paper {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklch, var(--border) 30%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--border) 30%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 70% 80% at 30% 20%, black, transparent 75%);
+}
+
 /* Notebook chat: faint square grid (graph paper) behind the transcript */
 .chat-panel-graph-grid {
   background-color: var(--background);
