@@ -17,6 +17,9 @@ const cardVariants = cva(
         // data-selected marks the chosen card (e.g. the marketing preview's active tool).
         interactive:
           "relative gap-0 overflow-hidden py-0 shadow-xs transition duration-200 ease-out motion-safe:hover:-translate-y-0.5 hover:shadow-md motion-safe:active:scale-99 data-[selected=true]:shadow-md data-[selected=true]:ring-2 data-[selected=true]:ring-primary/40",
+        // The one card a section wants picked (e.g. the Pro plan): floating shadow and a brand ring.
+        // No padding or gap, like flush; the children own their spacing.
+        featured: "gap-0 py-0 shadow-xl ring-2 ring-primary/35",
       },
     },
     defaultVariants: { variant: "default" },
