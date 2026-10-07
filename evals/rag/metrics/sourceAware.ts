@@ -10,27 +10,7 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
-
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  status: MetricStatus,
-  score: number,
-  detail: string,
-  breakdown?: Record<string, unknown>
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status,
-    score,
-    detail,
-    ...(breakdown ? { breakdown } : {}),
-  };
-}
+import { metricResult } from "./metricResult";
 
 /**
  * Source Diversity Score
@@ -50,7 +30,7 @@ export function sourceDiversityScore(
   const evidence = artifact.sourceEvidence ?? [];
 
   if (channels.length <= 1) {
-    return baseMetric(
+    return metricResult(
       "source_diversity",
       fixture,
       artifact,
@@ -65,7 +45,7 @@ export function sourceDiversityScore(
   const score = activeChannels.size > 1 ? 1 : 0.5;
   const status = score >= 1 ? "pass" : "warn";
 
-  return baseMetric(
+  return metricResult(
     "source_diversity",
     fixture,
     artifact,
@@ -92,7 +72,7 @@ export function sourceRecallByChannel(
 
   if (fixture.expectedItems.length === 0) {
     return [
-      baseMetric(
+      metricResult(
         "source_recall_by_channel",
         fixture,
         artifact,
@@ -125,7 +105,7 @@ export function sourceRecallByChannel(
     const score =
       fixture.expectedItems.length > 0 ? matched.length / fixture.expectedItems.length : 1;
 
-    return baseMetric(
+    return metricResult(
       `source_recall_${channel}`,
       fixture,
       artifact,
@@ -175,7 +155,7 @@ export function researchSourceBreadth(
   const hasExternal = channels.some((c) => c !== "notebook");
 
   if (!hasExternal) {
-    return baseMetric(
+    return metricResult(
       "research_source_breadth",
       fixture,
       artifact,
@@ -207,7 +187,7 @@ export function researchSourceBreadth(
     score = 0;
   }
 
-  return baseMetric(
+  return metricResult(
     "research_source_breadth",
     fixture,
     artifact,
@@ -227,7 +207,7 @@ export function externalSourceUtilization(
   const hasExternal = channels.some((c) => c !== "notebook");
 
   if (!hasExternal) {
-    return baseMetric(
+    return metricResult(
       "external_source_utilization",
       fixture,
       artifact,
@@ -251,7 +231,7 @@ export function externalSourceUtilization(
   else if (score > 0) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "external_source_utilization",
     fixture,
     artifact,
