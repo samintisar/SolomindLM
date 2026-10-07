@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../../_generated/api";
@@ -10,6 +11,7 @@ const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 preloadModules(modules, ["./studio/jobMutations/mindmaps.ts", "./studio/mindmaps/index.ts"]);
+preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 
 async function seedMindmap(overrides: { metadata?: Record<string, unknown> } = {}) {
   const t = convexTest(schema, modules);
@@ -83,9 +85,56 @@ describe("mind map job writes keep the map's sources", () => {
   });
 });
 
+async function seedGenerateMindMapUser() {
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  const now = Date.now();
+  const { userId, notebookId, docId } = await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", { name: "Test" });
+    const notebookId = await ctx.db.insert("notebooks", {
+      userId,
+      title: "Notebook",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const docId = await ctx.db.insert("documents", {
+      userId,
+      notebookId,
+      fileName: "notes.txt",
+      fileType: "text",
+      status: "completed",
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { userId, notebookId, docId };
+  });
+  const asOwner = t.withIdentity({
+    subject: userId,
+    issuer: "test",
+    tokenIdentifier: `test|${userId}`,
+  });
+  return { t, userId, notebookId, docId, asOwner };
+}
+
 describe("generateMindMap", () => {
+  test("is refused once a Free user's daily mind map has been used", async () => {
+    const { t, userId, notebookId, docId, asOwner } = await seedGenerateMindMapUser();
+    await t.mutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "mindmap",
+    });
+
+    await expect(
+      asOwner.mutation(api.studio.mindmaps.index.generateMindMap, {
+        notebookId,
+        documentIds: [docId],
+      })
+    ).rejects.toThrow(/Daily mind map limit reached \(1\/1\)/);
+  });
+
   test("stores the selected sources on the new row", async () => {
     const t = convexTest(schema, modules);
+    registerRateLimiter(t);
     const now = Date.now();
     const { userId, notebookId, docId } = await t.run(async (ctx) => {
       const userId = await ctx.db.insert("users", { name: "Test" });

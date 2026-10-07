@@ -1,5 +1,6 @@
 import { BadgePercent, Check } from "lucide-react";
 import React, { useState } from "react";
+import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/features/billing/planFeatures";
 import { Button } from "@/shared/components/ui/button";
 
 interface PricingSectionProps {
@@ -22,14 +23,7 @@ const pricingPlans: PricingPlan[] = [
     name: "Free",
     price: "$0",
     description: "Get started with core tools",
-    features: [
-      "5 notebooks · 20 sources each",
-      "10 chat messages / day",
-      "2 flashcards, quizzes, reports / day",
-      "2 audio overviews / day",
-      "2 infographics / day",
-      "2 written questions / day",
-    ],
+    features: FREE_PLAN_FEATURES,
     cta: "Start free",
     highlighted: false,
     billingKey: "free",
@@ -39,14 +33,7 @@ const pricingPlans: PricingPlan[] = [
     price: "$7.50",
     period: "/mo, billed yearly",
     description: "For serious learners",
-    features: [
-      "200 notebooks · 200 sources each",
-      "500 chat messages / day",
-      "100 flashcards, quizzes, reports / day",
-      "100 audio overviews / day",
-      "100 infographics / day",
-      "100 written questions / day",
-    ],
+    features: PRO_PLAN_FEATURES,
     cta: "Get Pro",
     highlighted: true,
     billingKey: "yearly",
@@ -56,14 +43,7 @@ const pricingPlans: PricingPlan[] = [
     price: "$15",
     period: "/mo",
     description: "Same as yearly, billed monthly",
-    features: [
-      "200 notebooks · 200 sources each",
-      "500 chat messages / day",
-      "100 flashcards, quizzes, reports / day",
-      "100 audio overviews / day",
-      "100 infographics / day",
-      "100 written questions / day",
-    ],
+    features: PRO_PLAN_FEATURES,
     cta: "Get Pro",
     highlighted: false,
     billingKey: "monthly",

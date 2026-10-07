@@ -535,14 +535,6 @@ export interface UnifiedDiscoveryResult {
 }
 
 /**
- * Features that have daily limits
+ * Features that have usage limits (defined by the backend's limit tables)
  */
-export type DailyFeature =
-  | "chat"
-  | "flashcard"
-  | "quiz"
-  | "report"
-  | "audio"
-  | "writtenQuestion"
-  | "spreadsheet"
-  | "infographic";
+export type { DailyFeature } from "@convex/_lib/errors";

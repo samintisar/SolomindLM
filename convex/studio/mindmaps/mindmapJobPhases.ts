@@ -680,6 +680,12 @@ export async function runFinalizeMindMapPhase(
     // Clear intermediate data
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.clearMindMapMapData, { mindmapId });
 
+    // Consume rate limit token on success
+    await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "mindmap",
+    });
+
     logger.jobComplete({
       title,
       mapSuccess: Object.keys(mapResults).length - failedCount.count,

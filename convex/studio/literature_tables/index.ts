@@ -7,6 +7,12 @@ import type { Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { internalMutation, mutation, query } from "../../_generated/server";
 import {
+  assertConcurrentRunCapacity,
+  assertRetryAllowed,
+  isProUser,
+  takeFeatureRun,
+} from "../../_lib/limits";
+import {
   assertCanEditNotebook,
   assertCanReadNotebook,
   canReadNotebook,
@@ -240,6 +246,11 @@ export const startLiteratureReview = mutation({
 
     await assertCanEditNotebook(ctx, args.notebookId, userId);
 
+    // Count the run now, not on success: a review takes minutes, so parallel starts
+    // would otherwise all pass the check. Mutations are atomic, so a later throw undoes it.
+    const { isPro } = await takeFeatureRun(ctx, userId, "literatureReview");
+    await assertConcurrentRunCapacity(ctx, userId, "literatureReview", isPro);
+
     // Keep only this notebook's finished PDFs and saved papers; the client list is not trusted.
     const notebookPaperIds = (
       await loadNotebookPaperDocuments(ctx, args.notebookId, args.documentIds ?? [])
@@ -442,10 +453,17 @@ export const retryLiteratureReview = mutation({
       throw new Error(`Invalid fromStep: ${fromStep}`);
     }
 
+    // Retries reuse the run they belong to (a failed run is retried, not charged
+    // again), so cap them instead.
+    const isPro = await isProUser(ctx, userId);
+    assertRetryAllowed(session.retryCount, "literatureReview", isPro);
+    await assertConcurrentRunCapacity(ctx, userId, "literatureReview", isPro);
+
     // Update session status before restart
     await ctx.db.patch(args.sessionId, {
       status: fromStep === "planning" ? "planning" : "searching",
       error: undefined,
+      retryCount: (session.retryCount ?? 0) + 1,
       updatedAt: Date.now(),
     });
 
@@ -512,6 +530,7 @@ export const getLiteratureReviewSession = query({
       assistantMessageId: v.optional(v.id("messages")),
       searchOptions: v.optional(literatureSearchOptionsValidator),
       workflowProvenance: v.optional(literatureReviewWorkflowProvenanceValidator),
+      retryCount: v.optional(v.number()),
       createdAt: v.number(),
       updatedAt: v.number(),
     }),

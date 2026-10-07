@@ -1,3 +1,4 @@
+import { PRO_FEATURE_LIMITS } from "@convex/_lib/errors";
 import type { FAQItem } from "./constants";
 
 export type IntentLandingCluster = "students" | "research";
@@ -428,7 +429,7 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     h1: "Infographics that visualize your study content",
     subheadline:
       "Turn key ideas from your sources into an image with controls for style, orientation, and detail.",
-    conversionPromise: "Start free and generate a visual summary of your next topic.",
+    conversionPromise: "Upgrade to Pro and generate a visual summary of your next topic.",
     proofBullets: [
       "Image output based on notebook sources",
       "Style, orientation, and detail settings",
@@ -454,6 +455,10 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
         question: "What file format do I get?",
         answer:
           "Infographics are delivered as images you can view and download from your notebook.",
+      },
+      {
+        question: "Are infographics included in the free plan?",
+        answer: `No. Infographics are a Pro feature, with up to ${PRO_FEATURE_LIMITS.infographic.rate} a day. The free plan includes flashcards, quizzes, reports, mind maps, and audio overviews.`,
       },
     ],
     ctaLabel: "Create free account",
@@ -710,8 +715,7 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     faqs: [
       {
         question: "Is there a free AI literature review tool?",
-        answer:
-          "Yes. SolomindLM offers a free tier so you can import papers and run literature review mode on your reading list. Paid plans raise notebook and generation limits.",
+        answer: `Yes. The free plan includes one literature review every 30 days on your imported papers, with screening and a written synthesis. Pro raises that to ${PRO_FEATURE_LIMITS.literatureReview.rate} a day, along with higher notebook and generation limits.`,
       },
       {
         question: "How does the AI literature review generator work?",
@@ -795,7 +799,7 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     subheadline:
       "Multi-step workflows search the web and your notebook, then assemble a report draft you can edit and verify.",
     conversionPromise:
-      "Start free and run deep research on a question using your notebook plus the web.",
+      "Upgrade to Pro and run deep research on a question using your notebook plus the web.",
     proofBullets: [
       "Multi-step research across web and notebook sources",
       "Produces a structured report draft",
@@ -821,6 +825,10 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
         question: "Is the report ready to publish as-is?",
         answer:
           "No. Treat it as a draft. Check facts, citations, and bias before sharing or submitting.",
+      },
+      {
+        question: "Is deep research included in the free plan?",
+        answer: `No. Deep research is a Pro feature, with up to ${PRO_FEATURE_LIMITS.deepResearch.rate} runs a day. The free plan includes chat with citations over your sources and one literature review every 30 days.`,
       },
     ],
     ctaLabel: "Create free account",

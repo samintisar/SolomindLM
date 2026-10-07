@@ -3,6 +3,8 @@
  * These errors can be serialized through Convex and parsed by the frontend.
  */
 
+import { ConvexError } from "convex/values";
+
 /**
  * Error codes for different types of limit errors
  */
@@ -10,15 +12,21 @@ export enum ErrorCode {
   NOTEBOOK_LIMIT_REACHED = "NOTEBOOK_LIMIT_REACHED",
   SOURCE_LIMIT_REACHED = "SOURCE_LIMIT_REACHED",
   DAILY_LIMIT_REACHED = "DAILY_LIMIT_REACHED",
+  FEATURE_REQUIRES_PRO = "FEATURE_REQUIRES_PRO",
+  CONCURRENT_RUN_LIMIT_REACHED = "CONCURRENT_RUN_LIMIT_REACHED",
+  RETRY_LIMIT_REACHED = "RETRY_LIMIT_REACHED",
 }
 
 /**
- * Types of limits that can be enforced
+ * Types of limits that can be enforced. "daily" covers every usage window
+ * (day, week, 30 days); `window` on the error says which. "plan" means the
+ * feature is not on the user's plan at all.
  */
-export type LimitType = "notebook" | "source" | "daily";
+export type LimitType = "notebook" | "source" | "daily" | "plan" | "concurrent" | "retry";
 
 /**
- * Features that have daily limits
+ * Features with a per-window usage limit. Named for the original daily-only
+ * windows; some features now use a weekly or 30-day window (see `FeatureLimit`).
  */
 export type DailyFeature =
   | "chat"
@@ -29,39 +37,49 @@ export type DailyFeature =
   | "writtenQuestion"
   | "spreadsheet"
   | "infographic"
-  | "sourceGuide";
+  | "sourceGuide"
+  | "mindmap"
+  | "literatureReview"
+  | "deepResearch";
+
+/** Length of a usage-limit window. "month" is a rolling 30 days. */
+export type LimitWindow = "day" | "week" | "month";
+
+export interface FeatureLimit {
+  rate: number;
+  window: LimitWindow;
+}
 
 /**
  * Structured error data that can be serialized through Convex
  */
-export interface LimitErrorData {
+export type LimitErrorData = {
   code: string;
+  /** Human-readable summary; also the error's `message` on the server. */
+  message: string;
   limit: number;
   current: number;
   limitType: LimitType;
   feature?: DailyFeature;
+  window?: LimitWindow;
   isPro?: boolean;
-}
+};
 
 /**
  * Custom error class for limit-related errors.
- * This includes structured data that the frontend can parse
- * to show appropriate error messages and upgrade CTAs.
+ *
+ * Extends ConvexError so production deployments pass `data` to the client
+ * (plain Errors are redacted to "Server Error"), letting the frontend show
+ * the right message and upgrade CTA.
  */
-export class LimitError extends Error {
+export class LimitError extends ConvexError<LimitErrorData> {
   code: ErrorCode;
   limit: number;
   current: number;
   limitType: LimitType;
   feature?: DailyFeature;
+  window?: LimitWindow;
   isPro: boolean;
-
-  /**
-   * Attach structured data for Convex serialization.
-   * Convex can serialize plain objects but not class instances,
-   * so we include this data property.
-   */
-  data: LimitErrorData;
 
   constructor(
     code: ErrorCode,
@@ -70,26 +88,20 @@ export class LimitError extends Error {
     current: number,
     limit: number,
     feature?: DailyFeature,
-    isPro: boolean = false
+    isPro: boolean = false,
+    window?: LimitWindow
   ) {
-    super(message);
+    super({ code, message, limit, current, limitType, feature, window, isPro });
+    // ConvexError builds its message from the data; keep the readable one.
+    this.message = message;
     this.name = "LimitError";
     this.code = code;
     this.limitType = limitType;
     this.current = current;
     this.limit = limit;
     this.feature = feature;
+    this.window = window;
     this.isPro = isPro;
-
-    // Attach structured data for Convex serialization
-    this.data = {
-      code,
-      limit,
-      current,
-      limitType,
-      feature,
-      isPro,
-    };
   }
 }
 
@@ -135,29 +147,39 @@ export function createSourceLimitError(
   );
 }
 
+const FEATURE_NAMES: Record<DailyFeature, string> = {
+  chat: "chat message",
+  flashcard: "flashcard set",
+  quiz: "quiz",
+  report: "report",
+  audio: "audio overview",
+  writtenQuestion: "written question set",
+  spreadsheet: "spreadsheet",
+  infographic: "infographic",
+  sourceGuide: "source guide",
+  mindmap: "mind map",
+  literatureReview: "literature review",
+  deepResearch: "deep research",
+};
+
+const WINDOW_LABELS: Record<LimitWindow, string> = {
+  day: "Daily",
+  week: "Weekly",
+  month: "30-day",
+};
+
 /**
- * Create a daily limit error for a specific feature
+ * Create a usage limit error for a specific feature. The window defaults to
+ * the feature's configured window on the user's plan.
  */
 export function createDailyLimitError(
   feature: DailyFeature,
   current: number,
   limit: number,
-  isPro: boolean = false
+  isPro: boolean = false,
+  window: LimitWindow = getFeatureWindow(feature, isPro)
 ): LimitError {
-  const featureNames: Record<DailyFeature, string> = {
-    chat: "chat message",
-    flashcard: "flashcard set",
-    quiz: "quiz",
-    report: "report",
-    audio: "audio overview",
-    writtenQuestion: "written question set",
-    spreadsheet: "spreadsheet",
-    infographic: "infographic",
-    sourceGuide: "source guide",
-  };
-
-  const featureName = featureNames[feature] || feature;
-  const message = `Daily ${featureName} limit reached (${current}/${limit}). Upgrade for higher limits.`;
+  const message = `${WINDOW_LABELS[window]} ${FEATURE_NAMES[feature]} limit reached (${current}/${limit}). Upgrade for higher limits.`;
 
   return new LimitError(
     ErrorCode.DAILY_LIMIT_REACHED,
@@ -166,51 +188,121 @@ export function createDailyLimitError(
     current,
     limit,
     feature,
+    isPro,
+    window
+  );
+}
+
+/** The feature is not available on the Free plan. */
+export function createProRequiredError(feature: DailyFeature): LimitError {
+  const name = FEATURE_NAMES[feature];
+  const message = `${name.charAt(0).toUpperCase()}${name.slice(1)} is a Pro feature. Upgrade to Pro to use it.`;
+  return new LimitError(ErrorCode.FEATURE_REQUIRES_PRO, message, "plan", 0, 0, feature, false);
+}
+
+/** Too many runs of a long-running feature are in progress at once. */
+export function createConcurrentRunLimitError(
+  feature: DailyFeature,
+  current: number,
+  limit: number,
+  isPro: boolean
+): LimitError {
+  const message = `You already have ${current} ${FEATURE_NAMES[feature]} run${current === 1 ? "" : "s"} in progress (limit ${limit}). Wait for one to finish before starting another.`;
+  return new LimitError(
+    ErrorCode.CONCURRENT_RUN_LIMIT_REACHED,
+    message,
+    "concurrent",
+    current,
+    limit,
+    feature,
+    isPro
+  );
+}
+
+/** A single run has been retried as many times as allowed. */
+export function createRetryLimitError(
+  feature: DailyFeature,
+  current: number,
+  limit: number,
+  isPro: boolean
+): LimitError {
+  const message = `This ${FEATURE_NAMES[feature]} has already been retried ${current} times (limit ${limit}). Start a new run instead.`;
+  return new LimitError(
+    ErrorCode.RETRY_LIMIT_REACHED,
+    message,
+    "retry",
+    current,
+    limit,
+    feature,
     isPro
   );
 }
 
 /**
- * Canonical daily per-feature limits. This is the single source of truth —
+ * Canonical per-feature usage limits. This is the single source of truth —
  * `rateLimits.ts` derives both its accessors and the rate-limiter window
  * config from these maps, so the numbers live in exactly one place.
  */
-export const PRO_DAILY_LIMITS: Record<DailyFeature, number> = {
-  chat: 500,
-  flashcard: 100,
-  quiz: 100,
-  report: 100,
-  audio: 100,
-  writtenQuestion: 100,
-  spreadsheet: 100,
-  infographic: 100,
-  sourceGuide: 200,
+export const PRO_FEATURE_LIMITS: Record<DailyFeature, FeatureLimit> = {
+  chat: { rate: 500, window: "day" },
+  flashcard: { rate: 100, window: "day" },
+  quiz: { rate: 100, window: "day" },
+  report: { rate: 100, window: "day" },
+  audio: { rate: 20, window: "day" },
+  writtenQuestion: { rate: 100, window: "day" },
+  spreadsheet: { rate: 100, window: "day" },
+  infographic: { rate: 10, window: "day" },
+  sourceGuide: { rate: 200, window: "day" },
+  mindmap: { rate: 100, window: "day" },
+  literatureReview: { rate: 10, window: "day" },
+  deepResearch: { rate: 15, window: "day" },
 };
 
-export const FREE_DAILY_LIMITS: Record<DailyFeature, number> = {
-  chat: 10,
-  flashcard: 2,
-  quiz: 2,
-  report: 2,
-  audio: 2,
-  writtenQuestion: 2,
-  spreadsheet: 2,
-  infographic: 2,
-  sourceGuide: 50,
+/** `null` means the feature is Pro only. */
+export const FREE_FEATURE_LIMITS: Record<DailyFeature, FeatureLimit | null> = {
+  chat: { rate: 10, window: "day" },
+  flashcard: { rate: 1, window: "day" },
+  quiz: { rate: 1, window: "day" },
+  report: { rate: 1, window: "day" },
+  audio: { rate: 3, window: "week" },
+  writtenQuestion: { rate: 1, window: "day" },
+  spreadsheet: { rate: 1, window: "day" },
+  infographic: null,
+  sourceGuide: { rate: 50, window: "day" },
+  mindmap: { rate: 1, window: "day" },
+  literatureReview: { rate: 1, window: "month" },
+  deepResearch: null,
 };
+
+/** Most runs of a long-running feature one user can have in progress at once. */
+export const CONCURRENT_RUN_LIMITS: Record<
+  "literatureReview" | "deepResearch",
+  { free: number; pro: number }
+> = {
+  literatureReview: { free: 1, pro: 3 },
+  deepResearch: { free: 1, pro: 3 },
+};
+
+/** Retries allowed per literature review or deep research run; retries don't use a run. */
+export const MAX_RUN_RETRIES = 3;
+
+/** True when Free users cannot use the feature at all. */
+export function isProOnlyFeature(feature: DailyFeature): boolean {
+  return FREE_FEATURE_LIMITS[feature] === null;
+}
 
 /**
  * Get the pro tier limit for a feature
  */
 export function getProLimit(feature: DailyFeature): number {
-  return PRO_DAILY_LIMITS[feature];
+  return PRO_FEATURE_LIMITS[feature].rate;
 }
 
 /**
- * Get the free tier limit for a feature
+ * Get the free tier limit for a feature (0 when the feature is Pro only)
  */
 export function getFreeLimit(feature: DailyFeature): number {
-  return FREE_DAILY_LIMITS[feature];
+  return FREE_FEATURE_LIMITS[feature]?.rate ?? 0;
 }
 
 /**
@@ -218,6 +310,12 @@ export function getFreeLimit(feature: DailyFeature): number {
  */
 export function getFeatureLimit(feature: DailyFeature, isPro: boolean): number {
   return isPro ? getProLimit(feature) : getFreeLimit(feature);
+}
+
+/** The usage window for a feature on a plan (Pro-only features fall back to Pro's). */
+export function getFeatureWindow(feature: DailyFeature, isPro: boolean): LimitWindow {
+  const limit = isPro ? PRO_FEATURE_LIMITS[feature] : FREE_FEATURE_LIMITS[feature];
+  return (limit ?? PRO_FEATURE_LIMITS[feature]).window;
 }
 
 // --- Service / IO errors (Convex-serializable .data, discriminated by `type`) ---
