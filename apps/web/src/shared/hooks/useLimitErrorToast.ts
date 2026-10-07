@@ -10,6 +10,7 @@ import { useToast } from "../contexts/useToast";
 import {
   getLimitErrorMessage,
   getUpgradeMessage,
+  isUpgradeableLimit,
   type ParsedLimitError,
   parseLimitError,
 } from "../utils/errorParser";
@@ -83,7 +84,8 @@ export function useLimitErrorToast() {
       // Build full message
       const fullMessage = upgradeText ? `${message} ${upgradeText}` : message;
 
-      const effectiveShowUpgrade = purchasable && showUpgradeButton && !parsedError.isPro;
+      const effectiveShowUpgrade =
+        purchasable && showUpgradeButton && !parsedError.isPro && isUpgradeableLimit(parsedError);
 
       // Show toast with upgrade button (free tier only)
       showError(fullMessage, {

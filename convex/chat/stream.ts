@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
@@ -121,7 +121,14 @@ export const runWithStreamId = internalAction({
     } catch (e) {
       console.error("[ChatStream] runWithStreamId failed:", e);
       try {
-        const msg = e instanceof Error ? e.message : "Unknown error while generating a response.";
+        // A ConvexError from a mutation (e.g. a limit error) arrives with its data as the
+        // message; prefer the readable message it carries.
+        const msg =
+          e instanceof ConvexError && typeof e.data?.message === "string"
+            ? e.data.message
+            : e instanceof Error
+              ? e.message
+              : "Unknown error while generating a response.";
         await ctx.runMutation(internal.chat.index.persistAssistantFromStream, {
           conversationId,
           streamId: args.streamId,

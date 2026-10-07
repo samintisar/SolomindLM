@@ -1,10 +1,8 @@
 {
   "features/landing": {
-    "shadcn/no-arbitrary-values": 66,
-    "shadcn/no-inline-styles": 16,
-    "shadcn/no-raw-colors": 15,
-    "shadcn/no-restyle": 59,
-    "solomind/soft-surfaces": 18
+    "shadcn/no-arbitrary-values": 6,
+    "shadcn/no-restyle": 14,
+    "solomind/soft-surfaces": 5
   },
   "shared": {
     "shadcn/no-arbitrary-values": 45,

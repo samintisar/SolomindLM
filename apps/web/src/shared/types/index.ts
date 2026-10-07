@@ -533,16 +533,3 @@ export interface UnifiedDiscoveryResult {
     relevanceLabel?: "high" | "medium" | "low";
   };
 }
-
-/**
- * Features that have daily limits
- */
-export type DailyFeature =
-  | "chat"
-  | "flashcard"
-  | "quiz"
-  | "report"
-  | "audio"
-  | "writtenQuestion"
-  | "spreadsheet"
-  | "infographic";

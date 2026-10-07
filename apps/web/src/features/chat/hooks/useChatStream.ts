@@ -6,6 +6,7 @@ import {
   mergePendingStudioNotes,
   prunePendingStudioNotes,
 } from "@/features/studio/utils/mergePendingStudioNotes";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import {
   AgentGroundingCheck,
   ChatActivityPhase,
@@ -96,6 +97,7 @@ export function useChatStream({
   const releaseChatGenerationMutation = useMutation(api.chat.messages.releaseChatGeneration);
   const { sendMessage, stopChat: stopSendMessage } = useSendMessage();
   const startDeepResearch = useStartDeepResearch();
+  const { handleLimitError } = useLimitErrorToast();
   const setMessageFeedback = useSetMessageFeedback();
 
   const [isChatStreaming, setIsChatStreaming] = useState(false);
@@ -326,8 +328,10 @@ export function useChatStream({
             query: messageText,
             sourcePolicy,
           });
-        } catch {
+        } catch (err) {
           resetStreamingState();
+          // Pro-only and usage-limit refusals get the upgrade toast.
+          await handleLimitError(err);
         } finally {
           setIsChatStreaming(false);
         }
@@ -462,6 +466,7 @@ export function useChatStream({
       releaseChatGenerationMutation,
       sendMessage,
       startDeepResearch,
+      handleLimitError,
       resetStreamingState,
       shouldApplyStreamUpdate,
       onConversationEnsured,

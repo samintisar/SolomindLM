@@ -1,4 +1,6 @@
 import { ChevronDown } from "lucide-react";
+import { useShowProBadges } from "@/features/billing/hooks/useShowProBadges";
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
@@ -27,6 +29,7 @@ type ModeMenuProps = {
 };
 
 export function ModeMenu({ mode, onModeChange, disabled, crowded = false }: ModeMenuProps) {
+  const showProBadges = useShowProBadges();
   const current = COMPOSER_MODES.find((m) => m.id === mode) ?? COMPOSER_MODES[0];
   const Icon = current.icon;
   return (
@@ -63,7 +66,12 @@ export function ModeMenu({ mode, onModeChange, disabled, crowded = false }: Mode
                 <ItemIcon />
               </DropdownMenuItemIcon>
               <DropdownMenuItemText>
-                {label}
+                <span className="flex items-center gap-1.5">
+                  {label}
+                  {showProBadges && id === "deepResearch" ? (
+                    <Badge variant="secondary">Pro</Badge>
+                  ) : null}
+                </span>
                 <DropdownMenuItemDescription>{description}</DropdownMenuItemDescription>
               </DropdownMenuItemText>
             </DropdownMenuRadioItem>

@@ -550,11 +550,14 @@ export default defineSchema({
       v.literal("failed")
     ),
     workflowId: v.optional(v.string()),
+    /** Times this plan's workflow was retried; capped so retries can't replace new runs. */
+    retryCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_conversation", ["conversationId"])
     .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"])
     .index("by_status", ["status"]),
 
   // Deep Research - execution state (separate from plans for re-runs)
@@ -921,11 +924,14 @@ export default defineSchema({
         extractCompletedAt: v.optional(v.number()),
       })
     ),
+    /** Times this review's workflow was retried; capped so retries can't replace new runs. */
+    retryCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"]),
 
   /** Screening decisions (included and excluded) for PRISMA transparency. */
   literatureReviewScreeningDecisions: defineTable({
