@@ -13,10 +13,16 @@ describe("toAnkiText", () => {
         "#separator:tab",
         "#html:false",
         "#columns:Front\tBack",
-        "What makes ATP?\tMitochondria",
-        'Define "osmosis" (short)\tWater moves across a membrane',
+        '"What makes ATP?"\t"Mitochondria"',
+        '"Define ""osmosis"" (short)"\t"Water moves across a membrane"',
         "",
       ].join("\n")
+    );
+  });
+
+  it("quotes fields so fronts starting with # or a quote survive the importer", () => {
+    expect(toAnkiText([{ front: "#hashtag is a label", back: '"Quoted" answer' }])).toContain(
+      '\n"#hashtag is a label"\t"""Quoted"" answer"\n'
     );
   });
 });

@@ -11,9 +11,15 @@ const flatten = (value: string) =>
 
 const tabLine = (card: ExportCard) => `${flatten(card.front)}\t${flatten(card.back)}`;
 
-/** Anki "Import File" plain text with file headers (Anki 2.1.55+). */
+const ankiField = (value: string) => `"${flatten(value).replace(/"/g, '""')}"`;
+
+/**
+ * Anki "Import File" plain text with file headers (Anki 2.1.55+). Every field is quoted: an
+ * unquoted line starting with "#" is read as a comment and one starting with `"` as quoting.
+ */
 export function toAnkiText(cards: ExportCard[]): string {
-  return `${["#separator:tab", "#html:false", "#columns:Front\tBack", ...cards.map(tabLine)].join("\n")}\n`;
+  const lines = cards.map((card) => `${ankiField(card.front)}\t${ankiField(card.back)}`);
+  return `${["#separator:tab", "#html:false", "#columns:Front\tBack", ...lines].join("\n")}\n`;
 }
 
 /** Paste into Quizlet's "Import" box with "Between term and definition: Tab" and "Between rows: New line". */
