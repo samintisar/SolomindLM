@@ -712,6 +712,7 @@ describe("extractDataHandler with LLM extraction", () => {
     expect(callArgs.papers[0].extractedData["key_findings"]).toBe(
       "30% improvement in primary outcome"
     );
+    expect(callArgs.papers[0].extractionFailed).toBeUndefined();
   });
 
   it("asks for every extraction column id in the structured schema, with reasoning off", async () => {
@@ -773,7 +774,7 @@ describe("extractDataHandler with LLM extraction", () => {
     expect(createLLM).toHaveBeenCalledWith(expect.objectContaining({ phase: "fast" }));
   });
 
-  it("falls back to basic metadata when LLM extraction fails", async () => {
+  it("falls back to basic metadata and marks the paper when LLM extraction fails", async () => {
     (createLLM as any).mockImplementation(() => {
       throw new Error("LLM Error");
     });
@@ -802,6 +803,8 @@ describe("extractDataHandler with LLM extraction", () => {
     expect(mockCtx.runMutation).toHaveBeenCalledTimes(1);
     const callArgs = (mockCtx.runMutation as any).mock.calls[0][1];
     expect(callArgs.papers[0].extractedData).toBeUndefined();
+    // So the table and report can tell a failed extraction from a paper that reports nothing (#398).
+    expect(callArgs.papers[0].extractionFailed).toBe(true);
   });
 
   it("skips LLM extraction when columns are metadata-only", async () => {
@@ -836,6 +839,7 @@ describe("extractDataHandler with LLM extraction", () => {
     expect(mockCtx.runMutation).toHaveBeenCalledTimes(1);
     const callArgs = (mockCtx.runMutation as any).mock.calls[0][1];
     expect(callArgs.papers[0].extractedData).toBeUndefined();
+    expect(callArgs.papers[0].extractionFailed).toBeUndefined();
   });
 });
 
