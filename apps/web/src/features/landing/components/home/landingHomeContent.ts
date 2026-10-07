@@ -131,7 +131,7 @@ export const STUDIO_TILES: StudioTile[] = [
   },
 ];
 
-export interface NotebookOutput {
+interface NotebookOutput {
   label: string;
   icon: LucideIcon;
   tone: Tone;
