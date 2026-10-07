@@ -3,37 +3,6 @@ import fs from "fs";
 import path from "path";
 import { defineConfig, loadEnv } from "vite";
 
-/** Copy KaTeX fonts to public and rewrite CSS URLs so they resolve at build time. */
-function katexFonts() {
-  return {
-    name: "katex-fonts",
-    enforce: "pre" as const,
-    buildStart() {
-      const src = path.resolve(__dirname, "node_modules/katex/dist/fonts");
-      const dest = path.resolve(__dirname, "public/katex/fonts");
-      if (!fs.existsSync(src)) {
-        const rootSrc = path.resolve(__dirname, "../../node_modules/katex/dist/fonts");
-        if (fs.existsSync(rootSrc)) {
-          fs.mkdirSync(path.dirname(dest), { recursive: true });
-          fs.cpSync(rootSrc, dest, { recursive: true });
-          return;
-        }
-      }
-      if (fs.existsSync(src)) {
-        fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.cpSync(src, dest, { recursive: true });
-      }
-    },
-    // Run before Vite resolves CSS url() so rewritten paths aren't treated as relative
-    load(id: string) {
-      if (id.includes("katex") && id.includes("katex.min.css")) {
-        const raw = fs.readFileSync(id, "utf-8");
-        return raw.replace(/url\(fonts\//g, "url(/katex/fonts/");
-      }
-    },
-  };
-}
-
 /** Copy PDF.js worker to public so it is served locally (avoids unpkg CDN round-trip). */
 function pdfjsWorker() {
   return {
@@ -82,7 +51,7 @@ export default defineConfig(({ mode }) => {
     })();
 
   return {
-    plugins: [react(), katexFonts(), pdfjsWorker()],
+    plugins: [react(), pdfjsWorker()],
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
     },
@@ -173,8 +142,9 @@ export default defineConfig(({ mode }) => {
               return "icons";
             }
 
-            // Math/KaTeX
-            if (id.includes("node_modules/katex")) {
+            // Math/KaTeX. The stylesheet is imported eagerly from index.tsx; keeping it out of
+            // this chunk stops the entry from statically pulling in the KaTeX JS.
+            if (id.includes("node_modules/katex") && !id.endsWith(".css")) {
               return "katex";
             }
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { getIntentPagesByCluster } from "../intentLandingPages";
-import { getComparisonPages, getGuidePages } from "../seoContentPages";
+import { COMPARE_HUB_PATH, getComparisonPages, getGuidePages } from "../seoContentPages";
 
 const FOOTER_TAGLINE =
   "SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers—flashcards, quizzes, reports, chat, and more, starting from the material you upload.";
@@ -168,6 +168,7 @@ export const Footer: React.FC = () => {
 
           <div className="lg:col-span-2">
             <FooterLinkColumn title="Comparisons">
+              <FooterLink to={COMPARE_HUB_PATH}>All comparisons</FooterLink>
               {comparisonPages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
                   {page.navLabel}

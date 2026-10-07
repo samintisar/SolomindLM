@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "katex/dist/katex.min.css";
 
 /* Streamdown (Tailwind v4): scan hoisted package classes — deps live under apps/web/node_modules */
 @source "../node_modules/streamdown/dist/*.js";

@@ -46,6 +46,8 @@ const literaturePaperFields = {
   documentId: v.optional(v.id("documents")),
   /** Set when a notebook paper looks off-topic for the question; it is still included. */
   offTopicReason: v.optional(v.string()),
+  /** Set when the extraction call failed, so its columns are empty for that reason (#398). */
+  extractionFailed: v.optional(v.boolean()),
 };
 
 const literaturePaperValidator = v.object(literaturePaperFields);
@@ -178,6 +180,7 @@ export const insertDraftBatch = internalMutation({
         includeReason: paper.includeReason,
         isIncluded: true,
         ...(paper.offTopicReason ? { offTopicReason: paper.offTopicReason } : {}),
+        ...(paper.extractionFailed ? { extractionFailed: true } : {}),
         batchNumber: args.batchNumber,
         createdAt: now,
       });
@@ -207,6 +210,7 @@ export const persistTable = internalMutation({
       includeReason?: string;
       isIncluded: boolean;
       offTopicReason?: string;
+      extractionFailed?: boolean;
     }> = [];
 
     for (const d of drafts) {
@@ -216,6 +220,7 @@ export const persistTable = internalMutation({
         includeReason: d.includeReason,
         isIncluded: d.isIncluded,
         ...(d.offTopicReason ? { offTopicReason: d.offTopicReason } : {}),
+        ...(d.extractionFailed ? { extractionFailed: true } : {}),
       });
     }
 
@@ -292,6 +297,7 @@ export const getTableById = internalQuery({
           isIncluded: v.boolean(),
           /** A notebook paper the screening check judged off-topic (#301); it is still included. */
           offTopicReason: v.optional(v.string()),
+          extractionFailed: v.optional(v.boolean()),
         })
       ),
       createdAt: v.number(),
@@ -327,6 +333,7 @@ export const getDraftsBySession = internalQuery({
       includeReason: v.optional(v.string()),
       isIncluded: v.boolean(),
       offTopicReason: v.optional(v.string()),
+      extractionFailed: v.optional(v.boolean()),
       batchNumber: v.number(),
     })
   ),
@@ -341,6 +348,7 @@ export const getDraftsBySession = internalQuery({
       includeReason: d.includeReason,
       isIncluded: d.isIncluded,
       ...(d.offTopicReason ? { offTopicReason: d.offTopicReason } : {}),
+      ...(d.extractionFailed ? { extractionFailed: true } : {}),
       batchNumber: d.batchNumber,
     }));
   },

@@ -81,6 +81,7 @@ function LiteratureTableStudioShell({
             includeReason: paper.includeReason,
             isIncluded: paper.isIncluded,
             offTopicReason: paper.offTopicReason,
+            extractionFailed: paper.extractionFailed,
           })),
         });
         toastSuccess("Table saved to Studio");
@@ -109,6 +110,7 @@ function LiteratureTableStudioShell({
               includeReason: p.includeReason,
               isIncluded: p.isIncluded,
               offTopicReason: p.offTopicReason,
+              extractionFailed: p.extractionFailed,
               citation: p.citation,
             })),
           }}
