@@ -1,0 +1,769 @@
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  .lp {
+    --background: oklch(0.9582 0.0152 90.2357);
+    --foreground: oklch(0.21 0.01 0);
+    --card: oklch(0.9914 0.0098 87.4695);
+    --primary: oklch(0.38 0.05 65.5444);
+    --muted: oklch(0.9239 0.019 83.0636);
+    --accent: oklch(0.8348 0.025 88.8064);
+    --border: oklch(0.8606 0.0321 84.5881);
+    --hairline: color-mix(in oklab, var(--border) 50%, transparent);
+    --muted-fg: oklch(0.5 0.038 71.1655);
+    --warning: oklch(0.75 0.08 85);
+    --warning-muted: oklch(0.95 0.04 85);
+    --info: oklch(0.52 0.08 245);
+    --info-muted: oklch(0.95 0.025 245);
+    --success: oklch(0.5471 0.08 142.9149);
+    --success-muted: oklch(0.95 0.03 145);
+    --success-muted-fg: oklch(0.33 0.07 145);
+    --destructive: oklch(0.51 0.09 32.9149);
+    --destructive-muted: oklch(0.95 0.025 30);
+    --violet: oklch(0.5 0.12 300);
+    --shadow-xs: 0 1px 2px 0 hsl(28 20% 20% / 0.06);
+    --shadow-md: 0 2px 4px -1px hsl(28 20% 20% / 0.06), 0 4px 8px -2px hsl(28 20% 20% / 0.08);
+    --shadow-lg: 0 4px 6px -2px hsl(28 20% 20% / 0.05), 0 12px 24px -4px hsl(28 20% 20% / 0.1);
+    --shadow-xl: 0 8px 12px -4px hsl(28 20% 20% / 0.06), 0 24px 48px -8px hsl(28 20% 20% / 0.14);
+    --shadow-2xl: 0 32px 64px -12px hsl(28 20% 20% / 0.22);
+    font-family: Lora, Georgia, serif; color: var(--foreground); background: var(--background);
+    width: 1280px; height: 760px; position: relative; overflow: hidden; transform-origin: top left;
+  }
+  .lp * { box-sizing: border-box; }
+  .lp svg.lucide { width: 1em; height: 1em; stroke-width: 2; flex: none; }
+  .lp .display { font-family: "Libre Baskerville", Georgia, serif; letter-spacing: -0.025em; }
+  .lp .sans { font-family: Inter, system-ui, sans-serif; }
+  .lp .paper { position:absolute; inset:0; background-image: linear-gradient(to right, color-mix(in oklab, var(--border) 30%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--border) 30%, transparent) 1px, transparent 1px); background-size: 28px 28px; -webkit-mask-image: radial-gradient(ellipse 70% 80% at 30% 20%, black, transparent 75%); mask-image: radial-gradient(ellipse 70% 80% at 30% 20%, black, transparent 75%); }
+  .lp .nav { position:relative; display:flex; align-items:center; justify-content:space-between; padding: 20px 56px; font-family: Inter, sans-serif; font-size: 14px; }
+  .lp .brand { display:flex; gap:9px; align-items:center; font-family:"Libre Baskerville",serif; font-weight:700; font-size:17px; }
+  .lp .mark { width:26px; height:26px; border-radius:7px; background: var(--primary); color: var(--card); display:grid; place-items:center; font-size: 15px; }
+  .lp .links { display:flex; gap:30px; color: var(--muted-fg); }
+  .lp .btn { font-family: Inter, sans-serif; font-weight:600; font-size:14px; border-radius: 12px; padding: 9px 16px; display:inline-flex; gap:7px; align-items:center; white-space: nowrap; }
+  .lp .btn-primary { background: var(--primary); color: white; box-shadow: var(--shadow-xs); }
+  .lp .btn-outline { background: var(--card); color: var(--foreground); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); }
+  .lp .btn-lg { padding: 13px 22px; font-size: 15px; }
+  .lp .pill { font-family: Inter, sans-serif; font-size: 12.5px; font-weight:500; padding: 6px 12px; border-radius: 99px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); color: var(--foreground); display:inline-flex; gap:7px; align-items:center; }
+  .lp .pill .dot { width:7px; height:7px; border-radius:99px; background: var(--success); }
+  .lp .h1 { font-size: 56px; font-weight: 700; line-height: 1.08; margin: 22px 0 0; }
+  .lp .h1 em { font-weight: 400; color: var(--primary); white-space: nowrap; }
+  .lp .lede { font-size: 18.5px; line-height: 1.6; color: color-mix(in oklab, var(--foreground) 72%, var(--background)); margin: 20px 0 28px; max-width: 470px; }
+  .lp .fine { font-family: Inter, sans-serif; font-size: 13px; color: var(--muted-fg); margin-top: 16px; display:flex; gap: 16px; align-items:center; }
+  .lp .fine span { display:inline-flex; gap:6px; align-items:center; }
+  .lp .fine svg { color: var(--success); }
+  .lp .hero { position:relative; display:grid; grid-template-columns: 500px 1fr; gap: 48px; padding: 40px 0 0 64px; }
+
+  /* ===== product frame: the real notebook layout ===== */
+  .app { position: relative; width: 860px; height: 560px; border-radius: 20px; background: var(--background); box-shadow: var(--shadow-2xl), 0 0 0 1px var(--hairline); overflow: hidden; font-family: Inter, sans-serif; font-size: 11px; }
+  .app .top { height: 40px; display:flex; align-items:center; justify-content:space-between; padding: 0 14px; background: var(--background); box-shadow: inset 0 -1px 0 var(--hairline); }
+  .app .top .t { display:flex; align-items:center; gap: 9px; font-family: "Libre Baskerville", serif; font-weight: 700; font-size: 12.5px; }
+  .app .top .t .m { width:18px; height:18px; border-radius:5px; background: var(--primary); }
+  .app .top .t .sep { width:1px; height: 14px; background: var(--border); }
+  .app .top .r { display:flex; gap: 8px; align-items:center; }
+  .app .chip { display:inline-flex; gap:5px; align-items:center; padding: 4px 9px; border-radius: 9px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); font-weight: 600; font-size: 10.5px; }
+  .app .avatar { width: 22px; height: 22px; border-radius: 99px; background: linear-gradient(135deg, var(--warning), var(--destructive)); }
+  .app .cols { display:grid; grid-template-columns: 196px 1fr 214px; height: calc(100% - 40px); }
+  .app .col { padding: 12px; position: relative; }
+  .app .col + .col { box-shadow: inset 1px 0 0 var(--hairline); }
+  .app .ch { display:flex; justify-content: space-between; align-items:center; font-weight: 700; letter-spacing: .07em; font-size: 9.5px; color: var(--foreground); text-transform: uppercase; margin-bottom: 10px; }
+  .app .ch span { display:inline-flex; gap:6px; align-items:center; }
+  .app .count { font-weight: 600; padding: 1px 6px; border-radius: 99px; background: var(--muted); color: var(--muted-fg); letter-spacing: 0; }
+  .app .add { display:flex; gap:6px; justify-content:center; align-items:center; padding: 7px; border-radius: 10px; background: var(--primary); color: white; font-weight: 600; margin-bottom: 10px; }
+  .app .src { display:flex; gap: 8px; align-items:center; padding: 8px; border-radius: 11px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); margin-bottom: 6px; }
+  .app .src .ic { width: 24px; height: 24px; border-radius: 7px; display:grid; place-items:center; font-size: 12px; }
+  .app .src .nm { flex:1; min-width:0; }
+  .app .src .nm b { display:block; font-weight: 600; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app .src .nm small { color: var(--muted-fg); font-size: 9.5px; }
+  .app .src .cb { width: 12px; height: 12px; border-radius: 4px; background: var(--primary); color: white; display:grid; place-items:center; font-size: 9px; }
+  .app .src.on { box-shadow: var(--shadow-md), 0 0 0 1.5px color-mix(in oklab, var(--primary) 45%, transparent); }
+  .app .chat { background-color: var(--background); background-image: linear-gradient(to right, color-mix(in oklch, var(--border) 22%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklch, var(--border) 22%, transparent) 1px, transparent 1px); background-size: 22px 22px; display:flex; flex-direction: column; }
+  .app .q { align-self: flex-end; max-width: 78%; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); border-radius: 14px 14px 4px 14px; padding: 9px 12px; font-family: Lora, serif; font-size: 12px; }
+  .app .a { font-family: Lora, serif; font-size: 12.5px; line-height: 1.65; margin-top: 14px; }
+  .app .a p { margin: 0 0 8px; }
+  .app .cite { display:inline-grid; place-items:center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; background: var(--muted); color: var(--primary); font-family: Inter, sans-serif; font-weight: 700; font-size: 9px; vertical-align: 1px; }
+  .app .cite.on { background: var(--primary); color: white; box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent); }
+  .app .composer { margin-top: auto; border-radius: 16px; background: var(--card); box-shadow: var(--shadow-lg), 0 0 0 1px var(--hairline); padding: 10px 12px; }
+  .app .composer .ph { font-family: Lora, serif; color: var(--muted-fg); font-size: 12px; }
+  .app .composer .row { display:flex; justify-content:space-between; align-items:center; margin-top: 12px; }
+  .app .composer .send { width: 24px; height: 24px; border-radius: 9px; background: var(--primary); color: white; display:grid; place-items:center; font-size: 12px; }
+  .app .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .app .tool { padding: 8px; border-radius: 11px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); font-size: 10px; font-weight: 500; }
+  .app .tool svg { font-size: 13px; display:block; margin-bottom: 7px; }
+  .app .saved { margin-top: 12px; }
+  .app .item { display:flex; gap: 8px; align-items:center; padding: 8px; border-radius: 11px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); margin-bottom: 6px; }
+  .app .item .ic { width: 22px; height: 22px; border-radius: 7px; display:grid; place-items:center; font-size: 11px; }
+  .app .item b { display:block; font-family: "Libre Baskerville", serif; font-size: 10px; }
+  .app .item small { color: var(--muted-fg); font-size: 9px; }
+  .app .bar { height: 4px; border-radius: 99px; background: var(--muted); margin-top: 4px; overflow: hidden; }
+  .app .bar i { display:block; height: 100%; width: 62%; background: var(--primary); border-radius: 99px; }
+
+  /* floating layers */
+  .float { position: absolute; border-radius: 18px; background: var(--card); box-shadow: var(--shadow-xl), 0 0 0 1px var(--hairline); font-family: Inter, sans-serif; }
+  .popover { width: 300px; padding: 14px 16px; }
+  .popover .hd { display:flex; gap: 8px; align-items:center; font-size: 11px; font-weight: 600; }
+  .popover .hd .ic { width: 22px; height: 22px; border-radius: 7px; background: var(--destructive-muted); color: var(--destructive); display:grid; place-items:center; font-size: 12px; }
+  .popover .hd small { display:block; font-weight: 500; color: var(--muted-fg); font-size: 10px; }
+  .popover blockquote { margin: 10px 0 0; font-family: Lora, serif; font-size: 12.5px; line-height: 1.6; color: color-mix(in oklab, var(--foreground) 80%, var(--background)); }
+  .popover mark { background: color-mix(in oklab, var(--warning) 45%, transparent); color: var(--foreground); border-radius: 3px; padding: 0 2px; }
+  .popover .ft { margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--primary); display:flex; gap: 5px; align-items:center; }
+  .fcard { width: 250px; padding: 16px; }
+  .fcard .k { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-fg); font-weight: 600; display:flex; justify-content: space-between; }
+  .fcard .qq { font-family: "Libre Baskerville", serif; font-size: 15px; line-height: 1.4; margin: 12px 0 14px; }
+  .fcard .ans { font-family: Lora, serif; font-size: 12px; line-height: 1.5; padding: 9px 10px; border-radius: 10px; background: var(--muted); }
+  .fcard .rate { display:flex; gap: 6px; margin-top: 12px; }
+  .fcard .rate span { flex: 1; text-align: center; padding: 6px 0; border-radius: 9px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); font-size: 10.5px; font-weight: 600; }
+  .fcard .rate span.go { background: var(--primary); color: white; box-shadow: var(--shadow-xs); }
+  .audio { width: 270px; padding: 12px 14px; display:flex; gap: 12px; align-items:center; }
+  .audio .play { width: 36px; height: 36px; border-radius: 12px; background: var(--primary); color: white; display:grid; place-items:center; font-size: 15px; }
+  .audio b { font-family: "Libre Baskerville", serif; font-size: 11.5px; display:block; }
+  .audio small { color: var(--muted-fg); font-size: 10px; }
+  .wave { display:flex; gap: 2px; align-items:center; height: 16px; margin-top: 5px; }
+  .wave i { width: 2.5px; border-radius: 2px; background: var(--primary); opacity: .75; display:block; }
+  .wave i.off { opacity: .25; }
+  .quizc { width: 290px; padding: 14px 16px; }
+  .quizc .k { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-fg); font-weight: 600; }
+  .quizc .qq { font-family: "Libre Baskerville", serif; font-size: 13.5px; line-height: 1.4; margin: 9px 0 10px; }
+  .quizc .opt { font-family: Lora, serif; font-size: 11.5px; padding: 7px 10px; border-radius: 10px; background: var(--card); box-shadow: 0 0 0 1px var(--hairline); margin-bottom: 5px; display:flex; justify-content: space-between; align-items:center; }
+  .quizc .opt.right { background: var(--success-muted); box-shadow: 0 0 0 1px color-mix(in oklab, var(--success) 40%, transparent); color: var(--success-muted-fg); font-weight: 600; }
+  .quizc .why { font-family: Inter, sans-serif; font-size: 10.5px; color: var(--muted-fg); margin-top: 8px; display:flex; gap: 6px; align-items: center; }
+
+  .stage { width: 100%; overflow: hidden; border-radius: 14px; }
+  .optwrap { margin-bottom: 30px; }
+  .optwrap .option { display:block; padding: 14px; }
+  .optwrap .option .content { margin-top: 12px; }
+  .copy-notes { font-size: 13px; line-height: 1.55; margin-top: 6px; }
+  .copy-notes b { font-weight: 600; }
+</style>
+
+<style>
+  .lp .eyebrow-rule { font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--primary); display:flex; gap: 12px; align-items:center; }
+  .lp .eyebrow-rule span { width: 28px; height: 1.5px; background: var(--primary); display:block; }
+  .lp .kicker { font-family: Lora, serif; font-style: italic; font-size: 19px; color: var(--muted-fg); }
+  .lp .news { font-family: Inter, sans-serif; font-size: 13px; font-weight: 500; color: var(--foreground); display:inline-flex; gap: 9px; align-items:center; padding: 4px 12px 4px 4px; border-radius: 99px; background: color-mix(in oklab, var(--muted) 70%, transparent); }
+  .lp .news .tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: var(--primary); color: white; }
+  .lp .news svg { color: var(--muted-fg); }
+  .lp .h1.first { margin-top: 0; }
+</style>
+<style>
+  .citetip { position: absolute; z-index: 5; width: 236px; padding: 9px 11px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow-xl), 0 0 0 1px var(--hairline); font-family: Inter, sans-serif; }
+  .citetip .arrow { position:absolute; top: -5px; left: 22px; width: 10px; height: 10px; background: var(--card); transform: rotate(45deg); box-shadow: -1px -1px 0 0 var(--hairline); border-radius: 2px; }
+  .citetip .hd { display:flex; gap: 7px; align-items:center; font-size: 10px; }
+  .citetip .hd b { display:block; font-weight: 600; }
+  .citetip .hd small { color: var(--muted-fg); font-size: 9px; }
+  .citetip .hd .ic { width: 18px; height: 18px; font-size: 10px; border-radius: 7px; background: var(--destructive-muted); color: var(--destructive); display:grid; place-items:center; font-size: 12px; flex:none; }
+  .citetip .hd .num { margin-left: auto; min-width: 15px; height: 15px; font-size: 8.5px; border-radius: 99px; background: var(--primary); color: white; display:grid; place-items:center; font-size: 9.5px; font-weight: 700; }
+  .citetip blockquote { margin: 7px 0 0; font-family: Lora, serif; font-size: 10.5px; line-height: 1.5; color: color-mix(in oklab, var(--foreground) 80%, var(--background)); }
+  .citetip mark { background: color-mix(in oklab, var(--warning) 45%, transparent); color: var(--foreground); border-radius: 3px; padding: 0 2px; }
+  .citetip .ft { margin-top: 7px; padding-top: 6px; font-size: 9.5px !important; box-shadow: inset 0 1px 0 var(--hairline); font-size: 10.5px; font-weight: 600; color: var(--primary); display:flex; gap: 5px; align-items:center; }
+  .wq { width: 312px; padding: 14px 16px; }
+  .wq .k { display:flex; justify-content:space-between; align-items:center; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-fg); font-weight: 600; }
+  .wq .score { letter-spacing: 0; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--success-muted); color: var(--success-muted-fg); }
+  .wq .qq { font-family: "Libre Baskerville", serif; font-size: 13.5px; line-height: 1.4; margin: 9px 0 10px; }
+  .wq .lab { display:flex; gap: 5px; align-items:center; font-family: Inter, sans-serif; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted-fg); margin-bottom: 4px; }
+  .wq .mine { font-family: Lora, serif; font-size: 11.5px; line-height: 1.5; padding: 8px 10px; border-radius: 10px; background: color-mix(in oklab, var(--muted) 55%, var(--card)); box-shadow: inset 0 0 0 1px var(--hairline); }
+  .wq .fb { font-family: Lora, serif; font-size: 11.5px; line-height: 1.5; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--success-muted); color: var(--success-muted-fg); }
+  .wq .fb .lab { color: var(--success-muted-fg); }
+  .wq .src { display:flex; gap: 5px; align-items:center; margin-top: 6px; font-family: Inter, sans-serif; font-size: 10px; font-weight: 600; opacity: .85; }
+  .lockedhero { margin-bottom: 34px; }
+  .herowrap .app { height: 640px; transform: scale(.76); transform-origin: top left; }
+  .herowrap .hero { padding-top: 34px; grid-template-columns: 470px 1fr; gap: 44px; }
+  .lockedhero .cap { font-size: 13px; color: var(--text-secondary, #888); margin: 8px 2px 0; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+  .mini {
+    --background: oklch(0.9582 0.0152 90.2357); --foreground: oklch(0.21 0.01 0); --card: oklch(0.9914 0.0098 87.4695);
+    --primary: oklch(0.38 0.05 65.5444); --muted: oklch(0.9239 0.019 83.0636); --border: oklch(0.8606 0.0321 84.5881);
+    --hairline: color-mix(in oklab, var(--border) 55%, transparent); --muted-fg: oklch(0.5 0.038 71.1655);
+    --info: oklch(0.52 0.08 245); --success: oklch(0.5471 0.08 142.9149); --warning: oklch(0.75 0.08 85); --destructive: oklch(0.51 0.09 32.9149);
+    background: var(--background); color: var(--foreground); border-radius: 12px; padding: 10px; font-family: Inter, sans-serif; font-size: 10px;
+  }
+  .mini .sec { position: relative; border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+  .mini .sec .lbl { font-family: "Libre Baskerville", serif; font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+  .mini .sec .why { font-family: Lora, serif; color: var(--muted-fg); font-size: 10.5px; line-height: 1.45; }
+  .mini .n { position: absolute; top: 8px; right: 9px; font-weight: 700; font-size: 9px; color: var(--muted-fg); }
+  .mini .hero { background: var(--card); box-shadow: 0 0 0 1px var(--hairline); }
+  .mini .card { background: var(--card); box-shadow: 0 1px 2px hsl(28 20% 20% / .06), 0 0 0 1px var(--hairline); }
+  .mini .flat { background: color-mix(in oklab, var(--muted) 60%, transparent); }
+  .mini .dark { background: var(--primary); color: white; }
+  .mini .dark .why { color: color-mix(in oklab, white 75%, var(--primary)); }
+  .mini .dark .n { color: color-mix(in oklab, white 70%, var(--primary)); }
+  .mini .viz { display:flex; gap: 4px; margin-top: 7px; }
+  .mini .viz i { display:block; border-radius: 4px; background: color-mix(in oklab, var(--border) 60%, var(--card)); height: 18px; flex: 1; }
+  .mini .viz.tall i { height: 34px; }
+  .mini .viz.marq i { flex: none; width: 34px; }
+  .mini .row { display:flex; gap: 6px; align-items: stretch; margin-top: 7px; }
+  .mini .row .t { flex: 1; font-family: Lora, serif; font-size: 10px; line-height: 1.35; }
+  .mini .row .v { flex: 1.2; border-radius: 6px; background: color-mix(in oklab, var(--border) 60%, var(--card)); min-height: 38px; }
+  .mini .chip { display:inline-block; padding: 2px 6px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 1px var(--hairline); font-size: 8.5px; margin: 5px 3px 0 0; color: var(--muted-fg); }
+  .mini .same { opacity: .55; }
+  .cols3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  .cols3 .option { display:block; padding: 12px; }
+  .cols3 .option .content { margin-top: 10px; }
+  .cols3 .option .content p { font-size: 13px; line-height: 1.5; }
+  @media (max-width: 900px) { .cols3 { grid-template-columns: 1fr; } }
+</style><h2>Home page, version B: the whole thing</h2>
+<p class="subtitle">Full fidelity, final copy, real product moments. It's interactive: the Studio marquee scrolls (hover to pause), and the "Who it's for" tabs, Annual/Monthly toggle and FAQ all work. Sections fade up as they scroll in. Scroll through it like a visitor would.</p>
+<template id="citetip-tpl"><div class="citetip" id="citetip">
+        <span class="arrow"></span>
+        <div class="hd"><span class="ic"><i data-lucide="file-text"></i></span><span><b>Lecture 12 – Beta blockers.pdf</b><small>Slide 14</small></span><span class="num">1</span></div>
+        <blockquote>“Non-selective agents antagonise β<sub>2</sub> receptors in bronchial smooth muscle and <mark>may precipitate bronchospasm in patients with asthma</mark>.”</blockquote>
+        <div class="ft"><span>Open in source</span><i data-lucide="arrow-up-right"></i></div>
+      </div></template>
+<div class="stage"><div class="lp page"><div class="herowrap">
+  <div class="paper"></div>
+  <div class="nav"><div class="brand"><img src="https://solomindlm.com/SolomindLM_logo.png" alt="" width="26" height="26" style="object-fit:contain">SolomindLM</div><div class="links"><span>Features</span><span>Use cases</span><span>Pricing</span><span>FAQ</span></div><div style="display:flex;gap:8px"><span class="btn">Log in</span><span class="btn btn-primary">Get started</span></div></div>
+  <div class="hero">
+    <div style="padding-top: 26px;">
+      
+      <h1 class="display h1 first">AI that makes you think, <em>not thinks for you.</em></h1>
+      <p class="lede">SolomindLM won't write your essay. It reads your sources with you, answers with citations, and quizzes you until it sticks — so what you know at the exam is actually yours.</p>
+      <div style="display:flex; gap:10px;"><span class="btn btn-primary btn-lg">Start free</span><span class="btn btn-outline btn-lg">How it works</span></div>
+      <div class="fine"><span><i data-lucide="check"></i>Free plan, no card</span><span><i data-lucide="check"></i>Works with any course</span></div>
+    </div>
+    <div style="position:relative;">
+      <div class="app" data-frame="quiz"></div>
+      <div class="float wq" style="left: 392px; top: 300px;">
+        <div class="k"><span>Written question · 2 of 5</span><span class="score">4 / 5</span></div>
+        <div class="qq">Explain why a non-selective beta blocker can be dangerous for a patient with asthma.</div>
+        <div class="mine"><span class="lab">Your answer</span>It blocks β<sub>2</sub> receptors in the lungs, so the airways can't relax and the patient may go into bronchospasm.</div>
+        <div class="fb"><span class="lab"><i data-lucide="sparkles"></i>Feedback</span>Right mechanism. For full marks, name a safer cardioselective option, such as bisoprolol.<span class="src"><i data-lucide="file-text"></i>Lecture 12, slide 15</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  .lp.page { height: auto; }
+  .herowrap { position: relative; height: 760px; overflow: hidden; }
+  .lp .wrap { width: 1120px; margin: 0 auto; }
+  .lp section { position: relative; }
+  .lp .eyebrow { font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--primary); }
+  .lp .h2 { font-family: "Libre Baskerville", serif; font-weight: 700; font-size: 44px; line-height: 1.12; letter-spacing: -0.025em; margin: 14px 0 0; }
+  .lp .h2 em { font-weight: 400; color: var(--primary); }
+  .lp .sub { font-size: 18px; line-height: 1.6; color: color-mix(in oklab, var(--foreground) 68%, var(--background)); margin: 16px 0 0; max-width: 620px; }
+  .lp .center { text-align: center; }
+  .lp .center .sub { margin-left: auto; margin-right: auto; }
+  .lp .soft { background: var(--card); border-radius: 20px; box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); }
+  .lp .raised { background: var(--card); border-radius: 20px; box-shadow: var(--shadow-xl), 0 0 0 1px var(--hairline); }
+  .lp .link { font-family: Inter, sans-serif; font-weight: 600; font-size: 14px; color: var(--primary); display: inline-flex; gap: 6px; align-items: center; }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+  /* 1 · sources strip */
+  .strip { padding: 34px 0 30px; }
+  .strip .wrap { display: flex; align-items: center; gap: 34px; padding: 22px 0; box-shadow: inset 0 1px 0 var(--hairline), inset 0 -1px 0 var(--hairline); }
+  .strip .lbl { font-family: Lora, serif; font-style: italic; font-size: 15px; color: var(--muted-fg); white-space: nowrap; }
+  .strip .items { display: flex; flex: 1; justify-content: space-between; }
+  .strip .it { display: flex; gap: 8px; align-items: center; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 500; color: color-mix(in oklab, var(--foreground) 75%, var(--background)); }
+  .strip .it svg { font-size: 17px; color: var(--muted-fg); }
+
+  /* 2 · how it works */
+  .how { padding: 120px 0 40px; }
+  .beat { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; padding: 64px 0; }
+  .beat.flip .txt { order: 2; }
+  .beat .num { font-family: Inter, sans-serif; font-size: 12.5px; font-weight: 600; color: var(--primary); display: flex; gap: 10px; align-items: center; letter-spacing: .04em; }
+  .beat .num b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--primary); color: white; font-size: 12px; }
+  .beat h3 { font-family: "Libre Baskerville", serif; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 16px 0 0; }
+  .beat p { font-size: 17px; line-height: 1.65; color: color-mix(in oklab, var(--foreground) 70%, var(--background)); margin: 16px 0 0; }
+  .beat .txt ul { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 10px; }
+  .beat .txt li { display: flex; gap: 10px; align-items: center; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; }
+  .beat .txt li svg { color: var(--success); font-size: 15px; }
+  .viz { position: relative; height: 400px; }
+
+  /* beat 1 visual */
+  .v1-ans { position: absolute; left: 0; top: 0; width: 318px; padding: 18px 20px; }
+  .v1-ans .q { font-family: Lora, serif; font-size: 13px; padding: 9px 12px; border-radius: 14px 14px 4px 14px; background: var(--muted); margin-left: 40px; }
+  .v1-ans .a { font-family: Lora, serif; font-size: 13.5px; line-height: 1.7; margin-top: 14px; }
+  .v1-ans .cite { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px; background: var(--muted); color: var(--primary); font: 700 9.5px Inter, sans-serif; vertical-align: 1px; }
+  .v1-ans .cite.on { background: var(--primary); color: white; box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 16%, transparent); }
+  .v1-src { position: absolute; right: 0; top: 196px; width: 300px; padding: 0; overflow: hidden; }
+  .v1-src .bar { display: flex; gap: 8px; align-items: center; padding: 11px 14px; font: 600 11.5px Inter, sans-serif; box-shadow: inset 0 -1px 0 var(--hairline); }
+  .v1-src .bar .ic { width: 22px; height: 22px; border-radius: 7px; background: var(--destructive-muted); color: var(--destructive); display: grid; place-items: center; font-size: 12px; }
+  .v1-src .bar small { margin-left: auto; color: var(--muted-fg); font-weight: 500; }
+  .v1-src .slide { margin: 14px; border-radius: 12px; background: var(--background); padding: 16px 16px 18px; box-shadow: inset 0 0 0 1px var(--hairline); }
+  .v1-src .slide h5 { margin: 0 0 10px; font: 700 14px "Libre Baskerville", serif; }
+  .v1-src .slide li { font-family: Lora, serif; font-size: 12px; line-height: 1.55; margin: 0 0 6px 14px; color: color-mix(in oklab, var(--foreground) 78%, var(--background)); }
+  .v1-src mark { background: color-mix(in oklab, var(--warning) 50%, transparent); color: var(--foreground); border-radius: 3px; padding: 1px 2px; box-shadow: 0 0 0 2px color-mix(in oklab, var(--warning) 30%, transparent); }
+  .v1-src .open { padding: 0 14px 14px; }
+  .v1-src .pin { display: inline-grid; place-items: center; min-width: 16px; height: 16px; border-radius: 99px; background: var(--primary); color: white; font: 700 9px Inter, sans-serif; margin-right: 4px; vertical-align: 1px; }
+  .v1-line { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+
+  /* beat 2 visual */
+  .v2 .c { position: absolute; width: 300px; padding: 18px; }
+  .v2 .k { font: 600 9.5px Inter, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-fg); display: flex; justify-content: space-between; align-items: center; }
+  .v2 .qq { font: 700 15px/1.4 "Libre Baskerville", serif; margin: 12px 0; }
+  .v2 .quiz { left: 0; top: 10px; transform: rotate(-5deg); opacity: .9; }
+  .v2 .quiz .o { font-family: Lora, serif; font-size: 12px; padding: 8px 11px; border-radius: 10px; box-shadow: 0 0 0 1px var(--hairline); margin-bottom: 6px; }
+  .v2 .fc { left: 0; top: 0; width: 278px; transform: rotate(-2.5deg); }
+  .v2 .fc .back { font-family: Lora, serif; font-size: 12.5px; line-height: 1.5; padding: 10px 12px; border-radius: 11px; background: var(--muted); }
+  .v2 .fc .rate { display: flex; gap: 6px; margin-top: 12px; }
+  .v2 .fc .rate span { flex: 1; text-align: center; padding: 7px 0; border-radius: 9px; box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); font: 600 11px Inter, sans-serif; background: var(--card); }
+  .v2 .fc .rate span.go { background: var(--primary); color: white; }
+  .v2 .qz { left: 294px; top: 22px; width: 236px; transform: rotate(2.5deg); padding: 16px; }
+  .v2 .qz .qq { font-size: 13.5px; margin: 10px 0; }
+  .v2 .qz .pts { letter-spacing: 0; font-size: 10.5px; font-weight: 700; color: var(--primary); }
+  .v2 .qz .o { font-family: Lora, serif; font-size: 12px; padding: 7px 10px; border-radius: 10px; box-shadow: 0 0 0 1px var(--hairline); margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+  .v2 .qz .o.right { background: var(--success-muted); color: var(--success-muted-fg); font-weight: 600; box-shadow: 0 0 0 1px color-mix(in oklab, var(--success) 40%, transparent); }
+  .v2 .qz .ex { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; font: 500 10.5px/1.45 Inter, sans-serif; color: var(--muted-fg); }
+  .v2 .qz .ex svg { color: oklch(0.6 0.12 60); flex: none; margin-top: 1px; }
+  .v2 .wqc { left: 128px; top: 286px; width: 360px; }
+  .v2 .score { letter-spacing: 0; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; background: var(--success-muted); color: var(--success-muted-fg); }
+  .v2 .mine { font-family: Lora, serif; font-size: 12px; line-height: 1.5; padding: 9px 11px; border-radius: 11px; background: color-mix(in oklab, var(--muted) 55%, var(--card)); box-shadow: inset 0 0 0 1px var(--hairline); }
+  .v2 .fb { font-family: Lora, serif; font-size: 12px; line-height: 1.5; margin-top: 8px; padding: 9px 11px; border-radius: 11px; background: var(--success-muted); color: var(--success-muted-fg); }
+  .v2 .due { position: absolute; left: -18px; top: 326px; padding: 14px 16px; width: 168px; transform: rotate(-4deg); }
+  .v2 .due b { font: 700 26px "Libre Baskerville", serif; display: block; margin: 4px 0 8px; }
+  .v2 .bars { display: flex; gap: 4px; align-items: flex-end; height: 34px; }
+  .v2 .bars i { flex: 1; border-radius: 3px; background: color-mix(in oklab, var(--primary) 70%, var(--card)); display: block; }
+  .v2 .bars i.now { background: var(--primary); }
+
+  /* beat 3 visual */
+  .v3-table { position: absolute; left: 0; top: 30px; width: 470px; overflow: hidden; padding: 0; }
+  .v3-table .hd { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 -1px 0 var(--hairline); }
+  .v3-table .hd b { font: 700 13px "Libre Baskerville", serif; }
+  .v3-table .hd small { font: 500 11px Inter, sans-serif; color: var(--muted-fg); }
+  .v3-table table { width: 100%; border-collapse: collapse; font-family: Inter, sans-serif; font-size: 11.5px; }
+  .v3-table th { text-align: left; font-weight: 600; font-size: 10.5px; color: var(--muted-fg); background: var(--muted); padding: 8px 14px; }
+  .v3-table td { padding: 10px 14px; box-shadow: inset 0 -1px 0 var(--hairline); vertical-align: top; }
+  .v3-table td.p { font-family: Lora, serif; font-size: 12px; }
+  .v3-table td.p small { display: block; font-family: Inter, sans-serif; color: var(--muted-fg); font-size: 10px; margin-top: 2px; }
+  .v3-table .st { display: inline-flex; gap: 5px; align-items: center; color: color-mix(in oklab, var(--foreground) 75%, var(--background)); white-space: nowrap; }
+  .v3-table .st svg { color: var(--info); }
+  .v3-table .dec { display: inline-flex; gap: 4px; align-items: center; padding: 3px 9px; border-radius: 99px; font-weight: 600; font-size: 10.5px; white-space: nowrap; }
+  .v3-table .dec.in { background: var(--success-muted); color: var(--success-muted-fg); }
+  .v3-table .dec.out { background: var(--destructive-muted); color: oklch(0.36 0.09 30); }
+  .v3-table .why { display: block; font-size: 9.5px; color: var(--muted-fg); margin-top: 4px; font-weight: 500; }
+  .v3-prisma { position: absolute; right: -24px; top: 262px; width: 190px; padding: 14px; }
+  .v3-prisma .k { font: 600 9.5px Inter, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-fg); margin-bottom: 10px; }
+  .v3-prisma .box { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 10px; font: 500 11.5px Inter, sans-serif; }
+  .v3-prisma .box b { font: 700 15px "Libre Baskerville", serif; }
+  .v3-prisma .box.a { background: var(--info-muted); }
+  .v3-prisma .box.b { background: var(--card); box-shadow: 0 0 0 1px var(--hairline); }
+  .v3-prisma .box.c { background: var(--success-muted); color: var(--success-muted-fg); }
+  .v3-prisma .arr { text-align: center; color: var(--muted-fg); font-size: 12px; line-height: 1; padding: 3px 0; }
+
+  /* 3 · studio marquee */
+  .studio { padding: 110px 0 120px; background: var(--card); box-shadow: inset 0 1px 0 var(--hairline), inset 0 -1px 0 var(--hairline); overflow: hidden; }
+  .mq { margin-top: 54px; -webkit-mask-image: linear-gradient(to right, transparent, black 120px, black calc(100% - 120px), transparent); mask-image: linear-gradient(to right, transparent, black 120px, black calc(100% - 120px), transparent); }
+  .mq + .mq { margin-top: 16px; }
+  .mq .track { display: flex; gap: 16px; width: max-content; animation: mq 70s linear infinite; }
+  .mq.rev .track { animation-direction: reverse; }
+  .mq:hover .track { animation-play-state: paused; }
+  @keyframes mq { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .mq .track { animation: none; } }
+  .tile { width: 264px; padding: 20px; background: var(--background); border-radius: 18px; box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); }
+  .tile .ti { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; }
+  .tile h4 { margin: 16px 0 4px; font: 700 15px "Libre Baskerville", serif; }
+  .tile p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted-fg); }
+
+  /* 4 · who it's for */
+  .who { padding: 130px 0 110px; }
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--muted); margin-top: 34px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; }
+  .tabs button { all: unset; cursor: pointer; padding: 9px 18px; border-radius: 11px; color: var(--muted-fg); }
+  .tabs button.on { background: var(--card); color: var(--foreground); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); }
+  .panel { display: none; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; margin-top: 48px; padding: 48px; }
+  .panel.on { display: grid; animation: fadein .4s cubic-bezier(.22,1,.36,1); }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px); } }
+  .panel h3 { font: 700 32px/1.18 "Libre Baskerville", serif; letter-spacing: -0.02em; margin: 0; }
+  .panel p { font-size: 16.5px; line-height: 1.65; color: color-mix(in oklab, var(--foreground) 70%, var(--background)); margin: 14px 0 22px; }
+  .steps { display: grid; gap: 12px; margin-bottom: 26px; }
+  .steps div { display: flex; gap: 12px; align-items: center; font: 500 14px Inter, sans-serif; }
+  .steps div b { width: 24px; height: 24px; border-radius: 99px; background: var(--muted); display: grid; place-items: center; font-size: 11px; color: var(--primary); flex: none; }
+  .nb { padding: 0; overflow: hidden; }
+  .nb .cover { height: 92px; display: flex; align-items: flex-end; padding: 14px 18px; font-size: 22px; }
+  .nb .body { padding: 16px 18px 18px; }
+  .nb .body b { font: 700 17px "Libre Baskerville", serif; display: block; }
+  .nb .body small { font: 500 12px Inter, sans-serif; color: var(--muted-fg); }
+  .nb .outs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .nb .outs span { display: inline-flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; background: var(--background); box-shadow: 0 0 0 1px var(--hairline); font: 500 12px Inter, sans-serif; }
+
+  /* 5 · pricing */
+  .pricing { padding: 110px 0 120px; }
+  .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--muted); font: 500 14px Inter, sans-serif; margin-top: 30px; align-items: center; }
+  .seg button { all: unset; cursor: pointer; padding: 8px 18px; border-radius: 11px; color: var(--muted-fg); }
+  .seg button.on { background: var(--card); color: var(--foreground); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); }
+  .seg .save { padding: 4px 10px; border-radius: 99px; background: var(--success-muted); color: var(--success-muted-fg); font-size: 12px; font-weight: 600; margin: 0 6px 0 4px; }
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 860px; margin: 44px auto 0; text-align: left; }
+  .plan { padding: 34px; }
+  .plan.pro { box-shadow: var(--shadow-xl), 0 0 0 1.5px color-mix(in oklab, var(--primary) 45%, transparent); }
+  .plan .name { display: flex; justify-content: space-between; align-items: center; font: 600 13px Inter, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-fg); }
+  .plan .tag { letter-spacing: 0; text-transform: none; font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--primary); color: white; }
+  .plan .price { display: flex; align-items: baseline; gap: 8px; margin-top: 18px; }
+  .plan .price b { font: 700 52px "Libre Baskerville", serif; letter-spacing: -0.03em; }
+  .plan .price span { font: 500 14px Inter, sans-serif; color: var(--muted-fg); }
+  .plan .desc { font-size: 15.5px; color: var(--muted-fg); margin: 6px 0 24px; }
+  .plan ul { list-style: none; margin: 0 0 30px; padding: 24px 0 0; display: grid; gap: 12px; box-shadow: inset 0 1px 0 var(--hairline); }
+  .plan li { display: flex; gap: 10px; align-items: center; font: 400 14px Inter, sans-serif; }
+  .plan li svg { color: var(--primary); }
+  .plan .btn { width: 100%; justify-content: center; padding: 13px; }
+
+  /* 6 · faq */
+  .faq { padding: 40px 0 120px; }
+  .faq .wrap { display: grid; grid-template-columns: 380px 1fr; gap: 80px; }
+  .acc { display: grid; gap: 10px; }
+  .acc .row { border-radius: 16px; background: var(--card); box-shadow: var(--shadow-xs), 0 0 0 1px var(--hairline); }
+  .acc button { all: unset; cursor: pointer; box-sizing: border-box; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; font: 600 15px Inter, sans-serif; }
+  .acc button svg { color: var(--muted-fg); transition: transform .3s cubic-bezier(.22,1,.36,1); }
+  .acc .row.open button svg { transform: rotate(45deg); }
+  .acc .ans { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s cubic-bezier(.22,1,.36,1); }
+  .acc .row.open .ans { grid-template-rows: 1fr; }
+  .acc .ans > div { overflow: hidden; }
+  .acc .ans p { margin: 0; padding: 0 22px 20px; font-size: 15.5px; line-height: 1.65; color: color-mix(in oklab, var(--foreground) 70%, var(--background)); }
+
+  /* 7 · closing */
+  .closing { padding: 0 0 100px; }
+  .closing .band { position: relative; overflow: hidden; border-radius: 28px; background: var(--primary); color: var(--card); padding: 84px 80px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; align-items: center; box-shadow: var(--shadow-2xl); }
+  .closing .band::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle at center, color-mix(in oklab, var(--card) 14%, transparent) 1.2px, transparent 1.3px); background-size: 22px 22px; -webkit-mask-image: linear-gradient(to left, black, transparent 70%); mask-image: linear-gradient(to left, black, transparent 70%); }
+  .closing h2 { position: relative; font: 700 44px/1.12 "Libre Baskerville", serif; letter-spacing: -0.025em; margin: 0; }
+  .closing h2 em { font-weight: 400; color: color-mix(in oklab, var(--warning) 70%, var(--card)); }
+  .closing .act { position: relative; justify-self: end; text-align: right; }
+  .closing .btn-light { background: var(--card); color: var(--primary); padding: 15px 26px; font-size: 16px; box-shadow: var(--shadow-lg); }
+  .closing .act p { font: 500 13px Inter, sans-serif; color: color-mix(in oklab, var(--card) 70%, var(--primary)); margin: 14px 0 0; }
+
+  /* footer */
+  .foot { padding: 60px 0 40px; box-shadow: inset 0 1px 0 var(--hairline); }
+  .foot .wrap { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; gap: 40px; }
+  .foot h6 { margin: 0 0 14px; font: 700 13px "Libre Baskerville", serif; }
+  .foot a { display: block; font: 400 13.5px Inter, sans-serif; color: var(--muted-fg); margin-bottom: 10px; }
+  .foot .tagline { font-size: 14px; line-height: 1.6; color: var(--muted-fg); margin: 14px 0 18px; max-width: 300px; }
+  .foot .copy { width: 1120px; margin: 40px auto 0; padding-top: 24px; box-shadow: inset 0 1px 0 var(--hairline); display: flex; justify-content: space-between; font: 400 13px Inter, sans-serif; color: var(--muted-fg); }
+</style>
+
+<!-- 1 · sources -->
+<section class="strip">
+  <div class="wrap reveal">
+    <span class="lbl">Bring what you already have</span>
+    <div class="items">
+      <span class="it"><i data-lucide="file-text"></i>PDFs</span>
+      <span class="it"><i data-lucide="presentation"></i>Slides &amp; docs</span>
+      <span class="it"><i data-lucide="youtube"></i>YouTube</span>
+      <span class="it"><i data-lucide="globe"></i>Web pages</span>
+      <span class="it"><i data-lucide="audio-lines"></i>Audio</span>
+      <span class="it"><i data-lucide="scan-line"></i>Scans</span>
+      <span class="it"><i data-lucide="graduation-cap"></i>Research papers</span>
+      <span class="it"><i data-lucide="hard-drive"></i>Google Drive</span>
+    </div>
+  </div>
+</section>
+
+<!-- 2 · how it works -->
+<section class="how" id="features">
+  <div class="wrap">
+    <div class="center reveal">
+      <div class="eyebrow">How it works</div>
+      <h2 class="h2">Read it. Practise it. <em>Go deeper.</em></h2>
+      <p class="sub">One notebook per course or project. Every step stays tied to the sources you put in it.</p>
+    </div>
+
+    <div class="beat">
+      <div class="txt reveal">
+        <div class="num"><b>1</b>Read with it</div>
+        <h3>Every answer shows its working.</h3>
+        <p>Ask anything about your material. SolomindLM answers only from the sources in your notebook and cites each claim. Hover a number to see the passage; click it to open the page.</p>
+        <ul><li><i data-lucide="check"></i>Citations on every claim</li><li><i data-lucide="check"></i>Chat, deep research or literature review</li><li><i data-lucide="check"></i>Answers in the language you study in</li></ul>
+      </div>
+      <div class="viz reveal" id="v1" style="height:450px">
+        <div class="soft v1-ans">
+          <div class="q">Why are beta blockers avoided in asthma?</div>
+          <div class="a">Non-selective beta blockers also block β<sub>2</sub> receptors in the airways. Blocking them can trigger bronchospasm <span class="cite">1</span>. Cardioselective drugs like bisoprolol carry less risk <span class="cite on" id="v1-cite">2</span>.</div>
+        </div>
+        <div class="raised v1-src">
+          <div class="bar"><span class="ic"><i data-lucide="file-text"></i></span>Lecture 12 – Beta blockers.pdf<small>Slide 15</small></div>
+          <div class="slide"><h5>β-blockers: choosing an agent</h5><ul style="padding:0;margin:0">
+            <li>Non-selective: propranolol, nadolol, timolol</li>
+            <li><span class="pin">2</span><mark id="v1-mark">Cardioselective agents such as bisoprolol act mainly on β<sub>1</sub>, so they carry less risk in asthma</mark></li>
+            <li>Start low and review if wheeze worsens</li></ul></div>
+          <div class="open"><span class="link" style="font-size:12px">Open in source <i data-lucide="arrow-up-right"></i></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="beat flip">
+      <div class="txt reveal">
+        <div class="num"><b>2</b>Practise it</div>
+        <h3>Then it makes you prove you know it.</h3>
+        <p>Turn a week of lectures into flashcards that come back just before you'd forget them, quizzes that explain every answer, and written questions marked against your own slides.</p>
+        <ul><li><i data-lucide="check"></i>Spaced-repetition flashcards</li><li><i data-lucide="check"></i>Quizzes that explain every answer</li><li><i data-lucide="check"></i>Written answers with feedback</li><li><i data-lucide="check"></i>Mind maps and audio recaps</li></ul>
+      </div>
+      <div class="viz v2 reveal" style="height:540px">
+        <div class="raised c fc"><div class="k"><span>Flashcard</span><span>7 / 24</span></div><div class="qq">Which receptor relaxes bronchial smooth muscle?</div><div class="back">β<sub>2</sub>-adrenergic receptors, which is why β<sub>2</sub> agonists like salbutamol relieve asthma.</div><div class="rate"><span>Again</span><span>Hard</span><span>Good</span><span class="go">Easy</span></div></div>
+        <div class="raised c qz"><div class="k"><span>Quiz · 4 of 15</span><span class="pts">3 / 3</span></div><div class="qq">Which beta blocker is the safer choice in asthma?</div><div class="o">Propranolol</div><div class="o right">Bisoprolol <i data-lucide="check"></i></div><div class="o">Nadolol</div><div class="ex"><i data-lucide="lightbulb"></i><span>Cardioselective: it mostly spares β<sub>2</sub> receptors in the airways.</span></div></div>
+        <div class="soft due"><div class="k"><span>Due today</span></div><b>12 cards</b><div class="bars"><i style="height:40%"></i><i style="height:65%"></i><i style="height:50%"></i><i style="height:80%"></i><i style="height:60%"></i><i class="now" style="height:100%"></i></div></div>
+        <div class="raised c wqc"><div class="k"><span>Written question · 2 of 5</span><span class="score">4 / 5</span></div><div class="qq" style="font-size:14px">Explain why a non-selective beta blocker can be dangerous in asthma.</div><div class="mine">It blocks β<sub>2</sub> receptors in the lungs, so the airways can't relax and the patient may go into bronchospasm.</div><div class="fb"><b style="font-family:Inter;font-size:10px;letter-spacing:.08em;text-transform:uppercase">Feedback</b><br>Right mechanism. For full marks, name a safer cardioselective option. <span style="font:600 10.5px Inter">· Lecture 12, slide 15</span></div></div>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="txt reveal">
+        <div class="num"><b>3</b>Go deeper</div>
+        <h3>When the slides aren't enough.</h3>
+        <p>Find and import papers, run deep research across the web and your notebook, or screen a stack of studies into a literature review with a PRISMA flow, in the citation style you need.</p>
+        <ul><li><i data-lucide="check"></i>Paper search, plus DOI, BibTeX and Zotero import</li><li><i data-lucide="check"></i>Screening with a reason for every decision</li><li><i data-lucide="check"></i>APA, MLA, Chicago, IEEE and more</li></ul>
+      </div>
+      <div class="viz reveal">
+        <div class="raised v3-table">
+          <div class="hd"><b>Beta blockers in asthma: review</b><small>24 papers</small></div>
+          <table>
+            <tr><th>Paper</th><th>Study type</th><th>Decision</th></tr>
+            <tr><td class="p">Cardioselective β-blockers in reactive airway disease<small>Salpeter et al., 2002</small></td><td><span class="st"><i data-lucide="layers"></i>Meta-analysis</span></td><td><span class="dec in"><i data-lucide="check"></i>Included</span></td></tr>
+            <tr><td class="p">Bisoprolol tolerance in mild asthma<small>Lainscak et al., 2011</small></td><td><span class="st"><i data-lucide="shuffle"></i>RCT</span></td><td><span class="dec in"><i data-lucide="check"></i>Included</span></td></tr>
+            <tr><td class="p">Beta blockade and airway tone in dogs<small>Hall et al., 1987</small></td><td><span class="st"><i data-lucide="flask-conical"></i>Animal study</span></td><td><span class="dec out"><i data-lucide="x"></i>Excluded</span><span class="why">Not human subjects</span></td></tr>
+          </table>
+        </div>
+        <div class="raised v3-prisma">
+          <div class="k">PRISMA flow</div>
+          <div class="box a">Found <b>214</b></div><div class="arr">↓</div>
+          <div class="box b">Screened <b>96</b></div><div class="arr">↓</div>
+          <div class="box c">Included <b>12</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · studio -->
+<section class="studio">
+  <div class="wrap center reveal">
+    <div class="eyebrow">Studio</div>
+    <h2 class="h2">Twelve ways to work with <em>one notebook.</em></h2>
+    <p class="sub">Everything Studio makes is built from your sources and saved right next to them.</p>
+  </div>
+  <div class="mq"><div class="track" data-row="1"></div></div>
+  <div class="mq rev"><div class="track" data-row="2"></div></div>
+</section>
+
+<!-- 4 · who -->
+<section class="who" id="use-cases">
+  <div class="wrap center">
+    <div class="reveal">
+      <div class="eyebrow">Who it's for</div>
+      <h2 class="h2">For people who have to <em>actually know it.</em></h2>
+    </div>
+    <div class="tabs reveal" id="who-tabs"><button class="on" data-t="0">Students</button><button data-t="1">Medical students</button><button data-t="2">Researchers</button><button data-t="3">Professionals</button></div>
+    <div style="text-align:left">
+      <div class="panel soft on">
+        <div><h3>Nine days. Fourteen lectures. One notebook.</h3><p>Put the whole module in one place, ask about the parts you don't get, and let it build your revision from your own slides.</p>
+          <div class="steps"><div><b>1</b>Upload the module: slides, readings, recordings</div><div><b>2</b>Ask about anything that doesn't click</div><div><b>3</b>Revise with flashcards and practice quizzes</div></div>
+          <span class="link">SolomindLM for students <i data-lucide="arrow-right"></i></span></div>
+        <div class="raised nb"><div class="cover" style="background:color-mix(in oklab,var(--info) 30%,var(--card));color:var(--info)"><i data-lucide="book-open"></i></div><div class="body"><b>ECON 101 · Midterm</b><small>14 sources · edited today</small><div class="outs"><span><i data-lucide="layers" style="color:var(--destructive)"></i>62 flashcards</span><span><i data-lucide="circle-help" style="color:var(--info)"></i>Practice quiz</span><span><i data-lucide="git-fork" style="color:var(--violet)"></i>Mind map</span><span><i data-lucide="audio-lines" style="color:var(--success)"></i>Audio recap</span></div></div></div>
+      </div>
+      <div class="panel soft">
+        <div><h3>Too many facts to fake it.</h3><p>Turn dense lectures into flashcards that resurface before you forget, and written questions that check your reasoning, not just your recall.</p>
+          <div class="steps"><div><b>1</b>Add a week of lectures and the textbook chapter</div><div><b>2</b>Generate a deck and review what's due each day</div><div><b>3</b>Answer written questions, marked against the slides</div></div>
+          <span class="link">Flashcards for medical students <i data-lucide="arrow-right"></i></span></div>
+        <div class="raised nb"><div class="cover" style="background:color-mix(in oklab,var(--destructive) 26%,var(--card));color:var(--destructive)"><i data-lucide="heart-pulse"></i></div><div class="body"><b>Pharmacology · Week 6</b><small>5 sources · edited 2h ago</small><div class="outs"><span><i data-lucide="layers" style="color:var(--destructive)"></i>24 flashcards · 12 due</span><span><i data-lucide="message-square-text" style="color:var(--success)"></i>Written questions</span><span><i data-lucide="audio-lines" style="color:var(--success)"></i>8-min recap</span></div></div></div>
+      </div>
+      <div class="panel soft">
+        <div><h3>From 200 papers to the 12 that matter.</h3><p>Search and import papers, screen them with reasons you can audit later, and draft a synthesis in your citation style.</p>
+          <div class="steps"><div><b>1</b>Search, or import from DOI, BibTeX or Zotero</div><div><b>2</b>Screen with include and exclude reasons</div><div><b>3</b>Draft the review with a PRISMA flow</div></div>
+          <span class="link">AI literature review <i data-lucide="arrow-right"></i></span></div>
+        <div class="raised nb"><div class="cover" style="background:color-mix(in oklab,var(--success) 26%,var(--card));color:var(--success)"><i data-lucide="microscope"></i></div><div class="body"><b>Thesis · Chapter 2</b><small>48 papers · edited yesterday</small><div class="outs"><span><i data-lucide="table-2" style="color:var(--info)"></i>Literature table</span><span><i data-lucide="file-text" style="color:oklch(0.6 0.12 60)"></i>Review draft · APA 7</span><span><i data-lucide="telescope" style="color:var(--violet)"></i>Deep research</span></div></div></div>
+      </div>
+      <div class="panel soft">
+        <div><h3>Get the brief. Keep the receipts.</h3><p>Drop in industry reports and long documents, get a cited briefing, and check any claim against the page it came from.</p>
+          <div class="steps"><div><b>1</b>Add the reports, decks and links</div><div><b>2</b>Ask for a briefing in the format you need</div><div><b>3</b>Share the notebook with your team</div></div>
+          <span class="link">Reports from your sources <i data-lucide="arrow-right"></i></span></div>
+        <div class="raised nb"><div class="cover" style="background:color-mix(in oklab,var(--warning) 40%,var(--card));color:oklch(0.45 0.08 70)"><i data-lucide="briefcase"></i></div><div class="body"><b>Q3 market scan</b><small>9 sources · shared with 3 people</small><div class="outs"><span><i data-lucide="file-text" style="color:oklch(0.6 0.12 60)"></i>Briefing doc</span><span><i data-lucide="table-2" style="color:var(--info)"></i>Competitor table</span><span><i data-lucide="image" style="color:var(--violet)"></i>Infographic</span></div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · pricing -->
+<section class="pricing" id="pricing">
+  <div class="wrap center">
+    <div class="reveal">
+      <div class="eyebrow">Pricing</div>
+      <h2 class="h2">Start free. <em>Upgrade when it's worth it.</em></h2>
+    </div>
+    <div class="seg reveal" id="bill"><button class="on" data-b="y">Annual</button><button data-b="m">Monthly</button><span class="save">Save 50%</span></div>
+    <div class="plans reveal">
+      <div class="soft plan">
+        <div class="name">Free</div>
+        <div class="price"><b>$0</b><span>forever</span></div>
+        <div class="desc">Everything you need to try it on a real course.</div>
+        <ul><li><i data-lucide="check"></i>5 notebooks, 20 sources each</li><li><i data-lucide="check"></i>10 chat messages a day</li><li><i data-lucide="check"></i>2 flashcard decks, quizzes and reports a day</li><li><i data-lucide="check"></i>2 audio recaps and infographics a day</li><li><i data-lucide="check"></i>2 written-question sets a day</li></ul>
+        <span class="btn btn-outline">Start free</span>
+      </div>
+      <div class="raised plan pro">
+        <div class="name">Pro <span class="tag" id="pro-tag">Best value</span></div>
+        <div class="price"><b id="pro-price">$7.50</b><span id="pro-per">/ month, billed yearly</span></div>
+        <div class="desc">For a full course load, or a thesis.</div>
+        <ul><li><i data-lucide="check"></i>200 notebooks, 200 sources each</li><li><i data-lucide="check"></i>500 chat messages a day</li><li><i data-lucide="check"></i>100 flashcard decks, quizzes and reports a day</li><li><i data-lucide="check"></i>100 audio recaps and infographics a day</li><li><i data-lucide="check"></i>100 written-question sets a day</li></ul>
+        <span class="btn btn-primary">Get Pro</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · faq -->
+<section class="faq" id="faq">
+  <div class="wrap">
+    <div class="reveal"><div class="eyebrow">FAQ</div><h2 class="h2">Questions, <em>answered.</em></h2><p class="sub" style="font-size:16.5px">Can't find yours? Email <span style="color:var(--primary);font-weight:500">support@solomindlm.com</span>, a person reads every message.</p><div style="margin-top:22px"><span class="link">See all questions <i data-lucide="arrow-right"></i></span></div></div>
+    <div class="acc reveal" id="acc"></div>
+  </div>
+</section>
+
+<!-- 7 · closing -->
+<style>
+  .cfirst { padding: 40px 0 130px; }
+  .cfirst .grid { width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 1fr 440px; gap: 90px; align-items: center; }
+  .cfirst h2 { font: 700 50px/1.1 "Libre Baskerville", serif; letter-spacing: -0.03em; margin: 16px 0 0; }
+  .cfirst h2 em { font-weight: 400; color: var(--primary); }
+  .cfirst p.lede2 { font-size: 18px; line-height: 1.6; color: color-mix(in oklab, var(--foreground) 70%, var(--background)); margin: 18px 0 30px; max-width: 470px; }
+  .cfirst .stack { position: relative; height: 380px; }
+  .cfirst .ghost { position: absolute; width: 330px; height: 300px; border-radius: 24px; background: var(--card); box-shadow: var(--shadow-md), 0 0 0 1px var(--hairline); }
+  .cfirst .ghost.g1 { left: 70px; top: 0; transform: rotate(6deg); opacity: .55; }
+  .cfirst .ghost.g2 { left: 40px; top: 14px; transform: rotate(3deg); opacity: .8; }
+  .cfirst .nbk { position: absolute; left: 0; top: 34px; width: 360px; border-radius: 24px; background: var(--card); box-shadow: var(--shadow-2xl), 0 0 0 1px var(--hairline); overflow: hidden; }
+  .cfirst .nbk .cover { height: 150px; background: var(--primary); position: relative; padding: 20px 22px; color: var(--card); display: flex; flex-direction: column; justify-content: space-between; }
+  .cfirst .nbk .cover::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle at center, color-mix(in oklab, var(--card) 16%, transparent) 1.2px, transparent 1.3px); background-size: 18px 18px; -webkit-mask-image: linear-gradient(to left, black, transparent 80%); mask-image: linear-gradient(to left, black, transparent 80%); }
+  .cfirst .nbk .cover .ic { width: 40px; height: 40px; border-radius: 12px; background: color-mix(in oklab, var(--card) 16%, transparent); display: grid; place-items: center; font-size: 19px; }
+  .cfirst .nbk .cover .yr { font: 600 11px Inter, sans-serif; letter-spacing: .12em; text-transform: uppercase; opacity: .8; position: relative; z-index: 1; }
+  .cfirst .nbk .body { padding: 20px 22px 22px; }
+  .cfirst .nbk .title { font: 700 21px "Libre Baskerville", serif; display: flex; align-items: center; gap: 4px; }
+  .cfirst .nbk .title .caret { width: 2px; height: 22px; background: var(--primary); animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .cfirst .nbk small { font: 500 12.5px Inter, sans-serif; color: var(--muted-fg); display: block; margin-top: 4px; }
+  .cfirst .nbk .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+  .cfirst .nbk .slots span { display: flex; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; background: color-mix(in oklab, var(--muted) 45%, var(--card)); box-shadow: inset 0 0 0 1px var(--hairline); font: 500 12px Inter, sans-serif; color: var(--muted-fg); }
+  .cfirst .nbk .slots span.add { background: var(--primary); color: white; box-shadow: var(--shadow-xs); grid-column: span 2; justify-content: center; font-weight: 600; font-size: 13px; }
+</style>
+<section class="cfirst reveal">
+    <div class="grid">
+      <div>
+        <div class="eyebrow">Your turn</div>
+        <h2>Your next notebook is <em>one upload away.</em></h2>
+        <p class="lede2">Start with the lecture you're dreading. Ask it anything, then let it question you back. Free, no card, and you can stop whenever.</p>
+        <div style="display:flex; gap:16px; align-items:center;"><span class="btn btn-primary btn-lg">Create my first notebook <i data-lucide="arrow-right"></i></span></div>
+      </div>
+      <div class="stack">
+        <div class="ghost g1"></div><div class="ghost g2"></div>
+        <div class="nbk">
+          <div class="cover"><span class="ic" style="position:relative;z-index:1"><i data-lucide="book-open"></i></span><span class="yr">New notebook</span></div>
+          <div class="body">
+            <div class="title">Your course<span class="caret"></span></div>
+            <small>0 sources · start with one</small>
+            <div class="slots"><span><i data-lucide="file-text"></i>Lecture notes</span><span><i data-lucide="youtube"></i>Recording</span><span class="add"><i data-lucide="plus"></i>Add your first source</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<footer class="foot">
+  <div class="wrap">
+    <div><div class="brand"><img src="https://solomindlm.com/SolomindLM_logo.png" alt="" width="26" height="26" style="object-fit:contain">SolomindLM</div><p class="tagline">An AI study and research partner that works from the material you give it.</p></div>
+    <div><h6>Product</h6><a>Features</a><a>Pricing</a><a>FAQ</a><a>Compare to NotebookLM</a></div>
+    <div><h6>For students</h6><a>All student tools</a><a>Flashcards</a><a>Quizzes</a><a>Audio overviews</a><a>Written questions</a></div>
+    <div><h6>For research</h6><a>All research tools</a><a>Literature review</a><a>Paper discovery</a><a>Citation styles</a><a>Deep research</a></div>
+    <div><h6>Company</h6><a>Guides</a><a>Privacy</a><a>Terms</a><a>GitHub</a></div>
+  </div>
+  <div class="copy"><span>© 2026 SolomindLM</span><span>Made for people who'd rather understand it.</span></div>
+</footer>
+
+<script>
+(function(){
+  var TOOLS = [
+    ['message-circle','var(--info)','Chat','Ask questions using your notebook sources'],
+    ['telescope','var(--violet)','Deep research','Multi-step research with web and notebook sources'],
+    ['book-open','var(--success)','Literature review','Screen papers and draft synthesis reports'],
+    ['audio-lines','var(--success)','Audio overview','Audio recaps from your study material'],
+    ['git-fork','var(--violet)','Mind map','Visual maps of concepts from your sources'],
+    ['file-text','oklch(0.6 0.12 60)','Reports','Study guides and report drafts on demand'],
+    ['layers','var(--destructive)','Flashcards','Spaced-repetition decks from your material'],
+    ['circle-help','var(--info)','Quiz','Multiple-choice practice that explains answers'],
+    ['image','var(--violet)','Infographic','Visual infographics from your sources'],
+    ['message-square-text','var(--success)','Written questions','Written prompts with answer feedback'],
+    ['table-2','var(--info)','Spreadsheets','Structured tables extracted from sources'],
+    ['share-2','oklch(0.45 0.08 70)','Shared notebooks','Cowork or fork a notebook via link']
+  ];
+  function tile(t){ return '<div class="tile"><span class="ti" style="color:'+t[1]+';background:color-mix(in oklab,'+t[1]+' 14%, var(--card))"><i data-lucide="'+t[0]+'"></i></span><h4>'+t[2]+'</h4><p>'+t[3]+'</p></div>'; }
+  var r1 = TOOLS.slice(0,6).map(tile).join(''), r2 = TOOLS.slice(6).map(tile).join('');
+  document.querySelector('[data-row="1"]').innerHTML = r1 + r1;
+  document.querySelector('[data-row="2"]').innerHTML = r2 + r2;
+
+  var FAQ = [
+    ['How accurate is the AI-generated content?','Generated content is based on the sources you add, and every answer cites where it came from, but you should still check it against the original material before you rely on it.'],
+    ['What makes SolomindLM different from Quizlet or Anki?','It starts from your PDFs, videos, articles and notes, then generates study materials from that content, instead of you writing every card by hand.'],
+    ['What languages are supported?','Pick an output language and study materials, reports and chat answers come back in it: English, Spanish, French, German, Portuguese, Arabic, Hindi, Chinese, Japanese, Korean and more. Your sources can be in any language.'],
+    ['Is there a limit on how much I can upload?','The free plan includes 5 notebooks with up to 20 sources each. Pro gives you 200 notebooks with up to 200 sources each. Both plans have daily limits on generated content.'],
+    ['How is my data used and protected?','Your content is used to run the product you see: search, chat and generation. We use trusted infrastructure and AI providers as subprocessors, and we don’t sell your personal information.'],
+    ['Is literature review mode a systematic review tool?','It helps you search, screen and synthesise papers with a PRISMA flow and reasons for every decision. Treat it as an assistant for the process, not a replacement for your protocol.']
+  ];
+  var acc = document.getElementById('acc');
+  acc.innerHTML = FAQ.map(function(f,i){ return '<div class="row'+(i===0?' open':'')+'"><button>'+f[0]+'<i data-lucide="plus"></i></button><div class="ans"><div><p>'+f[1]+'</p></div></div></div>'; }).join('');
+  acc.addEventListener('click', function(e){ var b=e.target.closest('button'); if(!b) return; b.parentElement.classList.toggle('open'); });
+
+  var tabs = document.getElementById('who-tabs'), panels = document.querySelectorAll('.who .panel');
+  tabs.addEventListener('click', function(e){ var b=e.target.closest('button'); if(!b) return; tabs.querySelectorAll('button').forEach(function(x){x.classList.toggle('on', x===b);}); panels.forEach(function(p,i){ p.classList.toggle('on', String(i)===b.dataset.t); }); });
+
+  var bill = document.getElementById('bill');
+  bill.addEventListener('click', function(e){ var b=e.target.closest('button'); if(!b) return; bill.querySelectorAll('button').forEach(function(x){x.classList.toggle('on', x===b);}); var y=b.dataset.b==='y';
+    document.getElementById('pro-price').textContent = y ? '$7.50' : '$15';
+    document.getElementById('pro-per').textContent = y ? '/ month, billed yearly' : '/ month';
+    document.getElementById('pro-tag').style.visibility = y ? 'visible' : 'hidden'; });
+
+
+  var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} }); }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+})();
+</script>
+
+</div></div>
+<script>
+(function(){
+  var SRC = [
+    ['file-text','var(--destructive-muted)','var(--destructive)','Lecture 12 – Beta blockers.pdf','PDF · 38 slides'],
+    ['book-open','var(--info-muted)','var(--info)','Katzung, ch. 10','PDF · pp. 151–168'],
+    ['youtube','var(--destructive-muted)','var(--destructive)','Dr. Patel – Autonomic pharm','YouTube · 52 min'],
+    ['globe','var(--success-muted)','var(--success)','NICE asthma guideline','Web page'],
+    ['mic','var(--warning-muted)','oklch(0.45 0.08 70)','Tutorial recording','Audio · 41 min']
+  ];
+  function srcList(onIdx){ return SRC.map(function(s,i){ return '<div class="src'+(i===onIdx?' on':'')+'"><span class="ic" style="background:'+s[1]+';color:'+s[2]+'"><i data-lucide="'+s[0]+'"></i></span><span class="nm"><b>'+s[3]+'</b><small>'+s[4]+'</small></span><span class="cb"><i data-lucide="check"></i></span></div>'; }).join(''); }
+  var TOOLS = [['audio-lines','var(--success)','Audio overview'],['git-fork','var(--violet)','Mind map'],['file-text','oklch(0.6 0.12 60)','Report'],['layers','var(--destructive)','Flashcards'],['circle-help','var(--info)','Quiz'],['message-square-text','var(--success)','Written questions']];
+  function tools(){ return '<div class="grid2">'+TOOLS.map(function(t){ return '<div class="tool"><i data-lucide="'+t[0]+'" style="color:'+t[1]+'"></i>'+t[2]+'</div>'; }).join('')+'</div>'; }
+  function saved(kind){
+    var items = [
+      ['layers','var(--destructive-muted)','var(--destructive)','Beta blockers','24 flashcards · due today'],
+      ['message-square-text','var(--success-muted)','var(--success)','Week 6 written questions','5 questions · 2 answered'],
+      ['audio-lines','var(--success-muted)','var(--success)','Week 6 audio recap','8 min']
+    ];
+    var html = '<div class="saved"><div class="ch"><span>Saved</span><span class="count">3</span></div>';
+    items.forEach(function(it,i){ html += '<div class="item"'+((kind==='study'&&i===0)||(kind==='quiz'&&i===1)?' style="box-shadow: var(--shadow-md), 0 0 0 1.5px color-mix(in oklab, var(--primary) 45%, transparent)"':'')+'><span class="ic" style="background:'+it[1]+';color:'+it[2]+'"><i data-lucide="'+it[0]+'"></i></span><span style="flex:1"><b>'+it[3]+'</b><small>'+it[4]+'</small>'+(kind==='study'&&i===0?'<div class="bar"><i></i></div>':'')+'</span></div>'; });
+    return html + '</div>';
+  }
+  var Q = 'Why are beta blockers avoided in patients with asthma?';
+  var A = '<p>Non-selective beta blockers such as propranolol also block β<sub>2</sub> receptors in the airways, which relax bronchial smooth muscle. Blocking them <b>can trigger bronchospasm</b> <span class="cite CITEON">1</span>.</p><p>Cardioselective agents like bisoprolol act mainly on β<sub>1</sub> receptors in the heart, so they carry less risk, but guidelines still advise caution <span class="cite">2</span> <span class="cite">3</span>.</p>';
+  function frame(kind){
+    return '<div class="top"><div class="t"><span class="m"></span><span class="sep"></span>Pharmacology · Week 6</div><div class="r"><span class="chip"><i data-lucide="share-2"></i>Share</span><span class="avatar"></span></div></div>'+
+      '<div class="cols">'+
+        '<div class="col"><div class="ch"><span>Sources <span class="count">5</span></span><i data-lucide="panel-left-close" style="color:var(--muted-fg)"></i></div><div class="add"><i data-lucide="plus"></i>Add source</div>'+srcList(kind==='cite'?0:-1)+'</div>'+
+        '<div class="col chat"><div class="ch"><span><i data-lucide="message-circle"></i>Chat</span></div><div class="q">'+Q+'</div><div class="a">'+A.replace('CITEON', (kind==='cite'||kind==='quiz')?'on':'')+'</div>'+
+          '<div class="composer"><div class="ph">Ask about your sources…</div><div class="row"><span class="chip"><i data-lucide="message-circle"></i>Chat<i data-lucide="chevron-down"></i></span><span class="send"><i data-lucide="arrow-up"></i></span></div></div></div>'+
+        '<div class="col"><div class="ch"><span><i data-lucide="sparkles"></i>Studio</span></div>'+tools()+saved(kind)+'</div>'+
+      '</div>';
+  }
+  document.querySelectorAll('[data-frame]').forEach(function(el){ el.innerHTML = frame(el.getAttribute('data-frame')); });
+  document.querySelectorAll('[data-wave]').forEach(function(el){ var h=''; for (var i=0;i<38;i++){ var v=4+Math.round(Math.abs(Math.sin(i*1.7)+Math.sin(i*0.6))*6); h+='<i class="'+(i>22?'off':'')+'" style="height:'+v+'px"></i>'; } el.innerHTML=h; });
+
+  (function placeTip(){
+    var tpl=document.getElementById('citetip-tpl'); if(!tpl) return;
+    var cite=document.querySelector('.herowrap .cite.on'); var col=cite.closest('.col');
+    col.appendChild(tpl.content.cloneNode(true)); var tip=document.getElementById('citetip');
+    // unscaled offsets of the citation inside its column
+    var x=0,y=0,el=cite; while(el && el!==col){ x+=el.offsetLeft; y+=el.offsetTop; el=el.offsetParent; }
+    if (el!==col){ var cr=col.getBoundingClientRect(), r=cite.getBoundingClientRect(), k=cr.width/col.offsetWidth; x=(r.left-cr.left)/k; y=(r.top-cr.top)/k; }
+    var cx=x+cite.offsetWidth/2, left=Math.max(10, Math.min(cx-28, col.offsetWidth-236-10));
+    tip.style.left=left+'px'; tip.style.top=(y+cite.offsetHeight+9)+'px';
+    tip.querySelector('.arrow').style.left=(cx-left-5)+'px';
+  })();
+  if (window.lucide) window.lucide.createIcons();
+  function icons(){ if (window.lucide) window.lucide.createIcons(); }
+  icons(); window.addEventListener('load', icons);
+  function fit(){ document.querySelectorAll('.stage').forEach(function(st){ var lp=st.firstElementChild; var k=st.clientWidth/1280; lp.style.transform='scale('+k+')'; st.style.height=(lp.offsetHeight*k)+'px'; }); }
+  window.addEventListener('resize', fit); fit(); setTimeout(fit, 300); window.addEventListener('load', fit); if (window.ResizeObserver) new ResizeObserver(fit).observe(document.querySelector('.lp.page'));
+})();
+</script>
