@@ -559,6 +559,14 @@ function CardsSection() {
             </span>
           </button>
         </Card>
+        <Card variant="featured">
+          <div className="flex flex-col gap-1 p-6">
+            <span className="font-sans font-semibold">Featured card</span>
+            <span className="text-sm text-muted-foreground">
+              The one option a section recommends, like the Pro plan.
+            </span>
+          </div>
+        </Card>
         <Card variant="flush">
           <div className="p-4">First row</div>
           <div className="border-border/50 not-first:border-t p-4">Second row</div>
@@ -631,6 +639,7 @@ function BadgesAndAlertsSection() {
       <div className="flex flex-wrap items-center gap-3">
         <Badge>Default</Badge>
         <Badge variant="secondary">Secondary</Badge>
+        <Badge variant="success">Success</Badge>
         <Badge variant="destructive">Destructive</Badge>
         <Badge variant="outline">Outline</Badge>
         <Badge variant="ghost">Ghost</Badge>
