@@ -9,6 +9,7 @@ import {
   FileText,
   GitFork,
   Globe,
+  Image as ImageIcon,
   Layers,
   MessageCircle,
   MessageSquareText,
@@ -17,6 +18,7 @@ import {
   Plus,
   Share2,
   Sparkles,
+  Table2,
   Youtube,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -39,13 +41,16 @@ const SOURCES: Row[] = [
   { title: "Tutorial recording", meta: "Audio · 41 min", icon: Mic, tone: "audioFile" },
 ];
 
+/** Studio's eight tools, in the app's order. */
 const TOOLS: Array<{ label: string; icon: LucideIcon; tone: Tone }> = [
   { label: "Audio overview", icon: AudioLines, tone: "audio" },
   { label: "Mind map", icon: GitFork, tone: "mindmap" },
   { label: "Report", icon: FileText, tone: "report" },
   { label: "Flashcards", icon: Layers, tone: "flashcard" },
   { label: "Quiz", icon: CircleHelp, tone: "quiz" },
+  { label: "Infographic", icon: ImageIcon, tone: "infographic" },
   { label: "Written questions", icon: MessageSquareText, tone: "written" },
+  { label: "Spreadsheets", icon: Table2, tone: "spreadsheet" },
 ];
 
 const SAVED: Array<Row & { selected?: boolean }> = [
