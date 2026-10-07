@@ -28,6 +28,7 @@ import {
   type GenerateFreeDeckResult,
   generateFreeDeck,
 } from "../lib/freeToolClient";
+import { invalidTextMessage } from "../lib/invalidTextMessage";
 import { savePendingDeck } from "../lib/pendingDeck";
 import { isTurnstileChallengeFailure } from "../lib/turnstileErrors";
 import { PDF_TO_FLASHCARDS_PAGE as PAGE } from "../toolPages";
@@ -59,11 +60,7 @@ function statusForResult(result: Exclude<GenerateFreeDeckResult, { kind: "ok" }>
             signup: true,
           };
     case "invalid":
-      return {
-        kind: "error",
-        title: "Check your text",
-        message: "Add at least a few paragraphs of material.",
-      };
+      return { kind: "error", ...invalidTextMessage(result.error) };
     default:
       return {
         kind: "error",
