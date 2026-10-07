@@ -3,17 +3,6 @@ import { Link } from "react-router-dom";
 import { getIntentPagesByCluster } from "../intentLandingPages";
 import { getComparisonPages, getGuidePages } from "../seoContentPages";
 
-const FOOTER_TAGLINE =
-  "SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers—flashcards, quizzes, reports, chat, and more, starting from the material you upload.";
-
-const COMPANY_LINKS = [
-  { label: "Features", to: "/#features" },
-  { label: "Pricing", to: "/#pricing" },
-  { label: "FAQ", to: "/faq" },
-  { label: "Privacy Policy", to: "/privacy" },
-  { label: "Terms", to: "/terms" },
-] as const;
-
 function GitHubIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -56,11 +45,30 @@ function LinkedInIcon({ className }: { className?: string }) {
   );
 }
 
+const FOOTER_TAGLINE = "An AI study and research partner that works from the material you give it.";
+
+const PRODUCT_LINKS = [
+  { label: "Features", to: "/#features" },
+  { label: "Pricing", to: "/#pricing" },
+  { label: "FAQ", to: "/faq" },
+] as const;
+
+const LEGAL_LINKS = [
+  { label: "Privacy Policy", to: "/privacy" },
+  { label: "Terms", to: "/terms" },
+] as const;
+
+const SOCIAL_LINKS = [
+  { label: "GitHub", href: "https://github.com/samintisar/SolomindLM", Icon: GitHubIcon },
+  { label: "X", href: "https://twitter.com/solomindlm", Icon: XIcon },
+  { label: "LinkedIn", href: "https://www.linkedin.com/company/solomindlm/", Icon: LinkedInIcon },
+] as const;
+
 function FooterLinkColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <nav aria-label={title}>
-      <h3 className="text-[15px] font-display font-semibold text-foreground mb-5">{title}</h3>
-      <ul className="space-y-3">{children}</ul>
+      <h3 className="mb-4 font-display text-sm font-bold text-foreground">{title}</h3>
+      <ul className="space-y-2.5">{children}</ul>
     </nav>
   );
 }
@@ -70,7 +78,7 @@ function FooterLink({ to, children }: { to: string; children: React.ReactNode })
     <li>
       <Link
         to={to}
-        className="text-sm text-muted-foreground hover:text-foreground transition-colors leading-snug"
+        className="font-sans text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground"
       >
         {children}
       </Link>
@@ -86,66 +94,53 @@ export const Footer: React.FC = () => {
   const guidePages = getGuidePages();
 
   return (
-    <footer className="border-t border-border/60 bg-card/40">
-      <div className="max-w-[1500px] w-full mx-auto px-6 sm:px-8 lg:px-12 pt-16 pb-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-10">
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Link to="/" className="inline-flex items-center gap-2.5 mb-5">
-              <img
-                src="/SolomindLM_logo.png"
-                alt="SolomindLM"
-                className="w-8 h-8 shrink-0 object-contain"
-              />
-              <span className="text-xl font-display font-bold text-foreground tracking-tight">
-                SolomindLM
-              </span>
+    <footer className="border-t border-border/50 px-6 pt-16 pb-10">
+      <div className="mx-auto max-w-280">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-4 lg:grid-cols-12">
+          <div className="col-span-2 md:col-span-4 lg:col-span-4">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2.5 font-display text-lg font-bold text-foreground"
+            >
+              <img src="/SolomindLM_logo.png" alt="" className="size-8 shrink-0 object-contain" />
+              SolomindLM
             </Link>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mb-6">
+            <p className="mt-4 max-w-xs font-serif text-sm leading-relaxed text-muted-foreground">
               {FOOTER_TAGLINE}
             </p>
-            <div className="flex items-center gap-4">
-              <a
-                href="https://github.com/samintisar/SolomindLM"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="GitHub"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <GitHubIcon className="w-5 h-5" />
-              </a>
-              <a
-                href="https://twitter.com/solomindlm"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="X"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <XIcon className="w-5 h-5" />
-              </a>
-              <a
-                href="https://www.linkedin.com/company/solomindlm/"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="LinkedIn"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <LinkedInIcon className="w-5 h-5" />
-              </a>
+            <div className="mt-5 flex items-center gap-4">
+              {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Icon className="size-5" />
+                </a>
+              ))}
             </div>
           </div>
 
           <div className="lg:col-span-2">
-            <FooterLinkColumn title="Company">
-              {COMPANY_LINKS.map((link) => (
+            <FooterLinkColumn title="Product">
+              {PRODUCT_LINKS.map((link) => (
                 <FooterLink key={link.to} to={link.to}>
                   {link.label}
+                </FooterLink>
+              ))}
+              {comparisonPages.map((page) => (
+                <FooterLink key={page.path} to={page.path}>
+                  {page.navLabel}
                 </FooterLink>
               ))}
             </FooterLinkColumn>
           </div>
 
           <div className="lg:col-span-2">
-            <FooterLinkColumn title="For Students">
+            <FooterLinkColumn title="For students">
               <FooterLink to="/students">All student tools</FooterLink>
               {studentPages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
@@ -155,8 +150,8 @@ export const Footer: React.FC = () => {
             </FooterLinkColumn>
           </div>
 
-          <div className="lg:col-span-3">
-            <FooterLinkColumn title="For Research">
+          <div className="lg:col-span-2">
+            <FooterLinkColumn title="For research">
               <FooterLink to="/research">All research tools</FooterLink>
               {researchPages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
@@ -167,29 +162,24 @@ export const Footer: React.FC = () => {
           </div>
 
           <div className="lg:col-span-2">
-            <FooterLinkColumn title="Comparisons">
-              {comparisonPages.map((page) => (
+            <FooterLinkColumn title="Company">
+              {guidePages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
                   {page.navLabel}
                 </FooterLink>
               ))}
+              {LEGAL_LINKS.map((link) => (
+                <FooterLink key={link.to} to={link.to}>
+                  {link.label}
+                </FooterLink>
+              ))}
             </FooterLinkColumn>
-            <div className="mt-10">
-              <FooterLinkColumn title="Guides">
-                {guidePages.map((page) => (
-                  <FooterLink key={page.path} to={page.path}>
-                    {page.navLabel}
-                  </FooterLink>
-                ))}
-              </FooterLinkColumn>
-            </div>
           </div>
         </div>
 
-        <div className="mt-14 pt-8 border-t border-border/60 text-center">
-          <p className="text-sm text-muted-foreground">
-            Copyright &copy; {currentYear} SolomindLM. All rights reserved.
-          </p>
+        <div className="mt-14 flex flex-col gap-2 border-t border-border/50 pt-8 font-sans text-sm text-muted-foreground sm:flex-row sm:justify-between">
+          <p>Copyright &copy; {currentYear} SolomindLM. All rights reserved.</p>
+          <p>Made for people who'd rather understand it.</p>
         </div>
       </div>
     </footer>
