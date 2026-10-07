@@ -387,6 +387,7 @@ const COMPARE_HUB_PAGE: SeoContentPageConfig = {
   articleType: "Article",
   changefreq: "monthly",
   priority: 0.8,
+  lastUpdated: "2026-10-07",
 };
 
 export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
