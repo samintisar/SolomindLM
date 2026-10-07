@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Auth — Auth page smoke tests", () => {
+  // Start signed out: with the stored session, / can redirect to /home before the clears below run.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("landing page Get Started navigates to auth", async ({ page }) => {
     // Auth tests need a clean, unauthenticated context
     await page.context().clearCookies();
