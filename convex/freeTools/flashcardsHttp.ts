@@ -33,7 +33,8 @@ export async function handleFreeFlashcardsOptions(
 /**
  * POST /tools/flashcards — the free no-signup flashcard tool.
  * Order matters for cost: cheap validation → Turnstile → rate limits → one LLM call.
- * Limits are consumed only after cards were generated. Raw IPs are never logged or stored.
+ * Each LLM call reserves an attempt first (the hard cost bound, failures included); the
+ * success limits are consumed only after cards were generated. Raw IPs are never logged or stored.
  */
 export async function handleFreeFlashcardsPost(
   ctx: ActionCtx,
@@ -79,7 +80,7 @@ export async function handleFreeFlashcardsPost(
   }
 
   const ipKey = await hashClientIp(ip ?? "unknown", salt);
-  const limit = await ctx.runMutation(internal.freeTools.rateLimit.checkFreeFlashcardLimits, {
+  const limit = await ctx.runMutation(internal.freeTools.rateLimit.reserveFreeFlashcardRun, {
     ipKey,
   });
   if (!limit.ok) {

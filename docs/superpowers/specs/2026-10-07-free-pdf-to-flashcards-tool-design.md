@@ -63,7 +63,10 @@ keep anonymous LLM spend bounded.
   `MAX_WORDS * 1.1` and above a 200 KB body). PDFs: first 40 pages read.
 - Output: `cardCount ∈ {10, 20, 30}`, default 20.
 - Client IP = last `x-forwarded-for` entry (not spoofable whether the edge appends or overwrites); verified on dev in the manual check.
-- Worst-case daily spend = global cap × one FAST_LLM call on ≤ 12k words. Nothing stored for anonymous runs.
+- Every LLM call first reserves an attempt (failures and timeouts included) in one mutation; successful
+  decks are counted separately after generation. Worst-case daily spend = global attempts cap (600) × one
+  FAST_LLM call on ≤ 12k words. Per IP: ≤ 6 calls/day, ≤ 3 successful decks/day. Nothing stored for
+  anonymous runs.
 
 ### Responses
 

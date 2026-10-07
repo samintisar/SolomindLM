@@ -256,6 +256,23 @@ describe("daily limit tables — single source of truth", () => {
       rate: bounds.FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
       period: 24 * 60 * 60 * 1000,
     });
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.freeToolFlashcardsIpAttempts).toEqual({
+      kind: "fixed window",
+      rate: bounds.FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
+      period: 24 * 60 * 60 * 1000,
+    });
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.freeToolFlashcardsGlobalAttempts).toEqual({
+      kind: "fixed window",
+      rate: bounds.FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
+      period: 24 * 60 * 60 * 1000,
+    });
+    // Attempts (LLM calls, failures included) are the hard cost bound; they must allow every success.
+    expect(bounds.FREE_FLASHCARD_IP_DAILY_ATTEMPTS).toBeGreaterThanOrEqual(
+      bounds.FREE_FLASHCARD_IP_DAILY_LIMIT
+    );
+    expect(bounds.FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS).toBeGreaterThanOrEqual(
+      bounds.FREE_FLASHCARD_GLOBAL_DAILY_LIMIT
+    );
   });
 });
 

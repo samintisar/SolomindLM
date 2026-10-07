@@ -17,6 +17,12 @@ export const FREE_FLASHCARD_DEFAULT_CARD_COUNT: FreeFlashcardCardCount = 20;
 export const FREE_FLASHCARD_IP_DAILY_LIMIT = 3;
 /** All anonymous runs per day: the cost circuit breaker. */
 export const FREE_FLASHCARD_GLOBAL_DAILY_LIMIT = 300;
+/**
+ * Attempts = LLM calls, failures and timeouts included, reserved atomically before each call.
+ * These are the hard cost bound: worst-case daily spend is the global attempts cap × one call.
+ */
+export const FREE_FLASHCARD_IP_DAILY_ATTEMPTS = 6;
+export const FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS = 600;
 export const FREE_FLASHCARD_LLM_TIMEOUT_MS = 90_000;
 
 const TITLE_MAX_CHARS = 80;

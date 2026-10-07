@@ -10,7 +10,12 @@
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 import { type DailyFeature, FREE_DAILY_LIMITS, PRO_DAILY_LIMITS } from "./errors";
-import { FREE_FLASHCARD_GLOBAL_DAILY_LIMIT, FREE_FLASHCARD_IP_DAILY_LIMIT } from "./freeToolBounds";
+import {
+  FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
+  FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+  FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
+  FREE_FLASHCARD_IP_DAILY_LIMIT,
+} from "./freeToolBounds";
 
 export type { DailyFeature } from "./errors";
 export { getFreeLimit, getProLimit } from "./errors";
@@ -53,6 +58,18 @@ export const RATE_LIMIT_CONFIG = {
   freeToolFlashcardsGlobal: {
     kind: "fixed window",
     rate: FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+    period: DAY,
+  },
+  /** Free flashcard tool: LLM calls (failures included) per salted-hash IP per day */
+  freeToolFlashcardsIpAttempts: {
+    kind: "fixed window",
+    rate: FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
+    period: DAY,
+  },
+  /** Free flashcard tool: all anonymous LLM calls per day (the hard cost bound, single key) */
+  freeToolFlashcardsGlobalAttempts: {
+    kind: "fixed window",
+    rate: FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
     period: DAY,
   },
 } satisfies Record<string, FixedWindow>;

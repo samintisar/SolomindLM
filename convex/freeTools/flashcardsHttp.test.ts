@@ -5,7 +5,9 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { invokeStructuredOutput } from "../_agents/_shared/structuredLlm";
 import {
+  FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
   FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
+  FREE_FLASHCARD_IP_DAILY_ATTEMPTS,
   FREE_FLASHCARD_MIN_WORDS,
 } from "../_lib/freeToolBounds";
 import { rateLimiter } from "../_lib/rateLimits";
@@ -153,13 +155,41 @@ describe("POST /tools/flashcards", () => {
     expect(await res.json()).toMatchObject({ error: "rate_limited", scope: "global" });
   });
 
-  test("a failed generation returns 502 and does not consume the limit", async () => {
+  test("a failed generation returns 502 and does not consume the success limit", async () => {
     vi.mocked(invokeStructuredOutput).mockRejectedValueOnce(new Error("upstream 500"));
     const t = makeT();
     const failed = await post(t, validBody);
     expect(failed.status).toBe(502);
     expect(await failed.json()).toEqual({ error: "generation_failed" });
     for (let i = 0; i < 3; i++) expect((await post(t, validBody)).status).toBe(200);
+    const fourth = await post(t, validBody);
+    expect(fourth.status).toBe(429);
+    expect(await fourth.json()).toMatchObject({ error: "rate_limited", scope: "ip" });
+  });
+
+  test("failed generations count as attempts: the 7th request from one IP is refused", async () => {
+    vi.mocked(invokeStructuredOutput).mockRejectedValue(new Error("upstream 500"));
+    const t = makeT();
+    for (let i = 0; i < FREE_FLASHCARD_IP_DAILY_ATTEMPTS; i++) {
+      expect((await post(t, validBody)).status).toBe(502);
+    }
+    const res = await post(t, validBody);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ error: "rate_limited", scope: "ip" });
+    expect(invokeStructuredOutput).toHaveBeenCalledTimes(FREE_FLASHCARD_IP_DAILY_ATTEMPTS);
+  });
+
+  test("429 global without an LLM call when the global attempts cap is used up", async () => {
+    const t = makeT();
+    await t.run(async (ctx) => {
+      await rateLimiter.limit(ctx, "freeToolFlashcardsGlobalAttempts", {
+        count: FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
+      });
+    });
+    const res = await post(t, validBody);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ error: "rate_limited", scope: "global" });
+    expect(invokeStructuredOutput).not.toHaveBeenCalled();
   });
 
   test("a timeout returns 504", async () => {

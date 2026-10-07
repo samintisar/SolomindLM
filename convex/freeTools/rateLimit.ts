@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
 import { rateLimiter } from "../_lib/rateLimits";
 
-const checkResult = v.union(
+const reserveResult = v.union(
   v.object({ ok: v.literal(true) }),
   v.object({
     ok: v.literal(false),
@@ -12,10 +12,17 @@ const checkResult = v.union(
   })
 );
 
-/** Check (without consuming) the per-IP window, then the global window. */
-export const checkFreeFlashcardLimits = internalMutation({
+/**
+ * Admit one LLM call, in a single transaction:
+ * 1. check (without consuming) the success windows — per IP, then global;
+ * 2. consume one attempt from the per-IP, then the global attempts window (the global one is
+ *    checked first so a closed tool does not burn IP attempts).
+ * Attempts count every call, failures included, so they bound spend even when generations fail
+ * or requests race; successes are consumed separately after cards were generated.
+ */
+export const reserveFreeFlashcardRun = internalMutation({
   args: { ipKey: v.string() },
-  returns: checkResult,
+  returns: reserveResult,
   handler: async (ctx, { ipKey }) => {
     const ip = await rateLimiter.check(ctx, "freeToolFlashcardsIp", { key: ipKey });
     if (!ip.ok) return { ok: false as const, scope: "ip" as const, retryAfterMs: ip.retryAfter };
@@ -23,11 +30,30 @@ export const checkFreeFlashcardLimits = internalMutation({
     if (!global.ok) {
       return { ok: false as const, scope: "global" as const, retryAfterMs: global.retryAfter };
     }
+
+    // Peek at the global attempts first so a refusal there does not burn the caller's IP attempt.
+    const globalOpen = await rateLimiter.check(ctx, "freeToolFlashcardsGlobalAttempts");
+    if (!globalOpen.ok) {
+      return { ok: false as const, scope: "global" as const, retryAfterMs: globalOpen.retryAfter };
+    }
+    const ipAttempt = await rateLimiter.limit(ctx, "freeToolFlashcardsIpAttempts", { key: ipKey });
+    if (!ipAttempt.ok) {
+      return { ok: false as const, scope: "ip" as const, retryAfterMs: ipAttempt.retryAfter };
+    }
+    // Same transaction as the check above, so this cannot be refused; handled for completeness.
+    const globalAttempt = await rateLimiter.limit(ctx, "freeToolFlashcardsGlobalAttempts");
+    if (!globalAttempt.ok) {
+      return {
+        ok: false as const,
+        scope: "global" as const,
+        retryAfterMs: globalAttempt.retryAfter,
+      };
+    }
     return { ok: true as const };
   },
 });
 
-/** Consume one run from both windows. Called only after cards were generated. */
+/** Consume one run from both success windows. Called only after cards were generated. */
 export const consumeFreeFlashcardLimits = internalMutation({
   args: { ipKey: v.string() },
   returns: v.null(),
@@ -35,7 +61,7 @@ export const consumeFreeFlashcardLimits = internalMutation({
     const ip = await rateLimiter.limit(ctx, "freeToolFlashcardsIp", { key: ipKey });
     const global = await rateLimiter.limit(ctx, "freeToolFlashcardsGlobal");
     if (!ip.ok || !global.ok) {
-      // A concurrent request took the last slot between check and consume; the work is done.
+      // A concurrent request took the last slot between reserve and consume; the work is done.
       console.warn("[FreeTools] limit consumed past the window", { ip: ip.ok, global: global.ok });
     }
     return null;
