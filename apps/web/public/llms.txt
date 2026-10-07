@@ -2,7 +2,7 @@
 
 > SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers. Upload or import sources into notebooks, chat with your materials, and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and more—all grounded in the documents you provide. Free to start; no credit card required.
 
-Last-updated: 2026-09-15
+Last-updated: 2026-10-07
 Category: AI learning and research assistant
 Audience: Students, researchers, knowledge workers
 
@@ -42,7 +42,16 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 - Free PDF to flashcards maker (no signup; Anki, Quizlet and CSV export): https://www.solomindlm.com/tools/pdf-to-flashcards
 
 ### Compare and guides
-- SolomindLM vs NotebookLM: https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+- All comparisons: https://www.solomindlm.com/compare
+- SolomindLM vs NotebookLM (now Gemini Notebook): https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+- SolomindLM vs Elicit: https://www.solomindlm.com/compare/solomindlm-vs-elicit
+- SolomindLM vs Consensus: https://www.solomindlm.com/compare/solomindlm-vs-consensus
+- SolomindLM vs ChatPDF: https://www.solomindlm.com/compare/solomindlm-vs-chatpdf
+- SolomindLM vs SciSpace: https://www.solomindlm.com/compare/solomindlm-vs-scispace
+- SolomindLM vs Humata: https://www.solomindlm.com/compare/solomindlm-vs-humata
+- SolomindLM vs Stanford STORM: https://www.solomindlm.com/compare/solomindlm-vs-storm
+- SolomindLM vs Quizlet: https://www.solomindlm.com/compare/solomindlm-vs-quizlet
+- SolomindLM vs Perplexity: https://www.solomindlm.com/compare/solomindlm-vs-perplexity
 - How to study from PDFs with AI: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai
 - How to do an AI literature review: https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review
 
@@ -71,9 +80,9 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 
 ## Pricing
 
-Free tier ($0): 5 notebooks with up to 20 sources each; daily limits on chat and Studio generation (e.g. 10 chat messages/day, 2 flashcards/quizzes/reports/day, 2 audio overviews/day, 2 infographics/day, 2 written questions/day). No credit card required.
+Free tier ($0): 5 notebooks with up to 20 sources each; usage limits on chat and Studio generation (10 chat messages/day; 1 flashcard set, quiz, report, mind map, written question set, and spreadsheet per day each; 3 audio overviews/week; 1 literature review every 30 days). Deep research and infographics are Pro features. No credit card required.
 
-Pro: 200 notebooks with up to 200 sources each; higher daily limits (e.g. 500 chat messages/day, 100 generations/day for flashcards, quizzes, reports, audio, infographics, and written questions). $7.50/month billed yearly or $15/month billed monthly.
+Pro: 200 notebooks with up to 200 sources each; higher daily limits (500 chat messages/day; 100/day each for flashcards, quizzes, reports, mind maps, written questions, and spreadsheets; 20 audio overviews/day; 10 literature reviews/day; 15 deep research runs/day; 10 infographics/day). $7.50/month billed yearly or $15/month billed monthly.
 
 Full pricing: https://www.solomindlm.com/#pricing
 

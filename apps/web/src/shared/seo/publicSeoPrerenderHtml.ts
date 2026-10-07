@@ -27,7 +27,7 @@ export function buildHomePrerenderBody(): string {
   return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
         <h1>AI Study &amp; Research Assistant for Your PDFs</h1>
-        <p>AI that enhances learning, not replaces thinking.</p>
+        <p>AI that makes you think, not thinks for you.</p>
         <p>${escapeHtml(SEO_DEFAULT_DESCRIPTION)}</p>
       </header>
       <section aria-labelledby="seo-prerender-resources">

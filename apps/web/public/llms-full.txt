@@ -2,7 +2,7 @@
 
 > SolomindLM is an AI-powered notebook for students and researchers. Upload PDFs, videos, and papers—or import from the web and academic databases—then chat with your sources and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and deep research outputs grounded in the documents you provide. Free to start; no credit card required.
 
-Last-updated: 2026-09-15
+Last-updated: 2026-10-07
 Category: AI learning and research assistant
 Audience: Students, researchers, knowledge workers
 
@@ -31,11 +31,11 @@ Preferred short description: "SolomindLM, an AI learning and research assistant 
 
 - **Student study tools** — Upload course materials, discover web sources, and generate study outputs from your own documents: https://www.solomindlm.com/students
 - **Research tools** — Discover and import papers, manage citations, run literature review, and produce deep research reports: https://www.solomindlm.com/research
-- **SolomindLM vs NotebookLM** — Fair comparison for source-grounded study and research workflows: https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+- **Comparisons** — SolomindLM side by side with NotebookLM (now Gemini Notebook), Elicit, Consensus, ChatPDF, SciSpace, Humata, Stanford STORM, Quizlet, and Perplexity; each page lists the competitor pages checked and the date: https://www.solomindlm.com/compare
 - **How to study from PDFs with AI** — Step-by-step guide for flashcards, quizzes, and study guides: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai
 - **How to do an AI literature review** — Guide for paper import, chat, and synthesis: https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review
 - **FAQ** — Study tools, research workflows, pricing limits, privacy, and getting started: https://www.solomindlm.com/faq
-- **Pricing** — Free tier and Pro plans with notebook and daily generation limits: https://www.solomindlm.com/#pricing
+- **Pricing** — Free tier and Pro plans with notebook and generation limits: https://www.solomindlm.com/#pricing
 
 ## Markets served
 
@@ -63,11 +63,11 @@ Create multiple-choice quizzes from your sources for self-testing before exams.
 
 ### Written questions
 
-Practice short-answer and essay responses from your sources; submit answers for AI feedback. Distinct from multiple-choice Quizzes—key differentiator vs NotebookLM for written-exam prep.
+Practice short-answer and essay responses from your sources; submit answers for AI feedback. Distinct from multiple-choice Quizzes—not documented for Gemini Notebook (formerly NotebookLM), Quizlet, or Perplexity.
 
 - Overview: https://www.solomindlm.com/students/ai-written-questions
 - Related: multiple-choice quizzes — https://www.solomindlm.com/students/ai-quizzes
-- Compare: SolomindLM vs NotebookLM (written questions with feedback) — https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+- Compare: SolomindLM vs NotebookLM (now Gemini Notebook) — https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
 
 ### Mind maps
 
@@ -118,9 +118,9 @@ Extract tabular data from PDFs and documents into editable spreadsheets for comp
 
 ## Pricing summary
 
-**Free ($0):** 5 notebooks, up to 20 sources each; daily limits on chat and Studio generation (e.g. 10 chat messages/day; 2 flashcards, quizzes, reports, audio overviews, infographics, and written questions per day). No credit card required.
+**Free ($0):** 5 notebooks with up to 20 sources each; usage limits on chat and Studio generation (10 chat messages/day; 1 flashcard set, quiz, report, mind map, written question set, and spreadsheet per day each; 3 audio overviews/week; 1 literature review every 30 days). Deep research and infographics are Pro features. No credit card required.
 
-**Pro:** 200 notebooks, up to 200 sources each; higher daily limits (e.g. 500 chat messages/day; 100 generations/day for flashcards, quizzes, reports, audio, infographics, and written questions). $7.50/month billed yearly or $15/month billed monthly.
+**Pro:** 200 notebooks with up to 200 sources each; higher daily limits (500 chat messages/day; 100/day each for flashcards, quizzes, reports, mind maps, written questions, and spreadsheets; 20 audio overviews/day; 10 literature reviews/day; 15 deep research runs/day; 10 infographics/day). $7.50/month billed yearly or $15/month billed monthly.
 
 Full details: https://www.solomindlm.com/#pricing
 

@@ -1,15 +1,22 @@
 /// <reference types="vite/client" />
+import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
+import { FREE_FEATURE_LIMITS, PRO_FEATURE_LIMITS } from "./errors";
 import {
+  assertConcurrentRunCapacity,
+  assertRetryAllowed,
   checkDailyLimit,
   checkNotebookLimit,
   checkSourceLimit,
   consumeDailyLimit,
   getSubscriptionLimit,
+  STALE_RUN_MS,
+  takeFeatureRun,
 } from "./limits";
 import * as rateLimitsModule from "./rateLimits";
 
@@ -17,6 +24,14 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
+
+/** convexTest with the real rate-limiter component, for tests that exercise the windows. */
+function setupWithRateLimiter() {
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  return t;
+}
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId as string}|session1` });
@@ -204,13 +219,13 @@ describe("getSubscriptionLimit", () => {
   test("returns pro limits when isPro=true", () => {
     expect(getSubscriptionLimit("chat", true)).toBe(500);
     expect(getSubscriptionLimit("flashcard", true)).toBe(100);
-    expect(getSubscriptionLimit("audio", true)).toBe(100);
+    expect(getSubscriptionLimit("audio", true)).toBe(20);
   });
 
   test("returns free limits when isPro=false", () => {
     expect(getSubscriptionLimit("chat", false)).toBe(10);
-    expect(getSubscriptionLimit("flashcard", false)).toBe(2);
-    expect(getSubscriptionLimit("audio", false)).toBe(2);
+    expect(getSubscriptionLimit("flashcard", false)).toBe(1);
+    expect(getSubscriptionLimit("audio", false)).toBe(3);
   });
 });
 
@@ -225,6 +240,9 @@ describe("daily limit tables — single source of truth", () => {
     "spreadsheet",
     "infographic",
     "sourceGuide",
+    "mindmap",
+    "literatureReview",
+    "deepResearch",
   ] as const;
 
   test("errors.ts and rateLimits.ts expose the same accessor functions", async () => {
@@ -233,14 +251,59 @@ describe("daily limit tables — single source of truth", () => {
     expect(rateLimitsModule.getProLimit).toBe(errorsModule.getProLimit);
   });
 
-  test("every rate-limiter window is derived from the same accessor value", () => {
+  test("every rate-limiter window is derived from the same limit and window", () => {
     for (const feature of FEATURES) {
-      expect(rateLimitsModule.RATE_LIMIT_CONFIG[`${feature}Free`].rate).toBe(
-        rateLimitsModule.getFreeLimit(feature)
+      const free = FREE_FEATURE_LIMITS[feature];
+      const freeWindow = rateLimitsModule.RATE_LIMIT_CONFIG[`${feature}Free`];
+      if (free) {
+        expect(freeWindow.rate).toBe(rateLimitsModule.getFreeLimit(feature));
+        expect(freeWindow.period).toBe(rateLimitsModule.WINDOW_PERIOD_MS[free.window]);
+      } else {
+        expect(freeWindow).toBeUndefined();
+      }
+      const proWindow = rateLimitsModule.RATE_LIMIT_CONFIG[`${feature}Pro`];
+      expect(proWindow.rate).toBe(rateLimitsModule.getProLimit(feature));
+      expect(proWindow.period).toBe(
+        rateLimitsModule.WINDOW_PERIOD_MS[PRO_FEATURE_LIMITS[feature].window]
       );
-      expect(rateLimitsModule.RATE_LIMIT_CONFIG[`${feature}Pro`].rate).toBe(
-        rateLimitsModule.getProLimit(feature)
+    }
+  });
+
+  test("Free audio is weekly and the Free literature review is once per 30 days", () => {
+    const day = 24 * 60 * 60 * 1000;
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.audioFree).toEqual({
+      kind: "token bucket",
+      rate: 3,
+      period: 7 * day,
+      capacity: 3,
+    });
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.literatureReviewFree).toEqual({
+      kind: "token bucket",
+      rate: 1,
+      period: 30 * day,
+      capacity: 1,
+    });
+    expect(rateLimitsModule.RATE_LIMIT_CONFIG.chatFree.kind).toBe("fixed window");
+  });
+
+  test("a used 30-day run only comes back once the full 30 days have passed", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setupWithRateLimiter();
+      const userId = await seedUser(t);
+      const day = 24 * 60 * 60 * 1000;
+
+      await t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"));
+      vi.advanceTimersByTime(29 * day);
+      await expect(t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"))).rejects.toThrow(
+        "30-day literature review limit"
       );
+      vi.advanceTimersByTime(day + 1000);
+      await expect(
+        t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"))
+      ).resolves.toEqual({ isPro: false });
+    } finally {
+      vi.useRealTimers();
     }
   });
 
@@ -423,5 +486,167 @@ describe("internal mutation wrappers", () => {
     ).resolves.toBeNull();
 
     rateLimitsModule.rateLimiter.limit = originalLimit;
+  });
+});
+
+describe("Pro-only features", () => {
+  test("checkDailyLimit rejects a Free user without consulting the rate limiter", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const checkSpy = vi.spyOn(rateLimitsModule.rateLimiter, "check");
+
+    await expect(t.run((ctx) => checkDailyLimit(ctx, userId, "infographic"))).rejects.toThrow(
+      "Infographic is a Pro feature"
+    );
+    expect(checkSpy).not.toHaveBeenCalled();
+    checkSpy.mockRestore();
+  });
+
+  test("checkDailyLimit lets a Pro user through", async () => {
+    const t = setupWithRateLimiter();
+    const userId = await seedUser(t);
+    await seedSubscription(t, userId);
+
+    await expect(t.run((ctx) => checkDailyLimit(ctx, userId, "infographic"))).resolves.toBeNull();
+  });
+
+  test("consumeDailyLimit is a no-op for a Free user on a Pro-only feature", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const limitSpy = vi.spyOn(rateLimitsModule.rateLimiter, "limit");
+
+    await t.run((ctx) => consumeDailyLimit(ctx, userId, "infographic"));
+    expect(limitSpy).not.toHaveBeenCalled();
+    limitSpy.mockRestore();
+  });
+});
+
+describe("takeFeatureRun", () => {
+  test("a Free user gets one literature review, then the 30-day limit", async () => {
+    const t = setupWithRateLimiter();
+    const userId = await seedUser(t);
+
+    await expect(t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"))).resolves.toEqual({
+      isPro: false,
+    });
+    await expect(t.run((ctx) => takeFeatureRun(ctx, userId, "literatureReview"))).rejects.toThrow(
+      "30-day literature review limit reached (1/1)"
+    );
+  });
+
+  test("a Pro user can take several runs a day", async () => {
+    const t = setupWithRateLimiter();
+    const userId = await seedUser(t);
+    await seedSubscription(t, userId);
+
+    for (let i = 0; i < 3; i++) {
+      await expect(t.run((ctx) => takeFeatureRun(ctx, userId, "deepResearch"))).resolves.toEqual({
+        isPro: true,
+      });
+    }
+  });
+
+  test("deep research is Pro only", async () => {
+    const t = setupWithRateLimiter();
+    const userId = await seedUser(t);
+
+    await expect(t.run((ctx) => takeFeatureRun(ctx, userId, "deepResearch"))).rejects.toThrow(
+      "Deep research is a Pro feature"
+    );
+  });
+});
+
+type ReviewStatus =
+  | "planning"
+  | "awaiting_columns"
+  | "searching"
+  | "processing"
+  | "completed"
+  | "failed";
+
+async function seedReviewSession(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  status: ReviewStatus,
+  updatedAt = Date.now()
+) {
+  await t.run(async (ctx) => {
+    const notebookId = await ctx.db.insert("notebooks", {
+      userId,
+      title: "Notebook",
+      createdAt: updatedAt,
+      updatedAt,
+    });
+    await ctx.db.insert("literatureReviewSessions", {
+      query: "q",
+      notebookId,
+      userId,
+      workflowId: "wf",
+      status,
+      createdAt: updatedAt,
+      updatedAt,
+    });
+  });
+}
+
+describe("assertConcurrentRunCapacity", () => {
+  test("rejects a Pro user's fourth literature review while three are running", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedReviewSession(t, userId, "planning");
+    await seedReviewSession(t, userId, "searching");
+    await seedReviewSession(t, userId, "processing");
+
+    await expect(
+      t.run((ctx) => assertConcurrentRunCapacity(ctx, userId, "literatureReview", true))
+    ).rejects.toThrow("You already have 3 literature review runs in progress (limit 3)");
+  });
+
+  test("ignores finished runs, runs waiting on the user, and stale runs", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedReviewSession(t, userId, "completed");
+    await seedReviewSession(t, userId, "failed");
+    await seedReviewSession(t, userId, "awaiting_columns");
+    await seedReviewSession(t, userId, "processing", Date.now() - STALE_RUN_MS - 1000);
+
+    await expect(
+      t.run((ctx) => assertConcurrentRunCapacity(ctx, userId, "literatureReview", false))
+    ).resolves.toBeNull();
+  });
+
+  test("old stuck runs don't hide the user's live ones", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    for (let i = 0; i < 4; i++) {
+      await seedReviewSession(t, userId, "processing", Date.now() - STALE_RUN_MS - 1000);
+    }
+    for (let i = 0; i < 3; i++) {
+      await seedReviewSession(t, userId, "processing");
+    }
+
+    await expect(
+      t.run((ctx) => assertConcurrentRunCapacity(ctx, userId, "literatureReview", true))
+    ).rejects.toThrow("3 literature review runs in progress");
+  });
+
+  test("a Free user can have one run in progress", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedReviewSession(t, userId, "searching");
+
+    await expect(
+      t.run((ctx) => assertConcurrentRunCapacity(ctx, userId, "literatureReview", false))
+    ).rejects.toThrow("(limit 1)");
+  });
+});
+
+describe("assertRetryAllowed", () => {
+  test("allows up to three retries per run", () => {
+    expect(() => assertRetryAllowed(undefined, "literatureReview", false)).not.toThrow();
+    expect(() => assertRetryAllowed(2, "literatureReview", false)).not.toThrow();
+    expect(() => assertRetryAllowed(3, "literatureReview", false)).toThrow(
+      "already been retried 3 times"
+    );
   });
 });

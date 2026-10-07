@@ -23,6 +23,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
   if (!subscription) {
     return {
       hasSubscription: false,
+      isLoading: subscription === undefined,
       plan: "free",
       notebookLimit: 5,
       sourceLimit: 20,

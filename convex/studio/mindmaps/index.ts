@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { checkDailyLimit } from "../../_lib/limits";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
@@ -158,6 +159,7 @@ export const generateMindMap = mutation({
     }
 
     await assertCanEditNotebook(ctx, notebookId, userId);
+    await checkDailyLimit(ctx, userId, "mindmap");
 
     // Create mindmap record
     const mindmapId = await Mindmaps.createMindmap(ctx, {

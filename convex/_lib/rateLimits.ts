@@ -1,15 +1,21 @@
 /**
  * Rate limiting configuration using @convex-dev/rate-limiter.
- * Defines daily limits for content generation features.
+ * Defines per-window usage limits for content generation features.
  *
  * The per-feature limit numbers are NOT defined here — they live in
- * `./errors` (`FREE_DAILY_LIMITS` / `PRO_DAILY_LIMITS`) and both the accessors
- * and the rate-limiter window config below are derived from them.
+ * `./errors` (`FREE_FEATURE_LIMITS` / `PRO_FEATURE_LIMITS`) and both the
+ * accessors and the rate-limiter window config below are derived from them.
  */
 
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
-import { type DailyFeature, FREE_DAILY_LIMITS, PRO_DAILY_LIMITS } from "./errors";
+import {
+  type DailyFeature,
+  type FeatureLimit,
+  FREE_FEATURE_LIMITS,
+  type LimitWindow,
+  PRO_FEATURE_LIMITS,
+} from "./errors";
 import {
   FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
   FREE_FLASHCARD_GLOBAL_DAILY_LIMIT,
@@ -22,29 +28,53 @@ export { getFreeLimit, getProLimit } from "./errors";
 
 const DAY = 24 * HOUR;
 
-type FixedWindow = { kind: "fixed window"; rate: number; period: number };
+export const WINDOW_PERIOD_MS: Record<LimitWindow, number> = {
+  day: DAY,
+  week: 7 * DAY,
+  month: 30 * DAY,
+};
 
-/** Build `{ chatFree: {...}, flashcardFree: {...}, ... }` from a limit map. */
+type FixedWindow = { kind: "fixed window"; rate: number; period: number };
+type TokenBucket = { kind: "token bucket"; rate: number; period: number; capacity: number };
+type LimitConfig = FixedWindow | TokenBucket;
+
+/**
+ * Daily limits keep the original fixed windows. Weekly and 30-day limits use a
+ * token bucket instead: a fixed window with no `start` begins at a random point
+ * per user, so a 30-day window could roll over minutes after a run and allow a
+ * second one at once. A bucket refills one run every `period / rate`.
+ */
+function windowConfig(limit: FeatureLimit): LimitConfig {
+  const period = WINDOW_PERIOD_MS[limit.window];
+  return limit.window === "day"
+    ? { kind: "fixed window", rate: limit.rate, period }
+    : { kind: "token bucket", rate: limit.rate, period, capacity: limit.rate };
+}
+
+/**
+ * Build `{ chatFree: {...}, flashcardFree: {...}, ... }` from a limit map.
+ * Pro-only features (`null`) get no window: their check rejects before the
+ * rate limiter is consulted.
+ */
 function tierWindows<S extends string>(
-  limits: Record<DailyFeature, number>,
+  limits: Record<DailyFeature, FeatureLimit | null>,
   suffix: S
-): Record<`${DailyFeature}${S}`, FixedWindow> {
+): Partial<Record<`${DailyFeature}${S}`, LimitConfig>> {
   return Object.fromEntries(
-    Object.entries(limits).map(([feature, rate]) => [
-      `${feature}${suffix}`,
-      { kind: "fixed window", rate, period: DAY } satisfies FixedWindow,
-    ])
-  ) as Record<`${DailyFeature}${S}`, FixedWindow>;
+    Object.entries(limits).flatMap(([feature, limit]) =>
+      limit ? [[`${feature}${suffix}`, windowConfig(limit)]] : []
+    )
+  ) as Partial<Record<`${DailyFeature}${S}`, LimitConfig>>;
 }
 
 /**
  * Full rate-limiter config. Exported so tests can assert every window is
  * derived from the canonical limit maps.
  */
-export const RATE_LIMIT_CONFIG = {
-  // Free + Pro daily content-generation limits, derived from the canonical maps.
-  ...tierWindows(FREE_DAILY_LIMITS, "Free"),
-  ...tierWindows(PRO_DAILY_LIMITS, "Pro"),
+export const RATE_LIMIT_CONFIG: Record<string, LimitConfig> = {
+  // Free + Pro content-generation limits, derived from the canonical maps.
+  ...tierWindows(FREE_FEATURE_LIMITS, "Free"),
+  ...tierWindows(PRO_FEATURE_LIMITS, "Pro"),
 
   /** Joining notebooks via share link (per user, per hour) */
   shareRedeem: { kind: "fixed window", rate: 60, period: HOUR },
@@ -72,6 +102,6 @@ export const RATE_LIMIT_CONFIG = {
     rate: FREE_FLASHCARD_GLOBAL_DAILY_ATTEMPTS,
     period: DAY,
   },
-} satisfies Record<string, FixedWindow>;
+};
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, RATE_LIMIT_CONFIG);

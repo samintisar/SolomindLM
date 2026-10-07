@@ -12,6 +12,12 @@ import {
   mutation,
   query,
 } from "../_generated/server";
+import {
+  assertConcurrentRunCapacity,
+  assertRetryAllowed,
+  isProUser,
+  takeFeatureRun,
+} from "../_lib/limits";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
 import { scheduleResearchRunCompletionPush } from "../push/notify";
@@ -565,6 +571,11 @@ export const startDeepResearch = mutation({
 
     await assertCanEditNotebook(ctx, args.notebookId, userId);
 
+    // Pro only. Count the run at start (planning included) so parallel starts
+    // can't all pass the check; mutations are atomic, so a later throw undoes it.
+    const { isPro } = await takeFeatureRun(ctx, userId, "deepResearch");
+    await assertConcurrentRunCapacity(ctx, userId, "deepResearch", isPro);
+
     // Ensure conversation exists
     const conversationId: Id<"conversations"> = await ctx.runMutation(
       internal.chat.index.ensureConversation,
@@ -669,8 +680,15 @@ export const retryDeepResearch = mutation({
       throw new ConvexError({ code: "BAD_REQUEST", message: `Invalid step: ${fromStep}` });
     }
 
+    // Retries reuse the run they belong to, so cap them instead of charging again.
+    // A user who has since dropped to Free can still retry a run they paid for.
+    const isPro = await isProUser(ctx, userId);
+    assertRetryAllowed(plan.retryCount, "deepResearch", isPro);
+    await assertConcurrentRunCapacity(ctx, userId, "deepResearch", isPro);
+
     await ctx.db.patch(args.planId, {
       status: fromStep === "planning" ? "planning" : "running",
+      retryCount: (plan.retryCount ?? 0) + 1,
       updatedAt: Date.now(),
     });
 
