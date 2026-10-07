@@ -23,7 +23,7 @@ import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
-import { cleanCsvOutput } from "../../_agents/spreadsheet/csvHelpers";
+import { cleanCsvOutput, withoutPipelineWording } from "../../_agents/spreadsheet/csvHelpers";
 import {
   COLLAPSE_PROMPTS,
   COLLAPSE_SYSTEM_PROMPT,
@@ -33,6 +33,7 @@ import {
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/spreadsheet/prompts";
 import { labelWithSource, packChunksBySource } from "../../_agents/spreadsheet/sourcePacking";
+import { spreadsheetTitleSource } from "../../_agents/spreadsheet/title";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -149,6 +150,7 @@ export async function runSpreadsheetGenerationPhase(
     const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
       topic: customPrompt,
+      excludeReferenceLists: true,
     });
     // Sources left after narrowing to the requested topic (#288).
     const topicDocumentCount = new Set(chunkObjects.map((c) => c.documentId)).size;
@@ -638,7 +640,7 @@ export async function runFinalizeSpreadsheetPhase(
       phaseLabel: "SpreadsheetReduce",
     });
 
-    let finalOutput = cleanCsvOutput(rawContent);
+    let finalOutput = withoutPipelineWording(cleanCsvOutput(rawContent));
 
     if (rawContent.length >= 31_000) {
       console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
@@ -664,12 +666,13 @@ export async function runFinalizeSpreadsheetPhase(
       },
     });
 
-    // Generate title from first chunk
+    // Title from the finished table, so it describes every row, not the first source's notes.
     let title = "Spreadsheet";
-    if (allOutputs.length > 0) {
+    const titleSource = spreadsheetTitleSource(finalOutput, customPrompt ?? "") || allOutputs[0];
+    if (titleSource) {
       try {
         title = await invokeWithTimeout(
-          () => generateTitleFromChunk(allOutputs[0]),
+          () => generateTitleFromChunk(titleSource),
           deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
           "SpreadsheetTitle"
         );
