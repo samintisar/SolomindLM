@@ -17,10 +17,9 @@ export async function* sliceParagraphForStream(para: string): AsyncGenerator<str
       const sp = trimmed.lastIndexOf(" ", end);
       if (sp > i + 48) end = sp + 1;
     }
-    const part = trimmed.slice(i, end).trimEnd();
-    if (part) {
-      yield part + (end >= trimmed.length ? "\n\n" : "");
-    }
+    // Keep the slice as cut: a slice ending at a space carries it, so the concatenated stream (and
+    // the stored answer) keeps the space between the two words (#353).
+    yield trimmed.slice(i, end) + (end >= trimmed.length ? "\n\n" : "");
     i = end;
   }
 }
