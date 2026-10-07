@@ -114,7 +114,7 @@ export function AddSourceMenu({
     {
       key: "doi",
       label: "Import from DOI",
-      hint: "Look up a paper by its DOI",
+      hint: "Look up a paper by its DOI or arXiv ID",
       icon: Fingerprint,
       onClick: () => onSelect("doi"),
     },
