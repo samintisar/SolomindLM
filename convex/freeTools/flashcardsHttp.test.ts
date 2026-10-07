@@ -231,6 +231,26 @@ describe("POST /tools/flashcards", () => {
     expect(await res.json()).toEqual({ error: "generation_failed" });
   });
 
+  test("413 for an oversized body even when content-length is missing", async () => {
+    const t = makeT();
+    const body = JSON.stringify({ ...validBody, text: "x ".repeat(450_000) });
+    const res = await post(t, body, "203.0.113.9", { "content-length": "10" });
+    expect(res.status).toBe(413);
+    expect(siteverify).not.toHaveBeenCalled();
+  });
+
+  test("503 without generating when the client address is unknown", async () => {
+    const t = makeT();
+    const res = await t.fetch("/tools/flashcards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+      body: JSON.stringify(validBody),
+    });
+    expect(res.status).toBe(503);
+    expect(siteverify).not.toHaveBeenCalled();
+    expect(invokeStructuredOutput).not.toHaveBeenCalled();
+  });
+
   test("503 when the server is not configured", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "");
     const t = makeT();

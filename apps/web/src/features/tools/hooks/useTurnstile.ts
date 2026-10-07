@@ -45,6 +45,19 @@ function loadTurnstile(): Promise<TurnstileApi> {
 
 type Pending = { resolve: (token: string) => void; reject: (error: Error) => void };
 
+/** Rejects with `message` after `ms`; a stalled script or challenge must not hang the caller. */
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Invisible Turnstile: the script loads on first use, and `getToken()` runs a fresh challenge
  * each call (tokens are single-use). The container stays empty unless Cloudflare needs interaction.
@@ -64,7 +77,11 @@ export function useTurnstile(containerRef: RefObject<HTMLDivElement | null>) {
   );
 
   const getToken = useCallback(async (): Promise<string> => {
-    const turnstile = await loadTurnstile();
+    const turnstile = await withTimeout(
+      loadTurnstile(),
+      TOKEN_TIMEOUT_MS,
+      "turnstile_load_timeout"
+    );
     const container = containerRef.current;
     if (!container) throw new Error("turnstile_no_container");
 
@@ -91,14 +108,9 @@ export function useTurnstile(containerRef: RefObject<HTMLDivElement | null>) {
     }
     turnstile.execute(widgetId.current);
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("turnstile_timeout")), TOKEN_TIMEOUT_MS);
-    });
     try {
-      return await Promise.race([token, timeout]);
+      return await withTimeout(token, TOKEN_TIMEOUT_MS, "turnstile_timeout");
     } finally {
-      clearTimeout(timer);
       if (pending.current === entry) pending.current = null;
     }
   }, [containerRef]);

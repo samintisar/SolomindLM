@@ -1,3 +1,4 @@
+import { downloadBlob } from "@/shared/utils/downloadFile";
 import type { RankedPaper } from "../types/rankedPaper";
 
 function escapeBibtex(value: string): string {
@@ -78,13 +79,5 @@ export function exportPapersToExcel(papers: RankedPaper[], filename: string) {
 }
 
 function downloadText(content: string, filename: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([content], { type: mime }), filename);
 }

@@ -26,16 +26,16 @@ const FORMULA_START = /^\s*[=+\-@]./s;
 const SIGNED_NUMBER = /^\s*[+-]?[\d.,]+%?\s*$/;
 
 /**
- * CSV for a downloaded file. Spreadsheet apps run a cell that starts like a formula, so such
- * cells get a leading apostrophe and open as text; signed numbers stay numbers. The grid, and
- * the CSV the app saves, are unchanged.
+ * A cell for a downloaded file. Spreadsheet apps run a cell that starts like a formula, so such
+ * a cell gets a leading apostrophe and opens as text; signed numbers stay numbers.
  */
+export function toSafeExportCell(cell: string): string {
+  return FORMULA_START.test(cell) && !SIGNED_NUMBER.test(cell) ? `'${cell}` : cell;
+}
+
+/** CSV for a downloaded file (see `toSafeExportCell`). The grid, and the CSV the app saves, are unchanged. */
 export function toExportCsv(grid: Grid): string {
-  return serializeCsv(
-    grid.map((row) =>
-      row.map((cell) => (FORMULA_START.test(cell) && !SIGNED_NUMBER.test(cell) ? `'${cell}` : cell))
-    )
-  );
+  return serializeCsv(grid.map((row) => row.map(toSafeExportCell)));
 }
 
 /** Number of columns, taken from the header row. */

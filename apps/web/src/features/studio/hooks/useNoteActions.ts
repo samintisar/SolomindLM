@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { isFlashcardNote, isReportNote, isUserNote, Note } from "@/shared/types/index";
+import { downloadBlob } from "@/shared/utils/downloadFile";
 import { exportFlashcardsCSV } from "../services/flashcardsApi";
 
 interface ConfirmOptions {
@@ -118,13 +119,7 @@ export const useNoteActions = ({
 
     const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, "_").trim() || "report";
     const filename = `${safeName}.md`;
-    const blob = new Blob([activeNote.content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([activeNote.content], { type: "text/markdown;charset=utf-8" }), filename);
   }, [activeNote]);
 
   // Get user note body as plain text (content or messages formatted)
@@ -158,13 +153,7 @@ export const useNoteActions = ({
     if (!body) return;
     const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, "_").trim() || "note";
     const filename = `${safeName}.md`;
-    const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([body], { type: "text/markdown;charset=utf-8" }), filename);
   }, [activeNote, getUserNoteBody]);
 
   // Delete note with confirmation

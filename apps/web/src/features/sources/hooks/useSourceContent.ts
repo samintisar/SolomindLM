@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/useAuth";
+import { downloadBlob } from "@/shared/utils/downloadFile";
 
 interface UseSourceContentResult {
   // State
@@ -79,13 +80,7 @@ export function useSourceContent(): UseSourceContentResult {
 
     const safeName = sourceTitle.replace(/[\\/:*?"<>|]/g, "_").trim() || "source";
     const filename = `${safeName}.md`;
-    const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([markdownContent], { type: "text/markdown;charset=utf-8" }), filename);
   };
 
   // State modifiers
