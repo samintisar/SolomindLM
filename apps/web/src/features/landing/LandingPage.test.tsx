@@ -36,4 +36,16 @@ describe("LandingPage", () => {
     const { container } = renderPage();
     expect(container.querySelector(".auth-form-light")).not.toBeNull();
   });
+
+  it("scrolls to the section named in the URL hash", () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(
+      <MemoryRouter initialEntries={["/#pricing"]}>
+        <LandingPage onGetStarted={vi.fn()} />
+      </MemoryRouter>
+    );
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(scrollIntoView.mock.contexts[0]).toHaveProperty("id", "pricing");
+  });
 });

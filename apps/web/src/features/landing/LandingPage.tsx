@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthModal } from "@/features/auth/components/AuthModal";
 import { useAuth } from "@/features/auth/useAuth";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
@@ -14,6 +14,7 @@ import { LandingNav } from "./components/home/LandingNav";
 import { PricingSection } from "./components/home/PricingSection";
 import { SourceStrip } from "./components/home/SourceStrip";
 import { StudioMarquee } from "./components/home/StudioMarquee";
+import { scrollToSection } from "./components/home/scrollToSection";
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -23,6 +24,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const { hash } = useLocation();
+
+  // Nav links on other pages arrive as `/#section`: scroll to it once the home page has rendered.
+  useEffect(() => {
+    if (hash) scrollToSection(hash.slice(1));
+  }, [hash]);
 
   if (isNativeShell()) {
     if (isLoading) {
