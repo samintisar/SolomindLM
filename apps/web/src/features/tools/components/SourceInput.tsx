@@ -36,6 +36,9 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
   const fileInput = useRef<HTMLInputElement>(null);
   const [pasted, setPasted] = useState("");
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ kind: "idle" });
+  const [dragging, setDragging] = useState(false);
+  // dragenter/dragleave also fire for the button's children; count to know when the file truly left.
+  const dragDepth = useRef(0);
 
   const readPdf = async (file: File) => {
     setPdfStatus({ kind: "reading" });
@@ -98,13 +101,25 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
           />
           <Button
             type="button"
-            variant="outline"
+            variant="dropzone"
             size="lg"
             className="h-32 w-full flex-col"
+            data-dragging={dragging}
             onClick={() => fileInput.current?.click()}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              dragDepth.current += 1;
+              setDragging(true);
+            }}
             onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => {
+              dragDepth.current = Math.max(0, dragDepth.current - 1);
+              if (dragDepth.current === 0) setDragging(false);
+            }}
             onDrop={(event) => {
               event.preventDefault();
+              dragDepth.current = 0;
+              setDragging(false);
               const file = event.dataTransfer.files?.[0];
               if (file) void readPdf(file);
             }}
@@ -117,11 +132,13 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
               <Upload />
             )}
             <span>
-              {pdfStatus.kind === "ready"
-                ? pdfStatus.source.label
-                : pdfStatus.kind === "reading"
-                  ? "Reading your PDF…"
-                  : "Drop a PDF here or click to choose"}
+              {dragging
+                ? "Drop your PDF to read it"
+                : pdfStatus.kind === "ready"
+                  ? pdfStatus.source.label
+                  : pdfStatus.kind === "reading"
+                    ? "Reading your PDF…"
+                    : "Drop a PDF here or click to choose"}
             </span>
             <span className="text-xs font-normal text-muted-foreground">
               Text PDFs up to {FREE_FLASHCARD_MAX_PDF_PAGES} pages · stays in your browser
