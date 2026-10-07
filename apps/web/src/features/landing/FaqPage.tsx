@@ -50,7 +50,8 @@ export function FaqPage() {
                   id={category.id}
                   className="mx-auto grid max-w-280 scroll-mt-24 grid-cols-1 gap-8 py-10 lg:grid-cols-12 lg:gap-20"
                 >
-                  <div className="lg:col-span-4">
+                  {/* The title stays in view beside a long list of questions. */}
+                  <div className="lg:sticky lg:top-24 lg:col-span-4 lg:self-start">
                     <h2 className="font-display text-2xl font-bold">{category.title}</h2>
                     <p className="mt-3 font-serif text-base text-foreground/70">
                       {category.description}

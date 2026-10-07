@@ -14,7 +14,8 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
           return (
-            <li key={item.path} className="inline-flex items-center gap-2">
+            // Keyed by name: two crumbs can share a path (the first guide is also the Guides crumb).
+            <li key={item.name} className="inline-flex items-center gap-2">
               {index > 0 ? <ChevronRight aria-hidden className="size-3.5 text-border" /> : null}
               {isLast ? (
                 <span aria-current="page" className="font-medium text-foreground">

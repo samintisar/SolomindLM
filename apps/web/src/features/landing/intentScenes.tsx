@@ -238,7 +238,14 @@ const INTENT_SCENES: Record<string, IntentScene> = {
   literatureReview: {
     sources: [
       {
-        name: "24 papers",
+        name: "β-blockers in reactive airway disease.pdf",
+        meta: "Meta-analysis",
+        icon: FileText,
+        tone: "pdf",
+      },
+      { name: "Bisoprolol in mild asthma.pdf", meta: "RCT", icon: FileText, tone: "pdf" },
+      {
+        name: "+ 22 more papers",
         meta: "Beta blockers in asthma",
         icon: BookOpen,
         tone: "literature",
