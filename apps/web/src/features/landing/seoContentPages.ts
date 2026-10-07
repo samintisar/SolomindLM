@@ -1,8 +1,11 @@
+import { COMPETITOR_COMPARE_PAGES } from "./competitorComparePages";
 import type { FAQItem } from "./constants";
 
 export const SEO_CONTENT_LAST_UPDATED = "2026-09-15";
 
-type SeoContentPageType = "compare" | "guide";
+export const COMPARE_HUB_PATH = "/compare";
+
+type SeoContentPageType = "compare" | "compareHub" | "guide";
 
 type SeoContentSection = {
   h2: string;
@@ -21,6 +24,11 @@ type SeoContentQuickAnswer = {
   chooseCompetitor?: string;
 };
 
+type SeoContentSource = {
+  label: string;
+  url: string;
+};
+
 type SeoContentRelatedLink = {
   path: string;
   label: string;
@@ -35,9 +43,15 @@ export type SeoContentPageConfig = {
   keywords: string;
   h1: string;
   intro: string;
+  /** Competitor named in the quick answer and comparison table header (compare pages). */
+  competitorName?: string;
   quickAnswer?: SeoContentQuickAnswer;
   comparisonTable?: SeoContentComparisonRow[];
   sections: SeoContentSection[];
+  /** Public pages the competitor claims were checked against, shown under the comparison. */
+  sources?: SeoContentSource[];
+  /** ISO date the page's facts were last checked; defaults to SEO_CONTENT_LAST_UPDATED. */
+  lastUpdated?: string;
   faqs: FAQItem[];
   ctaLabel: string;
   conversionPromise: string;
@@ -49,258 +63,9 @@ export type SeoContentPageConfig = {
   priority?: number;
 };
 
-export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
-  {
-    path: "/compare/solomindlm-vs-notebooklm",
-    pageType: "compare",
-    title: "SolomindLM vs NotebookLM: Study Tool Comparison",
-    description:
-      "Compare SolomindLM and NotebookLM for PDF study, flashcards, audio, literature review, and research workflows.",
-    keywords:
-      "NotebookLM alternative, best NotebookLM alternative, NotebookLM alternative free, NotebookLM alternatives for studying, NotebookLM audio overview alternative, SolomindLM vs NotebookLM",
-    h1: "Best NotebookLM alternative for PDFs, flashcards, and research",
-    intro:
-      "SolomindLM is a strong NotebookLM alternative when you want source-grounded chat with citations plus notebook folders, web and academic discovery, literature review with twelve citation styles, and study tools such as written questions with feedback and spaced-repetition flashcards. NotebookLM fits users anchored in Google Workspace who want Audio Overviews, Video Overviews, and the Learning Guide. This page compares both so you can pick the best NotebookLM alternative for your workflow—not just a feature checklist.",
-    quickAnswer: {
-      chooseCompetitor:
-        "Choose NotebookLM if you want Google's ecosystem integration plus Audio Overviews, Video Overviews, flashcards, quizzes, reports, and the Learning Guide AI tutor on top of source-grounded chat with citations.",
-      chooseSolomindlm:
-        "Choose SolomindLM if you want source-grounded chat with citations plus folders for notebooks, web and academic source discovery, literature review with twelve citation styles, chat search with one-click save to your notebook, a model switcher, voice input in chat, audio transcription, written questions with feedback, spaced-repetition flashcards, editable reports, and academic import workflows.",
-    },
-    comparisonTable: [
-      {
-        topic: "Source-grounded chat",
-        solomindlm:
-          "Source-grounded chat with citations across notebook sources; RAG-backed answers and Studio outputs synthesized from your uploads.",
-        competitor:
-          "Source-grounded chat with citations against uploaded sources; synthesis and study outputs from the same materials.",
-      },
-      {
-        topic: "Student outputs",
-        solomindlm:
-          "Flashcards with spaced repetition, quizzes, mind maps, audio overviews, editable reports, infographics, spreadsheets.",
-        competitor:
-          "Audio Overviews, Video Overviews, flashcards, quizzes, mind maps, reports, infographics, Learning Guide.",
-      },
-      {
-        topic: "Written questions",
-        solomindlm:
-          "Short-answer and essay prompts from your sources with AI feedback on responses you submit—not multiple-choice only.",
-        competitor:
-          "Quizzes and the Learning Guide AI tutor; no written-response practice with feedback on product pages.",
-      },
-      {
-        topic: "Research workflows",
-        solomindlm:
-          "Academic paper discovery, import papers, AI literature review, deep research, and formatted citations in multiple styles.",
-        competitor:
-          "Source discovery, Deep Research, and literature review synthesis on its plans and product pages.",
-      },
-      {
-        topic: "Literature review citations",
-        solomindlm:
-          "Twelve citation styles—including APA, MLA, Chicago, IEEE, Vancouver, and Harvard—for literature reviews, reports, and the Cite Paper modal.",
-        competitor:
-          "No multi-style academic citation formatting for literature review outputs described on product pages.",
-      },
-      {
-        topic: "Notebook organization",
-        solomindlm: "Organize notebooks in folders and move them between folders.",
-        competitor: "No equivalent folder organization described on official product pages.",
-      },
-      {
-        topic: "Source discovery",
-        solomindlm:
-          "Built-in web and academic discovery with results you can add directly to notebooks.",
-        competitor:
-          "Emphasizes uploads and plan-tier source discovery rather than the same web plus academic discovery workflow.",
-      },
-      {
-        topic: "Chat search & models",
-        solomindlm:
-          "Optional web and academic search in chat; save external hits to the notebook; multiple model choices; voice transcription in chat.",
-        competitor:
-          "Google's model stack only; no model switcher, in-chat web/academic search, or voice input called out on product pages.",
-      },
-      {
-        topic: "Audio & source panel",
-        solomindlm:
-          "Upload audio for transcription; delete and refresh sources from the source panel.",
-        competitor:
-          "No audio ingestion or source-panel delete and refresh workflow described on product pages.",
-      },
-      {
-        topic: "Academic import",
-        solomindlm: "DOI, BibTeX, Zotero, and Mendeley import into research notebooks.",
-        competitor:
-          "Official pages emphasize uploads and source discovery rather than academic reference-manager imports.",
-      },
-      {
-        topic: "Pricing model",
-        solomindlm:
-          "Free ($0): 5 notebooks, 20 sources per notebook, daily generation caps. Pro ($7.50/mo billed yearly or $15/mo monthly): 200 notebooks, 200 sources per notebook, higher daily limits.",
-        competitor:
-          "Free, Plus, Pro, and Ultra tiers; source limits of 50, 100, 300, and 600 per notebook respectively.",
-      },
-      {
-        topic: "Best fit",
-        solomindlm:
-          "Students and researchers who want grounded synthesis with citations plus folders, discovery, and academic workflows.",
-        competitor:
-          "Users anchored in Google Workspace who want Google's study features on top of grounded chat.",
-      },
-    ],
-    sections: [
-      {
-        h2: "Why choose SolomindLM as a NotebookLM alternative?",
-        paragraphs: [
-          "Most people searching for a NotebookLM alternative want the same core idea—upload sources, chat with citations, and generate study or research outputs. SolomindLM matches that foundation and adds workflows NotebookLM does not emphasize on its product pages: academic paper import, literature review with multiple citation styles, written questions with feedback, notebook folders, and in-app web and academic discovery.",
-          "If you need a free NotebookLM alternative for studying from PDFs, generating flashcards and quizzes, or running literature review on a reading list, SolomindLM is built for that path. If you primarily want Google's ecosystem, Video Overviews, and the Learning Guide AI tutor, NotebookLM may still be the better fit.",
-        ],
-      },
-      {
-        h2: "What do SolomindLM and NotebookLM have in common?",
-        paragraphs: [
-          "Both tools are built around source-grounded AI with citations: you add documents, ask questions, and get answers and outputs that refer back to those materials rather than inventing facts from general training data alone.",
-          "Each supports study-oriented outputs such as flashcards, quizzes, mind maps, audio-style recaps, reports, and infographics. Both are useful when you need to review course readings or research papers inside a dedicated workspace instead of copying text into a blank chat window.",
-        ],
-      },
-      {
-        h2: "When is SolomindLM the better choice?",
-        paragraphs: [
-          "SolomindLM fits when your workflow needs more than upload-and-chat inside one Google stack. It combines notebook folders, built-in discovery, flexible chat search, and study and research tools that NotebookLM does not emphasize on its product pages.",
-        ],
-        bullets: [
-          "You want notebooks organized in folders and moved between them",
-          "You need web or academic discovery with one-click add to a notebook",
-          "You want web or academic search in chat and to save external sources from chat into the notebook",
-          "You prefer choosing among multiple models instead of a single Google model stack",
-          "You need voice transcription in chat or audio file ingestion with transcription",
-          "You want written questions with feedback on your answers—a standout SolomindLM feature",
-          "You want flashcards with a spaced-repetition study mode",
-          "You need to edit generated reports in place",
-          "You want delete and refresh controls in the source panel",
-          "You need DOI, BibTeX, Zotero, or Mendeley imports for a reading list",
-          "You need literature review outputs with references formatted in APA, MLA, Chicago, IEEE, Vancouver, Harvard, or other academic styles",
-        ],
-      },
-      {
-        h2: "What sets SolomindLM apart?",
-        paragraphs: [
-          "Both products generate flashcards, quizzes, mind maps, reports, infographics, and spreadsheets from sources. The meaningful differences are workflow depth and control—not a longer list of output types.",
-        ],
-        bullets: [
-          "Notebook folders: group notebooks and move them between folders",
-          "Written questions with feedback on short and essay answers",
-          "Flashcards with spaced-repetition review",
-          "Editable reports after generation",
-          "Web and academic source discovery built into the app",
-          "Web and academic search in chat, with external sources easy to add to the notebook",
-          "Model switcher across multiple models",
-          "Voice transcription in chat and audio source ingestion",
-          "Delete and refresh options in the source panel",
-          "Academic import via DOI, BibTeX, Zotero, and Mendeley",
-          "Twelve citation styles for literature reviews and reports (APA, MLA, Chicago, IEEE, Vancouver, Harvard, and more)",
-        ],
-      },
-      {
-        h2: "When is NotebookLM the better choice?",
-        paragraphs: [
-          "NotebookLM is a strong fit when you already live in Google Workspace, want polished source-grounded chat with citations, and plan to use Google's study features such as Audio Overviews, Video Overviews, and the Learning Guide—a personal AI tutor that uses probing questions and adapts explanations to your learning style—on supported plans.",
-          "If your workflow is mostly upload → chat → generate study aids inside Google's ecosystem, NotebookLM's integration advantages may outweigh a separate notebook product.",
-        ],
-      },
-      {
-        h2: "Which tool is better for students?",
-        paragraphs: [
-          "For students, the better tool depends on scope. Both offer strong grounded chat with citations from uploads. NotebookLM adds Video Overviews and the Learning Guide AI tutor on supported plans. SolomindLM differentiates with written questions with feedback, spaced-repetition flashcards, notebook folders, in-app discovery, chat search that saves sources to your notebook, voice input, and editable reports.",
-          "Neither replaces reviewing your original PDFs before exams. Pick the tool whose outputs match how you actually study.",
-        ],
-      },
-      {
-        h2: "Which tool is better for literature review?",
-        paragraphs: [
-          "SolomindLM is designed for research notebooks with academic discovery, paper import, chat across papers, and dedicated literature review mode—with twelve citation styles (APA, MLA, Chicago, IEEE, Vancouver, Harvard, and more) for formatted references in reviews and reports. NotebookLM offers source discovery, Deep Research, and literature review synthesis, but does not offer the same multi-style citation formatting for literature review deliverables.",
-          "For a reading-list-first literature review where you need import, synthesis, and field-appropriate citations, SolomindLM is the closer match. For exploratory synthesis from mixed uploads inside Google, NotebookLM remains competitive.",
-        ],
-      },
-      {
-        h2: "Which tool is better for studying from PDFs?",
-        paragraphs: [
-          "Both handle PDF-grounded study well. Upload chapters or lecture slides, ask clarifying questions, then generate flashcards or quizzes. Each can also produce mind maps, audio recaps, reports, and infographics from the same sources.",
-          "NotebookLM adds Video Overviews and the Learning Guide AI tutor on supported plans. SolomindLM adds written questions with feedback, spaced-repetition flashcards, voice and audio ingestion, discovery and chat search workflows, and editable reports—pick based on control and workflow fit, not on who lists more output types.",
-        ],
-      },
-    ],
-    faqs: [
-      {
-        question: "What is the best NotebookLM alternative?",
-        answer:
-          "The best NotebookLM alternative depends on your workflow. SolomindLM is a strong fit for students and researchers who want source-grounded chat plus folders, discovery, academic imports, literature review with twelve citation styles, written questions with feedback, and spaced-repetition flashcards. NotebookLM remains competitive if you prioritize Google's ecosystem, Video Overviews, and the Learning Guide AI tutor.",
-      },
-      {
-        question: "Is there a free NotebookLM alternative?",
-        answer:
-          "Yes. SolomindLM offers a free tier with notebooks, per-notebook source limits, and daily generation caps so you can upload PDFs, chat with sources, and try flashcards, quizzes, and literature review before upgrading.",
-      },
-      {
-        question: "Is SolomindLM a NotebookLM alternative for audio overviews?",
-        answer:
-          "Yes. SolomindLM generates audio overviews from your uploaded sources so you can listen to study recaps on the go—similar to NotebookLM's Audio Overviews, alongside flashcards, quizzes, and research tools in the same notebook.",
-      },
-      {
-        question: "Is SolomindLM a NotebookLM alternative?",
-        answer:
-          "Yes, for many workflows. Both support source-grounded chat with citations. SolomindLM is the stronger fit when you also need folders, web and academic discovery, chat search with save-to-notebook, multiple models, written questions with feedback, spaced-repetition flashcards, editable reports, and academic imports. NotebookLM remains the better fit if you prioritize Google's ecosystem, Video Overviews, and the Learning Guide AI tutor.",
-      },
-      {
-        question: "Which tool is better for students?",
-        answer:
-          "Both handle grounded chat with citations well. NotebookLM adds Video Overviews and the Learning Guide AI tutor on supported plans. SolomindLM fits students who want written questions with feedback, spaced-repetition flashcards, discovery and chat search workflows, voice input, notebook folders, and editable reports. Compare workflows against how you actually study—not just output checklists.",
-      },
-      {
-        question: "Which tool is better for literature review?",
-        answer:
-          "SolomindLM is built for research notebooks with paper discovery, DOI and reference-manager import, AI literature review, and twelve citation styles for formatted references in reviews and reports. NotebookLM supports discovery, Deep Research, and literature review synthesis but does not offer the same multi-style citation formatting or academic import workflow.",
-      },
-      {
-        question: "Does NotebookLM have written questions with feedback?",
-        answer:
-          "NotebookLM offers quizzes and the Learning Guide AI tutor, but its product pages do not describe short-answer or essay practice with feedback on your written responses. SolomindLM's Written Questions tool generates prompts from your sources and gives feedback on what you submit—useful when exams require written answers, not only multiple choice.",
-      },
-    ],
-    ctaLabel: "Try SolomindLM free",
-    conversionPromise: "Try SolomindLM free with your own PDFs, papers, and lecture materials.",
-    breadcrumbParent: { name: "Compare", path: "/compare/solomindlm-vs-notebooklm" },
-    navLabel: "SolomindLM vs NotebookLM",
-    relatedLinks: [
-      {
-        path: "/students/ai-written-questions",
-        label: "Written questions with feedback",
-        description:
-          "Practice short-answer and essay responses from your sources—SolomindLM grades your answers, not just multiple choice.",
-      },
-      {
-        path: "/guides/how-to-study-from-pdfs-with-ai",
-        label: "How to study from PDFs with AI",
-        description:
-          "Step-by-step workflow for turning readings into flashcards, quizzes, and study guides.",
-      },
-      {
-        path: "/students/ai-flashcards",
-        label: "AI flashcards",
-        description: "Generate flashcard decks grounded in your uploaded sources.",
-      },
-      {
-        path: "/research/ai-literature-review",
-        label: "AI literature review",
-        description: "Synthesize themes and gaps across papers in a research notebook.",
-      },
-    ],
-    articleType: "TechArticle",
-    changefreq: "monthly",
-    priority: 0.85,
-  },
+const COMPARE_PAGES = COMPETITOR_COMPARE_PAGES;
+
+const GUIDE_PAGES: SeoContentPageConfig[] = [
   {
     path: "/guides/how-to-study-from-pdfs-with-ai",
     pageType: "guide",
@@ -555,6 +320,81 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
   },
 ];
 
+const COMPARE_HUB_PAGE: SeoContentPageConfig = {
+  path: COMPARE_HUB_PATH,
+  pageType: "compareHub",
+  title: "Compare SolomindLM With AI Research and Study Tools",
+  description:
+    "Side-by-side comparisons of SolomindLM with NotebookLM (Gemini Notebook), Elicit, Consensus, SciSpace, ChatPDF, Humata, STORM, Quizlet, and Perplexity.",
+  keywords:
+    "NotebookLM alternatives, Elicit alternatives, best AI tools for literature review, AI study tool comparison, ChatPDF alternative, Quizlet alternative",
+  h1: "How SolomindLM compares with other AI research and study tools",
+  intro:
+    "Each comparison below puts SolomindLM next to one other tool, with a feature table, the cases where the other tool is the better pick, and links to the public pages we checked. Use them to match a tool to the job: studying from your own course material, reviewing academic literature, chatting with a few PDFs, or answering questions from the web.",
+  sections: [
+    {
+      h2: "Which tool fits which job?",
+      paragraphs: [
+        "These tools overlap less than their marketing suggests. Start from the job you need done, then read the comparison for the tools that fit it.",
+      ],
+      bullets: [
+        "Study from your own PDFs, slides, and notes: SolomindLM, Gemini Notebook (formerly NotebookLM), Quizlet",
+        "Search and screen academic papers: SolomindLM, Elicit, Consensus, SciSpace",
+        "Ask questions of a handful of documents: ChatPDF, Humata, SolomindLM",
+        "Get cited answers from the open web: Perplexity",
+        "Draft a Wikipedia-style overview of a topic from web sources: STORM",
+      ],
+    },
+    {
+      h2: "What SolomindLM is built for",
+      paragraphs: [
+        "SolomindLM keeps your sources in a notebook and answers from them with citations. From the same notebook you can search academic databases, import papers by DOI or BibTeX, run a literature review with visible screening counts, and turn the material into flashcards, quizzes, written questions with feedback, mind maps, reports, and audio overviews.",
+        "It is not a reference manager, a full systematic-review platform, or a general web search engine. The comparisons say where another tool does those jobs better.",
+      ],
+    },
+  ],
+  faqs: [
+    {
+      question: "Which AI tools answer only from my own sources?",
+      answer:
+        "Notebook tools such as SolomindLM and Gemini Notebook (formerly NotebookLM), and document-chat tools such as ChatPDF and Humata, answer from files you upload and cite them. Perplexity and STORM answer mainly from the web, and Elicit, Consensus, and SciSpace answer mainly from their academic paper indexes.",
+    },
+    {
+      question: "Which AI tool is best for a literature review?",
+      answer:
+        "For a formal systematic review with large-scale screening, Elicit is the most complete. For quick evidence answers, Consensus is fast. SolomindLM fits a student or researcher who wants search, screening counts, an evidence table, and a written review with formatted citations in the same notebook as their own PDFs, at a lower price.",
+    },
+    {
+      question: "How are these comparisons kept accurate?",
+      answer:
+        "Each page lists the competitor's public pages we checked and the date we checked them. We only state what those pages say; where a feature or price could not be confirmed, the page says so or leaves it out. Plans change often, so check the other tool's site before you buy.",
+    },
+    {
+      question: "Is SolomindLM free to try?",
+      answer:
+        "Yes. The free plan includes notebooks, sources per notebook, and daily generation limits, with no credit card required. Pro raises those limits.",
+    },
+  ],
+  ctaLabel: "Try SolomindLM free",
+  conversionPromise: "Try SolomindLM free with your own PDFs, papers, and lecture notes.",
+  breadcrumbParent: { name: "Home", path: "/" },
+  navLabel: "Compare",
+  relatedLinks: COMPARE_PAGES.map((page) => ({
+    path: page.path,
+    label: page.navLabel,
+    description: page.description,
+  })),
+  articleType: "Article",
+  changefreq: "monthly",
+  priority: 0.8,
+};
+
+export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
+  COMPARE_HUB_PAGE,
+  ...COMPARE_PAGES,
+  ...GUIDE_PAGES,
+];
+
 export type SeoContentBreadcrumbItem = {
   name: string;
   path: string;
@@ -584,15 +424,15 @@ export function isSeoContentPath(path: string): boolean {
 export function getSeoContentBreadcrumbItems(
   page: SeoContentPageConfig
 ): SeoContentBreadcrumbItem[] {
-  const compareHubPath = "/compare/solomindlm-vs-notebooklm";
   const guideHubPath = "/guides/how-to-study-from-pdfs-with-ai";
+  const compareCrumb = { name: "Compare", path: COMPARE_HUB_PATH };
+
+  if (page.pageType === "compareHub") {
+    return [{ name: "Home", path: "/" }, compareCrumb];
+  }
 
   if (page.pageType === "compare") {
-    return [
-      { name: "Home", path: "/" },
-      { name: "Compare", path: compareHubPath },
-      { name: page.navLabel, path: page.path },
-    ];
+    return [{ name: "Home", path: "/" }, compareCrumb, { name: page.navLabel, path: page.path }];
   }
 
   return [
@@ -600,4 +440,8 @@ export function getSeoContentBreadcrumbItems(
     { name: "Guides", path: guideHubPath },
     { name: page.navLabel, path: page.path },
   ];
+}
+
+export function getSeoContentLastUpdated(page: SeoContentPageConfig): string {
+  return page.lastUpdated ?? SEO_CONTENT_LAST_UPDATED;
 }
