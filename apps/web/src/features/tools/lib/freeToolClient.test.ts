@@ -22,6 +22,14 @@ describe("generateFreeDeck", () => {
     expect(fetchImpl.mock.calls[0][0]).toMatch(/\/tools\/flashcards$/);
   });
 
+  it("falls back to a default title when the response has none", async () => {
+    const cards = [{ type: "definition", front: "Define: cell", back: "Unit of life" }];
+    for (const title of [undefined, "", "   ", 7]) {
+      const result = await generateFreeDeck(req, respond(200, { title, cards }));
+      expect(result).toMatchObject({ kind: "ok", deck: { title: "Flashcards" } });
+    }
+  });
+
   it("maps 400, 403, 429 and 5xx", async () => {
     expect(await generateFreeDeck(req, respond(400, { error: "text_too_short" }))).toEqual({
       kind: "invalid",

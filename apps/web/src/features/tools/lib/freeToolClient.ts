@@ -42,7 +42,8 @@ export async function generateFreeDeck(
     const cards = (body.cards as WireCard[]).map(({ topic, ...card }) =>
       topic ? { ...card, topic } : card
     );
-    return { kind: "ok", deck: { title: String(body.title), cards } };
+    const title = typeof body.title === "string" && body.title.trim() ? body.title : "Flashcards";
+    return { kind: "ok", deck: { title, cards } };
   }
   if (response.status === 400 || response.status === 413) {
     return { kind: "invalid", error: String(body.error ?? "invalid_body") };
