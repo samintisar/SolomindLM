@@ -6,6 +6,7 @@ import {
   FREE_FLASHCARD_MAX_WORDS,
   FREE_FLASHCARD_MIN_WORDS,
   parseFreeFlashcardRequest,
+  TURNSTILE_TOKEN_MAX_CHARS,
   truncateToWords,
 } from "./freeToolBounds";
 
@@ -18,6 +19,15 @@ describe("countWords", () => {
   test("is zero for blank text", () => {
     expect(countWords("   \n ")).toBe(0);
   });
+  test("counts each Han, Kana or Thai character as a word", () => {
+    expect(countWords("能量转换")).toBe(4);
+    expect(countWords("カタカナ ひらがな 変換")).toBe(10);
+    expect(countWords("พลังงาน")).toBe(7);
+  });
+  test("counts mixed text: runs of other scripts stay one word", () => {
+    expect(countWords("ATP是能量")).toBe(4);
+    expect(countWords("the ATP 是 energy")).toBe(4);
+  });
 });
 
 describe("truncateToWords", () => {
@@ -26,6 +36,16 @@ describe("truncateToWords", () => {
   });
   test("cuts after the Nth word and keeps original whitespace", () => {
     expect(truncateToWords("a  b\n\nc d e", 3)).toEqual({ text: "a  b\n\nc", truncated: true });
+  });
+  test("cuts Chinese text after N characters", () => {
+    expect(truncateToWords("能量转换过程", 4)).toEqual({ text: "能量转换", truncated: true });
+    expect(truncateToWords("ATP是能量", 2)).toEqual({ text: "ATP是", truncated: true });
+    expect(truncateToWords("能量", 2)).toEqual({ text: "能量", truncated: false });
+  });
+  test("a non-positive cap yields empty text", () => {
+    expect(truncateToWords("a b", 0)).toEqual({ text: "", truncated: true });
+    expect(truncateToWords("a b", -1)).toEqual({ text: "", truncated: true });
+    expect(truncateToWords("  ", 0)).toEqual({ text: "", truncated: false });
   });
 });
 
@@ -39,6 +59,21 @@ describe("deriveDeckTitle", () => {
     const title = deriveDeckTitle(`${"Photosynthesis ".repeat(20)}\nrest`);
     expect(title.length).toBeLessThanOrEqual(80);
     expect(title.endsWith(" ")).toBe(false);
+  });
+  test("trims and strips heading marks with or without a space", () => {
+    expect(deriveDeckTitle("   # Heading")).toBe("Heading");
+    expect(deriveDeckTitle("#Heading")).toBe("Heading");
+  });
+  test("strips list markers, checkboxes and emphasis", () => {
+    expect(deriveDeckTitle("- [ ] **Bold** item")).toBe("Bold item");
+    expect(deriveDeckTitle("1. __Numbered__ title")).toBe("Numbered title");
+    expect(deriveDeckTitle("> Quoted title")).toBe("Quoted title");
+  });
+  test("never cuts a surrogate pair when capping long titles", () => {
+    const title = deriveDeckTitle(`Cells${"😀".repeat(100)}`);
+    expect(title).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(title).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(Array.from(title).length).toBeLessThanOrEqual(80);
   });
   test("falls back to Flashcards", () => {
     expect(deriveDeckTitle("12 34\n--")).toBe("Flashcards");
@@ -69,6 +104,20 @@ describe("parseFreeFlashcardRequest", () => {
       ok: false,
       error: "missing_token",
     });
+  });
+  test("rejects an oversized turnstile token", () => {
+    expect(
+      parseFreeFlashcardRequest({
+        ...valid,
+        turnstileToken: "x".repeat(TURNSTILE_TOKEN_MAX_CHARS + 1),
+      })
+    ).toEqual({ ok: false, error: "invalid_body" });
+    expect(
+      parseFreeFlashcardRequest({
+        ...valid,
+        turnstileToken: "x".repeat(TURNSTILE_TOKEN_MAX_CHARS),
+      }).ok
+    ).toBe(true);
   });
   test("rejects short text", () => {
     expect(
