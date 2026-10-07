@@ -43,6 +43,7 @@ const literatureTablePaperValidator = v.object({
   includeReason: v.optional(v.string()),
   isIncluded: v.boolean(),
   offTopicReason: v.optional(v.string()),
+  extractionFailed: v.optional(v.boolean()),
 });
 
 /** Chat workflow tables/reports — never listed in the studio sidebar. */
@@ -656,6 +657,7 @@ export const getLiteratureTable = query({
           includeReason: v.optional(v.string()),
           isIncluded: v.boolean(),
           offTopicReason: v.optional(v.string()),
+          extractionFailed: v.optional(v.boolean()),
           citation: v.union(citationMetadataValidator, v.null()),
         })
       ),

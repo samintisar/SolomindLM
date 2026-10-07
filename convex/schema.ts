@@ -772,6 +772,8 @@ export default defineSchema({
         isIncluded: v.boolean(),
         /** A notebook paper that looks off-topic for the question; it is still included (#301). */
         offTopicReason: v.optional(v.string()),
+        /** The extraction call failed, so the row's columns are empty for that reason (#398). */
+        extractionFailed: v.optional(v.boolean()),
       })
     ),
     /** Set for chat workflow outputs — excluded from studio sidebar lists. */
@@ -945,6 +947,7 @@ export default defineSchema({
     includeReason: v.optional(v.string()),
     isIncluded: v.boolean(),
     offTopicReason: v.optional(v.string()),
+    extractionFailed: v.optional(v.boolean()),
     batchNumber: v.number(),
     createdAt: v.number(),
   })
