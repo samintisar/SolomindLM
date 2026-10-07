@@ -1,10 +1,12 @@
 // convex/freeTools/claimDeck.test.ts
 /// <reference types="vite/client" />
+
+import { ConvexError, type Value } from "convex/values";
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { FREE_FLASHCARD_MIN_WORDS } from "../_lib/freeToolBounds";
+import { FREE_FLASHCARD_MAX_BODY_BYTES, FREE_FLASHCARD_MIN_WORDS } from "../_lib/freeToolBounds";
 import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -24,6 +26,32 @@ afterEach(() => vi.useRealTimers());
 
 async function seedUser(t: ReturnType<typeof convexTest>): Promise<Id<"users">> {
   return t.run(async (ctx) => ctx.db.insert("users", { name: "T" }));
+}
+
+/** A signed-in caller whose `claim` fills in valid defaults for any arg not overridden. */
+async function signedIn() {
+  const t = convexTest(schema, modules);
+  const userId = await seedUser(t);
+  const asUser = t.withIdentity({ subject: `${userId}|s1` });
+  const claim = (overrides: Partial<{ title: string; sourceText: string; cards: typeof CARDS }>) =>
+    asUser.mutation(api.freeTools.claimDeck.claimDeck, {
+      title: "D",
+      sourceText: SOURCE,
+      cards: CARDS,
+      ...overrides,
+    });
+  return { claim };
+}
+
+/** The ConvexError payload a rejected call carries (fails the test if it resolves). */
+async function rejectionData(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConvexError);
+    return (error as ConvexError<Value>).data;
+  }
+  throw new Error("expected the call to reject");
 }
 
 describe("freeTools.claimDeck.claimDeck", () => {
@@ -71,24 +99,47 @@ describe("freeTools.claimDeck.claimDeck", () => {
     expect(deck?.metadata).toMatchObject({ cardCount: 2, source: "free_tool" });
   });
 
-  test("rejects an empty or oversized deck", async () => {
-    const t = convexTest(schema, modules);
-    const userId = await seedUser(t);
-    const asUser = t.withIdentity({ subject: `${userId}|s1` });
-    await expect(
-      asUser.mutation(api.freeTools.claimDeck.claimDeck, {
-        title: "D",
-        sourceText: SOURCE,
-        cards: [],
-      })
-    ).rejects.toThrow();
+  test("rejects an empty or oversized deck with a structured cards error", async () => {
+    const { claim } = await signedIn();
+    expect(await rejectionData(claim({ cards: [] }))).toEqual({
+      type: "INPUT_VALIDATION_ERROR",
+      field: "cards",
+      detail: "A deck needs 1–30 cards",
+    });
     const many = Array.from({ length: 31 }, () => CARDS[0]);
-    await expect(
-      asUser.mutation(api.freeTools.claimDeck.claimDeck, {
-        title: "D",
-        sourceText: SOURCE,
-        cards: many,
-      })
-    ).rejects.toThrow();
+    expect(await rejectionData(claim({ cards: many }))).toMatchObject({
+      type: "INPUT_VALIDATION_ERROR",
+      field: "cards",
+      detail: "A deck needs 1–30 cards",
+    });
+    const long = [{ ...CARDS[0], back: "x".repeat(4001) }];
+    expect(await rejectionData(claim({ cards: long }))).toMatchObject({
+      field: "cards",
+      detail: "A card is too long",
+    });
+  });
+
+  test("rejects source text outside the word limits", async () => {
+    const { claim } = await signedIn();
+    const short = Array.from({ length: FREE_FLASHCARD_MIN_WORDS - 1 }, (_, i) => `w${i}`).join(" ");
+    expect(await rejectionData(claim({ sourceText: short }))).toMatchObject({
+      type: "INPUT_VALIDATION_ERROR",
+      field: "sourceText",
+      detail: "Source text is outside the free tool's limits",
+    });
+  });
+
+  test("rejects source text over the character cap", async () => {
+    const { claim } = await signedIn();
+    // Few words, many characters: passes the word limits, fails the character cap.
+    const huge = Array.from({ length: FREE_FLASHCARD_MIN_WORDS + 5 }, () => "a".repeat(2_500)).join(
+      " "
+    );
+    expect(huge.length).toBeGreaterThan(FREE_FLASHCARD_MAX_BODY_BYTES);
+    expect(await rejectionData(claim({ sourceText: huge }))).toMatchObject({
+      type: "INPUT_VALIDATION_ERROR",
+      field: "sourceText",
+      detail: "Source text is too long",
+    });
   });
 });
