@@ -1,11 +1,25 @@
+import type { Page } from "@playwright/test";
+import {
+  FREE_PLAN_FEATURES,
+  PRO_PLAN_FEATURES,
+} from "../../apps/web/src/features/billing/planFeatures";
 import { expect, test } from "../fixtures/auth.fixture";
+
+/** The current-plan section's "<Interval> billing" line. */
+const BILLING_LINE = /^(Monthly|Yearly) billing$/;
+
+/** The pricing card whose heading is `title` ("Free", "Yearly" or "Monthly"). */
+function planCard(page: Page, title: string) {
+  return page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+}
 
 test.describe("Billing page", () => {
   test("loads and displays pricing plans", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
 
     await expect(page.getByRole("heading", { name: "Choose Your Plan" })).toBeVisible();
 
@@ -19,17 +33,12 @@ test.describe("Billing page", () => {
     await expect(page.getByText("Save 50%")).toBeVisible();
     await expect(page.getByText("$7.50").first()).toBeVisible();
     await expect(page.getByText("$15").first()).toBeVisible();
-
-    // Feature lists
-    await expect(page.getByText("5 notebooks per account").first()).toBeVisible();
-    await expect(page.getByText("200 notebooks per account").first()).toBeVisible();
   });
 
   test("navigates from home via Pro button", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
     await page.goto("/home");
-    await page.waitForLoadState("networkidle");
 
     // Subscribed users see "Pro" button in header
     const proBtn = page.getByRole("button", { name: "Pro" });
@@ -44,7 +53,6 @@ test.describe("Billing page", () => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { name: "Choose Your Plan" })).toBeVisible();
 
     await page.getByRole("button", { name: /Back/ }).click();
@@ -56,37 +64,38 @@ test.describe("Billing page", () => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
 
     // Current plan section is visible for subscribers
     await expect(page.getByRole("heading", { name: "Pro Plan" })).toBeVisible();
-    await expect(page.getByText(/billing/i).first()).toBeVisible();
+    const billingLine = page.getByText(BILLING_LINE);
+    await expect(billingLine).toBeVisible();
 
     // Free card shows "Downgrade" button for subscribers
     await expect(page.getByRole("button", { name: "Downgrade" })).toBeVisible();
 
-    // Both Pro cards show "Current Plan" (disabled) for subscribers
-    const currentPlanButtons = page.getByRole("button", { name: "Current Plan" });
-    await expect(currentPlanButtons).toHaveCount(2);
+    // The subscribed interval's card shows "Current Plan"; the other card offers a switch
+    const current = BILLING_LINE.exec((await billingLine.textContent()) ?? "")?.[1];
+    if (!current) throw new Error("Could not read the subscribed interval from the billing line");
+    const other = current === "Monthly" ? "Yearly" : "Monthly";
+    await expect(
+      planCard(page, current).getByRole("button", { name: "Current Plan" })
+    ).toBeDisabled();
+    await expect(
+      planCard(page, other).getByRole("button", { name: `Switch to ${other}` })
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Current Plan" })).toHaveCount(1);
   });
 
   test("displays correct feature comparisons", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
 
-    // Free features - just check they exist somewhere on page
-    await expect(page.getByText("10 chat messages/day").first()).toBeVisible();
-    await expect(page.getByText("2 flashcards/day").first()).toBeVisible();
-    await expect(page.getByText("2 quizzes/day").first()).toBeVisible();
-
-    // Pro features - just check they exist somewhere on page
-    await expect(page.getByText("500 chat messages/day").first()).toBeVisible();
-    await expect(page.getByText("100 flashcards/day").first()).toBeVisible();
-    await expect(page.getByText("100 quizzes/day").first()).toBeVisible();
-    await expect(page.getByText("100 reports/day").first()).toBeVisible();
-    await expect(page.getByText("100 audio overviews/day").first()).toBeVisible();
-    await expect(page.getByText("100 written questions/day").first()).toBeVisible();
+    // Each card lists exactly its plan's lines. This checks the page wiring; the limit values
+    // themselves are pinned by apps/web/src/features/billing/planFeatures.test.ts.
+    await expect(planCard(page, "Free").getByRole("listitem")).toHaveText(FREE_PLAN_FEATURES);
+    for (const title of ["Yearly", "Monthly"]) {
+      await expect(planCard(page, title).getByRole("listitem")).toHaveText(PRO_PLAN_FEATURES);
+    }
   });
 });
