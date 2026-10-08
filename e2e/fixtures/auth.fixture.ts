@@ -42,7 +42,11 @@ export const test = base.extend<AuthFixtures, WorkerAuthFixtures>({
   context: async ({ context, workerAuth }, use) => {
     await use(context);
     // Keep the refresh token this test rotated to, for the worker's next test.
-    workerAuth.state = await context.storageState();
+    try {
+      workerAuth.state = await context.storageState();
+    } catch {
+      // The test already timed out; a failed test gets a fresh worker, which signs in again.
+    }
   },
 
   authenticatedPage: async ({ page }, use) => {
