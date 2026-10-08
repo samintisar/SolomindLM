@@ -1,32 +1,15 @@
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { getNativeWebViewBridge } from "@/utils/platformDetection";
+import { applyTheme, readStoredTheme, storeTheme, type Theme } from "./theme";
 import { ThemeContext } from "./useTheme";
 
-type Theme = "light" | "dark";
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [isInitialized, setIsInitialized] = useState(false);
+  // Read synchronously so the first render already matches the class that
+  // public/theme-init.js put on <html> before first paint (no light -> dark flip).
+  const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
 
-  // Load theme from localStorage on mount
   useEffect(() => {
-    const storedTheme = localStorage.getItem("solomind_theme") as Theme | null;
-    if (storedTheme && (storedTheme === "light" || storedTheme === "dark")) {
-      setTheme(storedTheme);
-    }
-    setIsInitialized(true);
-  }, []);
-
-  // Apply theme to document element
-  useEffect(() => {
-    if (!isInitialized) return;
-
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    applyTheme(theme);
 
     // Let the mobile shell match its status-bar inset to the web theme.
     try {
@@ -34,15 +17,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [theme, isInitialized]);
+  }, [theme]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prevTheme) => {
       const newTheme = prevTheme === "light" ? "dark" : "light";
-      localStorage.setItem("solomind_theme", newTheme);
+      storeTheme(newTheme);
       return newTheme;
     });
   }, []);
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
