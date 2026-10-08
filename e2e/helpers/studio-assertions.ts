@@ -92,11 +92,12 @@ export async function waitForNoteProgress(
   const progressbar = noteEl.locator('[role="progressbar"]');
 
   await expect(progressbar).toBeVisible({ timeout });
-  await expect(progressbar).toHaveAttribute(
-    "aria-valuenow",
-    (val: string | null) => val !== null && parseInt(val) >= minPercent,
-    { timeout }
-  );
+  await expect
+    .poll(
+      async () => Number.parseInt((await progressbar.getAttribute("aria-valuenow")) ?? "", 10),
+      { timeout }
+    )
+    .toBeGreaterThanOrEqual(minPercent);
 }
 
 /**

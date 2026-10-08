@@ -5,6 +5,9 @@ import {
 } from "../../apps/web/src/features/billing/planFeatures";
 import { expect, test } from "../fixtures/auth.fixture";
 
+/** The current-plan section's "<Interval> billing" line. */
+const BILLING_LINE = /^(Monthly|Yearly) billing$/;
+
 /** The pricing card whose heading is `title` ("Free", "Yearly" or "Monthly"). */
 function planCard(page: Page, title: string) {
   return page
@@ -17,7 +20,6 @@ test.describe("Billing page", () => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
 
     await expect(page.getByRole("heading", { name: "Choose Your Plan" })).toBeVisible();
 
@@ -31,23 +33,12 @@ test.describe("Billing page", () => {
     await expect(page.getByText("Save 50%")).toBeVisible();
     await expect(page.getByText("$7.50").first()).toBeVisible();
     await expect(page.getByText("$15").first()).toBeVisible();
-
-    // Feature lists (first line of each plan is the notebook and source limit)
-    await expect(
-      planCard(page, "Free").getByText(FREE_PLAN_FEATURES[0], { exact: true })
-    ).toBeVisible();
-    for (const title of ["Yearly", "Monthly"]) {
-      await expect(
-        planCard(page, title).getByText(PRO_PLAN_FEATURES[0], { exact: true })
-      ).toBeVisible();
-    }
   });
 
   test("navigates from home via Pro button", async ({ authenticatedPage }) => {
     const page = authenticatedPage;
 
     await page.goto("/home");
-    await page.waitForLoadState("networkidle");
 
     // Subscribed users see "Pro" button in header
     const proBtn = page.getByRole("button", { name: "Pro" });
@@ -62,7 +53,6 @@ test.describe("Billing page", () => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { name: "Choose Your Plan" })).toBeVisible();
 
     await page.getByRole("button", { name: /Back/ }).click();
@@ -74,18 +64,18 @@ test.describe("Billing page", () => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
 
     // Current plan section is visible for subscribers
     await expect(page.getByRole("heading", { name: "Pro Plan" })).toBeVisible();
-    const billingLine = page.getByText(/^(Monthly|Yearly) billing$/);
+    const billingLine = page.getByText(BILLING_LINE);
     await expect(billingLine).toBeVisible();
 
     // Free card shows "Downgrade" button for subscribers
     await expect(page.getByRole("button", { name: "Downgrade" })).toBeVisible();
 
     // The subscribed interval's card shows "Current Plan"; the other card offers a switch
-    const current = (await billingLine.textContent())?.startsWith("Monthly") ? "Monthly" : "Yearly";
+    const current = BILLING_LINE.exec((await billingLine.textContent()) ?? "")?.[1];
+    if (!current) throw new Error("Could not read the subscribed interval from the billing line");
     const other = current === "Monthly" ? "Yearly" : "Monthly";
     await expect(
       planCard(page, current).getByRole("button", { name: "Current Plan" })
@@ -100,9 +90,9 @@ test.describe("Billing page", () => {
     const page = authenticatedPage;
 
     await page.goto("/billing");
-    await page.waitForLoadState("networkidle");
 
-    // Each card lists exactly its plan's lines, which come from the backend limit tables
+    // Each card lists exactly its plan's lines. This checks the page wiring; the limit values
+    // themselves are pinned by apps/web/src/features/billing/planFeatures.test.ts.
     await expect(planCard(page, "Free").getByRole("listitem")).toHaveText(FREE_PLAN_FEATURES);
     for (const title of ["Yearly", "Monthly"]) {
       await expect(planCard(page, title).getByRole("listitem")).toHaveText(PRO_PLAN_FEATURES);
