@@ -26,7 +26,7 @@
         "convex/_services/search/DiscoveryService.ts!",
         "convex/_services/search/TavilySearchService.ts!",
         "convex/eval/_studioRowCreators.ts!",
-        "evals/rag/runners/*.ts",
+        "evals/rag/{cli,seed}.ts",
         "evals/rag/fixtures/{fixtureTemplate,notebookLM_converter,scenarioCategories}.ts",
         "scripts/**/*.{js,mjs,ts}",
         "e2e/**/*.ts"
@@ -61,7 +61,6 @@
         "app/**/*.{ts,tsx}!",
         "src/**/*.{ts,tsx}!",
         "components/**/*.{ts,tsx}!",
-        "constants/**/*.ts!",
         "plugins/**/*.js!",
         "scripts/**/*.mjs",
         "*.js"

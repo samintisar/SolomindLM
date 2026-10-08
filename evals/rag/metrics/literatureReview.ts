@@ -15,31 +15,16 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
-import { DEFAULT_LLM_JUDGE_MODEL } from "./llmJudge";
+import {
+  DEFAULT_LLM_JUDGE_MODEL,
+  type LlmJudgeOptions,
+  parseJsonResponse,
+  requireJudgeScore,
+} from "./llmJudge";
+import { metricResult } from "./metricResult";
 import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
 
 // ─── Helpers ────────────────────────────────────────────────────
-
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  status: MetricStatus,
-  score: number,
-  detail: string,
-  breakdown?: Record<string, unknown>
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status,
-    score,
-    detail,
-    ...(breakdown ? { breakdown } : {}),
-  };
-}
 
 function getRaw(artifact: EvalRunArtifact): LiteratureReviewEvalResult | undefined {
   return artifact.studioOutput?.raw as LiteratureReviewEvalResult | undefined;
@@ -250,14 +235,14 @@ function lrSearchYield(
   const found = raw?.counts.found ?? 0;
 
   if (searchWasSkipped(raw)) {
-    return baseMetric("lr_search_yield", fixture, artifact, "info", 0, NO_SEARCH_DETAIL, {
+    return metricResult("lr_search_yield", fixture, artifact, "info", 0, NO_SEARCH_DETAIL, {
       found,
       queryCount: 0,
     });
   }
 
   if (searchQueries.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_search_yield",
       fixture,
       artifact,
@@ -274,7 +259,7 @@ function lrSearchYield(
   else if (yieldPerQuery >= 1) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_search_yield",
     fixture,
     artifact,
@@ -301,7 +286,7 @@ function lrDeduplicationRatio(
   const deduped = raw?.counts.deduplicated ?? 0;
 
   if (found === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_deduplication_ratio",
       fixture,
       artifact,
@@ -313,7 +298,7 @@ function lrDeduplicationRatio(
   }
 
   const ratio = (found - deduped) / found;
-  return baseMetric(
+  return metricResult(
     "lr_deduplication_ratio",
     fixture,
     artifact,
@@ -340,13 +325,21 @@ function lrRankingTopRelevance(
   const query = fixture.question;
 
   if (searchWasSkipped(raw)) {
-    return baseMetric("lr_ranking_top_relevance", fixture, artifact, "info", 0, NO_SEARCH_DETAIL, {
-      top5Relevant: 0,
-    });
+    return metricResult(
+      "lr_ranking_top_relevance",
+      fixture,
+      artifact,
+      "info",
+      0,
+      NO_SEARCH_DETAIL,
+      {
+        top5Relevant: 0,
+      }
+    );
   }
 
   if (ranked.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_ranking_top_relevance",
       fixture,
       artifact,
@@ -366,7 +359,7 @@ function lrRankingTopRelevance(
   else if (relevantCount >= 1) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_ranking_top_relevance",
     fixture,
     artifact,
@@ -393,7 +386,7 @@ function lrScreeningInclusionRate(
   const included = raw?.counts.included ?? 0;
 
   if (searchWasSkipped(raw)) {
-    return baseMetric(
+    return metricResult(
       "lr_screening_inclusion_rate",
       fixture,
       artifact,
@@ -405,7 +398,7 @@ function lrScreeningInclusionRate(
   }
 
   if (screened === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_screening_inclusion_rate",
       fixture,
       artifact,
@@ -422,7 +415,7 @@ function lrScreeningInclusionRate(
   else if (rate >= 0.1) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_screening_inclusion_rate",
     fixture,
     artifact,
@@ -448,7 +441,7 @@ function lrExtractionCoverage(
   const coverage = raw?.extractionCoverage ?? [];
 
   if (coverage.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_extraction_coverage",
       fixture,
       artifact,
@@ -468,7 +461,7 @@ function lrExtractionCoverage(
   else if (overallCoverage >= 0.5) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_extraction_coverage",
     fixture,
     artifact,
@@ -499,7 +492,7 @@ function lrExtractionDepth(
   const samples = raw?.extractionSamples ?? [];
 
   if (samples.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_extraction_depth",
       fixture,
       artifact,
@@ -513,7 +506,7 @@ function lrExtractionDepth(
   const lengths = samples.map((s) => s.extractedValue.length);
   const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
 
-  return baseMetric(
+  return metricResult(
     "lr_extraction_depth",
     fixture,
     artifact,
@@ -540,7 +533,7 @@ function lrReportCitationCoverage(
   const reportContent = raw?.report.content ?? "";
 
   if (tablePapers.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_report_citation_coverage",
       fixture,
       artifact,
@@ -572,7 +565,7 @@ function lrReportCitationCoverage(
   else if (coverage >= 0.5) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_report_citation_coverage",
     fixture,
     artifact,
@@ -599,7 +592,7 @@ function lrExpectedItemRecall(
   const reportAndAnswer = artifact.answer + "\n" + reportContent;
 
   if (fixture.expectedItems.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_expected_item_recall",
       fixture,
       artifact,
@@ -635,7 +628,7 @@ function lrExpectedItemRecall(
       ? `All ${matched.length} expected items found in report/answer.`
       : `Found ${matched.length}/${fixture.expectedItems.length} expected items. Missing: ${unmatched.join(", ")}`;
 
-  return baseMetric("lr_expected_item_recall", fixture, artifact, status, score, detail, {
+  return metricResult("lr_expected_item_recall", fixture, artifact, status, score, detail, {
     matched,
     unmatched,
   });
@@ -643,24 +636,74 @@ function lrExpectedItemRecall(
 
 // ─── LLM Judge Metrics ──────────────────────────────────────────
 
-interface JudgeResponse {
-  score: number;
-  reasoning: string;
+/** Judge invoker for the Likert judges: the injected one, else Together with `options.model`. */
+function likertInvoker(options: LlmJudgeOptions): {
+  invoke: NonNullable<LlmJudgeOptions["invoke"]>;
+  model: string;
+} {
+  const model = options.model ?? DEFAULT_LLM_JUDGE_MODEL;
+  return { invoke: options.invoke ?? createTogetherJudgeInvoker({ model }), model };
 }
 
-function parseJudgeResponse(content: string): JudgeResponse {
+/**
+ * Score a Likert judge response. Throws (like the other judges) when the response has no
+ * JSON object or no 0–1 score, so the caller records a failure instead of a guessed score.
+ */
+async function judgeScore(
+  invoke: NonNullable<LlmJudgeOptions["invoke"]>,
+  prompt: string
+): Promise<{ score: number; reasoning: string }> {
+  const result = parseJsonResponse(await invoke(prompt));
+  const reasoning = result.reasoning ?? result.explanation;
+  return {
+    score: requireJudgeScore(result),
+    reasoning: typeof reasoning === "string" ? reasoning : "No reasoning provided.",
+  };
+}
+
+function likertStatus(score: number): MetricStatus {
+  if (score >= 0.8) return "pass";
+  if (score >= 0.6) return "warn";
+  return "fail";
+}
+
+/** Run one report-level Likert judge and turn its verdict (or failure) into a metric row. */
+async function reportJudgeMetric(
+  metric: string,
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  prompt: string,
+  options: LlmJudgeOptions
+): Promise<MetricResult> {
+  const model = options.model ?? DEFAULT_LLM_JUDGE_MODEL;
   try {
-    const parsed = JSON.parse(content);
-    return {
-      score: typeof parsed.score === "number" ? Math.max(0, Math.min(1, parsed.score)) : 0.5,
-      reasoning: String(parsed.reasoning ?? parsed.explanation ?? "No reasoning provided."),
-    };
-  } catch {
-    // Fallback: try to extract a number from the text
-    const match = content.match(/(\d\.?\d*)/);
-    const score = match ? parseFloat(match[1]) : 0.5;
-    return { score: Math.max(0, Math.min(1, score)), reasoning: content.slice(0, 200) };
+    const { invoke } = likertInvoker(options);
+    const judged = await judgeScore(invoke, prompt);
+    return metricResult(
+      metric,
+      fixture,
+      artifact,
+      likertStatus(judged.score),
+      judged.score,
+      `LLM judge score: ${judged.score.toFixed(2)}. ${judged.reasoning}`,
+      { score: judged.score, reasoning: judged.reasoning, model }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return metricResult(metric, fixture, artifact, "fail", 0, `LLM judge failed: ${message}`, {
+      error: message,
+      model,
+    });
   }
+}
+
+/** Beginning and end of a long report, so the judge sees both intro and conclusion sections. */
+function sampleReport(content: string, sampleLimit: number): string {
+  return content.length <= sampleLimit * 2
+    ? content
+    : content.slice(0, sampleLimit) +
+        "\n\n[...middle sections omitted...]\n\n" +
+        content.slice(-sampleLimit);
 }
 
 /**
@@ -670,14 +713,14 @@ function parseJudgeResponse(content: string): JudgeResponse {
 async function lrLlmJudgeReportQuality(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline
+  options: LlmJudgeOptions
 ): Promise<MetricResult> {
   const raw = getRaw(artifact);
   const reportContent = raw?.report.content ?? "";
   const includedCount = raw?.counts.included ?? 0;
 
   if (reportContent.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_llm_judge_report_quality",
       fixture,
       artifact,
@@ -688,56 +731,17 @@ async function lrLlmJudgeReportQuality(
     );
   }
 
-  // Sample from beginning and end so the judge sees both intro and conclusion sections
-  const sampleLimit = 3500;
-  const reportSample =
-    reportContent.length <= sampleLimit * 2
-      ? reportContent
-      : reportContent.slice(0, sampleLimit) +
-        "\n\n[...middle sections omitted...]\n\n" +
-        reportContent.slice(-sampleLimit);
-
   const prompt = `You are evaluating a literature review report. Rate it on a scale of 0 to 1 for:
 1. Coherence: Does the report flow logically?
 2. Structure: Does it have clear sections (Abstract, Introduction, Methods, Results, Discussion, Conclusion)?
 3. Coverage: Does it cover the ${includedCount} included papers meaningfully?
 
 Report content sample:
-${reportSample}
+${sampleReport(reportContent, 3500)}
 
 Respond with JSON: {"score": number, "reasoning": string}`;
 
-  try {
-    const invoker = createTogetherJudgeInvoker({ model: DEFAULT_LLM_JUDGE_MODEL });
-    const response = await invoker(prompt);
-    const judged = parseJudgeResponse(response);
-
-    let status: MetricStatus;
-    if (judged.score >= 0.8) status = "pass";
-    else if (judged.score >= 0.6) status = "warn";
-    else status = "fail";
-
-    return baseMetric(
-      "lr_llm_judge_report_quality",
-      fixture,
-      artifact,
-      status,
-      judged.score,
-      `LLM judge score: ${judged.score.toFixed(2)}. ${judged.reasoning}`,
-      { score: judged.score, reasoning: judged.reasoning }
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return baseMetric(
-      "lr_llm_judge_report_quality",
-      fixture,
-      artifact,
-      "fail",
-      0,
-      `LLM judge failed: ${message}`,
-      { error: message }
-    );
-  }
+  return reportJudgeMetric("lr_llm_judge_report_quality", fixture, artifact, prompt, options);
 }
 
 /**
@@ -749,13 +753,13 @@ Respond with JSON: {"score": number, "reasoning": string}`;
 async function lrLlmJudgeCompleteness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline
+  options: LlmJudgeOptions
 ): Promise<MetricResult> {
   const raw = getRaw(artifact);
   const reportContent = raw?.report.content ?? "";
 
   if (reportContent.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_llm_judge_completeness",
       fixture,
       artifact,
@@ -766,15 +770,6 @@ async function lrLlmJudgeCompleteness(
     );
   }
 
-  // Sample from beginning and end so the judge sees intro and conclusion/synthesis
-  const sampleLimit = 4000;
-  const reportSample =
-    reportContent.length <= sampleLimit * 2
-      ? reportContent
-      : reportContent.slice(0, sampleLimit) +
-        "\n\n[...middle sections omitted...]\n\n" +
-        reportContent.slice(-sampleLimit);
-
   const prompt = `You are evaluating the completeness of a literature review report.
 
 **Research Question:** ${fixture.question}
@@ -782,7 +777,7 @@ async function lrLlmJudgeCompleteness(
 **Expected Behavior:** ${fixture.expectedBehavior}
 
 **Report Content Sample:**
-${reportSample}
+${sampleReport(reportContent, 4000)}
 
 Did the report fully address the expected behavior?
 Check for:
@@ -794,37 +789,7 @@ If the report covers the major categories/approaches implied by the question, it
 
 Respond with JSON: {"score": number, "reasoning": string}`;
 
-  try {
-    const invoker = createTogetherJudgeInvoker({ model: DEFAULT_LLM_JUDGE_MODEL });
-    const response = await invoker(prompt);
-    const judged = parseJudgeResponse(response);
-
-    let status: MetricStatus;
-    if (judged.score >= 0.8) status = "pass";
-    else if (judged.score >= 0.6) status = "warn";
-    else status = "fail";
-
-    return baseMetric(
-      "lr_llm_judge_completeness",
-      fixture,
-      artifact,
-      status,
-      judged.score,
-      `LLM judge score: ${judged.score.toFixed(2)}. ${judged.reasoning}`,
-      { score: judged.score, reasoning: judged.reasoning }
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return baseMetric(
-      "lr_llm_judge_completeness",
-      fixture,
-      artifact,
-      "fail",
-      0,
-      `LLM judge failed: ${message}`,
-      { error: message }
-    );
-  }
+  return reportJudgeMetric("lr_llm_judge_completeness", fixture, artifact, prompt, options);
 }
 
 /**
@@ -833,13 +798,13 @@ Respond with JSON: {"score": number, "reasoning": string}`;
 async function lrLlmJudgeExtractionQuality(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline
+  options: LlmJudgeOptions
 ): Promise<MetricResult> {
   const raw = getRaw(artifact);
   const samples = raw?.extractionSamples ?? [];
 
   if (samples.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_llm_judge_extraction_quality",
       fixture,
       artifact,
@@ -850,11 +815,25 @@ async function lrLlmJudgeExtractionQuality(
     );
   }
 
-  const invoker = createTogetherJudgeInvoker({ model: DEFAULT_LLM_JUDGE_MODEL });
-  const judgments: Array<{ sample: string; score: number; reasoning: string }> = [];
-
-  for (const sample of samples.slice(0, 3)) {
-    const prompt = `You are evaluating data extraction from academic papers.
+  let judge: ReturnType<typeof likertInvoker>;
+  try {
+    judge = likertInvoker(options);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return metricResult(
+      "lr_llm_judge_extraction_quality",
+      fixture,
+      artifact,
+      "fail",
+      0,
+      `LLM judge failed: ${message}`,
+      { error: message, model: options.model ?? DEFAULT_LLM_JUDGE_MODEL }
+    );
+  }
+  const { invoke, model } = judge;
+  const judgments = await Promise.all(
+    samples.slice(0, 3).map(async (sample) => {
+      const prompt = `You are evaluating data extraction from academic papers.
 Paper title: ${sample.paperTitle}
 Column: ${sample.columnName}
 Extracted value: ${sample.extractedValue.slice(0, 500)}
@@ -864,39 +843,29 @@ Rate whether this extraction is accurate and faithful to what would be found in 
 1 = perfectly accurate
 
 Respond with JSON: {"score": number, "reasoning": string}`;
-
-    try {
-      const response = await invoker(prompt);
-      const judged = parseJudgeResponse(response);
-      judgments.push({
-        sample: `${sample.paperTitle} / ${sample.columnName}`,
-        score: judged.score,
-        reasoning: judged.reasoning,
-      });
-    } catch (err) {
-      judgments.push({
-        sample: `${sample.paperTitle} / ${sample.columnName}`,
-        score: 0,
-        reasoning: `Judge error: ${err instanceof Error ? err.message : String(err)}`,
-      });
-    }
-  }
+      const label = `${sample.paperTitle} / ${sample.columnName}`;
+      try {
+        return { sample: label, ...(await judgeScore(invoke, prompt)) };
+      } catch (err) {
+        return {
+          sample: label,
+          score: 0,
+          reasoning: `Judge error: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    })
+  );
 
   const avgScore = judgments.reduce((s, j) => s + j.score, 0) / judgments.length;
 
-  let status: MetricStatus;
-  if (avgScore >= 0.8) status = "pass";
-  else if (avgScore >= 0.6) status = "warn";
-  else status = "fail";
-
-  return baseMetric(
+  return metricResult(
     "lr_llm_judge_extraction_quality",
     fixture,
     artifact,
-    status,
+    likertStatus(avgScore),
     avgScore,
     `Avg extraction accuracy: ${avgScore.toFixed(2)} across ${judgments.length} samples.`,
-    { avgScore, judgments }
+    { avgScore, judgments, model }
   );
 }
 
@@ -929,7 +898,7 @@ export function lrCitationKeyValidity(
   }
 
   if (keys.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_citation_key_validity",
       fixture,
       artifact,
@@ -951,7 +920,7 @@ export function lrCitationKeyValidity(
   const score = invalid.length === 0 ? 1 : Math.max(0, 1 - invalid.length / keys.length);
   const status: MetricStatus = invalid.length === 0 ? "pass" : score >= 0.8 ? "warn" : "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_citation_key_validity",
     fixture,
     artifact,
@@ -978,7 +947,7 @@ export function lrRequiredSectionNames(
   const status: MetricStatus =
     missing.length === 0 ? "pass" : missing.length <= 1 ? "warn" : "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_required_section_names",
     fixture,
     artifact,
@@ -1006,7 +975,7 @@ function lrSummaryOfEvidencePresent(
   const hasTable =
     haystack.includes("summary of evidence") &&
     (haystack.includes("effect direction") || haystack.includes("| theme |"));
-  return baseMetric(
+  return metricResult(
     "lr_summary_of_evidence_present",
     fixture,
     artifact,
@@ -1101,7 +1070,7 @@ export function lrNumericGrounding(
   const raw = getRaw(artifact);
   const content = raw?.report.content ?? "";
   if (!raw || content.length === 0) {
-    return baseMetric(
+    return metricResult(
       "lr_numeric_grounding",
       fixture,
       artifact,
@@ -1119,7 +1088,7 @@ export function lrNumericGrounding(
     claims.length === 0 ? 1 : Math.max(0, 1 - ungrounded.length / Math.max(claims.length, 1));
   const status: MetricStatus = ungrounded.length === 0 ? "pass" : score >= 0.85 ? "warn" : "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_numeric_grounding",
     fixture,
     artifact,
@@ -1171,7 +1140,7 @@ export function lrPrismaConsistency(
     (provMatchesCounts ? 0.2 : 0);
   const status: MetricStatus = score >= 0.9 ? "pass" : score >= 0.5 ? "warn" : "fail";
 
-  return baseMetric(
+  return metricResult(
     "lr_prisma_consistency",
     fixture,
     artifact,
@@ -1216,15 +1185,15 @@ export function scoreLiteratureReviewMetrics(
   ];
 }
 
-/** Run all LLM-judge literature review metrics. */
+/** Run all LLM-judge literature review metrics (concurrently; results keep this order). */
 export async function scoreLiteratureReviewLlmJudgeMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline
+  options: LlmJudgeOptions = {}
 ): Promise<MetricResult[]> {
-  const results: MetricResult[] = [];
-  results.push(await lrLlmJudgeReportQuality(fixture, artifact, baseline));
-  results.push(await lrLlmJudgeCompleteness(fixture, artifact, baseline));
-  results.push(await lrLlmJudgeExtractionQuality(fixture, artifact, baseline));
-  return results;
+  return Promise.all([
+    lrLlmJudgeReportQuality(fixture, artifact, options),
+    lrLlmJudgeCompleteness(fixture, artifact, options),
+    lrLlmJudgeExtractionQuality(fixture, artifact, options),
+  ]);
 }
