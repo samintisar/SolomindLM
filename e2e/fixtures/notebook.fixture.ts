@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { randomUUID } from "crypto";
 import { CHAT_TEXTAREA_PLACEHOLDER } from "../helpers/chat-assertions";
-import { tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
+import { myNotebooks, tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
 import { test as authTest, expect } from "./auth.fixture";
 
 type NotebookFixtures = {
@@ -48,7 +48,7 @@ export const test = authTest.extend<NotebookFixtures>({
       timeout: 15_000,
     });
 
-    const notebookEl = page.getByText(title, { exact: true });
+    const notebookEl = myNotebooks(page).getByText(title, { exact: true });
     await expect(notebookEl).toBeVisible({ timeout: 45_000 });
 
     // Click to navigate into the notebook
