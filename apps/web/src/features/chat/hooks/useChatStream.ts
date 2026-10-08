@@ -7,6 +7,7 @@ import {
   prunePendingStudioNotes,
 } from "@/features/studio/utils/mergePendingStudioNotes";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import {
   AgentGroundingCheck,
   ChatActivityPhase,
@@ -47,6 +48,11 @@ interface UseChatStreamProps {
 }
 
 const SKEW_MS = 120_000;
+/**
+ * Upper bound on how long buffered tokens wait when no animation frame arrives: a background
+ * tab pauses `requestAnimationFrame`, but the content must keep accumulating.
+ */
+const TOKEN_FLUSH_FALLBACK_MS = 50;
 
 export function useChatStream({
   activeNotebookId,
@@ -127,6 +133,54 @@ export function useChatStream({
   const streamStartedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Streamed tokens arrive about one per LLM token. They are buffered here and appended to
+  // `streamingContent` at most once per animation frame, so the tree re-renders per frame,
+  // not per token. Every exit path (complete, stop, error, reset, conversation switch) either
+  // flushes or drops the buffer synchronously, so no token is lost or lands in another chat.
+  const pendingTokensRef = useRef("");
+  const tokenFlushRef = useRef<{
+    frame: number | null;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+
+  const cancelScheduledTokenFlush = useCallback(() => {
+    const scheduled = tokenFlushRef.current;
+    if (!scheduled) return;
+    tokenFlushRef.current = null;
+    if (scheduled.frame != null) cancelAnimationFrame(scheduled.frame);
+    clearTimeout(scheduled.timer);
+  }, []);
+
+  const flushPendingTokens = useCallback(() => {
+    cancelScheduledTokenFlush();
+    const pending = pendingTokensRef.current;
+    if (!pending) return;
+    pendingTokensRef.current = "";
+    setStreamingContent((prev) => prev + pending);
+  }, [cancelScheduledTokenFlush]);
+
+  const discardPendingTokens = useCallback(() => {
+    cancelScheduledTokenFlush();
+    pendingTokensRef.current = "";
+  }, [cancelScheduledTokenFlush]);
+
+  const enqueueToken = useCallback(
+    (token: string) => {
+      pendingTokensRef.current += token;
+      if (tokenFlushRef.current) return;
+      // Whichever fires first flushes and cancels the other.
+      const frame =
+        typeof requestAnimationFrame === "function"
+          ? requestAnimationFrame(flushPendingTokens)
+          : null;
+      const timer = setTimeout(flushPendingTokens, TOKEN_FLUSH_FALLBACK_MS);
+      tokenFlushRef.current = { frame, timer };
+    },
+    [flushPendingTokens]
+  );
+
+  useEffect(() => cancelScheduledTokenFlush, [cancelScheduledTokenFlush]);
+
   const [studioListOverlay, setStudioListOverlay] = useState<StudioListOverlayState>({
     notebookId: null,
     pending: [],
@@ -188,6 +242,7 @@ export function useChatStream({
   );
 
   const resetStreamingState = useCallback(() => {
+    discardPendingTokens();
     setIsChatStreaming(false);
     setStreamingContent("");
     setStreamingReferences(null);
@@ -200,7 +255,7 @@ export function useChatStream({
     setStreamingClarification(null);
     setStreamingResearchPlan(null);
     streamStartedAtRef.current = null;
-  }, []);
+  }, [discardPendingTokens]);
 
   // Reset streaming state when switching to a different conversation.
   // Do not abort when auto-select binds the thread we just created/sent on.
@@ -286,6 +341,7 @@ export function useChatStream({
 
       streamStartedAtRef.current = Date.now();
       streamOwnerConversationIdRef.current = activeConversationId;
+      discardPendingTokens();
       setIsChatStreaming(true);
       setStreamingContent("");
       setStreamingReferences(null);
@@ -307,6 +363,7 @@ export function useChatStream({
       setExternalSources([]);
 
       const onStreamComplete = () => {
+        flushPendingTokens();
         setIsChatStreaming(false);
         setStreamingJustFinished(true);
         // Keep trace, tool calls, phase, and grounding until the synthetic __streaming__ row
@@ -346,7 +403,7 @@ export function useChatStream({
             {
               onToken: (token) => {
                 if (!shouldApplyStreamUpdate()) return;
-                setStreamingContent((prev) => prev + token);
+                enqueueToken(token);
               },
               onReferences: (refs) => {
                 if (!shouldApplyStreamUpdate()) return;
@@ -433,6 +490,7 @@ export function useChatStream({
               },
               onStopped: () => {
                 if (!shouldApplyStreamUpdate()) return;
+                flushPendingTokens();
                 setIsChatStreaming(false);
                 setStreamingJustFinished(true);
                 streamStartedAtRef.current = null;
@@ -470,6 +528,9 @@ export function useChatStream({
       resetStreamingState,
       shouldApplyStreamUpdate,
       onConversationEnsured,
+      discardPendingTokens,
+      enqueueToken,
+      flushPendingTokens,
     ]
   );
 
@@ -532,7 +593,8 @@ export function useChatStream({
   }, [isChatStreaming, streamingContent, messages]);
 
   useEffect(() => {
-    if (!isChatStreaming || streamingContent.trim()) return;
+    // Tokens still waiting for the next frame count as content: this is not a stuck stream.
+    if (!isChatStreaming || streamingContent.trim() || pendingTokensRef.current.trim()) return;
     const t0 = streamStartedAtRef.current;
     if (t0 == null) return;
     const n = messages.length;
@@ -797,6 +859,7 @@ export function useChatStream({
 
       const onResearchStreamComplete = () => {
         if (!shouldApplyStreamUpdate()) return;
+        flushPendingTokens();
         setIsChatStreaming(false);
         setStreamingJustFinished(true);
         const len = messagesRef.current.length;
@@ -833,6 +896,7 @@ export function useChatStream({
       };
 
       streamOwnerConversationIdRef.current = activeConversationId;
+      discardPendingTokens();
       setIsChatStreaming(true);
       setStreamingContent("");
       setStreamingReferences(null);
@@ -853,7 +917,7 @@ export function useChatStream({
           {
             onToken: (token) => {
               if (!shouldApplyStreamUpdate()) return;
-              setStreamingContent((prev) => prev + token);
+              enqueueToken(token);
             },
             onReferences: (refs) => {
               if (!shouldApplyStreamUpdate()) return;
@@ -876,6 +940,7 @@ export function useChatStream({
             onComplete: onResearchStreamComplete,
             onStopped: () => {
               if (!shouldApplyStreamUpdate()) return;
+              flushPendingTokens();
               setIsChatStreaming(false);
               setStreamingJustFinished(true);
               streamStartedAtRef.current = null;
@@ -895,8 +960,28 @@ export function useChatStream({
         throw new Error("Research stream failed");
       }
     },
-    [isChatStreaming, resetStreamingState, shouldApplyStreamUpdate, activeConversationId]
+    [
+      isChatStreaming,
+      resetStreamingState,
+      shouldApplyStreamUpdate,
+      activeConversationId,
+      discardPendingTokens,
+      enqueueToken,
+      flushPendingTokens,
+    ]
   );
+
+  const clearExternalSources = useCallback(() => setExternalSources([]), []);
+
+  // These close over per-render state (`isChatStreaming`, `chatDisplayMessages`, ...), so their
+  // identity would change on every streamed token and invalidate the chat context. They only
+  // run from event handlers, so a stable wrapper that calls the latest closure is equivalent.
+  const stableHandleSendMessage = useStableCallback(handleSendMessage);
+  const stableHandleRetryMessage = useStableCallback(handleRetryMessage);
+  const stableConsumeResearchExecuteStream = useStableCallback(consumeResearchExecuteStream);
+  const stableHandleClearChatHistory = useStableCallback(handleClearChatHistory);
+  const stableStopChat = useStableCallback(stopChat);
+  const stableAddPendingStudioNote = useStableCallback(addPendingStudioNote);
 
   return {
     chatDisplayMessages,
@@ -904,21 +989,21 @@ export function useChatStream({
     remoteChatGenerating: chatRemoteGenerating,
     remoteGenerationBlocksSend,
     displayNotes,
-    addPendingStudioNote,
+    addPendingStudioNote: stableAddPendingStudioNote,
     updatePendingStudioNote,
     removePendingStudioNote,
-    handleSendMessage,
-    handleClearChatHistory,
+    handleSendMessage: stableHandleSendMessage,
+    handleClearChatHistory: stableHandleClearChatHistory,
     setMessageFeedback,
-    handleRetryMessage,
+    handleRetryMessage: stableHandleRetryMessage,
     setOptimisticSaveNote,
-    consumeResearchExecuteStream,
-    stopChat,
+    consumeResearchExecuteStream: stableConsumeResearchExecuteStream,
+    stopChat: stableStopChat,
     sourceCount,
     sourceSummary: sourceSuggestions.summary,
     suggestions: sourceSuggestions.suggestions,
     isLoadingSuggestions: sourceSuggestions.isLoading,
     externalSources,
-    clearExternalSources: () => setExternalSources([]),
+    clearExternalSources,
   };
 }

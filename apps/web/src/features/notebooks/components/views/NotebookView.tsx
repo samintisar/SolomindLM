@@ -1,11 +1,11 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Group, Panel, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
 import { useAuth } from "@/features/auth/useAuth";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
-import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
+import { useChatSessionContext } from "@/features/chat/useChatStreaming";
 import { useNotebookContext } from "@/features/notebooks/useNotebookContext";
 import { resolveAskSources } from "@/features/notebooks/utils/askSources";
 import {
@@ -22,12 +22,16 @@ import { useStudioContext } from "@/features/studio/useStudioContext";
 import { STUDIO_TOOLS } from "@/shared/constants";
 import { useToast } from "@/shared/contexts/useToast";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { NotebookPanelSeparator } from "./NotebookPanelSeparator";
 
 // Tailwind's `md` breakpoint (48rem), so panel internals that use `md:` classes agree with the layout.
 const DESKTOP_LAYOUT_QUERY = "(min-width: 48rem)";
 
-export function NotebookView() {
+// Module-level so the memoized panels get the same function every render.
+const noop = () => undefined;
+
+function NotebookViewContent() {
   const { user } = useAuth();
 
   const isDesktop = useMediaQuery(DESKTOP_LAYOUT_QUERY, true);
@@ -42,13 +46,15 @@ export function NotebookView() {
 
   const { notes } = useStudioContext();
 
+  // The session half only: the message list (which changes per streamed token) is read by
+  // ChatPanel alone, so a streaming reply does not re-render this view or its panels.
   const {
     onSendMessage,
 
     isChatStreaming,
 
     remoteGenerationBlocksSend,
-  } = useChatStreamingContext();
+  } = useChatSessionContext();
 
   const { error: toastError } = useToast();
 
@@ -148,7 +154,7 @@ export function NotebookView() {
     setMobileActiveTab("studio");
   }, []);
 
-  const toggleSources = () => {
+  const toggleSources = useCallback(() => {
     if (isSourcesOpen) {
       sourcesPanelRef.current?.collapse();
       setIsSourcesOpen(false);
@@ -156,11 +162,11 @@ export function NotebookView() {
       sourcesPanelRef.current?.expand();
       setIsSourcesOpen(true);
     }
-  };
+  }, [isSourcesOpen, sourcesPanelRef]);
 
   const toggleStudio = useCallback(() => setIsStudioOpen((isOpen) => !isOpen), []);
 
-  const handleAskInChat = useCallback(
+  const askInChat = useCallback(
     (prompt: string, documentIds?: string[]) => {
       if (!urlNotebookId || isChatStreaming || remoteGenerationBlocksSend) return;
 
@@ -183,6 +189,10 @@ export function NotebookView() {
     },
     [isChatStreaming, onSendMessage, remoteGenerationBlocksSend, sources, toastError, urlNotebookId]
   );
+
+  // Stable: it reads stream status and sources at call time, so starting or finishing a reply
+  // does not hand the memoized Studio panel a new prop.
+  const handleAskInChat = useStableCallback(askInChat);
 
   // One builder for the Studio column so desktop and mobile can't drift apart.
   const renderStudioColumn = (layout: "desktop" | "mobile") => {
@@ -222,7 +232,7 @@ export function NotebookView() {
     return (
       <StudioPanel
         isOpen={layout === "mobile" || isStudioOpen}
-        onClose={layout === "desktop" ? toggleStudio : () => undefined}
+        onClose={layout === "desktop" ? toggleStudio : noop}
         tools={STUDIO_TOOLS}
         sources={sources}
         notebookId={urlNotebookId}
@@ -261,7 +271,7 @@ export function NotebookView() {
     }));
   }, []);
 
-  const handleDiscussSourceTopic = useCallback(
+  const discussSourceTopic = useCallback(
     (topic: string) => {
       const trimmed = topic.trim();
 
@@ -285,6 +295,9 @@ export function NotebookView() {
     },
     [isChatStreaming, onSendMessage, remoteGenerationBlocksSend, sources, toastError, urlNotebookId]
   );
+
+  // Stable for the same reason as handleAskInChat (memoized Sources panel).
+  const handleDiscussSourceTopic = useStableCallback(discussSourceTopic);
 
   const handlePlayAudio = useCallback(
     (
@@ -385,7 +398,7 @@ export function NotebookView() {
                   onClose={toggleSources}
                   userId={user?.id}
                   noteId={urlNotebookId}
-                  onDocumentUploaded={() => undefined}
+                  onDocumentUploaded={noop}
                   focusSourceRequest={sourceFocusRequest}
                   onFocusSourceHandled={clearSourceFocusRequest}
                   onDiscussTopic={handleDiscussSourceTopic}
@@ -482,10 +495,10 @@ export function NotebookView() {
                 <div className="flex-1 w-full overflow-hidden">
                   <SourcesPanel
                     isOpen={true}
-                    onClose={() => undefined}
+                    onClose={noop}
                     userId={user?.id}
                     noteId={urlNotebookId}
-                    onDocumentUploaded={() => undefined}
+                    onDocumentUploaded={noop}
                     focusSourceRequest={sourceFocusRequest}
                     onFocusSourceHandled={clearSourceFocusRequest}
                     onDiscussTopic={handleDiscussSourceTopic}
@@ -498,8 +511,8 @@ export function NotebookView() {
                   <ChatPanel
                     isLeftOpen={false}
                     isRightOpen={false}
-                    toggleLeft={() => undefined}
-                    toggleRight={() => undefined}
+                    toggleLeft={noop}
+                    toggleRight={noop}
                     notebookId={urlNotebookId}
                     notebookTitle={notebookTitle}
                     notebookIcon={activeNotebook?.icon}
@@ -524,3 +537,6 @@ export function NotebookView() {
     </AudioPlayerProvider>
   );
 }
+
+/** Memoized: the app root re-renders on every streamed frame, and this view takes no props. */
+export const NotebookView = memo(NotebookViewContent);
