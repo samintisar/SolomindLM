@@ -9,6 +9,9 @@ import {
 /**
  * Plan feature lists for the pricing cards and the billing page, built from the
  * backend's limit tables so the copy always matches what the server enforces.
+ *
+ * e2e/billing/billing.spec.ts imports this module into Playwright's Node runtime, so keep it
+ * (and what it imports) free of browser- or Vite-only code.
  */
 
 const PER: Record<LimitWindow, string> = { day: "a day", week: "a week", month: "every 30 days" };
