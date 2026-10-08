@@ -118,12 +118,11 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   }, [activeConversationId, conversationCRUD.conversations]);
 
   const currentView = useMemo(() => {
-    if (location.pathname === "/") return "landing";
     if (location.pathname === "/home") return "home";
     if (location.pathname === "/billing") return "billing";
     if (location.pathname.startsWith("/folder/")) return "folder";
     if (location.pathname.startsWith("/notebook/")) return "notebook";
-    return "landing";
+    return "other";
   }, [location.pathname]);
 
   const urlFolderId = useMemo(() => {
@@ -180,10 +179,12 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     }
   }, [shareModalOpen, urlNotebookId, activeNotebook]);
 
+  // Signed in, / only bounces back to /home (useAuthGuard), and crossing to the public shell would
+  // unmount this whole shell on the way. Signed-out visitors still get the landing page.
   const handleLogoClick = useCallback(() => {
-    navigate(isNativeShell() ? "/home" : "/");
+    navigate(isNativeShell() || isAuthenticated ? "/home" : "/");
     setActiveNotebookId(null);
-  }, [navigate]);
+  }, [navigate, isAuthenticated]);
 
   const handleSelectNotebook = useCallback(
     (notebook: NotebookItem) => {

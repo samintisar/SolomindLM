@@ -27,4 +27,16 @@ declare module "react-router-dom" {
   export function useNavigate(): (to: string | number, options?: { replace?: boolean }) => void;
   export function useNavigationType(): "POP" | "PUSH" | "REPLACE";
   export function useParams(): Record<string, string | undefined>;
+
+  export interface RouteObject {
+    path?: string;
+    element?: ReactNode;
+    index?: boolean;
+    children?: RouteObject[];
+  }
+  export function useRoutes(routes: RouteObject[]): ReactNode;
+  export function matchRoutes(
+    routes: RouteObject[],
+    location: string
+  ): { route: RouteObject; pathname: string }[] | null;
 }

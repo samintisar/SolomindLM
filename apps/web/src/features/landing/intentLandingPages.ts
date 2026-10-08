@@ -858,10 +858,6 @@ export function getIntentLandingPaths(): string[] {
   return INTENT_LANDING_PAGES.map((page) => page.path);
 }
 
-export function isIntentLandingPath(path: string): boolean {
-  return getIntentLandingPageByPath(path) !== undefined;
-}
-
 const CLUSTER_HUB_PATHS: Record<IntentLandingCluster, string> = {
   students: "/students",
   research: "/research",

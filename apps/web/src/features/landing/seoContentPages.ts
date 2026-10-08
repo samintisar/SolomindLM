@@ -417,10 +417,6 @@ export function getGuidePages(): SeoContentPageConfig[] {
   return SEO_CONTENT_PAGES.filter((page) => page.pageType === "guide");
 }
 
-export function isSeoContentPath(path: string): boolean {
-  return getSeoContentPageByPath(path) !== undefined;
-}
-
 export function getSeoContentBreadcrumbItems(
   page: SeoContentPageConfig
 ): SeoContentBreadcrumbItem[] {

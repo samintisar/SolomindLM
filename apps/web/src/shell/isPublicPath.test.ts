@@ -4,6 +4,7 @@ import { INTENT_LANDING_PAGES } from "@/features/landing/intentLandingPages";
 import { SEO_CONTENT_PAGES } from "@/features/landing/seoContentPages";
 import { FREE_TOOL_PAGES } from "@/features/tools/toolPages";
 import { isPublicPath } from "./isPublicPath";
+import { DESIGN_GALLERY_ENABLED } from "./publicRoutes";
 
 describe("isPublicPath", () => {
   it.each(["/", "/sign-in", "/privacy", "/terms", "/faq", "/tools/pdf-to-flashcards"])(
@@ -42,8 +43,14 @@ describe("isPublicPath", () => {
     expect(isPublicPath(path)).toBe(false);
   });
 
+  it.each(["/sign-in/", "/faq/", "/privacy/", "/tools/pdf-to-flashcards/", "/FAQ"])(
+    "matches %s like React Router does (trailing slash, case)",
+    (path) => {
+      expect(isPublicPath(path)).toBe(true);
+    }
+  );
+
   it("only treats /dev/design as public when the gallery is built", () => {
-    expect(isPublicPath("/dev/design", { designGallery: true })).toBe(true);
-    expect(isPublicPath("/dev/design", { designGallery: false })).toBe(false);
+    expect(isPublicPath("/dev/design")).toBe(DESIGN_GALLERY_ENABLED);
   });
 });
