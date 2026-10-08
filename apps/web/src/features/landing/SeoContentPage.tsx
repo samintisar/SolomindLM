@@ -1,12 +1,22 @@
-import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
-import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
-import { AuthModal } from "@/features/auth/components/AuthModal";
-import { useAuth } from "@/features/auth/useAuth";
+import { ArrowRight, Scale } from "lucide-react";
+import { Navigate } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
+import { Card } from "@/shared/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/shared/components/ui/table";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
-import { isNativeShell } from "@/utils/platformDetection";
-import { Footer } from "./components/Footer";
+import { ContentFaq } from "./components/content/ContentFaq";
+import { LinkCard } from "./components/content/LinkCard";
+import { MarketingPage } from "./components/content/MarketingPage";
+import { PageHero } from "./components/content/PageHero";
+import { Stage } from "./components/content/Stage";
+import { Accent, SectionHeading } from "./components/home/SectionHeading";
 import {
   getSeoContentBreadcrumbItems,
   getSeoContentLastUpdated,
@@ -18,25 +28,12 @@ type SeoContentPageProps = {
   pagePath: string;
 };
 
+/** Comparison pages, guides and the /compare hub. */
 export function SeoContentPage({ pagePath }: SeoContentPageProps) {
   const page = getSeoContentPageByPath(pagePath);
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-
   if (!page) {
     return <Navigate to="/" replace />;
   }
-
-  if (isNativeShell()) {
-    if (isLoading) {
-      return <div className="min-h-screen bg-background" />;
-    }
-    return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
-  }
-
-  const openSignup = () => setAuthModalOpen(true);
 
   return (
     <>
@@ -47,173 +44,117 @@ export function SeoContentPage({ pagePath }: SeoContentPageProps) {
         keywords={page.keywords}
         ogType="article"
       />
-      <div className="min-h-screen landing-grid-pattern">
-        <SeoContentHeader />
-        <main>
-          <SeoContentHero page={page} onSignup={openSignup} />
-          <SeoContentBody page={page} />
-          <SeoContentFaqSection
-            page={page}
-            openFaqIndex={openFaqIndex}
-            onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-          />
-          <SeoContentRelatedSection page={page} />
-          <SeoContentFinalCta page={page} onSignup={openSignup} />
-        </main>
-        <Footer />
-      </div>
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onAuthenticated={() => navigate("/home", { replace: true })}
-      />
+      <MarketingPage closing={{ body: page.conversionPromise, ctaLabel: page.ctaLabel }}>
+        {(openSignup) => (
+          <>
+            <PageHero
+              breadcrumbs={getSeoContentBreadcrumbItems(page)}
+              title={page.h1}
+              titleAccent={page.h1Accent}
+              lede={page.intro}
+              // A quick answer carries the sign-up button, so the hero doesn't repeat it.
+              cta={page.quickAnswer ? undefined : { label: page.ctaLabel, onClick: openSignup }}
+            />
+            {page.quickAnswer ? <QuickAnswer page={page} onSignup={openSignup} /> : null}
+            {page.comparisonTable ? <ComparisonTable page={page} /> : null}
+            <Article sections={page.sections} />
+            {page.faqs.length > 0 ? <ContentFaq id="faq-title" faqs={page.faqs} /> : null}
+            <RelatedPages links={page.relatedLinks} />
+          </>
+        )}
+      </MarketingPage>
     </>
   );
 }
 
-function SeoContentHeader() {
+function competitorOf(page: SeoContentPageConfig) {
+  return page.competitorName ?? "Alternative";
+}
+
+function QuickAnswer({ page, onSignup }: { page: SeoContentPageConfig; onSignup: () => void }) {
+  const answer = page.quickAnswer;
+  if (!answer) return null;
+
   return (
-    <header className="border-b border-border/60 bg-card/40 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-[1500px] mx-auto px-6 sm:px-8 lg:px-12 h-16 flex items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2.5">
-          <img
-            src="/SolomindLM_logo.png"
-            alt="SolomindLM"
-            className="w-8 h-8 shrink-0 object-contain"
-          />
-          <span className="text-lg font-display font-bold text-foreground tracking-tight">
-            SolomindLM
-          </span>
-        </Link>
-        <Link
-          to="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+    <section aria-labelledby="quick-answer-title" className="px-6">
+      <Stage className="mx-auto max-w-280">
+        <h2
+          id="quick-answer-title"
+          className="flex items-center justify-center gap-2 font-sans text-xs font-semibold tracking-wider text-muted-foreground uppercase"
         >
-          Back to home
-        </Link>
-      </div>
-    </header>
-  );
-}
-
-function SeoContentHero({ page, onSignup }: { page: SeoContentPageConfig; onSignup: () => void }) {
-  const breadcrumbItems = getSeoContentBreadcrumbItems(page);
-
-  return (
-    <section className="px-6 md:px-8 pt-16 pb-12 md:pt-24 md:pb-16">
-      <div className="max-w-3xl mx-auto space-y-8">
-        <SeoContentBreadcrumb items={breadcrumbItems} />
-        <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-tight text-center">
-          {page.h1}
-        </h1>
-        <p className="text-lg md:text-xl text-muted-foreground leading-relaxed text-center">
-          {page.intro}
-        </p>
-        {page.quickAnswer ? (
-          <div className="rounded-xl border border-border bg-card p-6 md:p-8 space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Quick answer
-            </p>
-            {page.quickAnswer.chooseCompetitor ? (
-              <p className="text-sm text-foreground leading-relaxed">
-                <span className="font-medium">{page.competitorName}:</span>{" "}
-                {page.quickAnswer.chooseCompetitor}
+          <Scale aria-hidden className="size-3.5" />
+          Quick answer
+        </h2>
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {answer.chooseCompetitor ? (
+            <Card variant="flush">
+              <div className="p-6 md:p-7">
+                <h3 className="font-display text-lg font-bold">Choose {competitorOf(page)} if…</h3>
+                <p className="mt-3 font-serif text-base leading-relaxed text-foreground/80">
+                  {answer.chooseCompetitor}
+                </p>
+              </div>
+            </Card>
+          ) : null}
+          <Card
+            variant="featured"
+            className={answer.chooseCompetitor ? undefined : "md:col-span-2"}
+          >
+            <div className="p-6 md:p-7">
+              <h3 className="font-display text-lg font-bold text-primary">Choose SolomindLM if…</h3>
+              <p className="mt-3 font-serif text-base leading-relaxed text-foreground/80">
+                {answer.chooseSolomindlm}
               </p>
-            ) : null}
-            <p className="text-sm text-foreground leading-relaxed">
-              <span className="font-medium">SolomindLM:</span> {page.quickAnswer.chooseSolomindlm}
-            </p>
-          </div>
-        ) : null}
-        <div className="flex justify-center">
-          <Button size="lg" onClick={onSignup} className="font-semibold px-8">
-            {page.ctaLabel}
-          </Button>
+              <Button className="mt-5" onClick={onSignup}>
+                {page.ctaLabel}
+                <ArrowRight aria-hidden />
+              </Button>
+            </div>
+          </Card>
         </div>
-      </div>
+      </Stage>
     </section>
   );
 }
 
-function SeoContentBody({ page }: { page: SeoContentPageConfig }) {
+function ComparisonTable({ page }: { page: SeoContentPageConfig }) {
+  const rows = page.comparisonTable;
+  if (!rows) return null;
+
   return (
-    <section className="px-6 md:px-8 pb-16 md:pb-20">
-      <div className="max-w-3xl mx-auto space-y-12">
-        {page.comparisonTable ? (
-          <div className="space-y-4">
-            <SeoContentComparisonTable
-              rows={page.comparisonTable}
-              competitorName={page.competitorName ?? "Alternative"}
-            />
-            <SeoContentSources page={page} />
-          </div>
-        ) : null}
-        {page.sections.map((section) => (
-          <article key={section.h2} className="space-y-4">
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-              {section.h2}
-            </h2>
-            {section.paragraphs.map((paragraph) => (
-              <p key={paragraph} className="text-muted-foreground leading-relaxed">
-                {paragraph}
-              </p>
-            ))}
-            {section.bullets && section.bullets.length > 0 ? (
-              <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-                {section.bullets.map((bullet) => (
-                  <li key={bullet} className="leading-relaxed">
-                    {bullet}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </article>
-        ))}
+    <section aria-labelledby="table-title" className="px-6 pt-16">
+      <div className="mx-auto max-w-280">
+        <h2 id="table-title" className="font-display text-3xl font-bold tracking-tight">
+          Side by side
+        </h2>
+        {/* The table keeps a min width and scrolls sideways inside the card on phones. */}
+        <Card variant="flush" className="mt-6">
+          <Table aria-labelledby="table-title" className="min-w-160">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col" className="w-44">
+                  Topic
+                </TableHead>
+                <TableHead scope="col" highlight>
+                  SolomindLM
+                </TableHead>
+                <TableHead scope="col">{competitorOf(page)}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.topic}>
+                  <TableHead scope="row">{row.topic}</TableHead>
+                  <TableCell highlight>{row.solomindlm}</TableCell>
+                  <TableCell>{row.competitor}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+        <SeoContentSources page={page} />
       </div>
     </section>
-  );
-}
-
-function SeoContentComparisonTable({
-  rows,
-  competitorName,
-}: {
-  rows: NonNullable<SeoContentPageConfig["comparisonTable"]>;
-  competitorName: string;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full min-w-[640px] text-sm bg-card">
-        <thead>
-          <tr className="border-b border-border bg-muted">
-            <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
-              Topic
-            </th>
-            <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
-              SolomindLM
-            </th>
-            <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
-              {competitorName}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.topic} className="border-b border-border/60 last:border-0">
-              <th scope="row" className="px-4 py-3 text-left font-medium text-foreground align-top">
-                {row.topic}
-              </th>
-              <td className="px-4 py-3 text-muted-foreground align-top leading-relaxed">
-                {row.solomindlm}
-              </td>
-              <td className="px-4 py-3 text-muted-foreground align-top leading-relaxed">
-                {row.competitor}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
@@ -225,7 +166,7 @@ function SeoContentSources({ page }: { page: SeoContentPageConfig }) {
   );
 
   return (
-    <p className="text-xs text-muted-foreground leading-relaxed">
+    <p className="mt-3 font-sans text-xs leading-relaxed text-muted-foreground">
       {page.competitorName} details checked {checked} against:{" "}
       {page.sources.map((source, index) => (
         <span key={source.url}>
@@ -245,146 +186,64 @@ function SeoContentSources({ page }: { page: SeoContentPageConfig }) {
   );
 }
 
-function SeoContentBreadcrumb({
-  items,
-}: {
-  items: ReturnType<typeof getSeoContentBreadcrumbItems>;
-}) {
+function Article({ sections }: { sections: SeoContentPageConfig["sections"] }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex justify-center">
-      <ol className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          return (
-            <li key={item.path} className="inline-flex items-center gap-2">
-              {index > 0 ? (
-                <span aria-hidden className="text-border">
-                  /
-                </span>
-              ) : null}
-              {isLast ? (
-                <span className="font-medium text-foreground">{item.name}</span>
-              ) : (
-                <Link to={item.path} className="hover:text-foreground transition-colors">
-                  {item.name}
-                </Link>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
+    <section className="px-6 pt-16">
+      <div className="mx-auto max-w-170 space-y-14">
+        {sections.map((section) => (
+          <article key={section.h2}>
+            <h2 className="font-display text-3xl font-bold tracking-tight">{section.h2}</h2>
+            {section.paragraphs.map((paragraph) => (
+              <p
+                key={paragraph}
+                className="mt-5 font-serif text-lg leading-relaxed text-foreground/80"
+              >
+                {paragraph}
+              </p>
+            ))}
+            {section.bullets && section.bullets.length > 0 ? (
+              <ul className="mt-5 grid gap-3">
+                {section.bullets.map((bullet) => (
+                  <li
+                    key={bullet}
+                    className="flex gap-3 font-serif text-lg leading-relaxed text-foreground/80"
+                  >
+                    <span aria-hidden className="mt-3 size-1.5 shrink-0 rounded-full bg-primary" />
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
-function SeoContentRelatedSection({ page }: { page: SeoContentPageConfig }) {
-  if (page.relatedLinks.length === 0) return null;
+function RelatedPages({ links }: { links: SeoContentPageConfig["relatedLinks"] }) {
+  if (links.length === 0) return null;
 
   return (
-    <section className="px-6 md:px-8 py-16 md:py-20 border-t border-border/60 bg-card/30">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-3">
-            Related pages
-          </h2>
-          <p className="text-muted-foreground">
-            Continue with SolomindLM study and research workflows.
-          </p>
-        </div>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {page.relatedLinks.map((link) => (
+    <section aria-labelledby="related-title" className="px-6 pb-16 md:pb-24">
+      <div className="mx-auto max-w-280">
+        <SectionHeading
+          id="related-title"
+          eyebrow="Keep reading"
+          title={
+            <>
+              Related <Accent>pages</Accent>
+            </>
+          }
+          sub="Continue with SolomindLM study and research workflows."
+        />
+        <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {links.map((link) => (
             <li key={link.path}>
-              <Link
-                to={link.path}
-                className="group flex flex-col h-full rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-sm transition-all"
-              >
-                <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                  {link.label}
-                </span>
-                <span className="mt-2 text-sm text-muted-foreground leading-relaxed flex-1">
-                  {link.description}
-                </span>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                  Learn more
-                  <ChevronRight className="w-4 h-4" aria-hidden />
-                </span>
-              </Link>
+              <LinkCard to={link.path} title={link.label} description={link.description} />
             </li>
           ))}
         </ul>
-      </div>
-    </section>
-  );
-}
-
-function SeoContentFaqSection({
-  page,
-  openFaqIndex,
-  onToggleFaq,
-}: {
-  page: SeoContentPageConfig;
-  openFaqIndex: number | null;
-  onToggleFaq: (index: number) => void;
-}) {
-  if (page.faqs.length === 0) return null;
-
-  return (
-    <section className="px-6 md:px-8 py-16 md:py-20 border-t border-border/60 bg-card/30">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-8 text-center">
-          Frequently asked questions
-        </h2>
-        <div className="space-y-3">
-          {page.faqs.map((faq, index) => {
-            const isOpen = openFaqIndex === index;
-            return (
-              <div
-                key={faq.question}
-                className="rounded-xl border border-border bg-card overflow-hidden"
-              >
-                <button
-                  type="button"
-                  onClick={() => onToggleFaq(index)}
-                  className="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-secondary/30 transition-colors"
-                  aria-expanded={isOpen}
-                >
-                  <span className="font-medium text-foreground">{faq.question}</span>
-                  {isOpen ? (
-                    <ChevronUp className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  )}
-                </button>
-                {isOpen ? (
-                  <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed border-t border-border/50 pt-4">
-                    {faq.answer}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SeoContentFinalCta({
-  page,
-  onSignup,
-}: {
-  page: SeoContentPageConfig;
-  onSignup: () => void;
-}) {
-  return (
-    <section className="px-6 md:px-8 py-16 md:py-20">
-      <div className="max-w-2xl mx-auto text-center space-y-6">
-        <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-          {page.conversionPromise}
-        </h2>
-        <Button size="lg" onClick={onSignup} className="font-semibold px-8">
-          {page.ctaLabel}
-        </Button>
       </div>
     </section>
   );

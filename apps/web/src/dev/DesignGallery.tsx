@@ -351,7 +351,9 @@ function TablesSection() {
               <TableHead pinned className="min-w-60">
                 Papers (2)
               </TableHead>
-              <TableHead className="min-w-60">Method</TableHead>
+              <TableHead highlight className="min-w-60">
+                Method
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -360,7 +362,9 @@ function TablesSection() {
                 <TableCell pinned className="min-w-60">
                   {row.paper}
                 </TableCell>
-                <TableCell className="min-w-60">{row.method}</TableCell>
+                <TableCell highlight className="min-w-60">
+                  {row.method}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
