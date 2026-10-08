@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
@@ -100,9 +100,8 @@ export function useNotebookCRUD({
     [isAuthenticated, user, deleteNotebook, activeNotebookId, navigate, onRequireAuth]
   );
 
-  return {
-    handleCreateNotebook,
-    handleUpdateNotebook,
-    handleDeleteNotebook,
-  };
+  return useMemo(
+    () => ({ handleCreateNotebook, handleUpdateNotebook, handleDeleteNotebook }),
+    [handleCreateNotebook, handleUpdateNotebook, handleDeleteNotebook]
+  );
 }

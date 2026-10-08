@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
+import { useCallback, useMemo } from "react";
 import type { InfographicNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -114,31 +115,43 @@ export function useCreateInfographic() {
  * Rename an infographic by ID with optimistic update
  */
 export function useRenameInfographic() {
-  const update = useMutation(api.studio.infographic.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-    }
+  const updateMutation = useMutation(api.studio.infographic.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+      }),
+    [updateMutation]
   );
 
-  return async (infographicId: string, newTitle: string) => {
-    return await update({
-      id: infographicId as Id<"infographics">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (infographicId: string, newTitle: string) => {
+      return await update({
+        id: infographicId as Id<"infographics">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete an infographic by ID with optimistic update
  */
 export function useDeleteInfographic() {
-  const remove = useMutation(api.studio.infographic.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
+  const removeMutation = useMutation(api.studio.infographic.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+      }),
+    [removeMutation]
   );
 
-  return async (infographicId: string) => {
-    await remove({ id: infographicId as Id<"infographics"> });
-  };
+  return useCallback(
+    async (infographicId: string) => {
+      await remove({ id: infographicId as Id<"infographics"> });
+    },
+    [remove]
+  );
 }

@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { QuizNote, QuizQuestion } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -136,40 +136,52 @@ export function useCreateQuiz() {
  * Rename a quiz by ID with optimistic update
  */
 export function useRenameQuiz() {
-  const update = useMutation(api.studio.quizzes.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-      // The view also reads the per-type query (live progress) while it is open
-      const current = localStore.getQuery(api.studio.quizzes.index.get, { id });
-      if (current) {
-        localStore.setQuery(api.studio.quizzes.index.get, { id }, { ...current, title });
-      }
-    }
+  const updateMutation = useMutation(api.studio.quizzes.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+        // The view also reads the per-type query (live progress) while it is open
+        const current = localStore.getQuery(api.studio.quizzes.index.get, { id });
+        if (current) {
+          localStore.setQuery(api.studio.quizzes.index.get, { id }, { ...current, title });
+        }
+      }),
+    [updateMutation]
   );
 
-  return async (quizId: string, newTitle: string) => {
-    return await update({
-      id: quizId as Id<"quizzes">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (quizId: string, newTitle: string) => {
+      return await update({
+        id: quizId as Id<"quizzes">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a quiz by ID with optimistic update
  */
 export function useDeleteQuiz() {
-  const remove = useMutation(api.studio.quizzes.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-      // The view also reads the per-type query (live progress) while it is open
-      localStore.setQuery(api.studio.quizzes.index.get, { id }, null);
-    }
+  const removeMutation = useMutation(api.studio.quizzes.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+        // The view also reads the per-type query (live progress) while it is open
+        localStore.setQuery(api.studio.quizzes.index.get, { id }, null);
+      }),
+    [removeMutation]
   );
 
-  return async (quizId: string) => {
-    await remove({ id: quizId as Id<"quizzes"> });
-  };
+  return useCallback(
+    async (quizId: string) => {
+      await remove({ id: quizId as Id<"quizzes"> });
+    },
+    [remove]
+  );
 }
 
 /**

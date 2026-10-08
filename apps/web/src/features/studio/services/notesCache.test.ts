@@ -1,4 +1,6 @@
+// @vitest-environment jsdom
 import { api } from "@convex/_generated/api";
+import { renderHook } from "@testing-library/react";
 import type { OptimisticLocalStore } from "convex/browser";
 import type { FunctionReference } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -197,7 +199,7 @@ describe("removeNoteFromNotesCache", () => {
 
 /**
  * Run the optimistic update a mutation hook registers, against a fake localStore.
- * `convex/react` is mocked, so the hook calls no real React hooks and runs outside a component.
+ * `convex/react` is mocked; the hook still memoizes with React hooks, so it renders via renderHook.
  */
 function runOptimisticUpdate(
   mutationHook: () => unknown,
@@ -205,7 +207,7 @@ function runOptimisticUpdate(
   args: Record<string, unknown>
 ) {
   registered.update = null;
-  mutationHook();
+  renderHook(mutationHook);
   const update = registered.update as OptimisticUpdate | null;
   if (!update) throw new Error("hook registered no optimistic update");
   update(fakeLocalStore(entries), args);
