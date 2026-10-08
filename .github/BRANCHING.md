@@ -69,14 +69,20 @@ touches docs, CI config, `apps/mobile/`, `evals/` or `e2e/`. Those PRs get no
 preview, and their **Vercel** check reports the build as skipped. If the script
 can't tell what changed, it builds.
 
+**Preview cleanup.** `.github/workflows/convex-preview-cleanup.yml` deletes a
+branch's Convex preview when its PR closes, merged or not, and once a day
+deletes every preview whose branch no longer exists. It uses the
+`CONVEX_TEAM_ACCESS_TOKEN` secret (a Convex team access token). Run it by hand
+from Actions → Convex preview cleanup → Run workflow, with **dry-run** to only
+list what it would delete.
+
 **`DeploymentQuotaReached`.** If the Vercel check fails with
 `DeploymentQuotaReached: Your team's deployment quota of 40 has been reached`,
-the failure is the Convex quota, not the code. In the Convex dashboard, delete
-the preview deployments of merged or closed branches (the `convex` CLI can't
-delete deployments), then redeploy the failed previews from Vercel
-(Deployments → ⋯ → Redeploy). Convex also removes previews by itself after 5
-days on the Free and Starter plans, or 14 days on Professional, Business and
-Enterprise.
+the failure is the Convex quota, not the code. Run the cleanup workflow, or
+delete previews of finished branches in the Convex dashboard, then redeploy the
+failed previews from Vercel (Deployments → ⋯ → Redeploy). Convex also removes
+previews by itself after 5 days on the Free and Starter plans, or 14 days on
+Professional, Business and Enterprise.
 
 ## Issues
 
