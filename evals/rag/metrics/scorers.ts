@@ -2,7 +2,13 @@
  * Aggregator that runs all deterministic metrics and returns a flat
  * MetricResult[] for a single fixture/artifact pair.
  */
-import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
+import {
+  type EvalBaseline,
+  type EvalFixture,
+  type EvalRunArtifact,
+  isStudioRunner,
+  type MetricResult,
+} from "../types";
 import { getPack } from "../usecases";
 import type { SourceText } from "../usecases/types";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
@@ -50,10 +56,6 @@ function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
 
 function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
   return runner === "chat" || runner === "research";
-}
-
-function isStudioRunnerKind(runner: EvalRunArtifact["runner"]): boolean {
-  return runner !== "chat" && runner !== "research" && runner !== "literatureReview";
 }
 
 function judgeInvoker(options: ScoreAllMetricsOptions): LlmJudgeOptions["invoke"] | undefined {
@@ -104,44 +106,51 @@ export async function scoreAllMetrics(
     }
   } else if (artifact.runner === "literatureReview") {
     results.push(...scoreLiteratureReviewMetrics(fixture, artifact, baseline));
-  } else if (isStudioRunnerKind(artifact.runner)) {
+  } else if (isStudioRunner(artifact.runner)) {
     const studioResults = await scoreStudioMetrics(fixture, artifact, baseline);
     results.push(...studioResults);
   }
 
   const invoke = options.dryRun ? undefined : judgeInvoker(options);
+  const judgeModel = options.judgeModel ?? DEFAULT_JUDGE_MODEL;
   const binaryOptions: BinaryJudgeOptions = {
     invoke,
-    model: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+    model: judgeModel,
     enabled: !options.dryRun && invoke !== undefined,
   };
-  const binaryResults = await scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions);
-  results.push(...binaryResults);
 
-  if (fixture.useCase && binaryOptions.enabled && invoke) {
-    results.push(
-      ...(await scoreRubricMetrics(fixture, artifact, getPack(fixture.useCase).pack, {
+  // Judge groups run one after another (each parallelises its own judges), so one case never
+  // bursts the shared Together key; rows keep the order binary, rubric, Likert.
+  const judgeGroups: Array<() => Promise<MetricResult[]>> = [
+    () => scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
+  ];
+
+  const useCase = fixture.useCase;
+  if (useCase && binaryOptions.enabled && invoke) {
+    judgeGroups.push(() =>
+      scoreRubricMetrics(fixture, artifact, getPack(useCase).pack, {
         invoke,
-        model: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+        model: judgeModel,
         sourceTexts: options.packSourceTexts,
-      }))
+      })
     );
   }
 
   if (options.likertJudges && !options.dryRun && invoke) {
     const likertModel = options.judgeModel ?? "openai/gpt-oss-120b";
-    const likertInvoke = options.judgeInvoke ?? createTogetherJudgeInvoker({ model: likertModel });
+    const likertOptions: LlmJudgeOptions = {
+      invoke: options.judgeInvoke ?? createTogetherJudgeInvoker({ model: likertModel }),
+      model: likertModel,
+    };
+    judgeGroups.push(() =>
+      artifact.runner === "literatureReview"
+        ? scoreLiteratureReviewLlmJudgeMetrics(fixture, artifact, likertOptions)
+        : scoreAllLlmJudgeMetrics(fixture, artifact, likertOptions)
+    );
+  }
 
-    if (artifact.runner === "literatureReview") {
-      results.push(...(await scoreLiteratureReviewLlmJudgeMetrics(fixture, artifact, baseline)));
-    } else {
-      results.push(
-        ...(await scoreAllLlmJudgeMetrics(fixture, artifact, {
-          invoke: likertInvoke,
-          model: likertModel,
-        }))
-      );
-    }
+  for (const runGroup of judgeGroups) {
+    results.push(...(await runGroup()));
   }
 
   return results;
