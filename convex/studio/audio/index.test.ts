@@ -146,6 +146,36 @@ describe("studio.audio.resolveRawAudioUrl", () => {
     expect(await resolve(t, stranger, storageId)).toBeNull();
   });
 
+  test("finds the caller's overview behind many unreadable forks of the same file", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, stranger, notebookId, storageId } = await seed(t);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 30; i++) {
+        const forkOwner = await ctx.db.insert("users", { name: `Forker ${i}` });
+        const forkNotebook = await ctx.db.insert("notebooks", {
+          userId: forkOwner,
+          title: `Fork ${i}`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("audioOverviews", {
+          userId: forkOwner,
+          notebookId: forkNotebook,
+          title: "Overview",
+          status: "completed",
+          audioStorageId: storageId,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+    });
+    // Inserted last, so it sorts after every fork in the index.
+    await addOverview(t, { userId: owner, notebookId, audioStorageId: storageId });
+
+    expect((await resolve(t, owner, storageId))?.url).toBeTruthy();
+    expect(await resolve(t, stranger, storageId)).toBeNull();
+  });
+
   test("passes full URLs through unchanged", async () => {
     const t = convexTest(schema, modules);
     const { stranger } = await seed(t);

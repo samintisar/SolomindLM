@@ -7,9 +7,6 @@ import { canReadNotebook } from "../_lib/notebookAccess";
  * No query/mutation/action exports — used by convex/audioOverviews.ts and jobs.
  */
 
-/** Overviews checked per lookup; forks share one file, so it can back a few rows. */
-const AUDIO_FILE_OWNER_SCAN = 25;
-
 /** What an `audioUrl` points at: a playable URL, a stored file, or nothing usable (null). */
 export type AudioUrlTarget = { url: string } | { storageRef: string } | null;
 
@@ -40,13 +37,20 @@ export async function storageUrlForRef(ctx: QueryCtx, storageRef: string): Promi
   }
 }
 
+/**
+ * Walks every overview the query matches (forks of a shared notebook can be many) and stops at
+ * the first whose notebook the user can read. `checked` skips notebooks already ruled out.
+ */
 async function anyNotebookReadable(
   ctx: QueryCtx,
-  overviews: Doc<"audioOverviews">[],
-  userId: Id<"users">
+  overviews: AsyncIterable<Doc<"audioOverviews">>,
+  userId: Id<"users">,
+  checked: Set<Id<"notebooks">>
 ): Promise<boolean> {
-  for (const notebookId of new Set(overviews.map((o) => o.notebookId))) {
-    if (await canReadNotebook(ctx, notebookId, userId)) return true;
+  for await (const overview of overviews) {
+    if (checked.has(overview.notebookId)) continue;
+    checked.add(overview.notebookId);
+    if (await canReadNotebook(ctx, overview.notebookId, userId)) return true;
   }
   return false;
 }
@@ -61,27 +65,25 @@ export async function canReadAudioFile(
   storageRef: string,
   userId: Id<"users">
 ): Promise<boolean> {
+  const checked = new Set<Id<"notebooks">>();
   const storageId = ctx.db.system.normalizeId("_storage", storageRef);
   if (storageId) {
-    const byStorageId = await ctx.db
+    const byStorageId = ctx.db
       .query("audioOverviews")
-      .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", storageId))
-      .take(AUDIO_FILE_OWNER_SCAN);
-    if (await anyNotebookReadable(ctx, byStorageId, userId)) return true;
+      .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", storageId));
+    if (await anyNotebookReadable(ctx, byStorageId, userId, checked)) return true;
   }
 
   const urlSpellings = [storageRef, `/audio/${storageRef}`, `audio/${storageRef}`];
   const storageUrl = await storageUrlForRef(ctx, storageRef);
   if (storageUrl) urlSpellings.push(storageUrl);
-  const byUrl = await Promise.all(
-    urlSpellings.map((audioUrl) =>
-      ctx.db
-        .query("audioOverviews")
-        .withIndex("by_audioUrl", (q) => q.eq("audioUrl", audioUrl))
-        .take(AUDIO_FILE_OWNER_SCAN)
-    )
-  );
-  return await anyNotebookReadable(ctx, byUrl.flat(), userId);
+  for (const audioUrl of urlSpellings) {
+    const byUrl = ctx.db
+      .query("audioOverviews")
+      .withIndex("by_audioUrl", (q) => q.eq("audioUrl", audioUrl));
+    if (await anyNotebookReadable(ctx, byUrl, userId, checked)) return true;
+  }
+  return false;
 }
 
 export async function getAudioOverview(

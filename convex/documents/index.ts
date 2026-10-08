@@ -1019,17 +1019,16 @@ export const addExternalSources = mutation({
     const now = Date.now();
     const createdIds: Id<"documents">[] = [];
 
-    // Deduplicate against the notebook and within the batch, then check the limit once for all.
+    // Deduplicate against the notebook (one scan) and within the batch, then check the limit once.
     const seenUrls = new Set<string>();
+    for await (const doc of ctx.db
+      .query("documents")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))) {
+      if (doc.fileUrl) seenUrls.add(doc.fileUrl);
+    }
     const newSources: typeof args.sources = [];
     for (const source of args.sources) {
-      const existing = await ctx.db
-        .query("documents")
-        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-        .filter((q) => q.eq(q.field("fileUrl"), source.url))
-        .first();
-
-      if (existing || seenUrls.has(source.url)) {
+      if (seenUrls.has(source.url)) {
         logger.info("skipped_duplicate_source", { url: source.url });
         continue;
       }
