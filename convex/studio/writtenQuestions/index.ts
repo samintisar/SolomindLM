@@ -101,43 +101,6 @@ export const createInternal = internalMutation({
   },
 });
 
-export const generateWrittenQuestions = mutation({
-  args: {
-    notebookId: v.id("notebooks"),
-    documentIds: v.array(v.id("documents")),
-    questionType: v.string(),
-    title: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const { notebookId, documentIds, questionType, title } = args;
-    await assertCanEditNotebook(ctx, notebookId, userId);
-    const writtenQuestionId = await WrittenQuestions.createWrittenQuestion(ctx, {
-      userId,
-      notebookId,
-      title: title || `Written Questions (${questionType})`,
-      questionType,
-      status: "generating",
-    });
-    await ctx.scheduler.runAfter(
-      0,
-      internal.studio.writtenQuestions.job.writtenQuestionsGeneration,
-      {
-        writtenQuestionId,
-        userId,
-        notebookId,
-        documentIds,
-        questionType,
-        questionCount: 10,
-        difficulty: "medium",
-        focus: undefined,
-      }
-    );
-    return writtenQuestionId;
-  },
-});
-
 export const update = mutation({
   args: {
     id: v.id("writtenQuestions"),
@@ -191,27 +154,6 @@ export const saveUserAnswerDraft = mutation({
       args.questionId,
       args.answer
     );
-  },
-});
-
-export const updateWrittenQuestions = mutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-    questionsData: v.optional(v.array(v.any())),
-    title: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const { writtenQuestionId, questionsData, title } = args;
-    const writtenQuestion = await WrittenQuestions.getWrittenQuestion(ctx, writtenQuestionId);
-    if (!writtenQuestion) throw new Error("Written question set not found or access denied");
-    await assertCanEditNotebook(ctx, writtenQuestion.notebookId, userId);
-    const updates: Record<string, unknown> = { updatedAt: Date.now() };
-    if (questionsData !== undefined) updates.questionsData = questionsData;
-    if (title !== undefined) updates.title = title;
-    await WrittenQuestions.updateWrittenQuestion(ctx, writtenQuestionId, updates);
-    return writtenQuestionId;
   },
 });
 

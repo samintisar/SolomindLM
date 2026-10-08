@@ -55,19 +55,6 @@ export const saveAudioOverviewResults = internalMutation({
   },
 });
 
-export const updateAudioOverviewTitle = internalMutation({
-  args: {
-    audioOverviewId: v.id("audioOverviews"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.audioOverviewId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
 export const updateAudioOverviewStatus = internalMutation({
   args: {
     audioOverviewId: v.id("audioOverviews"),

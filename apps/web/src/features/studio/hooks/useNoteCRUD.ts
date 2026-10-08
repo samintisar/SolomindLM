@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useDeleteUserNote, useUpdateUserNote } from "@/features/chat/services/userNotesApi";
 import { Note } from "@/shared/types/index";
 import { useDeleteAudioOverview, useUpdateAudioOverview } from "../services/audioApi";
@@ -135,10 +135,8 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
     [updateReport]
   );
 
-  return {
-    notes,
-    handleUpdateNote,
-    handleDeleteNote,
-    handleSaveReportContent,
-  };
+  return useMemo(
+    () => ({ notes, handleUpdateNote, handleDeleteNote, handleSaveReportContent }),
+    [notes, handleUpdateNote, handleDeleteNote, handleSaveReportContent]
+  );
 }

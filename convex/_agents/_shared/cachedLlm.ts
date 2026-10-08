@@ -1,19 +1,10 @@
 "use node";
 
 /**
- * Cached LLM Service
- *
- * Provides caching for deterministic LLM calls (temperature=0).
- * Non-deterministic calls bypass cache and go directly to the LLM.
+ * Together AI chat-completions client (retries transient HTTP failures, parses structured output).
  */
 
-import { v } from "convex/values";
-import { internal } from "../../_generated/api";
-import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
-import { hashInput } from "../../_services/cache/cacheCrypto";
-import { createCachedAction } from "../../_services/cache/cachedAgent";
 import { mergeModelKwargs } from "./llm_factory.js";
 
 // ============================================================
@@ -374,106 +365,8 @@ async function executeTogetherLlmRequest(
   throw lastFailure ?? new Error("LLM request failed after retries");
 }
 
-// ============================================================
-// Internal Action (makes actual API call)
-// ============================================================
-
-export const llmInternal = internalAction({
-  args: {
-    model: v.string(),
-    messages: v.array(
-      v.object({
-        role: v.string(),
-        content: v.string(),
-      })
-    ),
-    temperature: v.number(),
-    maxTokens: v.optional(v.number()),
-    responseFormat: v.optional(
-      v.union(
-        v.object({ type: v.union(v.literal("text"), v.literal("json_object")) }),
-        v.object({
-          type: v.literal("json_schema"),
-          json_schema: v.object({
-            name: v.string(),
-            schema: v.record(v.string(), v.any()),
-          }),
-        })
-      )
-    ),
-    reasoningEnabled: v.optional(v.boolean()),
-    toolChoice: v.optional(v.string()),
-  },
-  handler: async (_, args) => {
-    const apiKey = env.TOGETHER_AI_API_KEY;
-    if (!apiKey) {
-      throw new Error("TOGETHER_AI_API_KEY is not configured");
-    }
-
-    return executeTogetherLlmRequest(
-      {
-        model: args.model,
-        messages: args.messages as LLMMessage[],
-        temperature: args.temperature,
-        maxTokens: args.maxTokens,
-        responseFormat: args.responseFormat as LLMOptions["responseFormat"],
-        reasoningEnabled: args.reasoningEnabled,
-        toolChoice: args.toolChoice as LLMOptions["toolChoice"],
-      },
-      apiKey
-    );
-  },
-});
-
-// ============================================================
-// Cached Wrapper
-// ============================================================
-
-const llmCache = createCachedAction(internal._agents._shared.cachedLlm.llmInternal, {
-  ttl: withJitter(CACHE_TTL.generatedContent, 0.1),
-  name: "llm-deterministic",
-});
-
-// ============================================================
-// Public Functions
-// ============================================================
-
 /**
- * Cached LLM call - only caches when temperature=0 (deterministic)
- *
- * @param ctx - Convex context
- * @param options - LLM options including model, messages, temperature
- * @returns LLM response with content and usage stats
- */
-export async function cachedLlmCall(ctx: any, options: LLMOptions): Promise<LLMResponse> {
-  // Skip caching for non-deterministic calls
-  if (options.temperature > 0) {
-    console.log(
-      `[CachedLLM] Skipping cache for non-deterministic call (temp=${options.temperature})`
-    );
-    return uncachedLlmCall(options);
-  }
-
-  // Build cache key for logging
-  const messagesHash = await hashInput(
-    options.messages.map((m) => `${m.role}:${m.content}`).join("|")
-  );
-  console.log(`[CachedLLM] Cached call: model=${options.model}, messagesHash=${messagesHash}`);
-
-  // Use cached action
-  return llmCache.fetch(ctx, {
-    model: options.model,
-    messages: options.messages,
-    temperature: options.temperature,
-    maxTokens: options.maxTokens,
-    responseFormat: options.responseFormat,
-    reasoningEnabled: options.reasoningEnabled,
-    toolChoice: options.toolChoice,
-  });
-}
-
-/**
- * Uncached LLM call (for non-deterministic or streaming calls)
+ * Call the Together chat-completions API directly.
  */
 export async function uncachedLlmCall(options: LLMOptions): Promise<LLMResponse> {
   const apiKey = env.TOGETHER_AI_API_KEY;
@@ -482,11 +375,4 @@ export async function uncachedLlmCall(options: LLMOptions): Promise<LLMResponse>
   }
 
   return executeTogetherLlmRequest(options, apiKey);
-}
-
-/**
- * Check if a call should be cached (temperature=0)
- */
-export function shouldCache(temperature: number): boolean {
-  return temperature === 0;
 }

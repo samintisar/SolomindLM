@@ -50,7 +50,7 @@ interface StudioPanelProps {
  * StudioPanel component - Main studio creation and notes panel.
  * Refactored to use sub-components for better maintainability.
  */
-export const StudioPanel: React.FC<StudioPanelProps> = ({
+const StudioPanelContent: React.FC<StudioPanelProps> = ({
   isOpen,
   onClose,
   tools,
@@ -219,6 +219,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       note.type === "spreadsheet" ||
       note.type === "note"
     ) {
+      // Opening the playing note hands it to the full player, as Expand does. Closing (not just
+      // hiding) keeps the mini player from remounting and restarting when the user goes back.
+      if (miniPlayerVisible && miniPlayerData?.noteId === note.id) onCloseMiniPlayer();
       setActiveNoteId(note.id);
     }
   };
@@ -423,3 +426,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     </>
   );
 };
+
+/** Memoized so a parent re-render with unchanged props (e.g. a streamed chat token) skips it. */
+export const StudioPanel = React.memo(StudioPanelContent);

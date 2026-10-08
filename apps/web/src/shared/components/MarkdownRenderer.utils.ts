@@ -2,6 +2,15 @@ import { createCodePlugin } from "@streamdown/code";
 import { createMathPlugin } from "@streamdown/math";
 import { StreamdownProps } from "streamdown";
 
+/**
+ * Light theme for both slots. Module scope on purpose: Streamdown's top-level memo compares props by
+ * identity, so a fresh array per render would re-render every markdown block on every parent render.
+ */
+export const DEFAULT_SHIKI_THEME: NonNullable<StreamdownProps["shikiTheme"]> = [
+  "github-light",
+  "github-light",
+];
+
 const codePlugin = createCodePlugin({
   themes: ["github-light", "github-light"],
 });

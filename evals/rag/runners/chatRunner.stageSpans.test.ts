@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
+import type { ReferenceChunk } from "../../../convex/_agents/chat/types";
 import type { EvalFixture } from "../types";
 import { type ChatAgentInvoker, runChatEval } from "./chatRunner";
 import { snapshotRetrievalConfig } from "./config";

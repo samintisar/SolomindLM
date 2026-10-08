@@ -15,34 +15,6 @@ export function decideStudioExecutionMode(input: {
   return "map_reduce";
 }
 
-export function selectStudioMapBatches(input: {
-  documentCount: number;
-  chunks: string[];
-  estimateTokens: (text: string) => number;
-  pack: (chunks: string[]) => string[];
-}): { mode: StudioExecutionMode; batches: string[] } {
-  const { chunks } = input;
-  if (chunks.length === 0) {
-    return { mode: "map_reduce", batches: [] };
-  }
-
-  const estimatedContextTokens = chunks.reduce(
-    (sum, chunk) => sum + input.estimateTokens(chunk),
-    0
-  );
-  const mode = decideStudioExecutionMode({
-    documentCount: input.documentCount,
-    selectedChunkCount: chunks.length,
-    estimatedContextTokens,
-  });
-
-  if (mode === "single_pass") {
-    return { mode, batches: [chunks.join("\n\n")] };
-  }
-
-  return { mode, batches: input.pack(chunks) };
-}
-
 export function planStudioJobMapPhase(input: {
   documentCount: number;
   chunks: string[];

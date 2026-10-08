@@ -64,10 +64,13 @@ async function resolveDocumentIds(
   documentTitleHint?: string
 ): Promise<Id<"documents">[]> {
   if (provided && provided.length > 0) return provided;
-  const docs = await ctx.runQuery(internal.documents.index.listDocumentsForNotebookReadInternal, {
-    notebookId,
-    userId,
-  });
+  const docs = await ctx.runQuery(
+    internal.documents.internal.listDocumentsForNotebookReadInternal,
+    {
+      notebookId,
+      userId,
+    }
+  );
   const typedDocs = docs as Array<{ _id: Id<"documents">; fileName?: string }>;
   const hint = documentTitleHint?.trim().toLowerCase();
   const scoped =
@@ -94,38 +97,6 @@ async function resolveDocumentIds(
     );
   }
   return ids;
-}
-
-// Studio jobs chain phases via `ctx.scheduler.runAfter`, so the kickoff
-// action returns long before the row is populated. The eval needs to wait
-// for the row to reach a terminal status before reading it.
-const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "failed"]);
-const POLL_INTERVAL_MS = 2000;
-// Audio reduce alone is configured to allow up to 10 minutes of LLM time
-// (AUDIO_REDUCE_TIMEOUT_MS), and a job can have multiple slow phases plus
-// TTS. Keep the eval ceiling well above the total expected time.
-const POLL_TIMEOUT_MS = 20 * 60 * 1000;
-
-async function pollUntilTerminal<T extends { status?: string } | null>(
-  ctx: EvalActionCtx,
-  read: () => Promise<T>,
-  label: string
-): Promise<NonNullable<T>> {
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
-  let last: T = await read();
-  while (Date.now() < deadline) {
-    if (last && last.status && TERMINAL_STATUSES.has(last.status)) {
-      return last as NonNullable<T>;
-    }
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    last = await read();
-  }
-  if (!last) {
-    throw new Error(`${label}: row disappeared while polling for terminal status.`);
-  }
-  throw new Error(
-    `${label}: timed out after ${POLL_TIMEOUT_MS}ms waiting for terminal status (last status: ${last.status ?? "unknown"}).`
-  );
 }
 
 // ─── Reports ─────────────────────────────────────────────────
@@ -634,24 +605,7 @@ export const getWrittenQuestionsEvalStatus = action({
 
 // ─── Audio Overview (script-only eval) ───────────────────────
 
-export interface AudioScriptEvalResult {
-  audioOverviewId: string;
-  title: string;
-  status: string;
-  /** Generated dialogue script (text). The TTS audio file is not evaluated. */
-  transcript: string;
-  audioUrl?: string;
-  latencyMs: number;
-}
-
 export interface AudioScriptEvalStatus extends StudioEvalTelemetry {
-  status: string;
-  title: string;
-  transcript: string;
-  audioUrl?: string;
-}
-
-export interface AudioScriptOnlyEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   transcript: string;
@@ -767,88 +721,6 @@ export const startAudioScriptOnlyEval = action({
     return {
       audioOverviewId: audioOverviewId as string,
       startedAt: Date.now(),
-    };
-  },
-});
-
-export const getAudioScriptOnlyEvalStatus = action({
-  args: {
-    evalSecret: v.string(),
-    audioOverviewId: v.id("audioOverviews"),
-  },
-  handler: async (ctx, args): Promise<AudioScriptOnlyEvalStatus> => {
-    assertRagEvalGate(args.evalSecret);
-    const populated = await ctx.runQuery(internal.studio.audio.index.getInternal, {
-      id: args.audioOverviewId,
-    });
-    if (!populated) {
-      throw new Error(`AudioOverview ${args.audioOverviewId} not found`);
-    }
-    return {
-      status: populated.status,
-      title: populated.title,
-      transcript: populated.transcript ?? "",
-      audioUrl: populated.audioUrl,
-      ...pickStudioEvalTelemetry(populated),
-    };
-  },
-});
-
-// Kept for backward compatibility, but the eval client should prefer the
-// kickoff + poll flow above. This single-call variant can hit HTTP timeouts on
-// long audio jobs.
-export const runAudioScriptEval = action({
-  args: {
-    evalSecret: v.string(),
-    notebookId: v.id("notebooks"),
-    documentIds: v.optional(v.array(v.id("documents"))),
-    audioType: v.optional(v.string()),
-    length: v.optional(v.string()),
-    focus: v.optional(v.string()),
-  },
-  handler: async (ctx, args): Promise<AudioScriptEvalResult> => {
-    assertRagEvalGate(args.evalSecret);
-    const startTime = Date.now();
-    const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
-    const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
-
-    const audioOverviewId = await ctx.runMutation(
-      internal.eval._studioRowCreators.createAudioOverviewInternal,
-      {
-        userId,
-        notebookId: args.notebookId,
-        title: "Audio Overview (eval)",
-        audioType: args.audioType,
-        length: args.length,
-        focus: args.focus,
-      }
-    );
-
-    // The audio job runs script generation followed by TTS. For eval we accept
-    // both — the resulting `transcript` is what we score; `audioUrl` is ignored.
-    await ctx.runAction(internal.studio.audio.job.audioOverviewGeneration, {
-      audioOverviewId,
-      userId: userId as string,
-      notebookId: args.notebookId,
-      documentIds,
-    });
-
-    const populated = await pollUntilTerminal(
-      ctx,
-      () =>
-        ctx.runQuery(internal.studio.audio.index.getInternal, {
-          id: audioOverviewId,
-        }),
-      `AudioOverview ${audioOverviewId}`
-    );
-
-    return {
-      audioOverviewId: audioOverviewId as string,
-      title: populated.title,
-      status: populated.status,
-      transcript: populated.transcript ?? "",
-      audioUrl: populated.audioUrl,
-      latencyMs: Date.now() - startTime,
     };
   },
 });

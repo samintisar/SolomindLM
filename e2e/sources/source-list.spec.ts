@@ -42,7 +42,7 @@ test.describe("Source List", () => {
     const title = await addPasteTextSource(page, sourceText);
     await waitForSourceStatus(page, title, "completed", 120_000);
 
-    // Verify source card is visible (use getSourceCard to avoid matching hidden mobile layout)
+    // Verify source card is visible
     const card = getSourceCard(page, title);
     await expect(card).toBeVisible();
 

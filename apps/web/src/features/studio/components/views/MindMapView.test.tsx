@@ -6,7 +6,7 @@ import { askPrompt } from "../mindmap/outline";
 import { MindMapView } from "./MindMapView";
 
 const chat = vi.hoisted(() => ({ isChatStreaming: false, remoteGenerationBlocksSend: false }));
-vi.mock("@/features/chat/useChatStreaming", () => ({ useChatStreamingContext: () => chat }));
+vi.mock("@/features/chat/useChatStreaming", () => ({ useChatSessionContext: () => chat }));
 vi.mock("@/shared/contexts/useToast", () => ({ useToast: () => ({ error: vi.fn() }) }));
 
 function tree(childCount: number) {

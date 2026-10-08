@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useQuery } from "convex/react";
@@ -15,6 +16,7 @@ import { useAuth } from "./features/auth/useAuth";
 import { BillingPage } from "./features/billing/components/BillingPage";
 import { useSubscriptionStatus } from "./features/billing/services/subscriptionApi";
 import { ChatStreamingProvider } from "./features/chat/ChatStreamingContext";
+import { useChatSessionValue } from "./features/chat/hooks/useChatSessionValue";
 import { useChatStream } from "./features/chat/hooks/useChatStream";
 import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
 import { AdminFeedbackPage } from "./features/feedback/components/AdminFeedbackPage";
@@ -69,6 +71,9 @@ const DesignGallery =
 // Free tools: own chunk so the marketing shell doesn't ship pdfjs or the tool UI.
 const PdfToFlashcardsPage = lazy(() => import("./features/tools/pages/PdfToFlashcardsPage"));
 
+/** Stable fallback while the documents query is skipped or loading, so consumers' effects don't re-run each render. */
+const EMPTY_DOCUMENTS: readonly DocumentSummary[] = Object.freeze([]);
+
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -115,9 +120,9 @@ const AppContent: React.FC = () => {
   const folders = useFolders();
   const documents =
     useQuery(
-      api.documents.index.list,
+      api.documents.listSummary.listSummary,
       dataNotebookId ? { notebookId: dataNotebookId as Id<"notebooks"> } : "skip"
-    ) ?? [];
+    ) ?? EMPTY_DOCUMENTS;
   useGenerateUploadUrl();
   useCreateDocument();
 
@@ -305,46 +310,14 @@ const AppContent: React.FC = () => {
     ]
   );
 
-  const chatStreamingContextValue = useMemo(
-    () => ({
-      messages: chatStream.chatDisplayMessages,
-      isChatStreaming: chatStream.isChatStreaming,
-      remoteChatGenerating: chatStream.remoteChatGenerating,
-      remoteGenerationBlocksSend: chatStream.remoteGenerationBlocksSend,
-      onSendMessage: chatStream.handleSendMessage,
-      onStopChat: chatStream.stopChat,
-      consumeResearchExecuteStream: chatStream.consumeResearchExecuteStream,
-      onClearHistory: chatStream.handleClearChatHistory,
-      onSetFeedback: chatStream.setMessageFeedback,
-      onRetry: chatStream.handleRetryMessage,
-      onSaveChatOptimistic: chatStream.setOptimisticSaveNote,
-      externalSources: chatStream.externalSources,
-      clearExternalSources: chatStream.clearExternalSources,
-      sourceCount: chatStream.sourceCount,
-      sourceSummary: chatStream.sourceSummary,
-      suggestions: chatStream.suggestions,
-      isLoadingSuggestions: chatStream.isLoadingSuggestions,
-      activeConversationId,
-      conversations: conversationCRUD.conversations,
-      onSelectConversation: setActiveConversationId,
-      onCreateConversation: conversationCRUD.handleCreate,
-      onRenameConversation: conversationCRUD.handleRename,
-      onDeleteConversation: async (id: string) => {
-        const list = conversationCRUD.conversations;
-        const wasOnlyThread = list != null && list.length === 1 && list[0]._id === id;
-        await conversationCRUD.handleDelete(id);
-        if (wasOnlyThread) {
-          const newId = await conversationCRUD.handleCreate();
-          setActiveConversationId(newId ?? null);
-          return;
-        }
-        if (activeConversationId === id) {
-          setActiveConversationId(null);
-        }
-      },
-    }),
-    [chatStream, activeConversationId, conversationCRUD]
-  );
+  // Two halves: the session value keeps its identity while a reply streams; only `messages`
+  // changes per frame, so only the chat message list re-renders (#418).
+  const chatSessionValue = useChatSessionValue({
+    chatStream,
+    conversationCRUD,
+    activeConversationId,
+    setActiveConversationId,
+  });
 
   const sourcesContextValue = useMemo(
     () => ({
@@ -359,19 +332,34 @@ const AppContent: React.FC = () => {
     [sourceManager]
   );
 
+  // Built from individual fields: `chatStream` and `noteCRUD` are new objects every render.
+  const { displayNotes, addPendingStudioNote, updatePendingStudioNote, removePendingStudioNote } =
+    chatStream;
+  const { handleUpdateNote, handleDeleteNote, handleSaveReportContent } = noteCRUD;
+  const handleDeleteStudioNote = useCallback(
+    async (id: string) => {
+      removePendingStudioNote(id);
+      await handleDeleteNote(id);
+    },
+    [removePendingStudioNote, handleDeleteNote]
+  );
   const studioContextValue = useMemo(
     () => ({
-      notes: chatStream.displayNotes,
-      onUpdateNote: noteCRUD.handleUpdateNote,
-      onUpdateNoteFull: chatStream.updatePendingStudioNote,
-      onDeleteNote: async (id: string) => {
-        chatStream.removePendingStudioNote(id);
-        await noteCRUD.handleDeleteNote(id);
-      },
-      onAddNote: chatStream.addPendingStudioNote,
-      onSaveReportContent: noteCRUD.handleSaveReportContent,
+      notes: displayNotes,
+      onUpdateNote: handleUpdateNote,
+      onUpdateNoteFull: updatePendingStudioNote,
+      onDeleteNote: handleDeleteStudioNote,
+      onAddNote: addPendingStudioNote,
+      onSaveReportContent: handleSaveReportContent,
     }),
-    [chatStream, noteCRUD]
+    [
+      displayNotes,
+      handleUpdateNote,
+      updatePendingStudioNote,
+      handleDeleteStudioNote,
+      addPendingStudioNote,
+      handleSaveReportContent,
+    ]
   );
 
   return (
@@ -518,7 +506,10 @@ const AppContent: React.FC = () => {
                 path="/notebook/:id"
                 element={
                   <ProtectedRoute requireNotebookAccess={true}>
-                    <ChatStreamingProvider value={chatStreamingContextValue}>
+                    <ChatStreamingProvider
+                      session={chatSessionValue}
+                      messages={chatStream.chatDisplayMessages}
+                    >
                       <SourcesProvider value={sourcesContextValue}>
                         <StudioProvider value={studioContextValue}>
                           <NotebookView />

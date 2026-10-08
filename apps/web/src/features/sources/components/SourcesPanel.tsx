@@ -35,7 +35,7 @@ interface SourcesPanelProps {
   onDiscussTopic?: (topic: string) => void;
 }
 
-export const SourcesPanel: React.FC<SourcesPanelProps> = ({
+const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
   isOpen,
   onClose,
   userId,
@@ -440,3 +440,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     </>
   );
 };
+
+/** Memoized so a parent re-render with unchanged props (e.g. a streamed chat token) skips it. */
+export const SourcesPanel = React.memo(SourcesPanelContent);

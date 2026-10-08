@@ -47,7 +47,6 @@ vi.mock("@convex/_generated/api", () => ({
 
 // Import after mock setup
 const {
-  useDocuments,
   useDocument,
   useCreateDocument,
   useUpdateDocument,
@@ -68,25 +67,6 @@ describe("documentsApi hooks", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe("useDocuments", () => {
-    it("calls useQuery with notebookId when provided", () => {
-      mockUseQuery.mockReturnValue([]);
-      renderHook(() => useDocuments("notebook-1"));
-
-      expect(mockUseQuery).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ notebookId: "notebook-1" })
-      );
-    });
-
-    it("calls useQuery with empty args when notebookId is null", () => {
-      mockUseQuery.mockReturnValue([]);
-      renderHook(() => useDocuments(null));
-
-      expect(mockUseQuery).toHaveBeenCalledWith(expect.anything(), {});
-    });
   });
 
   describe("useDocument", () => {
@@ -193,6 +173,19 @@ describe("documentsApi hooks", () => {
       expect(mockWithOptimistic).toHaveBeenCalled();
       expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: "doc-1" }));
     });
+
+    it("keeps the same function across rerenders", () => {
+      // Like Convex, withOptimisticUpdate builds a new function on every call.
+      const mockWithOptimistic = vi.fn(() => vi.fn());
+      mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
+
+      const { result, rerender } = renderHook(() => useDeleteDocument());
+      const first = result.current;
+      rerender();
+
+      expect(result.current).toBe(first);
+      expect(mockWithOptimistic).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("useRemoveManyDocuments", () => {
@@ -208,6 +201,23 @@ describe("documentsApi hooks", () => {
       expect(mockRemoveMany).toHaveBeenCalledWith(
         expect.objectContaining({ ids: ["doc-1", "doc-2"] })
       );
+    });
+
+    it("keeps the same function across rerenders until notebookId changes", () => {
+      // Like Convex, withOptimisticUpdate builds a new function on every call.
+      const mockWithOptimistic = vi.fn(() => vi.fn());
+      mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
+
+      const { result, rerender } = renderHook(
+        ({ notebookId }: { notebookId: string }) => useRemoveManyDocuments(notebookId),
+        { initialProps: { notebookId: "nb-1" } }
+      );
+      const first = result.current;
+      rerender({ notebookId: "nb-1" });
+      expect(result.current).toBe(first);
+
+      rerender({ notebookId: "nb-2" });
+      expect(result.current).not.toBe(first);
     });
 
     it("returns early for empty array", async () => {

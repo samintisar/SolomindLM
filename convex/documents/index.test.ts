@@ -824,6 +824,24 @@ describe("documents.addExternalSources", () => {
   });
 });
 
+describe("documents.assertCanAddSourceInternal", () => {
+  test("applies the source limit to the given user without a signed-in identity", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    await seedDocuments(t, userId, notebookId, 19);
+
+    expect(
+      await t.query(internal.documents.index.assertCanAddSourceInternal, { notebookId, userId })
+    ).toBeNull();
+
+    await seedDocuments(t, userId, notebookId, 1);
+    await expect(
+      t.query(internal.documents.index.assertCanAddSourceInternal, { notebookId, userId })
+    ).rejects.toThrow("Source limit reached");
+  });
+});
+
 describe("documents source-guide access for shared notebooks", () => {
   async function seedSharedDocument(t: ReturnType<typeof convexTest>) {
     const owner = await seedUser(t);
@@ -895,20 +913,6 @@ describe("documents source-guide access for shared notebooks", () => {
         userId: stranger,
       })
     ).toEqual([]);
-  });
-
-  test("getSourceGuide shows the guide to notebook members only", async () => {
-    const t = convexTest(schema, modules);
-    const { member, stranger, documentId } = await seedSharedDocument(t);
-
-    const guide = await withAuth(t, member).query(api.documents.index.getSourceGuide, {
-      documentId,
-    });
-    expect(guide?.summary).toBe("Shared summary.");
-
-    expect(
-      await withAuth(t, stranger).query(api.documents.index.getSourceGuide, { documentId })
-    ).toBeNull();
   });
 });
 

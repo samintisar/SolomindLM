@@ -3,6 +3,7 @@
 import type { HybridSearchConfig, KeywordSearchRunner } from "../_agents/chat/hybrid_search.js";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
+import type { ChunkMetadata } from "../_agents/chat/types";
 import type { ChatAgentOptions } from "../_agents/chat/types.js";
 import type { RerankFunction, VectorSearchRunner } from "../_agents/chat/vector_search.js";
 import { internal } from "../_generated/api";
@@ -11,7 +12,6 @@ import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
-import type { ChunkMetadata } from "../storage/ChatHistoryService";
 
 type DocumentChunkDoc = Doc<"documentChunks">;
 type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };

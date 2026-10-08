@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
+import { useCallback, useMemo } from "react";
 import type { ReportNote } from "@/shared/types/index";
 import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
@@ -91,31 +92,43 @@ export function useCreateReport() {
  * Update a report (e.g. title or content) with optimistic update
  */
 export function useUpdateReport() {
-  const update = useMutation(api.studio.reports.index.update).withOptimisticUpdate(
-    (localStore, { id, ...updates }) => {
-      patchNoteInNotesCache(localStore, id, updates);
-    }
+  const updateMutation = useMutation(api.studio.reports.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, ...updates }) => {
+        patchNoteInNotesCache(localStore, id, updates);
+      }),
+    [updateMutation]
   );
 
-  return async (reportId: string, updates: { title?: string; content?: string }) => {
-    await update({
-      id: reportId as Id<"reports">,
-      ...updates,
-    });
-  };
+  return useCallback(
+    async (reportId: string, updates: { title?: string; content?: string }) => {
+      await update({
+        id: reportId as Id<"reports">,
+        ...updates,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a report by ID with optimistic update
  */
 export function useDeleteReport() {
-  const remove = useMutation(api.studio.reports.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
+  const removeMutation = useMutation(api.studio.reports.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+      }),
+    [removeMutation]
   );
 
-  return async (reportId: string) => {
-    await remove({ id: reportId as Id<"reports"> });
-  };
+  return useCallback(
+    async (reportId: string) => {
+      await remove({ id: reportId as Id<"reports"> });
+    },
+    [remove]
+  );
 }

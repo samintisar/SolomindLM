@@ -1,5 +1,5 @@
 import type { Doc } from "@convex/_generated/dataModel";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { Message, Note } from "@/shared/types/index";
 
 import type { ChatStreamSourcePolicy } from "./chatStreamTypes";
@@ -45,11 +45,35 @@ export interface ChatStreamingContextType {
   onDeleteConversation: (id: string) => Promise<void>;
 }
 
-export const ChatStreamingContext = createContext<ChatStreamingContextType | undefined>(undefined);
+/**
+ * Everything in the chat context except the message list. It changes at stream boundaries
+ * (start, finish, conversation switch), not per streamed token, so components that only need
+ * to send or know whether a reply is in flight subscribe to this one.
+ */
+export type ChatSessionContextType = Omit<ChatStreamingContextType, "messages">;
 
-export function useChatStreamingContext() {
-  const context = useContext(ChatStreamingContext);
-  if (!context)
-    throw new Error("useChatStreamingContext must be used within ChatStreamingProvider");
-  return context;
+export const ChatSessionContext = createContext<ChatSessionContextType | undefined>(undefined);
+
+/** The displayed message list, including the in-progress streaming row. Changes per frame while streaming. */
+export const ChatMessagesContext = createContext<Message[] | undefined>(undefined);
+
+const PROVIDER_ERROR = "must be used within ChatStreamingProvider";
+
+/** Chat actions and stream status without the message list: no re-render per streamed token. */
+export function useChatSessionContext(): ChatSessionContextType {
+  const session = useContext(ChatSessionContext);
+  if (!session) throw new Error(`useChatSessionContext ${PROVIDER_ERROR}`);
+  return session;
+}
+
+/** The full chat context, messages included. Re-renders the caller on every streamed frame. */
+export function useChatStreamingContext(): ChatStreamingContextType {
+  const session = useContext(ChatSessionContext);
+  const messages = useContext(ChatMessagesContext);
+  const value = useMemo(
+    () => (session && messages ? { ...session, messages } : undefined),
+    [session, messages]
+  );
+  if (!value) throw new Error(`useChatStreamingContext ${PROVIDER_ERROR}`);
+  return value;
 }
