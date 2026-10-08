@@ -5,6 +5,8 @@ import { internalAction } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { WebLoaderService } from "./extraction/WebLoaderService";
 
+// Internal only: callers (the embedding job, evals) apply their own auth and rate limits.
+
 export const scrapeWebPageInternal = internalAction({
   args: { url: v.string() },
   handler: async (_ctx, args): Promise<{ title: string; content: string; url: string }> => {
