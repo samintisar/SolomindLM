@@ -24,3 +24,29 @@ export function assertNotProdConvexUrl(
     );
   }
 }
+
+/**
+ * Read RAG_EVAL_CONVEX_URL + RAG_EVAL_SECRET for a live eval or seed run and refuse a prod URL.
+ * Throws an Error whose message (one or more lines) is ready to print after "FATAL: ".
+ */
+export function requireEvalConvexEnv(env: Record<string, string | undefined> = process.env): {
+  convexUrl: string;
+  evalSecret: string;
+} {
+  const convexUrl = env.RAG_EVAL_CONVEX_URL?.trim();
+  const evalSecret = env.RAG_EVAL_SECRET?.trim();
+  if (!convexUrl) {
+    throw new Error(
+      "Set RAG_EVAL_CONVEX_URL to your dev Convex URL (https://….convex.cloud).\n" +
+        "  Do not point this at prod (see evals/rag/env.eval.example)."
+    );
+  }
+  if (!evalSecret) {
+    throw new Error(
+      "Set RAG_EVAL_SECRET to match the RAG_EVAL_SECRET env var on that deployment.\n" +
+        "  Convex must also set RAG_EVALS_ENABLED=true on that deployment for eval actions."
+    );
+  }
+  assertNotProdConvexUrl(convexUrl, env.CONVEX_DEPLOYMENT);
+  return { convexUrl, evalSecret };
+}
