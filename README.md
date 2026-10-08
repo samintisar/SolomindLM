@@ -477,13 +477,8 @@ bun run convex:env:push        # Push .env.local → Convex dev
 bun run convex:env:push:prod   # Push .env → Convex prod
 bun run convex:env:push:dry    # Dry run env push
 
-# Agent tooling
-bun run link:claude-skills     # Symlink .agents/skills → .claude/skills
-
-# E2E cleanup (Convex test data)
-bun run e2e:convex:cleanup
-bun run e2e:convex:cleanup-folders
-bun run e2e:convex:cleanup-notebooks
+# E2E cleanup (Convex test data): delete a test user's `e2e-…` notebooks
+bunx convex run e2e/cleanupNotebooks:deleteE2eNotebooksByEmail '{"email":"<test user>"}'
 ```
 
 **Web app:**

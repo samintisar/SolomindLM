@@ -7,9 +7,9 @@
  * Mirrors the shape of [chatRunner.ts](./chatRunner.ts).
  */
 
-import { computeConfigHash } from "../configHash";
-import type { EvalFixture, EvalRunArtifact, StudioOutput, StudioRunnerKind } from "../types";
+import type { EvalFixture, StudioOutput, StudioRunnerKind } from "../types";
 import type { StudioInvoker } from "./convexStudioInvoker";
+import { runWithHarness } from "./harness";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 // ─── Validation ──────────────────────────────────────────────
@@ -26,26 +26,6 @@ function validateFixture(fixture: EvalFixture): string[] {
     errors.push("Fixture must have at least one expectedItem or a non-empty expectedAnswer");
   }
   return errors;
-}
-
-function stubArtifact(
-  fixture: EvalFixture,
-  kind: StudioRunnerKind,
-  configHash: string
-): EvalRunArtifact {
-  return {
-    caseId: fixture.id,
-    runner: kind,
-    configHash,
-    answer: "",
-    citations: [],
-    preRerankChunks: [],
-    postRerankChunks: [],
-    selectedChunks: [],
-    subQueries: [],
-    latencyMs: 0,
-    timestamp: new Date().toISOString(),
-  };
 }
 
 // ─── Serializers (structured output → plain text) ────────────
@@ -249,62 +229,47 @@ export async function runStudioEval(
   options: StudioRunnerOptions,
   invoker?: StudioInvoker
 ): Promise<EvalRunnerResult> {
-  const { fixture, config, dryRun, kind } = options;
-  const configHash = computeConfigHash(config);
-
-  const validationErrors = validateFixture(fixture);
-  if (validationErrors.length > 0) {
-    return { artifact: stubArtifact(fixture, kind, configHash), errors: validationErrors };
-  }
-
-  if (dryRun) {
-    return { artifact: stubArtifact(fixture, kind, configHash), errors: [] };
-  }
-
-  if (!invoker) {
-    throw new Error(
+  const { fixture, kind } = options;
+  return runWithHarness(options, invoker, {
+    runner: kind,
+    validate: validateFixture,
+    missingInvokerMessage:
       `No StudioInvoker provided for runner "${kind}". ` +
-        "Use --dry-run to validate fixtures without invoking studio actions."
-    );
-  }
-  if (invoker.kind !== kind) {
-    throw new Error(
-      `Studio invoker mismatch: fixture wants "${kind}", invoker is "${invoker.kind}"`
-    );
-  }
+      "Use --dry-run to validate fixtures without invoking studio actions.",
+    checkInvoker(studio) {
+      if (studio.kind !== kind) {
+        throw new Error(
+          `Studio invoker mismatch: fixture wants "${kind}", invoker is "${studio.kind}"`
+        );
+      }
+    },
+    failurePrefix: `Studio agent invocation failed (${kind})`,
+    async invoke(studio, configHash) {
+      const result = await studio.invoke({
+        // validateFixture requires notebookId
+        notebookId: fixture.notebookId!,
+        documentIds: fixture.documentIds,
+        studioParams: fixture.studioParams,
+      });
 
-  const errors: string[] = [];
-  try {
-    const result = await invoker.invoke({
-      notebookId: fixture.notebookId!,
-      documentIds: fixture.documentIds,
-      studioParams: fixture.studioParams,
-    });
-
-    const studioOutput: StudioOutput = { kind, raw: result.raw };
-    const answer = serialize(kind, result.raw);
-
-    const artifact: EvalRunArtifact = {
-      caseId: fixture.id,
-      runner: kind,
-      configHash,
-      answer,
-      citations: [],
-      preRerankChunks: [],
-      postRerankChunks: [],
-      selectedChunks: [],
-      subQueries: [],
-      studioOutput,
-      latencyMs: result.latencyMs,
-      tokenUsage: result.tokenUsage,
-      tokenUsageSource: result.tokenUsageSource,
-      stageSpans: result.stageSpans,
-      timestamp: new Date().toISOString(),
-    };
-    return { artifact, errors };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    errors.push(`Studio agent invocation failed (${kind}): ${message}`);
-    return { artifact: stubArtifact(fixture, kind, configHash), errors };
-  }
+      const studioOutput: StudioOutput = { kind, raw: result.raw };
+      return {
+        caseId: fixture.id,
+        runner: kind,
+        configHash,
+        answer: serialize(kind, result.raw),
+        citations: [],
+        preRerankChunks: [],
+        postRerankChunks: [],
+        selectedChunks: [],
+        subQueries: [],
+        studioOutput,
+        latencyMs: result.latencyMs,
+        tokenUsage: result.tokenUsage,
+        tokenUsageSource: result.tokenUsageSource,
+        stageSpans: result.stageSpans,
+        timestamp: new Date().toISOString(),
+      };
+    },
+  });
 }

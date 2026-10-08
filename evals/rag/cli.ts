@@ -5,9 +5,11 @@
  *   bun run eval:rag -- --dry-run                  # Validate fixtures
  *   bun run eval:rag -- --case agentic-patterns-20 # Needs RAG_EVAL_CONVEX_URL + RAG_EVAL_SECRET
  *   bun run eval:rag -- --prefix ml-               # ML NotebookLM fixture suite only
- *   bun run eval:rag -- --full                     # All fixtures, verbose
+ *   bun run eval:rag -- --runner studio            # Studio runners (also --runner=report,quiz)
  *   bun run eval:rag -- --export-artifacts         # Export Ragas-compatible artifacts
  */
+
+import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { caseFileStem } from "./caseFile";
@@ -24,30 +26,33 @@ import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import {
   createConvexChatInvoker,
   createConvexLiteratureReviewInvoker,
+  createConvexResearchInvoker,
   createConvexStudioInvokers,
   runEval,
 } from "./runners";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
-import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { LiteratureReviewInvoker } from "./runners/literatureReviewRunner";
 import type { ResearchAgentInvoker } from "./runners/researchRunner";
 import { parseEvalSourceChannels } from "./sourceChannels";
 import { filterFixtureIdsBySplit } from "./splits";
-import type {
-  EvalBaseline,
-  EvalFixture,
-  EvalReport,
-  EvalRunArtifact,
-  EvalSplit,
-  MetricResult,
-  RunnerKind,
-  SourcePolicyConfig,
-  StudioRunnerKind,
+import {
+  type EvalBaseline,
+  type EvalFixture,
+  type EvalReport,
+  type EvalRunArtifact,
+  type EvalSplit,
+  type MetricResult,
+  RUNNER_KINDS,
+  type RunnerKind,
+  type SourcePolicyConfig,
+  STUDIO_RUNNER_KINDS,
+  type StudioRunnerKind,
 } from "./types";
 import { USE_CASE_PACKS } from "./usecases";
 import { createConvexSeedApi } from "./usecases/convexSeedApi";
 import { resolveUseCaseIds } from "./usecases/ids";
+import { requireEvalConvexEnv } from "./usecases/prodGuard";
 import {
   excludeUnselectedPackFixtures,
   formatPlannedJobs,
@@ -73,7 +78,6 @@ interface CliOptions {
   /** Restrict to use-case pack fixtures (ids from evals/rag/usecases) */
   useCases?: string[];
   dryRun: boolean;
-  full: boolean;
   verbose: boolean;
   output?: string;
   /** Export artifacts in Ragas-compatible format alongside the report */
@@ -98,33 +102,33 @@ interface CliOptions {
   promotionCheckAfter?: string;
 }
 
-const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
-  "chat",
-  "research",
-  "literatureReview",
-  "both",
-  "report",
-  "flashcards",
-  "quiz",
-  "mindmap",
-  "infographic",
-  "spreadsheet",
-  "writtenQuestions",
-  "audioScript",
-  "audioScriptOnly",
-]);
+/**
+ * `--runner` group aliases. `studio` is every studio kind except `audioScriptOnly` (the
+ * script-only variant of `audioScript`), matching what `eval:studio` has always run.
+ */
+const RUNNER_GROUPS: Readonly<Record<string, readonly RunnerKind[]>> = {
+  studio: STUDIO_RUNNER_KINDS.filter((kind) => kind !== "audioScriptOnly"),
+};
 
 function parseRunners(value: string): RunnerKind[] {
   const parts = value
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const kinds: RunnerKind[] = [];
   for (const p of parts) {
-    if (!ALL_RUNNERS.has(p as RunnerKind)) {
-      throw new Error(`Unknown runner kind "${p}". Valid: ${Array.from(ALL_RUNNERS).join(", ")}`);
+    const group = RUNNER_GROUPS[p];
+    if (group) {
+      kinds.push(...group);
+    } else if ((RUNNER_KINDS as readonly string[]).includes(p)) {
+      kinds.push(p as RunnerKind);
+    } else {
+      throw new Error(
+        `Unknown runner kind "${p}". Valid: ${[...RUNNER_KINDS, ...Object.keys(RUNNER_GROUPS)].join(", ")}`
+      );
     }
   }
-  return parts as RunnerKind[];
+  return kinds;
 }
 
 function parseUseCases(value: string | undefined): string[] {
@@ -138,87 +142,102 @@ function parseUseCases(value: string | undefined): string[] {
   return ids;
 }
 
+function parseSplit(value: string): EvalSplit {
+  if (value !== "smoke" && value !== "train" && value !== "holdout") {
+    throw new Error(`Invalid --split "${value}". Use smoke, train, or holdout.`);
+  }
+  return value;
+}
+
+const CLI_OPTIONS = {
+  case: { type: "string" },
+  prefix: { type: "string" },
+  runner: { type: "string" },
+  split: { type: "string" },
+  "use-case": { type: "string" },
+  "dry-run": { type: "boolean" },
+  // Alias of --verbose (it never changed which fixtures run).
+  full: { type: "boolean" },
+  verbose: { type: "boolean", short: "v" },
+  output: { type: "string", short: "o" },
+  "export-artifacts": { type: "boolean" },
+  "artifacts-dir": { type: "string", default: "evals/rag/generated" },
+  "source-matrix": { type: "string" },
+  "smart-llm": { type: "string" },
+  "likert-judges": { type: "boolean" },
+  "judge-model": { type: "string" },
+  /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
+  compare: { type: "string" },
+  "score-judge-queue": { type: "string" },
+  /** Takes two paths: `--promotion-check <before.json> <after.json>`. */
+  "promotion-check": { type: "string" },
+  help: { type: "boolean", short: "h" },
+} as const satisfies NonNullable<ParseArgsConfig["options"]>;
+
+/** Options that take two values; the second is the positional right after the first. */
+const TWO_VALUE_OPTIONS = new Set(["compare", "promotion-check"]);
+
+/**
+ * Parse CLI args strictly: unknown flags and stray arguments are errors, and both
+ * `--runner report` and `--runner=report` work.
+ */
 function parseArgs(args: string[]): CliOptions {
-  const opts: CliOptions = {
-    dryRun: false,
-    full: false,
-    verbose: false,
-    exportArtifacts: false,
-    artifactsDir: "evals/rag/generated",
-    likertJudges: false,
-  };
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case "--case":
-        opts.caseId = args[++i];
-        break;
-      case "--prefix":
-        opts.idPrefix = args[++i];
-        break;
-      case "--runner":
-        opts.runners = parseRunners(args[++i]);
-        break;
-      case "--split": {
-        const split = args[++i] as EvalSplit;
-        if (split !== "smoke" && split !== "train" && split !== "holdout") {
-          throw new Error(`Invalid --split "${split}". Use smoke, train, or holdout.`);
-        }
-        opts.split = split;
-        break;
+  const { values, tokens } = parseNodeArgs({
+    args,
+    options: CLI_OPTIONS,
+    strict: true,
+    allowPositionals: true,
+    tokens: true,
+  });
+
+  // Pair each two-value option with the positional that directly follows it.
+  const secondValues = new Map<string, string>();
+  for (const [i, token] of tokens.entries()) {
+    if (token.kind === "positional") {
+      const prev = tokens[i - 1];
+      if (
+        prev?.kind === "option" &&
+        TWO_VALUE_OPTIONS.has(prev.name) &&
+        !secondValues.has(prev.name)
+      ) {
+        secondValues.set(prev.name, token.value);
+        continue;
       }
-      case "--use-case":
-        opts.useCases = parseUseCases(args[++i]);
-        break;
-      case "--dry-run":
-        opts.dryRun = true;
-        break;
-      case "--full":
-        opts.full = true;
-        break;
-      case "--verbose":
-      case "-v":
-        opts.verbose = true;
-        break;
-      case "--output":
-      case "-o":
-        opts.output = args[++i];
-        break;
-      case "--export-artifacts":
-        opts.exportArtifacts = true;
-        break;
-      case "--artifacts-dir":
-        opts.artifactsDir = args[++i];
-        break;
-      case "--source-matrix":
-        opts.sourceMatrix = args[++i];
-        break;
-      case "--smart-llm":
-        opts.smartLlm = args[++i];
-        break;
-      case "--likert-judges":
-        opts.likertJudges = true;
-        break;
-      case "--judge-model":
-        opts.judgeModel = args[++i];
-        break;
-      case "--compare":
-        opts.compareA = args[++i];
-        opts.compareB = args[++i];
-        break;
-      case "--score-judge-queue":
-        opts.scoreJudgeQueue = args[++i];
-        break;
-      case "--promotion-check":
-        opts.promotionCheckBefore = args[++i];
-        opts.promotionCheckAfter = args[++i];
-        break;
-      case "--help":
-      case "-h":
-        printHelp();
-        process.exit(0);
+      throw new Error(`Unexpected argument "${token.value}". See --help.`);
     }
   }
-  return opts;
+  for (const name of TWO_VALUE_OPTIONS) {
+    if (values[name as keyof typeof values] !== undefined && !secondValues.has(name)) {
+      throw new Error(`--${name} takes two paths. See --help.`);
+    }
+  }
+
+  if (values.help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  return {
+    caseId: values.case,
+    idPrefix: values.prefix,
+    runners: values.runner !== undefined ? parseRunners(values.runner) : undefined,
+    split: values.split !== undefined ? parseSplit(values.split) : undefined,
+    useCases: values["use-case"] !== undefined ? parseUseCases(values["use-case"]) : undefined,
+    dryRun: values["dry-run"] ?? false,
+    verbose: (values.verbose ?? false) || (values.full ?? false),
+    output: values.output,
+    exportArtifacts: values["export-artifacts"] ?? false,
+    artifactsDir: values["artifacts-dir"],
+    sourceMatrix: values["source-matrix"],
+    smartLlm: values["smart-llm"],
+    likertJudges: values["likert-judges"] ?? false,
+    judgeModel: values["judge-model"],
+    compareA: values.compare,
+    compareB: secondValues.get("compare"),
+    scoreJudgeQueue: values["score-judge-queue"],
+    promotionCheckBefore: values["promotion-check"],
+    promotionCheckAfter: secondValues.get("promotion-check"),
+  };
 }
 
 function printHelp(): void {
@@ -226,17 +245,17 @@ function printHelp(): void {
 RAG Eval Pipeline
 
 Usage:
-  bun run eval:rag [options]
+  bun run eval:rag [options]     (--opt value and --opt=value both work; unknown flags error)
 
 Options:
   --case <id>              Run a specific fixture by id
   --prefix <str>           Run fixtures whose id starts with prefix (e.g. ml-)
-  --runner <kinds>         Comma-separated runner filter (chat,research,literatureReview,…)
+  --runner <kinds>         Comma-separated runner filter (chat,research,literatureReview,…);
+                           "studio" = every studio kind except audioScriptOnly
   --split <smoke|train|holdout>  Filter fixtures by dataset split (live default: smoke)
   --use-case <ids|all>     Use-case pack fixtures only (seed first: bun run eval:seed)
   --dry-run                Validate fixtures without running agents
-  --full                   Run all fixtures with verbose output
-  --verbose, -v            Show detailed metric output
+  --verbose, -v            Show detailed metric output (--full is an alias)
   --output, -o <path>      Write JSON report to file
   --export-artifacts       Export per-case JSON (for --compare) and Ragas jsonl
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
@@ -327,7 +346,13 @@ function exportRagasArtifacts(
 // ─── Main ────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const opts = parseArgs(process.argv.slice(2));
+  let opts: CliOptions;
+  try {
+    opts = parseArgs(process.argv.slice(2));
+  } catch (err) {
+    console.error(`FATAL: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
 
   if (opts.scoreJudgeQueue) {
     const { loadJudgeQueueFile } = await import("./reports/judgeQueueFile");
@@ -436,22 +461,12 @@ async function main(): Promise<void> {
   let studioInvokers: Partial<Record<StudioRunnerKind, StudioInvoker>> | undefined;
   let seedApi: PackSeedApi | undefined;
   if (!opts.dryRun) {
-    const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
-    const evalSecret = process.env.RAG_EVAL_SECRET?.trim();
-    if (!convexUrl) {
-      console.error(
-        "FATAL: Set RAG_EVAL_CONVEX_URL to your dev Convex URL (https://….convex.cloud)."
-      );
-      console.error("  Do not point this at prod. Use --dry-run to validate fixtures offline.");
-      process.exit(2);
-    }
-    if (!evalSecret) {
-      console.error(
-        "FATAL: Set RAG_EVAL_SECRET to match the RAG_EVAL_SECRET env var on that deployment."
-      );
-      console.error(
-        "  Convex must also set RAG_EVALS_ENABLED=true on that deployment for eval actions."
-      );
+    let convexUrl: string;
+    let evalSecret: string;
+    try {
+      ({ convexUrl, evalSecret } = requireEvalConvexEnv());
+    } catch (err) {
+      console.error(`FATAL: ${err instanceof Error ? err.message : String(err)}`);
       console.error("  Use --dry-run to validate fixtures without Convex.");
       process.exit(2);
     }
@@ -590,7 +605,7 @@ async function main(): Promise<void> {
       });
       allMetrics.push(...metrics);
 
-      if (opts.verbose || opts.full) {
+      if (opts.verbose) {
         for (const m of metrics) {
           const icon =
             m.status === "pass" ? "+" : m.status === "fail" ? "x" : m.status === "warn" ? "!" : "i";
