@@ -97,4 +97,23 @@ describe("useSourceManager", () => {
     await waitFor(() => expect(result.current.sources[0].status).toBe("failed"));
     expect(result.current.sources[0].title).toBe("A");
   });
+
+  it("resets local-only rows when switching between notebooks with the same document list", async () => {
+    const empty: DocumentSummary[] = [];
+    const { result, rerender } = renderHook(
+      ({ notebookId }) => useSourceManager({ documents: empty, notebookId }),
+      { initialProps: { notebookId: "n1" } }
+    );
+    act(() => {
+      result.current.handleAddSource({
+        id: "pending",
+        title: "Uploading",
+        selected: true,
+      } as never);
+    });
+    expect(result.current.sources.map((s) => s.id)).toEqual(["pending"]);
+
+    rerender({ notebookId: "n2" });
+    await waitFor(() => expect(result.current.sources).toEqual([]));
+  });
 });

@@ -32,7 +32,9 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   const { error: showError } = useToast();
 
   useEffect(() => {
-    const signature = documents.map(documentSignature).join(",");
+    // Keyed by notebook too, so switching between two notebooks with the same (e.g. empty)
+    // list still resets local-only rows such as optimistically added sources.
+    const signature = `${notebookId ?? ""}|${documents.map(documentSignature).join(",")}`;
     if (signature === prevSignatureRef.current) return;
     prevSignatureRef.current = signature;
     setSources((prev) => {
@@ -42,7 +44,7 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
         selected: prev.find((s) => s.id === source.id)?.selected ?? true,
       }));
     });
-  }, [documents]);
+  }, [documents, notebookId]);
 
   const handleToggleSource = useCallback((id: string) => {
     setSources((prev) =>
