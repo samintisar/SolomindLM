@@ -2,9 +2,6 @@ import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { openAddSourceModal } from "./navigation";
 
-/** Default title for paste-text sources (set by the backend). */
-export const PASTED_TEXT_TITLE = "Pasted Text";
-
 /**
  * Get the source row (shadcn `Item`, `data-slot="item"`) whose text contains the title.
  * While a row is being renamed its title becomes an input, so it no longer matches
@@ -23,10 +20,18 @@ export function getSourceCheckbox(page: Page, sourceTitle: string | RegExp) {
 }
 
 /**
- * Add a paste-text source: opens the dialog, clicks "Copied text", fills the textarea, submits.
- * After calling this, use waitForSourceStatus(page, PASTED_TEXT_TITLE, ...) to wait for completion.
+ * Add a paste-text source: opens the dialog, clicks "Copied text", fills the title and textarea,
+ * submits. Returns the title, which locates the source's row.
+ *
+ * The source always gets a typed title: with a blank one, processing replaces the placeholder
+ * with a title generated from the text, which a test cannot predict. The default is unique per
+ * call so the row never matches another source.
  */
-export async function addPasteTextSource(page: Page, text: string) {
+export async function addPasteTextSource(
+  page: Page,
+  text: string,
+  title = `E2E pasted text ${Date.now()}`
+): Promise<string> {
   await openAddSourceModal(page);
 
   // The dialog is named by its title, which changes once a step is chosen
@@ -40,16 +45,20 @@ export async function addPasteTextSource(page: Page, text: string) {
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByPlaceholder("Paste your text here...")).toBeVisible();
 
-  // Fill the textarea using pressSequentially for reliable React state updates
+  await dialog.getByLabel("Title (optional)").fill(title);
+
+  // fill() rather than typing: the studio seed is thousands of characters, and typing them
+  // used up most of a test's budget
   const textarea = dialog.getByPlaceholder("Paste your text here...");
-  await textarea.click();
-  await textarea.pressSequentially(text, { delay: 2 });
+  await textarea.fill(text);
+  await expect(textarea).toHaveValue(text);
 
   // Submit
   await dialog.getByRole("button", { name: "Add Source", exact: true }).click();
 
   // Wait for the dialog to close (confirms submission succeeded)
   await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+  return title;
 }
 
 /**
@@ -76,6 +85,9 @@ export async function addUrlSource(page: Page, url: string) {
   await dialog.getByRole("button", { name: "Add Sources", exact: true }).click();
 }
 
+/** How long a new source may stay pending before its processing job starts. */
+const PROCESSING_START_TIMEOUT = 10_000;
+
 /**
  * Wait for a source to reach the given status.
  * Polls the source card for the status badge text.
@@ -96,8 +108,18 @@ export async function waitForSourceStatus(
   await expect(sourceCard).toBeVisible({ timeout: remaining() });
 
   if (expectedStatus === "completed") {
-    // Completed sources don't show a status badge — wait for processing badge to disappear
-    await expect(sourceCard.getByText("Processing")).not.toBeVisible({ timeout: remaining() });
+    // A new source is "pending" until its processing job starts, and neither pending nor
+    // completed rows show a badge. So first wait for the Processing badge, which the job sets
+    // as its first step (it starts within seconds of the upload).
+    const processing = sourceCard.getByText("Processing");
+    await expect(processing)
+      .toBeVisible({ timeout: Math.min(PROCESSING_START_TIMEOUT, remaining()) })
+      .catch(() => {
+        // Never seen: the job finished between polls
+      });
+    await expect(processing).not.toBeVisible({ timeout: remaining() });
+    // A failed source loses the Processing badge too
+    await expect(sourceCard.getByText("Failed")).not.toBeVisible();
   } else if (expectedStatus === "processing") {
     await expect(sourceCard.getByText("Processing")).toBeVisible({ timeout: remaining() });
   } else if (expectedStatus === "failed") {

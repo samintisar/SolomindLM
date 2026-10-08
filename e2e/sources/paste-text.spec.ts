@@ -3,7 +3,6 @@ import { shouldSkipAITests } from "../helpers/ai-service";
 import {
   addPasteTextSource,
   getSourceCard,
-  PASTED_TEXT_TITLE,
   waitForSourceStatus,
 } from "../helpers/source-assertions";
 
@@ -14,10 +13,10 @@ test.describe("Paste Text Source", () => {
     const page = notebookPage;
     const sourceText = `E2E Paste Test ${Date.now()}: The quick brown fox jumps over the lazy dog. This is a longer text to ensure sufficient content for embedding generation and chunk creation.`;
 
-    await addPasteTextSource(page, sourceText);
+    const title = await addPasteTextSource(page, sourceText);
 
-    // Source should appear in the list with default title "Pasted Text"
-    const sourceCard = getSourceCard(page, PASTED_TEXT_TITLE);
+    // Source should appear in the list under the title typed in the dialog
+    const sourceCard = getSourceCard(page, title);
     await expect(sourceCard).toBeVisible({ timeout: 15_000 });
   });
 
@@ -27,9 +26,9 @@ test.describe("Paste Text Source", () => {
     const page = notebookPage;
     const sourceText = `E2E Complete Test ${Date.now()}: Another block of text for testing status transitions. Contains enough content to produce embeddings and chunks for vector search.`;
 
-    await addPasteTextSource(page, sourceText);
+    const title = await addPasteTextSource(page, sourceText);
 
     // Wait for source to reach completed status
-    await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 120_000);
+    await waitForSourceStatus(page, title, "completed", 120_000);
   });
 });
