@@ -10,7 +10,7 @@
  */
 import { getPack, USE_CASE_PACKS } from "./usecases";
 import { createConvexSeedApi } from "./usecases/convexSeedApi";
-import { assertNotProdConvexUrl } from "./usecases/prodGuard";
+import { requireEvalConvexEnv } from "./usecases/prodGuard";
 import { parseSeedArgs } from "./usecases/seedArgs";
 import { seedPack } from "./usecases/seedClient";
 import { readPackSources } from "./usecases/sources";
@@ -23,13 +23,10 @@ function fatal(message: string): never {
 }
 
 async function main(): Promise<void> {
-  const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
-  const evalSecret = process.env.RAG_EVAL_SECRET?.trim();
-  if (!convexUrl || !evalSecret) {
-    fatal("set RAG_EVAL_CONVEX_URL and RAG_EVAL_SECRET (see evals/rag/env.eval.example).");
-  }
+  let convexUrl: string;
+  let evalSecret: string;
   try {
-    assertNotProdConvexUrl(convexUrl, process.env.CONVEX_DEPLOYMENT);
+    ({ convexUrl, evalSecret } = requireEvalConvexEnv());
   } catch (err) {
     fatal(err instanceof Error ? err.message : String(err));
   }

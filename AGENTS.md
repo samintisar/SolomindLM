@@ -26,12 +26,12 @@ bun install                    # Install dependencies (also enables .githooks)
 bun run dev:web                # Web dev server: :5173 in the main checkout, own port per worktree
 bun run dev:mobile             # Expo mobile dev server
 bun run dev:convex             # Convex dev watcher; ONE per dev deployment across worktrees (others: --once)
-bun run typecheck:web          # also :convex, :evals, :mobile — run separately, not in parallel
+bun run typecheck:web          # also :convex, :evals, :e2e, :mobile — run separately, not in parallel
 bun run lint                   # Biome (lint:fix to auto-fix); lint:design = shadcn design-lint ratchet
 bun run test:convex            # vitest + convex-test (~1,800 tests, ~20s)
 bun run test:web               # vitest for web utilities, hooks and components
 bun run test:e2e               # Playwright
-bun run eval:rag --case <id>   # or --runner <name> (space, not `=`); eval:studio only for cross-cutting work
+bun run eval:rag --case <id>   # or --runner <name>; eval:studio only for cross-cutting work
 ```
 
 ## Validation gates (in order)

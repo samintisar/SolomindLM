@@ -37,7 +37,7 @@
       ]
     },
     {
-      "description": "Auto-merge low-risk dev/build/test tooling on patch + minor (Renovate merges once CI is green; repo auto-merge is off, so platformAutomerge is disabled globally).",
+      "description": "Auto-merge low-risk dev/build/test tooling on patch + minor (Renovate merges once CI is green itself; platformAutomerge is disabled globally, so these PRs don't use GitHub auto-merge and pr-autoupdate.yml leaves them to Renovate).",
       "matchPackageNames": [
         "typescript",
         "vitest",
