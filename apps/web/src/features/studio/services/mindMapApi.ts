@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
+import { useCallback, useMemo } from "react";
 import type { MindMapNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -108,31 +109,43 @@ export function useCreateMindMap() {
  * Rename a mind map by ID with optimistic update
  */
 export function useRenameMindMap() {
-  const update = useMutation(api.studio.mindmaps.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-    }
+  const updateMutation = useMutation(api.studio.mindmaps.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+      }),
+    [updateMutation]
   );
 
-  return async (mindMapId: string, newTitle: string) => {
-    return await update({
-      id: mindMapId as Id<"mindmaps">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (mindMapId: string, newTitle: string) => {
+      return await update({
+        id: mindMapId as Id<"mindmaps">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a mind map by ID with optimistic update
  */
 export function useDeleteMindMap() {
-  const remove = useMutation(api.studio.mindmaps.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
+  const removeMutation = useMutation(api.studio.mindmaps.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+      }),
+    [removeMutation]
   );
 
-  return async (mindMapId: string) => {
-    await remove({ id: mindMapId as Id<"mindmaps"> });
-  };
+  return useCallback(
+    async (mindMapId: string) => {
+      await remove({ id: mindMapId as Id<"mindmaps"> });
+    },
+    [remove]
+  );
 }
