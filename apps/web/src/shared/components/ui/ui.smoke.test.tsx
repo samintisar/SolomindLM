@@ -832,6 +832,35 @@ describe("Table", () => {
     expect(screen.getByRole("cell", { name: "Attention" })).toHaveClass("sticky", "bg-card");
     expect(table.querySelector("thead")).toHaveClass("sticky", "top-0");
   });
+
+  it("tints a highlighted column and styles row headers like cells", () => {
+    render(
+      <Table aria-label="Compare">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Topic</TableHead>
+            <TableHead highlight>Ours</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableHead scope="row">Search</TableHead>
+            <TableCell highlight>Four databases</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    );
+    const ours = screen.getByRole("columnheader", { name: "Ours" });
+    // The tint sits over the band's solid fill, so a sticky header doesn't show rows through it.
+    expect(ours).toHaveClass("bg-muted", "from-link/8", "text-link");
+    expect(screen.getByRole("columnheader", { name: "Topic" })).not.toHaveClass("from-link/8");
+    const oursCell = screen.getByRole("cell", { name: "Four databases" });
+    // The solid fill gives way to the selected row's, like a pinned cell.
+    expect(oursCell).toHaveClass("bg-card", "from-link/5", "in-[tr[data-state=selected]]:bg-muted");
+    const rowHeader = screen.getByRole("rowheader", { name: "Search" });
+    expect(rowHeader).toHaveClass("align-top");
+    expect(rowHeader).not.toHaveClass("bg-muted", "whitespace-nowrap");
+  });
 });
 
 describe("Switch", () => {

@@ -1,10 +1,11 @@
-import { Check } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
+import { FinePrint } from "./FinePrint";
+import { FREE_PLAN_LINE } from "./landingHomeContent";
 import { NotebookPreview } from "./NotebookPreview";
 import { Accent } from "./SectionHeading";
 import { scrollToSection } from "./scrollToSection";
 
-const FINE_PRINT = ["Free plan, no card", "Works with any course"] as const;
+const FINE_PRINT = [FREE_PLAN_LINE, "Works with any course"] as const;
 
 export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
   return (
@@ -31,14 +32,7 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
               How it works
             </Button>
           </div>
-          <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 font-sans text-xs text-muted-foreground">
-            {FINE_PRINT.map((line) => (
-              <li key={line} className="flex items-center gap-1.5">
-                <Check aria-hidden className="size-3.5 text-success" />
-                {line}
-              </li>
-            ))}
-          </ul>
+          <FinePrint lines={FINE_PRINT} className="mt-5" />
         </div>
         <div className="lg:col-span-7">
           <NotebookPreview />

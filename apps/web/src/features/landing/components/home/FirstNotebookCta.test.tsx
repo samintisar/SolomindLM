@@ -11,4 +11,16 @@ describe("FirstNotebookCta", () => {
     await userEvent.click(screen.getByRole("button", { name: /Create my first notebook/ }));
     expect(onGetStarted).toHaveBeenCalledOnce();
   });
+
+  it("uses the page's copy when given", () => {
+    render(
+      <FirstNotebookCta
+        onGetStarted={vi.fn()}
+        body="Custom promise."
+        ctaLabel="Create free account"
+      />
+    );
+    expect(screen.getByText("Custom promise.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Create free account/ })).toBeInTheDocument();
+  });
 });

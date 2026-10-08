@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/shared/utils/cn";
+import { Stage } from "../content/Stage";
 import { Reveal } from "./Reveal";
 
 interface BeatProps {
@@ -41,9 +42,7 @@ export function Beat({ number, label, title, body, points, visual, flip = false 
         </ul>
       </Reveal>
       <Reveal className={cn("lg:col-span-7", flip && "lg:order-1")}>
-        <div className="rounded-3xl bg-muted/40 p-5 ring-1 ring-hairline ring-inset sm:p-8 lg:p-10">
-          {visual}
-        </div>
+        <Stage>{visual}</Stage>
       </Reveal>
     </div>
   );

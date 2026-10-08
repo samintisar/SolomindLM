@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LandingNav } from "./LandingNav";
+import { NAV_ITEMS } from "./landingHomeContent";
 import { scrollToSection } from "./scrollToSection";
 
 vi.mock("./scrollToSection", () => ({ scrollToSection: vi.fn() }));
@@ -50,5 +51,20 @@ describe("LandingNav", () => {
     await userEvent.click(within(menu).getByRole("button", { name: "Use cases" }));
     expect(scrollToSection).toHaveBeenCalledWith("use-cases");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("links nav items to home sections when not on the home page", () => {
+    render(
+      <MemoryRouter initialEntries={["/students/ai-flashcards"]}>
+        <LandingNav onGetStarted={vi.fn()} onLogin={vi.fn()} />
+      </MemoryRouter>
+    );
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    for (const item of NAV_ITEMS) {
+      expect(within(nav).getByRole("link", { name: item.label })).toHaveAttribute(
+        "href",
+        `/#${item.target}`
+      );
+    }
   });
 });

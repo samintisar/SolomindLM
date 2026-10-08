@@ -136,3 +136,17 @@ describe("getSeoContentBreadcrumbItems", () => {
     ]);
   });
 });
+
+describe("SEO_CONTENT_PAGES h1 accents", () => {
+  it("only accents a phrase that is in the h1", () => {
+    for (const page of SEO_CONTENT_PAGES) {
+      if (page.h1Accent) expect(page.h1, page.path).toContain(page.h1Accent);
+    }
+  });
+
+  it("accents every page", () => {
+    for (const page of SEO_CONTENT_PAGES) {
+      expect(page.h1Accent, page.path).toBeTruthy();
+    }
+  });
+});

@@ -1029,7 +1029,7 @@
   color: var(--foreground);
 }
 
-/* Landing page: dot grid background — theme-aware, visible across full page */
+/* Dot grid background for the free tool pages (features/tools) — theme-aware, full page */
 .landing-grid-pattern {
   background-color: var(--background);
   background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.12) 1.5px, transparent 1.5px);
