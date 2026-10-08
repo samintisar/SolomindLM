@@ -82,6 +82,26 @@ describe("studio.audio.resolvePlaybackUrl", () => {
     ).toBeNull();
   });
 
+  test("returns null for a .convex.site/audio/ URL with a malformed escape", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, notebookId } = await seed(t);
+    const audioOverviewId = await t.run(async (ctx) =>
+      ctx.db.insert("audioOverviews", {
+        userId: owner,
+        notebookId,
+        title: "Overview",
+        status: "completed",
+        audioUrl: "https://calm-fox-456.convex.site/audio/%E0%A4%A",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+
+    expect(
+      await asUser(t, owner).query(api.studio.audio.index.resolvePlaybackUrl, { audioOverviewId })
+    ).toBeNull();
+  });
+
   test("re-signs a full URL to the removed .convex.site/audio/ route", async () => {
     const t = convexTest(schema, modules);
     const { owner, notebookId, storageId } = await seed(t);

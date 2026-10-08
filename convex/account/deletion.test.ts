@@ -182,6 +182,35 @@ describe("account deletion", () => {
     });
   });
 
+  test("keeps an audio file a legacy URL-only overview shares with an id-only fork", async () => {
+    const t = setup();
+    const doomed = await seedUser(t, "doomed@example.com");
+    const forker = await seedUser(t, "forker@example.com");
+    const [, sharedAudioId] = doomed.fileIds;
+    await t.run(async (ctx) => {
+      const source = await ctx.db
+        .query("audioOverviews")
+        .withIndex("by_user", (q) => q.eq("userId", doomed.userId))
+        .first();
+      // Legacy source row: only a storage URL naming the file. The other overview stores only
+      // the id, so the two rows share no audioUrl spelling.
+      await ctx.db.patch(source!._id, {
+        audioStorageId: undefined,
+        audioUrl: `https://calm-fox-456.convex.cloud/api/storage/${sharedAudioId}`,
+      } as never);
+      await ctx.db.insert("audioOverviews", {
+        userId: forker.userId,
+        audioStorageId: sharedAudioId,
+      } as never);
+    });
+
+    await deleteAndDrain(t, doomed.userId);
+
+    await t.run(async (ctx) => {
+      expect(await ctx.storage.get(sharedAudioId)).not.toBeNull();
+    });
+  });
+
   test("deletes other users' saves, ratings and reports of the user's public prompts", async () => {
     const t = setup();
     const doomed = await seedUser(t, "doomed@example.com");

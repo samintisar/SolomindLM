@@ -22,7 +22,13 @@ export function parseAudioUrl(audioUrl: string): AudioUrlTarget {
   const raw = audioUrl.trim();
   if (!raw) return null;
   const legacySite = LEGACY_SITE_AUDIO_URL.exec(raw);
-  if (legacySite) return { storageRef: decodeURIComponent(legacySite[1]) };
+  if (legacySite) {
+    try {
+      return { storageRef: decodeURIComponent(legacySite[1]) };
+    } catch {
+      return null; // malformed percent-escape: names no file
+    }
+  }
   // URI schemes are case-insensitive (RFC 3986), so `HTTPS://…` is a URL too.
   if (/^https?:\/\//i.test(raw)) return { url: raw };
   let ref = raw;
@@ -64,9 +70,13 @@ async function anyNotebookReadable(
   checked: Set<Id<"notebooks">>,
   budget: { remaining: number }
 ): Promise<boolean> {
-  for await (const overview of overviews) {
-    if (budget.remaining <= 0) return false;
+  // Advance by hand so no row past the budget is read.
+  const rows = overviews[Symbol.asyncIterator]();
+  while (budget.remaining > 0) {
+    const next = await rows.next();
+    if (next.done) return false;
     budget.remaining -= 1;
+    const overview = next.value;
     if (checked.has(overview.notebookId)) continue;
     checked.add(overview.notebookId);
     if (await canReadNotebook(ctx, overview.notebookId, userId)) return true;

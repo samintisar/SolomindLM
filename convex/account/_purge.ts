@@ -91,10 +91,13 @@ function storageIdFromUrl(url: string | undefined): string | null {
 /** True when an overview other than this one points at the same audio file (a fork, or its source). */
 async function audioFileSharedByAnother(
   ctx: MutationCtx,
-  overview: Doc<"audioOverviews">
+  overview: Doc<"audioOverviews">,
+  storageRef: string
 ): Promise<boolean> {
   const isOther = (rows: Doc<"audioOverviews">[]) => rows.some((r) => r._id !== overview._id);
-  const { audioStorageId, audioUrl } = overview;
+  const { audioUrl } = overview;
+  // The canonical id, so a legacy URL-only row still finds overviews that store the id itself.
+  const audioStorageId = ctx.db.system.normalizeId("_storage", storageRef);
   if (audioStorageId) {
     const rows = await ctx.db
       .query("audioOverviews")
@@ -371,7 +374,7 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
           );
           const storageId = overview.audioStorageId ?? storageIdFromUrl(overview.audioUrl);
           // Forks share the source's file; keep it while another overview still plays it.
-          if (storageId && !(await audioFileSharedByAnother(ctx, overview))) {
+          if (storageId && !(await audioFileSharedByAnother(ctx, overview, storageId))) {
             await deleteStoredFile(ctx, storageId);
           }
         }
