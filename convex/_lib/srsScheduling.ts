@@ -189,3 +189,19 @@ export function initializeProficiency(): CardProficiency {
     learningStep: 0,
   };
 }
+
+/**
+ * Indices of the cards due for review at `nowMs`. A card with no `nextReviewDate` has never been
+ * reviewed and is always due. Shared by the server and the web app so both agree on "due".
+ */
+export function getDueCardIndices(
+  cards: ReadonlyArray<{ proficiency?: { nextReviewDate?: number } | null }>,
+  nowMs: number
+): number[] {
+  const due: number[] = [];
+  cards.forEach((card, index) => {
+    const next = card.proficiency?.nextReviewDate;
+    if (!next || next <= nowMs) due.push(index);
+  });
+  return due;
+}
