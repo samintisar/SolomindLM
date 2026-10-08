@@ -401,7 +401,9 @@ export const deleteCard = mutation({
 });
 
 /**
- * Get cards that are due for review
+ * Get cards that are due for review.
+ * The web app now computes this from the loaded deck (`useDueCards`); kept so tabs opened before
+ * that deploy keep working. Safe to remove once those have reloaded.
  */
 export const getDueCards = query({
   args: {
