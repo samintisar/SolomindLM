@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Group, Panel, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
+import type { AudioPlayerContextType } from "@/features/audio/useAudioPlayer";
 import { useAuth } from "@/features/auth/useAuth";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
@@ -241,15 +242,8 @@ export function NotebookView() {
 
   const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
 
-  const [miniPlayerData, setMiniPlayerData] = useState<{
-    audioUrl: string;
-
-    title: string;
-
-    transcript?: string;
-
-    audioOverviewId?: string;
-  } | null>(null);
+  const [miniPlayerData, setMiniPlayerData] =
+    useState<AudioPlayerContextType["miniPlayerData"]>(null);
 
   const clearSourceFocusRequest = useCallback(() => {
     setSourceFocusRequest(null);
@@ -304,13 +298,10 @@ export function NotebookView() {
 
       audioOverviewId?: string
     ) => {
-      setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
+      // noteId lets StudioPanel hide the mini player while that note is open in the full player.
+      setMiniPlayerData({ audioUrl, title, transcript, noteId, audioOverviewId });
 
       setMiniPlayerVisible(true);
-
-      if (noteId) {
-        (window as any).__currentPlayingAudioNoteId = noteId;
-      }
     },
 
     []
@@ -323,18 +314,12 @@ export function NotebookView() {
   const handleExpandAudioPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
 
-    const noteId = (window as any).__currentPlayingAudioNoteId;
+    const noteId = miniPlayerData?.noteId;
 
-    if (noteId) {
-      const note = notes.find((n) => n.id === noteId);
-
-      if (note) {
-        const event = new CustomEvent("setActiveNote", { detail: { noteId } });
-
-        window.dispatchEvent(event);
-      }
+    if (noteId && notes.some((n) => n.id === noteId)) {
+      window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId } }));
     }
-  }, [notes]);
+  }, [miniPlayerData, notes]);
 
   const audioPlayerContextValue = useMemo(
     () => ({
