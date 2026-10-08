@@ -1,3 +1,7 @@
+import {
+  FREE_PLAN_FEATURES,
+  PRO_PLAN_FEATURES,
+} from "../../apps/web/src/features/billing/planFeatures";
 import { expect, test } from "../fixtures/auth.fixture";
 
 test.describe("Billing page", () => {
@@ -20,9 +24,9 @@ test.describe("Billing page", () => {
     await expect(page.getByText("$7.50").first()).toBeVisible();
     await expect(page.getByText("$15").first()).toBeVisible();
 
-    // Feature lists
-    await expect(page.getByText("5 notebooks per account").first()).toBeVisible();
-    await expect(page.getByText("200 notebooks per account").first()).toBeVisible();
+    // Feature lists (first line of each plan is the notebook and source limit)
+    await expect(page.getByText(FREE_PLAN_FEATURES[0], { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(PRO_PLAN_FEATURES[0], { exact: true }).first()).toBeVisible();
   });
 
   test("navigates from home via Pro button", async ({ authenticatedPage }) => {
@@ -65,9 +69,9 @@ test.describe("Billing page", () => {
     // Free card shows "Downgrade" button for subscribers
     await expect(page.getByRole("button", { name: "Downgrade" })).toBeVisible();
 
-    // Both Pro cards show "Current Plan" (disabled) for subscribers
-    const currentPlanButtons = page.getByRole("button", { name: "Current Plan" });
-    await expect(currentPlanButtons).toHaveCount(2);
+    // Only the subscribed interval's Pro card shows "Current Plan"; the other offers a switch
+    await expect(page.getByRole("button", { name: "Current Plan" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /^Switch to (Monthly|Yearly)$/ })).toHaveCount(1);
   });
 
   test("displays correct feature comparisons", async ({ authenticatedPage }) => {
@@ -76,17 +80,9 @@ test.describe("Billing page", () => {
     await page.goto("/billing");
     await page.waitForLoadState("networkidle");
 
-    // Free features - just check they exist somewhere on page
-    await expect(page.getByText("10 chat messages/day").first()).toBeVisible();
-    await expect(page.getByText("2 flashcards/day").first()).toBeVisible();
-    await expect(page.getByText("2 quizzes/day").first()).toBeVisible();
-
-    // Pro features - just check they exist somewhere on page
-    await expect(page.getByText("500 chat messages/day").first()).toBeVisible();
-    await expect(page.getByText("100 flashcards/day").first()).toBeVisible();
-    await expect(page.getByText("100 quizzes/day").first()).toBeVisible();
-    await expect(page.getByText("100 reports/day").first()).toBeVisible();
-    await expect(page.getByText("100 audio overviews/day").first()).toBeVisible();
-    await expect(page.getByText("100 written questions/day").first()).toBeVisible();
+    // Every plan line renders; the lists come from the backend limit tables
+    for (const feature of [...FREE_PLAN_FEATURES, ...PRO_PLAN_FEATURES]) {
+      await expect(page.getByText(feature, { exact: true }).first()).toBeVisible();
+    }
   });
 });
