@@ -30,6 +30,19 @@ vi.mock("motion/react", () => ({
   useReducedMotion: () => false,
 }));
 
+/** Called on every render of the transcript reader, behind its memo. */
+const transcriptRendered = vi.hoisted(() => vi.fn());
+vi.mock("./TranscriptReaderView", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./TranscriptReaderView")>();
+  const { createElement } = await import("react");
+  return {
+    TranscriptReaderView: (props: React.ComponentProps<typeof actual.TranscriptReaderView>) => {
+      transcriptRendered();
+      return createElement(actual.TranscriptReaderView, props);
+    },
+  };
+});
+
 const play = vi.fn(() => Promise.resolve());
 const pause = vi.fn();
 
@@ -64,6 +77,7 @@ beforeEach(() => {
   resolvedUrl = "https://example.test/audio.mp3";
   alignment = { lines: null, status: "idle" };
   usePauseAlignedLines.mockClear();
+  transcriptRendered.mockClear();
   play.mockClear();
   pause.mockClear();
   HTMLMediaElement.prototype.play = play as unknown as typeof HTMLMediaElement.prototype.play;
@@ -81,6 +95,32 @@ describe("AudioPlayer", () => {
     fireEvent(audio, new Event("durationchange"));
     await userEvent.click(screen.getByRole("button", { name: /Second line, answering/ }));
     expect(audio.currentTime).toBe(3);
+  });
+
+  it("re-renders the transcript only when the active line changes, not on every timeupdate", () => {
+    const { container } = renderPlayer();
+    const audio = audioElement(container);
+    Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+    fireEvent(audio, new Event("durationchange"));
+    const timeUpdate = (seconds: number) => {
+      audio.currentTime = seconds;
+      fireEvent(audio, new Event("timeupdate"));
+    };
+
+    timeUpdate(0.5);
+    const rendersOnFirstLine = transcriptRendered.mock.calls.length;
+    timeUpdate(1);
+    timeUpdate(2);
+    // The scrubber still follows the time.
+    expect(screen.getByRole("slider", { name: "Seek" })).toHaveAttribute("aria-valuenow", "2");
+    expect(transcriptRendered).toHaveBeenCalledTimes(rendersOnFirstLine);
+
+    timeUpdate(4);
+    expect(transcriptRendered.mock.calls.length).toBeGreaterThan(rendersOnFirstLine);
+    expect(screen.getByRole("button", { name: /Second line, answering/ })).toHaveAttribute(
+      "aria-current",
+      "true"
+    );
   });
 
   it("ignores a line click until the audio can seek", async () => {
