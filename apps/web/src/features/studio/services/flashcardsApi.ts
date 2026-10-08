@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { downloadBlob } from "@/shared/utils/downloadFile";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
@@ -242,23 +242,6 @@ export function useCardReview() {
       rating,
     });
   };
-}
-
-/**
- * Get cards that are due for review.
- * `nowMs` is refreshed on an interval so the query re-runs as the clock advances (no Date.now in the Convex query).
- */
-export function useDueCards(flashcardId: string | null) {
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, [flashcardId]);
-
-  return useQuery(
-    api.studio.flashcards.index.getDueCards,
-    flashcardId ? { id: flashcardId as Id<"flashcards">, nowMs } : "skip"
-  );
 }
 
 /**

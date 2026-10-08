@@ -3,11 +3,12 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import {
   type CardProficiency,
   calculateNextReview,
+  getDueCardIndices,
   initializeProficiency,
 } from "../_lib/srsScheduling";
 
 export type { CardProficiency, SM2State } from "../_lib/srsScheduling";
-export { calculateNextReview, initializeProficiency };
+export { calculateNextReview, getDueCardIndices, initializeProficiency };
 
 /**
  * Database operations for flashcards.
@@ -151,27 +152,6 @@ export function isCardDue(
     return true;
   }
   return proficiency.nextReviewDate <= nowMs;
-}
-
-/**
- * Get cards that are due for review from a flashcard set
- * @param cardsData - Array of cards with proficiency data
- * @returns Array of indices for due cards
- */
-export function getDueCardIndices(
-  cardsData: Array<{ proficiency?: CardProficiency }>,
-  nowMs: number
-): number[] {
-  return cardsData
-    .map((card, index) => ({ card, index }))
-    .filter(({ card }) => {
-      const proficiency = card.proficiency;
-      if (!proficiency || !proficiency.nextReviewDate) {
-        return true; // New card
-      }
-      return proficiency.nextReviewDate <= nowMs;
-    })
-    .map(({ index }) => index);
 }
 
 export async function updateFlashcard(
