@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Doc } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,7 +27,7 @@ const doc = (id: string, fileName: string) =>
     status: "completed",
     createdAt: 0,
     _creationTime: 0,
-  }) as unknown as Doc<"documents">;
+  }) as unknown as DocumentSummary;
 
 describe("useSourceManager", () => {
   beforeEach(() => {
@@ -92,5 +92,41 @@ describe("useSourceManager", () => {
     await waitFor(() => expect(result.current.sources).toHaveLength(2));
     await act(() => result.current.handleDeleteSource("a"));
     expect(result.current.sources.map((s) => s.id)).toEqual(["b"]);
+  });
+
+  it("rebuilds sources only when a shown field changes, not on a new array", async () => {
+    updateDocument.mockResolvedValueOnce(undefined);
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [doc("a", "A.md")] } }
+    );
+    await waitFor(() => expect(result.current.sources).toHaveLength(1));
+    await act(() => result.current.handleRenameSource("a", "Local title"));
+
+    rerender({ documents: [doc("a", "A.md")] });
+    expect(result.current.sources[0].title).toBe("Local title");
+
+    rerender({ documents: [{ ...doc("a", "A.md"), status: "failed" }] });
+    await waitFor(() => expect(result.current.sources[0].status).toBe("failed"));
+    expect(result.current.sources[0].title).toBe("A");
+  });
+
+  it("resets local-only rows when switching between notebooks with the same document list", async () => {
+    const empty: DocumentSummary[] = [];
+    const { result, rerender } = renderHook(
+      ({ notebookId }) => useSourceManager({ documents: empty, notebookId }),
+      { initialProps: { notebookId: "n1" } }
+    );
+    act(() => {
+      result.current.handleAddSource({
+        id: "pending",
+        title: "Uploading",
+        selected: true,
+      } as never);
+    });
+    expect(result.current.sources.map((s) => s.id)).toEqual(["pending"]);
+
+    rerender({ notebookId: "n2" });
+    await waitFor(() => expect(result.current.sources).toEqual([]));
   });
 });

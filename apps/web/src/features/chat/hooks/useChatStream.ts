@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { type Doc, Id } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -42,7 +43,7 @@ interface UseChatStreamProps {
   activeConversationId: string | null;
   sources: Source[];
   notes: Note[];
-  documents: Doc<"documents">[];
+  documents: readonly DocumentSummary[];
   onConversationEnsured?: (conversationId: string) => void;
 }
 
@@ -787,7 +788,7 @@ export function useChatStream({
     documents
   );
   const sourceCount = useMemo(
-    () => documents.filter((d: any) => d.status === "completed").length,
+    () => documents.filter((d) => d.status === "completed").length,
     [documents]
   );
 

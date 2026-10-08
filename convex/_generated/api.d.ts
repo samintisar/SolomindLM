@@ -195,6 +195,7 @@ import type * as documents_embeddingJob from "../documents/embeddingJob.js";
 import type * as documents_getExistingPapers from "../documents/getExistingPapers.js";
 import type * as documents_index from "../documents/index.js";
 import type * as documents_internal from "../documents/internal.js";
+import type * as documents_listSummary from "../documents/listSummary.js";
 import type * as documents_paperRecord from "../documents/paperRecord.js";
 import type * as documents_parseBibliography from "../documents/parseBibliography.js";
 import type * as documents_refreshRemote from "../documents/refreshRemote.js";
@@ -505,6 +506,7 @@ declare const fullApi: ApiFromModules<{
   "documents/getExistingPapers": typeof documents_getExistingPapers;
   "documents/index": typeof documents_index;
   "documents/internal": typeof documents_internal;
+  "documents/listSummary": typeof documents_listSummary;
   "documents/paperRecord": typeof documents_paperRecord;
   "documents/parseBibliography": typeof documents_parseBibliography;
   "documents/refreshRemote": typeof documents_refreshRemote;
