@@ -49,7 +49,7 @@ export function markdownFromMistralOcrResponse(data: {
  * Strip all media references from text (images, videos, audio, etc.)
  * This ensures only text content is returned
  */
-export function stripMistralOcrMedia(text: string): string {
+function stripMistralOcrMedia(text: string): string {
   return (
     text
       // Remove markdown images: ![alt](url) or ![alt][ref]
