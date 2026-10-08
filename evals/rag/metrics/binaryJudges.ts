@@ -10,7 +10,7 @@ import {
   type MetricResult,
 } from "../types";
 import type { LlmJudgeOptions } from "./llmJudge";
-import { binaryMetricResult } from "./metricResult";
+import { metricResult } from "./metricResult";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
 
 interface BinaryJudgeResult {
@@ -110,10 +110,13 @@ async function runBinaryJudge(
   try {
     const raw = await invoke(prompt);
     const { pass, reason } = parseBinaryResponse(raw);
-    return binaryMetricResult(metric, fixture, artifact, pass, reason, { model, pass });
+    return metricResult(metric, fixture, artifact, pass ? "pass" : "fail", pass ? 1 : 0, reason, {
+      model,
+      pass,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return binaryMetricResult(metric, fixture, artifact, false, `Binary judge failed: ${message}`, {
+    return metricResult(metric, fixture, artifact, "fail", 0, `Binary judge failed: ${message}`, {
       model,
       error: message,
     });

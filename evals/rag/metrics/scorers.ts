@@ -119,14 +119,16 @@ export async function scoreAllMetrics(
     enabled: !options.dryRun && invoke !== undefined,
   };
 
-  // Judge groups of one artifact run concurrently; rows keep the order binary, rubric, Likert.
-  const judgeGroups: Array<Promise<MetricResult[]>> = [
-    scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
+  // Judge groups run one after another (each parallelises its own judges), so one case never
+  // bursts the shared Together key; rows keep the order binary, rubric, Likert.
+  const judgeGroups: Array<() => Promise<MetricResult[]>> = [
+    () => scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
   ];
 
-  if (fixture.useCase && binaryOptions.enabled && invoke) {
-    judgeGroups.push(
-      scoreRubricMetrics(fixture, artifact, getPack(fixture.useCase).pack, {
+  const useCase = fixture.useCase;
+  if (useCase && binaryOptions.enabled && invoke) {
+    judgeGroups.push(() =>
+      scoreRubricMetrics(fixture, artifact, getPack(useCase).pack, {
         invoke,
         model: judgeModel,
         sourceTexts: options.packSourceTexts,
@@ -140,15 +142,15 @@ export async function scoreAllMetrics(
       invoke: options.judgeInvoke ?? createTogetherJudgeInvoker({ model: likertModel }),
       model: likertModel,
     };
-    judgeGroups.push(
+    judgeGroups.push(() =>
       artifact.runner === "literatureReview"
         ? scoreLiteratureReviewLlmJudgeMetrics(fixture, artifact, likertOptions)
         : scoreAllLlmJudgeMetrics(fixture, artifact, likertOptions)
     );
   }
 
-  for (const group of await Promise.all(judgeGroups)) {
-    results.push(...group);
+  for (const runGroup of judgeGroups) {
+    results.push(...(await runGroup()));
   }
 
   return results;

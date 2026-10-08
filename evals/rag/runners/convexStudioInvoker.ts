@@ -238,7 +238,8 @@ export const STUDIO_INVOKER_FACTORIES: Partial<Record<StudioRunnerKind, StudioIn
     kind: "audioScriptOnly",
     label: "AudioScriptOnly",
     start: studio.startAudioScriptOnlyEval,
-    status: studio.getAudioScriptOnlyEvalStatus,
+    // Same row shape as the full audio job, so it shares the audioScript status action.
+    status: studio.getAudioScriptEvalStatus,
     idKey: "audioOverviewId",
     buildArgs: (p) => ({ focus: p.topic, length: p.length, audioType: p.audioType }),
   }),

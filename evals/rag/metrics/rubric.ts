@@ -10,7 +10,7 @@ import {
   formatChunks,
   parseBinaryResponse,
 } from "./binaryJudges";
-import { binaryMetricResult, metricResult } from "./metricResult";
+import { metricResult } from "./metricResult";
 
 /** Long enough for a full report or a many-row spreadsheet, so the judge sees every row. */
 const OUTPUT_LIMIT = 40_000;
@@ -143,11 +143,19 @@ export async function scoreRubricMetrics(
           buildRubricPrompt(pack, check, fixture, artifact, options.sourceTexts)
         );
         const { pass, reason } = parseBinaryResponse(raw);
-        return binaryMetricResult(metric, fixture, artifact, pass, reason, {
-          model: options.model,
-          pass,
-          check: check.question,
-        });
+        return metricResult(
+          metric,
+          fixture,
+          artifact,
+          pass ? "pass" : "fail",
+          pass ? 1 : 0,
+          reason,
+          {
+            model: options.model,
+            pass,
+            check: check.question,
+          }
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         // No verdict: a warning, so a flaky judge does not fail the run (scorecard counts it apart).

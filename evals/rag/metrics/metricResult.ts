@@ -21,18 +21,3 @@ export function metricResult(
     ...(breakdown ? { breakdown } : {}),
   };
 }
-
-/** A pass/fail judge verdict (score 1 or 0). Always carries `breakdown`, even when undefined. */
-export function binaryMetricResult(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  pass: boolean,
-  reason: string,
-  breakdown: Record<string, unknown> | undefined
-): MetricResult {
-  return {
-    ...metricResult(metric, fixture, artifact, pass ? "pass" : "fail", pass ? 1 : 0, reason),
-    breakdown,
-  };
-}
