@@ -13,7 +13,7 @@ export default function NotFoundScreen() {
         <Text style={[styles.title, { color: textColor }]}>This screen doesn't exist.</Text>
 
         <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
+          <Text style={[styles.linkText, dark && styles.linkTextDark]}>Go to home screen!</Text>
         </Link>
       </View>
     </>
@@ -38,5 +38,8 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 14,
     color: "#2e78b7",
+  },
+  linkTextDark: {
+    color: "#6aa9de",
   },
 });

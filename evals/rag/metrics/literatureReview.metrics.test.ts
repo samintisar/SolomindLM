@@ -342,4 +342,19 @@ describe("literatureReview Likert judges", () => {
     ]);
     expect(results[0].detail).toMatch(/^LLM judge failed:/);
   });
+
+  it("fail each judge, not the batch, when the judge client can't be built", async () => {
+    vi.stubEnv("TOGETHER_AI_API_KEY", "");
+    try {
+      const results = await scoreLiteratureReviewLlmJudgeMetrics(fixture, stubArtifact(raw), {});
+      expect(results.map((r) => [r.metric, r.status, r.score])).toEqual([
+        ["lr_llm_judge_report_quality", "fail", 0],
+        ["lr_llm_judge_completeness", "fail", 0],
+        ["lr_llm_judge_extraction_quality", "fail", 0],
+      ]);
+      expect(results[2].detail).toMatch(/TOGETHER_AI_API_KEY/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

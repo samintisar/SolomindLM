@@ -675,8 +675,9 @@ async function reportJudgeMetric(
   prompt: string,
   options: LlmJudgeOptions
 ): Promise<MetricResult> {
-  const { invoke, model } = likertInvoker(options);
+  const model = options.model ?? DEFAULT_LLM_JUDGE_MODEL;
   try {
+    const { invoke } = likertInvoker(options);
     const judged = await judgeScore(invoke, prompt);
     return metricResult(
       metric,
@@ -814,7 +815,22 @@ async function lrLlmJudgeExtractionQuality(
     );
   }
 
-  const { invoke, model } = likertInvoker(options);
+  let judge: ReturnType<typeof likertInvoker>;
+  try {
+    judge = likertInvoker(options);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return metricResult(
+      "lr_llm_judge_extraction_quality",
+      fixture,
+      artifact,
+      "fail",
+      0,
+      `LLM judge failed: ${message}`,
+      { error: message, model: options.model ?? DEFAULT_LLM_JUDGE_MODEL }
+    );
+  }
+  const { invoke, model } = judge;
   const judgments = await Promise.all(
     samples.slice(0, 3).map(async (sample) => {
       const prompt = `You are evaluating data extraction from academic papers.
