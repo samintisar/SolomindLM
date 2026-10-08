@@ -14,12 +14,22 @@ vi.mock("./PdfViewer", () => ({
   PdfViewer: ({ file }: { file: string }) => <div data-testid="pdf-viewer">{file}</div>,
 }));
 
+/** `components` prop of each markdown render, to check the override map keeps its identity. */
+const markdownComponentsSeen = vi.hoisted(() => [] as unknown[]);
+
 vi.mock("@/shared/components/MarkdownRenderer", () => ({
-  default: ({ children }: { children: string }) => (
-    <div data-testid="markdown-renderer">{children}</div>
-  ),
+  default: ({ children, components }: { children: string; components?: unknown }) => {
+    markdownComponentsSeen.push(components);
+    return <div data-testid="markdown-renderer">{children}</div>;
+  },
 }));
 
+vi.mock("@/shared/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/utils")>();
+  return { ...actual, sanitizeMarkdown: vi.fn(actual.sanitizeMarkdown) };
+});
+
+import { sanitizeMarkdown } from "@/shared/utils";
 import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
 
 function renderViewer(overrides: Partial<ComponentProps<typeof SourceViewer>> = {}) {
@@ -385,6 +395,49 @@ describe("SourceViewer PDF view switch", () => {
     expect(await screen.findByText("Could not load PDF.")).toBeInTheDocument();
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+});
+
+describe("SourceViewer render cost", () => {
+  const webSource = {
+    id: "doc-web",
+    title: "Article",
+    type: "WEB" as const,
+    date: "2024-01-15",
+    selected: true,
+    status: "completed" as const,
+    sourceGuide: { summary: "Summary.", topics: [], generatedAt: Date.now() },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    markdownComponentsSeen.length = 0;
+    (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(vi.fn());
+  });
+
+  test("sanitizes the body once per content change, not on every re-render", async () => {
+    const { rerender, props } = renderViewer({ source: webSource, content: "First body" });
+    expect(await screen.findByText("First body")).toBeInTheDocument();
+    expect(sanitizeMarkdown).toHaveBeenCalledTimes(1);
+
+    // A parent re-render (e.g. a streamed chat token) with the same content.
+    rerender(<SourceViewer {...props} onDiscussTopic={() => {}} />);
+    rerender(<SourceViewer {...props} onDiscussTopic={() => {}} />);
+    expect(sanitizeMarkdown).toHaveBeenCalledTimes(1);
+
+    rerender(<SourceViewer {...props} content="Second body" />);
+    expect(await screen.findByText("Second body")).toBeInTheDocument();
+    expect(sanitizeMarkdown).toHaveBeenCalledTimes(2);
+  });
+
+  test("passes the same components map to the body renderer on every render", async () => {
+    const { rerender, props } = renderViewer({ source: webSource, content: "Body" });
+    await screen.findByText("Body");
+    rerender(<SourceViewer {...props} onDiscussTopic={() => {}} />);
+
+    const bodyMaps = markdownComponentsSeen.filter((c) => c !== undefined);
+    expect(bodyMaps.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(bodyMaps).size).toBe(1);
   });
 });
 
