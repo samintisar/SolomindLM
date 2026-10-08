@@ -1,4 +1,5 @@
 import { Message } from "@/shared/types/index";
+import { downloadBlob } from "@/shared/utils/downloadFile";
 
 /**
  * Convert chat messages to clean markdown format
@@ -50,11 +51,5 @@ export function exportAsMarkdown(
   markdown += messagesToMarkdown(messages);
 
   // Create and trigger download
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), filename);
 }

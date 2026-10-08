@@ -5,7 +5,7 @@ import {
   FREE_FLASHCARD_MIN_WORDS,
 } from "@convex/_lib/freeToolBounds";
 import { FileText, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
@@ -25,20 +25,38 @@ type PdfStatus =
 
 const PASTED_LABEL = "Pasted notes";
 
-function pastedSource(value: string): SourceState | null {
-  return countWords(value) >= FREE_FLASHCARD_MIN_WORDS
-    ? { text: value, label: PASTED_LABEL }
-    : null;
+function pastedSource(value: string, words: number): SourceState | null {
+  return words >= FREE_FLASHCARD_MIN_WORDS ? { text: value, label: PASTED_LABEL } : null;
+}
+
+const isFileDrag = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+
+/** Swallow file drops that miss the drop zone; the browser would otherwise open the file in the tab. */
+function useBlockStrayFileDrops() {
+  useEffect(() => {
+    const block = (event: DragEvent) => {
+      if (isFileDrag(event)) event.preventDefault();
+    };
+    window.addEventListener("dragover", block);
+    window.addEventListener("drop", block);
+    return () => {
+      window.removeEventListener("dragover", block);
+      window.removeEventListener("drop", block);
+    };
+  }, []);
 }
 
 /** PDF upload (text read in the browser) or pasted notes; reports the active tab's usable source. */
 export function SourceInput({ onChange }: { onChange: (source: SourceState | null) => void }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [pasted, setPasted] = useState("");
+  // Counted once per edit: the regex scans the whole text, which can be ~200k characters.
+  const [pastedWords, setPastedWords] = useState(0);
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>({ kind: "idle" });
   const [dragging, setDragging] = useState(false);
   // dragenter/dragleave also fire for the button's children; count to know when the file truly left.
   const dragDepth = useRef(0);
+  useBlockStrayFileDrops();
   // A slow extraction must not overwrite a newer drop, or the pasted source after a tab switch.
   const readSeq = useRef(0);
   const activeTab = useRef<Tab>("pdf");
@@ -70,18 +88,18 @@ export function SourceInput({ onChange }: { onChange: (source: SourceState | nul
   };
 
   const updatePasted = (value: string) => {
+    const words = countWords(value);
     setPasted(value);
-    onChange(pastedSource(value));
+    setPastedWords(words);
+    onChange(pastedSource(value, words));
   };
 
   // Switching tabs hands back the source the newly shown tab already holds.
   const switchTab = (tab: string) => {
     activeTab.current = tab as Tab;
     if ((tab as Tab) === "pdf") onChange(pdfStatus.kind === "ready" ? pdfStatus.source : null);
-    else onChange(pastedSource(pasted));
+    else onChange(pastedSource(pasted, pastedWords));
   };
-
-  const pastedWords = countWords(pasted);
 
   return (
     <Tabs defaultValue="pdf" className="w-full" onValueChange={switchTab}>

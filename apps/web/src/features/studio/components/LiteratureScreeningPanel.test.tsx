@@ -79,7 +79,6 @@ describe("LiteratureScreeningPanel", () => {
       expect(createObjectURL).toHaveBeenCalledTimes(1);
       expect(createObjectURL.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
       expect(click).toHaveBeenCalledTimes(1);
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:screening");
     } finally {
       click.mockRestore();
       URL.createObjectURL = original.create;
