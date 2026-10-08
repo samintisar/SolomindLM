@@ -26,11 +26,22 @@ vi.mock("../hooks/usePauseAlignedLines", async (importOriginal) => {
   };
 });
 
-/** Only TranscriptReader calls it in this tree, so its call count is the reader's render count. */
-const useReducedMotion = vi.fn(() => false);
 vi.mock("motion/react", () => ({
-  useReducedMotion: () => useReducedMotion(),
+  useReducedMotion: () => false,
 }));
+
+/** Called on every render of the transcript reader, behind its memo. */
+const transcriptRendered = vi.hoisted(() => vi.fn());
+vi.mock("./TranscriptReaderView", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./TranscriptReaderView")>();
+  const { createElement } = await import("react");
+  return {
+    TranscriptReaderView: (props: React.ComponentProps<typeof actual.TranscriptReaderView>) => {
+      transcriptRendered();
+      return createElement(actual.TranscriptReaderView, props);
+    },
+  };
+});
 
 const play = vi.fn(() => Promise.resolve());
 const pause = vi.fn();
@@ -66,7 +77,7 @@ beforeEach(() => {
   resolvedUrl = "https://example.test/audio.mp3";
   alignment = { lines: null, status: "idle" };
   usePauseAlignedLines.mockClear();
-  useReducedMotion.mockClear();
+  transcriptRendered.mockClear();
   play.mockClear();
   pause.mockClear();
   HTMLMediaElement.prototype.play = play as unknown as typeof HTMLMediaElement.prototype.play;
@@ -97,15 +108,15 @@ describe("AudioPlayer", () => {
     };
 
     timeUpdate(0.5);
-    const rendersOnFirstLine = useReducedMotion.mock.calls.length;
+    const rendersOnFirstLine = transcriptRendered.mock.calls.length;
     timeUpdate(1);
     timeUpdate(2);
     // The scrubber still follows the time.
     expect(screen.getByRole("slider", { name: "Seek" })).toHaveAttribute("aria-valuenow", "2");
-    expect(useReducedMotion).toHaveBeenCalledTimes(rendersOnFirstLine);
+    expect(transcriptRendered).toHaveBeenCalledTimes(rendersOnFirstLine);
 
     timeUpdate(4);
-    expect(useReducedMotion.mock.calls.length).toBeGreaterThan(rendersOnFirstLine);
+    expect(transcriptRendered.mock.calls.length).toBeGreaterThan(rendersOnFirstLine);
     expect(screen.getByRole("button", { name: /Second line, answering/ })).toHaveAttribute(
       "aria-current",
       "true"
