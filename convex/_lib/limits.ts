@@ -55,10 +55,14 @@ export async function checkNotebookLimit(ctx: MutationCtx): Promise<void> {
 }
 
 /**
- * Check if user has reached their source (document) limit.
+ * Check that `adding` more sources fit under the user's source (document) limit.
  * Free tier is capped at 20 sources per notebook; Pro at 200.
  */
-export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Promise<void> {
+export async function checkSourceLimit(
+  ctx: QueryCtx,
+  notebookId: string,
+  adding = 1
+): Promise<void> {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new Error("Unauthenticated");
 
@@ -71,7 +75,7 @@ export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Pr
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId as Id<"notebooks">))
     .take(cap);
 
-  if (documents.length >= limit) {
+  if (documents.length + adding > limit) {
     throw createSourceLimitError(documents.length, limit, isPro);
   }
 }

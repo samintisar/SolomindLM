@@ -237,7 +237,10 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"])
+    // Resolve a stored audio file back to the overviews (and notebooks) that may serve it.
+    .index("by_audioStorageId", ["audioStorageId"])
+    .index("by_audioUrl", ["audioUrl"]),
 
   // Flashcards table
   flashcards: defineTable({
