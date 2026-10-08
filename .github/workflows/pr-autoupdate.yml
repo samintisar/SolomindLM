@@ -20,9 +20,11 @@ on:
     branches: [main]
   pull_request:
     types: [auto_merge_enabled]
+    branches: [main]
   workflow_dispatch:
 
-# A newer push to main supersedes a run that is still updating branches.
+# A newer run supersedes one that is still updating branches; every run sweeps all PRs, so a
+# cancelled sweep is always redone.
 concurrency:
   group: pr-autoupdate
   cancel-in-progress: true
@@ -49,13 +51,9 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          prs=$(gh pr list --repo "$REPO" --base main --state open --limit 100 \
+          prs=$(gh pr list --repo "$REPO" --base main --limit 100 \
             --json number,isDraft,isCrossRepository,autoMergeRequest \
             --jq '.[] | select(.autoMergeRequest != null and (.isDraft | not) and (.isCrossRepository | not)) | .number')
-          if [ -z "$prs" ]; then
-            echo "No open auto-merge PRs."
-            exit 0
-          fi
           for pr in $prs; do
             # Up-to-date PRs answer 422 "no new commits"; a conflicting one fails to merge.
             # Neither should stop the others, so report and carry on.
