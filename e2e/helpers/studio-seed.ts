@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { openSourcesPanel } from "./navigation";
-import { addPasteTextSource, PASTED_TEXT_TITLE, waitForSourceStatus } from "./source-assertions";
+import { addPasteTextSource, waitForSourceStatus } from "./source-assertions";
 
 /**
  * Substantive pasted article for studio E2E: long enough for realistic chunking,
@@ -31,6 +31,6 @@ function studioSeedArticle(runId: number): string {
 export async function seedPastedTextSourceForStudio(page: Page) {
   const text = studioSeedArticle(Date.now());
   await openSourcesPanel(page);
-  await addPasteTextSource(page, text);
-  await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 180_000);
+  const title = await addPasteTextSource(page, text);
+  await waitForSourceStatus(page, title, "completed", 180_000);
 }

@@ -43,9 +43,9 @@ test.describe("Add Source Modal", () => {
 
     await openAddSourceModal(page);
 
-    // Footer should show 0 / 100 for a new notebook
+    // Footer shows 0 of the plan's per-notebook cap (20 Free, 200 Pro) for a new notebook
     const dialog = addSourcesDialog(page);
-    await expect(dialog.getByText("0 / 100")).toBeVisible();
+    await expect(dialog.getByText(/^0 \/ \d+$/)).toBeVisible();
     await expect(dialog.getByText("Source limit")).toBeVisible();
   });
 

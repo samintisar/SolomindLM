@@ -34,8 +34,11 @@ test.describe("Auth — Sign-in flow", () => {
     await page.getByPlaceholder("Password").fill("WrongPassword123!");
     await page.getByRole("button", { name: "Continue with email" }).click();
 
-    const errorLocator = page.locator("text=That password doesn't match this account");
-    await expect(errorLocator).toBeVisible({ timeout: 5_000 });
+    // The server reports wrong passwords and unknown emails alike (convex/auth.ts),
+    // so the message can't reveal which addresses have accounts
+    await expect(page.getByText("Email or password is incorrect.")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("sign in with non-existent email shows error", async ({ page }) => {
@@ -43,8 +46,10 @@ test.describe("Auth — Sign-in flow", () => {
     await page.getByPlaceholder("Password").fill("SomePassword123!");
     await page.getByRole("button", { name: "Continue with email" }).click();
 
-    const errorLocator = page.locator("text=We couldn't find an email/password account");
-    await expect(errorLocator).toBeVisible({ timeout: 5_000 });
+    // Same message as a wrong password: unknown emails aren't disclosed
+    await expect(page.getByText("Email or password is incorrect.")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("empty email shows HTML5 validation", async ({ page }) => {

@@ -5,7 +5,6 @@ import {
   deleteSource,
   getSourceCard,
   getSourceCheckbox,
-  PASTED_TEXT_TITLE,
   renameSource,
   selectSource,
   waitForSourceStatus,
@@ -18,19 +17,19 @@ test.describe("Source List", () => {
     const page = notebookPage;
     const sourceText = `Selection Test ${Date.now()}: This is test content for selection.`;
 
-    await addPasteTextSource(page, sourceText);
-    await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 120_000);
+    const title = await addPasteTextSource(page, sourceText);
+    await waitForSourceStatus(page, title, "completed", 120_000);
 
     // Sources are selected by default — verify initial selected state
-    const checkbox = getSourceCheckbox(page, PASTED_TEXT_TITLE);
+    const checkbox = getSourceCheckbox(page, title);
     await expect(checkbox).toBeChecked();
 
     // Deselect by clicking the checkbox
-    await selectSource(page, PASTED_TEXT_TITLE);
+    await selectSource(page, title);
     await expect(checkbox).not.toBeChecked();
 
     // Re-select by clicking again
-    await selectSource(page, PASTED_TEXT_TITLE);
+    await selectSource(page, title);
     await expect(checkbox).toBeChecked();
   });
 
@@ -40,18 +39,18 @@ test.describe("Source List", () => {
     const page = notebookPage;
     const sourceText = `Delete Test ${Date.now()}: This content will be deleted.`;
 
-    await addPasteTextSource(page, sourceText);
-    await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 120_000);
+    const title = await addPasteTextSource(page, sourceText);
+    await waitForSourceStatus(page, title, "completed", 120_000);
 
     // Verify source card is visible (use getSourceCard to avoid matching hidden mobile layout)
-    const card = getSourceCard(page, PASTED_TEXT_TITLE);
+    const card = getSourceCard(page, title);
     await expect(card).toBeVisible();
 
     // Delete it
-    await deleteSource(page, PASTED_TEXT_TITLE);
+    await deleteSource(page, title);
 
     // Source should be removed
-    await expect(getSourceCard(page, PASTED_TEXT_TITLE)).not.toBeVisible({ timeout: 5_000 });
+    await expect(getSourceCard(page, title)).not.toBeVisible({ timeout: 5_000 });
   });
 
   test("source can be renamed via kebab menu", async ({ notebookPage }) => {
@@ -61,12 +60,12 @@ test.describe("Source List", () => {
     const sourceText = `Rename Test ${Date.now()}: Original name.`;
     const newName = `Renamed Source ${Date.now()}`;
 
-    await addPasteTextSource(page, sourceText);
-    await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 120_000);
+    const title = await addPasteTextSource(page, sourceText);
+    await waitForSourceStatus(page, title, "completed", 120_000);
 
     // Menu -> Rename -> inline "Rename source" textbox -> Enter. The row's title
     // becomes an input while renaming, so the helper finds it by role, not by card.
-    await renameSource(page, PASTED_TEXT_TITLE, newName);
+    await renameSource(page, title, newName);
 
     // Verify new name is visible in source card
     await expect(getSourceCard(page, newName)).toBeVisible({ timeout: 5_000 });
