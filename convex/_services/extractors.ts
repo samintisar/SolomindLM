@@ -1,21 +1,11 @@
 "use node";
 
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
-import { action, internalAction } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
-import { getAuthUserId } from "../auth";
-import { CACHE_TTL, withJitter } from "./cache/cache";
-import { createCachedAction } from "./cache/cachedAgent";
-import {
-  markdownFromMistralOcrResponse,
-  stripMistralOcrMedia,
-} from "./extraction/MistralOCRService";
 import { WebLoaderService } from "./extraction/WebLoaderService";
 
-// ============================================================
-// Internal Actions (make actual API calls)
-// ============================================================
+// Internal only: callers (the embedding job, evals) apply their own auth and rate limits.
 
 export const scrapeWebPageInternal = internalAction({
   args: { url: v.string() },
@@ -46,109 +36,5 @@ export const getSocialTranscriptInternal = internalAction({
       contentLength: result.content.length,
     });
     return { ...result, url: args.url };
-  },
-});
-
-// ============================================================
-// Cached Wrappers
-// ============================================================
-
-const scrapeCache = createCachedAction(internal._services.extractors.scrapeWebPageInternal, {
-  ttl: withJitter(CACHE_TTL.documentContent, 0.15),
-  name: "supadata-scrape",
-});
-
-const transcriptCache = createCachedAction(
-  internal._services.extractors.getSocialTranscriptInternal,
-  { ttl: withJitter(CACHE_TTL.documentContent, 0.15), name: "supadata-transcript" }
-);
-
-// ============================================================
-// Public Cached Actions
-// ============================================================
-
-/**
- * Scrape a URL using Supadata (cached)
- */
-export const scrapeUrl = action({
-  args: { url: v.string() },
-  handler: async (ctx, args): Promise<{ title: string; content: string }> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthenticated");
-    }
-    return scrapeCache.fetch(ctx, { url: args.url });
-  },
-});
-
-/**
- * Get YouTube/social transcript using Supadata (cached)
- */
-export const getYouTubeTranscript = action({
-  args: { url: v.string() },
-  handler: async (ctx, args): Promise<{ title: string; content: string }> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthenticated");
-    }
-    return transcriptCache.fetch(ctx, { url: args.url });
-  },
-});
-
-/**
- * Extract transcript from a YouTube video using Supadata (legacy alias, cached)
- */
-export const extractFromYouTube = action({
-  args: { videoId: v.string() },
-  handler: async (ctx, args): Promise<{ title: string; content: string }> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthenticated");
-    }
-    return transcriptCache.fetch(ctx, {
-      url: `https://youtube.com/watch?v=${args.videoId}`,
-    });
-  },
-});
-
-/**
- * Extract text from a PDF/image using Mistral OCR API
- */
-export const extractFromOCR = action({
-  args: { fileUrl: v.string() },
-  handler: async (ctx, args): Promise<string> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthenticated");
-    }
-    const apiKey = process.env.MISTRAL_API_KEY;
-    if (!apiKey) {
-      throw new Error("MISTRAL_API_KEY is not set");
-    }
-
-    const response = await fetch("https://api.mistral.ai/v1/ocr", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "mistral-ocr-latest",
-        document: {
-          type: "document_url",
-          document_url: args.fileUrl,
-        },
-        table_format: "markdown",
-        include_image_base64: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Mistral OCR API error: ${error}`);
-    }
-
-    const data = await response.json();
-    return stripMistralOcrMedia(markdownFromMistralOcrResponse(data));
   },
 });
