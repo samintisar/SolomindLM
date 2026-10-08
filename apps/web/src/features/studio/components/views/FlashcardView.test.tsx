@@ -5,13 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { FlashcardView } from "./FlashcardView";
 
-let due: { index: number; card: Flashcard }[] = [];
 const noop = vi.fn().mockResolvedValue(undefined);
 const updateCard = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/features/studio/services/flashcardsApi", () => ({
   useFlashcard: () => null,
-  useDueCards: () => due,
   useAddCard: () => noop,
   useUpdateCard: () => updateCard,
   useDeleteCard: () => noop,
@@ -50,7 +48,6 @@ function makeNote(showMastered = false, flashcards = makeCards()): FlashcardNote
 
 beforeEach(() => {
   vi.clearAllMocks();
-  due = makeCards().map((card, index) => ({ index, card }));
 });
 
 describe("FlashcardView", () => {
@@ -67,12 +64,14 @@ describe("FlashcardView", () => {
 
   it("disables Study Mode with nothing due, and starts a session when there is", async () => {
     const user = userEvent.setup();
-    due = [];
-    const { unmount } = render(<FlashcardView note={makeNote()} />);
+    const notDueYet = makeCards().map((card) => ({
+      ...card,
+      proficiency: { nextReviewDate: Date.now() + 86_400_000, interval: 1 },
+    })) as unknown as Flashcard[];
+    const { unmount } = render(<FlashcardView note={makeNote(false, notDueYet)} />);
     expect(screen.getByRole("button", { name: "Study Mode" })).toBeDisabled();
     unmount();
 
-    due = makeCards().map((card, index) => ({ index, card }));
     render(<FlashcardView note={makeNote()} />);
     await user.click(screen.getByRole("button", { name: "Study Mode" }));
     expect(await screen.findByRole("button", { name: "Reveal answer" })).toBeInTheDocument();
