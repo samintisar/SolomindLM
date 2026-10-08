@@ -58,6 +58,11 @@ jobs:
       - name: Typecheck evals
         run: bun run typecheck:evals
 
+      # e2e/ runs under Playwright, which strips types without checking them, and
+      # imports web modules (e2e/billing).
+      - name: Typecheck e2e
+        run: bun run typecheck:e2e
+
   # Its own job, not a step in typecheck-convex, so it shows as its own required
   # check in branch protection (.github/branch-protection.ps1).
   convex-codegen:
