@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
@@ -112,6 +112,43 @@ async function seedNotebook(
       createdAt: Date.now(),
       updatedAt: Date.now(),
     })
+  );
+}
+
+async function seedDocuments(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  notebookId: Id<"notebooks">,
+  count: number
+): Promise<void> {
+  await t.run(async (ctx) => {
+    for (let i = 0; i < count; i++) {
+      await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: `Existing ${i}`,
+        fileType: "url",
+        fileUrl: `https://existing.example.com/${i}`,
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+  });
+}
+
+async function countNotebookDocuments(
+  t: ReturnType<typeof convexTest>,
+  notebookId: Id<"notebooks">
+): Promise<number> {
+  return t.run(
+    async (ctx) =>
+      (
+        await ctx.db
+          .query("documents")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+          .collect()
+      ).length
   );
 }
 
@@ -726,6 +763,132 @@ describe("documents.addExternalSources", () => {
         .collect()
     );
     expect(docs).toHaveLength(1);
+  });
+
+  test("enforces the source limit across the batch", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    await seedDocuments(t, userId, notebookId, 19); // one below the free cap of 20
+    const asUser = withAuth(t, userId);
+
+    await expect(
+      asUser.mutation(api.documents.index.addExternalSources, {
+        notebookId,
+        sources: [1, 2, 3].map((n) => ({
+          title: `Source ${n}`,
+          url: `https://example.com/${n}`,
+          sourceType: "web",
+        })),
+      })
+    ).rejects.toThrow("Source limit reached");
+
+    // The mutation rolls back, so nothing from the batch is kept.
+    expect(await countNotebookDocuments(t, notebookId)).toBe(19);
+  });
+
+  test("refuses a notebook already at the source limit", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    await seedDocuments(t, userId, notebookId, 20);
+    const asUser = withAuth(t, userId);
+
+    await expect(
+      asUser.mutation(api.documents.index.addExternalSources, {
+        notebookId,
+        sources: [{ title: "One more", url: "https://example.com/more", sourceType: "web" }],
+      })
+    ).rejects.toThrow("Source limit reached");
+    expect(await countNotebookDocuments(t, notebookId)).toBe(20);
+  });
+});
+
+describe("documents source-guide access for shared notebooks", () => {
+  async function seedSharedDocument(t: ReturnType<typeof convexTest>) {
+    const owner = await seedUser(t);
+    const member = await seedUser(t);
+    const stranger = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    const documentId = await t.run(async (ctx) => {
+      await ctx.db.insert("notebookMembers", {
+        notebookId,
+        userId: member,
+        role: "editor",
+        joinedAt: Date.now(),
+      });
+      const id = await ctx.db.insert("documents", {
+        userId: owner,
+        notebookId,
+        fileName: "Shared Paper",
+        fileType: "file",
+        status: "completed",
+        sourceGuide: { summary: "Shared summary.", topics: ["Topic"], generatedAt: Date.now() },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("documentChunks", {
+        documentId: id,
+        userId: owner,
+        notebookId,
+        content: "Chunk uploaded by the owner.",
+        chunkIndex: 0,
+        createdAt: Date.now(),
+      });
+      return id;
+    });
+    return { owner, member, stranger, documentId };
+  }
+
+  test("getDocumentInternal returns the document to notebook members", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, member, stranger, documentId } = await seedSharedDocument(t);
+
+    for (const userId of [owner, member]) {
+      const doc = await t.query(internal.documents.index.getDocumentInternal, {
+        documentId,
+        userId,
+      });
+      expect(doc?._id).toBe(documentId);
+    }
+    expect(
+      await t.query(internal.documents.index.getDocumentInternal, {
+        documentId,
+        userId: stranger,
+      })
+    ).toBeNull();
+  });
+
+  test("getDocumentChunksInternal returns the uploader's chunks to notebook members", async () => {
+    const t = convexTest(schema, modules);
+    const { member, stranger, documentId } = await seedSharedDocument(t);
+
+    const chunks = await t.query(internal.documents.index.getDocumentChunksInternal, {
+      documentId,
+      userId: member,
+    });
+    expect(chunks.map((c) => c.content)).toEqual(["Chunk uploaded by the owner."]);
+
+    expect(
+      await t.query(internal.documents.index.getDocumentChunksInternal, {
+        documentId,
+        userId: stranger,
+      })
+    ).toEqual([]);
+  });
+
+  test("getSourceGuide shows the guide to notebook members only", async () => {
+    const t = convexTest(schema, modules);
+    const { member, stranger, documentId } = await seedSharedDocument(t);
+
+    const guide = await withAuth(t, member).query(api.documents.index.getSourceGuide, {
+      documentId,
+    });
+    expect(guide?.summary).toBe("Shared summary.");
+
+    expect(
+      await withAuth(t, stranger).query(api.documents.index.getSourceGuide, { documentId })
+    ).toBeNull();
   });
 });
 

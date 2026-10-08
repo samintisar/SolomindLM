@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { checkDailyLimit } from "../../_lib/limits";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
@@ -65,16 +64,11 @@ export const resolvePlaybackUrl = query({
     }
 
     const raw = overview.audioUrl.trim();
-    if (raw.startsWith("http://") || raw.startsWith("https://")) {
-      return { url: raw };
-    }
+    const storageRef = AudioOverviews.storageRefFromAudioUrl(raw);
+    if (!storageRef) return { url: raw };
 
-    let storageId = raw;
-    if (storageId.startsWith("/audio/")) storageId = storageId.slice("/audio/".length);
-    else if (storageId.startsWith("audio/")) storageId = storageId.slice("audio/".length);
-    if (storageId.startsWith("/")) storageId = storageId.slice(1);
-
-    const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
+    const storageId = ctx.db.system.normalizeId("_storage", storageRef);
+    const url = storageId ? await ctx.storage.getUrl(storageId) : null;
     return url ? { url } : null;
   },
 });
@@ -82,8 +76,8 @@ export const resolvePlaybackUrl = query({
 /**
  * Resolve a raw audioUrl string (storageId or legacy /audio/<id> path) to a signed
  * playback URL. Used for legacy audio notes that don't have an audioOverviewId.
- * Requires authentication but does not verify ownership — callers should ensure
- * the audioUrl came from a resource the user already has access to.
+ * A storage reference only resolves when the user can read a notebook whose audio
+ * overview points at that file.
  */
 export const resolveRawAudioUrl = query({
   args: { audioUrl: v.string() },
@@ -95,17 +89,13 @@ export const resolveRawAudioUrl = query({
     if (!raw) return null;
 
     // Already a full URL — return as-is
-    if (raw.startsWith("http://") || raw.startsWith("https://")) {
-      return { url: raw };
-    }
+    const storageRef = AudioOverviews.storageRefFromAudioUrl(raw);
+    if (!storageRef) return { url: raw };
 
-    // Strip /audio/ prefix from legacy storage paths
-    let storageId = raw;
-    if (storageId.startsWith("/audio/")) storageId = storageId.slice("/audio/".length);
-    else if (storageId.startsWith("audio/")) storageId = storageId.slice("audio/".length);
-    if (storageId.startsWith("/")) storageId = storageId.slice(1);
+    if (!(await AudioOverviews.canReadAudioFile(ctx, storageRef, userId))) return null;
 
-    const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
+    const storageId = ctx.db.system.normalizeId("_storage", storageRef);
+    const url = storageId ? await ctx.storage.getUrl(storageId) : null;
     return url ? { url } : null;
   },
 });

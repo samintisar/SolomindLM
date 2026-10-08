@@ -1149,15 +1149,9 @@ export async function runAssembleAudioOverviewPhase(
       throw new Error("Failed to get Convex storage URL for audio");
     }
 
-    // For now, use the standard URL while we debug the custom endpoint
-    // TODO: Switch to custom /audio/ endpoint once verified working
     const audioUrl = standardUrl;
 
-    console.log(`[AudioJob] Audio uploaded:`, {
-      storageId,
-      standardUrl,
-      customUrl: `${process.env.CONVEX_DEPLOYMENT}/audio/${storageId}`,
-    });
+    console.log(`[AudioJob] Audio uploaded:`, { storageId, standardUrl });
 
     // Build transcript
     const transcript = fullDialogueScript.map((l) => l.text).join("\n");
