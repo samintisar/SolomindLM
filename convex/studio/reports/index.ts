@@ -197,19 +197,6 @@ export const updateStatus = internalMutation({
 });
 
 /**
- * Internal: Update report content
- */
-export const updateContent = internalMutation({
-  args: {
-    reportId: v.id("reports"),
-    content: v.any(),
-  },
-  handler: async (ctx, args) => {
-    await Reports.updateReportContent(ctx, args.reportId, args.content);
-  },
-});
-
-/**
  * Internal: Update report with partial updates
  */
 export const patch = internalMutation({

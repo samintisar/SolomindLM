@@ -104,72 +104,6 @@ export const isChatGenerationActiveInternal = internalQuery({
 });
 
 /**
- * Get all conversations for a user
- */
-export const list = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      id: v.id("conversations"),
-      notebookId: v.id("notebooks"),
-      notebookTitle: v.string(),
-      createdAt: v.number(),
-      updatedAt: v.number(),
-    })
-  ),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    const conversations = await ConvModel.getUserConversations(ctx, userId);
-
-    const result = await Promise.all(
-      conversations.map(async (conv) => {
-        const notebook = await ctx.db.get(conv.notebookId);
-        return {
-          id: conv._id,
-          notebookId: conv.notebookId,
-          notebookTitle: notebook?.title || "Unknown",
-          createdAt: conv.createdAt,
-          updatedAt: conv.updatedAt,
-        };
-      })
-    );
-
-    return result;
-  },
-});
-
-/**
- * Get messages for a conversation (with pagination)
- */
-export const getMessages = query({
-  args: {
-    conversationId: v.id("conversations"),
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return { messages: [], cursor: null, isDone: true };
-
-    await assertCanReadConversation(ctx, args.conversationId, userId);
-
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
-      .order("asc")
-      .paginate({ cursor: args.cursor as any, numItems: args.limit || 50 });
-
-    return {
-      messages: messages.page,
-      cursor: messages.continueCursor,
-      isDone: messages.isDone,
-    };
-  },
-});
-
-/**
  * INTERNAL: Get messages for a conversation (no auth check - for HTTP actions)
  * Supports pagination for long conversations
  */
@@ -387,30 +321,5 @@ export const updateMessageMetadata = internalMutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.messageId, { metadata: args.metadata });
-  },
-});
-
-/**
- * Clear all messages in a conversation
- */
-export const clearMessages = mutation({
-  args: { conversationId: v.id("conversations") },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-
-    await assertCanEditConversation(ctx, args.conversationId, userId);
-
-    // Delete all messages
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
-      .collect();
-
-    for (const message of messages) {
-      await ctx.db.delete(message._id);
-    }
-
-    return { message: "Messages cleared successfully" };
   },
 });

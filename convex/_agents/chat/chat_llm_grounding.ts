@@ -1,6 +1,6 @@
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
 import { passageTextForModel } from "./passageContext.js";
+import type { ReferenceChunk } from "./types";
 
 /**
  * Builds grounding prompt optimized for research/learning contexts.

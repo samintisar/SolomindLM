@@ -1,7 +1,49 @@
 "use node";
 
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import type { VectorSearchHandler } from "./vector_search.js";
+
+/**
+ * Chunk-level metadata for RAG context.
+ * Extracted during chunking and used for retrieval context.
+ */
+export interface ChunkMetadata {
+  totalChunks?: number;
+  relativePosition?: number;
+  chunkLengthChars?: number;
+  wordCount?: number;
+  sentenceCount?: number;
+  pageNumber?: number | null;
+  sectionTitle?: string | null;
+  sectionLevel?: number | null;
+  headingPath?: string[];
+  previousChunkPreview?: string | null;
+  nextChunkPreview?: string | null;
+  hasCodeBlock?: boolean;
+  hasMathNotation?: boolean;
+  hasTable?: boolean;
+  hasBulletList?: boolean;
+  hasNumberedList?: boolean;
+  /** User @-mentioned this notebook document — keep in context; do not demote via query reranking */
+  userAttached?: boolean;
+}
+
+export interface ReferenceChunk {
+  id: string;
+  sourceId: string;
+  /** Notebook document (same for all chunks from one file); use for UI grouping */
+  documentId?: string;
+  sourceTitle: string;
+  /** Original URL for `url` / `youtube` documents — use for opening in browser (fileName may be title or hostname only) */
+  sourceUrl?: string;
+  content: string;
+  chunkIndex: number;
+  similarity?: number;
+  rrfScore?: number;
+  vectorRank?: number;
+  keywordRank?: number;
+  // Chunk metadata for enhanced context
+  metadata?: ChunkMetadata;
+}
 
 export interface ChatAgentContext {
   userId: string;

@@ -8,8 +8,8 @@
  */
 
 import type { EmbeddingService } from "../../_services/ai/embeddingClient";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { matchAllInlineCitations, stripInlineCitationMarkers } from "../_shared/citationExtract.js";
+import type { ReferenceChunk } from "./types";
 
 // ============================================================
 // Types
