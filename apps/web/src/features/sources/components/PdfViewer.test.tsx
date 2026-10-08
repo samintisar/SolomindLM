@@ -1,11 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode, useEffect } from "react";
-import { beforeAll, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { PdfViewer } from "./PdfViewer";
 
 vi.mock("react-pdf/dist/Page/AnnotationLayer.css", () => ({}));
 vi.mock("react-pdf/dist/Page/TextLayer.css", () => ({}));
+
+const pageRenders = vi.hoisted(() => new Map<number, number>());
 
 vi.mock("react-pdf", () => ({
   pdfjs: { GlobalWorkerOptions: {} },
@@ -23,7 +25,10 @@ vi.mock("react-pdf", () => ({
     }, [onLoadSuccess]);
     return <div data-testid="pdf-document">{children}</div>;
   },
-  Page: ({ pageNumber }: { pageNumber: number }) => <div data-testid={`page-${pageNumber}`} />,
+  Page: ({ pageNumber }: { pageNumber: number }) => {
+    pageRenders.set(pageNumber, (pageRenders.get(pageNumber) ?? 0) + 1);
+    return <div data-testid={`page-${pageNumber}`} />;
+  },
   Outline: () => <div data-testid="pdf-outline" />,
 }));
 
@@ -100,5 +105,81 @@ describe("PdfViewer toolbar", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("pdf-outline")).toBeInTheDocument();
+  });
+});
+
+describe("PdfViewer page virtualization", () => {
+  let observerCallback: IntersectionObserverCallback | null = null;
+  let observerOptions: IntersectionObserverInit | undefined;
+  const observed: Element[] = [];
+
+  beforeAll(() => {
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(cb: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+          observerCallback = cb;
+          observerOptions = options;
+        }
+        observe = (el: Element) => {
+          observed.push(el);
+        };
+        unobserve = () => undefined;
+        disconnect = () => {
+          observed.length = 0;
+        };
+        takeRecords = () => [];
+      }
+    );
+  });
+
+  afterEach(() => {
+    pageRenders.clear();
+  });
+
+  function report(pageNumber: number, isIntersecting: boolean) {
+    const target = observed.find((el) => (el as HTMLElement).dataset.page === String(pageNumber));
+    if (!target) throw new Error(`page ${pageNumber} slot is not observed`);
+    act(() => {
+      observerCallback?.(
+        [{ target, isIntersecting } as unknown as IntersectionObserverEntry],
+        {} as IntersectionObserver
+      );
+    });
+  }
+
+  test("observes every page slot with a single membership threshold", async () => {
+    render(<PdfViewer file="blob:test.pdf" />);
+    await screen.findByTestId("page-1");
+
+    expect(observed).toHaveLength(3);
+    expect(observerOptions?.threshold).toBe(0);
+  });
+
+  test("an observer report that changes nothing re-renders no pages", async () => {
+    render(<PdfViewer file="blob:test.pdf" />);
+    await screen.findByTestId("page-1");
+    const before = pageRenders.get(1);
+
+    report(1, true);
+    report(3, false);
+
+    expect(pageRenders.get(1)).toBe(before);
+  });
+
+  test("a page entering the viewport renders without re-rendering the others", async () => {
+    render(<PdfViewer file="blob:test.pdf" />);
+    await screen.findByTestId("page-1");
+    const before = pageRenders.get(1);
+    expect(screen.queryByTestId("page-2")).not.toBeInTheDocument();
+
+    report(2, true);
+
+    expect(screen.getByTestId("page-2")).toBeInTheDocument();
+    expect(pageRenders.get(1)).toBe(before);
+
+    report(1, false);
+    expect(screen.queryByTestId("page-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("page-2")).toBeInTheDocument();
   });
 });
