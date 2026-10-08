@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { calculateNextReview, initializeProficiency } from "./srsScheduling";
+import { calculateNextReview, getDueCardIndices, initializeProficiency } from "./srsScheduling";
 
 describe("calculateNextReview", () => {
   const now = new Date("2026-04-29T12:00:00Z");
@@ -75,5 +75,23 @@ describe("initializeProficiency", () => {
       phase: "learning",
       learningStep: 0,
     });
+  });
+});
+
+describe("getDueCardIndices", () => {
+  const now = 1_000_000;
+  const base = { interval: 1, easeFactor: 2.5, streak: 0, totalReviews: 1 };
+
+  it("treats never-reviewed cards as due", () => {
+    expect(getDueCardIndices([{}, { proficiency: { ...base } }], now)).toEqual([0, 1]);
+  });
+
+  it("includes cards whose review time has arrived and skips future ones", () => {
+    const cards = [
+      { proficiency: { ...base, nextReviewDate: now - 1 } },
+      { proficiency: { ...base, nextReviewDate: now + 1 } },
+      { proficiency: { ...base, nextReviewDate: now } },
+    ];
+    expect(getDueCardIndices(cards, now)).toEqual([0, 2]);
   });
 });

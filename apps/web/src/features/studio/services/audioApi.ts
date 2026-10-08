@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
+import { useCallback, useMemo } from "react";
 import type { AudioOverviewNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -93,34 +94,46 @@ export function useCreateAudioOverview() {
  * Update an audio overview with optimistic update
  */
 export function useUpdateAudioOverview() {
-  const update = useMutation(api.studio.audio.index.update).withOptimisticUpdate(
-    (localStore, { id, ...updates }) => {
-      patchNoteInNotesCache(localStore, id, updates);
-    }
+  const updateMutation = useMutation(api.studio.audio.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, ...updates }) => {
+        patchNoteInNotesCache(localStore, id, updates);
+      }),
+    [updateMutation]
   );
 
-  return async (
-    audioOverviewId: string,
-    updates: Partial<Pick<AudioOverviewNote, "transcript" | "audioUrl" | "title" | "metadata">>
-  ) => {
-    return await update({
-      id: audioOverviewId as Id<"audioOverviews">,
-      ...updates,
-    });
-  };
+  return useCallback(
+    async (
+      audioOverviewId: string,
+      updates: Partial<Pick<AudioOverviewNote, "transcript" | "audioUrl" | "title" | "metadata">>
+    ) => {
+      return await update({
+        id: audioOverviewId as Id<"audioOverviews">,
+        ...updates,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete an audio overview by ID with optimistic update
  */
 export function useDeleteAudioOverview() {
-  const remove = useMutation(api.studio.audio.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
+  const removeMutation = useMutation(api.studio.audio.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+      }),
+    [removeMutation]
   );
 
-  return async (audioOverviewId: string) => {
-    await remove({ id: audioOverviewId as Id<"audioOverviews"> });
-  };
+  return useCallback(
+    async (audioOverviewId: string) => {
+      await remove({ id: audioOverviewId as Id<"audioOverviews"> });
+    },
+    [remove]
+  );
 }

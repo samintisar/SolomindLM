@@ -219,6 +219,9 @@ const StudioPanelContent: React.FC<StudioPanelProps> = ({
       note.type === "spreadsheet" ||
       note.type === "note"
     ) {
+      // Opening the playing note hands it to the full player, as Expand does. Closing (not just
+      // hiding) keeps the mini player from remounting and restarting when the user goes back.
+      if (miniPlayerVisible && miniPlayerData?.noteId === note.id) onCloseMiniPlayer();
       setActiveNoteId(note.id);
     }
   };
