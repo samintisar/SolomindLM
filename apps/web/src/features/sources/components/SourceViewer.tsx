@@ -1,5 +1,6 @@
 import { BookOpenText, ChevronDown, FileText, FileType, Tags, XCircle } from "lucide-react";
-import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { MarkdownRendererProps } from "@/shared/components/MarkdownRenderer.utils";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
@@ -22,6 +23,38 @@ import { YouTubeEmbedUnavailable, YouTubeVideoPreview } from "./YouTubeVideoPrev
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
+
+type MarkdownComponents = NonNullable<MarkdownRendererProps["components"]>;
+
+/**
+ * Overrides for the source body. Module scope keeps the map's identity stable: Streamdown's
+ * blocks skip re-rendering only while each override is the same function as last render.
+ */
+const SOURCE_MARKDOWN_COMPONENTS: MarkdownComponents = {
+  img: () => null,
+  a: ({ children }) => <span className="text-foreground">{children}</span>,
+  video: () => null,
+  audio: () => null,
+  iframe: () => null,
+  table: ({ children }) => (
+    <table className="w-full border-separate border-spacing-0 overflow-hidden rounded-xl ring-1 ring-hairline">
+      {children}
+    </table>
+  ),
+  thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr>{children}</tr>,
+  th: ({ children }) => (
+    <th className="px-4 py-2 text-left font-semibold text-foreground border-b border-r border-border/60 last:border-r-0">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-4 py-2 text-foreground border-b border-r border-border/60 last:border-r-0">
+      {children}
+    </td>
+  ),
+};
 
 type PdfViewMode = "pdf" | "markdown";
 
@@ -115,6 +148,13 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   ]);
 
   const youtubeVideoId = isYouTubeSource(source) ? extractYouTubeVideoId(source.url) : null;
+
+  // DOMPurify over the whole document is the costliest step here; the panel re-renders on every
+  // streamed chat token, so only re-sanitize when the content itself changes.
+  const sanitizedContent = useMemo(
+    () => sanitizeMarkdown(content || "No content available."),
+    [content]
+  );
 
   return (
     <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
@@ -280,34 +320,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           ) : (
             <div className="prose max-w-none font-serif leading-relaxed text-foreground/90 select-text">
               <Suspense fallback={<Skeleton className="h-4 w-full" />}>
-                <MarkdownRenderer
-                  components={{
-                    img: () => null,
-                    a: ({ children }) => <span className="text-foreground">{children}</span>,
-                    video: () => null,
-                    audio: () => null,
-                    iframe: () => null,
-                    table: ({ children }) => (
-                      <table className="w-full border-separate border-spacing-0 overflow-hidden rounded-xl ring-1 ring-hairline">
-                        {children}
-                      </table>
-                    ),
-                    thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => <tr>{children}</tr>,
-                    th: ({ children }) => (
-                      <th className="px-4 py-2 text-left font-semibold text-foreground border-b border-r border-border/60 last:border-r-0">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-4 py-2 text-foreground border-b border-r border-border/60 last:border-r-0">
-                        {children}
-                      </td>
-                    ),
-                  }}
-                >
-                  {sanitizeMarkdown(content || "No content available.")}
+                <MarkdownRenderer components={SOURCE_MARKDOWN_COMPONENTS}>
+                  {sanitizedContent}
                 </MarkdownRenderer>
               </Suspense>
             </div>
