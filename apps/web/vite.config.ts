@@ -96,12 +96,6 @@ export default defineConfig(({ mode }) => {
                 return proxy;
               },
             },
-            // Convex http.ts serves /audio/:storageId on the .site deployment
-            "/audio": {
-              target: convexSiteUrl,
-              changeOrigin: true,
-              secure: true,
-            },
           }
         : undefined,
     },

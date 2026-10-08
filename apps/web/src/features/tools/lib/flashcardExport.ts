@@ -1,5 +1,8 @@
 /** Exports for the free flashcard tool. Pure string builders + one DOM download helper. */
 
+import { toSafeExportCell } from "@/features/studio/components/spreadsheet/sheetModel";
+import { downloadBlob } from "@/shared/utils/downloadFile";
+
 export type ExportCard = { front: string; back: string };
 
 /** Anki/Quizlet text imports split fields on tabs and cards on newlines. */
@@ -27,9 +30,9 @@ export function toQuizletText(cards: ExportCard[]): string {
   return cards.map(tabLine).join("\n");
 }
 
-const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+const csvCell = (value: string) => `"${toSafeExportCell(value).replace(/"/g, '""')}"`;
 
-/** BOM so Excel reads UTF-8; CRLF rows per RFC 4180. */
+/** BOM so Excel reads UTF-8; CRLF rows per RFC 4180; formula-like cells open as text. */
 export function toCsv(cards: ExportCard[]): string {
   const rows = cards.map((c) => `${csvCell(c.front)},${csvCell(c.back)}`);
   return `﻿${["Front,Back", ...rows].join("\r\n")}`;
@@ -46,12 +49,5 @@ export function exportFileName(title: string, extension: string): string {
 }
 
 export function downloadTextFile(fileName: string, content: string, mimeType: string): void {
-  const url = URL.createObjectURL(new Blob([content], { type: `${mimeType};charset=utf-8` }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([content], { type: `${mimeType};charset=utf-8` }), fileName);
 }

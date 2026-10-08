@@ -78,23 +78,6 @@ export const list = query({
   },
 });
 
-/**
- * Internal: Get notebooks for a specific user (for caching)
- */
-export const listInternal = internalQuery({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const notebooks = await Notebooks.getUserNotebooks(ctx, args.userId);
-    const notebooksWithCounts = await Promise.all(
-      notebooks.map(async (notebook) => {
-        const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
-        return toNotebookDTO(notebook, sourceCount);
-      })
-    );
-    return notebooksWithCounts;
-  },
-});
-
 /** For actions: check edit access without throwing. */
 export const canEditNotebookInternal = internalQuery({
   args: {
@@ -254,21 +237,5 @@ export const remove = mutation({
 
     await Notebooks.removeNotebookWithRelated(ctx, args.id);
     return { message: "Notebook deleted successfully" };
-  },
-});
-
-/**
- * Get all reports for a notebook
- */
-export const getReports = query({
-  args: { notebookId: v.id("notebooks") },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    const access = await getNotebookAccess(ctx, args.notebookId, userId);
-    if (!access) return [];
-
-    return await Notebooks.getReportsByNotebook(ctx, args.notebookId);
   },
 });

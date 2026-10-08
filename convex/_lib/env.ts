@@ -44,12 +44,6 @@ export const env = {
   // Supadata
   SUPADATA_API_KEY: process.env.SUPADATA_API_KEY || "",
 
-  // Stripe
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "",
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || "",
-  STRIPE_PRO_MONTHLY_PRICE_ID: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || "",
-  STRIPE_PRO_YEARLY_PRICE_ID: process.env.STRIPE_PRO_YEARLY_PRICE_ID || "",
-
   // Chat (RAG + reranking)
   CHAT_LLM_TEMPERATURE: "0.2",
   CHAT_VECTOR_MATCH_THRESHOLD: "0.4",
@@ -67,8 +61,6 @@ export const env = {
   CHAT_HISTORY_TOKEN_BUDGET: "4000",
   /** Grounding: async (stream-first + warn), sync (validate + strict retry before stream), off. */
   CHAT_GROUNDING_MODE: "async",
-  /** Whole-answer vs cited-chunks embedding similarity bar (grounding_validator). */
-  GROUNDING_SIMILARITY_THRESHOLD: "0.30",
 
   // Hybrid Search
   CHAT_ENABLE_HYBRID_SEARCH: "true",
@@ -79,12 +71,7 @@ export const env = {
   // Voyage AI (reranking); model is fixed in rerankConfig.ts
   VOYAGE_API_KEY: process.env.VOYAGE_API_KEY || "",
 
-  // In-app feedback → GitHub Issues sync (staff-triggered)
-  FEEDBACK_GITHUB_TOKEN: process.env.FEEDBACK_GITHUB_TOKEN || "",
-  FEEDBACK_GITHUB_REPO: process.env.FEEDBACK_GITHUB_REPO || "samintisar/SolomindLM",
+  // In-app feedback
   /** Comma-separated email allowlist for /admin/feedback and the GitHub sync action. */
   FEEDBACK_ADMIN_EMAILS: process.env.FEEDBACK_ADMIN_EMAILS || "",
-
-  // Convex deployment info
-  CONVEX_CLOUD_URL: process.env.CONVEX_CLOUD_URL || "",
 };

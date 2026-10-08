@@ -42,12 +42,16 @@ describe("useClaimPendingDeck", () => {
         resolveClaim = resolve;
       })
     );
-    const onSettled = vi.fn();
-    renderHook(() => useClaimPendingDeck(onSettled));
-    renderHook(() => useClaimPendingDeck(onSettled));
+    const firstSettled = vi.fn();
+    const secondSettled = vi.fn();
+    renderHook(() => useClaimPendingDeck(firstSettled));
+    renderHook(() => useClaimPendingDeck(secondSettled));
     expect(claimDeck).toHaveBeenCalledOnce();
+    // The claimer that found the deck taken settles at once, so its caller isn't left waiting.
+    expect(secondSettled).toHaveBeenCalledOnce();
+    expect(firstSettled).not.toHaveBeenCalled();
     resolveClaim({ notebookId: "nb1", flashcardId: "fc1" });
-    await waitFor(() => expect(onSettled).toHaveBeenCalledOnce());
+    await waitFor(() => expect(firstSettled).toHaveBeenCalledOnce());
     expect(navigate).toHaveBeenCalledOnce();
   });
 
@@ -58,10 +62,12 @@ describe("useClaimPendingDeck", () => {
     await waitFor(() => expect(onSettled).toHaveBeenCalledOnce());
   });
 
-  it("does nothing without a pending deck", () => {
+  it("does nothing without a pending deck, and settles", () => {
     localStorage.clear();
-    renderHook(() => useClaimPendingDeck());
+    const onSettled = vi.fn();
+    renderHook(() => useClaimPendingDeck(onSettled));
     expect(claimDeck).not.toHaveBeenCalled();
+    expect(onSettled).toHaveBeenCalledOnce();
   });
 
   it("explains the notebook limit and drops the deck", async () => {

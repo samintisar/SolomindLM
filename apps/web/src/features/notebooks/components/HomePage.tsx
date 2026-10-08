@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useClaimPendingDeck } from "@/features/tools/hooks/useClaimPendingDeck";
 import { Tabs, TabsContent } from "@/shared/components/ui/tabs";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
@@ -142,9 +142,16 @@ export const HomePage: React.FC = () => {
 
   const { sortOption, setSortOption, getSortedNotebooks } = useNotebookSorting();
 
-  // Sort notebooks based on current sort option
-  const sortedRecentNotebooks = getSortedNotebooks(recentNotebooks);
-  const sortedFeaturedNotebooks = getSortedNotebooks(featuredNotebooks);
+  // Re-sort only when a list or the sort option changes, not on every render (modals, tabs).
+  // getSortedNotebooks changes exactly when the sort option does.
+  const sortedRecentNotebooks = useMemo(
+    () => getSortedNotebooks(recentNotebooks),
+    [getSortedNotebooks, recentNotebooks]
+  );
+  const sortedFeaturedNotebooks = useMemo(
+    () => getSortedNotebooks(featuredNotebooks),
+    [getSortedNotebooks, featuredNotebooks]
+  );
 
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
     onMoveNotebookToFolder(notebookId, folderId);

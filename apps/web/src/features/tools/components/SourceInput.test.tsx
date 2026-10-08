@@ -29,6 +29,19 @@ function choosePdf(name: string) {
 describe("SourceInput", () => {
   beforeEach(() => pdf.extractPdfText.mockReset());
 
+  it("stops a file dropped outside the drop zone from opening in the tab", () => {
+    render(<SourceInput onChange={() => {}} />);
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", { value: { types: ["Files"] } });
+    document.body.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+
+    const textDrop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(textDrop, "dataTransfer", { value: { types: ["text/plain"] } });
+    document.body.dispatchEvent(textDrop);
+    expect(textDrop.defaultPrevented).toBe(false);
+  });
+
   it("ignores an older PDF that finishes after a newer one", async () => {
     const first = deferredExtraction();
     const second = deferredExtraction();

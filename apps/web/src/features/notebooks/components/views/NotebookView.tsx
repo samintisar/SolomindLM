@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Group, Panel, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
+import type { AudioPlayerContextType } from "@/features/audio/useAudioPlayer";
 import { useAuth } from "@/features/auth/useAuth";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
@@ -21,10 +22,16 @@ import type { ActiveLiteratureView } from "@/features/studio/types/literatureStu
 import { useStudioContext } from "@/features/studio/useStudioContext";
 import { STUDIO_TOOLS } from "@/shared/constants";
 import { useToast } from "@/shared/contexts/useToast";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { NotebookPanelSeparator } from "./NotebookPanelSeparator";
+
+// Tailwind's `md` breakpoint (48rem), so panel internals that use `md:` classes agree with the layout.
+const DESKTOP_LAYOUT_QUERY = "(min-width: 48rem)";
 
 export function NotebookView() {
   const { user } = useAuth();
+
+  const isDesktop = useMediaQuery(DESKTOP_LAYOUT_QUERY, true);
 
   const location = useLocation();
 
@@ -178,8 +185,9 @@ export function NotebookView() {
     [isChatStreaming, onSendMessage, remoteGenerationBlocksSend, sources, toastError, urlNotebookId]
   );
 
-  const renderRightPanel = useCallback(() => {
-    if (!isStudioOpen || !urlNotebookId) return null;
+  // One builder for the Studio column so desktop and mobile can't drift apart.
+  const renderStudioColumn = (layout: "desktop" | "mobile") => {
+    if (!urlNotebookId) return null;
 
     if (activeLiteratureView?.kind === "papers") {
       return (
@@ -214,42 +222,22 @@ export function NotebookView() {
 
     return (
       <StudioPanel
-        isOpen={isStudioOpen}
-        onClose={toggleStudio}
+        isOpen={layout === "mobile" || isStudioOpen}
+        onClose={layout === "desktop" ? toggleStudio : () => undefined}
         tools={STUDIO_TOOLS}
         sources={sources}
         notebookId={urlNotebookId}
         onAskInChat={handleAskInChat}
       />
     );
-  }, [
-    activeLiteratureView,
-    handleAskInChat,
-    handleCloseLiteratureView,
-    handleOpenSavedReport,
-    handleOpenSavedSpreadsheet,
-
-    isStudioOpen,
-
-    sources,
-    toggleStudio,
-
-    urlNotebookId,
-  ]);
+  };
 
   // Mini Audio Player state
 
   const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
 
-  const [miniPlayerData, setMiniPlayerData] = useState<{
-    audioUrl: string;
-
-    title: string;
-
-    transcript?: string;
-
-    audioOverviewId?: string;
-  } | null>(null);
+  const [miniPlayerData, setMiniPlayerData] =
+    useState<AudioPlayerContextType["miniPlayerData"]>(null);
 
   const clearSourceFocusRequest = useCallback(() => {
     setSourceFocusRequest(null);
@@ -304,13 +292,10 @@ export function NotebookView() {
 
       audioOverviewId?: string
     ) => {
-      setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
+      // noteId lets StudioPanel hide the mini player while that note is open in the full player.
+      setMiniPlayerData({ audioUrl, title, transcript, noteId, audioOverviewId });
 
       setMiniPlayerVisible(true);
-
-      if (noteId) {
-        (window as any).__currentPlayingAudioNoteId = noteId;
-      }
     },
 
     []
@@ -323,18 +308,12 @@ export function NotebookView() {
   const handleExpandAudioPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
 
-    const noteId = (window as any).__currentPlayingAudioNoteId;
+    const noteId = miniPlayerData?.noteId;
 
-    if (noteId) {
-      const note = notes.find((n) => n.id === noteId);
-
-      if (note) {
-        const event = new CustomEvent("setActiveNote", { detail: { noteId } });
-
-        window.dispatchEvent(event);
-      }
+    if (noteId && notes.some((n) => n.id === noteId)) {
+      window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId } }));
     }
-  }, [notes]);
+  }, [miniPlayerData, notes]);
 
   const audioPlayerContextValue = useMemo(
     () => ({
@@ -358,226 +337,174 @@ export function NotebookView() {
     ]
   );
 
-  const mobileRightPanel = useMemo(() => {
-    if (!urlNotebookId) return null;
-
-    if (activeLiteratureView?.kind === "papers") {
-      return (
-        <LiteraturePapersPanel
-          sessionId={activeLiteratureView.sessionId}
-          notebookId={urlNotebookId as Id<"notebooks">}
-          onClose={handleCloseLiteratureView}
-        />
-      );
-    }
-
-    if (activeLiteratureView?.kind === "screening") {
-      return (
-        <LiteratureScreeningPanel
-          sessionId={activeLiteratureView.sessionId}
-          onClose={handleCloseLiteratureView}
-        />
-      );
-    }
-
-    if (activeLiteratureView?.kind === "table" || activeLiteratureView?.kind === "report") {
-      return (
-        <LiteratureStudioView
-          view={activeLiteratureView}
-          notebookId={urlNotebookId as Id<"notebooks">}
-          onClose={handleCloseLiteratureView}
-          onOpenSavedReport={handleOpenSavedReport}
-          onOpenSavedSpreadsheet={handleOpenSavedSpreadsheet}
-        />
-      );
-    }
-
-    return (
-      <StudioPanel
-        isOpen={true}
-        onClose={() => undefined}
-        tools={STUDIO_TOOLS}
-        sources={sources}
-        notebookId={urlNotebookId}
-        onAskInChat={handleAskInChat}
-      />
-    );
-  }, [
-    activeLiteratureView,
-    handleAskInChat,
-    handleCloseLiteratureView,
-    handleOpenSavedReport,
-    handleOpenSavedSpreadsheet,
-    sources,
-    urlNotebookId,
-  ]);
-
   return (
     <AudioPlayerProvider value={audioPlayerContextValue}>
       <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
-        {/* Mobile panel tabs (below app header on all viewports) */}
-        <div className="md:hidden sticky top-0 z-60 flex h-12 items-center justify-around gap-1 border-b border-border bg-background px-2">
-          <button
-            onClick={() => setMobileActiveTab("sources")}
-            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === "sources"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            Sources
-          </button>
-
-          <div className="w-px h-6 bg-border"></div>
-
-          <button
-            onClick={() => setMobileActiveTab("chat")}
-            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === "chat"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            Chat
-          </button>
-
-          <div className="w-px h-6 bg-border"></div>
-
-          <button
-            data-onboarding="studio-panel-toggle"
-            onClick={() => setMobileActiveTab("studio")}
-            className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === "studio"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            Studio
-          </button>
-        </div>
-
-        {/* Desktop Layout */}
-
-        <div className="hidden md:flex min-h-0 min-w-0 w-full flex-1 overflow-hidden">
-          <Group
-            id="notebook-desktop-panels"
-            orientation="horizontal"
-            defaultLayout={defaultLayout}
-            onLayoutChanged={onLayoutChanged}
-            className="h-full min-h-0 min-w-0 w-full"
-          >
-            <Panel
-              id="notebook-sources"
-              panelRef={sourcesPanelRef}
-              collapsible={true}
-              collapsedSize={0}
-              defaultSize="360px"
-              minSize="220px"
-              maxSize="70%"
-              className="min-h-0 min-w-0"
-              onResize={() => {
-                const collapsed = sourcesPanelRef.current?.isCollapsed() ?? false;
-                setIsSourcesOpen(!collapsed);
-              }}
+        {/* Only the layout for the current viewport is mounted: a hidden twin would still run
+            its effects (duplicate source-guide generation, a second audio player). */}
+        {isDesktop ? (
+          <div className="flex min-h-0 min-w-0 w-full flex-1 overflow-hidden">
+            <Group
+              id="notebook-desktop-panels"
+              orientation="horizontal"
+              defaultLayout={defaultLayout}
+              onLayoutChanged={onLayoutChanged}
+              className="h-full min-h-0 min-w-0 w-full"
             >
-              <SourcesPanel
-                isOpen={isSourcesOpen}
-                onClose={toggleSources}
-                userId={user?.id}
-                noteId={urlNotebookId}
-                onDocumentUploaded={() => undefined}
-                focusSourceRequest={sourceFocusRequest}
-                onFocusSourceHandled={clearSourceFocusRequest}
-                onDiscussTopic={handleDiscussSourceTopic}
-              />
-            </Panel>
-
-            <NotebookPanelSeparator
-              disabled={!isSourcesOpen}
-              data-testid="notebook-sources-separator"
-            />
-
-            <Panel id="notebook-chat" minSize="280px" className="min-h-0 min-w-0">
-              <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-                <ChatPanel
-                  isLeftOpen={isSourcesOpen}
-                  isRightOpen={isStudioOpen}
-                  toggleLeft={toggleSources}
-                  toggleRight={toggleStudio}
-                  notebookId={urlNotebookId as Id<"notebooks"> | null}
-                  notebookTitle={notebookTitle}
-                  notebookIcon={activeNotebook?.icon}
-                  notebookCoverColor={activeNotebook?.coverColor}
-                  chatSettings={activeNotebook?.chatSettings}
-                  onOpenNotebookSource={handleOpenNotebookSourceFromChat}
-                  onOpenLiteratureTable={handleOpenLiteratureTable}
-                  onOpenLiteratureReport={handleOpenLiteratureReport}
-                  onOpenRankedPapers={handleOpenRankedPapers}
-                  onOpenScreeningDecisions={handleOpenScreeningDecisions}
+              <Panel
+                id="notebook-sources"
+                panelRef={sourcesPanelRef}
+                collapsible={true}
+                collapsedSize={0}
+                defaultSize="360px"
+                minSize="220px"
+                maxSize="70%"
+                className="min-h-0 min-w-0"
+                onResize={() => {
+                  const collapsed = sourcesPanelRef.current?.isCollapsed() ?? false;
+                  setIsSourcesOpen(!collapsed);
+                }}
+              >
+                <SourcesPanel
+                  isOpen={isSourcesOpen}
+                  onClose={toggleSources}
+                  userId={user?.id}
+                  noteId={urlNotebookId}
+                  onDocumentUploaded={() => undefined}
+                  focusSourceRequest={sourceFocusRequest}
+                  onFocusSourceHandled={clearSourceFocusRequest}
+                  onDiscussTopic={handleDiscussSourceTopic}
                 />
-              </div>
-            </Panel>
+              </Panel>
 
-            {isStudioOpen && urlNotebookId ? (
-              <>
-                <NotebookPanelSeparator data-testid="notebook-studio-separator" />
-                <Panel
-                  id="notebook-studio"
-                  defaultSize="420px"
-                  minSize="220px"
-                  maxSize="70%"
-                  className="min-h-0 min-w-0"
-                >
-                  {renderRightPanel()}
-                </Panel>
-              </>
-            ) : null}
-          </Group>
-        </div>
-
-        {/* Mobile Layout */}
-
-        <div className="md:hidden flex flex-1 w-full flex-col overflow-hidden">
-          {mobileActiveTab === "sources" && (
-            <div className="flex-1 w-full overflow-hidden">
-              <SourcesPanel
-                isOpen={true}
-                onClose={() => undefined}
-                userId={user?.id}
-                noteId={urlNotebookId}
-                onDocumentUploaded={() => undefined}
-                focusSourceRequest={sourceFocusRequest}
-                onFocusSourceHandled={clearSourceFocusRequest}
-                onDiscussTopic={handleDiscussSourceTopic}
+              <NotebookPanelSeparator
+                disabled={!isSourcesOpen}
+                data-testid="notebook-sources-separator"
               />
-            </div>
-          )}
 
-          {mobileActiveTab === "chat" && (
-            <div className="flex-1 w-full overflow-hidden">
-              <ChatPanel
-                isLeftOpen={false}
-                isRightOpen={false}
-                toggleLeft={() => undefined}
-                toggleRight={() => undefined}
-                notebookId={urlNotebookId}
-                notebookTitle={notebookTitle}
-                notebookIcon={activeNotebook?.icon}
-                notebookCoverColor={activeNotebook?.coverColor}
-                chatSettings={activeNotebook?.chatSettings}
-                onOpenNotebookSource={handleOpenNotebookSourceFromChat}
-                onOpenLiteratureTable={handleOpenLiteratureTable}
-                onOpenLiteratureReport={handleOpenLiteratureReport}
-                onOpenRankedPapers={handleOpenRankedPapers}
-                onOpenScreeningDecisions={handleOpenScreeningDecisions}
-              />
-            </div>
-          )}
+              <Panel id="notebook-chat" minSize="280px" className="min-h-0 min-w-0">
+                <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                  <ChatPanel
+                    isLeftOpen={isSourcesOpen}
+                    isRightOpen={isStudioOpen}
+                    toggleLeft={toggleSources}
+                    toggleRight={toggleStudio}
+                    notebookId={urlNotebookId as Id<"notebooks"> | null}
+                    notebookTitle={notebookTitle}
+                    notebookIcon={activeNotebook?.icon}
+                    notebookCoverColor={activeNotebook?.coverColor}
+                    chatSettings={activeNotebook?.chatSettings}
+                    onOpenNotebookSource={handleOpenNotebookSourceFromChat}
+                    onOpenLiteratureTable={handleOpenLiteratureTable}
+                    onOpenLiteratureReport={handleOpenLiteratureReport}
+                    onOpenRankedPapers={handleOpenRankedPapers}
+                    onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                  />
+                </div>
+              </Panel>
 
-          {mobileActiveTab === "studio" && (
-            <div className="flex-1 w-full overflow-hidden">{mobileRightPanel}</div>
-          )}
-        </div>
+              {isStudioOpen && urlNotebookId ? (
+                <>
+                  <NotebookPanelSeparator data-testid="notebook-studio-separator" />
+                  <Panel
+                    id="notebook-studio"
+                    defaultSize="420px"
+                    minSize="220px"
+                    maxSize="70%"
+                    className="min-h-0 min-w-0"
+                  >
+                    {renderStudioColumn("desktop")}
+                  </Panel>
+                </>
+              ) : null}
+            </Group>
+          </div>
+        ) : (
+          <>
+            {/* Mobile panel tabs (below app header) */}
+            <div className="sticky top-0 z-60 flex h-12 items-center justify-around gap-1 border-b border-border bg-background px-2">
+              <button
+                onClick={() => setMobileActiveTab("sources")}
+                className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
+                  mobileActiveTab === "sources"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                Sources
+              </button>
+
+              <div className="w-px h-6 bg-border"></div>
+
+              <button
+                onClick={() => setMobileActiveTab("chat")}
+                className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
+                  mobileActiveTab === "chat"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                Chat
+              </button>
+
+              <div className="w-px h-6 bg-border"></div>
+
+              <button
+                data-onboarding="studio-panel-toggle"
+                onClick={() => setMobileActiveTab("studio")}
+                className={`flex-1 rounded-lg py-2 px-4 text-sm font-semibold transition-colors ${
+                  mobileActiveTab === "studio"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                Studio
+              </button>
+            </div>
+
+            <div className="flex flex-1 w-full flex-col overflow-hidden">
+              {mobileActiveTab === "sources" && (
+                <div className="flex-1 w-full overflow-hidden">
+                  <SourcesPanel
+                    isOpen={true}
+                    onClose={() => undefined}
+                    userId={user?.id}
+                    noteId={urlNotebookId}
+                    onDocumentUploaded={() => undefined}
+                    focusSourceRequest={sourceFocusRequest}
+                    onFocusSourceHandled={clearSourceFocusRequest}
+                    onDiscussTopic={handleDiscussSourceTopic}
+                  />
+                </div>
+              )}
+
+              {mobileActiveTab === "chat" && (
+                <div className="flex-1 w-full overflow-hidden">
+                  <ChatPanel
+                    isLeftOpen={false}
+                    isRightOpen={false}
+                    toggleLeft={() => undefined}
+                    toggleRight={() => undefined}
+                    notebookId={urlNotebookId}
+                    notebookTitle={notebookTitle}
+                    notebookIcon={activeNotebook?.icon}
+                    notebookCoverColor={activeNotebook?.coverColor}
+                    chatSettings={activeNotebook?.chatSettings}
+                    onOpenNotebookSource={handleOpenNotebookSourceFromChat}
+                    onOpenLiteratureTable={handleOpenLiteratureTable}
+                    onOpenLiteratureReport={handleOpenLiteratureReport}
+                    onOpenRankedPapers={handleOpenRankedPapers}
+                    onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                  />
+                </div>
+              )}
+
+              {mobileActiveTab === "studio" && (
+                <div className="flex-1 w-full overflow-hidden">{renderStudioColumn("mobile")}</div>
+              )}
+            </div>
+          </>
+        )}
       </main>
     </AudioPlayerProvider>
   );

@@ -24,6 +24,8 @@ export type ClusterHubPageConfig = {
   description: string;
   keywords: string;
   h1: string;
+  /** Phrase inside `h1` shown in the accent colour. */
+  h1Accent?: string;
   subheadline: string;
   summaryBullets: string[];
   sections: ClusterHubSection[];
@@ -45,6 +47,7 @@ export const CLUSTER_HUB_PAGES: ClusterHubPageConfig[] = [
     keywords:
       "ai study tools for students, ai study tools for college students, ai for studying, student study tools, AI flashcards, quiz generator",
     h1: "AI study tools built around your course materials",
+    h1Accent: "your course materials",
     subheadline:
       "SolomindLM is a free AI study tool for students—bring lectures, PDFs, and media into one notebook, then turn them into flashcards, quizzes, reports, and other outputs you can review and edit.",
     summaryBullets: [
@@ -133,6 +136,7 @@ export const CLUSTER_HUB_PAGES: ClusterHubPageConfig[] = [
     keywords:
       "ai tools for literature review, ai literature review tools, ai for research literature review, research tools, chat with papers, deep research",
     h1: "AI research and literature review tools for your papers",
+    h1Accent: "for your papers",
     subheadline:
       "Collect papers in a research notebook, ask questions across your sources, screen and synthesize literature, and format citations—while you stay responsible for rigor and verification.",
     summaryBullets: [

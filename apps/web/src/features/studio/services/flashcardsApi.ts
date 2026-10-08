@@ -1,8 +1,9 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
+import { downloadBlob } from "@/shared/utils/downloadFile";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -112,40 +113,52 @@ export function useCreateFlashcard() {
  * Rename a flashcard set by ID with optimistic update
  */
 export function useRenameFlashcard() {
-  const update = useMutation(api.studio.flashcards.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-      // The view also reads the per-type query (live progress) while it is open
-      const current = localStore.getQuery(api.studio.flashcards.index.get, { id });
-      if (current) {
-        localStore.setQuery(api.studio.flashcards.index.get, { id }, { ...current, title });
-      }
-    }
+  const updateMutation = useMutation(api.studio.flashcards.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+        // The view also reads the per-type query (live progress) while it is open
+        const current = localStore.getQuery(api.studio.flashcards.index.get, { id });
+        if (current) {
+          localStore.setQuery(api.studio.flashcards.index.get, { id }, { ...current, title });
+        }
+      }),
+    [updateMutation]
   );
 
-  return async (flashcardId: string, newTitle: string) => {
-    return await update({
-      id: flashcardId as Id<"flashcards">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (flashcardId: string, newTitle: string) => {
+      return await update({
+        id: flashcardId as Id<"flashcards">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a flashcard set by ID with optimistic update
  */
 export function useDeleteFlashcard() {
-  const remove = useMutation(api.studio.flashcards.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-      // The view also reads the per-type query (live progress) while it is open
-      localStore.setQuery(api.studio.flashcards.index.get, { id }, null);
-    }
+  const removeMutation = useMutation(api.studio.flashcards.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+        // The view also reads the per-type query (live progress) while it is open
+        localStore.setQuery(api.studio.flashcards.index.get, { id }, null);
+      }),
+    [removeMutation]
   );
 
-  return async (flashcardId: string) => {
-    await remove({ id: flashcardId as Id<"flashcards"> });
-  };
+  return useCallback(
+    async (flashcardId: string) => {
+      await remove({ id: flashcardId as Id<"flashcards"> });
+    },
+    [remove]
+  );
 }
 
 /**
@@ -199,21 +212,13 @@ export async function exportFlashcardsCSV(
 
   // Create a blob and trigger download
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
 
   // Generate filename
   const safeTitle = title
     .replace(/[^a-z0-9]/gi, "_")
     .replace(/_+/g, "_")
     .toLowerCase();
-  link.download = `flashcards_${safeTitle}_${new Date().toISOString().split("T")[0]}.csv`;
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  downloadBlob(blob, `flashcards_${safeTitle}_${new Date().toISOString().split("T")[0]}.csv`);
 }
 
 // ============================================================================
@@ -237,23 +242,6 @@ export function useCardReview() {
       rating,
     });
   };
-}
-
-/**
- * Get cards that are due for review.
- * `nowMs` is refreshed on an interval so the query re-runs as the clock advances (no Date.now in the Convex query).
- */
-export function useDueCards(flashcardId: string | null) {
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, [flashcardId]);
-
-  return useQuery(
-    api.studio.flashcards.index.getDueCards,
-    flashcardId ? { id: flashcardId as Id<"flashcards">, nowMs } : "skip"
-  );
 }
 
 /**

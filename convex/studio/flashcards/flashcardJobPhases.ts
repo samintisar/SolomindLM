@@ -18,7 +18,6 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { packChunks, validateChunks } from "../../_agents/FlashcardGraph";
 import {
   recursiveCollapse,
   refineFlashcardSelection,
@@ -44,6 +43,9 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { createStudioChunkHelpers } from "../_job/studioChunks";
+
+const { packChunks, validateChunks } = createStudioChunkHelpers("FlashcardGraph");
 
 // ============================================================
 // CONFIGURATION
@@ -94,20 +96,6 @@ export type FinalizeFlashcardPhaseArgs = {
   smartLlm?: string;
 };
 
-// ============================================================
-// HELPER: Create structured LLM for map phase
-// ============================================================
-
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.3,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-  });
-}
-
 function createReduceLLM(modelOverride?: string): ChatTogetherAI {
   const model = modelOverride || env.FLASHCARDS_LLM;
   return new ChatTogetherAI({
@@ -128,8 +116,6 @@ export async function runFlashcardGenerationPhase(
   ctx: ActionCtx,
   args: FlashcardGenerationPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic, smartLlm } =
     args;
 
@@ -284,8 +270,6 @@ export async function runProcessFlashcardMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessFlashcardMapChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const {
     flashcardId,
     userId,
@@ -505,8 +489,6 @@ export async function runFinalizeFlashcardPhase(
   ctx: ActionCtx,
   args: FinalizeFlashcardPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { flashcardId, userId, notebookId, cardCount, difficulty, topic, smartLlm } = args;
 
   const logger = createJobLogger({

@@ -20,7 +20,8 @@ let claimInFlight = false;
  * Mounted on the tool page (email/password sign-in) and on /home (OAuth redirects land there).
  * The pending deck is kept after a transient failure (so a later visit retries) and dropped
  * once the server has rejected it for good (plan limit or invalid deck).
- * `onSettled` runs after a claim this hook started succeeds or fails.
+ * `onSettled` runs after a claim this hook started succeeds or fails, or once signed in when
+ * there is nothing for it to claim (no pending deck, or another claimer already has it).
  */
 export function useClaimPendingDeck(onSettled?: () => void): void {
   const { isAuthenticated } = useAuth();
@@ -32,9 +33,12 @@ export function useClaimPendingDeck(onSettled?: () => void): void {
   onSettledRef.current = onSettled;
 
   useEffect(() => {
-    if (!isAuthenticated || started.current || claimInFlight) return;
-    const deck = readPendingDeck();
-    if (!deck) return;
+    if (!isAuthenticated || started.current) return;
+    const deck = claimInFlight ? null : readPendingDeck();
+    if (!deck) {
+      onSettledRef.current?.();
+      return;
+    }
     started.current = true;
     claimInFlight = true;
     claimDeck({ title: deck.title, sourceText: deck.sourceText, cards: deck.cards })

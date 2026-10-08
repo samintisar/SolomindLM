@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTokens, countTokensBatch, freeEncoder, truncateToTokens } from "./tokenizer";
+import { countTokens, truncateToTokens } from "./tokenizer";
 
 describe("countTokens", () => {
   it("returns 0 for empty string", () => {
@@ -21,32 +21,6 @@ describe("countTokens", () => {
   it("handles typical English text", () => {
     const text = "Hello, how are you today?";
     expect(countTokens(text)).toBe(Math.ceil(text.length / 4));
-  });
-});
-
-describe("countTokensBatch", () => {
-  it("returns empty array for empty input", () => {
-    expect(countTokensBatch([])).toEqual([]);
-  });
-
-  it("returns empty array for null/undefined", () => {
-    expect(countTokensBatch(null as any)).toEqual([]);
-  });
-
-  it("counts tokens for multiple texts", () => {
-    const result = countTokensBatch(["hello", "world", "test"]);
-    expect(result).toHaveLength(3);
-    expect(result).toEqual([2, 2, 1]);
-  });
-
-  it("handles mixed valid and empty strings", () => {
-    const result = countTokensBatch(["hello", "", "world"]);
-    expect(result).toEqual([2, 0, 2]);
-  });
-
-  it("handles non-string entries", () => {
-    const result = countTokensBatch(["hello", null as any, 42 as any]);
-    expect(result).toEqual([2, 0, 0]);
   });
 });
 
@@ -83,11 +57,5 @@ describe("truncateToTokens", () => {
     const text = "a".repeat(30);
     const result = truncateToTokens(text, 10, undefined, 2);
     expect(result.length).toBeLessThanOrEqual(20);
-  });
-});
-
-describe("freeEncoder", () => {
-  it("does not throw", () => {
-    expect(() => freeEncoder()).not.toThrow();
   });
 });

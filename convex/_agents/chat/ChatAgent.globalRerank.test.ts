@@ -7,9 +7,9 @@ vi.hoisted(() => {
 });
 
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { ChatAgent } from "./ChatAgent";
 import { GLOBAL_RERANK_TIMEOUT_MS } from "./chatConfig";
+import type { ReferenceChunk } from "./types";
 
 const chunk = (chunkIndex: number) =>
   ({ sourceId: "doc-1", chunkIndex, content: `chunk ${chunkIndex}` }) as unknown as ReferenceChunk;
