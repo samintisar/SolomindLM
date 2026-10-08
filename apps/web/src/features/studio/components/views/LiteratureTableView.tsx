@@ -64,10 +64,13 @@ type TablePaper = TablePaperRow;
  */
 const COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH = 896;
 
-/** Phone-sized columns below `@2xl`, where the paper column also stops pinning. */
+/**
+ * Below `@4xl` the paper column scrolls with the rest at a narrower width: pinned at full width it
+ * would leave too little room to scroll the data columns under it.
+ */
 const PAPER_COLUMN_CLASS =
-  "min-w-72 @max-2xl/literature-table:static @2xl/literature-table:min-w-105";
-const DATA_COLUMN_CLASS = "min-w-64 @2xl/literature-table:min-w-70";
+  "min-w-72 @max-4xl/literature-table:static @4xl/literature-table:min-w-105";
+const DATA_COLUMN_CLASS = "min-w-64 @4xl/literature-table:min-w-70";
 
 export interface LiteratureTable {
   title: string;
@@ -477,7 +480,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
               )}
             </Empty>
           ) : (
-            <Table containerClassName="min-h-0 flex-1" className="@2xl/literature-table:min-w-275">
+            <Table containerClassName="min-h-0 flex-1" className="@4xl/literature-table:min-w-275">
               <TableHeader sticky>
                 <TableRow>
                   <TableHead pinned className={PAPER_COLUMN_CLASS}>
