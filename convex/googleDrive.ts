@@ -49,8 +49,11 @@ export const ingestFromGoogleDrive = action({
         message: string;
       };
     } catch (error) {
-      // The upload re-checks access and limits; don't leave the downloaded file orphaned.
-      await ctx.storage.delete(storageId);
+      // The upload re-checks access and limits; don't leave the downloaded file orphaned. A failed
+      // delete is logged, not thrown, so the caller still sees the upload error (e.g. the limit).
+      await ctx.storage.delete(storageId).catch((deleteError: unknown) => {
+        console.error(`[googleDrive] could not delete orphaned file ${storageId}`, deleteError);
+      });
       throw error;
     }
   },

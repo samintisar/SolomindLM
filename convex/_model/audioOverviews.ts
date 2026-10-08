@@ -7,27 +7,54 @@ import { canReadNotebook } from "../_lib/notebookAccess";
  * No query/mutation/action exports — used by convex/audioOverviews.ts and jobs.
  */
 
-/** Overviews checked per lookup; forks copy `audioUrl`, so one file can back a few rows. */
+/** Overviews checked per lookup; forks share one file, so it can back a few rows. */
 const AUDIO_FILE_OWNER_SCAN = 25;
 
+/** What an `audioUrl` points at: a playable URL, a stored file, or nothing usable (null). */
+export type AudioUrlTarget = { url: string } | { storageRef: string } | null;
+
 /**
- * Storage reference inside a non-HTTP `audioUrl`: a bare storage id or a legacy
- * `/audio/<storageId>` path. Returns null for full URLs.
+ * Parse an `audioUrl`: full http(s) URLs play as-is; a bare storage id or a legacy
+ * `/audio/<storageId>` path names a stored file.
  */
-export function storageRefFromAudioUrl(audioUrl: string): string | null {
+export function parseAudioUrl(audioUrl: string): AudioUrlTarget {
   const raw = audioUrl.trim();
-  if (!raw || raw.startsWith("http://") || raw.startsWith("https://")) return null;
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return { url: raw };
   let ref = raw;
   if (ref.startsWith("/audio/")) ref = ref.slice("/audio/".length);
   else if (ref.startsWith("audio/")) ref = ref.slice("audio/".length);
   if (ref.startsWith("/")) ref = ref.slice(1);
-  return ref || null;
+  return ref ? { storageRef: ref } : null;
+}
+
+/** Playback URL for a stored file, or null when the reference names no file. */
+export async function storageUrlForRef(ctx: QueryCtx, storageRef: string): Promise<string | null> {
+  const storageId = ctx.db.system.normalizeId("_storage", storageRef);
+  if (storageId) return await ctx.storage.getUrl(storageId);
+  try {
+    // Pre-Id storage ids are plain strings that `getUrl` still accepts; it throws on anything else.
+    return await ctx.storage.getUrl(storageRef as Id<"_storage">);
+  } catch {
+    return null;
+  }
+}
+
+async function anyNotebookReadable(
+  ctx: QueryCtx,
+  overviews: Doc<"audioOverviews">[],
+  userId: Id<"users">
+): Promise<boolean> {
+  for (const notebookId of new Set(overviews.map((o) => o.notebookId))) {
+    if (await canReadNotebook(ctx, notebookId, userId)) return true;
+  }
+  return false;
 }
 
 /**
  * True when the user can read the notebook of an audio overview backed by this stored file.
- * Overviews saved before `audioStorageId` existed (and notebook forks) only carry `audioUrl`,
- * so every spelling of the file's URL is checked too.
+ * Overviews saved before `audioStorageId` existed only carry `audioUrl`, so when the storage-id
+ * index finds no readable row, every spelling of the file's URL is checked too.
  */
 export async function canReadAudioFile(
   ctx: QueryCtx,
@@ -35,16 +62,17 @@ export async function canReadAudioFile(
   userId: Id<"users">
 ): Promise<boolean> {
   const storageId = ctx.db.system.normalizeId("_storage", storageRef);
-  if (!storageId) return false;
+  if (storageId) {
+    const byStorageId = await ctx.db
+      .query("audioOverviews")
+      .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", storageId))
+      .take(AUDIO_FILE_OWNER_SCAN);
+    if (await anyNotebookReadable(ctx, byStorageId, userId)) return true;
+  }
 
-  const byStorageId = await ctx.db
-    .query("audioOverviews")
-    .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", storageId))
-    .take(AUDIO_FILE_OWNER_SCAN);
-
-  const signedUrl = await ctx.storage.getUrl(storageId);
-  const urlSpellings = [storageId, `/audio/${storageId}`, `audio/${storageId}`];
-  if (signedUrl) urlSpellings.push(signedUrl);
+  const urlSpellings = [storageRef, `/audio/${storageRef}`, `audio/${storageRef}`];
+  const storageUrl = await storageUrlForRef(ctx, storageRef);
+  if (storageUrl) urlSpellings.push(storageUrl);
   const byUrl = await Promise.all(
     urlSpellings.map((audioUrl) =>
       ctx.db
@@ -53,12 +81,7 @@ export async function canReadAudioFile(
         .take(AUDIO_FILE_OWNER_SCAN)
     )
   );
-
-  const notebookIds = new Set([...byStorageId, ...byUrl.flat()].map((o) => o.notebookId));
-  for (const notebookId of notebookIds) {
-    if (await canReadNotebook(ctx, notebookId, userId)) return true;
-  }
-  return false;
+  return await anyNotebookReadable(ctx, byUrl.flat(), userId);
 }
 
 export async function getAudioOverview(

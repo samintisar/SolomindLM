@@ -63,12 +63,11 @@ export const resolvePlaybackUrl = query({
       return null;
     }
 
-    const raw = overview.audioUrl.trim();
-    const storageRef = AudioOverviews.storageRefFromAudioUrl(raw);
-    if (!storageRef) return { url: raw };
+    const target = AudioOverviews.parseAudioUrl(overview.audioUrl);
+    if (!target) return null;
+    if ("url" in target) return { url: target.url };
 
-    const storageId = ctx.db.system.normalizeId("_storage", storageRef);
-    const url = storageId ? await ctx.storage.getUrl(storageId) : null;
+    const url = await AudioOverviews.storageUrlForRef(ctx, target.storageRef);
     return url ? { url } : null;
   },
 });
@@ -85,17 +84,14 @@ export const resolveRawAudioUrl = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const raw = args.audioUrl.trim();
-    if (!raw) return null;
-
+    const target = AudioOverviews.parseAudioUrl(args.audioUrl);
+    if (!target) return null;
     // Already a full URL — return as-is
-    const storageRef = AudioOverviews.storageRefFromAudioUrl(raw);
-    if (!storageRef) return { url: raw };
+    if ("url" in target) return { url: target.url };
 
-    if (!(await AudioOverviews.canReadAudioFile(ctx, storageRef, userId))) return null;
+    if (!(await AudioOverviews.canReadAudioFile(ctx, target.storageRef, userId))) return null;
 
-    const storageId = ctx.db.system.normalizeId("_storage", storageRef);
-    const url = storageId ? await ctx.storage.getUrl(storageId) : null;
+    const url = await AudioOverviews.storageUrlForRef(ctx, target.storageRef);
     return url ? { url } : null;
   },
 });

@@ -61,6 +61,28 @@ async function addOverview(
 const resolve = (t: T, userId: Id<"users">, audioUrl: string) =>
   asUser(t, userId).query(api.studio.audio.index.resolveRawAudioUrl, { audioUrl });
 
+describe("studio.audio.resolvePlaybackUrl", () => {
+  test("returns null when the overview's audioUrl names no file", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, notebookId } = await seed(t);
+    const audioOverviewId = await t.run(async (ctx) =>
+      ctx.db.insert("audioOverviews", {
+        userId: owner,
+        notebookId,
+        title: "Overview",
+        status: "completed",
+        audioUrl: "/audio/",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+
+    expect(
+      await asUser(t, owner).query(api.studio.audio.index.resolvePlaybackUrl, { audioOverviewId })
+    ).toBeNull();
+  });
+});
+
 describe("studio.audio.resolveRawAudioUrl", () => {
   test("signs the file for the notebook owner and members", async () => {
     const t = convexTest(schema, modules);
@@ -94,6 +116,15 @@ describe("studio.audio.resolveRawAudioUrl", () => {
     const { owner } = await seed(t);
 
     expect(await resolve(t, owner, "/audio/not-a-storage-id")).toBeNull();
+  });
+
+  test("returns null for an empty storage reference", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, notebookId } = await seed(t);
+    await addOverview(t, { userId: owner, notebookId, audioUrl: "/audio/" });
+
+    expect(await resolve(t, owner, "/audio/")).toBeNull();
+    expect(await resolve(t, owner, "/")).toBeNull();
   });
 
   test("finds legacy overviews that store only an /audio/ path", async () => {

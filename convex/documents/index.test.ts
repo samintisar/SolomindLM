@@ -787,6 +787,26 @@ describe("documents.addExternalSources", () => {
     expect(await countNotebookDocuments(t, notebookId)).toBe(19);
   });
 
+  test("adds a batch that exactly fills the source limit, counting in-batch duplicates once", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    await seedDocuments(t, userId, notebookId, 18);
+    const asUser = withAuth(t, userId);
+
+    const ids = await asUser.mutation(api.documents.index.addExternalSources, {
+      notebookId,
+      sources: [
+        { title: "A", url: "https://example.com/a", sourceType: "web" },
+        { title: "A again", url: "https://example.com/a", sourceType: "web" },
+        { title: "B", url: "https://example.com/b", sourceType: "web" },
+      ],
+    });
+
+    expect(ids).toHaveLength(2);
+    expect(await countNotebookDocuments(t, notebookId)).toBe(20);
+  });
+
   test("refuses a notebook already at the source limit", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);

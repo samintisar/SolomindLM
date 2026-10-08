@@ -4,12 +4,14 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { preloadModules } from "./_testing/preloadModules.helpers";
 import schema from "./schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(modules, ["./googleDrive.ts", "./documents/index.ts"]);
 
 type T = ReturnType<typeof convexTest>;
 
@@ -101,6 +103,31 @@ describe("googleDrive.ingestFromGoogleDrive", () => {
     ).rejects.toThrow("Source limit reached");
 
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(await storedFileCount(t)).toBe(0);
+  });
+
+  test("deletes the downloaded file when the upload fails after the pre-check", async () => {
+    const actualDocuments = (await modules["./documents/index.ts"]()) as Record<string, unknown>;
+    const { mutation } = await import("./_generated/server");
+    const t = convexTest(schema, {
+      ...modules,
+      // Stands in for a limit or access change between the pre-check and the upload.
+      "./documents/index.ts": async () => ({
+        ...actualDocuments,
+        upload: mutation({
+          handler: async () => {
+            throw new Error("Source limit reached");
+          },
+        }),
+      }),
+    });
+    const { owner, notebookId } = await seed(t);
+
+    await expect(
+      asUser(t, owner).action(api.googleDrive.ingestFromGoogleDrive, driveArgs(notebookId))
+    ).rejects.toThrow("Source limit reached");
+
+    expect(fetchMock).toHaveBeenCalledOnce();
     expect(await storedFileCount(t)).toBe(0);
   });
 
