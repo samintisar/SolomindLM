@@ -1,6 +1,6 @@
 import { PersistentTextStreaming, type StreamId } from "@convex-dev/persistent-text-streaming";
 import { components } from "../_generated/api";
-import type { Id, TableNames } from "../_generated/dataModel";
+import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { deleteSynthesisChunkFiles } from "../studio/jobMutations/audio";
 
@@ -86,6 +86,33 @@ async function deleteStoredFile(ctx: MutationCtx, storageId: string): Promise<vo
 function storageIdFromUrl(url: string | undefined): string | null {
   const match = url ? /\/api\/storage\/([^/?#]+)/.exec(url) : null;
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+/** True when an overview other than this one points at the same audio file (a fork, or its source). */
+async function audioFileSharedByAnother(
+  ctx: MutationCtx,
+  overview: Doc<"audioOverviews">,
+  storageRef: string
+): Promise<boolean> {
+  const isOther = (rows: Doc<"audioOverviews">[]) => rows.some((r) => r._id !== overview._id);
+  const { audioUrl } = overview;
+  // The canonical id, so a legacy URL-only row still finds overviews that store the id itself.
+  const audioStorageId = ctx.db.system.normalizeId("_storage", storageRef);
+  if (audioStorageId) {
+    const rows = await ctx.db
+      .query("audioOverviews")
+      .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", audioStorageId))
+      .take(2);
+    if (isOther(rows)) return true;
+  }
+  if (audioUrl) {
+    const rows = await ctx.db
+      .query("audioOverviews")
+      .withIndex("by_audioUrl", (q) => q.eq("audioUrl", audioUrl))
+      .take(2);
+    if (isOther(rows)) return true;
+  }
+  return false;
 }
 
 const streaming = new PersistentTextStreaming(components.persistentTextStreaming);
@@ -346,7 +373,10 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             console.warn("[accountDeletion] could not delete audio chunk files", error)
           );
           const storageId = overview.audioStorageId ?? storageIdFromUrl(overview.audioUrl);
-          if (storageId) await deleteStoredFile(ctx, storageId);
+          // Forks share the source's file; keep it while another overview still plays it.
+          if (storageId && !(await audioFileSharedByAnother(ctx, overview, storageId))) {
+            await deleteStoredFile(ctx, storageId);
+          }
         }
       ),
   },
