@@ -1,6 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
 import {
-  ArrowLeft,
   ChevronDown,
   Columns3,
   Download,
@@ -13,7 +12,7 @@ import {
   Table2,
   X,
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBulkUpload, useGetExistingPapers } from "@/features/sources/services/documentsApi";
 import { Button } from "@/shared/components/ui/button";
@@ -57,6 +56,17 @@ import { LiteratureTableExtractionCell } from "../LiteratureTableExtractionCell"
 import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
 
 type TablePaper = TablePaperRow;
+
+/**
+ * Narrowest table area (px, Tailwind's `@4xl`) that fits the column manager beside the table. Below
+ * it the manager covers the table, so it starts closed.
+ */
+const COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH = 896;
+
+/** Phone-sized columns below `@2xl`, where the paper column also stops pinning. */
+const PAPER_COLUMN_CLASS =
+  "min-w-72 @max-2xl/literature-table:static @2xl/literature-table:min-w-105";
+const DATA_COLUMN_CLASS = "min-w-64 @2xl/literature-table:min-w-70";
 
 export interface LiteratureTable {
   title: string;
@@ -117,12 +127,21 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 }) => {
   const { success: toastSuccess, error: toastError } = useToast();
   const [table, setTable] = useState<LiteratureTable>(initialTable);
-  const [showColumnManager, setShowColumnManager] = useState(true);
+  const [showColumnManager, setShowColumnManager] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [citeTarget, setCiteTarget] = useState<{ paper: TablePaper; index: number } | null>(null);
+
+  const shellRef = useRef<HTMLDivElement>(null);
+
+  // Open the column manager on mount only where it fits beside the table; on a phone or in the
+  // default-width studio panel it would hide the table.
+  useLayoutEffect(() => {
+    const width = shellRef.current?.clientWidth ?? 0;
+    if (width >= COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH) setShowColumnManager(true);
+  }, []);
 
   const existingPapers = useGetExistingPapers(notebookId);
   const bulkUpload = useBulkUpload();
@@ -263,16 +282,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   );
 
   const tableShell = (
-    <div className={shellClassName} data-literature-table-shell>
-      {onBack && !isFocusMode && (
-        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-sm md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-          <span className="truncate text-sm font-semibold">{table.title}</span>
-        </div>
-      )}
-
+    <div ref={shellRef} className={shellClassName} data-literature-table-shell>
       <div className="@container/table-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <Table2 className="hidden size-5 shrink-0 text-muted-foreground @sm/table-toolbar:block" />
@@ -402,8 +412,10 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col bg-card">
+      {/* Narrow widths: the column manager covers the table, and the paper column scrolls with the
+          rest instead of pinning (pinned, its width alone fills a phone screen). */}
+      <div className="@container/table-body relative flex min-h-0 flex-1">
+        <div className="@container/literature-table flex min-w-0 flex-1 flex-col bg-card">
           {table.papers.length === 0 ? (
             <Empty>
               <EmptyHeader>
@@ -419,10 +431,10 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
               )}
             </Empty>
           ) : (
-            <Table containerClassName="min-h-0 flex-1" className="min-w-275">
+            <Table containerClassName="min-h-0 flex-1" className="@2xl/literature-table:min-w-275">
               <TableHeader sticky>
                 <TableRow>
-                  <TableHead pinned className="min-w-105">
+                  <TableHead pinned className={PAPER_COLUMN_CLASS}>
                     <div className="flex items-center gap-3 pl-9.5">
                       <Checkbox
                         checked={allSelected}
@@ -433,7 +445,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                     </div>
                   </TableHead>
                   {dataColumns.map((col) => (
-                    <TableHead key={col.id} className="min-w-70">
+                    <TableHead key={col.id} className={DATA_COLUMN_CLASS}>
                       {col.name}
                     </TableHead>
                   ))}
@@ -456,7 +468,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                         key={paper.citationId}
                         data-state={isSelected ? "selected" : undefined}
                       >
-                        <TableCell pinned className="min-w-105">
+                        <TableCell pinned className={PAPER_COLUMN_CLASS}>
                           <LiteratureTablePaperCell
                             rank={visibleRank}
                             paper={paper}
@@ -470,7 +482,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                           />
                         </TableCell>
                         {dataColumns.map((col) => (
-                          <TableCell key={col.id} className="min-w-70">
+                          <TableCell key={col.id} className={DATA_COLUMN_CLASS}>
                             <LiteratureTableExtractionCell value={paper.rowData[col.id] ?? ""} />
                           </TableCell>
                         ))}
@@ -488,6 +500,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
             columns={table.columns}
             onChange={handleColumnsChange}
             onClose={() => setShowColumnManager(false)}
+            className="absolute inset-y-0 right-0 z-30 w-full @md/table-body:w-88 @4xl/table-body:static"
           />
         )}
       </div>

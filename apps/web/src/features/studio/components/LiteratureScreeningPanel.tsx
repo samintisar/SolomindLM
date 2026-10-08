@@ -123,7 +123,8 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
         onClose={onClose}
       />
 
-      <div className="flex-1 overflow-y-auto bg-background">
+      {/* @container/screening: below @3xl the paper and its result stack instead of sitting side by side */}
+      <div className="@container/screening flex-1 overflow-y-auto bg-background">
         {isLoading ? (
           <LoadingState />
         ) : isEmpty ? (
@@ -153,14 +154,20 @@ function ScreeningPanelHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background px-4">
+    <div className="@container/screening-toolbar flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-background px-4">
       <div className="min-w-0 flex-1">
         <h2 className="truncate font-sans text-sm font-medium text-foreground">{title}</h2>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Button variant="ghost" size="sm" onClick={onExport} disabled={!canExport}>
+        <Button
+          variant="ghost"
+          size="sm-adaptive"
+          onClick={onExport}
+          disabled={!canExport}
+          title="Export screening decisions"
+        >
           <Download />
-          Export
+          <span className="@max-md/screening-toolbar:sr-only">Export</span>
         </Button>
         <Button
           variant="ghost"
@@ -216,10 +223,12 @@ function ScreeningDecisionGrid({
   onToggleExpanded: (paperIndex: number) => void;
 }) {
   return (
-    <div className="min-w-190" style={SCREENING_GRID_STYLE}>
-      <div className="sticky top-0 z-10 grid grid-cols-(--screening-cols) border-b border-border/50 bg-muted font-sans text-xs font-medium text-muted-foreground">
-        <div className="border-r border-border/50 px-4 py-2.5">Papers ({decisions.length})</div>
-        <div className="px-4 py-2.5">Screening Results</div>
+    <div style={SCREENING_GRID_STYLE}>
+      <div className="sticky top-0 z-10 grid border-b border-border/50 bg-muted font-sans text-xs font-medium text-muted-foreground @3xl/screening:grid-cols-(--screening-cols)">
+        <div className="border-border/50 px-4 py-2.5 @3xl/screening:border-r">
+          Papers ({decisions.length})
+        </div>
+        <div className="hidden px-4 py-2.5 @3xl/screening:block">Screening Results</div>
       </div>
       <ul>
         {decisions.map((decision) => (
@@ -253,7 +262,7 @@ function ScreeningDecisionRow({
   );
 
   return (
-    <li className="grid grid-cols-(--screening-cols) border-b border-border/50 transition-colors hover:bg-muted/10">
+    <li className="grid border-b border-border/50 transition-colors hover:bg-muted/10 @3xl/screening:grid-cols-(--screening-cols)">
       <PaperSummaryCell decision={decision} />
       <ScreeningResultCell
         criteria={criteria}
@@ -273,7 +282,7 @@ function PaperSummaryCell({ decision }: { decision: LiteratureScreeningDecision 
   const rank = decision.rank ?? decision.paperIndex + 1;
 
   return (
-    <div className="flex gap-3 border-r border-border/50 px-4 py-4">
+    <div className="flex gap-3 border-border/50 px-4 pt-4 @3xl/screening:border-r @3xl/screening:pb-4">
       <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted font-sans text-xs font-medium text-muted-foreground">
         {rank}
       </span>
@@ -315,7 +324,8 @@ function ScreeningResultCell({
   const criteriaId = useId();
 
   return (
-    <div className="px-4 py-4">
+    // Stacked under the paper, indent past its rank badge so the result lines up with the title.
+    <div className="py-4 pr-4 pl-13 @3xl/screening:pl-4">
       <p className="text-xs leading-relaxed text-foreground">{decision.reason}</p>
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
         {criteria.map((criterion) => (

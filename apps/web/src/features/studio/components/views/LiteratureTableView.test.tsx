@@ -110,14 +110,27 @@ describe("LiteratureTableView", () => {
     const user = userEvent.setup();
     renderTable();
     const toggle = screen.getByRole("button", { name: "Manage columns" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
     await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByRole("complementary", { name: "Manage Columns" })).not.toBeInTheDocument();
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+  });
+
+  it("opens the column manager on mount only when it fits beside the table", () => {
+    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);
+    try {
+      renderTable();
+      expect(screen.getByRole("button", { name: "Manage columns" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      );
+      expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+    } finally {
+      clientWidth.mockRestore();
+    }
   });
 
   it("disables Save while saving, under the name Saving table", () => {
