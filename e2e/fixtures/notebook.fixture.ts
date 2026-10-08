@@ -13,7 +13,8 @@ type NotebookFixtures = {
  * Yields a page already on /notebook/:id with chat input visible.
  * Uses UUID for unique titles to avoid collisions in parallel workers.
  * Each test using this fixture creates one new `e2e-…` notebook; bulk-delete stragglers with
- * `bun run e2e:convex:cleanup` (Convex CLI) if needed.
+ * `bunx convex run e2e/cleanupNotebooks:deleteE2eNotebooksByEmail '{"email":"<test user>"}'`
+ * if needed.
  */
 export const test = authTest.extend<NotebookFixtures>({
   notebookPage: async ({ authenticatedPage }, use) => {
