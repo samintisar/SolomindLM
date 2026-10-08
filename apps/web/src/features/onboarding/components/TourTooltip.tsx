@@ -13,10 +13,30 @@ interface Rect {
   height: number;
   /** Spotlight hole radius from the target's computed border-radius. */
   rx: number;
+  /** Viewport size at measure time; the dimming overlay is drawn at this size. */
+  viewportWidth: number;
+  viewportHeight: number;
 }
 
 /** Breathing room around the target so the cutout keeps rounded corners smooth. */
 const SPOTLIGHT_PADDING_PX = 4;
+
+/** How often the rAF loop re-measures the target when no scroll or resize asked for it. */
+const MEASURE_POLL_MS = 100;
+
+function sameRect(a: Rect | null, b: Rect | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.top === b.top &&
+    a.left === b.left &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.rx === b.rx &&
+    a.viewportWidth === b.viewportWidth &&
+    a.viewportHeight === b.viewportHeight
+  );
+}
 
 function readRect(selector: string): Rect | null {
   const elements = document.querySelectorAll(selector);
@@ -48,7 +68,7 @@ function readRect(selector: string): Rect | null {
 
     const rx = Math.min(innerRx + SPOTLIGHT_PADDING_PX, width / 2, height / 2);
 
-    return { top, left, width, height, rx };
+    return { top, left, width, height, rx, viewportWidth: vw, viewportHeight: vh };
   }
   return null;
 }
@@ -81,7 +101,6 @@ export const TourTooltip: React.FC = () => {
   const { tourStatus, currentStepId, skip } = useOnboarding();
   const { showError } = useServiceErrorToast();
   const [rect, setRect] = useState<Rect | null>(null);
-  const rafRef = useRef<number | null>(null);
   const spotlightMaskId = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
   const step = currentStepId ? findStep(currentStepId) : null;
@@ -93,52 +112,47 @@ export const TourTooltip: React.FC = () => {
     }
     logSelectorInvariants(step);
 
+    // Measuring forces layout, so it happens at most once per frame and only inside the
+    // rAF loop: a ~100ms poll catches the target mounting, moving or unmounting, and
+    // scroll/resize mark the next frame dirty so the spotlight keeps up while scrolling.
+    // No MutationObserver: streaming chat mutates the DOM constantly (#425).
     let stopped = false;
-    let lastFrame = 0;
+    // rAF timestamps share performance.now()'s clock.
+    let lastMeasuredAt = performance.now();
+    let dirty = false;
+    let frame = 0;
+    // undefined until the first measure, so a new step always publishes its rect.
+    let last: Rect | null | undefined;
     const measure = () => {
       const next = readRect(step.targetSelector);
-      setRect((prev) => {
-        if (!next && !prev) return prev;
-        if (
-          next &&
-          prev &&
-          next.top === prev.top &&
-          next.left === prev.left &&
-          next.width === prev.width &&
-          next.height === prev.height &&
-          next.rx === prev.rx
-        ) {
-          return prev;
-        }
-        return next;
-      });
+      if (last !== undefined && sameRect(next, last)) return;
+      last = next;
+      setRect(next);
     };
     measure();
 
-    const onResize = () => measure();
-    const onScroll = () => measure();
-    window.addEventListener("resize", onResize);
-    window.addEventListener("scroll", onScroll, true);
-
-    const observer = new MutationObserver(() => measure());
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    const invalidate = () => {
+      dirty = true;
+    };
+    window.addEventListener("resize", invalidate, { passive: true });
+    window.addEventListener("scroll", invalidate, { capture: true, passive: true });
 
     const tick = (t: number) => {
       if (stopped) return;
-      if (t - lastFrame >= 100) {
-        lastFrame = t;
+      if (dirty || t - lastMeasuredAt >= MEASURE_POLL_MS) {
+        dirty = false;
+        lastMeasuredAt = t;
         measure();
       }
-      rafRef.current = requestAnimationFrame(tick);
+      frame = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
+    frame = requestAnimationFrame(tick);
 
     return () => {
       stopped = true;
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("scroll", onScroll, true);
-      observer.disconnect();
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize", invalidate);
+      window.removeEventListener("scroll", invalidate, { capture: true });
+      cancelAnimationFrame(frame);
     };
   }, [step, tourStatus]);
 
@@ -163,8 +177,9 @@ export const TourTooltip: React.FC = () => {
   if (tourStatus !== "active" || !step || !rect) return null;
 
   const stepNumber = STEP_IDS.indexOf(step.id) + 1;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  // From the measured state, so a resize that leaves the target in place still re-renders.
+  const vw = rect.viewportWidth;
+  const vh = rect.viewportHeight;
 
   const handleSkip = () => {
     void skip().catch((error) => {
