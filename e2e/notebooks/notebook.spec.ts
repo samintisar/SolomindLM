@@ -1,5 +1,5 @@
 import { expect, test } from "../fixtures/auth.fixture";
-import { tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
+import { myNotebooks, tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
 
 test.describe("Notebook CRUD", () => {
   test("creates a new notebook", async ({ authenticatedPage }) => {
@@ -22,7 +22,9 @@ test.describe("Notebook CRUD", () => {
     await expect(page.getByRole("heading", { name: "Create notebook" })).not.toBeVisible();
 
     // New notebook should appear in the grid (Convex sync may take a moment)
-    await expect(page.getByText(notebookTitle)).toBeVisible({ timeout: 15_000 });
+    await expect(myNotebooks(page).getByText(notebookTitle, { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
 
     await tryDeleteNotebookByTitleFromHome(page, notebookTitle);
   });
@@ -48,7 +50,9 @@ test.describe("Notebook CRUD", () => {
     await page.getByRole("button", { name: "New notebook" }).first().click();
     await page.getByPlaceholder("Notebook title").fill(beforeName);
     await page.getByRole("button", { name: "Create" }).click();
-    await expect(page.getByText(beforeName, { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(myNotebooks(page).getByText(beforeName, { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
 
     const card = page.locator('[data-slot="card"]', { hasText: beforeName });
     await card.getByRole("button", { name: "Notebook actions" }).click();
@@ -59,7 +63,9 @@ test.describe("Notebook CRUD", () => {
     await titleInput.fill(afterName);
 
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText(afterName, { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(myNotebooks(page).getByText(afterName, { exact: true })).toBeVisible({
+      timeout: 5_000,
+    });
 
     await tryDeleteNotebookByTitleFromHome(page, afterName);
     await tryDeleteNotebookByTitleFromHome(page, beforeName);
