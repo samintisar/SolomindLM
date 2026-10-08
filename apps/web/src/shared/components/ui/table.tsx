@@ -70,13 +70,36 @@ const tableCellVariants = cva("border-r border-b border-hairline last:border-r-0
       true: "sticky left-0 z-10 bg-card in-[tr[data-state=selected]]:bg-muted",
       false: "",
     },
+    /**
+     * highlight: the column the page is about (e.g. ours in a comparison). `link` is the brand colour
+     * that reads in both themes. The tint is a gradient over a solid fill, so a pinned cell stays opaque;
+     * the fill follows a selected row like a pinned cell's does.
+     */
+    highlight: {
+      true: "bg-card bg-linear-to-b from-link/5 to-link/5 in-[tr[data-state=selected]]:bg-muted",
+      false: "",
+    },
   },
-  defaultVariants: { pinned: false },
+  defaultVariants: { pinned: false, highlight: false },
+});
+
+const tableHeadVariants = cva("px-5 text-left font-sans font-semibold", {
+  variants: {
+    /** `scope="row"` (set from the prop): a body row's label, top-aligned and wrapping like its cells. */
+    rowHeader: {
+      true: "py-4 align-top text-sm text-foreground",
+      false: "h-12 bg-muted align-middle text-xs whitespace-nowrap text-muted-foreground",
+    },
+    /** highlight: the column the page is about; a tint over the band's solid fill, so a sticky header stays opaque. */
+    highlight: { true: "bg-linear-to-b from-link/8 to-link/8 text-link", false: "" },
+  },
+  defaultVariants: { rowHeader: false, highlight: false },
 });
 
 function TableHead({
   className,
   pinned,
+  highlight,
   ...props
 }: React.ComponentProps<"th"> & VariantProps<typeof tableCellVariants>) {
   return (
@@ -84,7 +107,7 @@ function TableHead({
       data-slot="table-head"
       className={cn(
         tableCellVariants({ pinned }),
-        "h-12 bg-muted px-5 text-left align-middle font-sans text-xs font-semibold whitespace-nowrap text-muted-foreground",
+        tableHeadVariants({ rowHeader: props.scope === "row", highlight }),
         className
       )}
       {...props}
@@ -95,12 +118,13 @@ function TableHead({
 function TableCell({
   className,
   pinned,
+  highlight,
   ...props
 }: React.ComponentProps<"td"> & VariantProps<typeof tableCellVariants>) {
   return (
     <td
       data-slot="table-cell"
-      className={cn(tableCellVariants({ pinned }), "px-5 py-4 align-top", className)}
+      className={cn(tableCellVariants({ pinned, highlight }), "px-5 py-4 align-top", className)}
       {...props}
     />
   );

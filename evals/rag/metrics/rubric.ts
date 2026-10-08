@@ -10,6 +10,7 @@ import {
   formatChunks,
   parseBinaryResponse,
 } from "./binaryJudges";
+import { metricResult } from "./metricResult";
 
 /** Long enough for a full report or a many-row spreadsheet, so the judge sees every row. */
 const OUTPUT_LIMIT = 40_000;
@@ -132,42 +133,47 @@ export async function scoreRubricMetrics(
   pack: UseCasePack,
   options: RubricJudgeOptions
 ): Promise<MetricResult[]> {
-  const results: MetricResult[] = [];
-  for (const check of pack.rubric.filter((c) => c.appliesTo.includes(artifact.runner))) {
-    const base = {
-      metric: rubricMetricName(pack.id, check.id),
-      caseId: fixture.id,
-      runner: artifact.runner,
-      configHash: artifact.configHash,
-    };
-    try {
-      const raw = await options.invoke(
-        buildRubricPrompt(pack, check, fixture, artifact, options.sourceTexts)
-      );
-      const { pass, reason } = parseBinaryResponse(raw);
-      results.push({
-        ...base,
-        status: pass ? "pass" : "fail",
-        score: pass ? 1 : 0,
-        detail: reason,
-        breakdown: { model: options.model, pass, check: check.question },
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // No verdict: a warning, so a flaky judge does not fail the run (scorecard counts it apart).
-      results.push({
-        ...base,
-        status: "warn",
-        score: 0,
-        detail: `Rubric judge failed: ${message}`,
-        breakdown: {
-          model: options.model,
-          judgeError: true,
-          error: message,
-          check: check.question,
-        },
-      });
-    }
-  }
-  return results;
+  const checks = pack.rubric.filter((c) => c.appliesTo.includes(artifact.runner));
+  // Independent checks of one artifact run concurrently; results keep rubric order.
+  return Promise.all(
+    checks.map(async (check): Promise<MetricResult> => {
+      const metric = rubricMetricName(pack.id, check.id);
+      try {
+        const raw = await options.invoke(
+          buildRubricPrompt(pack, check, fixture, artifact, options.sourceTexts)
+        );
+        const { pass, reason } = parseBinaryResponse(raw);
+        return metricResult(
+          metric,
+          fixture,
+          artifact,
+          pass ? "pass" : "fail",
+          pass ? 1 : 0,
+          reason,
+          {
+            model: options.model,
+            pass,
+            check: check.question,
+          }
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // No verdict: a warning, so a flaky judge does not fail the run (scorecard counts it apart).
+        return metricResult(
+          metric,
+          fixture,
+          artifact,
+          "warn",
+          0,
+          `Rubric judge failed: ${message}`,
+          {
+            model: options.model,
+            judgeError: true,
+            error: message,
+            check: check.question,
+          }
+        );
+      }
+    })
+  );
 }

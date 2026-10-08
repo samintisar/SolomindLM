@@ -55,24 +55,37 @@ export async function checkNotebookLimit(ctx: MutationCtx): Promise<void> {
 }
 
 /**
- * Check if user has reached their source (document) limit.
+ * Check that `adding` more sources fit under the user's source (document) limit.
  * Free tier is capped at 20 sources per notebook; Pro at 200.
+ * `userId` defaults to the signed-in user; pass `existingCount` when the caller already
+ * counted the notebook's documents, to skip reading them again.
  */
-export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Promise<void> {
-  const userId = await getAuthUserId(ctx);
+export async function checkSourceLimit(
+  ctx: QueryCtx,
+  notebookId: string,
+  {
+    adding = 1,
+    userId: givenUserId,
+    existingCount,
+  }: { adding?: number; userId?: Id<"users">; existingCount?: number } = {}
+): Promise<void> {
+  const userId = givenUserId ?? (await getAuthUserId(ctx));
   if (!userId) throw new Error("Unauthenticated");
 
   const isPro = await isProUser(ctx, userId);
   const limit = isPro ? 200 : 20;
 
-  const cap = limit + 1;
-  const documents = await ctx.db
-    .query("documents")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId as Id<"notebooks">))
-    .take(cap);
+  const count =
+    existingCount ??
+    (
+      await ctx.db
+        .query("documents")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId as Id<"notebooks">))
+        .take(limit + 1)
+    ).length;
 
-  if (documents.length >= limit) {
-    throw createSourceLimitError(documents.length, limit, isPro);
+  if (count + adding > limit) {
+    throw createSourceLimitError(count, limit, isPro);
   }
 }
 

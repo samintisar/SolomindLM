@@ -6,7 +6,6 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
-import { ShellAuthProvider } from "@mobile/auth/AuthContext";
 import { NativeConvexAuthBridgeProvider } from "@mobile/context/NativeConvexAuthBridgeContext";
 import { parseMobileDeepLink } from "@mobile/services/platform/deepLinking";
 import {
@@ -90,11 +89,9 @@ function RootLayout() {
 
   return (
     <NativeConvexAuthBridgeProvider>
-      <ShellAuthProvider>
-        <SafeAreaProvider>
-          <RootLayoutNav />
-        </SafeAreaProvider>
-      </ShellAuthProvider>
+      <SafeAreaProvider>
+        <RootLayoutNav />
+      </SafeAreaProvider>
     </NativeConvexAuthBridgeProvider>
   );
 }

@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import {
   internalAction,
   internalMutation,
   internalQuery,
   type MutationCtx,
   mutation,
+  type QueryCtx,
   query,
 } from "../_generated/server";
 import { checkSourceLimit } from "../_lib/limits";
@@ -516,6 +517,23 @@ export const prepareDocumentReembed = internalMutation({
 });
 
 /**
+ * Internal: throws unless the user can add one more source to this notebook. Lets actions that
+ * download a file first (Google Drive) refuse before storing anything.
+ */
+export const assertCanAddSourceInternal = internalQuery({
+  args: {
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await assertCanEditNotebook(ctx, args.notebookId, args.userId);
+    await checkSourceLimit(ctx, args.notebookId, { userId: args.userId });
+    return null;
+  },
+});
+
+/**
  * Internal: List documents in a notebook when the user can read the notebook (for internal actions).
  */
 export const listDocumentsForNotebookReadInternal = internalQuery({
@@ -1001,19 +1019,34 @@ export const addExternalSources = mutation({
     const now = Date.now();
     const createdIds: Id<"documents">[] = [];
 
+    // Deduplicate against the notebook (one scan, which also counts it for the limit) and
+    // within the batch, then check the limit once.
+    const seenUrls = new Set<string>();
+    let existingCount = 0;
+    for await (const doc of ctx.db
+      .query("documents")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))) {
+      existingCount += 1;
+      if (doc.fileUrl) seenUrls.add(doc.fileUrl);
+    }
+    const newSources: typeof args.sources = [];
     for (const source of args.sources) {
-      // Deduplicate: skip if URL already exists in this notebook
-      const existing = await ctx.db
-        .query("documents")
-        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-        .filter((q) => q.eq(q.field("fileUrl"), source.url))
-        .first();
-
-      if (existing) {
+      if (seenUrls.has(source.url)) {
         logger.info("skipped_duplicate_source", { url: source.url });
         continue;
       }
+      seenUrls.add(source.url);
+      newSources.push(source);
+    }
 
+    if (newSources.length > 0) {
+      await checkSourceLimit(ctx, args.notebookId, {
+        adding: newSources.length,
+        existingCount,
+      });
+    }
+
+    for (const source of newSources) {
       const documentId = await ctx.db.insert("documents", {
         userId,
         notebookId: args.notebookId,
@@ -1046,15 +1079,24 @@ export const addExternalSources = mutation({
 
 // ── Source Guide (lazy-generated AI summary + topic chips) ──────────
 
+/** The document when the user can read its notebook (owner or member), else null. */
+async function getReadableDocument(
+  ctx: QueryCtx,
+  documentId: Id<"documents">,
+  userId: Id<"users">
+): Promise<Doc<"documents"> | null> {
+  const document = await ctx.db.get(documentId);
+  if (!document || !(await canReadNotebook(ctx, document.notebookId, userId))) return null;
+  return document;
+}
+
 export const getDocumentInternal = internalQuery({
   args: {
     documentId: v.id("documents"),
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const document = await ctx.db.get(args.documentId);
-    if (!document || document.userId !== args.userId) return null;
-    return document;
+    return await getReadableDocument(ctx, args.documentId, args.userId);
   },
 });
 
@@ -1064,12 +1106,12 @@ export const getDocumentChunksInternal = internalQuery({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const chunks = await ctx.db
+    if (!(await getReadableDocument(ctx, args.documentId, args.userId))) return [];
+    return await ctx.db
       .query("documentChunks")
       .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
       .order("asc")
       .take(100);
-    return chunks.filter((c) => c.userId === args.userId);
   },
 });
 
@@ -1081,8 +1123,8 @@ export const getSourceGuide = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const document = await ctx.db.get(args.documentId);
-    if (!document || document.userId !== userId) return null;
+    const document = await getReadableDocument(ctx, args.documentId, userId);
+    if (!document) return null;
 
     if (document.sourceGuide) {
       return {

@@ -70,10 +70,20 @@ export function buildLegalPrerenderBody(title: string, path: "/privacy" | "/term
       </article>\n    </main>`;
 }
 
+/**
+ * Pins the light-theme tokens on prerendered marketing content. public/theme-init.js puts the
+ * saved `dark` class on <html> before first paint; the marketing pages render light regardless
+ * (`auth-form-light`), so their static fallback must too, or dark-mode visitors would see it dark
+ * until React mounts. Legal and tool pages follow the app theme, so they stay unwrapped.
+ */
+function pinLightTheme(bodyHtml: string): string {
+  return `    <div class="auth-form-light min-h-screen bg-background text-foreground">\n${bodyHtml}\n    </div>`;
+}
+
 /** Returns prerender body HTML for indexable public SEO pages, or undefined if not needed. */
 export function buildPublicSeoPrerenderBody(path: string): string | undefined {
   if (path === "/") {
-    return buildHomePrerenderBody();
+    return pinLightTheme(buildHomePrerenderBody());
   }
   if (path === "/privacy") {
     return buildLegalPrerenderBody("Privacy Policy", "/privacy");
@@ -82,22 +92,22 @@ export function buildPublicSeoPrerenderBody(path: string): string | undefined {
     return buildLegalPrerenderBody("Terms of Service", "/terms");
   }
   if (path === "/faq") {
-    return buildFaqPrerenderBody();
+    return pinLightTheme(buildFaqPrerenderBody());
   }
 
   const hubPage = getClusterHubPageByPath(path);
   if (hubPage) {
-    return buildClusterHubPrerenderBody(hubPage);
+    return pinLightTheme(buildClusterHubPrerenderBody(hubPage));
   }
 
   const intentPage = getIntentLandingPageByPath(path);
   if (intentPage) {
-    return buildIntentLandingPrerenderBody(intentPage);
+    return pinLightTheme(buildIntentLandingPrerenderBody(intentPage));
   }
 
   const seoContentPage = getSeoContentPageByPath(path);
   if (seoContentPage) {
-    return buildSeoContentPrerenderBody(seoContentPage);
+    return pinLightTheme(buildSeoContentPrerenderBody(seoContentPage));
   }
 
   const toolPage = getToolPageByPath(path);
