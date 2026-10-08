@@ -10,13 +10,25 @@ import { canReadNotebook } from "../_lib/notebookAccess";
 /** What an `audioUrl` points at: a playable URL, a stored file, or nothing usable (null). */
 export type AudioUrlTarget = { url: string } | { storageRef: string } | null;
 
+/** The old `/audio/:storageId` HTTP route on the deployment's `.convex.site` host (now removed). */
+const LEGACY_SITE_AUDIO_URL = /^https?:\/\/[^/?#]+\.convex\.site\/audio\/([^/?#]+)\/?$/i;
+
 /**
- * Parse an `audioUrl`: full http(s) URLs play as-is; a bare storage id or a legacy
- * `/audio/<storageId>` path names a stored file.
+ * Parse an `audioUrl`: full http(s) URLs play as-is; a bare storage id, a legacy
+ * `/audio/<storageId>` path, or a full URL to the removed `.convex.site/audio/` route names a
+ * stored file.
  */
 export function parseAudioUrl(audioUrl: string): AudioUrlTarget {
   const raw = audioUrl.trim();
   if (!raw) return null;
+  const legacySite = LEGACY_SITE_AUDIO_URL.exec(raw);
+  if (legacySite) {
+    try {
+      return { storageRef: decodeURIComponent(legacySite[1]) };
+    } catch {
+      return null; // malformed percent-escape: names no file
+    }
+  }
   // URI schemes are case-insensitive (RFC 3986), so `HTTPS://…` is a URL too.
   if (/^https?:\/\//i.test(raw)) return { url: raw };
   let ref = raw;
@@ -33,22 +45,38 @@ export async function storageUrlForRef(ctx: QueryCtx, storageRef: string): Promi
   try {
     // Pre-Id storage ids are plain strings that `getUrl` still accepts; it throws on anything else.
     return await ctx.storage.getUrl(storageRef as Id<"_storage">);
-  } catch {
+  } catch (error) {
+    // Usually a reference that names no file; logged so a storage failure isn't silent.
+    console.warn(`[audio] could not resolve storage reference ${storageRef}`, error);
     return null;
   }
 }
 
 /**
- * Walks every overview the query matches (forks of a shared notebook can be many) and stops at
- * the first whose notebook the user can read. `checked` skips notebooks already ruled out.
+ * Most overviews one access check reads across all its lookups. Forks of a popular shared
+ * notebook can share a file thousands of times; past this the check answers "no access"
+ * instead of reading every fork (and hitting the query read limit).
+ */
+const MAX_AUDIO_OVERVIEWS_SCANNED = 100;
+
+/**
+ * Walks the overviews the query matches and stops at the first whose notebook the user can
+ * read. `checked` skips notebooks already ruled out; `budget` caps rows read across lookups.
  */
 async function anyNotebookReadable(
   ctx: QueryCtx,
   overviews: AsyncIterable<Doc<"audioOverviews">>,
   userId: Id<"users">,
-  checked: Set<Id<"notebooks">>
+  checked: Set<Id<"notebooks">>,
+  budget: { remaining: number }
 ): Promise<boolean> {
-  for await (const overview of overviews) {
+  // Advance by hand so no row past the budget is read.
+  const rows = overviews[Symbol.asyncIterator]();
+  while (budget.remaining > 0) {
+    const next = await rows.next();
+    if (next.done) return false;
+    budget.remaining -= 1;
+    const overview = next.value;
     if (checked.has(overview.notebookId)) continue;
     checked.add(overview.notebookId);
     if (await canReadNotebook(ctx, overview.notebookId, userId)) return true;
@@ -67,12 +95,13 @@ export async function canReadAudioFile(
   userId: Id<"users">
 ): Promise<boolean> {
   const checked = new Set<Id<"notebooks">>();
+  const budget = { remaining: MAX_AUDIO_OVERVIEWS_SCANNED };
   const storageId = ctx.db.system.normalizeId("_storage", storageRef);
   if (storageId) {
     const byStorageId = ctx.db
       .query("audioOverviews")
       .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", storageId));
-    if (await anyNotebookReadable(ctx, byStorageId, userId, checked)) return true;
+    if (await anyNotebookReadable(ctx, byStorageId, userId, checked, budget)) return true;
   }
 
   const urlSpellings = [storageRef, `/audio/${storageRef}`, `audio/${storageRef}`];
@@ -82,7 +111,7 @@ export async function canReadAudioFile(
     const byUrl = ctx.db
       .query("audioOverviews")
       .withIndex("by_audioUrl", (q) => q.eq("audioUrl", audioUrl));
-    if (await anyNotebookReadable(ctx, byUrl, userId, checked)) return true;
+    if (await anyNotebookReadable(ctx, byUrl, userId, checked, budget)) return true;
   }
   return false;
 }
