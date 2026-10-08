@@ -96,6 +96,52 @@ describe("ThemeProvider", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
+  it("renders the saved theme on the first render, with no light -> dark flip", () => {
+    localStorage.setItem("solomind_theme", "dark");
+    const seen: string[] = [];
+    renderHook(
+      () => {
+        const { theme } = useTheme();
+        seen.push(theme);
+      },
+      { wrapper: ThemeProvider }
+    );
+
+    expect(seen.length).toBeGreaterThan(0);
+    expect(new Set(seen)).toEqual(new Set(["dark"]));
+  });
+
+  it("keeps the context value stable across re-renders that don't change the theme", () => {
+    const { result, rerender } = renderThemeHook();
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  it("reports the theme to the native shell bridge", () => {
+    localStorage.setItem("solomind_theme", "dark");
+    const postMessage = vi.fn();
+    window.ReactNativeWebView = { postMessage };
+    try {
+      const { result } = renderThemeHook();
+      expect(postMessage).toHaveBeenLastCalledWith(
+        JSON.stringify({ type: "shell-web:theme", theme: "dark" })
+      );
+
+      act(() => {
+        result.current.toggleTheme();
+      });
+
+      expect(postMessage).toHaveBeenLastCalledWith(
+        JSON.stringify({ type: "shell-web:theme", theme: "light" })
+      );
+    } finally {
+      delete window.ReactNativeWebView;
+    }
+  });
+
   it("removes dark class when toggling to light", () => {
     localStorage.setItem("solomind_theme", "dark");
     const { result } = renderThemeHook();

@@ -218,3 +218,26 @@ describe("free tool pages", () => {
     expect(body).not.toContain("Written questions with feedback");
   });
 });
+
+describe("prerendered body theme", () => {
+  const LIGHT_PIN = 'class="auth-form-light';
+
+  it("pins marketing pages light, as their React pages are", () => {
+    const marketingPaths = [
+      "/",
+      "/faq",
+      getClusterHubPaths()[0]!,
+      getIntentLandingPaths()[0]!,
+      getSeoContentPaths()[0]!,
+    ];
+    for (const path of marketingPaths) {
+      expect(buildPublicSeoPrerenderBody(path), path).toContain(LIGHT_PIN);
+    }
+  });
+
+  it("leaves legal and tool pages on the app theme", () => {
+    for (const path of ["/privacy", "/terms", PDF_TO_FLASHCARDS_PAGE.path]) {
+      expect(buildPublicSeoPrerenderBody(path), path).not.toContain(LIGHT_PIN);
+    }
+  });
+});
