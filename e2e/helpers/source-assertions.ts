@@ -118,6 +118,8 @@ export async function waitForSourceStatus(
         // Never seen: the job finished between polls
       });
     await expect(processing).not.toBeVisible({ timeout: remaining() });
+    // A failed source loses the Processing badge too
+    await expect(sourceCard.getByText("Failed")).not.toBeVisible();
   } else if (expectedStatus === "processing") {
     await expect(sourceCard.getByText("Processing")).toBeVisible({ timeout: remaining() });
   } else if (expectedStatus === "failed") {
