@@ -1,8 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
-import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
-import { DEFAULT_NOTEBOOK_ICON } from "@/shared/notebook/notebookIcons";
 import type { ChatSettings } from "@/shared/types";
 
 // ============================================================
@@ -18,40 +16,14 @@ export function useNotebooks() {
 }
 
 /**
- * Create a new notebook with optimistic update
+ * Create a new notebook.
+ *
+ * No optimistic insert: callers await the result before closing the dialog or navigating, and a
+ * `temp-` placeholder gets a different React key than the real row, so the grid's exit animation
+ * showed both cards at once.
  */
 export function useCreateNotebook() {
-  const create = useMutation(api.notebooks.index.create).withOptimisticUpdate(
-    (localStore, args) => {
-      // Generate a temporary ID for the optimistic update
-      const tempId = `temp-${Date.now()}` as Id<"notebooks">;
-      const now = Date.now();
-
-      const newNotebook = {
-        id: tempId,
-        title: args.title,
-        date: new Date(now).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        sourceCount: 0,
-        coverColor: args.coverColor || DEFAULT_COVER_COLOR,
-        icon: args.icon || DEFAULT_NOTEBOOK_ICON,
-        isFeatured: args.isFeatured || false,
-        isSharedNotebook: false,
-        folderId: args.folderId,
-        created_at: now,
-        updated_at: now,
-      };
-
-      // Optimistically add to list
-      const notebooks = localStore.getQuery(api.notebooks.index.list);
-      if (notebooks) {
-        localStore.setQuery(api.notebooks.index.list, {}, [newNotebook, ...notebooks]);
-      }
-    }
-  );
+  const create = useMutation(api.notebooks.index.create);
 
   return async (data: {
     title: string;

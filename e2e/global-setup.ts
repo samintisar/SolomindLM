@@ -1,12 +1,13 @@
 import { chromium, type FullConfig } from "@playwright/test";
 import { spawnSync } from "child_process";
+import { signInWithPassword } from "./helpers/sign-in";
 
 /** Repo root: run E2E from the project root (`bunx playwright test`). */
 const repoRoot = process.cwd();
 
 /**
- * Global setup: authenticate once and save storage state.
- * All workers reuse this auth state instead of logging in per test.
+ * Global setup: check the test account signs in and save its storage state (used by specs that
+ * import `test` from @playwright/test; `auth.fixture` tests sign in once per worker instead).
  */
 async function globalSetup(config: FullConfig) {
   if (!process.env.E2E_TEST_EMAIL?.trim() || !process.env.E2E_TEST_PASSWORD) {
@@ -24,18 +25,7 @@ async function globalSetup(config: FullConfig) {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
 
-  await page.goto("/sign-in");
-  await page.getByPlaceholder("Enter your email").fill(TEST_EMAIL);
-  await page.getByPlaceholder("Password").fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Continue with email" }).click();
-
-  try {
-    await page.waitForURL("/home", { timeout: 10_000 });
-  } catch {
-    throw new Error(
-      "E2E global setup: sign-in landed on verification screen. Ensure test account is already verified."
-    );
-  }
+  await signInWithPassword(page, TEST_EMAIL, TEST_PASSWORD);
 
   await context.storageState({ path: ".auth/storageState.json" });
   await browser.close();
