@@ -1,6 +1,6 @@
 import { FileText, LocateFixed } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { memo, useEffect, useEffectEvent, useRef, useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
@@ -30,8 +30,18 @@ interface TranscriptReaderProps {
  * The transcript, read like live lyrics: the line being spoken is full strength and centred, the
  * rest recede. It follows the audio until the reader scrolls away mid-playback, then offers a
  * button to rejoin. Clicking a line seeks the audio to it.
+ *
+ * Memoized: the player re-renders on every `timeupdate`, but this only needs to when the active
+ * line changes, so give it a stable `onSeek` and `lines`.
  */
-export function TranscriptReader({
+export const TranscriptReader = memo(function TranscriptReader(props: TranscriptReaderProps) {
+  // The memo wraps a plain component rather than the reader itself: in a function passed straight
+  // to memo, React 19.2.0's useEffectEvent read stale props and state, so the reader went on
+  // following the audio after the user had scrolled away.
+  return <TranscriptReaderView {...props} />;
+});
+
+function TranscriptReaderView({
   lines,
   activeIndex,
   isPlaying,

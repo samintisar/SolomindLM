@@ -26,8 +26,10 @@ vi.mock("../hooks/usePauseAlignedLines", async (importOriginal) => {
   };
 });
 
+/** Only TranscriptReader calls it in this tree, so its call count is the reader's render count. */
+const useReducedMotion = vi.fn(() => false);
 vi.mock("motion/react", () => ({
-  useReducedMotion: () => false,
+  useReducedMotion: () => useReducedMotion(),
 }));
 
 const play = vi.fn(() => Promise.resolve());
@@ -64,6 +66,7 @@ beforeEach(() => {
   resolvedUrl = "https://example.test/audio.mp3";
   alignment = { lines: null, status: "idle" };
   usePauseAlignedLines.mockClear();
+  useReducedMotion.mockClear();
   play.mockClear();
   pause.mockClear();
   HTMLMediaElement.prototype.play = play as unknown as typeof HTMLMediaElement.prototype.play;
@@ -81,6 +84,32 @@ describe("AudioPlayer", () => {
     fireEvent(audio, new Event("durationchange"));
     await userEvent.click(screen.getByRole("button", { name: /Second line, answering/ }));
     expect(audio.currentTime).toBe(3);
+  });
+
+  it("re-renders the transcript only when the active line changes, not on every timeupdate", () => {
+    const { container } = renderPlayer();
+    const audio = audioElement(container);
+    Object.defineProperty(audio, "duration", { value: 100, configurable: true });
+    fireEvent(audio, new Event("durationchange"));
+    const timeUpdate = (seconds: number) => {
+      audio.currentTime = seconds;
+      fireEvent(audio, new Event("timeupdate"));
+    };
+
+    timeUpdate(0.5);
+    const rendersOnFirstLine = useReducedMotion.mock.calls.length;
+    timeUpdate(1);
+    timeUpdate(2);
+    // The scrubber still follows the time.
+    expect(screen.getByRole("slider", { name: "Seek" })).toHaveAttribute("aria-valuenow", "2");
+    expect(useReducedMotion).toHaveBeenCalledTimes(rendersOnFirstLine);
+
+    timeUpdate(4);
+    expect(useReducedMotion.mock.calls.length).toBeGreaterThan(rendersOnFirstLine);
+    expect(screen.getByRole("button", { name: /Second line, answering/ })).toHaveAttribute(
+      "aria-current",
+      "true"
+    );
   });
 
   it("ignores a line click until the audio can seek", async () => {

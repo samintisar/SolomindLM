@@ -1,5 +1,5 @@
 import { ArrowLeft, Download } from "lucide-react";
-import React, { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
@@ -114,7 +114,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       : alignment.status === "aligning"
         ? "syncing"
         : null;
+  // The reader gets only the index, so a `timeupdate` within the same line does not re-render it.
   const activeIndex = currentLineIndex(resolved, currentTime * 1000);
+  const seekToLine = useCallback(
+    (ms: number) => {
+      // Before the audio loads a seek would move the highlight with no audio behind it.
+      if (canSeek) seekTo(ms / 1000);
+    },
+    [canSeek, seekTo]
+  );
 
   const rootRef = useRef<HTMLDivElement>(null);
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -174,10 +182,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         isPlaying={isPlaying}
         approximate={syncBadge !== null}
         syncing={syncBadge === "syncing"}
-        onSeek={(ms) => {
-          // Before the audio loads a seek would move the highlight with no audio behind it.
-          if (canSeek) seekTo(ms / 1000);
-        }}
+        onSeek={seekToLine}
       />
 
       {(isResolving || isUnavailable || error) && (
