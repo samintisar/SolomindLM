@@ -528,7 +528,7 @@ export const assertCanAddSourceInternal = internalQuery({
   returns: v.null(),
   handler: async (ctx, args) => {
     await assertCanEditNotebook(ctx, args.notebookId, args.userId);
-    await checkSourceLimit(ctx, args.notebookId);
+    await checkSourceLimit(ctx, args.notebookId, { userId: args.userId });
     return null;
   },
 });
@@ -1019,11 +1019,14 @@ export const addExternalSources = mutation({
     const now = Date.now();
     const createdIds: Id<"documents">[] = [];
 
-    // Deduplicate against the notebook (one scan) and within the batch, then check the limit once.
+    // Deduplicate against the notebook (one scan, which also counts it for the limit) and
+    // within the batch, then check the limit once.
     const seenUrls = new Set<string>();
+    let existingCount = 0;
     for await (const doc of ctx.db
       .query("documents")
       .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))) {
+      existingCount += 1;
       if (doc.fileUrl) seenUrls.add(doc.fileUrl);
     }
     const newSources: typeof args.sources = [];
@@ -1037,7 +1040,10 @@ export const addExternalSources = mutation({
     }
 
     if (newSources.length > 0) {
-      await checkSourceLimit(ctx, args.notebookId, newSources.length);
+      await checkSourceLimit(ctx, args.notebookId, {
+        adding: newSources.length,
+        existingCount,
+      });
     }
 
     for (const source of newSources) {
