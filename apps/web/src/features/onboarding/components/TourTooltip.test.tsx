@@ -253,6 +253,39 @@ describe("TourTooltip measuring", () => {
     expect(holeX()).toBe("196");
   });
 
+  test("resizes the overlay when the viewport changes but the target does not", () => {
+    spyTarget("create-notebook-button");
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    const setViewport = (width: number, height: number) => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+    };
+    try {
+      setViewport(800, 600);
+      render(withCtx({ tourStatus: "active", currentStepId: "createNotebook" }));
+      const overlay = () => document.body.querySelector("svg[aria-hidden]");
+      expect(overlay()?.getAttribute("width")).toBe("800");
+      expect(overlay()?.getAttribute("height")).toBe("600");
+
+      setViewport(1400, 900);
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      advanceFrames(FRAME_MS);
+
+      expect(holeX()).toBe("96");
+      expect(overlay()?.getAttribute("width")).toBe("1400");
+      expect(overlay()?.getAttribute("height")).toBe("900");
+      const mask = overlay()?.querySelector("mask");
+      expect(mask?.getAttribute("width")).toBe("1400");
+      expect(mask?.querySelector("rect")?.getAttribute("height")).toBe("900");
+      expect(overlay()?.querySelector(":scope > rect")?.getAttribute("width")).toBe("1400");
+    } finally {
+      setViewport(originalWidth, originalHeight);
+    }
+  });
+
   test("appears when the target mounts and hides when it goes away", () => {
     render(withCtx({ tourStatus: "active", currentStepId: "createNotebook" }));
     expect(screen.queryByRole("dialog")).toBeNull();

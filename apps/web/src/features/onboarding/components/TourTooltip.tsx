@@ -13,6 +13,9 @@ interface Rect {
   height: number;
   /** Spotlight hole radius from the target's computed border-radius. */
   rx: number;
+  /** Viewport size at measure time; the dimming overlay is drawn at this size. */
+  viewportWidth: number;
+  viewportHeight: number;
 }
 
 /** Breathing room around the target so the cutout keeps rounded corners smooth. */
@@ -29,7 +32,9 @@ function sameRect(a: Rect | null, b: Rect | null): boolean {
     a.left === b.left &&
     a.width === b.width &&
     a.height === b.height &&
-    a.rx === b.rx
+    a.rx === b.rx &&
+    a.viewportWidth === b.viewportWidth &&
+    a.viewportHeight === b.viewportHeight
   );
 }
 
@@ -63,7 +68,7 @@ function readRect(selector: string): Rect | null {
 
     const rx = Math.min(innerRx + SPOTLIGHT_PADDING_PX, width / 2, height / 2);
 
-    return { top, left, width, height, rx };
+    return { top, left, width, height, rx, viewportWidth: vw, viewportHeight: vh };
   }
   return null;
 }
@@ -172,8 +177,9 @@ export const TourTooltip: React.FC = () => {
   if (tourStatus !== "active" || !step || !rect) return null;
 
   const stepNumber = STEP_IDS.indexOf(step.id) + 1;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  // From the measured state, so a resize that leaves the target in place still re-renders.
+  const vw = rect.viewportWidth;
+  const vh = rect.viewportHeight;
 
   const handleSkip = () => {
     void skip().catch((error) => {
