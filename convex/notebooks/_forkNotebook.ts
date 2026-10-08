@@ -233,6 +233,8 @@ export async function performNotebookFork(
       status: r.status,
       audioType: r.audioType,
       audioUrl: r.audioUrl,
+      // Same file as the source row, so access checks can find the fork by storage id.
+      audioStorageId: r.audioStorageId,
       metadata: r.metadata,
       createdAt: now,
       updatedAt: now,

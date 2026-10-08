@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
+import { parseAudioUrl, storageUrlForRef } from "../../_model/audioOverviews";
 
 /**
  * Quick fix for a specific audio overview URL
@@ -24,22 +25,16 @@ export const fixSpecificAudioUrl = internalMutation({
     }
 
     // Extract storage ID from the URL
-    let storageId = overview.audioUrl;
-
-    // Remove /audio/ prefix if present
-    if (storageId.startsWith("/audio/")) {
-      storageId = storageId.replace("/audio/", "");
+    const target = parseAudioUrl(overview.audioUrl);
+    if (!target || !("storageRef" in target)) {
+      throw new Error(`audioUrl is not a storage reference: ${overview.audioUrl}`);
     }
-
-    // Remove leading slash if present
-    if (storageId.startsWith("/")) {
-      storageId = storageId.substring(1);
-    }
+    const storageId = target.storageRef;
 
     console.log(`  Extracted storageId: ${storageId}`);
 
     // Generate the correct Convex storage URL
-    const correctUrl = await ctx.storage.getUrl(storageId as any);
+    const correctUrl = await storageUrlForRef(ctx, storageId);
 
     if (!correctUrl) {
       throw new Error(`Failed to get Convex storage URL for storageId: ${storageId}`);
