@@ -1,6 +1,6 @@
 import { Menu } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import {
   Sheet,
@@ -13,6 +13,46 @@ import { cn } from "@/shared/utils/cn";
 import { NAV_ITEMS } from "./landingHomeContent";
 import { scrollToSection } from "./scrollToSection";
 
+type NavItem = (typeof NAV_ITEMS)[number];
+
+/** On the home page a nav item scrolls to its section; elsewhere it links to `/#section`, and the home page scrolls to the hash. */
+function NavItemButton({
+  item,
+  onHome,
+  onNavigate,
+  onLinkClick,
+  size,
+  className,
+}: {
+  item: NavItem;
+  onHome: boolean;
+  onNavigate: (target: string) => void;
+  /** Runs when the off-home link is followed (the phone menu closes itself here). */
+  onLinkClick?: () => void;
+  size?: "sm";
+  className?: string;
+}) {
+  if (onHome) {
+    return (
+      <Button
+        variant="ghost"
+        size={size}
+        className={className}
+        onClick={() => onNavigate(item.target)}
+      >
+        {item.label}
+      </Button>
+    );
+  }
+  return (
+    <Button asChild variant="ghost" size={size} className={className}>
+      <Link to={`/#${item.target}`} onClick={onLinkClick}>
+        {item.label}
+      </Link>
+    </Button>
+  );
+}
+
 interface LandingNavProps {
   onGetStarted: () => void;
   onLogin: () => void;
@@ -21,6 +61,7 @@ interface LandingNavProps {
 export function LandingNav({ onGetStarted, onLogin }: LandingNavProps) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const onHome = useLocation().pathname === "/";
 
   useEffect(() => {
     const update = () => setScrolled(window.scrollY > 8);
@@ -51,9 +92,13 @@ export function LandingNav({ onGetStarted, onLogin }: LandingNavProps) {
 
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
           {NAV_ITEMS.map((item) => (
-            <Button key={item.target} variant="ghost" size="sm" onClick={() => go(item.target)}>
-              {item.label}
-            </Button>
+            <NavItemButton
+              key={item.target}
+              item={item}
+              onHome={onHome}
+              onNavigate={go}
+              size="sm"
+            />
           ))}
         </nav>
 
@@ -74,14 +119,14 @@ export function LandingNav({ onGetStarted, onLogin }: LandingNavProps) {
               </SheetHeader>
               <nav aria-label="Mobile" className="flex flex-col gap-1 px-4">
                 {NAV_ITEMS.map((item) => (
-                  <Button
+                  <NavItemButton
                     key={item.target}
-                    variant="ghost"
+                    item={item}
+                    onHome={onHome}
+                    onNavigate={go}
+                    onLinkClick={() => setMenuOpen(false)}
                     className="justify-start"
-                    onClick={() => go(item.target)}
-                  >
-                    {item.label}
-                  </Button>
+                  />
                 ))}
                 <Button
                   variant="outline"
