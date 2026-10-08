@@ -25,9 +25,18 @@ interface ColumnManagerProps {
   columns: TableColumn[];
   onChange: (columns: TableColumn[]) => void;
   onClose?: () => void;
+  className?: string;
+  /** Move focus to the close button on mount (when the manager opens over the table). */
+  focusOnMount?: boolean;
 }
 
-export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange, onClose }) => {
+export const ColumnManager: React.FC<ColumnManagerProps> = ({
+  columns,
+  onChange,
+  onClose,
+  className,
+  focusOnMount = false,
+}) => {
   const [customName, setCustomName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -36,7 +45,13 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
   const instructionsId = useId();
   const headingId = useId();
   const openerRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const formWasOpen = useRef(false);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus once, when the manager mounts
+  useEffect(() => {
+    if (focusOnMount) closeButtonRef.current?.focus();
+  }, []);
 
   // The opener is unmounted while the form is open, so hand focus back to it once it returns.
   useEffect(() => {
@@ -185,7 +200,10 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
   return (
     <aside
       aria-labelledby={headingId}
-      className="flex h-full w-88 max-w-full shrink-0 flex-col border-l border-border/50 bg-card shadow-lg"
+      className={cn(
+        "flex h-full w-88 max-w-full shrink-0 flex-col border-l border-border/50 bg-card shadow-lg",
+        className
+      )}
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 px-5">
         <h3 id={headingId} className="font-sans text-sm font-semibold text-foreground">
@@ -193,6 +211,7 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange,
         </h3>
         {onClose && (
           <Button
+            ref={closeButtonRef}
             variant="ghost"
             size="icon-sm"
             onClick={onClose}

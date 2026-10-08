@@ -13,7 +13,7 @@ import {
   Table2,
   X,
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBulkUpload, useGetExistingPapers } from "@/features/sources/services/documentsApi";
 import { Button } from "@/shared/components/ui/button";
@@ -57,6 +57,20 @@ import { LiteratureTableExtractionCell } from "../LiteratureTableExtractionCell"
 import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
 
 type TablePaper = TablePaperRow;
+
+/**
+ * Narrowest table area (px) that fits the column manager beside the table. Narrower, the manager
+ * opens over the table, so it starts closed.
+ */
+const COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH = 896;
+
+/**
+ * Below `@4xl` the paper column scrolls with the rest at a narrower width: pinned at full width it
+ * would leave too little room to scroll the data columns under it.
+ */
+const PAPER_COLUMN_CLASS =
+  "min-w-72 @max-4xl/literature-table:static @4xl/literature-table:min-w-105";
+const DATA_COLUMN_CLASS = "min-w-64 @4xl/literature-table:min-w-70";
 
 export interface LiteratureTable {
   title: string;
@@ -117,12 +131,36 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 }) => {
   const { success: toastSuccess, error: toastError } = useToast();
   const [table, setTable] = useState<LiteratureTable>(initialTable);
-  const [showColumnManager, setShowColumnManager] = useState(true);
+  const [showColumnManager, setShowColumnManager] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [citeTarget, setCiteTarget] = useState<{ paper: TablePaper; index: number } | null>(null);
+
+  /** Whether the column manager fits beside the table; null until the table area is measured. */
+  const [fitsBeside, setFitsBeside] = useState<boolean | null>(null);
+  const previousFitsBeside = useRef<boolean | null>(null);
+  const manageColumnsButtonRef = useRef<HTMLButtonElement>(null);
+
+  // A callback ref, so a remount (entering or leaving full screen) observes the new node.
+  const observeTableBody = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const measure = () => setFitsBeside(node.clientWidth >= COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // Open the manager on first measure only where it fits beside the table, and close it if the
+  // panel narrows so it would cover the table the user never asked it to cover.
+  useLayoutEffect(() => {
+    const previous = previousFitsBeside.current;
+    previousFitsBeside.current = fitsBeside;
+    if (previous === null && fitsBeside) setShowColumnManager(true);
+    else if (previous && fitsBeside === false) setShowColumnManager(false);
+  }, [fitsBeside]);
 
   const existingPapers = useGetExistingPapers(notebookId);
   const bulkUpload = useBulkUpload();
@@ -221,6 +259,23 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   );
 
   const columnManagerOpen = showColumnManager && !isFocusMode;
+  const columnManagerCoversTable = columnManagerOpen && fitsBeside === false;
+
+  const closeColumnManager = useCallback(() => {
+    setShowColumnManager(false);
+    manageColumnsButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!columnManagerCoversTable) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) closeColumnManager();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeColumnManager, columnManagerCoversTable]);
 
   const handleExportCSV = useCallback(() => {
     if (onExport) onExport("csv");
@@ -298,6 +353,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
             </Button>
           )}
           <Button
+            ref={manageColumnsButtonRef}
             variant={columnManagerOpen ? "secondary" : "ghost"}
             size="sm-adaptive"
             onClick={() => {
@@ -402,8 +458,13 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col bg-card">
+      {/* Narrow widths: the column manager covers the table, and the paper column scrolls with the
+          rest instead of pinning (pinned, its width alone fills a phone screen). */}
+      <div ref={observeTableBody} className="@container/table-body relative flex min-h-0 flex-1">
+        <div
+          className="@container/literature-table flex min-w-0 flex-1 flex-col bg-card"
+          inert={columnManagerCoversTable || undefined}
+        >
           {table.papers.length === 0 ? (
             <Empty>
               <EmptyHeader>
@@ -419,10 +480,10 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
               )}
             </Empty>
           ) : (
-            <Table containerClassName="min-h-0 flex-1" className="min-w-275">
+            <Table containerClassName="min-h-0 flex-1" className="@4xl/literature-table:min-w-275">
               <TableHeader sticky>
                 <TableRow>
-                  <TableHead pinned className="min-w-105">
+                  <TableHead pinned className={PAPER_COLUMN_CLASS}>
                     <div className="flex items-center gap-3 pl-9.5">
                       <Checkbox
                         checked={allSelected}
@@ -433,7 +494,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                     </div>
                   </TableHead>
                   {dataColumns.map((col) => (
-                    <TableHead key={col.id} className="min-w-70">
+                    <TableHead key={col.id} className={DATA_COLUMN_CLASS}>
                       {col.name}
                     </TableHead>
                   ))}
@@ -456,7 +517,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                         key={paper.citationId}
                         data-state={isSelected ? "selected" : undefined}
                       >
-                        <TableCell pinned className="min-w-105">
+                        <TableCell pinned className={PAPER_COLUMN_CLASS}>
                           <LiteratureTablePaperCell
                             rank={visibleRank}
                             paper={paper}
@@ -470,7 +531,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                           />
                         </TableCell>
                         {dataColumns.map((col) => (
-                          <TableCell key={col.id} className="min-w-70">
+                          <TableCell key={col.id} className={DATA_COLUMN_CLASS}>
                             <LiteratureTableExtractionCell value={paper.rowData[col.id] ?? ""} />
                           </TableCell>
                         ))}
@@ -487,7 +548,13 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
           <ColumnManager
             columns={table.columns}
             onChange={handleColumnsChange}
-            onClose={() => setShowColumnManager(false)}
+            onClose={closeColumnManager}
+            className={
+              columnManagerCoversTable
+                ? "absolute inset-y-0 right-0 z-30 w-full @md/table-body:w-88"
+                : undefined
+            }
+            focusOnMount={columnManagerCoversTable}
           />
         )}
       </div>
