@@ -62,8 +62,9 @@ jobs:
           CONVEX_TEAM_ACCESS_TOKEN: ${{ secrets.CONVEX_TEAM_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+          DRY_RUN: ${{ inputs.dry-run }}
         run: |
           LIVE_BRANCHES=$(gh api --paginate "repos/$REPO/branches?per_page=100" --jq '.[].name')
           export LIVE_BRANCHES
-          bun scripts/cleanup-convex-previews.ts --sweep $DRY_RUN
+          if [ "$DRY_RUN" = "true" ]; then set -- --dry-run; fi
+          bun scripts/cleanup-convex-previews.ts --sweep "$@"
