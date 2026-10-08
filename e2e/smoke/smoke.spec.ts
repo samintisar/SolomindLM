@@ -1,6 +1,9 @@
 import { devices, expect, type Page, test } from "@playwright/test";
 
 test.describe("Smoke tests — public pages", () => {
+  // Signed out: the suite's stored session would send /sign-in straight on to /home.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("landing page loads with hero content", async ({ page }) => {
     await page.goto("/");
 

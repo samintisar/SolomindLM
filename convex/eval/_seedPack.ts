@@ -9,7 +9,7 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import * as Notebooks from "../_model/notebooks";
-import { deleteAllChunksForDocument } from "../documents/index";
+import { deleteAllChunksForDocument } from "../documents/internal";
 import { EVAL_PACK_FOLDER_NAME } from "./_packFolder";
 
 export { EVAL_PACK_FOLDER_NAME };

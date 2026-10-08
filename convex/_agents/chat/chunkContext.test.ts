@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { LIST_QUERY_MAX_SELECTED_CHUNKS } from "./chatConfig.js";
 import {
   addNeighbourPassages,
@@ -9,6 +8,7 @@ import {
   selectChunksByTokenBudget,
   selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext";
+import type { ReferenceChunk } from "./types";
 
 function chunk(
   partial: Partial<ReferenceChunk> & Pick<ReferenceChunk, "sourceId" | "chunkIndex" | "content">

@@ -1,5 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
-import { MemoryRouter, useNavigate } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, test } from "vitest";
 import { RouteTransition } from "./RouteTransition";
 
@@ -10,10 +10,10 @@ function CaptureNavigate() {
   return <span data-testid="page" />;
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, animateOnMount?: boolean) {
   render(
     <MemoryRouter initialEntries={[path]}>
-      <RouteTransition fill={false}>
+      <RouteTransition fill={false} animateOnMount={animateOnMount}>
         <CaptureNavigate />
       </RouteTransition>
     </MemoryRouter>
@@ -47,4 +47,29 @@ describe("RouteTransition", () => {
     act(() => navigate("/notebook/b"));
     expect(wrapper()).toBe(before);
   });
+
+  test("fades on mount when asked to (a shell swapped in after navigation)", () => {
+    renderAt("/home", true);
+    expect(wrapper()).toHaveClass("animate-route-in");
+  });
+
+  test("does not fade on mount after a redirect, even when asked to", () => {
+    render(
+      <MemoryRouter initialEntries={["/", "/home"]} initialIndex={1}>
+        <ReplaceThenMount />
+      </MemoryRouter>
+    );
+    act(() => navigate("/sign-in", { replace: true }));
+    expect(wrapper()).not.toHaveClass("animate-route-in");
+  });
 });
+
+/** Mounts a fresh RouteTransition per pathname, like the root switching between shells. */
+function ReplaceThenMount() {
+  const { pathname } = useLocation();
+  return (
+    <RouteTransition key={pathname} fill={false} animateOnMount={pathname !== "/home"}>
+      <CaptureNavigate />
+    </RouteTransition>
+  );
+}

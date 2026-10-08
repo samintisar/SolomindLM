@@ -6,6 +6,11 @@ interface RouteTransitionProps {
   children: ReactNode;
   /** Apply the app-shell flex layout (non-public pages live in a flex column). */
   fill: boolean;
+  /**
+   * Fade the first section too. Set when this instance mounts because of a navigation (the root
+   * swapping the public and app shells), so the swap fades like any other section change.
+   */
+  animateOnMount?: boolean;
 }
 
 /**
@@ -17,7 +22,7 @@ interface RouteTransitionProps {
  * load and on redirects (REPLACE navigations, e.g. <Navigate replace> to /sign-in), so first
  * paint is never faded from blank.
  */
-export function RouteTransition({ children, fill }: RouteTransitionProps) {
+export function RouteTransition({ children, fill, animateOnMount = false }: RouteTransitionProps) {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
   const section = pathname.split("/")[1] ?? "";
@@ -25,7 +30,7 @@ export function RouteTransition({ children, fill }: RouteTransitionProps) {
   // Decided once per section change. Re-renders within a section (auth/data loading) must not
   // add the class to the already-visible div.
   const currentSection = useRef(section);
-  const animate = useRef(false);
+  const animate = useRef(animateOnMount && navigationType !== "REPLACE");
   if (section !== currentSection.current) {
     currentSection.current = section;
     animate.current = navigationType !== "REPLACE";

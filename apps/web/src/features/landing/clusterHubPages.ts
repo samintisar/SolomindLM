@@ -212,10 +212,6 @@ export function getClusterHubPaths(): string[] {
   return CLUSTER_HUB_PAGES.map((page) => page.path);
 }
 
-export function isClusterHubPath(path: string): boolean {
-  return getClusterHubPageByPath(path) !== undefined;
-}
-
 export function resolveHubSectionPages(
   hub: ClusterHubPageConfig,
   section: ClusterHubSection

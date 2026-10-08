@@ -4,19 +4,6 @@ import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
-export const updateWrittenQuestionsTitle = internalMutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.writtenQuestionId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
 export const saveWrittenQuestionsResults = internalMutation({
   args: {
     writtenQuestionId: v.id("writtenQuestions"),

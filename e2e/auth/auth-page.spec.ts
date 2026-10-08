@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Auth — Auth page smoke tests", () => {
+  // Start signed out: with the stored session, / can redirect to /home before the clears below run.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("landing page Get Started navigates to auth", async ({ page }) => {
     // Auth tests need a clean, unauthenticated context
     await page.context().clearCookies();
@@ -65,19 +68,13 @@ test.describe("Auth — Auth page smoke tests", () => {
     await page.waitForURL("/", { timeout: 5_000 });
     await expect(page).toHaveURL("/");
   });
+});
 
+test.describe("Auth — signed in", () => {
+  // Uses the suite's stored session (global setup), unlike the signed-out block above.
   test("already authenticated user is redirected from /sign-in", async ({ page }) => {
-    // This test relies on the global setup auth state being present
-    await page.goto("/home");
-
-    // If we're on home, we're authenticated; try going to sign-in
-    const currentUrl = page.url();
-    if (currentUrl.includes("/home")) {
-      await page.goto("/sign-in");
-      // Should redirect back to home since already authenticated
-      await page.waitForURL(/\/(home|sign-in)/, { timeout: 5_000 });
-      const url = page.url();
-      expect(url).toMatch(/\/(home|sign-in)/);
-    }
+    await page.goto("/sign-in");
+    await page.waitForURL(/\/home/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/home/);
   });
 });

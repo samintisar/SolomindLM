@@ -1,7 +1,7 @@
 import { ArrowLeft, Network, XCircle } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
-import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
+import { useChatSessionContext } from "@/features/chat/useChatStreaming";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
@@ -27,7 +27,7 @@ function errorMessage(error: unknown): string {
 
 /** A mind map note as a collapsible outline; clicking a topic asks the notebook chat about it. */
 export const MindMapView: React.FC<MindMapViewProps> = ({ note, onBack, onAskInChat }) => {
-  const { isChatStreaming, remoteGenerationBlocksSend } = useChatStreamingContext();
+  const { isChatStreaming, remoteGenerationBlocksSend } = useChatSessionContext();
   const title = note.title?.trim() || "Mind Map";
   // `content` is the stored map serialised, so it only changes when the map does. The note is
   // mapped afresh on every render, which makes `mindMapData` a new object each time.

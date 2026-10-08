@@ -20,7 +20,7 @@ vi.mock("@/features/studio/useStudioContext", () => ({
   useStudioContext: () => ({ notes: [{ id: "note-1", title: "First", type: "audioOverview" }] }),
 }));
 vi.mock("@/features/chat/useChatStreaming", () => ({
-  useChatStreamingContext: () => ({
+  useChatSessionContext: () => ({
     onSendMessage: vi.fn(),
     isChatStreaming: false,
     remoteGenerationBlocksSend: false,
