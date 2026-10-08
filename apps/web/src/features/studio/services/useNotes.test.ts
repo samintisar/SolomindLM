@@ -95,6 +95,46 @@ describe("useNotes (Convex-mocked integration)", () => {
     expect(mockUseQuery).toHaveBeenCalledWith(expect.anything(), "skip");
   });
 
+  it("keeps the same array across rerenders while the query result is unchanged", () => {
+    const dbNotes = [
+      { _id: "r1", _type: "report", title: "R", status: "completed", content: "", metadata: {} },
+    ];
+    mockUseQuery.mockReturnValue(dbNotes);
+
+    const { result, rerender } = renderHook(() => useNotes("notebook-1"));
+    const first = result.current;
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  it("returns a new array when the query result changes", () => {
+    mockUseQuery.mockReturnValue([
+      { _id: "r1", _type: "report", title: "R", status: "completed", content: "", metadata: {} },
+    ]);
+    const { result, rerender } = renderHook(() => useNotes("notebook-1"));
+    const first = result.current;
+
+    mockUseQuery.mockReturnValue([
+      { _id: "r1", _type: "report", title: "R2", status: "completed", content: "", metadata: {} },
+    ]);
+    rerender();
+
+    expect(result.current).not.toBe(first);
+    expect(result.current[0].title).toBe("R2");
+  });
+
+  it("returns the same empty array on every render while loading", () => {
+    mockUseQuery.mockReturnValue(undefined);
+
+    const { result, rerender } = renderHook(() => useNotes("notebook-1"));
+    const first = result.current;
+    rerender();
+
+    expect(result.current).toBe(first);
+    expect(result.current).toEqual([]);
+  });
+
   it("handles mixed note types correctly", () => {
     const dbNotes = [
       {

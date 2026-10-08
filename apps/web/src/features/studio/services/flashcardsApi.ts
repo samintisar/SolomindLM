@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { downloadBlob } from "@/shared/utils/downloadFile";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
@@ -113,40 +113,52 @@ export function useCreateFlashcard() {
  * Rename a flashcard set by ID with optimistic update
  */
 export function useRenameFlashcard() {
-  const update = useMutation(api.studio.flashcards.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-      // The view also reads the per-type query (live progress) while it is open
-      const current = localStore.getQuery(api.studio.flashcards.index.get, { id });
-      if (current) {
-        localStore.setQuery(api.studio.flashcards.index.get, { id }, { ...current, title });
-      }
-    }
+  const updateMutation = useMutation(api.studio.flashcards.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+        // The view also reads the per-type query (live progress) while it is open
+        const current = localStore.getQuery(api.studio.flashcards.index.get, { id });
+        if (current) {
+          localStore.setQuery(api.studio.flashcards.index.get, { id }, { ...current, title });
+        }
+      }),
+    [updateMutation]
   );
 
-  return async (flashcardId: string, newTitle: string) => {
-    return await update({
-      id: flashcardId as Id<"flashcards">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (flashcardId: string, newTitle: string) => {
+      return await update({
+        id: flashcardId as Id<"flashcards">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a flashcard set by ID with optimistic update
  */
 export function useDeleteFlashcard() {
-  const remove = useMutation(api.studio.flashcards.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-      // The view also reads the per-type query (live progress) while it is open
-      localStore.setQuery(api.studio.flashcards.index.get, { id }, null);
-    }
+  const removeMutation = useMutation(api.studio.flashcards.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+        // The view also reads the per-type query (live progress) while it is open
+        localStore.setQuery(api.studio.flashcards.index.get, { id }, null);
+      }),
+    [removeMutation]
   );
 
-  return async (flashcardId: string) => {
-    await remove({ id: flashcardId as Id<"flashcards"> });
-  };
+  return useCallback(
+    async (flashcardId: string) => {
+      await remove({ id: flashcardId as Id<"flashcards"> });
+    },
+    [remove]
+  );
 }
 
 /**

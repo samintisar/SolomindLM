@@ -1,9 +1,9 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { DocumentSummary } from "@convex/documents/listSummary";
-import { ConvexClient } from "convex/browser";
+import { ConvexClient, type OptimisticLocalStore } from "convex/browser";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type {
   Document,
   PaperRecordInput,
@@ -94,91 +94,112 @@ export function useCreateDocument() {
   };
 }
 
+type DocumentListArgs = { notebookId?: Id<"notebooks"> };
+
 /**
- * Update a document (rename) with optimistic update
+ * Args of the live source-list subscription in App.tsx. Optimistic updates are keyed by query and
+ * args, so they must use these exact args to reach the list the UI renders.
  */
-export function useUpdateDocument() {
-  const update = useMutation(api.documents.index.update).withOptimisticUpdate(
-    (localStore, args) => {
-      const { id, title } = args;
-
-      // Update list view
-      const listResult = localStore.getQuery(api.documents.listSummary.listSummary, {});
-      if (listResult) {
-        localStore.setQuery(
-          api.documents.listSummary.listSummary,
-          {},
-          listResult.map((doc: DocumentSummary) =>
-            doc._id === id ? { ...doc, fileName: title } : doc
-          )
-        );
-      }
-
-      // Update detail view
-      const document = localStore.getQuery(api.documents.index.get, { id });
-      if (document) {
-        localStore.setQuery(api.documents.index.get, { id }, { ...document, fileName: title });
-      }
-    }
+function useDocumentListArgs(notebookId: string | null): DocumentListArgs {
+  return useMemo(
+    () => (notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {}),
+    [notebookId]
   );
+}
 
-  return async (id: string, updates: { title: string }) => {
-    return await update({ id: id as Id<"documents">, title: updates.title });
-  };
+function updateCachedDocumentList(
+  localStore: OptimisticLocalStore,
+  listArgs: DocumentListArgs,
+  update: (docs: DocumentSummary[]) => DocumentSummary[]
+) {
+  const docs = localStore.getQuery(api.documents.listSummary.listSummary, listArgs);
+  if (docs) {
+    localStore.setQuery(api.documents.listSummary.listSummary, listArgs, update(docs));
+  }
 }
 
 /**
- * Delete a document with optimistic update
+ * Rename a document, optimistically updating the notebook's source list and the detail view.
  */
-export function useDeleteDocument() {
-  const remove = useMutation(api.documents.index.remove).withOptimisticUpdate(
-    (localStore, args) => {
-      // Optimistically remove from list
-      const listResult = localStore.getQuery(api.documents.listSummary.listSummary, {});
-      if (listResult) {
-        localStore.setQuery(
-          api.documents.listSummary.listSummary,
-          {},
-          listResult.filter((doc: DocumentSummary) => doc._id !== args.id)
+export function useUpdateDocument(notebookId: string | null) {
+  const listArgs = useDocumentListArgs(notebookId);
+  const updateMutation = useMutation(api.documents.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, args) => {
+        const { id, title } = args;
+        updateCachedDocumentList(localStore, listArgs, (docs) =>
+          docs.map((doc) => (doc._id === id ? { ...doc, fileName: title } : doc))
         );
-      }
 
-      // Clear detail view
-      localStore.setQuery(api.documents.index.get, { id: args.id }, null);
-    }
+        const document = localStore.getQuery(api.documents.index.get, { id });
+        if (document) {
+          localStore.setQuery(api.documents.index.get, { id }, { ...document, fileName: title });
+        }
+      }),
+    [updateMutation, listArgs]
   );
 
-  return async (id: string) => {
-    return await remove({ id: id as Id<"documents"> });
-  };
+  return useCallback(
+    async (id: string, updates: { title: string }) => {
+      return await update({ id: id as Id<"documents">, title: updates.title });
+    },
+    [update]
+  );
 }
 
 /**
- * Delete multiple documents with optimistic list updates (notebook-scoped list args).
+ * Delete a document, optimistically removing it from the notebook's source list and clearing the detail view.
+ */
+export function useDeleteDocument(notebookId: string | null) {
+  const listArgs = useDocumentListArgs(notebookId);
+  const removeMutation = useMutation(api.documents.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, args) => {
+        updateCachedDocumentList(localStore, listArgs, (docs) =>
+          docs.filter((doc) => doc._id !== args.id)
+        );
+        localStore.setQuery(api.documents.index.get, { id: args.id }, null);
+      }),
+    [removeMutation, listArgs]
+  );
+
+  return useCallback(
+    async (id: string) => {
+      return await remove({ id: id as Id<"documents"> });
+    },
+    [remove]
+  );
+}
+
+/**
+ * Delete multiple documents, optimistically removing them from the notebook's source list.
  */
 export function useRemoveManyDocuments(notebookId: string | null) {
-  const listArgs = notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {};
-  const removeMany = useMutation(api.documents.index.removeMany).withOptimisticUpdate(
-    (localStore, args: { ids: Id<"documents">[] }) => {
-      const listResult = localStore.getQuery(api.documents.listSummary.listSummary, listArgs);
-      if (listResult) {
-        const idSet = new Set(args.ids.map((id) => id));
-        localStore.setQuery(
-          api.documents.listSummary.listSummary,
-          listArgs,
-          listResult.filter((doc: DocumentSummary) => !idSet.has(doc._id))
+  const listArgs = useDocumentListArgs(notebookId);
+  const removeManyMutation = useMutation(api.documents.index.removeMany);
+  const removeMany = useMemo(
+    () =>
+      removeManyMutation.withOptimisticUpdate((localStore, args: { ids: Id<"documents">[] }) => {
+        const idSet = new Set(args.ids);
+        updateCachedDocumentList(localStore, listArgs, (docs) =>
+          docs.filter((doc) => !idSet.has(doc._id))
         );
-      }
-      for (const id of args.ids) {
-        localStore.setQuery(api.documents.index.get, { id }, null);
-      }
-    }
+        for (const id of args.ids) {
+          localStore.setQuery(api.documents.index.get, { id }, null);
+        }
+      }),
+    [removeManyMutation, listArgs]
   );
 
-  return async (ids: string[]) => {
-    if (ids.length === 0) return;
-    await removeMany({ ids: ids as Id<"documents">[] });
-  };
+  return useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      await removeMany({ ids: ids as Id<"documents">[] });
+    },
+    [removeMany]
+  );
 }
 
 /**

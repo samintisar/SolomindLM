@@ -2,6 +2,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { OptimisticLocalStore } from "convex/browser";
 import { useAction, useMutation } from "convex/react";
+import { useCallback, useMemo } from "react";
 import type { SpreadsheetNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -146,18 +147,24 @@ export function isSpreadsheetSaveQueued(id: string): boolean {
  * Rename a spreadsheet by ID with optimistic update
  */
 export function useRenameSpreadsheet() {
-  const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-    }
+  const updateMutation = useMutation(api.studio.spreadsheets.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+      }),
+    [updateMutation]
   );
 
-  return async (spreadsheetId: string, newTitle: string) => {
-    return await update({
-      id: spreadsheetId as Id<"spreadsheets">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (spreadsheetId: string, newTitle: string) => {
+      return await update({
+        id: spreadsheetId as Id<"spreadsheets">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
@@ -182,13 +189,19 @@ export function useSaveSpreadsheetData() {
  * Delete a spreadsheet by ID with optimistic update
  */
 export function useDeleteSpreadsheet() {
-  const remove = useMutation(api.studio.spreadsheets.index.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
+  const removeMutation = useMutation(api.studio.spreadsheets.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+      }),
+    [removeMutation]
   );
 
-  return async (spreadsheetId: string) => {
-    await remove({ id: spreadsheetId as Id<"spreadsheets"> });
-  };
+  return useCallback(
+    async (spreadsheetId: string) => {
+      await remove({ id: spreadsheetId as Id<"spreadsheets"> });
+    },
+    [remove]
+  );
 }

@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useQuery } from "convex/react";
+import { useMemo } from "react";
 import type { Note } from "@/shared/types/index";
 import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
@@ -297,6 +298,8 @@ function getNotePreview(dbNote: any): string {
   return dbNote.content?.substring(0, 100) || "Empty note";
 }
 
+const EMPTY_NOTES: Note[] = [];
+
 /**
  * Load all studio notes for a notebook using a SINGLE unified query.
  *
@@ -312,9 +315,10 @@ export function useNotes(notebookId: string | null, types?: string[]): Note[] {
     notebookId ? { notebookId: notebookId as Id<"notebooks">, types } : "skip"
   );
 
-  // Map raw database notes to frontend Note interfaces
-  // No useMemo needed - useQuery already memoizes the result
-  return notes?.map(mapDatabaseNoteToNote) ?? [];
+  // useQuery keeps the raw result's identity until the data changes, but `.map` builds a new
+  // array on every call, so memoize the mapping. Loading/skipped returns a shared empty array
+  // for the same reason.
+  return useMemo(() => notes?.map(mapDatabaseNoteToNote) ?? EMPTY_NOTES, [notes]);
 }
 
 /**

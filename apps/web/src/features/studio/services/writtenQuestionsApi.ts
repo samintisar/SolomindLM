@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -121,40 +121,52 @@ export function useCreateWrittenQuestions() {
  * Rename written questions by ID with optimistic update
  */
 export function useRenameWrittenQuestions() {
-  const update = useMutation(api.studio.writtenQuestions.index.update).withOptimisticUpdate(
-    (localStore, { id, title }) => {
-      patchNoteInNotesCache(localStore, id, { title });
-      // The view also reads the per-type query (live progress) while it is open
-      const current = localStore.getQuery(api.studio.writtenQuestions.index.get, { id });
-      if (current) {
-        localStore.setQuery(api.studio.writtenQuestions.index.get, { id }, { ...current, title });
-      }
-    }
+  const updateMutation = useMutation(api.studio.writtenQuestions.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, title }) => {
+        patchNoteInNotesCache(localStore, id, { title });
+        // The view also reads the per-type query (live progress) while it is open
+        const current = localStore.getQuery(api.studio.writtenQuestions.index.get, { id });
+        if (current) {
+          localStore.setQuery(api.studio.writtenQuestions.index.get, { id }, { ...current, title });
+        }
+      }),
+    [updateMutation]
   );
 
-  return async (id: string, newTitle: string) => {
-    return await update({
-      id: id as Id<"writtenQuestions">,
-      title: newTitle,
-    });
-  };
+  return useCallback(
+    async (id: string, newTitle: string) => {
+      return await update({
+        id: id as Id<"writtenQuestions">,
+        title: newTitle,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete written questions by ID with optimistic update
  */
 export function useDeleteWrittenQuestions() {
-  const remove = useMutation(api.studio.writtenQuestions.index.remove).withOptimisticUpdate(
-    (localStore, { writtenQuestionId }) => {
-      removeNoteFromNotesCache(localStore, writtenQuestionId);
-      // The view also reads the per-type query (live progress) while it is open
-      localStore.setQuery(api.studio.writtenQuestions.index.get, { id: writtenQuestionId }, null);
-    }
+  const removeMutation = useMutation(api.studio.writtenQuestions.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { writtenQuestionId }) => {
+        removeNoteFromNotesCache(localStore, writtenQuestionId);
+        // The view also reads the per-type query (live progress) while it is open
+        localStore.setQuery(api.studio.writtenQuestions.index.get, { id: writtenQuestionId }, null);
+      }),
+    [removeMutation]
   );
 
-  return async (id: string) => {
-    await remove({ writtenQuestionId: id as Id<"writtenQuestions"> });
-  };
+  return useCallback(
+    async (id: string) => {
+      await remove({ writtenQuestionId: id as Id<"writtenQuestions"> });
+    },
+    [remove]
+  );
 }
 
 /**

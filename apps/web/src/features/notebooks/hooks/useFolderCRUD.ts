@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import { FolderItem } from "@/shared/types/index";
 import { useCreateFolder, useDeleteFolder, useUpdateFolder } from "../services/foldersApi";
@@ -91,10 +91,13 @@ export function useFolderCRUD({ isAuthenticated, user, onRequireAuth }: UseFolde
     [isAuthenticated, user, updateNotebook, onRequireAuth]
   );
 
-  return {
-    handleCreateFolder,
-    handleUpdateFolder,
-    handleDeleteFolder,
-    handleMoveNotebookToFolder,
-  };
+  return useMemo(
+    () => ({
+      handleCreateFolder,
+      handleUpdateFolder,
+      handleDeleteFolder,
+      handleMoveNotebookToFolder,
+    }),
+    [handleCreateFolder, handleUpdateFolder, handleDeleteFolder, handleMoveNotebookToFolder]
+  );
 }

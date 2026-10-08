@@ -26,24 +26,56 @@ vi.mock("convex/browser", () => ({
   }),
 }));
 
-// Mock the Convex API
-function deepProxy(): any {
+// Mock the Convex API. Each function reference stringifies to its path (e.g.
+// "api.documents.index.get"), so the fake local store can key cached queries by it.
+function deepProxy(path: string): any {
   return new Proxy(
     {},
     {
       get(_target, prop) {
-        if (prop === Symbol.toPrimitive) return () => "api";
-        return deepProxy();
+        if (prop === Symbol.toPrimitive) return () => path;
+        return deepProxy(`${path}.${String(prop)}`);
       },
     }
   );
 }
 
 vi.mock("@convex/_generated/api", () => ({
-  api: deepProxy(),
-  internal: deepProxy(),
-  components: deepProxy(),
+  api: deepProxy("api"),
+  internal: deepProxy("internal"),
+  components: deepProxy("components"),
 }));
+
+const LIST_QUERY = "api.documents.listSummary.listSummary";
+const GET_QUERY = "api.documents.index.get";
+
+/** Minimal OptimisticLocalStore: cached query results keyed by query path + args, like Convex. */
+function fakeLocalStore(entries: Array<[query: string, args: object, value: unknown]>) {
+  const key = (query: unknown, args: unknown) => `${String(query)} ${JSON.stringify(args)}`;
+  const cache = new Map(entries.map(([query, args, value]) => [key(query, args), value]));
+  return {
+    getQuery: (query: unknown, args: unknown) => cache.get(key(query, args)),
+    setQuery: (query: unknown, args: unknown, value: unknown) => {
+      cache.set(key(query, args), value);
+    },
+    read: (query: string, args: object) => cache.get(key(query, args)),
+  };
+}
+
+/** Makes useMutation hand back the optimistic update a hook registers, so a test can run it. */
+function captureOptimisticUpdate() {
+  let registered: ((store: unknown, args: unknown) => void) | undefined;
+  mockUseMutation.mockReturnValue({
+    withOptimisticUpdate: vi.fn((update: (store: unknown, args: unknown) => void) => {
+      registered = update;
+      return vi.fn();
+    }),
+  });
+  return (store: unknown, args: unknown) => {
+    if (!registered) throw new Error("hook registered no optimistic update");
+    registered(store, args);
+  };
+}
 
 // Import after mock setup
 const {
@@ -150,7 +182,7 @@ describe("documentsApi hooks", () => {
       const mockWithOptimistic = vi.fn().mockReturnValue(mockUpdate);
       mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
 
-      const { result } = renderHook(() => useUpdateDocument());
+      const { result } = renderHook(() => useUpdateDocument("nb-1"));
       const updated = await result.current("doc-1", { title: "New Title" });
 
       expect(mockWithOptimistic).toHaveBeenCalled();
@@ -158,6 +190,31 @@ describe("documentsApi hooks", () => {
         expect.objectContaining({ id: "doc-1", title: "New Title" })
       );
       expect(updated?.fileName).toBe("New Title");
+    });
+
+    it("renames the document in the notebook's cached source list and detail view", () => {
+      const runOptimisticUpdate = captureOptimisticUpdate();
+      const store = fakeLocalStore([
+        [
+          LIST_QUERY,
+          { notebookId: "nb-1" },
+          [
+            { _id: "doc-1", fileName: "Old" },
+            { _id: "doc-2", fileName: "Other" },
+          ],
+        ],
+        [GET_QUERY, { id: "doc-1" }, { _id: "doc-1", fileName: "Old" }],
+      ]);
+
+      renderHook(() => useUpdateDocument("nb-1"));
+      runOptimisticUpdate(store, { id: "doc-1", title: "New" });
+
+      expect(store.read(LIST_QUERY, { notebookId: "nb-1" })).toEqual([
+        { _id: "doc-1", fileName: "New" },
+        { _id: "doc-2", fileName: "Other" },
+      ]);
+      expect(store.read(GET_QUERY, { id: "doc-1" })).toEqual({ _id: "doc-1", fileName: "New" });
+      expect(store.read(LIST_QUERY, {})).toBeUndefined();
     });
   });
 
@@ -167,11 +224,39 @@ describe("documentsApi hooks", () => {
       const mockWithOptimistic = vi.fn().mockReturnValue(mockRemove);
       mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
 
-      const { result } = renderHook(() => useDeleteDocument());
+      const { result } = renderHook(() => useDeleteDocument("nb-1"));
       await result.current("doc-1");
 
       expect(mockWithOptimistic).toHaveBeenCalled();
       expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: "doc-1" }));
+    });
+
+    it("removes the document from the notebook's cached source list and clears its detail view", () => {
+      const runOptimisticUpdate = captureOptimisticUpdate();
+      const store = fakeLocalStore([
+        [LIST_QUERY, { notebookId: "nb-1" }, [{ _id: "doc-1" }, { _id: "doc-2" }]],
+        [GET_QUERY, { id: "doc-1" }, { _id: "doc-1" }],
+      ]);
+
+      renderHook(() => useDeleteDocument("nb-1"));
+      runOptimisticUpdate(store, { id: "doc-1" });
+
+      expect(store.read(LIST_QUERY, { notebookId: "nb-1" })).toEqual([{ _id: "doc-2" }]);
+      expect(store.read(GET_QUERY, { id: "doc-1" })).toBeNull();
+      expect(store.read(LIST_QUERY, {})).toBeUndefined();
+    });
+
+    it("keeps the same function across rerenders", () => {
+      // Like Convex, withOptimisticUpdate builds a new function on every call.
+      const mockWithOptimistic = vi.fn(() => vi.fn());
+      mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
+
+      const { result, rerender } = renderHook(() => useDeleteDocument("nb-1"));
+      const first = result.current;
+      rerender();
+
+      expect(result.current).toBe(first);
+      expect(mockWithOptimistic).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -188,6 +273,41 @@ describe("documentsApi hooks", () => {
       expect(mockRemoveMany).toHaveBeenCalledWith(
         expect.objectContaining({ ids: ["doc-1", "doc-2"] })
       );
+    });
+
+    it("keeps the same function across rerenders until notebookId changes", () => {
+      // Like Convex, withOptimisticUpdate builds a new function on every call.
+      const mockWithOptimistic = vi.fn(() => vi.fn());
+      mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
+
+      const { result, rerender } = renderHook(
+        ({ notebookId }: { notebookId: string }) => useRemoveManyDocuments(notebookId),
+        { initialProps: { notebookId: "nb-1" } }
+      );
+      const first = result.current;
+      rerender({ notebookId: "nb-1" });
+      expect(result.current).toBe(first);
+
+      rerender({ notebookId: "nb-2" });
+      expect(result.current).not.toBe(first);
+    });
+
+    it("removes the documents from the notebook's cached source list", () => {
+      const runOptimisticUpdate = captureOptimisticUpdate();
+      const store = fakeLocalStore([
+        [
+          LIST_QUERY,
+          { notebookId: "nb-1" },
+          [{ _id: "doc-1" }, { _id: "doc-2" }, { _id: "doc-3" }],
+        ],
+      ]);
+
+      renderHook(() => useRemoveManyDocuments("nb-1"));
+      runOptimisticUpdate(store, { ids: ["doc-1", "doc-3"] });
+
+      expect(store.read(LIST_QUERY, { notebookId: "nb-1" })).toEqual([{ _id: "doc-2" }]);
+      expect(store.read(GET_QUERY, { id: "doc-1" })).toBeNull();
+      expect(store.read(GET_QUERY, { id: "doc-3" })).toBeNull();
     });
 
     it("returns early for empty array", async () => {

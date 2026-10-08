@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { useAction, useQuery } from "convex/react";
+import { useCallback, useMemo } from "react";
 import { canOfferPurchases } from "@/utils/platformDetection";
 import type {
   CheckoutSessionResponse,
@@ -20,63 +21,66 @@ function assertPurchasesAllowed() {
 export function useSubscriptionStatus(): SubscriptionStatusResponse {
   const subscription = useQuery(api.billing.index.getCurrent);
 
-  if (!subscription) {
-    return {
-      hasSubscription: false,
-      isLoading: subscription === undefined,
-      plan: "free",
-      notebookLimit: 5,
-      sourceLimit: 20,
-      currentPeriodEnd: undefined,
-      cancelAtPeriodEnd: false,
-    };
-  }
+  // Memoized so consumers (and context values built from this) keep identity between renders.
+  return useMemo((): SubscriptionStatusResponse => {
+    if (!subscription) {
+      return {
+        hasSubscription: false,
+        isLoading: subscription === undefined,
+        plan: "free",
+        notebookLimit: 5,
+        sourceLimit: 20,
+        currentPeriodEnd: undefined,
+        cancelAtPeriodEnd: false,
+      };
+    }
 
-  // Backend stores period start/end in milliseconds (Stripe seconds * 1000).
-  const periodEndMs = subscription.currentPeriodEnd;
-  let periodEndDate: Date | null =
-    typeof periodEndMs === "number" && Number.isFinite(periodEndMs) && periodEndMs > 0
-      ? new Date(periodEndMs)
-      : null;
-  // Fallback: if end is missing (e.g. old record), derive from period start + interval
-  if (!periodEndDate || !Number.isFinite(periodEndDate.getTime())) {
-    const periodStartMs = subscription.currentPeriodStart;
-    const startMs =
-      typeof periodStartMs === "number" && Number.isFinite(periodStartMs) && periodStartMs > 0
-        ? periodStartMs
-        : (subscription as { createdAt?: number }).createdAt;
-    if (typeof startMs === "number" && Number.isFinite(startMs) && startMs > 0) {
-      const start = new Date(startMs);
-      const interval = (subscription.interval as string) || "month";
-      const end = new Date(start);
-      if (interval === "year") {
-        end.setFullYear(end.getFullYear() + 1);
-      } else {
-        end.setMonth(end.getMonth() + 1);
+    // Backend stores period start/end in milliseconds (Stripe seconds * 1000).
+    const periodEndMs = subscription.currentPeriodEnd;
+    let periodEndDate: Date | null =
+      typeof periodEndMs === "number" && Number.isFinite(periodEndMs) && periodEndMs > 0
+        ? new Date(periodEndMs)
+        : null;
+    // Fallback: if end is missing (e.g. old record), derive from period start + interval
+    if (!periodEndDate || !Number.isFinite(periodEndDate.getTime())) {
+      const periodStartMs = subscription.currentPeriodStart;
+      const startMs =
+        typeof periodStartMs === "number" && Number.isFinite(periodStartMs) && periodStartMs > 0
+          ? periodStartMs
+          : (subscription as { createdAt?: number }).createdAt;
+      if (typeof startMs === "number" && Number.isFinite(startMs) && startMs > 0) {
+        const start = new Date(startMs);
+        const interval = (subscription.interval as string) || "month";
+        const end = new Date(start);
+        if (interval === "year") {
+          end.setFullYear(end.getFullYear() + 1);
+        } else {
+          end.setMonth(end.getMonth() + 1);
+        }
+        periodEndDate = end;
       }
-      periodEndDate = end;
     }
-  }
-  let currentPeriodEndIso: string | null = null;
-  if (periodEndDate && Number.isFinite(periodEndDate.getTime())) {
-    try {
-      currentPeriodEndIso = periodEndDate.toISOString();
-    } catch {
-      currentPeriodEndIso = null;
+    let currentPeriodEndIso: string | null = null;
+    if (periodEndDate && Number.isFinite(periodEndDate.getTime())) {
+      try {
+        currentPeriodEndIso = periodEndDate.toISOString();
+      } catch {
+        currentPeriodEndIso = null;
+      }
     }
-  }
 
-  return {
-    hasSubscription: subscription.status === "active",
-    status: subscription.status as any,
-    plan: subscription.status === "active" ? "premium" : "free",
-    notebookLimit: subscription.status === "active" ? 200 : 5,
-    sourceLimit: subscription.status === "active" ? 200 : 20,
-    currentPeriodEnd: currentPeriodEndIso ?? undefined,
-    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-    interval: subscription.interval as SubscriptionInterval,
-    amount: subscription.amount,
-  };
+    return {
+      hasSubscription: subscription.status === "active",
+      status: subscription.status as any,
+      plan: subscription.status === "active" ? "premium" : "free",
+      notebookLimit: subscription.status === "active" ? 200 : 5,
+      sourceLimit: subscription.status === "active" ? 200 : 20,
+      currentPeriodEnd: currentPeriodEndIso ?? undefined,
+      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+      interval: subscription.interval as SubscriptionInterval,
+      amount: subscription.amount,
+    };
+  }, [subscription]);
 }
 
 /**
@@ -85,23 +89,26 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
 export function useCreateCheckout() {
   const create = useAction(api.billing.index.createCheckoutSession);
 
-  return async (
-    interval: "month" | "year",
-    successUrl: string,
-    cancelUrl: string
-  ): Promise<CheckoutSessionResponse> => {
-    assertPurchasesAllowed();
-    const result = await create({
-      interval,
-      successUrl,
-      cancelUrl,
-    });
+  return useCallback(
+    async (
+      interval: "month" | "year",
+      successUrl: string,
+      cancelUrl: string
+    ): Promise<CheckoutSessionResponse> => {
+      assertPurchasesAllowed();
+      const result = await create({
+        interval,
+        successUrl,
+        cancelUrl,
+      });
 
-    return {
-      url: result.url,
-      sessionId: result.sessionId,
-    };
-  };
+      return {
+        url: result.url,
+        sessionId: result.sessionId,
+      };
+    },
+    [create]
+  );
 }
 
 /**

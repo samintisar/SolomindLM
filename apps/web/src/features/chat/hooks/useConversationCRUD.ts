@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 function useConversationsForNotebook(notebookId: string | null) {
   return useQuery(
@@ -41,5 +41,8 @@ export function useConversationCRUD(notebookId: string | null) {
     [deleteConversation]
   );
 
-  return { conversations, handleCreate, handleRename, handleDelete };
+  return useMemo(
+    () => ({ conversations, handleCreate, handleRename, handleDelete }),
+    [conversations, handleCreate, handleRename, handleDelete]
+  );
 }

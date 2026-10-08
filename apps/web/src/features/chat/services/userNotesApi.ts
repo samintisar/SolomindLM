@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
+import { useCallback, useMemo } from "react";
 import {
   patchNoteInNotesCache,
   removeNoteFromNotesCache,
@@ -61,31 +62,43 @@ export function useSaveChat() {
  * Update a note (title or content) with optimistic update
  */
 export function useUpdateUserNote() {
-  const update = useMutation(api.notes.userNotes.update).withOptimisticUpdate(
-    (localStore, { id, ...updates }) => {
-      patchNoteInNotesCache(localStore, id, updates);
-    }
+  const updateMutation = useMutation(api.notes.userNotes.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, { id, ...updates }) => {
+        patchNoteInNotesCache(localStore, id, updates);
+      }),
+    [updateMutation]
   );
 
-  return async (noteId: string, updates: { title?: string; content?: string }) => {
-    await update({
-      id: noteId as Id<"notes">,
-      ...updates,
-    });
-  };
+  return useCallback(
+    async (noteId: string, updates: { title?: string; content?: string }) => {
+      await update({
+        id: noteId as Id<"notes">,
+        ...updates,
+      });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a note by ID with optimistic update
  */
 export function useDeleteUserNote() {
-  const remove = useMutation(api.notes.userNotes.remove).withOptimisticUpdate(
-    (localStore, { id }) => {
-      removeNoteFromNotesCache(localStore, id);
-    }
+  const removeMutation = useMutation(api.notes.userNotes.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, { id }) => {
+        removeNoteFromNotesCache(localStore, id);
+      }),
+    [removeMutation]
   );
 
-  return async (noteId: string) => {
-    await remove({ id: noteId as Id<"notes"> });
-  };
+  return useCallback(
+    async (noteId: string) => {
+      await remove({ id: noteId as Id<"notes"> });
+    },
+    [remove]
+  );
 }

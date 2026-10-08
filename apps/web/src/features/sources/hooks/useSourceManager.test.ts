@@ -72,6 +72,19 @@ describe("useSourceManager", () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it("returns the same object across rerenders until sources change", async () => {
+    const documents = [doc("a", "A.md"), doc("b", "B.md")];
+    const { result, rerender } = renderHook(() => useSourceManager({ documents, notebookId: "n" }));
+    await waitFor(() => expect(result.current.sources).toHaveLength(2));
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+
+    act(() => result.current.handleToggleSource("a"));
+    expect(result.current).not.toBe(first);
+    expect(result.current.handleToggleSource).toBe(first.handleToggleSource);
+  });
+
   it("keeps the delete when it succeeds", async () => {
     deleteDocument.mockResolvedValueOnce(undefined);
     const documents = [doc("a", "A.md"), doc("b", "B.md")];

@@ -1,5 +1,5 @@
 import type { DocumentSummary } from "@convex/documents/listSummary";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
 import { Source } from "@/shared/types/index";
 import { documentToSource } from "@/shared/utils/documentToSource";
@@ -26,8 +26,8 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     sourcesRef.current = sources;
   }, [sources]);
   const prevSignatureRef = useRef("");
-  const updateDocument = useUpdateDocument();
-  const deleteDocumentMutation = useDeleteDocument();
+  const updateDocument = useUpdateDocument(notebookId);
+  const deleteDocumentMutation = useDeleteDocument(notebookId);
   const removeManyDocuments = useRemoveManyDocuments(notebookId);
   const { error: showError } = useToast();
 
@@ -123,13 +123,24 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     [updateDocument, showError]
   );
 
-  return {
-    sources,
-    handleToggleSource,
-    handleToggleAll,
-    handleAddSource,
-    handleDeleteSource,
-    handleDeleteSelectedSources,
-    handleRenameSource,
-  };
+  return useMemo(
+    () => ({
+      sources,
+      handleToggleSource,
+      handleToggleAll,
+      handleAddSource,
+      handleDeleteSource,
+      handleDeleteSelectedSources,
+      handleRenameSource,
+    }),
+    [
+      sources,
+      handleToggleSource,
+      handleToggleAll,
+      handleAddSource,
+      handleDeleteSource,
+      handleDeleteSelectedSources,
+      handleRenameSource,
+    ]
+  );
 }
