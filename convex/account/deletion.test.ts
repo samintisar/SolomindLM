@@ -157,6 +157,31 @@ describe("account deletion", () => {
     });
   });
 
+  test("keeps an audio file that another user's forked overview still plays", async () => {
+    const t = setup();
+    const doomed = await seedUser(t, "doomed@example.com");
+    const forker = await seedUser(t, "forker@example.com");
+    const [, sharedAudioId] = doomed.fileIds;
+    await t.run(async (ctx) => {
+      const source = await ctx.db
+        .query("audioOverviews")
+        .withIndex("by_user", (q) => q.eq("userId", doomed.userId))
+        .first();
+      // A fork copies the source's audioUrl and audioStorageId.
+      await ctx.db.insert("audioOverviews", {
+        userId: forker.userId,
+        audioUrl: source!.audioUrl,
+        audioStorageId: source!.audioStorageId,
+      } as never);
+    });
+
+    await deleteAndDrain(t, doomed.userId);
+
+    await t.run(async (ctx) => {
+      expect(await ctx.storage.get(sharedAudioId)).not.toBeNull();
+    });
+  });
+
   test("deletes other users' saves, ratings and reports of the user's public prompts", async () => {
     const t = setup();
     const doomed = await seedUser(t, "doomed@example.com");
