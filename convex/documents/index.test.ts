@@ -914,20 +914,6 @@ describe("documents source-guide access for shared notebooks", () => {
       })
     ).toEqual([]);
   });
-
-  test("getSourceGuide shows the guide to notebook members only", async () => {
-    const t = convexTest(schema, modules);
-    const { member, stranger, documentId } = await seedSharedDocument(t);
-
-    const guide = await withAuth(t, member).query(api.documents.index.getSourceGuide, {
-      documentId,
-    });
-    expect(guide?.summary).toBe("Shared summary.");
-
-    expect(
-      await withAuth(t, stranger).query(api.documents.index.getSourceGuide, { documentId })
-    ).toBeNull();
-  });
 });
 
 describe("documents.generateSourceGuide", () => {

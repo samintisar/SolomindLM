@@ -1,6 +1,5 @@
 "use node";
 
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { countTokens } from "../_shared/tokenizer";
 import {
   CONTEXT_TOKEN_BUDGET,
@@ -10,6 +9,7 @@ import {
   MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
   MULTI_SOURCE_MAX_EXTRA_TOKENS,
 } from "./chatConfig.js";
+import type { ReferenceChunk } from "./types";
 
 export function chunkDedupKey(c: ReferenceChunk): string {
   return `${c.sourceId}:${c.chunkIndex}`;

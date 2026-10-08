@@ -24,7 +24,6 @@ export const audioOverviewGeneration = internalAction({
     documentIds: v.array(v.id("documents")),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runAudioOverviewGenerationPhase(ctx, args);
   },
 });
@@ -39,7 +38,6 @@ export const processAudioMapChunk = internalAction({
     chunk: v.string(),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessAudioMapChunkPhase(ctx, args);
   },
 });
@@ -51,7 +49,6 @@ export const finalizeAudioOverviewPhase = internalAction({
     notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeAudioOverviewPhase(ctx, args);
   },
 });
@@ -63,7 +60,6 @@ export const synthesizeAudioOverviewPhase = internalAction({
     notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runSynthesizeAudioOverviewPhase(ctx, args);
   },
 });
@@ -77,7 +73,6 @@ export const synthesizeAudioOverviewChunk = internalAction({
     attempt: v.number(),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runSynthesizeAudioOverviewChunkPhase(ctx, args);
   },
 });
@@ -89,7 +84,6 @@ export const assembleAudioOverviewPhase = internalAction({
     notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runAssembleAudioOverviewPhase(ctx, args);
   },
 });

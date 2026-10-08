@@ -79,8 +79,6 @@ export const docEmbedding = internalAction({
     notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
-    "use node";
-
     const { documentId, userId, notebookId } = args;
 
     // Initialize structured logger

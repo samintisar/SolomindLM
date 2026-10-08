@@ -33,20 +33,6 @@ export function countTokens(text: string, _model: string = DEFAULT_MODEL): numbe
 }
 
 /**
- * Estimates tokens for multiple texts.
- *
- * @param texts - Array of texts to count tokens for
- * @param model - Ignored; kept for API compatibility
- * @returns Array of estimated token counts
- */
-export function countTokensBatch(texts: string[], model: string = DEFAULT_MODEL): number[] {
-  if (!texts || texts.length === 0) {
-    return [];
-  }
-  return texts.map((text) => (text && typeof text === "string" ? countTokens(text, model) : 0));
-}
-
-/**
  * Truncates text to fit within max tokens (character-based).
  *
  * @param text - Text to truncate
@@ -75,11 +61,4 @@ export function truncateToTokens(
     return truncated.slice(0, lastSpace).trim();
   }
   return truncated;
-}
-
-/**
- * No-op; kept for API compatibility (previously freed js-tiktoken encoder).
- */
-export function freeEncoder(): void {
-  // no-op
 }
