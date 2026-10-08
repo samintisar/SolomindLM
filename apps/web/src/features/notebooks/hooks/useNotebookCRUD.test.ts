@@ -102,6 +102,43 @@ describe("useNotebookCRUD", () => {
     expect(setNotebookTitle).toHaveBeenCalledWith("Renamed");
   });
 
+  it("returns the same object across rerenders with unchanged inputs", () => {
+    const user = { id: "u1" };
+    const { result, rerender } = renderHook(() =>
+      useNotebookCRUD({
+        isAuthenticated: true,
+        user,
+        activeNotebookId: "nb-1",
+        setNotebookTitle,
+        onRequireAuth,
+      })
+    );
+    const first = result.current;
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  it("returns a new object when an input its handlers use changes", () => {
+    const user = { id: "u1" };
+    const { result, rerender } = renderHook(
+      ({ activeNotebookId }: { activeNotebookId: string | null }) =>
+        useNotebookCRUD({
+          isAuthenticated: true,
+          user,
+          activeNotebookId,
+          setNotebookTitle,
+          onRequireAuth,
+        }),
+      { initialProps: { activeNotebookId: "nb-1" as string | null } }
+    );
+    const first = result.current;
+    rerender({ activeNotebookId: "nb-2" });
+
+    expect(result.current).not.toBe(first);
+    expect(result.current.handleCreateNotebook).toBe(first.handleCreateNotebook);
+  });
+
   it("deletes notebook and navigates home when active", async () => {
     const { result } = renderHook(() =>
       useNotebookCRUD({

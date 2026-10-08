@@ -1,6 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
+import { useCallback, useMemo } from "react";
 
 /**
  * Get all folders for the authenticated user
@@ -25,113 +26,137 @@ export function useFolderNotebooks(folderId: string | null) {
  * Create a new folder with optimistic update
  */
 export function useCreateFolder() {
-  const create = useMutation(api.folders.index.create).withOptimisticUpdate((localStore, args) => {
-    const tempId = `temp-${Date.now()}` as Id<"folders">;
-    const now = Date.now();
+  const createMutation = useMutation(api.folders.index.create);
+  const create = useMemo(
+    () =>
+      createMutation.withOptimisticUpdate((localStore, args) => {
+        const tempId = `temp-${Date.now()}` as Id<"folders">;
+        const now = Date.now();
 
-    const newFolder = {
-      id: tempId,
-      name: args.name,
-      description: args.description,
-      color: args.color,
-      icon: args.icon,
-      created_at: now,
-      updated_at: now,
-      notebookCount: 0,
-    };
+        const newFolder = {
+          id: tempId,
+          name: args.name,
+          description: args.description,
+          color: args.color,
+          icon: args.icon,
+          created_at: now,
+          updated_at: now,
+          notebookCount: 0,
+        };
 
-    // Optimistically add to list
-    const folders = localStore.getQuery(api.folders.index.list);
-    if (folders) {
-      localStore.setQuery(api.folders.index.list, {}, [...folders, newFolder]);
-    }
-  });
+        // Optimistically add to list
+        const folders = localStore.getQuery(api.folders.index.list);
+        if (folders) {
+          localStore.setQuery(api.folders.index.list, {}, [...folders, newFolder]);
+        }
+      }),
+    [createMutation]
+  );
 
-  return async (data: { name: string; description?: string; color?: string; icon?: string }) => {
-    return await create(data);
-  };
+  return useCallback(
+    async (data: { name: string; description?: string; color?: string; icon?: string }) => {
+      return await create(data);
+    },
+    [create]
+  );
 }
 
 /**
  * Update a folder with optimistic update
  */
 export function useUpdateFolder() {
-  const update = useMutation(api.folders.index.update).withOptimisticUpdate((localStore, args) => {
-    const { id, name, description, color, icon } = args;
-    const now = Date.now();
+  const updateMutation = useMutation(api.folders.index.update);
+  const update = useMemo(
+    () =>
+      updateMutation.withOptimisticUpdate((localStore, args) => {
+        const { id, name, description, color, icon } = args;
+        const now = Date.now();
 
-    // Update list view
-    const folders = localStore.getQuery(api.folders.index.list);
-    if (folders) {
-      localStore.setQuery(
-        api.folders.index.list,
-        {},
-        folders.map((folder: { id: string; [key: string]: unknown }) =>
-          folder.id === id
-            ? {
-                ...folder,
-                ...(name !== undefined && { name }),
-                ...(description !== undefined && { description }),
-                ...(color !== undefined && { color }),
-                ...(icon !== undefined && { icon }),
-                updated_at: now,
-              }
-            : folder
-        )
-      );
-    }
-
-    // Update detail view
-    const folder = localStore.getQuery(api.folders.index.get, { id });
-    if (folder) {
-      localStore.setQuery(
-        api.folders.index.get,
-        { id },
-        {
-          ...folder,
-          ...(name !== undefined && { name }),
-          ...(description !== undefined && { description }),
-          ...(color !== undefined && { color }),
-          ...(icon !== undefined && { icon }),
-          updated_at: now,
+        // Update list view
+        const folders = localStore.getQuery(api.folders.index.list);
+        if (folders) {
+          localStore.setQuery(
+            api.folders.index.list,
+            {},
+            folders.map((folder: { id: string; [key: string]: unknown }) =>
+              folder.id === id
+                ? {
+                    ...folder,
+                    ...(name !== undefined && { name }),
+                    ...(description !== undefined && { description }),
+                    ...(color !== undefined && { color }),
+                    ...(icon !== undefined && { icon }),
+                    updated_at: now,
+                  }
+                : folder
+            )
+          );
         }
-      );
-    }
-  });
 
-  return async (
-    id: string,
-    updates: {
-      name?: string;
-      description?: string;
-      color?: string;
-      icon?: string;
-    }
-  ) => {
-    return await update({ id: id as any, ...updates });
-  };
+        // Update detail view
+        const folder = localStore.getQuery(api.folders.index.get, { id });
+        if (folder) {
+          localStore.setQuery(
+            api.folders.index.get,
+            { id },
+            {
+              ...folder,
+              ...(name !== undefined && { name }),
+              ...(description !== undefined && { description }),
+              ...(color !== undefined && { color }),
+              ...(icon !== undefined && { icon }),
+              updated_at: now,
+            }
+          );
+        }
+      }),
+    [updateMutation]
+  );
+
+  return useCallback(
+    async (
+      id: string,
+      updates: {
+        name?: string;
+        description?: string;
+        color?: string;
+        icon?: string;
+      }
+    ) => {
+      return await update({ id: id as any, ...updates });
+    },
+    [update]
+  );
 }
 
 /**
  * Delete a folder with optimistic update
  */
 export function useDeleteFolder() {
-  const remove = useMutation(api.folders.index.remove).withOptimisticUpdate((localStore, args) => {
-    // Optimistically remove from list
-    const folders = localStore.getQuery(api.folders.index.list);
-    if (folders) {
-      localStore.setQuery(
-        api.folders.index.list,
-        {},
-        folders.filter((folder: { id: string }) => folder.id !== args.id)
-      );
-    }
+  const removeMutation = useMutation(api.folders.index.remove);
+  const remove = useMemo(
+    () =>
+      removeMutation.withOptimisticUpdate((localStore, args) => {
+        // Optimistically remove from list
+        const folders = localStore.getQuery(api.folders.index.list);
+        if (folders) {
+          localStore.setQuery(
+            api.folders.index.list,
+            {},
+            folders.filter((folder: { id: string }) => folder.id !== args.id)
+          );
+        }
 
-    // Clear detail view
-    localStore.setQuery(api.folders.index.get, { id: args.id }, null);
-  });
+        // Clear detail view
+        localStore.setQuery(api.folders.index.get, { id: args.id }, null);
+      }),
+    [removeMutation]
+  );
 
-  return async (id: string) => {
-    return await remove({ id: id as any });
-  };
+  return useCallback(
+    async (id: string) => {
+      return await remove({ id: id as any });
+    },
+    [remove]
+  );
 }
