@@ -9,7 +9,8 @@
     if (localStorage.getItem("solomind_theme") === "dark") {
       document.documentElement.classList.add("dark");
     }
-  } catch (_error) {
+  } catch (error) {
     // Storage unavailable: stay light; ThemeProvider falls back the same way.
+    console.warn("[theme-init] Could not read the saved theme; using light.", error);
   }
 })();

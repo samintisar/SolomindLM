@@ -15,20 +15,28 @@ export function parseTheme(value: string | null | undefined): Theme | null {
   return value === "light" || value === "dark" ? value : null;
 }
 
-/** The saved theme, or light when nothing valid is saved or storage is unavailable. */
-export function readStoredTheme(storage: Pick<Storage, "getItem"> = localStorage): Theme {
+/**
+ * The saved theme, or light when nothing valid is saved or storage is unavailable.
+ * The default storage is looked up inside the `try`: the `localStorage` getter itself throws
+ * a SecurityError when storage is disabled or in a sandboxed iframe.
+ */
+export function readStoredTheme(storage?: Pick<Storage, "getItem">): Theme {
   try {
-    return parseTheme(storage.getItem(THEME_STORAGE_KEY)) ?? DEFAULT_THEME;
-  } catch {
+    return (
+      parseTheme((storage ?? globalThis.localStorage).getItem(THEME_STORAGE_KEY)) ?? DEFAULT_THEME
+    );
+  } catch (error) {
+    console.warn("[theme] Could not read the saved theme; using light.", error);
     return DEFAULT_THEME;
   }
 }
 
-export function storeTheme(theme: Theme, storage: Pick<Storage, "setItem"> = localStorage): void {
+export function storeTheme(theme: Theme, storage?: Pick<Storage, "setItem">): void {
   try {
-    storage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    /* storage unavailable (private mode, quota): the choice lasts for this page only */
+    (storage ?? globalThis.localStorage).setItem(THEME_STORAGE_KEY, theme);
+  } catch (error) {
+    // Not worth interrupting the user: the choice still applies, for this page only.
+    console.warn(`[theme] Could not save the ${theme} theme; it lasts for this page only.`, error);
   }
 }
 

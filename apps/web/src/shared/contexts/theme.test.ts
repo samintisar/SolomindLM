@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import {
   applyTheme,
   parseTheme,
@@ -33,8 +33,31 @@ function runThemeInit(storage: Pick<Storage, "getItem">, root: HTMLElement) {
   new Function("localStorage", "document", themeInitSource)(storage, { documentElement: root });
 }
 
+/** Makes the `localStorage` getter itself throw, as it does when storage is disabled. */
+function makeLocalStorageGetterThrow() {
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    },
+  });
+}
+
+const originalLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+let warn: MockInstance<typeof console.warn>;
+
+beforeEach(() => {
+  warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
 afterEach(() => {
   document.documentElement.classList.remove("dark");
+  warn.mockRestore();
+  if (originalLocalStorage) {
+    Object.defineProperty(globalThis, "localStorage", originalLocalStorage);
+  } else {
+    delete (globalThis as { localStorage?: Storage }).localStorage;
+  }
 });
 
 describe("parseTheme", () => {
@@ -58,8 +81,27 @@ describe("readStoredTheme", () => {
     expect(readStoredTheme(storageWith("invalid"))).toBe("light");
   });
 
-  it("defaults to light when storage throws", () => {
+  it("defaults to light and warns when storage throws", () => {
     expect(readStoredTheme(throwingStorage)).toBe("light");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("[theme]"), expect.any(Error));
+  });
+
+  it("reads the global localStorage by default", () => {
+    globalThis.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    try {
+      expect(readStoredTheme()).toBe("dark");
+    } finally {
+      globalThis.localStorage.removeItem(THEME_STORAGE_KEY);
+    }
+  });
+
+  it("defaults to light and warns when the localStorage getter throws", () => {
+    makeLocalStorageGetterThrow();
+    expect(readStoredTheme()).toBe("light");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[theme]"),
+      expect.objectContaining({ name: "SecurityError" })
+    );
   });
 });
 
@@ -70,8 +112,18 @@ describe("storeTheme", () => {
     expect(writes).toEqual([[THEME_STORAGE_KEY, "dark"]]);
   });
 
-  it("ignores storage errors", () => {
+  it("warns instead of throwing when storage fails", () => {
     expect(() => storeTheme("dark", throwingStorage)).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("[theme]"), expect.any(Error));
+  });
+
+  it("warns instead of throwing when the localStorage getter throws", () => {
+    makeLocalStorageGetterThrow();
+    expect(() => storeTheme("dark")).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[theme]"),
+      expect.objectContaining({ name: "SecurityError" })
+    );
   });
 });
 
@@ -101,10 +153,25 @@ describe("public/theme-init.js", () => {
     }
   );
 
-  it("stays light when storage throws", () => {
+  it("stays light and warns when storage throws", () => {
     const root = document.createElement("html");
     expect(() => runThemeInit(throwingStorage, root)).not.toThrow();
     expect(root.classList.contains("dark")).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("[theme-init]"), expect.any(Error));
+  });
+
+  it("stays light and warns when the localStorage getter throws", () => {
+    makeLocalStorageGetterThrow();
+    const root = document.createElement("html");
+    // Run against the real global, so the getter is hit inside the script's try.
+    expect(() =>
+      new Function("document", themeInitSource)({ documentElement: root })
+    ).not.toThrow();
+    expect(root.classList.contains("dark")).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("[theme-init]"),
+      expect.objectContaining({ name: "SecurityError" })
+    );
   });
 
   it("uses the storage key ThemeProvider reads", () => {
