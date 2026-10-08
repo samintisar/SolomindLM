@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useQuery } from "convex/react";
@@ -69,6 +70,9 @@ const DesignGallery =
 // Free tools: own chunk so the marketing shell doesn't ship pdfjs or the tool UI.
 const PdfToFlashcardsPage = lazy(() => import("./features/tools/pages/PdfToFlashcardsPage"));
 
+/** Stable fallback while the documents query is skipped or loading, so consumers' effects don't re-run each render. */
+const EMPTY_DOCUMENTS: readonly DocumentSummary[] = Object.freeze([]);
+
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -115,9 +119,9 @@ const AppContent: React.FC = () => {
   const folders = useFolders();
   const documents =
     useQuery(
-      api.documents.index.list,
+      api.documents.listSummary.listSummary,
       dataNotebookId ? { notebookId: dataNotebookId as Id<"notebooks"> } : "skip"
-    ) ?? [];
+    ) ?? EMPTY_DOCUMENTS;
   useGenerateUploadUrl();
   useCreateDocument();
 

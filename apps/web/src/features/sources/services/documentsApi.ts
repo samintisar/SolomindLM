@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { ConvexClient } from "convex/browser";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useCallback } from "react";
@@ -13,17 +14,6 @@ import type {
 // ============================================================
 // Hooks (for use in React components)
 // ============================================================
-
-/**
- * Get all documents for a notebook (or all for user if no notebookId)
- * Returns undefined while loading, empty array when loaded but no results
- */
-export function useDocuments(notebookId: string | null) {
-  return useQuery(
-    api.documents.index.list,
-    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {}
-  );
-}
 
 /**
  * Get a specific document by ID
@@ -113,12 +103,12 @@ export function useUpdateDocument() {
       const { id, title } = args;
 
       // Update list view
-      const listResult = localStore.getQuery(api.documents.index.list, {});
+      const listResult = localStore.getQuery(api.documents.listSummary.listSummary, {});
       if (listResult) {
         localStore.setQuery(
-          api.documents.index.list,
+          api.documents.listSummary.listSummary,
           {},
-          listResult.map((doc: { _id: string; [key: string]: unknown }) =>
+          listResult.map((doc: DocumentSummary) =>
             doc._id === id ? { ...doc, fileName: title } : doc
           )
         );
@@ -144,12 +134,12 @@ export function useDeleteDocument() {
   const remove = useMutation(api.documents.index.remove).withOptimisticUpdate(
     (localStore, args) => {
       // Optimistically remove from list
-      const listResult = localStore.getQuery(api.documents.index.list, {});
+      const listResult = localStore.getQuery(api.documents.listSummary.listSummary, {});
       if (listResult) {
         localStore.setQuery(
-          api.documents.index.list,
+          api.documents.listSummary.listSummary,
           {},
-          listResult.filter((doc: { _id: string }) => doc._id !== args.id)
+          listResult.filter((doc: DocumentSummary) => doc._id !== args.id)
         );
       }
 
@@ -170,13 +160,13 @@ export function useRemoveManyDocuments(notebookId: string | null) {
   const listArgs = notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {};
   const removeMany = useMutation(api.documents.index.removeMany).withOptimisticUpdate(
     (localStore, args: { ids: Id<"documents">[] }) => {
-      const listResult = localStore.getQuery(api.documents.index.list, listArgs);
+      const listResult = localStore.getQuery(api.documents.listSummary.listSummary, listArgs);
       if (listResult) {
         const idSet = new Set(args.ids.map((id) => id));
         localStore.setQuery(
-          api.documents.index.list,
+          api.documents.listSummary.listSummary,
           listArgs,
-          listResult.filter((doc: { _id: string }) => !idSet.has(doc._id as Id<"documents">))
+          listResult.filter((doc: DocumentSummary) => !idSet.has(doc._id))
         );
       }
       for (const id of args.ids) {

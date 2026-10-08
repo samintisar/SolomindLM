@@ -1,4 +1,4 @@
-import { type Doc } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
 import { Source } from "@/shared/types/index";
@@ -9,8 +9,13 @@ import {
   useUpdateDocument,
 } from "../services/documentsApi";
 
+/** Fields that change what a source row shows. Rebuild `sources` only when one of them changes. */
+function documentSignature(d: DocumentSummary): string {
+  return `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${d.sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${d.metadata?.userMessage ?? ""}`;
+}
+
 interface UseSourceManagerProps {
-  documents: Doc<"documents">[];
+  documents: readonly DocumentSummary[];
   notebookId: string | null;
 }
 
@@ -20,36 +25,23 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   useEffect(() => {
     sourcesRef.current = sources;
   }, [sources]);
-  const prevDocumentsRef = useRef<any[]>([]);
+  const prevSignatureRef = useRef("");
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();
   const removeManyDocuments = useRemoveManyDocuments(notebookId);
   const { error: showError } = useToast();
 
   useEffect(() => {
-    const currentSignature = documents
-      .map(
-        (d: Doc<"documents">) =>
-          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${(d as Record<string, unknown>).sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${(d.metadata as { userMessage?: string } | undefined)?.userMessage ?? ""}`
-      )
-      .join(",");
-    const prevSignature = prevDocumentsRef.current
-      .map(
-        (d: Doc<"documents">) =>
-          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${(d as Record<string, unknown>).sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${(d.metadata as { userMessage?: string } | undefined)?.userMessage ?? ""}`
-      )
-      .join(",");
-
-    if (currentSignature !== prevSignature) {
-      setSources((prev) => {
-        const newSources = documents.map(documentToSource);
-        return newSources.map((source: Source) => ({
-          ...source,
-          selected: prev.find((s) => s.id === source.id)?.selected ?? true,
-        }));
-      });
-      prevDocumentsRef.current = documents;
-    }
+    const signature = documents.map(documentSignature).join(",");
+    if (signature === prevSignatureRef.current) return;
+    prevSignatureRef.current = signature;
+    setSources((prev) => {
+      const newSources = documents.map(documentToSource);
+      return newSources.map((source: Source) => ({
+        ...source,
+        selected: prev.find((s) => s.id === source.id)?.selected ?? true,
+      }));
+    });
   }, [documents]);
 
   const handleToggleSource = useCallback((id: string) => {
