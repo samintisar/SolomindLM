@@ -17,7 +17,8 @@ export type AudioUrlTarget = { url: string } | { storageRef: string } | null;
 export function parseAudioUrl(audioUrl: string): AudioUrlTarget {
   const raw = audioUrl.trim();
   if (!raw) return null;
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return { url: raw };
+  // URI schemes are case-insensitive (RFC 3986), so `HTTPS://…` is a URL too.
+  if (/^https?:\/\//i.test(raw)) return { url: raw };
   let ref = raw;
   if (ref.startsWith("/audio/")) ref = ref.slice("/audio/".length);
   else if (ref.startsWith("audio/")) ref = ref.slice("audio/".length);

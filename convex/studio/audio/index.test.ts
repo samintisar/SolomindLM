@@ -183,6 +183,9 @@ describe("studio.audio.resolveRawAudioUrl", () => {
     expect(await resolve(t, stranger, "https://cdn.example.com/a.mp3")).toEqual({
       url: "https://cdn.example.com/a.mp3",
     });
+    expect(await resolve(t, stranger, "HTTPS://cdn.example.com/a.mp3")).toEqual({
+      url: "HTTPS://cdn.example.com/a.mp3",
+    });
   });
 
   test("returns null when signed out", async () => {
