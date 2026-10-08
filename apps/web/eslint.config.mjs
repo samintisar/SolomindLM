@@ -25,8 +25,8 @@ const MIGRATED = [
   "src/features/legal/**/*.tsx",
   // Studio (#264).
   "src/features/studio/**/*.tsx",
-  // Landing home page (#263). The content templates follow in PR 2.
-  "src/features/landing/LandingPage.tsx",
+  // Landing: the home page and the content templates (#263).
+  "src/features/landing/*.tsx",
   "src/features/landing/components/**/*.tsx",
 ];
 

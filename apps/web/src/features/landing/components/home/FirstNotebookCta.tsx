@@ -4,7 +4,18 @@ import { NewNotebookDemo } from "./demo/NewNotebookDemo";
 import { Reveal } from "./Reveal";
 import { Accent, SectionHeading } from "./SectionHeading";
 
-export function FirstNotebookCta({ onGetStarted }: { onGetStarted: () => void }) {
+const DEFAULT_BODY =
+  "Start with the lecture you're dreading. Ask it anything, then let it question you back. Free, no card, and you can stop whenever.";
+
+export function FirstNotebookCta({
+  onGetStarted,
+  body = DEFAULT_BODY,
+  ctaLabel = "Create my first notebook",
+}: {
+  onGetStarted: () => void;
+  body?: string;
+  ctaLabel?: string;
+}) {
   return (
     <section aria-labelledby="cta-title" className="px-6 pt-8 pb-28 md:pb-32">
       <div className="mx-auto grid max-w-280 grid-cols-1 items-center gap-14 lg:grid-cols-12 lg:gap-20">
@@ -21,11 +32,10 @@ export function FirstNotebookCta({ onGetStarted }: { onGetStarted: () => void })
           />
           <Reveal>
             <p className="mt-5 max-w-lg font-serif text-lg leading-relaxed text-foreground/70">
-              Start with the lecture you're dreading. Ask it anything, then let it question you
-              back. Free, no card, and you can stop whenever.
+              {body}
             </p>
             <Button size="lg" className="mt-8" onClick={onGetStarted}>
-              Create my first notebook
+              {ctaLabel}
               <ArrowRight aria-hidden />
             </Button>
           </Reveal>
