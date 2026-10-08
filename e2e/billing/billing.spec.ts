@@ -1,8 +1,16 @@
+import type { Page } from "@playwright/test";
 import {
   FREE_PLAN_FEATURES,
   PRO_PLAN_FEATURES,
 } from "../../apps/web/src/features/billing/planFeatures";
 import { expect, test } from "../fixtures/auth.fixture";
+
+/** The pricing card whose heading is `title` ("Free", "Yearly" or "Monthly"). */
+function planCard(page: Page, title: string) {
+  return page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+}
 
 test.describe("Billing page", () => {
   test("loads and displays pricing plans", async ({ authenticatedPage }) => {
@@ -25,8 +33,14 @@ test.describe("Billing page", () => {
     await expect(page.getByText("$15").first()).toBeVisible();
 
     // Feature lists (first line of each plan is the notebook and source limit)
-    await expect(page.getByText(FREE_PLAN_FEATURES[0], { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(PRO_PLAN_FEATURES[0], { exact: true }).first()).toBeVisible();
+    await expect(
+      planCard(page, "Free").getByText(FREE_PLAN_FEATURES[0], { exact: true })
+    ).toBeVisible();
+    for (const title of ["Yearly", "Monthly"]) {
+      await expect(
+        planCard(page, title).getByText(PRO_PLAN_FEATURES[0], { exact: true })
+      ).toBeVisible();
+    }
   });
 
   test("navigates from home via Pro button", async ({ authenticatedPage }) => {
@@ -80,9 +94,10 @@ test.describe("Billing page", () => {
     await page.goto("/billing");
     await page.waitForLoadState("networkidle");
 
-    // Every plan line renders; the lists come from the backend limit tables
-    for (const feature of [...FREE_PLAN_FEATURES, ...PRO_PLAN_FEATURES]) {
-      await expect(page.getByText(feature, { exact: true }).first()).toBeVisible();
+    // Each card lists exactly its plan's lines, which come from the backend limit tables
+    await expect(planCard(page, "Free").getByRole("listitem")).toHaveText(FREE_PLAN_FEATURES);
+    for (const title of ["Yearly", "Monthly"]) {
+      await expect(planCard(page, title).getByRole("listitem")).toHaveText(PRO_PLAN_FEATURES);
     }
   });
 });
