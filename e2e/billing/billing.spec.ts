@@ -78,14 +78,22 @@ test.describe("Billing page", () => {
 
     // Current plan section is visible for subscribers
     await expect(page.getByRole("heading", { name: "Pro Plan" })).toBeVisible();
-    await expect(page.getByText(/billing/i).first()).toBeVisible();
+    const billingLine = page.getByText(/^(Monthly|Yearly) billing$/);
+    await expect(billingLine).toBeVisible();
 
     // Free card shows "Downgrade" button for subscribers
     await expect(page.getByRole("button", { name: "Downgrade" })).toBeVisible();
 
-    // Only the subscribed interval's Pro card shows "Current Plan"; the other offers a switch
+    // The subscribed interval's card shows "Current Plan"; the other card offers a switch
+    const current = (await billingLine.textContent())?.startsWith("Monthly") ? "Monthly" : "Yearly";
+    const other = current === "Monthly" ? "Yearly" : "Monthly";
+    await expect(
+      planCard(page, current).getByRole("button", { name: "Current Plan" })
+    ).toBeDisabled();
+    await expect(
+      planCard(page, other).getByRole("button", { name: `Switch to ${other}` })
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Current Plan" })).toHaveCount(1);
-    await expect(page.getByRole("button", { name: /^Switch to (Monthly|Yearly)$/ })).toHaveCount(1);
   });
 
   test("displays correct feature comparisons", async ({ authenticatedPage }) => {
