@@ -1,7 +1,7 @@
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { PaperScope } from "../../../convex/literatureReview/notebookPapers";
-import { computeConfigHash } from "../configHash";
-import type { EvalFixture, EvalRunArtifact, StudioOutput } from "../types";
+import type { EvalFixture, StudioOutput } from "../types";
+import { runWithHarness } from "./harness";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 export interface LiteratureReviewEvalResult {
@@ -145,22 +145,6 @@ function validateFixture(fixture: EvalFixture): string[] {
   return errors;
 }
 
-function stubArtifact(fixture: EvalFixture, configHash: string): EvalRunArtifact {
-  return {
-    caseId: fixture.id,
-    runner: "literatureReview",
-    configHash,
-    answer: "",
-    citations: [],
-    preRerankChunks: [],
-    postRerankChunks: [],
-    selectedChunks: [],
-    subQueries: [],
-    latencyMs: 0,
-    timestamp: new Date().toISOString(),
-  };
-}
-
 function serializeLiteratureReview(result: LiteratureReviewEvalResult): string {
   const tableLines = [
     `# ${result.table.title}`,
@@ -188,58 +172,40 @@ export async function runLiteratureReviewEval(
   options: EvalRunnerOptions,
   invoker?: LiteratureReviewInvoker
 ): Promise<EvalRunnerResult> {
-  const { fixture, config, dryRun } = options;
-  const configHash = computeConfigHash(config);
-
-  const validationErrors = validateFixture(fixture);
-  if (validationErrors.length > 0) {
-    return { artifact: stubArtifact(fixture, configHash), errors: validationErrors };
-  }
-
-  if (dryRun) {
-    return { artifact: stubArtifact(fixture, configHash), errors: [] };
-  }
-
-  if (!invoker) {
-    throw new Error(
+  const { fixture } = options;
+  return runWithHarness(options, invoker, {
+    runner: "literatureReview",
+    validate: validateFixture,
+    missingInvokerMessage:
       "No LiteratureReviewInvoker provided for real run. " +
-        "Use --dry-run to validate fixtures without invoking literature review actions."
-    );
-  }
+      "Use --dry-run to validate fixtures without invoking literature review actions.",
+    failurePrefix: "Literature review invocation failed",
+    async invoke(literatureReview, configHash) {
+      const paperScope = fixture.studioParams?.paperScope;
+      const result = await literatureReview.invoke({
+        question: fixture.question,
+        notebookId: fixture.notebookId as Id<"notebooks">,
+        ...(fixture.documentIds?.length
+          ? { documentIds: fixture.documentIds as Id<"documents">[] }
+          : {}),
+        ...(paperScope ? { paperScope } : {}),
+      });
 
-  const errors: string[] = [];
-  try {
-    const paperScope = fixture.studioParams?.paperScope;
-    const result = await invoker.invoke({
-      question: fixture.question,
-      notebookId: fixture.notebookId as Id<"notebooks">,
-      ...(fixture.documentIds?.length
-        ? { documentIds: fixture.documentIds as Id<"documents">[] }
-        : {}),
-      ...(paperScope ? { paperScope } : {}),
-    });
-
-    const answer = serializeLiteratureReview(result);
-    const studioOutput: StudioOutput = { kind: "literatureReview", raw: result };
-    const artifact: EvalRunArtifact = {
-      caseId: fixture.id,
-      runner: "literatureReview",
-      configHash,
-      answer,
-      citations: [],
-      preRerankChunks: [],
-      postRerankChunks: [],
-      selectedChunks: [],
-      subQueries: result.searchQueries,
-      studioOutput,
-      latencyMs: result.latencyMs,
-      timestamp: new Date().toISOString(),
-    };
-
-    return { artifact, errors };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    errors.push(`Literature review invocation failed: ${message}`);
-    return { artifact: stubArtifact(fixture, configHash), errors };
-  }
+      const studioOutput: StudioOutput = { kind: "literatureReview", raw: result };
+      return {
+        caseId: fixture.id,
+        runner: "literatureReview",
+        configHash,
+        answer: serializeLiteratureReview(result),
+        citations: [],
+        preRerankChunks: [],
+        postRerankChunks: [],
+        selectedChunks: [],
+        subQueries: result.searchQueries,
+        studioOutput,
+        latencyMs: result.latencyMs,
+        timestamp: new Date().toISOString(),
+      };
+    },
+  });
 }
