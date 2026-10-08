@@ -6,7 +6,8 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": ["node", "@playwright/test"]
+    "types": ["node", "@playwright/test"],
+    "paths": { "@convex/*": ["./convex/*"] }
   },
   "include": ["e2e/**/*.ts", "playwright.config.ts", "playwright.csp.config.ts"]
 }

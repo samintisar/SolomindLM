@@ -78,28 +78,6 @@ export async function waitForNoteStatus(
 }
 
 /**
- * Wait for a generating note to reach a minimum progress percentage.
- */
-export async function waitForNoteProgress(
-  page: Page,
-  noteTitle: string,
-  minPercent: number,
-  timeout = 30_000
-) {
-  await openStudioPanel(page);
-
-  const noteEl = studioNoteCard(page, noteTitle);
-  const progressbar = noteEl.locator('[role="progressbar"]');
-
-  await expect(progressbar).toBeVisible({ timeout });
-  await expect(progressbar).toHaveAttribute(
-    "aria-valuenow",
-    (val: string | null) => val !== null && parseInt(val) >= minPercent,
-    { timeout }
-  );
-}
-
-/**
  * Delete a note via the kebab menu.
  */
 export async function deleteNote(page: Page, noteTitle: string) {
