@@ -11,7 +11,6 @@ import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
 
 export type WebViewScreenProps = {
   path: string;
-  onUrlChange?: (url: string) => void;
   /** Called when the web app reports its active theme (`shell-web:theme`). */
   onThemeChange?: (theme: "light" | "dark") => void;
   /** Active web theme, so native-only screens (load error) stay readable on the shell background. */
@@ -24,12 +23,7 @@ function getWebBaseUrl(): string | null {
   return url.replace(/\/+$/, "");
 }
 
-export function WebViewScreen({
-  path,
-  onUrlChange,
-  onThemeChange,
-  theme = "light",
-}: WebViewScreenProps) {
+export function WebViewScreen({ path, onThemeChange, theme = "light" }: WebViewScreenProps) {
   const base = useMemo(() => getWebBaseUrl(), []);
   const {
     onWebViewMessage: onAuthBridgeMessage,
@@ -122,7 +116,7 @@ export function WebViewScreen({
   if (Platform.OS === "web") {
     return (
       <View style={styles.webview}>
-        <WebShellIframe uri={uri} onUrlChange={onUrlChange} onMessage={onWebViewMessage} />
+        <WebShellIframe uri={uri} onMessage={onWebViewMessage} />
       </View>
     );
   }
@@ -148,9 +142,6 @@ export function WebViewScreen({
           <ActivityIndicator size="large" />
         </View>
       )}
-      onNavigationStateChange={(nav) => {
-        if (nav.url) onUrlChange?.(nav.url);
-      }}
       onError={() => {
         setLoadError({ kind: "network" });
       }}
@@ -180,11 +171,10 @@ export function WebViewScreen({
 
 type WebShellIframeProps = {
   uri: string;
-  onUrlChange?: (url: string) => void;
   onMessage: (raw: string) => void;
 };
 
-function WebShellIframe({ uri, onUrlChange, onMessage }: WebShellIframeProps) {
+function WebShellIframe({ uri, onMessage }: WebShellIframeProps) {
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (typeof event.data === "string") {
@@ -205,7 +195,6 @@ function WebShellIframe({ uri, onUrlChange, onMessage }: WebShellIframeProps) {
       flex: 1,
       minHeight: 0,
     },
-    onLoad: () => onUrlChange?.(uri),
   });
 }
 
