@@ -9,6 +9,7 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { Toggle } from "@/shared/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/utils/cn";
+import { applyPageVisibilityChanges } from "../utils/pdfVisiblePages";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
@@ -29,39 +30,55 @@ const PAGE_ASPECT = 297 / 210;
 /** Cap device pixel ratio to avoid oversizing canvases on retina screens (e.g. 3x mobile) */
 const DPR_CAP = 2;
 
+type PageSlotRef = (el: HTMLDivElement | null) => void;
+
 interface VirtualizedPageProps {
   pageNumber: number;
   pageWidth: number;
   isVisible: boolean;
+  /** Stable per page (see `getPageSlotRef`) so memoization holds and the slot isn't re-registered each render. */
+  slotRef: PageSlotRef;
 }
 
-function VirtualizedPage({ pageNumber, pageWidth, isVisible }: VirtualizedPageProps) {
+/** Memoized: an observer update re-renders only the pages whose visibility flipped. */
+const VirtualizedPage = React.memo(function VirtualizedPage({
+  pageNumber,
+  pageWidth,
+  isVisible,
+  slotRef,
+}: VirtualizedPageProps) {
   const placeholderHeight = pageWidth * PAGE_ASPECT;
+  let content: React.ReactNode;
   if (!isVisible) {
-    return (
+    content = (
       <div
         className="h-(--pdf-page-h) min-h-(--pdf-page-h)"
         style={{ "--pdf-page-h": `${placeholderHeight}px` } as React.CSSProperties}
         aria-hidden
       />
     );
+  } else {
+    // Cap effective DPR so we don't render enormous canvases on high-DPI screens.
+    const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio, DPR_CAP) : 1;
+    const scale = (pageWidth / BASE_PAGE_WIDTH) * dpr;
+    content = (
+      <div className="flex justify-center">
+        <Page
+          pageNumber={pageNumber}
+          scale={scale}
+          renderTextLayer={true}
+          renderAnnotationLayer={false}
+        />
+      </div>
+    );
   }
 
-  // Cap effective DPR so we don't render enormous canvases on high-DPI screens.
-  const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio, DPR_CAP) : 1;
-  const scale = (pageWidth / BASE_PAGE_WIDTH) * dpr;
-
   return (
-    <div className="flex justify-center">
-      <Page
-        pageNumber={pageNumber}
-        scale={scale}
-        renderTextLayer={true}
-        renderAnnotationLayer={false}
-      />
+    <div ref={slotRef} data-page={pageNumber}>
+      {content}
     </div>
   );
-}
+});
 
 interface PdfViewerProps {
   /** URL of the PDF (signed URL from Convex storage or blob URL) */
@@ -80,11 +97,25 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
   const [showOutline, setShowOutline] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  /** One ref callback per page number, created once, so page slots keep a stable `ref` across renders. */
+  const pageSlotRefs = useRef<Map<number, PageSlotRef>>(new Map());
   const pageInputEditingRef = useRef(false);
   /** Programmatic scroll in progress — do not sync page field from observer (it flickers mid-scroll). */
   const scrollTargetPageRef = useRef<number | null>(null);
   const scrollTargetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageWidth = BASE_PAGE_WIDTH * zoom;
+
+  const getPageSlotRef = useCallback((pageNumber: number): PageSlotRef => {
+    let slotRef = pageSlotRefs.current.get(pageNumber);
+    if (!slotRef) {
+      slotRef = (el) => {
+        if (el) pageRefs.current.set(pageNumber, el);
+        else pageRefs.current.delete(pageNumber);
+      };
+      pageSlotRefs.current.set(pageNumber, slotRef);
+    }
+    return slotRef;
+  }, []);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -197,6 +228,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
 
   // Observe page slots and only mark as visible when in viewport (reduces lag by rendering fewer pages).
   // Do not derive currentPage here — ratio map only updates a subset of pages per callback, so "best ratio" is often wrong.
+  // currentPage comes from updatePageFromScroll, so only membership matters: a single 0 threshold
+  // fires exactly when a slot enters or leaves the (margin-expanded) viewport.
   useEffect(() => {
     if (numPages === 0) return;
     const container = containerRef.current;
@@ -204,17 +237,17 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
 
     const observer = new IntersectionObserver(
       (entries) => {
-        setVisiblePages((prev) => {
-          const next = new Set(prev);
-          for (const e of entries) {
-            const pageNum = Number((e.target as HTMLElement).dataset.page);
-            if (e.isIntersecting) next.add(pageNum);
-            else next.delete(pageNum);
-          }
-          return next;
-        });
+        setVisiblePages((prev) =>
+          applyPageVisibilityChanges(
+            prev,
+            entries.map((e) => ({
+              pageNumber: Number((e.target as HTMLElement).dataset.page),
+              isIntersecting: e.isIntersecting,
+            }))
+          )
+        );
       },
-      { root: container, rootMargin: "50px", threshold: [0, 0.25, 0.5, 0.75, 1] }
+      { root: container, rootMargin: "50px", threshold: 0 }
     );
 
     const refs = pageRefs.current;
@@ -440,20 +473,13 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
                 className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-lg bg-muted/20 py-2 ring-1 ring-hairline scrollbar-stable"
               >
                 {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-                  <div
+                  <VirtualizedPage
                     key={pageNum}
-                    ref={(el) => {
-                      if (el) pageRefs.current.set(pageNum, el);
-                      else pageRefs.current.delete(pageNum);
-                    }}
-                    data-page={pageNum}
-                  >
-                    <VirtualizedPage
-                      pageNumber={pageNum}
-                      pageWidth={pageWidth}
-                      isVisible={visiblePages.has(pageNum)}
-                    />
-                  </div>
+                    pageNumber={pageNum}
+                    pageWidth={pageWidth}
+                    isVisible={visiblePages.has(pageNum)}
+                    slotRef={getPageSlotRef(pageNum)}
+                  />
                 ))}
               </div>
             </div>
