@@ -19,6 +19,7 @@ const modules = Object.fromEntries(
 );
 preloadModules(modules, [
   "./documents/index.ts",
+  "./documents/listSummary.ts",
   "./chat/conversations.ts",
   "./chat/messages.ts",
   "./notes/userNotes.ts",
@@ -37,6 +38,11 @@ const EMPTY_CHAT = { messages: [], chatGenerating: false, chatGenerationStartedA
 
 const NOTEBOOK_LIST_QUERIES = [
   { name: "documents.index.list", fn: api.documents.index.list, empty: [] },
+  {
+    name: "documents.listSummary.listSummary",
+    fn: api.documents.listSummary.listSummary,
+    empty: [],
+  },
   {
     name: "chat.conversations.listForNotebook",
     fn: api.chat.conversations.listForNotebook,

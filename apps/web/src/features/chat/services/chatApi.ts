@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { DocumentSummary } from "@convex/documents/listSummary";
 import { useAction, useConvexAuth, useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
@@ -176,7 +177,10 @@ interface SourceSuggestionsResult {
 
 export function useSourceSuggestions(
   notebookId: string | null,
-  documents: any[]
+  documents: readonly Pick<
+    DocumentSummary,
+    "_id" | "status" | "fileName" | "wordCount" | "totalChunks"
+  >[]
 ): SourceSuggestionsResult {
   const [result, setResult] = useState<SourceSuggestionsResult>({
     summary: null,
@@ -188,9 +192,9 @@ export function useSourceSuggestions(
   const sourceSuggestions = useAction(api.chat.sourceSuggestions.getSourceSuggestions);
 
   const documentSignature = useMemo(() => {
-    const completed = documents.filter((d: any) => d.status === "completed");
+    const completed = documents.filter((d) => d.status === "completed");
     return completed
-      .map((d: any) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
+      .map((d) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
       .join("|");
   }, [documents]);
 

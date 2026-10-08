@@ -47,7 +47,6 @@ vi.mock("@convex/_generated/api", () => ({
 
 // Import after mock setup
 const {
-  useDocuments,
   useDocument,
   useCreateDocument,
   useUpdateDocument,
@@ -68,25 +67,6 @@ describe("documentsApi hooks", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe("useDocuments", () => {
-    it("calls useQuery with notebookId when provided", () => {
-      mockUseQuery.mockReturnValue([]);
-      renderHook(() => useDocuments("notebook-1"));
-
-      expect(mockUseQuery).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ notebookId: "notebook-1" })
-      );
-    });
-
-    it("calls useQuery with empty args when notebookId is null", () => {
-      mockUseQuery.mockReturnValue([]);
-      renderHook(() => useDocuments(null));
-
-      expect(mockUseQuery).toHaveBeenCalledWith(expect.anything(), {});
-    });
   });
 
   describe("useDocument", () => {
