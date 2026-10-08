@@ -851,15 +851,12 @@ describe("Table", () => {
       </Table>
     );
     const ours = screen.getByRole("columnheader", { name: "Ours" });
-    expect(ours).toHaveAttribute("data-highlight", "true");
     // The tint sits over the band's solid fill, so a sticky header doesn't show rows through it.
     expect(ours).toHaveClass("bg-muted", "from-link/8", "text-link");
-    expect(screen.getByRole("columnheader", { name: "Topic" })).not.toHaveAttribute(
-      "data-highlight"
-    );
+    expect(screen.getByRole("columnheader", { name: "Topic" })).not.toHaveClass("from-link/8");
     const oursCell = screen.getByRole("cell", { name: "Four databases" });
-    expect(oursCell).toHaveAttribute("data-highlight", "true");
-    expect(oursCell).toHaveClass("bg-card", "from-link/5");
+    // The solid fill gives way to the selected row's, like a pinned cell.
+    expect(oursCell).toHaveClass("bg-card", "from-link/5", "in-[tr[data-state=selected]]:bg-muted");
     const rowHeader = screen.getByRole("rowheader", { name: "Search" });
     expect(rowHeader).toHaveClass("align-top");
     expect(rowHeader).not.toHaveClass("bg-muted", "whitespace-nowrap");

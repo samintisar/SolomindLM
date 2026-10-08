@@ -19,7 +19,8 @@ export type IntentLandingPageConfig = {
   proofBullets: string[];
   sourceToOutput: { source: string; output: string };
   /** Prominent hero cross-link to a related intent page (e.g. quizzes → written questions). */
-  heroCrossLink?: { path: string; label: string; description: string };
+  /** A pointer to a neighbouring tool; `linkText` is the link's own words. */
+  heroCrossLink?: { path: string; label: string; description: string; linkText: string };
   faqs: FAQItem[];
   ctaLabel: string;
   navLabel: string;
@@ -263,6 +264,7 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     heroCrossLink: {
       path: "/students/ai-written-questions",
       label: "Practicing for essay or short-answer exams?",
+      linkText: "Written questions with feedback",
       description:
         "Written Questions generates prompts from your sources and gives AI feedback on responses you submit—not multiple choice.",
     },

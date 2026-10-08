@@ -103,17 +103,17 @@ describe("SeoContentPage: comparison", () => {
       "SolomindLM",
       page.competitorName,
     ]);
-    expect(headers[1]).toHaveAttribute("data-highlight", "true");
+    expect(headers[1]).toHaveClass("from-link/8");
     expect(
       within(table)
         .getAllByRole("rowheader")
         .map((header) => header.textContent)
     ).toEqual(rows.map((row) => row.topic));
 
-    const highlighted = table.querySelectorAll("td[data-highlight=true]");
-    expect([...highlighted].map((cell) => cell.textContent)).toEqual(
-      rows.map((row) => row.solomindlm)
+    const highlighted = [...table.querySelectorAll("td")].filter((cell) =>
+      cell.classList.contains("from-link/5")
     );
+    expect(highlighted.map((cell) => cell.textContent)).toEqual(rows.map((row) => row.solomindlm));
   });
 
   it("names the sources the competitor details were checked against", () => {

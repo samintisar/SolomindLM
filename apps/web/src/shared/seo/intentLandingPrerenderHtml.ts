@@ -45,7 +45,7 @@ ${breadcrumbNav}
         <p>${escapeHtml(page.subheadline)}</p>${
           page.heroCrossLink
             ? `
-        <p><strong>${escapeHtml(page.heroCrossLink.label)}</strong> ${escapeHtml(page.heroCrossLink.description)} <a href="${escapeHtml(page.heroCrossLink.path)}">Written questions with feedback</a></p>`
+        <p><strong>${escapeHtml(page.heroCrossLink.label)}</strong> ${escapeHtml(page.heroCrossLink.description)} <a href="${escapeHtml(page.heroCrossLink.path)}">${escapeHtml(page.heroCrossLink.linkText)}</a></p>`
             : ""
         }
       </header>

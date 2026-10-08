@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import type { AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
 import { AuthModal } from "@/features/auth/components/AuthModal";
 import { useAuth } from "@/features/auth/useAuth";
 import { isNativeShell } from "@/utils/platformDetection";
@@ -14,23 +15,28 @@ interface MarketingPageProps {
   children: (openSignup: () => void) => ReactNode;
 }
 
-/** The content-page frame: light pin, nav, main, closing section, footer and the sign-up modal. */
+/** The content-page frame: light pin, nav, main, closing section, footer and the auth modal (sign-up, or sign-in from "Log in"). */
 export function MarketingPage({ closing, children }: MarketingPageProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthFormInitialMode>("signUp");
 
   if (isNativeShell()) {
     if (isLoading) return <div className="auth-form-light min-h-screen bg-background" />;
     return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
   }
 
-  const openSignup = () => setAuthModalOpen(true);
+  const openAuth = (mode: AuthFormInitialMode) => {
+    setAuthMode(mode);
+    setAuthModalOpen(true);
+  };
+  const openSignup = () => openAuth("signUp");
   return (
     <>
       {/* Pinned light, like the home page: the marketing pages don't follow the app theme. */}
       <div className="auth-form-light min-h-screen bg-background font-serif text-foreground antialiased">
-        <LandingNav onGetStarted={openSignup} onLogin={openSignup} />
+        <LandingNav onGetStarted={openSignup} onLogin={() => openAuth("signIn")} />
         <main>
           {children(openSignup)}
           <FirstNotebookCta
@@ -43,6 +49,7 @@ export function MarketingPage({ closing, children }: MarketingPageProps) {
       </div>
       <AuthModal
         isOpen={authModalOpen}
+        initialMode={authMode}
         onClose={() => setAuthModalOpen(false)}
         onAuthenticated={() => navigate("/home", { replace: true })}
       />

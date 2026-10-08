@@ -69,22 +69,33 @@ function Waveform({ rows }: { rows: string[] }) {
   );
 }
 
+/** The grid follows the header's cell count (2–4), so every row lines up under it. */
+const columnRow = cva("grid gap-2 px-3 py-2", {
+  variants: {
+    columns: { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" },
+    header: { true: "bg-muted", false: "border-t border-border/50 font-sans text-xs" },
+  },
+});
+
+function columnsFor(count: number): 2 | 3 | 4 {
+  if (count <= 2) return 2;
+  return count >= 4 ? 4 : 3;
+}
+
 function ColumnRows({ rows }: { rows: string[] }) {
   const [header, ...body] = rows.map((row) => row.split(" · "));
+  const columns = columnsFor(header?.length ?? 0);
   return (
     <div className="overflow-hidden rounded-lg ring-1 ring-hairline">
       {header ? (
-        <div className="grid grid-cols-3 gap-2 bg-muted px-3 py-2">
-          {header.map((cell) => (
-            <DemoLabel key={cell}>{cell}</DemoLabel>
+        <div className={columnRow({ columns, header: true })}>
+          {header.map((cell, index) => (
+            <DemoLabel key={index}>{cell}</DemoLabel>
           ))}
         </div>
       ) : null}
       {body.map((cells) => (
-        <div
-          key={cells.join()}
-          className="grid grid-cols-3 gap-2 border-t border-border/50 px-3 py-2 font-sans text-xs"
-        >
+        <div key={cells.join()} className={columnRow({ columns, header: false })}>
           {cells.map((cell, index) => (
             <span key={index} className="min-w-0 truncate">
               {cell}

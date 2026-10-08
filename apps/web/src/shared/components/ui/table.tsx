@@ -72,9 +72,13 @@ const tableCellVariants = cva("border-r border-b border-hairline last:border-r-0
     },
     /**
      * highlight: the column the page is about (e.g. ours in a comparison). `link` is the brand colour
-     * that reads in both themes. The tint is a gradient over a solid fill, so a pinned cell stays opaque.
+     * that reads in both themes. The tint is a gradient over a solid fill, so a pinned cell stays opaque;
+     * the fill follows a selected row like a pinned cell's does.
      */
-    highlight: { true: "bg-card bg-linear-to-b from-link/5 to-link/5", false: "" },
+    highlight: {
+      true: "bg-card bg-linear-to-b from-link/5 to-link/5 in-[tr[data-state=selected]]:bg-muted",
+      false: "",
+    },
   },
   defaultVariants: { pinned: false, highlight: false },
 });
@@ -96,17 +100,14 @@ function TableHead({
   className,
   pinned,
   highlight,
-  scope,
   ...props
 }: React.ComponentProps<"th"> & VariantProps<typeof tableCellVariants>) {
   return (
     <th
       data-slot="table-head"
-      data-highlight={highlight ? "true" : undefined}
-      scope={scope}
       className={cn(
         tableCellVariants({ pinned }),
-        tableHeadVariants({ rowHeader: scope === "row", highlight }),
+        tableHeadVariants({ rowHeader: props.scope === "row", highlight }),
         className
       )}
       {...props}
@@ -123,7 +124,6 @@ function TableCell({
   return (
     <td
       data-slot="table-cell"
-      data-highlight={highlight ? "true" : undefined}
       className={cn(tableCellVariants({ pinned, highlight }), "px-5 py-4 align-top", className)}
       {...props}
     />

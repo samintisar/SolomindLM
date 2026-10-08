@@ -82,7 +82,7 @@ function CrossLinkCard({ link }: { link: NonNullable<IntentLandingPageConfig["he
           to={link.path}
           className="inline-flex items-center gap-1.5 self-start font-sans text-sm font-semibold text-primary hover:underline"
         >
-          Written questions with feedback
+          {link.linkText}
           <ArrowRight aria-hidden className="size-4" />
         </Link>
       </div>

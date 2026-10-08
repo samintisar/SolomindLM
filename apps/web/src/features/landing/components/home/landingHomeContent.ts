@@ -297,3 +297,6 @@ export const PLANS: Plan[] = [
     featured: true,
   },
 ];
+
+/** The pricing promise under a sign-up button; the home hero and the content pages share it. */
+export const FREE_PLAN_LINE = "Free plan, no card";

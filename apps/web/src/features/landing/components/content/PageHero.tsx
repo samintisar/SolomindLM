@@ -1,7 +1,11 @@
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
+import { FinePrint } from "../home/FinePrint";
+import { FREE_PLAN_LINE } from "../home/landingHomeContent";
 import { AccentHeading } from "./accentHeading";
 import { Breadcrumbs, type Crumb } from "./Breadcrumbs";
+
+const HERO_FINE_PRINT = [FREE_PLAN_LINE];
 
 interface PageHeroProps {
   eyebrow?: string;
@@ -36,12 +40,7 @@ export function PageHero({ eyebrow, breadcrumbs, title, titleAccent, lede, cta }
               {cta.label}
               <ArrowRight aria-hidden />
             </Button>
-            <ul className="flex flex-wrap gap-x-5 gap-y-2 font-sans text-xs text-muted-foreground">
-              <li className="flex items-center gap-1.5">
-                <Check aria-hidden className="size-3.5 text-success" />
-                Free plan, no card
-              </li>
-            </ul>
+            <FinePrint lines={HERO_FINE_PRINT} />
           </div>
         ) : null}
       </div>

@@ -10,8 +10,10 @@ vi.mock("@/features/auth/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
 }));
 vi.mock("@/features/auth/components/AuthModal", () => ({
-  AuthModal: ({ isOpen }: { isOpen: boolean }) =>
-    isOpen ? <div role="dialog" aria-label="Sign up" /> : null,
+  AuthModal: ({ isOpen, initialMode }: { isOpen: boolean; initialMode?: string }) =>
+    isOpen ? (
+      <div role="dialog" aria-label={initialMode === "signUp" ? "Sign up" : "Sign in"} />
+    ) : null,
 }));
 vi.mock("@/shared/seo/SEOMeta", () => ({ SEOMeta: () => null }));
 vi.mock("@/utils/platformDetection", () => ({ isNativeShell: () => nativeShell.value }));
@@ -56,6 +58,12 @@ describe("MarketingPage", () => {
     expect(screen.queryByRole("dialog", { name: "Sign up" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Try it" }));
     expect(screen.getByRole("dialog", { name: "Sign up" })).toBeInTheDocument();
+  });
+
+  it("opens the modal on sign-in from the nav's log-in button", async () => {
+    renderPage();
+    await userEvent.click(screen.getAllByRole("button", { name: /log in/i })[0]);
+    expect(screen.getByRole("dialog", { name: "Sign in" })).toBeInTheDocument();
   });
 
   it("redirects inside the native shell", () => {
