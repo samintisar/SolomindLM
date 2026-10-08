@@ -15,11 +15,11 @@ import {
   FlashcardFront,
 } from "@/features/studio/components/flashcards/FlashcardContent";
 import { FlipCard } from "@/features/studio/components/flashcards/FlipCard";
+import { useDueCards } from "@/features/studio/hooks/useDueCards";
 import {
   useAddCard,
   useCardReview,
   useDeleteCard,
-  useDueCards,
   useFlashcard,
   useUpdateCard,
   useUpdateFlashcardPreferences,
@@ -72,12 +72,8 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   const updatePreferences = useUpdateFlashcardPreferences();
   const submitCardReview = useCardReview();
 
-  // Due cards for study mode
-  const dueCardsData = useDueCards(note.id);
-  const dueCards: DueFlashcard[] = useMemo(() => {
-    if (!dueCardsData) return [];
-    return dueCardsData.map((d: { index: number; card: Flashcard }) => d);
-  }, [dueCardsData]);
+  // Due cards for study mode, from the deck already loaded (a deck switch resets to the new note's cards)
+  const dueCards = useDueCards(allCards);
 
   // Filter cards based on showMastered preference
   const filteredCards = useMemo(() => {
