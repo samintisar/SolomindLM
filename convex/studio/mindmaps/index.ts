@@ -185,39 +185,6 @@ export const generateMindMap = mutation({
 });
 
 /**
- * Update a mindmap
- */
-export const updateMindMap = mutation({
-  args: {
-    mindmapId: v.id("mindmaps"),
-    data: v.optional(v.any()),
-    title: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const { mindmapId, data, title } = args;
-
-    const mindmap = await Mindmaps.getMindmap(ctx, mindmapId);
-    if (!mindmap) {
-      throw new Error("Mindmap not found or access denied");
-    }
-
-    await assertCanEditNotebook(ctx, mindmap.notebookId, userId);
-
-    // Update
-    const updates: Record<string, unknown> = { updatedAt: Date.now() };
-    if (data !== undefined) updates.data = data;
-    if (title !== undefined) updates.title = title;
-
-    await Mindmaps.updateMindmap(ctx, mindmapId, updates);
-
-    return mindmapId;
-  },
-});
-
-/**
  * Delete a mindmap
  */
 export const deleteMindMap = mutation({

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createLLM, createLLMs, createLLMsFromEnv, mergeModelKwargs } from "./llm_factory";
+import { createLLM, mergeModelKwargs } from "./llm_factory";
 
 // Mock ChatTogetherAI
 vi.mock("@langchain/community/chat_models/togetherai", () => ({
@@ -50,79 +50,6 @@ describe("mergeModelKwargs", () => {
   });
 });
 
-describe("createLLMs", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("creates fast and smart LLMs with separate models", () => {
-    const result = createLLMs({
-      apiKey: "test-key",
-      mapModel: "Qwen/Qwen3.5-9B",
-      reduceModel: "openai/gpt-oss-120b",
-      temperatures: { map: 0.3, reduce: 0.6 },
-      maxTokens: { map: 1000, reduce: 2000 },
-    });
-
-    expect(ChatTogetherAI).toHaveBeenCalledTimes(2);
-
-    const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
-    expect(fastCall[0]).toMatchObject({
-      apiKey: "test-key",
-      model: "Qwen/Qwen3.5-9B",
-      temperature: 0.3,
-      maxTokens: 1000,
-      modelKwargs: { reasoning: { enabled: false } },
-    });
-
-    const smartCall = vi.mocked(ChatTogetherAI).mock.calls[1];
-    expect(smartCall[0]).toMatchObject({
-      apiKey: "test-key",
-      model: "openai/gpt-oss-120b",
-      temperature: 0.6,
-      maxTokens: 2000,
-      modelKwargs: { reasoning_effort: "medium" },
-    });
-
-    expect(result.fastLlm).toBeDefined();
-    expect(result.smartLlm).toBeDefined();
-  });
-
-  it("uses fastLlm as smartLlm when reduceModel is omitted", () => {
-    const result = createLLMs({
-      apiKey: "test-key",
-      mapModel: "deepseek-ai/DeepSeek-V4.1-Flash",
-    });
-
-    expect(ChatTogetherAI).toHaveBeenCalledTimes(1);
-    expect(result.fastLlm).toBe(result.smartLlm);
-  });
-
-  it("uses default temperatures when not provided", () => {
-    createLLMs({
-      apiKey: "test-key",
-      mapModel: "model-a",
-      reduceModel: "model-b",
-    });
-
-    const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
-    expect(fastCall[0].temperature).toBe(0.3);
-
-    const smartCall = vi.mocked(ChatTogetherAI).mock.calls[1];
-    expect(smartCall[0].temperature).toBe(0.6);
-  });
-
-  it("uses default maxTokens (undefined) when not provided", () => {
-    createLLMs({
-      apiKey: "test-key",
-      mapModel: "model-a",
-    });
-
-    const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
-    expect(fastCall[0].maxTokens).toBeUndefined();
-  });
-});
-
 describe("createLLM", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -160,72 +87,5 @@ describe("createLLM", () => {
       maxTokens: 4096,
       modelKwargs: { chat_template_kwargs: { thinking: true } },
     });
-  });
-});
-
-describe("createLLMsFromEnv", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("throws when TOGETHER_AI_API_KEY is missing", () => {
-    expect(() => createLLMsFromEnv({}, { mapModel: "model" })).toThrow(
-      "TOGETHER_AI_API_KEY is required"
-    );
-  });
-
-  it("throws when mapModel is not provided and env is empty", () => {
-    expect(() => createLLMsFromEnv({ TOGETHER_AI_API_KEY: "key" })).toThrow(
-      "TOGETHER_AI_API_KEY is required"
-    );
-  });
-
-  it("creates LLMs from env variables", () => {
-    createLLMsFromEnv(
-      {
-        TOGETHER_AI_API_KEY: "env-key",
-        FAST_LLM: "fast-model",
-        SMART_LLM: "smart-model",
-      },
-      { mapModel: "fast-model" }
-    );
-
-    const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
-    expect(fastCall[0].apiKey).toBe("env-key");
-    expect(fastCall[0].model).toBe("fast-model");
-
-    const smartCall = vi.mocked(ChatTogetherAI).mock.calls[1];
-    expect(smartCall[0].model).toBe("smart-model");
-  });
-
-  it("uses options over env variables", () => {
-    createLLMsFromEnv(
-      {
-        TOGETHER_AI_API_KEY: "env-key",
-        FAST_LLM: "env-fast",
-        SMART_LLM: "env-smart",
-      },
-      {
-        mapModel: "opt-fast",
-        reduceModel: "opt-smart",
-        mapTemperature: 0.1,
-        reduceTemperature: 0.9,
-      }
-    );
-
-    const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
-    expect(fastCall[0].model).toBe("opt-fast");
-    expect(fastCall[0].temperature).toBe(0.1);
-
-    const smartCall = vi.mocked(ChatTogetherAI).mock.calls[1];
-    expect(smartCall[0].model).toBe("opt-smart");
-    expect(smartCall[0].temperature).toBe(0.9);
-  });
-
-  it("uses default model when env.FAST_LLM is missing", () => {
-    createLLMsFromEnv({ TOGETHER_AI_API_KEY: "key" }, { mapModel: "custom-model" });
-
-    const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
-    expect(fastCall[0].model).toBe("custom-model");
   });
 });
