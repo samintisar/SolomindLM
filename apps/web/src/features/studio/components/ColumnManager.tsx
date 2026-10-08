@@ -26,6 +26,8 @@ interface ColumnManagerProps {
   onChange: (columns: TableColumn[]) => void;
   onClose?: () => void;
   className?: string;
+  /** Move focus to the close button on mount (when the manager opens over the table). */
+  focusOnMount?: boolean;
 }
 
 export const ColumnManager: React.FC<ColumnManagerProps> = ({
@@ -33,6 +35,7 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({
   onChange,
   onClose,
   className,
+  focusOnMount = false,
 }) => {
   const [customName, setCustomName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
@@ -42,7 +45,13 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({
   const instructionsId = useId();
   const headingId = useId();
   const openerRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const formWasOpen = useRef(false);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus once, when the manager mounts
+  useEffect(() => {
+    if (focusOnMount) closeButtonRef.current?.focus();
+  }, []);
 
   // The opener is unmounted while the form is open, so hand focus back to it once it returns.
   useEffect(() => {
@@ -202,6 +211,7 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({
         </h3>
         {onClose && (
           <Button
+            ref={closeButtonRef}
             variant="ghost"
             size="icon-sm"
             onClick={onClose}

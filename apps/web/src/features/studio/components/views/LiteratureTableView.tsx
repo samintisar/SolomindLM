@@ -1,5 +1,6 @@
 import type { Id } from "@convex/_generated/dataModel";
 import {
+  ArrowLeft,
   ChevronDown,
   Columns3,
   Download,
@@ -58,8 +59,8 @@ import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
 type TablePaper = TablePaperRow;
 
 /**
- * Narrowest table area (px, Tailwind's `@4xl`) that fits the column manager beside the table. Below
- * it the manager covers the table, so it starts closed.
+ * Narrowest table area (px) that fits the column manager beside the table. Narrower, the manager
+ * opens over the table, so it starts closed.
  */
 const COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH = 896;
 
@@ -134,14 +135,29 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [citeTarget, setCiteTarget] = useState<{ paper: TablePaper; index: number } | null>(null);
 
-  const shellRef = useRef<HTMLDivElement>(null);
+  /** Whether the column manager fits beside the table; null until the table area is measured. */
+  const [fitsBeside, setFitsBeside] = useState<boolean | null>(null);
+  const previousFitsBeside = useRef<boolean | null>(null);
+  const manageColumnsButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Open the column manager on mount only where it fits beside the table; on a phone or in the
-  // default-width studio panel it would hide the table.
-  useLayoutEffect(() => {
-    const width = shellRef.current?.clientWidth ?? 0;
-    if (width >= COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH) setShowColumnManager(true);
+  // A callback ref, so a remount (entering or leaving full screen) observes the new node.
+  const observeTableBody = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const measure = () => setFitsBeside(node.clientWidth >= COLUMN_MANAGER_BESIDE_TABLE_MIN_WIDTH);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
+
+  // Open the manager on first measure only where it fits beside the table, and close it if the
+  // panel narrows so it would cover the table the user never asked it to cover.
+  useLayoutEffect(() => {
+    const previous = previousFitsBeside.current;
+    previousFitsBeside.current = fitsBeside;
+    if (previous === null && fitsBeside) setShowColumnManager(true);
+    else if (previous && fitsBeside === false) setShowColumnManager(false);
+  }, [fitsBeside]);
 
   const existingPapers = useGetExistingPapers(notebookId);
   const bulkUpload = useBulkUpload();
@@ -240,6 +256,23 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   );
 
   const columnManagerOpen = showColumnManager && !isFocusMode;
+  const columnManagerCoversTable = columnManagerOpen && fitsBeside === false;
+
+  const closeColumnManager = useCallback(() => {
+    setShowColumnManager(false);
+    manageColumnsButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!columnManagerCoversTable) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) closeColumnManager();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeColumnManager, columnManagerCoversTable]);
 
   const handleExportCSV = useCallback(() => {
     if (onExport) onExport("csv");
@@ -282,7 +315,16 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   );
 
   const tableShell = (
-    <div ref={shellRef} className={shellClassName} data-literature-table-shell>
+    <div className={shellClassName} data-literature-table-shell>
+      {onBack && !isFocusMode && (
+        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-sm md:hidden">
+          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+            <ArrowLeft />
+          </Button>
+          <span className="truncate text-sm font-semibold">{table.title}</span>
+        </div>
+      )}
+
       <div className="@container/table-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <Table2 className="hidden size-5 shrink-0 text-muted-foreground @sm/table-toolbar:block" />
@@ -308,6 +350,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
             </Button>
           )}
           <Button
+            ref={manageColumnsButtonRef}
             variant={columnManagerOpen ? "secondary" : "ghost"}
             size="sm-adaptive"
             onClick={() => {
@@ -414,8 +457,11 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 
       {/* Narrow widths: the column manager covers the table, and the paper column scrolls with the
           rest instead of pinning (pinned, its width alone fills a phone screen). */}
-      <div className="@container/table-body relative flex min-h-0 flex-1">
-        <div className="@container/literature-table flex min-w-0 flex-1 flex-col bg-card">
+      <div ref={observeTableBody} className="@container/table-body relative flex min-h-0 flex-1">
+        <div
+          className="@container/literature-table flex min-w-0 flex-1 flex-col bg-card"
+          inert={columnManagerCoversTable || undefined}
+        >
           {table.papers.length === 0 ? (
             <Empty>
               <EmptyHeader>
@@ -499,8 +545,13 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
           <ColumnManager
             columns={table.columns}
             onChange={handleColumnsChange}
-            onClose={() => setShowColumnManager(false)}
-            className="absolute inset-y-0 right-0 z-30 w-full @md/table-body:w-88 @4xl/table-body:static"
+            onClose={closeColumnManager}
+            className={
+              columnManagerCoversTable
+                ? "absolute inset-y-0 right-0 z-30 w-full @md/table-body:w-88"
+                : undefined
+            }
+            focusOnMount={columnManagerCoversTable}
           />
         )}
       </div>
