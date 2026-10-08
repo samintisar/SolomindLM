@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { cn } from "@/shared/utils/cn";
 import { formatAudioTime } from "../../hooks/useAudioPlayer";
 
@@ -44,7 +44,8 @@ export function WaveformScrubber({
   bars = 64,
 }: WaveformScrubberProps) {
   const draggingRef = useRef(false);
-  const heights = barHeights(seed, bars);
+  // Depends only on the seed, not the time, so it is not redone on every `timeupdate`.
+  const heights = useMemo(() => barHeights(seed, bars), [seed, bars]);
   const canSeek = !disabled && Number.isFinite(duration) && duration > 0;
   const progress = canSeek ? currentTime / duration : 0;
 
