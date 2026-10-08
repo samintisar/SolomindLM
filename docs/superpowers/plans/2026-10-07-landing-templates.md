@@ -978,8 +978,9 @@ Smoke test: `<TableCell highlight>` and `<TableHead highlight>` get `data-highli
 - Related: same shape as the hub's guides block (eyebrow "Keep reading", title "Related `<Accent>`pages`</Accent>`").
 
 - [ ] **Step 4: Run the tests and confirm they pass.** Then run `bun run lint:design` and the design snapshot
-  update for the table change (Docker, run in the background):
-  `export $(grep -E '^VITE_CONVEX_URL=' C:/Users/samin/Documents/GitHub/SolomindLM/apps/web/.env.local | xargs) && bun run test:design:update`.
+  update for the table change (Docker, run in the background, from the worktree root; the URL comes from the
+  main checkout's `.env.local`, the first entry of `git worktree list`):
+  `export $(grep -E '^VITE_CONVEX_URL=' "$(git worktree list --porcelain | head -1 | cut -d' ' -f2)/apps/web/.env.local" | xargs) && bun run test:design:update`.
   Keep only the snapshot files that actually changed because of the Tables section. Restore any others with
   `git checkout -- <file>`; the 390px images are known to be flaky.
 

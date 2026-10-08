@@ -206,10 +206,10 @@ pwsh -File .github/branch-protection.ps1
 
    | Setting                             | Value                                       |
    | ----------------------------------- | ------------------------------------------- |
-   | Require a pull request              | ✅ (1 approval)                             |
+   | Require a pull request              | ✅ (0 approvals: PR required, CI enforced)  |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)`, `Coverage Report`, `Knip (unused code)`, `Convex codegen (generated API)` |
+   | Require status checks to pass       | Every check in `.github/branch-protection.ps1` (the **Required** list below), each with source **GitHub Actions** |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -222,7 +222,7 @@ The `.github/workflows/ci.yml` runs on:
 - Push to `main`
 - Pull requests targeting `main`
 
-**Required** (merge-blocking, enforced in branch protection):
+**Required** (merge-blocking, enforced in branch protection; the list itself lives in `.github/branch-protection.ps1`, so add a new check there and here):
 
 1. **Typecheck (Convex)** - Validates Convex backend TypeScript, then `typecheck:evals` (`evals/` runs under `bun run`, which doesn't check types)
 2. **Typecheck (Web)** - Validates web TypeScript
@@ -235,6 +235,7 @@ The `.github/workflows/ci.yml` runs on:
 9. **Coverage Report** - the `test:web` vitest suite with coverage (`test:web:coverage`): fails on a failing web test or a drop below the coverage floor
 10. **Knip (unused code)** - `bun run knip` (default mode) finds no unused files, exports, dependencies or duplicate exports. A finding fails the PR: delete the dead code, or if it's a false positive add an ignore with a reason to `knip.json` (`ignoreIssues` for a path, `ignoreDependencies`/`ignoreBinaries` for a package). Every Convex module outside a `_` path is an entry, plus the `_`-path modules that register Convex functions, which are listed by name. Add yours there, or Knip reports it as unused.
 11. **Convex codegen (generated API)** - `bun run check:convex-codegen` fails when `convex/_generated/api.d.ts` is missing a module under `convex/` (underscore dirs included) or still lists a deleted one. Typecheck passes either way, which is how #306 and #331 merged with a stale file. Fix it by running `npx convex codegen` against your dev deployment and committing `convex/_generated`.
+12. **CSP smoke test** - builds the web app, serves it with the headers from `apps/web/vercel.json` and loads it in Chromium (`bun run test:csp`); fails if a public route (`/`, `/sign-in`, `/faq`, `/privacy`) records a Content-Security-Policy violation, and a blocked-script canary checks that violations are detected at all. Needs no secrets or backend, so it runs on every PR.
 
 **Advisory** (run on PRs, not merge-blocking):
 
@@ -242,6 +243,7 @@ The `.github/workflows/ci.yml` runs on:
 - **Knip production (advisory)** - `bun run knip:production` (shipped code only) reports to the job summary without failing. It's the pass that finds dead Convex code, because convex-test's `import.meta.glob` marks every Convex module as used when tests are included. It still lists the test-only code tracked in #249-#253, so it stays advisory until those are resolved.
 - **Lint (PR title)** - conventional-commit form on the PR title (becomes the squash commit)
 - **PR labeler** - applies `area:*` labels from changed paths (`.github/labeler.yml`)
+- **PR auto-update** - after every push to `main`, and when auto-merge is turned on for a PR, merges `main` into each open PR that has auto-merge on (`.github/workflows/pr-autoupdate.yml`; can also be run by hand). `main` requires up-to-date branches and auto-merge doesn't update a branch itself, so without it PRs sit behind after each merge. Uses the Renovate GitHub App token so the update triggers CI. Not a check.
 - **CodeRabbit** - AI review comments on ready (non-draft) PRs; config in .coderabbit.yaml. Advisory only.
 
 E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it is not a required check. Phase 3 of the CI/CD deployment plan wires it to run against the Vercel preview deployment.

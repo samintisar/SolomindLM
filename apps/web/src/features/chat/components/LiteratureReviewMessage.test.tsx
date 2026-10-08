@@ -11,10 +11,15 @@ const mocks = vi.hoisted(() => ({
   table: null as unknown,
   report: null as unknown,
   toastError: vi.fn(),
+  handleLimitError: vi.fn(),
 }));
 
 vi.mock("@/shared/contexts/useToast", () => ({
   useToast: () => ({ error: mocks.toastError }),
+}));
+
+vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
+  useLimitErrorToast: () => ({ handleLimitError: mocks.handleLimitError }),
 }));
 
 vi.mock("../services/literatureReviewApi", () => ({
@@ -51,6 +56,7 @@ function renderMessage(
 
 beforeEach(() => {
   mocks.toastError.mockReset();
+  mocks.handleLimitError.mockReset().mockResolvedValue({ isLimitError: false });
   mocks.session = null;
   mocks.table = null;
   mocks.report = null;
@@ -78,6 +84,18 @@ describe("LiteratureReviewMessage failed state", () => {
     expect(mocks.toastError).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Retry from last step" })).toBeEnabled();
+    consoleError.mockRestore();
+  });
+
+  test("a retry refused by a limit shows the limit toast, not a generic one", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const refusal = new Error("This literature review has already been retried 3 times");
+    mocks.retry.mockRejectedValue(refusal);
+    mocks.handleLimitError.mockResolvedValue({ isLimitError: true });
+    renderMessage({ status: "failed", error: "Search provider timed out" });
+    await userEvent.click(screen.getByRole("button", { name: "Retry from last step" }));
+    expect(mocks.handleLimitError).toHaveBeenCalledWith(refusal);
+    expect(mocks.toastError).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 

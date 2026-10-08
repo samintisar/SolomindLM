@@ -1,3 +1,4 @@
+import { FREE_FEATURE_LIMITS, PRO_FEATURE_LIMITS } from "@convex/_lib/errors";
 import type { SeoContentPageConfig } from "./seoContentPages";
 
 /**
@@ -6,8 +7,11 @@ import type { SeoContentPageConfig } from "./seoContentPages";
  */
 const CHECKED = "2026-10-07";
 
-const SOLOMINDLM_PRICING =
-  "Free: 5 notebooks, 20 sources per notebook, 10 chat messages and 2 generations per Studio tool a day. Pro: $7.50/month billed yearly or $15 monthly, with 200 notebooks, 200 sources per notebook, and 100 generations per tool a day.";
+const FREE = FREE_FEATURE_LIMITS;
+const PRO = PRO_FEATURE_LIMITS;
+const FREE_STUDIO_PER_DAY = FREE.flashcard?.rate ?? 0;
+
+const SOLOMINDLM_PRICING = `Free: 5 notebooks, 20 sources per notebook, ${FREE.chat?.rate} chat messages and ${FREE_STUDIO_PER_DAY} generation per Studio tool a day, ${FREE.audio?.rate} audio overviews a week, and ${FREE.literatureReview?.rate} literature review every 30 days; deep research and infographics are Pro only. Pro: $7.50/month billed yearly or $15 monthly, with 200 notebooks, 200 sources per notebook, ${PRO.flashcard.rate} generations per Studio tool, ${PRO.audio.rate} audio overviews, ${PRO.infographic.rate} infographics, ${PRO.literatureReview.rate} literature reviews, and ${PRO.deepResearch.rate} deep research runs a day.`;
 
 const COMPARE_CTA = {
   ctaLabel: "Try SolomindLM free",
@@ -83,7 +87,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
       {
         topic: "Limits",
         solomindlm:
-          "Free: 5 notebooks of 20 sources. Pro: 200 notebooks of 200 sources. Fixed daily limits per tool.",
+          "Free: 5 notebooks of 20 sources. Pro: 200 notebooks of 200 sources. Fixed limits per tool, most of which reset daily.",
         competitor:
           "Free: 100 notebooks of 50 sources. Higher plans up to 500 notebooks of 300 to 600 sources. Usage limits refresh every 5 hours.",
       },
@@ -145,7 +149,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
           "You need references in APA, MLA, Chicago, AMA, IEEE, Vancouver, Harvard, or another set style",
           "You want notebooks organized in folders",
           "You study with spaced repetition or need essay answers graded against your sources",
-          "You prefer predictable daily limits to limits that refresh every 5 hours by compute used",
+          "You prefer predictable per-tool limits to limits that refresh every 5 hours by compute used",
         ],
       },
       {
@@ -343,7 +347,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
       {
         question: "Is there a free Elicit alternative?",
         answer:
-          "Yes. SolomindLM's free plan includes academic search, literature review, and chat over your own papers, with daily limits. Elicit also has a free Basic plan for search, summaries, and chat with papers, but its systematic review workflow needs Pro.",
+          "Yes. SolomindLM's free plan includes academic search, chat over your own papers, and one literature review every 30 days. Elicit also has a free Basic plan for search, summaries, and chat with papers, but its systematic review workflow needs Pro.",
       },
       {
         question: "Can SolomindLM do a systematic review like Elicit?",
@@ -494,7 +498,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
       {
         question: "Is there a free Consensus alternative?",
         answer:
-          "SolomindLM has a free plan with academic search, chat over your papers, and literature review within daily limits. Consensus also has a free plan with 10 Pro messages and up to 3 Deep reviews a month.",
+          "SolomindLM has a free plan with academic search, chat over your papers, and one literature review every 30 days. Consensus also has a free plan with 10 Pro messages and up to 3 Deep reviews a month.",
       },
       {
         question: "Does Consensus work with my own PDFs?",
@@ -734,7 +738,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
       },
       {
         topic: "Usage model",
-        solomindlm: "Daily limits per tool that reset each day.",
+        solomindlm: "Fixed limits per tool, most of which reset each day.",
         competitor:
           "Premium includes 1,200 credits a month; Advanced and Max list unlimited monthly usage.",
       },
@@ -759,7 +763,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
       {
         h2: "When is SolomindLM the better choice?",
         paragraphs: [
-          "SolomindLM is the simpler, cheaper option when your work centers on a set of sources you need to understand, review, and study. There are no credits to track: each tool has a daily limit that resets.",
+          "SolomindLM is the simpler, cheaper option when your work centers on a set of sources you need to understand, review, and study. There are no credits to track: each tool has a fixed limit that resets.",
         ],
         bullets: [
           "You want to approve the extraction columns before a literature review runs",
@@ -1132,7 +1136,7 @@ export const COMPETITOR_COMPARE_PAGES: SeoContentPageConfig[] = [
       },
       {
         topic: "Free plan limits",
-        solomindlm: "All study modes available; 2 generations per tool a day.",
+        solomindlm: `All study modes available; ${FREE_STUDIO_PER_DAY} generation per tool a day.`,
         competitor: "Limited Learn rounds per set and one practice test per set.",
       },
       {

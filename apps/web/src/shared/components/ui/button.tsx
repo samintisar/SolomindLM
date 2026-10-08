@@ -24,6 +24,12 @@ const buttonVariants = cva(
           "rounded-xl bg-warning text-warning-foreground shadow-md shadow-warning/25 hover:-translate-y-px hover:bg-warning/90 hover:shadow-lg active:translate-y-0 active:scale-98",
         outline:
           "rounded-xl bg-surface-raised shadow-xs ring-1 ring-hairline hover:bg-muted hover:text-foreground active:scale-98 aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-invalid:ring-destructive",
+        /**
+         * File drop target: an `outline` chip that lifts on hover and lifts further, with a primary
+         * ring, while a file is dragged over it (`data-dragging="true"` set by the caller).
+         */
+        dropzone:
+          "rounded-2xl bg-surface-raised shadow-xs ring-1 ring-hairline hover:-translate-y-px hover:bg-muted hover:shadow-md active:scale-98 data-[dragging=true]:-translate-y-0.5 data-[dragging=true]:bg-muted data-[dragging=true]:shadow-lg data-[dragging=true]:ring-2 data-[dragging=true]:ring-primary/60",
         secondary:
           "rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/70 active:scale-98 aria-expanded:bg-secondary/70",
         ghost:

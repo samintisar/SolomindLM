@@ -21,6 +21,9 @@ if ([string]::IsNullOrEmpty($repo)) {
 
 Write-Host "Applying branch protection rules to $repo..." -ForegroundColor Cyan
 
+# App ID of GitHub Actions, the app that posts the CI check runs.
+$actionsAppId = 15368
+
 # Create JSON file for branch protection
 $json = @{
     # required_approving_review_count = 0: a PR is still required (no direct pushes to
@@ -34,20 +37,24 @@ $json = @{
     # NOTE: E2E is intentionally not a required check. Phase 3 of the CI/CD deployment plan
     # (docs/superpowers/plans/2026-09-08-cicd-deployment-observability.md) moves it to a
     # deployment_status-triggered advisory job; promote to required only once stable.
+    # Every check is pinned to the GitHub Actions app so no other app or status poster can
+    # satisfy it. This list is the source of truth for the required checks; BRANCHING.md
+    # describes each one.
     required_status_checks = @{
         strict = $true
         checks = @(
-            @{ context = "Typecheck (Convex)" }
-            @{ context = "Typecheck (Web)" }
-            @{ context = "Typecheck (Expo mobile)" }
-            @{ context = "Lint (Biome)" }
-            @{ context = "Lint (Workflows)" }
-            @{ context = "Unit Tests" }
-            @{ context = "Test (Mobile)" }
-            @{ context = "Build (Web, PR parity)" }
-            @{ context = "Coverage Report" }
-            @{ context = "Knip (unused code)" }
-            @{ context = "Convex codegen (generated API)" }
+            @{ context = "Typecheck (Convex)"; app_id = $actionsAppId }
+            @{ context = "Typecheck (Web)"; app_id = $actionsAppId }
+            @{ context = "Typecheck (Expo mobile)"; app_id = $actionsAppId }
+            @{ context = "Lint (Biome)"; app_id = $actionsAppId }
+            @{ context = "Lint (Workflows)"; app_id = $actionsAppId }
+            @{ context = "Unit Tests"; app_id = $actionsAppId }
+            @{ context = "Test (Mobile)"; app_id = $actionsAppId }
+            @{ context = "Build (Web, PR parity)"; app_id = $actionsAppId }
+            @{ context = "Coverage Report"; app_id = $actionsAppId }
+            @{ context = "Knip (unused code)"; app_id = $actionsAppId }
+            @{ context = "Convex codegen (generated API)"; app_id = $actionsAppId }
+            @{ context = "CSP smoke test"; app_id = $actionsAppId }
         )
     }
     enforce_admins = $true
@@ -72,7 +79,7 @@ try {
     Write-Host "Summary of rules applied:" -ForegroundColor Cyan
     Write-Host "  - Branch: main"
     Write-Host "  - Require pull request reviews: Yes (0 approvals - PR required, CI enforced)"
-    Write-Host "  - Require status checks: Yes (Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Test Mobile, Build Web, Coverage, Knip, Convex codegen)"
+    Write-Host "  - Require status checks: Yes (Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Test Mobile, Build Web, Coverage, Knip, Convex codegen, CSP smoke test; all pinned to GitHub Actions)"
     Write-Host "  - Require branches to be up to date: Yes"
     Write-Host "  - Admin enforcement: Yes"
     Write-Host "  - Allow force pushes: No"

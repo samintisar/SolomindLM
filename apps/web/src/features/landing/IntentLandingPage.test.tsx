@@ -103,7 +103,7 @@ describe("IntentLandingPage", () => {
     renderPage(quizzes.path);
     expect(screen.getByText(crossLink.label)).toBeInTheDocument();
     expect(screen.getByText(crossLink.description)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: crossLink.linkText })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: crossLink.linkLabel })).toHaveAttribute(
       "href",
       crossLink.path
     );

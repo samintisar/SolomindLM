@@ -6,6 +6,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import type { SpreadsheetNote } from "@/shared/types/index";
+import { downloadBlob } from "@/shared/utils/downloadFile";
 import { useSaveSpreadsheetData } from "../../services/spreadsheetsApi";
 import { SheetGrid } from "../spreadsheet/SheetGrid";
 import { SheetSaveStatus } from "../spreadsheet/SheetSaveStatus";
@@ -28,12 +29,7 @@ function safeFileName(title: string): string {
  */
 function downloadCsv(grid: Grid, title: string) {
   const blob = new Blob([`﻿${toExportCsv(grid)}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${safeFileName(title)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `${safeFileName(title)}.csv`);
 }
 
 function errorMessage(error: unknown): string {

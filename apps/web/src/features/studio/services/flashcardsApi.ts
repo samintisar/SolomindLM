@@ -3,6 +3,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
+import { downloadBlob } from "@/shared/utils/downloadFile";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
 
@@ -199,21 +200,13 @@ export async function exportFlashcardsCSV(
 
   // Create a blob and trigger download
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
 
   // Generate filename
   const safeTitle = title
     .replace(/[^a-z0-9]/gi, "_")
     .replace(/_+/g, "_")
     .toLowerCase();
-  link.download = `flashcards_${safeTitle}_${new Date().toISOString().split("T")[0]}.csv`;
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  downloadBlob(blob, `flashcards_${safeTitle}_${new Date().toISOString().split("T")[0]}.csv`);
 }
 
 // ============================================================================

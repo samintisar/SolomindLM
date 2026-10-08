@@ -8,6 +8,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Input } from "@/shared/components/ui/input";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import type { Message } from "@/shared/types/index";
 import {
   useConfirmLiteratureReviewColumns,
@@ -122,6 +123,7 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
   const report = useLiteratureReport(reportId ?? null);
 
   const { error: toastError } = useToast();
+  const { handleLimitError } = useLimitErrorToast();
   const confirmColumnsMutation = useConfirmLiteratureReviewColumns();
   const retryMutation = useRetryLiteratureReview();
 
@@ -242,11 +244,14 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
       await retryMutation({ sessionId: sessionId! });
     } catch (err) {
       console.error("[LiteratureReview] Retry failed:", err);
-      toastError("Couldn't retry the literature review. Please try again.");
+      // Retry and in-progress caps explain themselves; "try again" would just fail again.
+      if (!(await handleLimitError(err)).isLimitError) {
+        toastError("Couldn't retry the literature review. Please try again.");
+      }
     } finally {
       setIsRetrying(false);
     }
-  }, [retryMutation, sessionId, toastError]);
+  }, [retryMutation, sessionId, toastError, handleLimitError]);
 
   if (!lr) return null;
 

@@ -33,6 +33,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
 import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
@@ -202,6 +203,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [channelsForChatSend, chatAcademicFilters, composerMode, researchDatabase]);
 
   const { success, error: toastError } = useToast();
+  const { handleLimitError } = useLimitErrorToast();
   const saveChat = useSaveChat();
 
   const authToken = useHttpAuthToken();
@@ -594,6 +596,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setActiveLiteratureSessionId(sessionId);
       } catch (err) {
         console.error("[LiteratureReview] Start failed:", err);
+        if ((await handleLimitError(err)).isLimitError) {
+          setIsSending(false);
+          return;
+        }
         const parsed = parseServiceError(err);
         toastError(
           parsed?.kind === "input_validation"
@@ -612,6 +618,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     notebookId,
     onSendMessage,
     toastError,
+    handleLimitError,
     composerMode,
     chatSourcePolicy,
     startLiteratureReview,

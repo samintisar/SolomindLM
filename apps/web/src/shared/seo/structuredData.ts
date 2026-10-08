@@ -131,3 +131,37 @@ export const generateBreadcrumbStructuredData = (items: BreadcrumbItem[]) => ({
     item: `${SEO_BASE_URL}${item.path === "/" ? "" : item.path}`,
   })),
 });
+
+export const generateWebApplicationStructuredData = (args: {
+  name: string;
+  description: string;
+  path: string;
+}) => ({
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: args.name,
+  description: args.description,
+  url: `${SEO_BASE_URL}${args.path}`,
+  applicationCategory: "EducationalApplication",
+  operatingSystem: "Any (web browser)",
+  isAccessibleForFree: true,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  provider: { "@type": "Organization", name: "SolomindLM", url: SEO_BASE_URL },
+});
+
+export const generateHowToStructuredData = (args: {
+  name: string;
+  description: string;
+  steps: { name: string; text: string }[];
+}) => ({
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  name: args.name,
+  description: args.description,
+  step: args.steps.map((step, index) => ({
+    "@type": "HowToStep",
+    position: index + 1,
+    name: step.name,
+    text: step.text,
+  })),
+});

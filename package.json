@@ -12,7 +12,8 @@
   },
   "overrides": {
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "katex": "^0.18.11"
   },
   "scripts": {
     "dev": "bun run --elide-lines=0 --filter \"./apps/**\" dev",

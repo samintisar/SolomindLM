@@ -22,6 +22,7 @@ import {
   Telescope,
   Youtube,
 } from "lucide-react";
+import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/features/billing/planFeatures";
 import type { CoverTone, Tone } from "./tone";
 
 /** Nav anchors. `target` is a section id on the home page. */
@@ -262,7 +263,7 @@ export interface Plan {
   featured: boolean;
 }
 
-/** Limits mirror FREE_DAILY_LIMITS / PRO_DAILY_LIMITS (convex/_lib/errors.ts) and BillingPage; change them together. */
+/** Feature lists are built from the backend's limit tables (see billing/planFeatures.ts). */
 export const PLANS: Plan[] = [
   {
     id: "free",
@@ -270,13 +271,7 @@ export const PLANS: Plan[] = [
     description: "Everything you need to try it on a real course.",
     price: { annual: "$0", monthly: "$0" },
     period: { annual: "forever", monthly: "forever" },
-    features: [
-      "5 notebooks, 20 sources each",
-      "10 chat messages a day",
-      "2 flashcard decks, quizzes and reports a day",
-      "2 audio recaps and infographics a day",
-      "2 written-question sets a day",
-    ],
+    features: FREE_PLAN_FEATURES,
     cta: "Start free",
     featured: false,
   },
@@ -286,13 +281,7 @@ export const PLANS: Plan[] = [
     description: "For a full course load, or a thesis.",
     price: { annual: "$7.50", monthly: "$15" },
     period: { annual: "/ month, billed yearly", monthly: "/ month" },
-    features: [
-      "200 notebooks, 200 sources each",
-      "500 chat messages a day",
-      "100 flashcard decks, quizzes and reports a day",
-      "100 audio recaps and infographics a day",
-      "100 written-question sets a day",
-    ],
+    features: PRO_PLAN_FEATURES,
     cta: "Get Pro",
     featured: true,
   },
