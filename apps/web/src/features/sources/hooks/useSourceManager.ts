@@ -1,5 +1,5 @@
 import { type Doc } from "@convex/_generated/dataModel";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
 import { Source } from "@/shared/types/index";
 import { documentToSource } from "@/shared/utils/documentToSource";
@@ -129,13 +129,24 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     [updateDocument, showError]
   );
 
-  return {
-    sources,
-    handleToggleSource,
-    handleToggleAll,
-    handleAddSource,
-    handleDeleteSource,
-    handleDeleteSelectedSources,
-    handleRenameSource,
-  };
+  return useMemo(
+    () => ({
+      sources,
+      handleToggleSource,
+      handleToggleAll,
+      handleAddSource,
+      handleDeleteSource,
+      handleDeleteSelectedSources,
+      handleRenameSource,
+    }),
+    [
+      sources,
+      handleToggleSource,
+      handleToggleAll,
+      handleAddSource,
+      handleDeleteSource,
+      handleDeleteSelectedSources,
+      handleRenameSource,
+    ]
+  );
 }
