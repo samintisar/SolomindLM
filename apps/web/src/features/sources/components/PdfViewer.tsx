@@ -84,9 +84,11 @@ interface PdfViewerProps {
   /** URL of the PDF (signed URL from Convex storage or blob URL) */
   file: string;
   className?: string;
+  /** Page to show once the document loads, e.g. the page a citation points at. */
+  initialPage?: number;
 }
 
-export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) => {
+export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "", initialPage }) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +105,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
   /** Programmatic scroll in progress — do not sync page field from observer (it flickers mid-scroll). */
   const scrollTargetPageRef = useRef<number | null>(null);
   const scrollTargetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Last `initialPage` jumped to, so a re-render doesn't pull the reader back after they scroll. */
+  const jumpedToPageRef = useRef<number | null>(null);
   const pageWidth = BASE_PAGE_WIDTH * zoom;
 
   const getPageSlotRef = useCallback((pageNumber: number): PageSlotRef => {
@@ -136,6 +140,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
     setCurrentPage(1);
     setPageInput("1");
     setShowOutline(false);
+    jumpedToPageRef.current = null;
     scrollTargetPageRef.current = null;
     if (scrollTargetTimeoutRef.current !== null) {
       clearTimeout(scrollTargetTimeoutRef.current);
@@ -280,6 +285,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
     },
     [finishProgrammaticScroll, numPages]
   );
+
+  useEffect(() => {
+    if (!initialPage || numPages < 1 || jumpedToPageRef.current === initialPage) return;
+    jumpedToPageRef.current = initialPage;
+    goToPage(initialPage);
+  }, [initialPage, numPages, goToPage]);
 
   const handleOutlineItemClick = useCallback(
     ({ pageNumber }: { pageNumber?: number }) => {

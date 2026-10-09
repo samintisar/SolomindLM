@@ -183,3 +183,21 @@ describe("PdfViewer page virtualization", () => {
     expect(screen.getByTestId("page-2")).toBeInTheDocument();
   });
 });
+
+describe("PdfViewer initial page", () => {
+  test("scrolls to initialPage once the document loads", async () => {
+    const scrolled: Element[] = [];
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (
+      this: Element
+    ) {
+      scrolled.push(this);
+    });
+
+    render(<PdfViewer file="blob:test.pdf" initialPage={3} />);
+
+    await vi.waitFor(() =>
+      expect(scrolled.map((el) => el.getAttribute("data-page"))).toContain("3")
+    );
+    scroll.mockRestore();
+  });
+});
