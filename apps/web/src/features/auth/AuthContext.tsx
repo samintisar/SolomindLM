@@ -9,6 +9,7 @@ import {
   requestNativeSignOut,
 } from "@/features/auth/nativeShellAuth";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
+import { oauthRedirectTo } from "@/features/auth/utils/oauthRedirectTo";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthContext, AuthContextType, User } from "./useAuth";
 
@@ -105,10 +106,10 @@ function AuthProviderContent({
 function AuthProviderWithConvexAuth({ children }: { children: ReactNode }) {
   const { signIn, signOut: authSignOut } = useAuthActions();
   const signInGoogle = useCallback(async () => {
-    await signIn("google", { redirectTo: "/home" });
+    await signIn("google", { redirectTo: oauthRedirectTo(window.location) });
   }, [signIn]);
   const signInApple = useCallback(async () => {
-    await signIn("apple", { redirectTo: "/home" });
+    await signIn("apple", { redirectTo: oauthRedirectTo(window.location) });
   }, [signIn]);
   return (
     <AuthProviderContent
