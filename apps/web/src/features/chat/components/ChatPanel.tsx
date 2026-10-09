@@ -35,7 +35,13 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
+import {
+  ChatSettings,
+  Message,
+  Note,
+  ReferenceChunk,
+  SourceFocusTarget,
+} from "@/shared/types/index";
 import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
@@ -93,7 +99,7 @@ interface ChatPanelProps {
   notebookCoverColor?: string | null;
   chatSettings?: ChatSettings;
   /** Open a notebook document in the sources panel (citation popover title) */
-  onOpenNotebookSource?: (documentId: string) => void;
+  onOpenNotebookSource?: (documentId: string, focus?: SourceFocusTarget) => void;
   onOpenLiteratureTable?: (tableId: Id<"literatureTables">) => void;
   onOpenLiteratureReport?: (reportId: Id<"literatureReports">) => void;
   onOpenRankedPapers?: (sessionId: Id<"literatureReviewSessions">) => void;
@@ -418,7 +424,11 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
       if (!docId || !onOpenNotebookSource || !sources.some((s) => s.id === docId)) {
         return undefined;
       }
-      return () => onOpenNotebookSource(docId);
+      return () =>
+        onOpenNotebookSource(docId, {
+          quote: reference.content,
+          pageNumber: reference.metadata?.pageNumber ?? null,
+        });
     },
     [onOpenNotebookSource, sources]
   );

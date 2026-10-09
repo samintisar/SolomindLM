@@ -20,6 +20,7 @@ import {
 } from "@/shared/components/ui/collapsible";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { useToast } from "@/shared/contexts/useToast";
+import type { SourceFocusTarget } from "@/shared/types";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useResearchRunEvidence } from "../services/researchApi";
 import {
@@ -48,7 +49,7 @@ interface DeepResearchSourcesSectionProps {
   researchRunId: string;
   answerContent: string;
   notebookId?: string;
-  onOpenNotebookSource?: (documentId: string) => void;
+  onOpenNotebookSource?: (documentId: string, focus?: SourceFocusTarget) => void;
   notebookDocumentIds?: Set<string>;
 }
 
