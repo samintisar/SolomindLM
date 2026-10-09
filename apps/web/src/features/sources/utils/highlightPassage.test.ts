@@ -55,4 +55,29 @@ describe("highlightPassage", () => {
     const root = mount("<p>Something else.</p>");
     expect(highlightPassage(root, "not here at all")).toBe(false);
   });
+
+  it("skips KaTeX's duplicated formula text", () => {
+    const registry = new Map<string, unknown>();
+    vi.stubGlobal("CSS", { highlights: registry });
+    vi.stubGlobal(
+      "Highlight",
+      class {
+        ranges: Range[];
+        constructor(...ranges: Range[]) {
+          this.ranges = ranges;
+        }
+      }
+    );
+    const root = mount(
+      '<p>Let <span class="katex"><span class="katex-mathml">a1</span><span class="katex-html">a1</span></span> be given so the function grows quickly here and there.</p>'
+    );
+
+    expect(
+      highlightPassage(root, "Let $a_1$ be given so the function grows quickly here and there.")
+    ).toBe(true);
+
+    const text = (registry.get(PASSAGE_HIGHLIGHT) as { ranges: Range[] }).ranges[0].toString();
+    expect(text.startsWith("Let")).toBe(true);
+    expect(text.endsWith("there")).toBe(true);
+  });
 });

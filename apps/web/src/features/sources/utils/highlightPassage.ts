@@ -10,7 +10,11 @@ function highlightRegistry(): HighlightRegistry | null {
 }
 
 function textSegments(root: Element): TextSegment<Text>[] {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  // KaTeX renders each formula three times (hidden MathML, its TeX source, aria-hidden HTML): skip them all.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      node.parentElement?.closest(".katex") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
   const segments: TextSegment<Text>[] = [];
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     segments.push({ node: node as Text, text: node.textContent ?? "" });

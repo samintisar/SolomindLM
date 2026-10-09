@@ -343,7 +343,6 @@
   /* Cited passage opened from a citation (sources/utils/highlightPassage.ts). */
   ::highlight(source-passage) {
     background-color: var(--warning-muted);
-    color: inherit;
   }
 }
 

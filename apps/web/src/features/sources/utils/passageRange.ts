@@ -4,7 +4,7 @@ export interface TextSegment<N> {
   text: string;
 }
 
-export interface PassagePoint<N> {
+interface PassagePoint<N> {
   node: N;
   offset: number;
 }
@@ -36,9 +36,29 @@ function wordsOf<N>(segments: readonly TextSegment<N>[]): Word<N>[] {
   return words;
 }
 
-/** The quote's words as a reader sees them: link targets and HTML tags dropped. */
+const ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&nbsp;": " ",
+};
+
+/**
+ * The quote's words as a reader sees them: images, maths (rendered apart from the prose), link targets and
+ * HTML tags dropped, common entities decoded.
+ */
 function quoteWords(quote: string): string[] {
-  const visible = quote.replace(/\]\([^)]*\)/g, "]").replace(/<[^>]+>/g, " ");
+  const visible = quote
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\$\$[\s\S]*?\$\$/g, " ")
+    .replace(/\$(?=\S)[^$\n]+?(?<=\S)\$/g, " ")
+    .replace(/\\\([\s\S]*?\\\)/g, " ")
+    .replace(/\\\[[\s\S]*?\\\]/g, " ")
+    .replace(/\]\([^)]*\)/g, "]")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (entity) => ENTITIES[entity] ?? entity);
   return Array.from(visible.matchAll(WORD), (m) => m[0].toLowerCase());
 }
 
@@ -73,21 +93,38 @@ export function findPassageRange<N>(
   for (let offset = 0; offset + k <= q.length; offset += k) windowOffsets.push(offset);
   if (windowOffsets[windowOffsets.length - 1] !== q.length - k) windowOffsets.push(q.length - k);
 
-  let startIdx = -1;
-  let skipped = 0;
+  // Each window, each place it occurs. An occurrence is confirmed when the quote's ending follows it; of
+  // those, the one with the ending nearest wins, so a repeated header or footer ahead of the passage
+  // (whose ending is also within reach) can't claim the start.
+  let fallback: { startIdx: number; remaining: number } | null = null;
+  let confirmed: { startIdx: number; endIdx: number; span: number } | null = null;
   for (const offset of windowOffsets) {
-    startIdx = indexOfRun(words, q.slice(offset, offset + k), 0, words.length);
-    if (startIdx !== -1) {
-      skipped = offset;
-      break;
+    const window = q.slice(offset, offset + k);
+    const remaining = q.length - offset;
+    for (
+      let at = indexOfRun(words, window, 0, words.length);
+      at !== -1;
+      at = indexOfRun(words, window, at + 1, words.length)
+    ) {
+      fallback ??= { startIdx: at, remaining };
+      const endRun = indexOfRun(words, q.slice(q.length - k), at, at + remaining * 2 + k);
+      if (endRun !== -1 && (!confirmed || endRun - at < confirmed.span)) {
+        confirmed = { startIdx: at, endIdx: endRun + k - 1, span: endRun - at };
+      }
     }
+    if (confirmed) break;
   }
-  if (startIdx === -1) return null;
 
-  const remaining = q.length - skipped;
-  const endRun = indexOfRun(words, q.slice(q.length - k), startIdx, startIdx + remaining * 2 + k);
-  const endIdx =
-    endRun !== -1 ? endRun + k - 1 : Math.min(startIdx + remaining - 1, words.length - 1);
+  let startIdx: number;
+  let endIdx: number;
+  if (confirmed) {
+    ({ startIdx, endIdx } = confirmed);
+  } else if (fallback) {
+    startIdx = fallback.startIdx;
+    endIdx = Math.min(startIdx + fallback.remaining - 1, words.length - 1);
+  } else {
+    return null;
+  }
 
   const first = words[startIdx];
   const last = words[endIdx];

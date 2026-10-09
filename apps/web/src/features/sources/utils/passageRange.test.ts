@@ -50,4 +50,40 @@ describe("findPassageRange", () => {
     expect(findPassageRange([], "anything")).toBeNull();
     expect(findPassageRange([{ node: "a", text: "Some text" }], "  ** ")).toBeNull();
   });
+
+  it("starts at the occurrence whose ending is also on the page when the opening repeats", () => {
+    const text =
+      "Journal of Machine Learning Research 23. Intro text here. Journal of Machine Learning Research 23 shows that retrieval improves factual answers a lot.";
+    const quote =
+      "Journal of Machine Learning Research 23 shows that retrieval improves factual answers a lot.";
+    expect(findPassageRange([{ node: "a", text }], quote)).toEqual({
+      start: { node: "a", offset: text.lastIndexOf("Journal") },
+      end: { node: "a", offset: text.lastIndexOf("lot") + "lot".length },
+    });
+  });
+
+  it("ignores maths in the quote, which the page renders separately", () => {
+    const text = "Let  be given so  then the function f grows quickly here";
+    const quote = "Let $a_1$ be given so $c^3 = d$ then the function f grows quickly here";
+    expect(findPassageRange([{ node: "a", text }], quote)).toEqual({
+      start: { node: "a", offset: 0 },
+      end: { node: "a", offset: text.length },
+    });
+    const display =
+      "Let $$a_1 + b$$ be given so \\(c\\) then \\[d\\] the function f grows quickly here";
+    expect(findPassageRange([{ node: "a", text }], display)).toEqual({
+      start: { node: "a", offset: 0 },
+      end: { node: "a", offset: text.length },
+    });
+  });
+
+  it("drops images and decodes entities in the quote", () => {
+    const text = "Smith & Jones found that rates rose sharply in 2020 overall";
+    const quote =
+      "![chart](https://example.org/c.png) Smith &amp; Jones found that rates rose sharply in 2020 overall";
+    expect(findPassageRange([{ node: "a", text }], quote)).toEqual({
+      start: { node: "a", offset: 0 },
+      end: { node: "a", offset: text.length },
+    });
+  });
 });
