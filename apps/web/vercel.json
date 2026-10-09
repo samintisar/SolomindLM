@@ -14,6 +14,14 @@
     }
   ],
   "routes": [
+    {
+      "src": "/pricing\\.md",
+      "headers": {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Link": "<https://www.solomindlm.com/pricing>; rel=\"canonical\""
+      },
+      "continue": true
+    },
     { "handle": "filesystem" },
     {
       "src": "/api/(.*)",

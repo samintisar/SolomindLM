@@ -2,12 +2,14 @@ import { getClusterHubPageByPath } from "@/features/landing/clusterHubPages";
 import { HOME_RESOURCE_LINKS } from "@/features/landing/constants";
 import { LANDING_FAQS } from "@/features/landing/faqRegistry";
 import { getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
+import { PRICING_PATH } from "@/features/landing/pricingPageContent";
 import { getSeoContentPageByPath } from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
 import { getToolPageByPath } from "@/features/tools/toolPages";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
+import { buildPricingPrerenderBody } from "./pricingPrerenderHtml";
 import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
 import { buildSeoContentPrerenderBody } from "./seoContentPrerenderHtml";
 import { escapeHtml } from "./seoHtml";
@@ -93,6 +95,9 @@ export function buildPublicSeoPrerenderBody(path: string): string | undefined {
   }
   if (path === "/faq") {
     return pinLightTheme(buildFaqPrerenderBody());
+  }
+  if (path === PRICING_PATH) {
+    return pinLightTheme(buildPricingPrerenderBody());
   }
 
   const hubPage = getClusterHubPageByPath(path);

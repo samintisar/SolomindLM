@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
 import { LANDING_FAQS } from "@/features/landing/faqRegistry";
 import {
   getIntentBreadcrumbItems,
@@ -69,6 +70,12 @@ describe("generateSoftwareApplicationStructuredData", () => {
 
     expect(data["@type"]).toBe("SoftwareApplication");
     expect(data.offers).toHaveLength(3);
+    // Prices come from billing/planPricing.ts, the same source as the pricing cards.
+    expect(data.offers.map((offer) => offer.price)).toEqual([
+      "0",
+      PRO_YEARLY_PER_MONTH_USD.toFixed(2),
+      String(PRO_PRICE_USD.monthly),
+    ]);
     expect(data.offers[0]).toMatchObject({
       "@type": "Offer",
       name: "Free",

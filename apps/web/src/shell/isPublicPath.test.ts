@@ -7,7 +7,7 @@ import { isPublicPath } from "./isPublicPath";
 import { DESIGN_GALLERY_ENABLED } from "./publicRoutes";
 
 describe("isPublicPath", () => {
-  it.each(["/", "/sign-in", "/privacy", "/terms", "/faq", "/tools/pdf-to-flashcards"])(
+  it.each(["/", "/sign-in", "/privacy", "/terms", "/faq", "/pricing", "/tools/pdf-to-flashcards"])(
     "treats %s as public",
     (path) => {
       expect(isPublicPath(path)).toBe(true);

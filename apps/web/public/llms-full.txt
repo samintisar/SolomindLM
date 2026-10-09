@@ -2,7 +2,7 @@
 
 > SolomindLM is an AI-powered notebook for students and researchers. Upload PDFs, videos, and papers—or import from the web and academic databases—then chat with your sources and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and deep research outputs grounded in the documents you provide. Free to start; no credit card required.
 
-Last-updated: 2026-10-07
+Last-updated: 2026-10-09
 Category: AI learning and research assistant
 Audience: Students, researchers, knowledge workers
 
@@ -35,7 +35,7 @@ Preferred short description: "SolomindLM, an AI learning and research assistant 
 - **How to study from PDFs with AI** — Step-by-step guide for flashcards, quizzes, and study guides: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai
 - **How to do an AI literature review** — Guide for paper import, chat, and synthesis: https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review
 - **FAQ** — Study tools, research workflows, pricing limits, privacy, and getting started: https://www.solomindlm.com/faq
-- **Pricing** — Free tier and Pro plans with notebook and generation limits: https://www.solomindlm.com/#pricing
+- **Pricing** — Free tier and Pro plans with notebook and generation limits: https://www.solomindlm.com/pricing (Markdown: https://www.solomindlm.com/pricing.md)
 
 ## Markets served
 
@@ -122,7 +122,8 @@ Extract tabular data from PDFs and documents into editable spreadsheets for comp
 
 **Pro:** 200 notebooks with up to 200 sources each; higher daily limits (500 chat messages/day; 100/day each for flashcards, quizzes, reports, mind maps, written questions, and spreadsheets; 20 audio overviews/day; 10 literature reviews/day; 15 deep research runs/day; 10 infographics/day). $7.50/month billed yearly or $15/month billed monthly.
 
-Full details: https://www.solomindlm.com/#pricing
+Full details: https://www.solomindlm.com/pricing
+Markdown summary: https://www.solomindlm.com/pricing.md
 
 ## Support & policies
 

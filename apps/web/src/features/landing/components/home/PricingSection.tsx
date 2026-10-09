@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { useState } from "react";
+import { PRO_YEARLY_SAVINGS_PERCENT } from "@/features/billing/planPricing";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
@@ -86,7 +87,7 @@ export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
                 <TabsTrigger value="annual">Annual</TabsTrigger>
                 <TabsTrigger value="monthly">Monthly</TabsTrigger>
               </TabsList>
-              <Badge variant="success">Save 50%</Badge>
+              <Badge variant="success">Save {PRO_YEARLY_SAVINGS_PERCENT}%</Badge>
             </div>
             {BILLING_PERIODS.map((period) => (
               <TabsContent key={period} value={period} className="mt-8 w-full">

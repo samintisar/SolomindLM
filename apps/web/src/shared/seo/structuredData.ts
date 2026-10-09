@@ -1,4 +1,10 @@
+import { PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
 import { SEO_BASE_URL, SEO_DEFAULT_DESCRIPTION, SEO_DEFAULT_OG_IMAGE } from "./seoConstants";
+
+/** schema.org prices are plain decimals: 0 → "0", 15 → "15", 7.5 → "7.50". */
+function schemaPrice(amount: number): string {
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
 
 export const generateFAQStructuredData = (faqs: Array<{ question: string; answer: string }>) => ({
   "@context": "https://schema.org",
@@ -54,7 +60,7 @@ export const generateSoftwareApplicationStructuredData = () => ({
     {
       "@type": "Offer",
       name: "Pro (annual billing)",
-      price: "7.50",
+      price: schemaPrice(PRO_YEARLY_PER_MONTH_USD),
       priceCurrency: "USD",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
@@ -65,7 +71,7 @@ export const generateSoftwareApplicationStructuredData = () => ({
     {
       "@type": "Offer",
       name: "Pro (monthly billing)",
-      price: "15",
+      price: schemaPrice(PRO_PRICE_USD.monthly),
       priceCurrency: "USD",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
