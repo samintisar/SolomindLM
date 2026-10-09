@@ -9,7 +9,8 @@ violations but block nothing.
 `{ "src": "/(.*)", "headers": {...}, "continue": true }`, ahead of `{ "handle": "filesystem" }`.
 Vercel ignores top-level `headers`, `redirects`, `rewrites`, `cleanUrls` and `trailingSlash` when
 `routes` is present, without failing the build. Until October 2026 the headers sat in a top-level
-`headers` block and never reached production.
+`headers` block and never reached production. The apex → `www` redirect is a domain redirect in the Vercel project
+settings (it keeps the path and query), not a `vercel.json` rule.
 
 ## What guards it
 
@@ -17,7 +18,7 @@ Vercel ignores top-level `headers`, `redirects`, `rewrites`, `cleanUrls` and `tr
 | --- | --- | --- |
 | Static check | `apps/web/src/shared/security/csp.test.ts` (`test:web`) | Headers declared where Vercel ignores them (a top-level `headers`/`redirects`/`rewrites` next to `routes`, or a headers route after `handle: filesystem`), `nosniff`/`DENY` removed, policy removed or loosened (`'unsafe-inline'`/`'unsafe-eval'` in `script-src`, bare `*`), inline `<script>` in `index.html`, an `index.html` script origin missing from `script-src`, `report-uri` pointing at a route that doesn't exist |
 | Browser smoke test | `e2e/csp/csp.spec.ts` (`bun run test:csp`, CI job **CSP smoke test**) | Any `securitypolicyviolation` on `/`, `/sign-in`, `/faq`, `/privacy`, including secondary requests such as GA4 collect calls |
-| Deployed headers | `e2e/csp/check-deployed-headers.ts` (`bun run test:deployed-headers <url>`, workflow **Deployed headers** on every Vercel `deployment_status`) | A deployment that doesn't send the `vercel.json` headers on `/`, `/faq`, an SEO page, an SPA route or a static file, or an unknown path that stops returning 404. Needs the `VERCEL_AUTOMATION_BYPASS_SECRET` repo secret for protected previews; advisory, not a required check |
+| Deployed headers | `e2e/csp/check-deployed-headers.ts` (`bun run test:deployed-headers <url>`, workflow **Deployed headers** on every Vercel `deployment_status`) | A deployment that doesn't send the `vercel.json` headers on `/`, `/faq`, an SEO page, an SPA route or a static file, or an unknown path that stops returning 404. Production is checked on `www.solomindlm.com` with no secret; previews need `VERCEL_AUTOMATION_BYPASS_SECRET` as a secret of the `vercel-preview-bypass` GitHub Environment (not a repo secret). Advisory, not a required check |
 | Production reports | `POST /api/csp-report` in `convex/http.ts` | Violations on pages and flows the tests don't cover (signed-in app, Google Drive Picker, audio, YouTube embeds) |
 
 The smoke test serves the built app with the headers from `vercel.json` (`e2e/csp/serve-dist.ts`),

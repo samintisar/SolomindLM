@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+// Shared with the CSP smoke server and the deployed-headers check, so all three agree on
+// which route carries the headers.
+import { isGlobalHeadersRoute, type VercelRoute } from "../../../../../e2e/csp/vercelHeaders";
 
 /**
  * Static guard for the security headers in apps/web/vercel.json.
@@ -13,16 +16,9 @@ import { describe, expect, it } from "vitest";
  * the headers a real deployment sends.
  */
 
-type Route = {
-  src?: string;
-  handle?: string;
-  headers?: Record<string, string>;
-  continue?: boolean;
-};
-
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const vercelConfig = JSON.parse(readFileSync(path.join(webRoot, "vercel.json"), "utf-8")) as {
-  routes?: Route[];
+  routes?: VercelRoute[];
 } & Record<string, unknown>;
 const indexHtml = readFileSync(path.join(webRoot, "index.html"), "utf-8");
 const routes = vercelConfig.routes ?? [];
@@ -33,10 +29,7 @@ const CSP_HEADERS = ["content-security-policy", "content-security-policy-report-
 // error, which is how the security headers went missing in production.
 const ROUTE_ONLY_CONFLICTS = ["headers", "redirects", "rewrites", "cleanUrls", "trailingSlash"];
 
-/** The catch-all `continue: true` route that adds headers to every response. */
-const headersRouteIndex = routes.findIndex(
-  (route) => route.src === "/(.*)" && route.continue === true && route.headers
-);
+const headersRouteIndex = routes.findIndex(isGlobalHeadersRoute);
 const globalHeaders = Object.fromEntries(
   Object.entries(routes[headersRouteIndex]?.headers ?? {}).map(([key, value]) => [
     key.toLowerCase(),
@@ -76,6 +69,9 @@ describe("vercel.json security headers", () => {
       headersRouteIndex,
       'add { "src": "/(.*)", "headers": {...}, "continue": true }'
     ).toBeGreaterThanOrEqual(0);
+    expect(filesystemIndex, 'vercel.json needs { "handle": "filesystem" }').toBeGreaterThanOrEqual(
+      0
+    );
     // Routes after `handle: filesystem` never run for static files (/, /faq, /assets/*).
     expect(headersRouteIndex).toBeLessThan(filesystemIndex);
   });

@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import { vercelGlobalHeaders } from "./vercelHeaders";
+import { vercelGlobalHeaders, vercelRoutes } from "./vercelHeaders";
 
 const repoRoot = process.cwd();
 const distDir = path.resolve(repoRoot, "apps/web/dist");
@@ -19,7 +19,16 @@ if (!existsSync(path.join(distDir, "index.html"))) {
   process.exit(1);
 }
 
-const globalHeaders = vercelGlobalHeaders(path.resolve(repoRoot, "apps/web/vercel.json"));
+const vercelJson = path.resolve(repoRoot, "apps/web/vercel.json");
+const globalHeaders = vercelGlobalHeaders(vercelJson);
+
+// After `handle: filesystem`, vercel.json sends the SPA routes to /index.html and everything
+// else to 404.html with status 404. Vercel anchors each `src` pattern.
+const routes = vercelRoutes(vercelJson);
+const spaRoutes = routes
+  .slice(routes.findIndex((route) => route.handle === "filesystem") + 1)
+  .filter((route) => route.src && route.dest === "/index.html")
+  .map((route) => new RegExp(`^${route.src}$`));
 
 const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -37,17 +46,20 @@ const contentTypes: Record<string, string> = {
   ".wasm": "application/wasm",
 };
 
-function resolveFile(urlPath: string): string | null {
+function resolveFile(urlPath: string): { file: string; status: number } | null {
   const decoded = decodeURIComponent(urlPath.split("?")[0] ?? "/");
   const candidate = path.join(distDir, decoded);
   // Block path traversal out of dist.
   if (!candidate.startsWith(distDir)) return null;
-  if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+  if (existsSync(candidate) && statSync(candidate).isFile())
+    return { file: candidate, status: 200 };
   const asIndex = path.join(candidate, "index.html");
-  if (existsSync(asIndex)) return asIndex;
-  // SPA fallback for extension-less client routes (/sign-in, /notebook/:id, ...).
-  if (!path.extname(decoded)) return path.join(distDir, "index.html");
-  return null;
+  if (existsSync(asIndex)) return { file: asIndex, status: 200 };
+  if (spaRoutes.some((route) => route.test(decoded))) {
+    return { file: path.join(distDir, "index.html"), status: 200 };
+  }
+  const notFound = path.join(distDir, "404.html");
+  return existsSync(notFound) ? { file: notFound, status: 404 } : null;
 }
 
 createServer((req, res) => {
@@ -57,17 +69,17 @@ createServer((req, res) => {
     res.end();
     return;
   }
-  const file = resolveFile(req.url ?? "/");
-  if (!file) {
+  const resolved = resolveFile(req.url ?? "/");
+  if (!resolved) {
     res.writeHead(404, globalHeaders);
     res.end("Not found");
     return;
   }
-  res.writeHead(200, {
+  res.writeHead(resolved.status, {
     ...globalHeaders,
-    "Content-Type": contentTypes[path.extname(file)] ?? "application/octet-stream",
+    "Content-Type": contentTypes[path.extname(resolved.file)] ?? "application/octet-stream",
   });
-  res.end(readFileSync(file));
+  res.end(readFileSync(resolved.file));
 }).listen(port, () => {
   console.log(`[serve-dist] http://localhost:${port} (headers from apps/web/vercel.json)`);
 });

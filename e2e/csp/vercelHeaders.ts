@@ -1,7 +1,25 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-type Route = { src?: string; headers?: Record<string, string>; continue?: boolean };
+export type VercelRoute = {
+  src?: string;
+  dest?: string;
+  status?: number;
+  handle?: string;
+  headers?: Record<string, string>;
+  continue?: boolean;
+};
+
+/** The catch-all `continue: true` route that adds headers to every response. */
+export function isGlobalHeadersRoute(route: VercelRoute): boolean {
+  return route.src === "/(.*)" && route.continue === true && route.headers !== undefined;
+}
+
+/** The `routes` array of a vercel.json. Only parses the file, never executes it. */
+export function vercelRoutes(configPath: string): VercelRoute[] {
+  const config = JSON.parse(readFileSync(configPath, "utf-8")) as { routes?: VercelRoute[] };
+  return config.routes ?? [];
+}
 
 /**
  * The headers apps/web/vercel.json adds to every response: the catch-all `continue: true`
@@ -13,9 +31,5 @@ type Route = { src?: string; headers?: Record<string, string>; continue?: boolea
 export function vercelGlobalHeaders(
   configPath = path.resolve(process.cwd(), "apps/web/vercel.json")
 ): Record<string, string> {
-  const config = JSON.parse(readFileSync(configPath, "utf-8")) as { routes?: Route[] };
-  const route = (config.routes ?? []).find(
-    (entry) => entry.src === "/(.*)" && entry.continue === true && entry.headers
-  );
-  return { ...route?.headers };
+  return { ...vercelRoutes(configPath).find(isGlobalHeadersRoute)?.headers };
 }

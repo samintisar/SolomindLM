@@ -15,12 +15,6 @@
       },
       "continue": true
     },
-    {
-      "src": "/(.*)",
-      "has": [{ "type": "host", "value": "solomindlm.com" }],
-      "status": 308,
-      "headers": { "Location": "https://www.solomindlm.com/$1" }
-    },
     { "handle": "filesystem" },
     {
       "src": "/api/(.*)",

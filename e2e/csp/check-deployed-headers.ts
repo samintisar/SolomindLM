@@ -23,6 +23,8 @@ const DEPLOYMENT_HOSTS = [
   /^solomindlm-(?:web-)?[a-z0-9-]+-samintisars-projects\.vercel\.app$/,
 ];
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 const CHECKS: { path: string; status: number }[] = [
   { path: "/", status: 200 },
   { path: "/faq", status: 200 },
@@ -61,7 +63,18 @@ const requestHeaders: Record<string, string> = bypass
 const failures: string[] = [];
 for (const { path, status } of CHECKS) {
   const url = new URL(path, baseUrl);
-  const response = await fetch(url, { headers: requestHeaders, redirect: "manual" });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: requestHeaders,
+      redirect: "manual",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (error) {
+    console.log(`FAIL --- ${path}`);
+    failures.push(`${path}: request failed (${error instanceof Error ? error.message : error})`);
+    continue;
+  }
   await response.body?.cancel();
   const problems: string[] = [];
   if (response.status !== status) problems.push(`status ${response.status}, expected ${status}`);
