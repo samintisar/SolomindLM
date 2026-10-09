@@ -17,11 +17,11 @@ import { formatFlashcardsAsText } from "./formatFlashcards.js";
 import {
   ANSWER_NOT_ON_FRONT_RULES,
   COLLAPSE_SYSTEM_PROMPT,
+  type Flashcard,
   FlashcardArraySchema,
   type FlashcardResponse,
   REDUCE_SYSTEM_PROMPT,
 } from "./prompts.js";
-import type { Flashcard } from "./state.js";
 import { createStructuredLLM } from "./structuredLlm.js";
 
 export interface CollapseReduceDeps {

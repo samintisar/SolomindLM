@@ -1,4 +1,12 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+
+/**
+ * The home "My notebooks" section. Scope title lookups to it: the customize dialog's preview
+ * card shows the title being typed too.
+ */
+export function myNotebooks(page: Page): Locator {
+  return page.getByRole("region", { name: "My notebooks" });
+}
 
 /**
  * Delete a notebook from the home "My Notebooks" grid/list via the card actions menu
@@ -19,7 +27,7 @@ export async function deleteNotebookByTitleFromHome(page: Page, title: string): 
     .getByRole("heading", { name: "My Notebooks" })
     .waitFor({ state: "visible", timeout: 20_000 });
 
-  const titleEl = page.getByText(title, { exact: true }).first();
+  const titleEl = myNotebooks(page).getByText(title, { exact: true }).first();
   const visible = await titleEl.isVisible({ timeout: 12_000 }).catch(() => false);
   if (!visible) {
     return;

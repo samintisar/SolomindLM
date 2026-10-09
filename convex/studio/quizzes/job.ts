@@ -24,7 +24,6 @@ export const quizGeneration = internalAction({
     focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runQuizGenerationPhase(ctx, args);
   },
 });
@@ -43,7 +42,6 @@ export const processQuizMapChunk = internalAction({
     focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessQuizMapChunkPhase(ctx, args);
   },
 });
@@ -58,7 +56,6 @@ export const finalizeQuizPhase = internalAction({
     focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeQuizPhase(ctx, args);
   },
 });

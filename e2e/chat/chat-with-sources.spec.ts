@@ -8,8 +8,7 @@ import {
 } from "../helpers/chat-assertions";
 import {
   addPasteTextSource,
-  PASTED_TEXT_TITLE,
-  selectSource,
+  getSourceCheckbox,
   waitForSourceStatus,
 } from "../helpers/source-assertions";
 
@@ -23,12 +22,11 @@ test.describe("Chat With Sources", () => {
 
     // Add a paste-text source
     const sourceText = `E2E Chat Source ${Date.now()}: Photosynthesis is the process by which green plants convert sunlight into chemical energy. This process occurs in chloroplasts and produces glucose and oxygen from carbon dioxide and water.`;
-    await addPasteTextSource(page, sourceText);
-    // List title is the default "Pasted Text", not the full pasted body (see paste-text.spec.ts)
-    await waitForSourceStatus(page, PASTED_TEXT_TITLE, "completed", 180_000);
+    const title = await addPasteTextSource(page, sourceText);
+    await waitForSourceStatus(page, title, "completed", 180_000);
 
-    // Select the source
-    await selectSource(page, PASTED_TEXT_TITLE);
+    // New sources start selected, so leave the checkbox alone (clicking it would deselect)
+    await expect(getSourceCheckbox(page, title)).toBeChecked();
 
     // Send a question about the source content
     await sendMessage(page, "What is photosynthesis?");

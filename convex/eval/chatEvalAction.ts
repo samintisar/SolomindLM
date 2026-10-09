@@ -17,6 +17,7 @@ import { v } from "convex/values";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
+import type { ReferenceChunk } from "../_agents/chat/types";
 import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
@@ -29,7 +30,6 @@ import {
   createFetchDocumentFn,
   createRerankFn,
 } from "../chat/_streamSearch";
-import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
 import { buildChatEvalTelemetry } from "./chatEvalTelemetry";
 import { createRetrieveClock } from "./retrieveClock";

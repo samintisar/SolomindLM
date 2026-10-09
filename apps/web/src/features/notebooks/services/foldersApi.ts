@@ -1,5 +1,4 @@
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback, useMemo } from "react";
 
@@ -23,35 +22,10 @@ export function useFolderNotebooks(folderId: string | null) {
 }
 
 /**
- * Create a new folder with optimistic update
+ * Create a new folder. No optimistic insert, for the same reason as `useCreateNotebook`.
  */
 export function useCreateFolder() {
-  const createMutation = useMutation(api.folders.index.create);
-  const create = useMemo(
-    () =>
-      createMutation.withOptimisticUpdate((localStore, args) => {
-        const tempId = `temp-${Date.now()}` as Id<"folders">;
-        const now = Date.now();
-
-        const newFolder = {
-          id: tempId,
-          name: args.name,
-          description: args.description,
-          color: args.color,
-          icon: args.icon,
-          created_at: now,
-          updated_at: now,
-          notebookCount: 0,
-        };
-
-        // Optimistically add to list
-        const folders = localStore.getQuery(api.folders.index.list);
-        if (folders) {
-          localStore.setQuery(api.folders.index.list, {}, [...folders, newFolder]);
-        }
-      }),
-    [createMutation]
-  );
+  const create = useMutation(api.folders.index.create);
 
   return useCallback(
     async (data: { name: string; description?: string; color?: string; icon?: string }) => {

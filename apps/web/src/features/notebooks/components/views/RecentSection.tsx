@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { FolderItem, NotebookItem } from "@/shared/types/index";
 import { FolderCard } from "../cards/FolderCard";
 import { NotebookCard } from "../cards/NotebookCard";
@@ -25,10 +26,13 @@ export function RecentSection(props: RecentSectionProps) {
   const { folders, viewMode } = props;
   // Notebooks inside a folder show in that folder, not on the home grid.
   const notebooks = props.recentNotebooks.filter((nb) => !nb.folderId);
+  const headingId = useId();
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="font-display text-lg font-semibold text-foreground">My notebooks</h2>
+    <section aria-labelledby={headingId} className="flex flex-col gap-4">
+      <h2 id={headingId} className="font-display text-lg font-semibold text-foreground">
+        My notebooks
+      </h2>
       {props.isLoading ? (
         <GridSkeleton />
       ) : folders.length === 0 && notebooks.length === 0 ? (

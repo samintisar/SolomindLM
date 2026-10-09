@@ -161,14 +161,3 @@ export async function removeNotebookWithRelated(
   }
   await deleteNotebook(ctx, notebookId);
 }
-
-export async function getReportsByNotebook(
-  ctx: QueryCtx,
-  notebookId: Id<"notebooks">
-): Promise<Doc<"reports">[]> {
-  return await ctx.db
-    .query("reports")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-    .order("desc")
-    .collect();
-}

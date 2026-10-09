@@ -100,7 +100,7 @@ interface ChatPanelProps {
   onOpenScreeningDecisions?: (sessionId: Id<"literatureReviewSessions">) => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({
+const ChatPanelContent: React.FC<ChatPanelProps> = ({
   isLeftOpen,
   isRightOpen,
   toggleLeft,
@@ -988,3 +988,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     </>
   );
 };
+
+/**
+ * Memoized so a NotebookView re-render with unchanged props skips it. It still re-renders on
+ * each streamed frame through `useChatStreamingContext`, which carries the message list.
+ */
+export const ChatPanel = React.memo(ChatPanelContent);

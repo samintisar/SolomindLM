@@ -17,7 +17,7 @@ vi.mock("@/features/sources/useSourcesContext", () => ({
 }));
 vi.mock("@/features/studio/useStudioContext", () => ({ useStudioContext: () => ({ notes: [] }) }));
 vi.mock("@/features/chat/useChatStreaming", () => ({
-  useChatStreamingContext: () => ({
+  useChatSessionContext: () => ({
     onSendMessage: vi.fn(),
     isChatStreaming: false,
     remoteGenerationBlocksSend: false,

@@ -41,23 +41,6 @@ export const saveReportResults = internalMutation({
   },
 });
 
-export const updateReportTitle = internalMutation({
-  args: {
-    reportId: v.id("reports"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const report = await ctx.db.get(args.reportId);
-    if (!report) return null;
-
-    await ctx.db.patch(args.reportId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-    return args.reportId;
-  },
-});
-
 export const updateReportStatus = internalMutation({
   args: {
     reportId: v.id("reports"),

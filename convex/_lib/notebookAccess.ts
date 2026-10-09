@@ -85,7 +85,3 @@ export async function assertNotebookOwner(
   }
   return notebook;
 }
-
-export function isNotebookOwner(notebook: Doc<"notebooks">, userId: Id<"users">): boolean {
-  return notebook.userId === userId;
-}

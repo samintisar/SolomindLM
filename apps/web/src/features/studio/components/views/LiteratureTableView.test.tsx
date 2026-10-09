@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -110,14 +110,80 @@ describe("LiteratureTableView", () => {
     const user = userEvent.setup();
     renderTable();
     const toggle = screen.getByRole("button", { name: "Manage columns" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
     await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByRole("complementary", { name: "Manage Columns" })).not.toBeInTheDocument();
+  });
+
+  it("opens the column manager on mount only when it fits beside the table", () => {
+    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);
+    try {
+      renderTable();
+      expect(screen.getByRole("button", { name: "Manage columns" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      );
+      expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+    } finally {
+      clientWidth.mockRestore();
+    }
+  });
+
+  it("closes the column manager when the panel narrows below the side-by-side width", () => {
+    let width = 1200;
+    const clientWidth = vi
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockImplementation(() => width);
+    const resizeCallbacks: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resizeCallbacks.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    try {
+      renderTable();
+      expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+      width = 500;
+      act(() => {
+        for (const callback of resizeCallbacks) callback();
+      });
+      expect(
+        screen.queryByRole("complementary", { name: "Manage Columns" })
+      ).not.toBeInTheDocument();
+    } finally {
+      clientWidth.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("over a narrow table, the column manager takes focus, hides the table and closes on Escape", async () => {
+    const user = userEvent.setup();
+    renderTable();
+    const toggle = screen.getByRole("button", { name: "Manage columns" });
     await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("complementary", { name: "Manage Columns" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close column manager" })).toHaveFocus();
+    expect(screen.getByRole("table").closest("[inert]")).not.toBeNull();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("complementary", { name: "Manage Columns" })).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+  });
+
+  it("keeps one toolbar on phones: Back to Studio leads it and the title shows once", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    renderTable({ onBack });
+    expect(screen.getAllByText(TABLE.title)).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Back to Studio" }));
+    expect(onBack).toHaveBeenCalledOnce();
   });
 
   it("disables Save while saving, under the name Saving table", () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { test as authTest, expect as expectAuth } from "../fixtures/auth.fixture";
 import { expect, test } from "../fixtures/notebook.fixture";
-import { tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
+import { myNotebooks, tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
 import { expectDialogAboveOnboarding } from "../helpers/onboarding-assertions";
 
 test.describe("Onboarding UI", () => {
@@ -29,7 +29,9 @@ authTest.describe("Onboarding UI (home)", () => {
     await page.getByRole("button", { name: "New notebook" }).first().click();
     await page.getByPlaceholder("Notebook title").fill(title);
     await page.getByRole("button", { name: "Create" }).click();
-    await expectAuth(page.getByText(title, { exact: true })).toBeVisible({ timeout: 45_000 });
+    await expectAuth(myNotebooks(page).getByText(title, { exact: true })).toBeVisible({
+      timeout: 45_000,
+    });
 
     const card = page.locator('[data-slot="card"]', { hasText: title });
     await card.getByRole("button", { name: "Notebook actions" }).click();
