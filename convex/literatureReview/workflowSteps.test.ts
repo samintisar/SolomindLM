@@ -96,6 +96,52 @@ describe("dedupePapers", () => {
     expect(result).toHaveLength(1);
   });
 
+  it("merges a copy with a DOI and a copy without one by title and first author", () => {
+    // e.g. a citation-index record and an arXiv record of the same paper.
+    const papers = [
+      { title: "Paper A: A Framework", authors: ["Saad-Falcon, Jon"], score: 0.5 },
+      {
+        title: "Paper A: A Framework",
+        authors: ["Jon Saad-Falcon", "Omar Khattab"],
+        doi: "10.48550/arXiv.2311.09476",
+        score: 0.8,
+        citationCount: 442,
+      },
+    ];
+
+    const result = dedupePapers(papers as any) as any[];
+
+    expect(result).toHaveLength(1);
+    expect(result[0].citationCount).toBe(442);
+  });
+
+  it("merges a preprint and its published version despite different DOIs", () => {
+    const papers = [
+      { title: "Paper A", authors: ["Ann Lee"], doi: "10.48550/arXiv.1", score: 0.5 },
+      { title: "Paper A", authors: ["Ann Lee"], doi: "10.18653/v1/x", score: 0.6 },
+    ];
+
+    expect(dedupePapers(papers as any)).toHaveLength(1);
+  });
+
+  it("matches titles regardless of case and punctuation", () => {
+    const papers = [
+      { title: "Paper A: An Automated Framework", authors: ["Ann Lee"], score: 0.5 },
+      { title: "paper a - an automated framework.", authors: ["Lee, Ann"], score: 0.6 },
+    ];
+
+    expect(dedupePapers(papers as any)).toHaveLength(1);
+  });
+
+  it("keeps same-titled papers by different first authors apart", () => {
+    const papers = [
+      { title: "A Survey of Methods", authors: ["Ann Lee"], doi: "10.1/a", score: 0.5 },
+      { title: "A Survey of Methods", authors: ["Bo Chen"], score: 0.6 },
+    ];
+
+    expect(dedupePapers(papers as any)).toHaveLength(2);
+  });
+
   it("keeps unique papers", () => {
     const papers = [
       { title: "Paper A", authors: ["A"], score: 0.8 },

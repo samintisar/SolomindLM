@@ -147,10 +147,27 @@ const confirmedColumnValidator = v.object({
   isVisible: v.boolean(),
 });
 
+/** Surname of a paper's first author, whether written "Given Surname" or "Surname, Given". */
+function firstAuthorSurname(authors: string[]): string {
+  const first = authors[0]?.trim() ?? "";
+  const surname = first.includes(",") ? first.split(",")[0] : (first.split(/\s+/).at(-1) ?? "");
+  return surname.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/** Title + first-author key that survives case, punctuation and author-name order. */
+function titleAuthorKey(paper: { title: string; authors: string[] }): string {
+  const title = paper.title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+  return `title:${title}|${firstAuthorSurname(paper.authors)}`;
+}
+
 /**
- * Keeps the first copy of each paper (by DOI, else title + first author). A later copy's higher
- * citation count is carried over, since a source without counts (e.g. arXiv) is often found
- * first and ranking weighs citations (#351).
+ * Keeps the first copy of each paper. Copies match on DOI or on title + first author, so a record
+ * with a DOI and one without (or a preprint and its published version) merge. A later copy's
+ * higher citation count is carried over, since a source without counts (e.g. arXiv) is often
+ * found first and ranking weighs citations (#351).
  */
 export function dedupePapers<
   T extends {
@@ -165,14 +182,15 @@ export function dedupePapers<
   const out: T[] = [];
   for (const p of papers) {
     const doiKey = p.doi?.toLowerCase().trim();
-    const first = p.authors[0]?.split(",")[0]?.trim().toLowerCase() ?? "";
-    const key = doiKey ? `doi:${doiKey}` : `title:${p.title.toLowerCase().trim()}|${first}`;
-    const keptIndex = kept.get(key);
+    const keys = [...(doiKey ? [`doi:${doiKey}`] : []), titleAuthorKey(p)];
+    const keptIndex = keys.map((k) => kept.get(k)).find((i) => i !== undefined);
     if (keptIndex === undefined) {
-      kept.set(key, out.length);
+      for (const k of keys) kept.set(k, out.length);
       out.push(p);
       continue;
     }
+    // Later copies can reach this paper by either key.
+    for (const k of keys) if (!kept.has(k)) kept.set(k, keptIndex);
     const existing = out[keptIndex];
     if (p.citationCount != null && p.citationCount > (existing.citationCount ?? -1)) {
       // The search score was computed from this copy's citations; the rerank-failure fallback
