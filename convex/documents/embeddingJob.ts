@@ -19,6 +19,7 @@ import {
   extractDocumentMetadata,
   getFileExtension,
 } from "../_services/processing/DocumentMetadataExtractor";
+import { maxPageLabel } from "../_services/processing/pageLabels";
 import { StructuralChunker } from "../_services/processing/StructuralChunker";
 import { buildPaperMetadataMarkdown } from "./paperRecord";
 
@@ -333,7 +334,11 @@ export const docEmbedding = internalAction({
       currentPhase = "chunking";
 
       const fileExtension = getFileExtension(docDetails.fileName);
-      const docMetadata = extractDocumentMetadata(extractedText, fileExtension);
+      const docMetadata = extractDocumentMetadata(
+        extractedText,
+        fileExtension,
+        maxPageLabel(extractedText) ?? undefined
+      );
       logger.info("Document metadata extracted", {
         wordCount: docMetadata.wordCount,
         readingTime: docMetadata.estimatedReadingTimeMinutes,
