@@ -79,4 +79,22 @@ describe("StructuralChunker pages", () => {
       ["Beta.", 2],
     ]);
   });
+
+  it("drops a page separator that is followed by whitespace-only lines", async () => {
+    const chunks = await chunk("**Page 1**\n\nAlpha.\n\n---  \n   \n**Page 2**\n\nBeta.");
+    expect(chunks.map((c) => [c.content.trim(), c.metadata.pageNumber])).toEqual([
+      ["Alpha.", 1],
+      ["Beta.", 2],
+    ]);
+  });
+
+  it("keeps pagination per chunk() call when calls overlap on one instance", async () => {
+    const c = new StructuralChunker();
+    const [ocr, plain] = await Promise.all([
+      c.chunk(OCR_DOC, 1000, 0),
+      c.chunk("Plain text.", 1000, 0),
+    ]);
+    expect(ocr.map((x) => x.metadata.pageNumber)).toEqual([1, 2, 2, 3]);
+    expect(plain.map((x) => x.metadata.pageNumber)).toEqual([null]);
+  });
 });

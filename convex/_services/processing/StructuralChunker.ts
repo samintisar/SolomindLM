@@ -56,8 +56,6 @@ interface DocumentSection {
 export class StructuralChunker {
   private headingStack: Array<{ level: number; title: string }> = [];
   private currentPageNumber: number = 1;
-  /** True when the document marks its pages (OCR page labels or form feeds); unpaginated text stores no page. */
-  private paginated = false;
 
   /**
    * Chunk document with structural context.
@@ -75,10 +73,9 @@ export class StructuralChunker {
     // Reset state
     this.headingStack = [];
     this.currentPageNumber = 1;
-    this.paginated = false;
 
     // Parse document into sections (by headings)
-    const sections = this.parseIntoSections(document);
+    const { sections, paginated } = this.parseIntoSections(document);
 
     const chunks: ChunkWithMetadata[] = [];
     let globalChunkIndex = 0;
@@ -93,6 +90,7 @@ export class StructuralChunker {
           chunkContent,
           globalChunkIndex,
           section,
+          paginated,
           chunks.length > 0 ? chunks[chunks.length - 1].content : null
         );
 
@@ -119,10 +117,15 @@ export class StructuralChunker {
    * Parse document into sections based on headings and page breaks.
    * A page break closes the current section and opens one on the new page with the same heading path,
    * so a section (and every chunk cut from it) sits on exactly one page.
+   * `paginated` is true when the document marks its pages (OCR page labels or form feeds); unpaginated text stores no page.
    */
-  private parseIntoSections(document: string): DocumentSection[] {
+  private parseIntoSections(document: string): {
+    sections: DocumentSection[];
+    paginated: boolean;
+  } {
     const lines = document.split("\n");
     const sections: DocumentSection[] = [];
+    let paginated = false;
 
     let currentSection: DocumentSection = {
       content: "",
@@ -136,7 +139,7 @@ export class StructuralChunker {
       // OCR writes a `---` line before each page label; it belongs to neither page.
       // Only a trailing one at a page break is dropped, so rules inside a page survive.
       const content = atPageBreak
-        ? currentSection.content.replace(/(?:^|\n)-{3,}[ \t]*(?:\r?\n)*$/, "\n")
+        ? currentSection.content.replace(/(?:^|\n)-{3,}\s*$/, "\n")
         : currentSection.content;
       if (content.trim()) {
         sections.push({ ...currentSection, content });
@@ -145,7 +148,7 @@ export class StructuralChunker {
 
     const startPage = (pageNumber: number) => {
       closeSection(true);
-      this.paginated = true;
+      paginated = true;
       this.currentPageNumber = pageNumber;
       currentSection = {
         content: "",
@@ -196,7 +199,7 @@ export class StructuralChunker {
     // Don't forget the last section
     closeSection();
 
-    return sections;
+    return { sections, paginated };
   }
 
   /**
@@ -221,6 +224,7 @@ export class StructuralChunker {
     content: string,
     chunkIndex: number,
     section: DocumentSection,
+    paginated: boolean,
     previousChunkContent: string | null
   ): ChunkMetadata {
     const words = content
@@ -236,7 +240,7 @@ export class StructuralChunker {
       chunkLengthChars: content.length,
       wordCount: words.length,
       sentenceCount: sentences.length,
-      pageNumber: this.paginated ? section.pageNumber : null,
+      pageNumber: paginated ? section.pageNumber : null,
       sectionTitle:
         section.headingPath.length > 0 ? section.headingPath[section.headingPath.length - 1] : null,
       sectionLevel: section.level > 0 ? section.level : null,
