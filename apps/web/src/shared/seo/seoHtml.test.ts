@@ -5,7 +5,7 @@ import {
   getIntentLandingPaths,
 } from "@/features/landing/intentLandingPages";
 import { getSeoContentPageByPath, getSeoContentPaths } from "@/features/landing/seoContentPages";
-import { PDF_TO_FLASHCARDS_PAGE } from "@/features/tools/toolPages";
+import { PDF_TO_FLASHCARDS_PAGE, PRISMA_FLOW_DIAGRAM_PAGE } from "@/features/tools/toolPages";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
@@ -207,6 +207,14 @@ describe("free tool pages", () => {
     expect(body).toContain(PDF_TO_FLASHCARDS_PAGE.steps[0]!.name);
     expect(body).toContain(PDF_TO_FLASHCARDS_PAGE.faqs[0]!.question);
     expect(body).toContain('href="/students/ai-flashcards"');
+  });
+
+  it("registers and prerenders the PRISMA flow-diagram tool", () => {
+    const page = getPublicSeoPageByPath(PRISMA_FLOW_DIAGRAM_PAGE.path);
+    expect(page?.title).toBe(PRISMA_FLOW_DIAGRAM_PAGE.title);
+    const body = buildPublicSeoPrerenderBody(PRISMA_FLOW_DIAGRAM_PAGE.path);
+    expect(body).toContain(`<h1>${PRISMA_FLOW_DIAGRAM_PAGE.h1}</h1>`);
+    expect(body).toContain('href="/research/ai-literature-review"');
   });
 
   it("cross-links the flashcards intent page to the tool with its own anchor text", () => {
