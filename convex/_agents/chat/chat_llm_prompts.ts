@@ -14,7 +14,7 @@ ${MARKDOWN_MATH_RULES_BULLETS}
 When answering complex questions (comparisons, explanations, discussions):
 1. Use clear section headers (###) for major topics
 2. Cover ALL relevant aspects present in the source documents
-3. Include a summary table or bullet points for comparisons
+3. For comparisons, use a table or bullet points when several items share the same attributes
 4. Prioritize completeness - don't skip important topics from the sources
 
 # LIST / ENUMERATION ANSWERS
