@@ -199,7 +199,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
             variant="disclosure"
             size="chip"
             aria-label={headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary}
-            className="group/trigger -ml-4 max-w-full justify-start"
+            className="group/trigger -ml-4 justify-start"
           >
             <span className="min-w-0 wrap-break-word">
               <span>{headerPrimary}</span>

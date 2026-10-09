@@ -63,8 +63,12 @@ const buttonVariants = cva(
         /** Icon button as tall as `sm` / `sm-adaptive` (h-9), for toolbars mixing both. */
         "icon-md": "size-9 rounded-lg",
         "icon-lg": "size-12 rounded-xl",
-        /** Suggestion chip whose label may run long: grows in height and wraps instead of overflowing. */
-        chip: "h-auto min-h-9 px-4 py-2 text-left text-sm font-medium leading-snug whitespace-normal pointer-coarse:min-h-10",
+        /**
+         * Suggestion chip whose label may run long: grows in height and wraps instead of overflowing.
+         * `max-w-full` caps it at its container — the base `shrink-0` otherwise keeps a flex item at
+         * its one-line width, so `whitespace-normal` never gets a chance to wrap.
+         */
+        chip: "h-auto min-h-9 max-w-full px-4 py-2 text-left text-sm font-medium leading-snug whitespace-normal pointer-coarse:min-h-10",
         avatar: "size-8 rounded-full p-0 hover:ring-2 hover:ring-ring/40",
       },
     },

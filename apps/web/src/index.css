@@ -594,9 +594,9 @@
   }
 }
 
-/* Chat empty state: room for the floating composer plus the iOS home indicator. */
+/* Chat empty state: room for the floating composer (measured by useComposerClearance) plus the iOS home indicator. */
 @utility pb-composer-safe {
-  padding-bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--chat-composer-clearance, 12.5rem) + env(safe-area-inset-bottom, 0px));
 }
 
 /* Scroll container that reserves its scrollbar track so content does not shift when it overflows. */
