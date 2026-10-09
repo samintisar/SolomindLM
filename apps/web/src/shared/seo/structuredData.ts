@@ -1,8 +1,16 @@
 import { SEO_BASE_URL, SEO_DEFAULT_DESCRIPTION, SEO_DEFAULT_OG_IMAGE } from "./seoConstants";
 
-export const generateFAQStructuredData = (faqs: Array<{ question: string; answer: string }>) => ({
+/**
+ * FAQPage is a WebPage, so a page whose main JSON-LD node is its FAQ carries `dateModified` here
+ * (tool and hub pages); article pages put it on their Article node instead.
+ */
+export const generateFAQStructuredData = (
+  faqs: Array<{ question: string; answer: string }>,
+  options: { dateModified?: string } = {}
+) => ({
   "@context": "https://schema.org",
   "@type": "FAQPage",
+  ...(options.dateModified ? { dateModified: options.dateModified } : {}),
   mainEntity: faqs.map((faq) => ({
     "@type": "Question",
     name: faq.question,

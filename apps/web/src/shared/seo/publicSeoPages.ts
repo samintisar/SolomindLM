@@ -1,7 +1,8 @@
-import { CLUSTER_HUB_PAGES } from "@/features/landing/clusterHubPages";
+import { CLUSTER_HUB_PAGES, getClusterHubLastUpdated } from "@/features/landing/clusterHubPages";
 import { getAllFaqs, LANDING_FAQS } from "@/features/landing/faqRegistry";
 import {
   getIntentBreadcrumbItems,
+  getIntentLandingLastUpdated,
   INTENT_LANDING_PAGES,
 } from "@/features/landing/intentLandingPages";
 import {
@@ -62,7 +63,10 @@ const CLUSTER_HUB_SEO_PAGES: PublicSeoPage[] = CLUSTER_HUB_PAGES.map((page) => (
   keywords: page.keywords,
   changefreq: page.changefreq ?? "weekly",
   priority: page.priority ?? 0.9,
-  structuredData: generateFAQStructuredData(page.faqs),
+  lastmod: getClusterHubLastUpdated(page),
+  structuredData: generateFAQStructuredData(page.faqs, {
+    dateModified: getClusterHubLastUpdated(page),
+  }),
 }));
 
 const SEO_CONTENT_SEO_PAGES: PublicSeoPage[] = SEO_CONTENT_PAGES.map((page) => ({
@@ -95,9 +99,10 @@ const INTENT_SEO_PAGES: PublicSeoPage[] = INTENT_LANDING_PAGES.map((page) => ({
   keywords: page.keywords,
   changefreq: page.changefreq ?? "weekly",
   priority: page.priority ?? 0.8,
+  lastmod: getIntentLandingLastUpdated(page),
   structuredData: [
     generateBreadcrumbStructuredData(getIntentBreadcrumbItems(page)),
-    generateFAQStructuredData(page.faqs),
+    generateFAQStructuredData(page.faqs, { dateModified: getIntentLandingLastUpdated(page) }),
   ],
 }));
 

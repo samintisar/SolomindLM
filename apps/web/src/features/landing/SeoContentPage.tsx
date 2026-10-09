@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/shared/components/ui/table";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
+import { formatSeoDate } from "@/shared/seo/seoDates";
 import { ContentFaq } from "./components/content/ContentFaq";
 import { LinkCard } from "./components/content/LinkCard";
 import { MarketingPage } from "./components/content/MarketingPage";
@@ -52,6 +53,7 @@ export function SeoContentPage({ pagePath }: SeoContentPageProps) {
               title={page.h1}
               titleAccent={page.h1Accent}
               lede={page.intro}
+              updated={getSeoContentLastUpdated(page)}
               // A quick answer carries the sign-up button, so the hero doesn't repeat it.
               cta={page.quickAnswer ? undefined : { label: page.ctaLabel, onClick: openSignup }}
             />
@@ -160,14 +162,12 @@ function ComparisonTable({ page }: { page: SeoContentPageConfig }) {
 
 function SeoContentSources({ page }: { page: SeoContentPageConfig }) {
   if (!page.sources || page.sources.length === 0) return null;
-  const checked = new Date(`${getSeoContentLastUpdated(page)}T00:00:00Z`).toLocaleDateString(
-    "en-US",
-    { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }
-  );
+  const checked = getSeoContentLastUpdated(page);
 
   return (
     <p className="mt-3 font-sans text-xs leading-relaxed text-muted-foreground">
-      {page.competitorName} details checked {checked} against:{" "}
+      {page.competitorName} details checked <time dateTime={checked}>{formatSeoDate(checked)}</time>{" "}
+      against:{" "}
       {page.sources.map((source, index) => (
         <span key={source.url}>
           {index > 0 ? ", " : null}
