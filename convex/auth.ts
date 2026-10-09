@@ -5,7 +5,7 @@ import { convexAuth } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { type ActionCtx, type MutationCtx, type QueryCtx, query } from "./_generated/server";
-import { extraOrigins, siteUrl } from "./_lib/allowedOrigins";
+import { DEV_WEB_PORTS, extraOrigins, siteUrl } from "./_lib/allowedOrigins";
 import { ResendOTP } from "./ResendOTP";
 import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
 
@@ -16,49 +16,80 @@ const MOBILE_DEV_WEB_ORIGINS = [
 ];
 
 const LAN_HOSTNAME = /^192\.168\.\d{1,3}\.\d{1,3}$/;
+/** Hosts a browser on the dev machine reaches a local web dev server on. */
+const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
 const NATIVE_APP_SCHEME = /^solomindlm:\/\//;
 const EXPO_DEV_SCHEME = /^exp:\/\//;
 
-/** True for a plain-http `192.168.x.x` URL (a Vite dev server on the LAN), on any port. */
-function isLanUrl(url: string): boolean {
-  let parsed: URL;
+function parseUrl(url: string): URL | null {
   try {
-    parsed = new URL(url);
+    return new URL(url);
   } catch {
-    return false;
+    return null;
   }
-  const { protocol, hostname, username, password } = parsed;
-  return protocol === "http:" && LAN_HOSTNAME.test(hostname) && !username && !password;
 }
 
-export function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
-  if (NATIVE_APP_SCHEME.test(redirectTo) || EXPO_DEV_SCHEME.test(redirectTo)) {
+/** A plain-http URL with no userinfo, or null. */
+function parsePlainHttpUrl(url: string): URL | null {
+  const parsed = parseUrl(url);
+  if (!parsed) return null;
+  const { protocol, username, password } = parsed;
+  return protocol === "http:" && !username && !password ? parsed : null;
+}
+
+/** True for a Vite dev server on the LAN: plain http, a `192.168.x.x` host, a dev web port. */
+function isLanDevServerUrl(url: string): boolean {
+  const parsed = parsePlainHttpUrl(url);
+  if (!parsed || !LAN_HOSTNAME.test(parsed.hostname)) return false;
+  const port = Number(parsed.port);
+  return port >= DEV_WEB_PORTS.first && port <= DEV_WEB_PORTS.last;
+}
+
+/**
+ * A dev deployment: `SITE_URL` itself is a plain-http localhost origin. Production sets an
+ * https `SITE_URL`, so this never holds there.
+ */
+export function isLocalDevSite(site: string): boolean {
+  const parsed = parsePlainHttpUrl(site);
+  return !!parsed && LOCALHOST_HOSTNAMES.has(parsed.hostname);
+}
+
+/**
+ * Compares parsed origins, never string prefixes: `https://<base>@evil.com` and
+ * `https://<base>.evil.com` start with a base as strings but resolve to another host.
+ */
+function hasAllowedOrigin(url: string, bases: string[]): boolean {
+  const parsed = parseUrl(url);
+  if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) return false;
+  return bases.some((base) => parseUrl(base)?.origin === parsed.origin);
+}
+
+interface RedirectPolicy {
+  /**
+   * Accept Expo Go (`exp://`) and LAN Vite dev server targets. Dev deployments only: on
+   * production they would hand the OAuth `?code=` to whoever holds that LAN IP or Expo project.
+   */
+  allowDevTargets?: boolean;
+}
+
+export function isAllowedRedirect(
+  redirectTo: string,
+  bases: string[],
+  { allowDevTargets = false }: RedirectPolicy = {}
+): boolean {
+  if (NATIVE_APP_SCHEME.test(redirectTo)) {
     return true;
   }
 
-  if (isLanUrl(redirectTo)) {
+  if (allowDevTargets && (EXPO_DEV_SCHEME.test(redirectTo) || isLanDevServerUrl(redirectTo))) {
     return true;
-  }
-
-  for (const origin of MOBILE_DEV_WEB_ORIGINS) {
-    if (redirectTo === origin || redirectTo.startsWith(`${origin}/`)) {
-      return true;
-    }
   }
 
   if (redirectTo.startsWith("?") || redirectTo.startsWith("/")) {
     return true;
   }
 
-  for (const base of bases) {
-    if (!redirectTo.startsWith(base)) continue;
-    const after = redirectTo[base.length];
-    if (after === undefined || after === "?" || after === "/") {
-      return true;
-    }
-  }
-
-  return false;
+  return hasAllowedOrigin(redirectTo, bases);
 }
 
 /**
@@ -145,7 +176,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     async redirect({ redirectTo }) {
       const bases = [siteUrl(), ...extraOrigins(), ...MOBILE_DEV_WEB_ORIGINS];
 
-      if (!isAllowedRedirect(redirectTo, bases)) {
+      const allowDevTargets = isLocalDevSite(bases[0]);
+
+      if (!isAllowedRedirect(redirectTo, bases, { allowDevTargets })) {
         throw new Error(`Invalid redirectTo ${redirectTo} for SITE_URL ${process.env.SITE_URL}`);
       }
 
