@@ -8,7 +8,12 @@ export function formatSeoDate(isoDate: string): string {
   if (!ISO_DATE.test(isoDate)) {
     throw new Error(`formatSeoDate: expected YYYY-MM-DD, got "${isoDate}"`);
   }
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-US", {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  // Date rolls 2026-02-30 into March; the visible date must match datetime/dateModified/lastmod.
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== isoDate) {
+    throw new Error(`formatSeoDate: "${isoDate}" is not a real date`);
+  }
+  return date.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",

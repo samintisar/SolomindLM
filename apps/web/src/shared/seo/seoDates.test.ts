@@ -11,6 +11,12 @@ describe("formatSeoDate", () => {
     expect(() => formatSeoDate("2026-10-07T12:00:00Z")).toThrow(/YYYY-MM-DD/);
     expect(() => formatSeoDate("October 7")).toThrow(/YYYY-MM-DD/);
   });
+
+  it("rejects calendar-invalid dates instead of rolling them into the next month", () => {
+    expect(() => formatSeoDate("2026-02-30")).toThrow(/not a real date/);
+    expect(() => formatSeoDate("2026-13-01")).toThrow(/not a real date/);
+    expect(formatSeoDate("2028-02-29")).toBe("February 29, 2028");
+  });
 });
 
 describe("buildUpdatedLineHtml", () => {
