@@ -1,15 +1,24 @@
 import { v } from "convex/values";
+import {
+  criterionAssessmentValidator,
+  type ScreeningCriterion,
+  screeningCriterionValidator,
+} from "./screeningCriteria";
 
 /** Persisted PRISMA-style counts and search provenance for a literature review session. */
 export const literatureReviewWorkflowProvenanceValidator = v.object({
   searchQueries: v.optional(v.array(v.string())),
   databasesUsed: v.optional(v.array(v.string())),
+  /** Eligibility criteria papers were screened against (#351). */
+  screeningCriteria: v.optional(v.array(screeningCriterionValidator)),
   recordsIdentified: v.optional(v.number()),
   recordsAfterDedupe: v.optional(v.number()),
   recordsRanked: v.optional(v.number()),
   recordsScreened: v.optional(v.number()),
   recordsIncluded: v.optional(v.number()),
   recordsExcluded: v.optional(v.number()),
+  /** Screened papers whose screening call failed; excluded, but not counted in recordsExcluded. */
+  recordsNotScreened: v.optional(v.number()),
   recordsFromNotebook: v.optional(v.number()),
   searchSkipped: v.optional(v.boolean()),
   extractedRowCount: v.optional(v.number()),
@@ -22,12 +31,16 @@ export const literatureReviewWorkflowProvenanceValidator = v.object({
 export type LiteratureReviewWorkflowProvenance = {
   searchQueries?: string[];
   databasesUsed?: string[];
+  /** Eligibility criteria papers were screened against (#351). */
+  screeningCriteria?: ScreeningCriterion[];
   recordsIdentified?: number;
   recordsAfterDedupe?: number;
   recordsRanked?: number;
   recordsScreened?: number;
   recordsIncluded?: number;
   recordsExcluded?: number;
+  /** Screened papers whose screening call failed; excluded, but not counted in recordsExcluded. */
+  recordsNotScreened?: number;
   /** Papers from the user's notebook, included without screening (#301). */
   recordsFromNotebook?: number;
   /** True when the review was limited to notebook papers (no database search). */
@@ -47,5 +60,6 @@ export const screeningDecisionValidator = v.object({
   year: v.optional(v.number()),
   decision: v.union(v.literal("included"), v.literal("excluded")),
   reason: v.string(),
+  criteria: v.optional(v.array(criterionAssessmentValidator)),
   rank: v.optional(v.number()),
 });

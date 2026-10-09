@@ -13,6 +13,7 @@ import {
   formatPaperTitleYear,
   isTitleLikeColumnName,
 } from "./reportContext.js";
+import { criterionAssessmentValidator } from "./screeningCriteria.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -659,6 +660,7 @@ export const replaceScreeningDecisions = internalMutation({
         year: v.optional(v.number()),
         decision: v.union(v.literal("included"), v.literal("excluded")),
         reason: v.string(),
+        criteria: v.optional(v.array(criterionAssessmentValidator)),
         rank: v.optional(v.number()),
       })
     ),
@@ -682,6 +684,7 @@ export const replaceScreeningDecisions = internalMutation({
         year: d.year,
         decision: d.decision,
         reason: d.reason,
+        ...(d.criteria ? { criteria: d.criteria } : {}),
         rank: d.rank,
         createdAt: now,
       });
@@ -700,6 +703,7 @@ export const getScreeningDecisionsBySession = internalQuery({
       year: v.optional(v.number()),
       decision: v.union(v.literal("included"), v.literal("excluded")),
       reason: v.string(),
+      criteria: v.optional(v.array(criterionAssessmentValidator)),
       rank: v.optional(v.number()),
     })
   ),
@@ -715,6 +719,7 @@ export const getScreeningDecisionsBySession = internalQuery({
       year: r.year,
       decision: r.decision,
       reason: r.reason,
+      ...(r.criteria ? { criteria: r.criteria } : {}),
       rank: r.rank,
     }));
   },
