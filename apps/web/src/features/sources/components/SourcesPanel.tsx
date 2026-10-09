@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
+import type { SourceFocusTarget } from "@/shared/types";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { useSourceContent } from "../hooks/useSourceContent";
 import { useSourceSearch } from "../hooks/useSourceSearch";
@@ -19,9 +20,9 @@ import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
 import { GoogleDrivePicker, isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
 import { SourceList } from "./SourceList";
 import { SourcesPanelHeader } from "./SourcesPanelHeader";
-import { SourceViewer } from "./SourceViewer";
+import { type SourceFocus, SourceViewer } from "./SourceViewer";
 
-export type SourcesPanelFocusRequest = { documentId: string; seq: number };
+export type SourcesPanelFocusRequest = SourceFocusTarget & { documentId: string; seq: number };
 
 interface SourcesPanelProps {
   isOpen: boolean;
@@ -58,6 +59,10 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
 
   // View state
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
+  /** The last citation focus, tied to the source it was for so it doesn't follow the reader to other sources. */
+  const [viewerFocus, setViewerFocus] = useState<(SourceFocus & { documentId: string }) | null>(
+    null
+  );
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -144,10 +149,11 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
   useEffect(() => {
     if (!focusSourceRequest) return;
     if (sources.length === 0) return;
-    const { documentId } = focusSourceRequest;
+    const { documentId, seq, quote, pageNumber } = focusSourceRequest;
     const exists = sources.some((s) => s.id === documentId);
     if (exists) {
       setViewingSourceId(documentId);
+      setViewerFocus({ documentId, seq, quote, pageNumber });
     }
     onFocusSourceHandled?.();
   }, [focusSourceRequest, sources, onFocusSourceHandled]);
@@ -364,6 +370,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
                 sourceContent.hasError(viewingSourceId ?? "") ? "Failed to load content" : undefined
               }
               onDiscussTopic={onDiscussTopic}
+              focus={viewerFocus?.documentId === viewingSourceId ? viewerFocus : null}
             />
           ) : (
             <SourceList
