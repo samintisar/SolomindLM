@@ -135,6 +135,92 @@ describe("useSourceManager", () => {
     await waitFor(() => expect(result.current.sources[0].url).toBe("https://new.example"));
   });
 
+  it("rebuilds a row when its contentType or paper identifiers change", async () => {
+    const file = (contentType: string) => ({ ...doc("a", "upload"), contentType });
+    const paper = (doi: string) => ({
+      ...doc("p", "Paper"),
+      fileType: "paper_record",
+      paperRecord: { doi },
+    });
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [file("application/pdf"), paper("10.1/old")] } }
+    );
+    await waitFor(() => expect(result.current.sources[0].type).toBe("PDF"));
+    expect(result.current.sources[1].paper?.doi).toBe("10.1/old");
+
+    rerender({ documents: [file("image/png"), paper("10.1/new")] });
+    await waitFor(() => expect(result.current.sources[0].type).toBe("IMG"));
+    expect(result.current.sources[1].paper?.doi).toBe("10.1/new");
+  });
+
+  it("keeps local state when a new array repeats nested fields unchanged", async () => {
+    updateDocument.mockResolvedValueOnce(undefined);
+    const full = () => ({
+      ...doc("a", "Page"),
+      fileType: "url",
+      fileUrl: "https://example.com",
+      sourceGuide: { summary: "S", topics: ["t"], generatedAt: 0 },
+      paperRecord: { doi: "10.1/x" },
+    });
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [full()] } }
+    );
+    await waitFor(() => expect(result.current.sources).toHaveLength(1));
+    await act(() => result.current.handleRenameSource("a", "Local title"));
+
+    rerender({ documents: [full()] });
+    expect(result.current.sources[0].title).toBe("Local title");
+  });
+
+  it("keeps a locally added row when another document changes before it arrives", async () => {
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [doc("a", "A.md")] } }
+    );
+    await waitFor(() => expect(result.current.sources).toHaveLength(1));
+    act(() => {
+      result.current.handleAddSource({ id: "new", title: "Uploading", selected: true } as never);
+    });
+
+    rerender({ documents: [{ ...doc("a", "A.md"), status: "failed" }] });
+    await waitFor(() => expect(result.current.sources[1]?.status).toBe("failed"));
+    expect(result.current.sources.map((s) => s.id)).toEqual(["new", "a"]);
+
+    rerender({ documents: [doc("new", "New.md"), { ...doc("a", "A.md"), status: "failed" }] });
+    await waitFor(() => expect(result.current.sources[0].title).toBe("New"));
+    expect(result.current.sources.map((s) => s.id)).toEqual(["new", "a"]);
+  });
+
+  it("does not bring back a row whose delete is still in flight", async () => {
+    let finishDelete: () => void = () => {};
+    deleteDocument.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishDelete = resolve;
+      })
+    );
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [doc("a", "A.md"), doc("b", "B.md")] } }
+    );
+    await waitFor(() => expect(result.current.sources).toHaveLength(2));
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = result.current.handleDeleteSource("a");
+    });
+    expect(result.current.sources.map((s) => s.id)).toEqual(["b"]);
+
+    rerender({ documents: [doc("a", "A.md"), { ...doc("b", "B.md"), status: "failed" }] });
+    await waitFor(() => expect(result.current.sources[0].status).toBe("failed"));
+    expect(result.current.sources.map((s) => s.id)).toEqual(["b"]);
+
+    await act(async () => {
+      finishDelete();
+      await pending;
+    });
+  });
+
   it("resets local-only rows when switching between notebooks with the same document list", async () => {
     const empty: DocumentSummary[] = [];
     const { result, rerender } = renderHook(
