@@ -57,15 +57,19 @@ export const generateSoftwareApplicationStructuredData = () => ({
       price: "0",
       priceCurrency: "USD",
     },
+    // Each offer states the amount charged per billing period (UN/CEFACT ANN = year, MON = month).
     {
       "@type": "Offer",
       name: "Pro (annual billing)",
-      price: schemaPrice(PRO_YEARLY_PER_MONTH_USD),
+      description: `Billed $${schemaPrice(PRO_PRICE_USD.yearly)} once a year, equivalent to $${schemaPrice(PRO_YEARLY_PER_MONTH_USD)}/month.`,
+      price: schemaPrice(PRO_PRICE_USD.yearly),
       priceCurrency: "USD",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
+        price: schemaPrice(PRO_PRICE_USD.yearly),
+        priceCurrency: "USD",
         billingDuration: 1,
-        unitCode: "MON",
+        unitCode: "ANN",
       },
     },
     {
@@ -75,6 +79,8 @@ export const generateSoftwareApplicationStructuredData = () => ({
       priceCurrency: "USD",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
+        price: schemaPrice(PRO_PRICE_USD.monthly),
+        priceCurrency: "USD",
         billingDuration: 1,
         unitCode: "MON",
       },

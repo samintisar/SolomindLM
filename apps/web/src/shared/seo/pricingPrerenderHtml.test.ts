@@ -28,7 +28,7 @@ describe("/pricing prerendered body", () => {
       expect(body).toContain(`<strong>${price}</strong>`);
     }
     expect(body).toContain(
-      `<li>Annual: <strong>${formatUsd(PRO_YEARLY_PER_MONTH_USD)}</strong> / month, billed yearly (save ${PRO_YEARLY_SAVINGS_PERCENT}%)</li>`
+      `<li>Annual: <strong>${formatUsd(PRO_YEARLY_PER_MONTH_USD)}</strong> / month, billed ${formatUsd(PRO_PRICE_USD.yearly)} yearly (save ${PRO_YEARLY_SAVINGS_PERCENT}%)</li>`
     );
     expect(body).toContain(
       `<li>Monthly: <strong>${formatUsd(PRO_PRICE_USD.monthly)}</strong> / month</li>`
@@ -96,7 +96,7 @@ describe("/pricing SEO registry entry", () => {
     const app = nodes[1] as { offers: { price: string }[] };
     expect(app.offers.map((offer) => offer.price)).toEqual([
       "0",
-      PRO_YEARLY_PER_MONTH_USD.toFixed(2),
+      String(PRO_PRICE_USD.yearly),
       String(PRO_PRICE_USD.monthly),
     ]);
   });

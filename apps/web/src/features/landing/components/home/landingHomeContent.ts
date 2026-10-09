@@ -293,7 +293,10 @@ export const PLANS: Plan[] = [
       annual: formatUsd(PRO_YEARLY_PER_MONTH_USD),
       monthly: formatUsd(PRO_PRICE_USD.monthly),
     },
-    period: { annual: "/ month, billed yearly", monthly: "/ month" },
+    period: {
+      annual: `/ month, billed ${formatUsd(PRO_PRICE_USD.yearly)} yearly`,
+      monthly: "/ month",
+    },
     features: PRO_PLAN_FEATURES,
     cta: "Get Pro",
     featured: true,
