@@ -177,6 +177,15 @@ describe("LiteratureTableView", () => {
     expect(toggle).toHaveFocus();
   });
 
+  it("keeps one toolbar on phones: Back to Studio leads it and the title shows once", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    renderTable({ onBack });
+    expect(screen.getAllByText(TABLE.title)).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Back to Studio" }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
   it("disables Save while saving, under the name Saving table", () => {
     renderTable({ onSave: vi.fn(), isSaving: true });
     expect(screen.getByRole("button", { name: "Saving table" })).toBeDisabled();

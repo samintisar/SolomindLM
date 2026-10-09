@@ -310,6 +310,8 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
     };
   }, [isFocusMode]);
 
+  const showMobileBack = Boolean(onBack) && !isFocusMode;
+
   const shellClassName = cn(
     "flex min-w-0 flex-col bg-background",
     isFocusMode
@@ -319,16 +321,19 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 
   const tableShell = (
     <div className={shellClassName} data-literature-table-shell>
-      {onBack && !isFocusMode && (
-        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-sm md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+      {/* On phones the toolbar leads with Back to Studio instead of ending with Close. */}
+      <div className="@container/table-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
+        {showMobileBack && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onBack}
+            aria-label="Back to Studio"
+            className="-ml-2 md:hidden"
+          >
             <ArrowLeft />
           </Button>
-          <span className="truncate text-sm font-semibold">{table.title}</span>
-        </div>
-      )}
-
-      <div className="@container/table-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
+        )}
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <Table2 className="hidden size-5 shrink-0 text-muted-foreground @sm/table-toolbar:block" />
           <h1
@@ -427,6 +432,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
               onClick={onBack}
               aria-label="Close table"
               title="Close"
+              className={showMobileBack ? "hidden md:inline-flex" : undefined}
             >
               <X />
             </Button>
