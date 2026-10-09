@@ -41,4 +41,10 @@ describe("CitationCard", () => {
     expect(await screen.findByText(/Published thresholds/)).toBeInTheDocument();
     expect(screen.queryByText(/…/)).not.toBeInTheDocument();
   });
+
+  test("shows the page the passage sits on", async () => {
+    render(<CitationCard refId={20} reference={reference({ pageNumber: 7 })} />);
+
+    expect(await screen.findByText(/Reference 20 • p\. 7/)).toBeInTheDocument();
+  });
 });

@@ -545,7 +545,7 @@ Imperative styling outside JSX (not linted): `ChatInput.tsx:270-272` sets `texta
   - Outer `max-w-3xl xl:max-w-4xl 2xl:max-w-5xl` L361.
   - Shell L362-366: `@container/chat-input`, `pointer-events-auto`, `rounded-2xl border bg-card shadow-lg`, `data-onboarding="chat-input"`.
   - Textarea L367-376. Toolbar row L378, left cluster L379, right cluster L618.
-  - Disclaimer L819-821: "SolomindLM can be inaccurate; please double check its responses."
+  - Disclaimer L819-821: "SolomindLM can be inaccurate; please double check its responses." (Removed 2026-10: nothing renders below the composer.)
 
 Toolbar controls in order:
 1. **Mode** (drop-up). Label L391 `aria-label="Composer mode: {Chat|Deep Research|Literature Review}"`; icons MessageCircle / Telescope / FileText; ChevronDown; the text label is hidden under container query widths.

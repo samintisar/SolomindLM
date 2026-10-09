@@ -284,18 +284,20 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
 
   return (
     <div className="flex h-full min-w-0 animate-in flex-col bg-background duration-300 fade-in slide-in-from-right-4">
-      {/* Mobile Back Button */}
-      {onBack && (
-        <div className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-sm md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
+      {/* Top Bar — @container/report-toolbar sizes controls from panel width. On phones it leads
+          with Back to Studio instead of ending with Close. */}
+      <div className="@container/report-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
+        {onBack && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onBack}
+            aria-label="Back to Studio"
+            className="-ml-2 md:hidden"
+          >
             <ArrowLeft />
           </Button>
-          <span className="truncate text-sm font-semibold">{toolbarLabel}</span>
-        </div>
-      )}
-
-      {/* Top Bar — @container/report-toolbar sizes controls from panel width */}
-      <div className="@container/report-toolbar flex h-14 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b border-border/50 bg-card px-4">
+        )}
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <FileText className="hidden size-5 shrink-0 text-muted-foreground @sm/report-toolbar:block" />
           <h2 className="min-w-0 flex-1 truncate text-sm font-medium" title={report.title}>
@@ -367,6 +369,7 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
               onClick={onBack}
               aria-label={`Close ${toolbarLabel.toLowerCase()}`}
               title="Close"
+              className="hidden md:inline-flex"
             >
               <X />
             </Button>

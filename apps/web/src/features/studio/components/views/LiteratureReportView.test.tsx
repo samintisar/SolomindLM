@@ -67,6 +67,15 @@ describe("LiteratureReportView", () => {
     print.mockRestore();
   });
 
+  it("keeps one toolbar on phones: Back to Studio leads it and the label shows once", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    render(<LiteratureReportView report={REPORT} onBack={onBack} />);
+    expect(screen.getAllByText("Literature Report")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Back to Studio" }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
   it("Save and edit shows its saving state until the save resolves", async () => {
     const user = userEvent.setup();
     let resolve: () => void = () => {};

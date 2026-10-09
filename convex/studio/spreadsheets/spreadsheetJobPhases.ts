@@ -23,12 +23,13 @@ import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { cleanCsvOutput, withoutPipelineWording } from "../../_agents/spreadsheet/csvHelpers";
+import { resolveSpreadsheetRequest } from "../../_agents/spreadsheet/presetRequests";
 import {
-  COLLAPSE_PROMPTS,
+  COLLAPSE_PROMPT,
   COLLAPSE_SYSTEM_PROMPT,
-  MAP_PROMPTS,
+  MAP_PROMPT,
   MAP_SYSTEM_PROMPT,
-  REDUCE_PROMPTS,
+  REDUCE_PROMPT,
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/spreadsheet/prompts";
 import { labelWithSource, packChunksBySource } from "../../_agents/spreadsheet/sourcePacking";
@@ -106,6 +107,8 @@ export async function runSpreadsheetGenerationPhase(
   args: SpreadsheetGenerationPhaseArgs
 ): Promise<void> {
   const { spreadsheetId, userId, notebookId, documentIds, spreadsheetType, customPrompt } = args;
+  // Later phases get the resolved request, so a preset runs its own request (#451).
+  const { request, topic } = resolveSpreadsheetRequest(spreadsheetType || "custom", customPrompt);
 
   // Initialize structured logger
   const logger = createJobLogger({
@@ -149,7 +152,7 @@ export async function runSpreadsheetGenerationPhase(
     // Get document chunks
     const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
-      topic: customPrompt,
+      topic,
       excludeReferenceLists: true,
     });
     // Sources left after narrowing to the requested topic (#288).
@@ -190,7 +193,7 @@ export async function runSpreadsheetGenerationPhase(
         spreadsheetId,
         totalMapTasks: 1,
         spreadsheetType: spreadsheetType || "custom",
-        customPrompt: customPrompt || "",
+        customPrompt: request,
       });
 
       await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
@@ -210,7 +213,7 @@ export async function runSpreadsheetGenerationPhase(
         userId,
         notebookId,
         spreadsheetType: spreadsheetType || "custom",
-        customPrompt: customPrompt || "",
+        customPrompt: request,
       });
 
       logger.info("Map phase skipped", {
@@ -229,7 +232,7 @@ export async function runSpreadsheetGenerationPhase(
       spreadsheetId,
       totalMapTasks: mapTasks.length,
       spreadsheetType: spreadsheetType || "custom",
-      customPrompt: customPrompt || "",
+      customPrompt: request,
     });
 
     // Schedule each map task as a separate action
@@ -242,7 +245,7 @@ export async function runSpreadsheetGenerationPhase(
         totalChunks: mapTasks.length,
         chunk: mapTasks[i].text,
         spreadsheetType: spreadsheetType || "custom",
-        customPrompt: customPrompt || "",
+        customPrompt: request,
         sourceTitle: mapTasks[i].source,
       });
       console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${mapTasks.length}`);
@@ -333,13 +336,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    // If customPrompt is provided, use the custom template
-    // Otherwise, use the predefined template for the spreadsheet type
-    const promptTemplate =
-      customPrompt && customPrompt.trim()
-        ? MAP_PROMPTS["custom"]
-        : MAP_PROMPTS[spreadsheetType] || MAP_PROMPTS["custom"];
-    const prompt = fillTemplate(promptTemplate, {
+    const prompt = fillTemplate(MAP_PROMPT, {
       chunk: sourceTitle ? labelWithSource(sourceTitle, chunk) : chunk,
       customPrompt: sanitizeUserInput(customPrompt || ""),
     });
@@ -576,7 +573,6 @@ export async function runFinalizeSpreadsheetPhase(
     console.log(`[SpreadsheetJob] Collapse input: ${allOutputs.length} outputs`);
     const collapsedOutputs = await recursiveCollapse(
       allOutputs,
-      spreadsheetType,
       customPrompt,
       deadline,
       language,
@@ -605,13 +601,7 @@ export async function runFinalizeSpreadsheetPhase(
       );
     }
 
-    // Get the reduce prompt based on spreadsheet type
-    const reducePromptTemplate =
-      customPrompt && customPrompt.trim()
-        ? REDUCE_PROMPTS["custom"]
-        : REDUCE_PROMPTS[spreadsheetType] || REDUCE_PROMPTS["custom"];
-    const prompt = fillTemplate(reducePromptTemplate, {
-      spreadsheetType,
+    const prompt = fillTemplate(REDUCE_PROMPT, {
       customPrompt: sanitizeUserInput(customPrompt || ""),
       content: combined,
     });
@@ -747,7 +737,6 @@ export async function runFinalizeSpreadsheetPhase(
 
 export async function recursiveCollapse(
   textOutputs: string[],
-  spreadsheetType: string,
   customPrompt: string,
   deadline: JobDeadline,
   language?: string,
@@ -785,12 +774,7 @@ export async function recursiveCollapse(
           console.log(`[SpreadsheetJob] Collapse group ${idx} skipped: out of time budget`);
           return combined;
         }
-        const collapsePromptTemplate =
-          customPrompt && customPrompt.trim()
-            ? COLLAPSE_PROMPTS["custom"]
-            : COLLAPSE_PROMPTS[spreadsheetType] || COLLAPSE_PROMPTS["custom"];
-
-        const prompt = fillTemplate(collapsePromptTemplate, {
+        const prompt = fillTemplate(COLLAPSE_PROMPT, {
           content: combined,
           customPrompt: sanitizeUserInput(customPrompt || ""),
         });
@@ -819,7 +803,7 @@ export async function recursiveCollapse(
     CONFIG.COLLAPSE_CONCURRENCY
   );
 
-  return recursiveCollapse(collapsed, spreadsheetType, customPrompt, deadline, language, onUsage);
+  return recursiveCollapse(collapsed, customPrompt, deadline, language, onUsage);
 }
 
 /**

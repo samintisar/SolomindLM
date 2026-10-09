@@ -1,4 +1,4 @@
-import type { Message } from "@/shared/types/index";
+import type { Message, SourceFocusTarget } from "@/shared/types/index";
 import type { RefHandlers } from "../../utils/messageRendering.utils";
 import type { ExternalSource } from "../ExternalSourcesModal";
 import type { MessageFeedback } from "./ActionBar";
@@ -21,7 +21,7 @@ export interface MessageBubbleProps {
   /** Whether to show the "X sources" button for this message */
   showSourcesButton?: boolean;
   notebookId?: string;
-  onOpenNotebookSource?: (documentId: string) => void;
+  onOpenNotebookSource?: (documentId: string, focus?: SourceFocusTarget) => void;
   notebookDocumentIds?: Set<string>;
 }
 

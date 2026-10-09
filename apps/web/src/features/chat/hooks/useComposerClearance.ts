@@ -13,8 +13,8 @@ const AT_BOTTOM_THRESHOLD_PX = 8;
  * Keeps `COMPOSER_CLEARANCE_VAR` on `hostRef` equal to the floating composer's rendered height,
  * so the message list can always scroll its last message clear of the composer.
  *
- * The composer's height isn't fixed: the disclaimer wraps in narrow chat columns (tablet
- * three-panel layout) and the textarea grows with long drafts. Writes to the DOM directly so
+ * The composer's height isn't fixed: the textarea grows with long drafts and the toolbar's
+ * labels collapse by container width (tablet three-panel layout). Writes to the DOM directly so
  * resizes don't re-render the chat panel. If the list was scrolled to the end, it stays there
  * when the clearance changes.
  */
