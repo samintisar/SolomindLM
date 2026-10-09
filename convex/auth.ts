@@ -36,7 +36,9 @@ function isLocalhostUrl(url: string): boolean {
 
 /**
  * A dev deployment: `SITE_URL` itself is a localhost origin. Production sets an
- * https `SITE_URL`, so this never holds there.
+ * https `SITE_URL`, so this is false there. Pass `siteUrl()`, which falls back to
+ * `http://localhost:5173` when `SITE_URL` is unset, so a deployment without it
+ * (e.g. a preview) counts as dev.
  */
 export function isLocalDevSite(site: string): boolean {
   return isLocalhostUrl(site);
