@@ -281,6 +281,8 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
 
   const handleViewSource = (sourceId: string) => {
     setViewingSourceId(sourceId);
+    // Opened by hand, not from a citation: don't replay the last citation's passage and page.
+    setViewerFocus(null);
   };
 
   const handleRenameSource = (id: string, newTitle: string) => {
@@ -308,6 +310,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
 
   const handleBackToList = () => {
     setViewingSourceId(null);
+    setViewerFocus(null);
     setRenamingId(null);
   };
 
