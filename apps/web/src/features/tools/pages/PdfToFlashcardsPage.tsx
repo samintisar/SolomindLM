@@ -7,7 +7,7 @@ import {
 } from "@convex/_lib/freeToolBounds";
 import { Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { AuthModal } from "@/features/auth/components/AuthModal";
 import { useAuth } from "@/features/auth/useAuth";
 import { Footer } from "@/features/landing/components/Footer";
@@ -21,6 +21,7 @@ import { isNativeShell } from "@/utils/platformDetection";
 import { DeckPreview } from "../components/DeckPreview";
 import { ExportBar } from "../components/ExportBar";
 import { SourceInput, type SourceState } from "../components/SourceInput";
+import { ToolArticle, ToolHeader } from "../components/ToolPageChrome";
 import { useClaimPendingDeck } from "../hooks/useClaimPendingDeck";
 import { useTurnstile } from "../hooks/useTurnstile";
 import {
@@ -163,29 +164,7 @@ export default function PdfToFlashcardsPage() {
       />
       <PendingDeckClaimer key={claimRun} onSettled={() => setClaiming(false)} />
       <div className="min-h-screen landing-grid-pattern">
-        <header className="sticky top-0 z-50 border-b border-border/60 bg-card/40 backdrop-blur-sm">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
-            <Link to="/" className="inline-flex items-center gap-2.5">
-              <img
-                src="/SolomindLM_logo.png"
-                alt="SolomindLM"
-                className="h-8 w-8 shrink-0 object-contain"
-              />
-              <span className="font-display text-lg font-bold tracking-tight text-foreground">
-                SolomindLM
-              </span>
-            </Link>
-            {isAuthenticated ? (
-              <Button variant="ghost" asChild>
-                <Link to="/home">Open SolomindLM</Link>
-              </Button>
-            ) : (
-              <Button variant="ghost" onClick={() => setAuthOpen(true)}>
-                Sign in
-              </Button>
-            )}
-          </div>
-        </header>
+        <ToolHeader isAuthenticated={isAuthenticated} onSignIn={() => setAuthOpen(true)} />
 
         <main className="px-4 pb-20 sm:px-6">
           <section className="mx-auto max-w-3xl space-y-4 pt-14 text-center md:pt-20">
@@ -276,55 +255,7 @@ export default function PdfToFlashcardsPage() {
             </section>
           ) : null}
 
-          <article className="mx-auto mt-20 max-w-3xl space-y-12">
-            <section aria-labelledby="how-heading">
-              <h2 id="how-heading" className="font-display text-2xl font-bold text-foreground">
-                How it works
-              </h2>
-              <ol className="mt-4 space-y-3">
-                {PAGE.steps.map((step, i) => (
-                  <li key={step.name} className="text-foreground">
-                    <span className="font-semibold">
-                      {i + 1}. {step.name}.
-                    </span>{" "}
-                    <span className="text-muted-foreground">{step.text}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-            {PAGE.sections.map((section) => (
-              <section key={section.heading}>
-                <h2 className="font-display text-2xl font-bold text-foreground">
-                  {section.heading}
-                </h2>
-                {section.paragraphs.map((p) => (
-                  <p key={p} className="mt-3 leading-relaxed text-muted-foreground">
-                    {p}
-                  </p>
-                ))}
-              </section>
-            ))}
-            <section aria-labelledby="faq-heading">
-              <h2 id="faq-heading" className="font-display text-2xl font-bold text-foreground">
-                Frequently asked questions
-              </h2>
-              <dl className="mt-4 space-y-5">
-                {PAGE.faqs.map((faq) => (
-                  <div key={faq.question}>
-                    <dt className="font-semibold text-foreground">{faq.question}</dt>
-                    <dd className="mt-1 text-muted-foreground">{faq.answer}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-            <nav aria-label="Related" className="flex flex-wrap gap-3">
-              {PAGE.related.map((link) => (
-                <Button key={link.path} variant="outline" asChild>
-                  <Link to={link.path}>{link.label}</Link>
-                </Button>
-              ))}
-            </nav>
-          </article>
+          <ToolArticle page={PAGE} />
         </main>
         <Footer />
       </div>
