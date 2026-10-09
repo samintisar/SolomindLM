@@ -19,7 +19,7 @@ if (!existsSync(path.join(distDir, "index.html"))) {
   process.exit(1);
 }
 
-const globalHeaders = vercelGlobalHeaders(repoRoot);
+const globalHeaders = vercelGlobalHeaders(path.resolve(repoRoot, "apps/web/vercel.json"));
 
 const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
