@@ -408,6 +408,9 @@ export const deduplicatePapers = internalAction({
   handler: deduplicatePapersHandler,
 });
 
+/** Voyage rerank's per-request document limit. */
+const RERANK_MAX_DOCUMENTS = 1_000;
+
 export async function rankPapersHandler(ctx: ActionCtx, args: { papers: any[]; query: string }) {
   const logger = createServiceLogger("literatureReview", "rankPapers");
 
@@ -428,7 +431,15 @@ export async function rankPapersHandler(ctx: ActionCtx, args: { papers: any[]; q
 
     // Score every paper so all candidates share one relevance scale (#351: scoring only a top
     // slice left the rest on the search score, a different scale, and sorted the two together).
-    const reranked = await cachedRerank(ctx, args.query, documents, documents.length);
+    // Voyage takes at most RERANK_MAX_DOCUMENTS per request; its scores are per query-document
+    // pair, so batches share one scale.
+    const batches: (typeof documents)[] = [];
+    for (let i = 0; i < documents.length; i += RERANK_MAX_DOCUMENTS) {
+      batches.push(documents.slice(i, i + RERANK_MAX_DOCUMENTS));
+    }
+    const reranked = (
+      await Promise.all(batches.map((batch) => cachedRerank(ctx, args.query, batch, batch.length)))
+    ).flat();
     const relevanceById = new Map(reranked.map((r) => [r.id, r.score]));
 
     const sorted = rankByRelevanceAndInfluence(

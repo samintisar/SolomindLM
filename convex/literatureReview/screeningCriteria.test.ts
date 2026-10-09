@@ -189,16 +189,26 @@ describe("decideScreening", () => {
     expect(decision.isIncluded).toBe(true);
   });
 
-  it("uses the screener's verdict when it returned no per-criterion checks", () => {
-    const included = decideScreening({ isIncluded: true, reason: "Relevant." }, CRITERIA);
+  it("keeps an exclusion that came without per-criterion checks", () => {
     const excluded = decideScreening(
       { isIncluded: false, reason: "Off topic.", criteria: [] },
       CRITERIA
     );
 
-    expect(included.isIncluded).toBe(true);
-    expect(included.criteria).toBeUndefined();
     expect(excluded.isIncluded).toBe(false);
+    expect(excluded.reason).toBe("Off topic.");
+  });
+
+  it("never includes a paper without per-criterion checks", () => {
+    for (const response of [
+      { isIncluded: true, reason: "Relevant." },
+      { isIncluded: true, reason: "Relevant.", criteria: [] },
+    ]) {
+      const decision = decideScreening(response, CRITERIA);
+
+      expect(decision.isIncluded).toBe(false);
+      expect(decision.criteria?.every((c) => c.status === "unclear")).toBe(true);
+    }
   });
 
   it("matches checks to criteria by number and marks unanswered ones unclear", () => {

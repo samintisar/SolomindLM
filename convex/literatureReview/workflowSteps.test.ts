@@ -482,6 +482,22 @@ describe("rankPapersHandler", () => {
     expect(cachedRerank).toHaveBeenCalledWith(mockCtx, "test query", expect.any(Array), 40);
   });
 
+  it("splits more than 1,000 papers into reranker requests of at most 1,000", async () => {
+    (cachedRerank as any).mockClear();
+    (cachedRerank as any).mockResolvedValue([]);
+    const papers = Array.from({ length: 1_500 }, (_, i) => ({
+      title: `Paper ${i}`,
+      authors: ["A"],
+      abstract: "Abstract",
+      score: 0.5,
+    }));
+
+    await rankPapersHandler(mockCtx, { papers, query: "test query" });
+
+    const sizes = (cachedRerank as any).mock.calls.map((call: unknown[]) => call[3]);
+    expect(sizes).toEqual([1_000, 500]);
+  });
+
   it("blends relevance with citation influence", async () => {
     // Voyage prefers the uncited paper slightly; the widely cited one should still lead.
     (cachedRerank as any).mockResolvedValue([
@@ -551,7 +567,15 @@ describe("screenPapersHandler", () => {
     let call = 0;
     const mockInvoke = vi.fn().mockImplementation(async () => {
       call += 1;
-      if (call === 1) return { isIncluded: true, reason: "Relevant" };
+      if (call === 1) {
+        // An inclusion needs per-criterion checks; the default criteria are three.
+        const criteria = [1, 2, 3].map((n) => ({
+          criterion: n,
+          status: "met",
+          explanation: "Yes.",
+        }));
+        return { isIncluded: true, reason: "Relevant", criteria };
+      }
       return { isIncluded: false, reason: "Not relevant" };
     });
     const mockLLM = {

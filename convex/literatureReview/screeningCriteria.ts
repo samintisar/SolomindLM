@@ -118,16 +118,10 @@ export function decideScreening(
   const modelReason = response.reason?.trim() ?? "";
   const checks = response.criteria ?? [];
 
-  // No per-criterion checks at all: fall back to the screener's own verdict.
-  if (checks.length === 0) {
-    return {
-      isIncluded: response.isIncluded,
-      reason:
-        modelReason ||
-        (response.isIncluded
-          ? "Meets the eligibility criteria."
-          : "Does not meet the eligibility criteria."),
-    };
+  // No per-criterion checks: an exclusion stands on the screener's word, but an inclusion is never
+  // taken unchecked; it falls through with every criterion unclear, which excludes the paper.
+  if (checks.length === 0 && !response.isIncluded) {
+    return { isIncluded: false, reason: modelReason || "Does not meet the eligibility criteria." };
   }
 
   // The prompt numbers criteria from 1; a model that numbers from 0 is shifted back into line.
