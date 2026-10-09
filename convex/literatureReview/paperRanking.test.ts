@@ -110,6 +110,14 @@ describe("rankByRelevanceAndInfluence", () => {
     expect(ranked[0].title).toBe("Scored");
   });
 
+  it("keeps a highly cited paper without a relevance score below scored papers", () => {
+    const papers = [paper("Not scored, landmark", 50_000, 2017), paper("Scored, uncited", 0, 2026)];
+
+    const ranked = rankByRelevanceAndInfluence(papers, [undefined, 0.05], CURRENT_YEAR);
+
+    expect(ranked.map((p) => p.title)).toEqual(["Scored, uncited", "Not scored, landmark"]);
+  });
+
   it("writes the blended score, between 0 and 1, onto each paper", () => {
     const papers = [paper("A", 5, 2024), paper("B", 500, 2020), paper("C")];
 

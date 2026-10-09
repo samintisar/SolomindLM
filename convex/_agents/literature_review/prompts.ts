@@ -219,7 +219,7 @@ Then give a one-sentence reason for the overall decision, and set isIncluded to 
 
 Respond in the following JSON format exactly (shape only; replace every value):
 
-{\n  "criteria": [\n    { "criterion": 1, "status": "met | not_met | unclear", "explanation": "One short sentence grounded in the title or abstract." }\n  ],\n  "reason": "One sentence explaining the decision.",\n  "isIncluded": "true | false"\n}
+{\n  "criteria": [\n    { "criterion": 1, "status": "met | not_met | unclear", "explanation": "One short sentence grounded in the title or abstract." }\n  ],\n  "reason": "One sentence explaining the decision.",\n  "isIncluded": true\n}
 
 JSON OUTPUT:`;
 

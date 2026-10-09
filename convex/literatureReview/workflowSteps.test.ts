@@ -136,6 +136,18 @@ describe("dedupePapers", () => {
     // The search score that counted those citations comes along, for the rerank fallback.
     expect(result.map((p: any) => p.score)).toEqual([0.9, 0.7]);
   });
+
+  it("takes the search score from the more-cited copy even when it is lower", () => {
+    const papers = [
+      { title: "Paper A", authors: ["A"], doi: "10.1234/a", score: 0.9, citationCount: 1 },
+      { title: "Paper A", authors: ["A"], doi: "10.1234/a", score: 0.6, citationCount: 400 },
+    ];
+
+    const [kept] = dedupePapers(papers as any) as any[];
+
+    expect(kept.citationCount).toBe(400);
+    expect(kept.score).toBe(0.6);
+  });
 });
 
 describe("planReviewHandler", () => {

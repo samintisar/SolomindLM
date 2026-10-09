@@ -175,11 +175,12 @@ export function dedupePapers<
     }
     const existing = out[keptIndex];
     if (p.citationCount != null && p.citationCount > (existing.citationCount ?? -1)) {
-      // The search score weighs citations too; the rerank-failure fallback sorts by it.
+      // The search score was computed from this copy's citations; the rerank-failure fallback
+      // sorts by it, so it comes along with the count.
       out[keptIndex] = {
         ...existing,
         citationCount: p.citationCount,
-        ...(p.score != null && p.score > (existing.score ?? -Infinity) ? { score: p.score } : {}),
+        ...(p.score != null ? { score: p.score } : {}),
       };
     }
   }

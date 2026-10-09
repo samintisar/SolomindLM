@@ -41,8 +41,8 @@ function median(values: number[]): number {
  * the reranker's own 0..1 score, unscaled, so a pool of near-equal scores stays near-equal and
  * citations can still separate it.
  *
- * `relevance[i]` is the reranker score for `papers[i]`; a missing one counts as the least
- * relevant. A paper with an unknown citation count gets the pool's median influence, so a source
+ * `relevance[i]` is the reranker score for `papers[i]`; a paper without one ranks below every
+ * scored paper. A paper with an unknown citation count gets the pool's median influence, so a source
  * that reports no counts is neither boosted nor buried. Ties keep the input order.
  */
 export function rankByRelevanceAndInfluence<
@@ -50,11 +50,14 @@ export function rankByRelevanceAndInfluence<
 >(papers: T[], relevance: Array<number | undefined>, currentYear: number): T[] {
   if (papers.length === 0) return [];
 
-  // A paper the reranker did not score sits at the bottom.
-  const relevanceScores = papers.map((_, i) => {
+  // A paper the reranker did not score sits below every scored one, whatever its citations.
+  const isScored = papers.map((_, i) => {
     const score = relevance[i];
-    return score != null && Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
+    return score != null && Number.isFinite(score);
   });
+  const relevanceScores = papers.map((_, i) =>
+    isScored[i] ? Math.min(1, Math.max(0, relevance[i] as number)) : 0
+  );
 
   const impacts = papers.map((p) => citationImpact(p.citationCount, p.year, currentYear));
   const known = impacts.filter((i): i is number => i !== undefined);
@@ -68,8 +71,9 @@ export function rankByRelevanceAndInfluence<
     .map((paper, index) => ({
       paper,
       index,
+      scored: isScored[index],
       score: RELEVANCE_WEIGHT * relevanceScores[index] + CITATION_WEIGHT * influenceScores[index],
     }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .sort((a, b) => Number(b.scored) - Number(a.scored) || b.score - a.score || a.index - b.index)
     .map(({ paper, score }) => ({ ...paper, score }));
 }
