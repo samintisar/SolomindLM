@@ -130,6 +130,23 @@ describe("isAllowedRedirect", () => {
     expect(isAllowedRedirect("http://192.168.1.999:5173/home", DEV_BASES, DEV)).toBe(false);
     expect(isAllowedRedirect("http://[192.168.1.20:5173/home", DEV_BASES, DEV)).toBe(false);
   });
+
+  test("allows a worktree's localhost port on a dev deployment", () => {
+    expect(isAllowedRedirect("http://localhost:64402/home", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("http://127.0.0.1:5181/home", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("http://localhost:64402", DEV_BASES, DEV)).toBe(true);
+  });
+
+  test("keeps localhost lookalikes out even on a dev deployment", () => {
+    expect(isAllowedRedirect("http://localhost:64402@evil.com/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://localhost.evil.com:64402/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("https://localhost:64402/home", DEV_BASES, DEV)).toBe(false);
+  });
+
+  test("rejects other localhost ports on production", () => {
+    expect(isAllowedRedirect("http://localhost:64402/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://127.0.0.1:5181/home", PROD_BASES)).toBe(false);
+  });
 });
 
 describe("isLocalDevSite", () => {
@@ -139,5 +156,6 @@ describe("isLocalDevSite", () => {
     expect(isLocalDevSite("https://solomindlm.com")).toBe(false);
     expect(isLocalDevSite("http://localhost.evil.com")).toBe(false);
     expect(isLocalDevSite("not a url")).toBe(false);
+    expect(isLocalDevSite("")).toBe(false);
   });
 });

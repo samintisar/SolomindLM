@@ -45,13 +45,20 @@ function isLanDevServerUrl(url: string): boolean {
   return port >= DEV_WEB_PORTS.first && port <= DEV_WEB_PORTS.last;
 }
 
+/** True for a dev server on this machine: plain http, `localhost` / `127.0.0.1`, any port. */
+function isLocalhostUrl(url: string): boolean {
+  const parsed = parsePlainHttpUrl(url);
+  return !!parsed && LOCALHOST_HOSTNAMES.has(parsed.hostname);
+}
+
 /**
  * A dev deployment: `SITE_URL` itself is a plain-http localhost origin. Production sets an
- * https `SITE_URL`, so this never holds there.
+ * https `SITE_URL`, so this is false there. Pass the raw `SITE_URL`, not `siteUrl()`: its
+ * localhost fallback would count a deployment with `SITE_URL` unset (a preview, or a
+ * misconfigured prod) as dev.
  */
 export function isLocalDevSite(site: string): boolean {
-  const parsed = parsePlainHttpUrl(site);
-  return !!parsed && LOCALHOST_HOSTNAMES.has(parsed.hostname);
+  return isLocalhostUrl(site);
 }
 
 /**
@@ -66,8 +73,10 @@ function hasAllowedOrigin(url: string, bases: string[]): boolean {
 
 interface RedirectPolicy {
   /**
-   * Accept Expo Go (`exp://`) and LAN Vite dev server targets. Dev deployments only: on
-   * production they would hand the OAuth `?code=` to whoever holds that LAN IP or Expo project.
+   * Accept Expo Go (`exp://`), LAN Vite dev server targets, and `localhost` / `127.0.0.1` on
+   * any port (so OAuth returns to the worktree dev server that started it). Dev deployments
+   * only: on production they would hand the OAuth `?code=` to whoever holds that LAN IP,
+   * Expo project or local port.
    */
   allowDevTargets?: boolean;
 }
@@ -81,7 +90,12 @@ export function isAllowedRedirect(
     return true;
   }
 
-  if (allowDevTargets && (EXPO_DEV_SCHEME.test(redirectTo) || isLanDevServerUrl(redirectTo))) {
+  if (
+    allowDevTargets &&
+    (EXPO_DEV_SCHEME.test(redirectTo) ||
+      isLanDevServerUrl(redirectTo) ||
+      isLocalhostUrl(redirectTo))
+  ) {
     return true;
   }
 
@@ -176,7 +190,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     async redirect({ redirectTo }) {
       const bases = [siteUrl(), ...extraOrigins(), ...MOBILE_DEV_WEB_ORIGINS];
 
-      const allowDevTargets = isLocalDevSite(bases[0]);
+      const allowDevTargets = isLocalDevSite(process.env.SITE_URL ?? "");
 
       if (!isAllowedRedirect(redirectTo, bases, { allowDevTargets })) {
         throw new Error(`Invalid redirectTo ${redirectTo} for SITE_URL ${process.env.SITE_URL}`);
