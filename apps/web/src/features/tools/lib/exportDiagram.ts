@@ -15,7 +15,7 @@ export function downloadSvg(svg: SVGSVGElement, fileName: string): void {
 }
 
 /** Rasterizes the SVG on a white canvas at `scale`× its size. */
-export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob> {
+async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob> {
   const width = Number(svg.getAttribute("width"));
   const height = Number(svg.getAttribute("height"));
   const url = URL.createObjectURL(new Blob([serializeSvg(svg)], { type: SVG_TYPE }));

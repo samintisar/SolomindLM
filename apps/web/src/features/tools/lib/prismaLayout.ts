@@ -35,7 +35,7 @@ export type PrismaBox = {
   lines: string[];
 };
 
-export type PrismaArrow = { id: string; points: [number, number][] };
+type PrismaArrow = { id: string; points: [number, number][] };
 
 export type PrismaLayout = {
   width: number;

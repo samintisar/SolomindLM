@@ -14,7 +14,7 @@ const INK = "#000000";
 const PAPER = "#ffffff";
 const BAND = "#e6e6e6";
 
-export const PRISMA_DIAGRAM_TITLE = "PRISMA 2020 flow diagram";
+const PRISMA_DIAGRAM_TITLE = "PRISMA 2020 flow diagram";
 
 /** Stable keys for a box's lines without using their index. */
 function keyedLines(boxId: string, lines: string[]) {

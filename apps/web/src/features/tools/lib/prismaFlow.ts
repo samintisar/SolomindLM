@@ -125,7 +125,7 @@ export function total(counts: Count[]): Count {
   return filled.length === 0 ? null : filled.reduce((sum, count) => sum + count, 0);
 }
 
-export type PrismaWarningField =
+type PrismaWarningField =
   | "recordsScreened"
   | "reportsAssessed"
   | "otherReportsAssessed"
