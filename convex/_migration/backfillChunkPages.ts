@@ -2,8 +2,9 @@
  * Migration: set `documentChunks.pageNumber` on chunks stored before the chunker read OCR page labels.
  *
  * For each document whose `extractedMarkdown` has `**Page N**` labels, every chunk's text is found in the
- * markdown and given the page of the nearest label at or before it. Chunk text and embeddings are untouched;
- * a chunk that can't be found keeps no page. Safe to rerun.
+ * markdown and given the page of the nearest label at or before it. Only chunks without a page are filled, so a
+ * page the chunker wrote is never changed. Chunk text and embeddings are untouched; a chunk that can't be
+ * found keeps no page. Safe to rerun.
  *
  *   npx convex run _migration/backfillChunkPages:start
  *
@@ -74,12 +75,14 @@ export const backfillDocumentChunks = internalMutation({
         .paginate({ cursor: chunkCursor, numItems: CHUNK_BATCH_SIZE });
 
       for (const chunk of result.page) {
+        // The chunker already set an exact page; a text search could pick a repeated passage on another page.
+        if (chunk.pageNumber != null) continue;
         const expected = Math.round((chunk.relativePosition ?? 0) * markdown.length);
         const offset = locateChunkOffset(markdown, chunk.content, expected);
         if (offset < 0) continue;
         // Old chunks can open on a page break; use the page their text starts on.
         const pageNumber = lookup(offset + leadingPageBreakLength(chunk.content));
-        if (pageNumber !== null && chunk.pageNumber !== pageNumber) {
+        if (pageNumber !== null) {
           await ctx.db.patch(chunk._id, { pageNumber });
         }
       }

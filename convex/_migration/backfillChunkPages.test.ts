@@ -52,18 +52,21 @@ describe("backfillChunkPages", () => {
         documentId: Id<"documents">,
         chunkIndex: number,
         content: string,
-        relativePosition: number
+        relativePosition: number,
+        pageNumber?: number
       ) =>
         ctx.db.insert("documentChunks", {
           documentId,
           chunkIndex,
           content,
           relativePosition,
+          pageNumber,
         } as never);
 
       const paged = await insertDoc(PAGED);
       const plain = await insertDoc("No labels here.");
       const empty = await insertDoc(undefined);
+      const second = await insertDoc("**Page 1**\n\nOne.\n\n---\n\n**Page 2**\n\nTwo.");
       return {
         alpha: await insertChunk(paged, 0, "**Page 1**\n\nAlpha on page one.", 0),
         beta: await insertChunk(paged, 1, "Beta on page two.", 0.5),
@@ -71,6 +74,10 @@ describe("backfillChunkPages", () => {
         missing: await insertChunk(paged, 3, "Text that is not in the markdown.", 1),
         plain: await insertChunk(plain, 0, "No labels here.", 0),
         empty: await insertChunk(empty, 0, "Anything.", 0),
+        // Written by the chunker: must not be replaced by a text search.
+        preset: await insertChunk(paged, 4, "Beta on page two.", 0.5, 4),
+        // Reached only after the walk passes through the unlabeled documents.
+        two: await insertChunk(second, 0, "Two.", 1),
       };
     });
 
@@ -87,6 +94,8 @@ describe("backfillChunkPages", () => {
         missing: await pageOf(ids.missing),
         plain: await pageOf(ids.plain),
         empty: await pageOf(ids.empty),
+        preset: await pageOf(ids.preset),
+        two: await pageOf(ids.two),
       };
     });
 
@@ -98,6 +107,8 @@ describe("backfillChunkPages", () => {
       missing: undefined,
       plain: undefined,
       empty: undefined,
+      preset: 4,
+      two: 2,
     });
   });
 
