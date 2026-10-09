@@ -59,9 +59,10 @@ for (const theme of THEMES) {
         await page.evaluate(() => document.fonts.ready);
 
         for (const name of SECTIONS) {
-          await expect(page.locator(`[data-gallery-section="${name}"]`)).toHaveScreenshot(
-            `${slugify(name)}-${theme}-${width}.png`
-          );
+          // Soft: one changed section (which shifts every later one) shouldn't hide the rest.
+          await expect
+            .soft(page.locator(`[data-gallery-section="${name}"]`))
+            .toHaveScreenshot(`${slugify(name)}-${theme}-${width}.png`);
         }
       });
 

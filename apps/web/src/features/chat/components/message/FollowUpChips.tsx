@@ -18,7 +18,6 @@ export function FollowUpChips({ followUps, onSend }: FollowUpChipsProps) {
             type="button"
             variant="outline"
             size="chip"
-            className="max-w-full"
             onClick={() => onSend(q)}
           >
             {q}

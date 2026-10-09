@@ -925,7 +925,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
           ref={composerRef}
           className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex min-w-0 justify-center px-3 pb-3 sm:px-4"
         >
-          {/* Opaque band behind the disclaimer strip so messages scrolled under the composer don't show through its text. */}
+          {/* Opaque band behind the composer so messages scrolled under it don't show through the gutters beside and below the input. */}
           <div
             className="absolute inset-x-0 bottom-0 -z-10 h-28 max-h-full bg-linear-to-t from-background from-60% to-transparent"
             aria-hidden
