@@ -12,10 +12,16 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { DataModel, Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
+import { SCREEN_PAPERS_BATCH_SIZE } from "../literatureReview/batchSizes";
 import {
   dropSearchCopiesOfNotebookPapers,
   resolvePaperScope,
 } from "../literatureReview/notebookPapers";
+import {
+  resolveScreeningDecisions,
+  type ScreeningCriterion,
+  type ScreeningDecision,
+} from "../literatureReview/screeningCriteria";
 import { literatureReviewWorkflowProvenanceValidator } from "../literatureReview/workflowProvenance";
 import { assertRagEvalGate } from "./_gate";
 
@@ -262,6 +268,7 @@ async function searchRankAndScreen(
     question: string;
     searchQueries: string[];
     notebookPapers: LiteraturePaper[];
+    screeningCriteria: ScreeningCriterion[];
   }
 ): Promise<SearchRankScreenResult> {
   const { sessionId } = args;
@@ -280,6 +287,7 @@ async function searchRankAndScreen(
     patch: {
       searchQueries: args.searchQueries,
       databasesUsed: ["arxiv", "semantic_scholar", "pubmed"],
+      screeningCriteria: args.screeningCriteria,
       recordsIdentified: searchResults.recordsIdentified,
       recordsAfterDedupe: searchResults.recordsAfterDedupe,
       recordsFromNotebook: args.notebookPapers.length,
@@ -304,21 +312,47 @@ async function searchRankAndScreen(
     },
   });
 
-  const screened: { papers: LiteraturePaper[] } = await ctx.runAction(
-    internal.literatureReview.workflowSteps.screenPapers,
-    { papers: ranked.papers.slice(0, 25), query: args.question }
+  // Screened the way the workflow screens (batch action + resolveScreeningDecisions), so the eval
+  // session stores the same per-criterion checks and counts.
+  const papersToScreen = ranked.papers.slice(0, 25);
+  const decisionsByIndex = new Map<number, ScreeningDecision>();
+  for (let i = 0; i < papersToScreen.length; i += SCREEN_PAPERS_BATCH_SIZE) {
+    const { decisions: batchDecisions } = await ctx.runAction(
+      internal.literatureReview.workflowSteps.screenPapersBatch,
+      {
+        papers: papersToScreen.slice(i, i + SCREEN_PAPERS_BATCH_SIZE),
+        query: args.question,
+        batchStartIndex: i,
+        criteria: args.screeningCriteria,
+      }
+    );
+    for (const { paperIndex, ...decision } of batchDecisions) {
+      decisionsByIndex.set(paperIndex, decision);
+    }
+  }
+  const { decisions, includedCount, excludedCount, failedCount } = resolveScreeningDecisions(
+    papersToScreen.length,
+    decisionsByIndex
   );
-  const included = screened.papers.filter((paper) => paper.isIncluded === true);
+  const screened = {
+    papers: papersToScreen.map((paper, i) => ({
+      ...paper,
+      isIncluded: decisions[i].isIncluded,
+      includeReason: decisions[i].reason,
+    })),
+  };
+  const included = screened.papers.filter((paper) => paper.isIncluded);
 
   await ctx.runMutation(internal.literatureReview.db.replaceScreeningDecisions, {
     sessionId,
-    decisions: screened.papers.map((paper, i) => ({
+    decisions: papersToScreen.map((paper, i) => ({
       paperIndex: i,
       title: paper.title,
       authors: paper.authors,
       year: paper.year,
-      decision: paper.isIncluded === true ? ("included" as const) : ("excluded" as const),
-      reason: paper.includeReason ?? "No reason recorded.",
+      decision: decisions[i].isIncluded ? ("included" as const) : ("excluded" as const),
+      reason: decisions[i].reason,
+      ...(decisions[i].criteria ? { criteria: decisions[i].criteria } : {}),
       rank: i + 1,
     })),
   });
@@ -326,9 +360,10 @@ async function searchRankAndScreen(
   await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
     sessionId,
     patch: {
-      recordsScreened: screened.papers.length,
-      recordsIncluded: included.length,
-      recordsExcluded: screened.papers.length - included.length,
+      recordsScreened: papersToScreen.length,
+      recordsIncluded: includedCount,
+      recordsExcluded: excludedCount - failedCount,
+      ...(failedCount > 0 ? { recordsNotScreened: failedCount } : {}),
       screenCompletedAt: Date.now(),
     },
   });
@@ -398,10 +433,13 @@ export const runLiteratureReviewEval = action({
     const notebookPaperIds = notebookPaperDocs.map((d) => d._id as Id<"documents">);
     const paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
 
-    const plan: { searchQueries: string[]; suggestedColumns: ConfirmedColumn[] } =
-      await ctx.runAction(internal.literatureReview.workflowSteps.planReview, {
-        query: args.question,
-      });
+    const plan: {
+      searchQueries: string[];
+      suggestedColumns: ConfirmedColumn[];
+      screeningCriteria: ScreeningCriterion[];
+    } = await ctx.runAction(internal.literatureReview.workflowSteps.planReview, {
+      query: args.question,
+    });
     const confirmedColumns: ConfirmedColumn[] = normalizeConfirmedColumns(plan.suggestedColumns);
     const suggestedColumns = toSuggestedColumns(confirmedColumns);
     const sessionId: Id<"literatureReviewSessions"> = await ctx.runMutation(
@@ -439,6 +477,7 @@ export const runLiteratureReviewEval = action({
           question: args.question,
           searchQueries: plan.searchQueries,
           notebookPapers,
+          screeningCriteria: plan.screeningCriteria,
         });
     if (papersOnly) {
       await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {

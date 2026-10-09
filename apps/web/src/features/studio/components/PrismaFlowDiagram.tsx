@@ -6,6 +6,8 @@ export interface PrismaFlowCounts {
   recordsAfterDedupe?: number;
   recordsScreened?: number;
   recordsExcluded?: number;
+  /** Screened papers whose screening call failed; excluded, but not counted in recordsExcluded. */
+  recordsNotScreened?: number;
   /** Search papers included after screening; notebook papers are counted separately. */
   recordsIncluded?: number;
   /** The user's selected notebook papers, included without screening (#301). */
@@ -37,6 +39,7 @@ export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, cl
   const deduped = counts.recordsAfterDedupe ?? identified;
   const screened = counts.recordsScreened ?? deduped;
   const excluded = counts.recordsExcluded ?? 0;
+  const notScreened = counts.recordsNotScreened ?? 0;
   const fromNotebook = counts.recordsFromNotebook ?? 0;
   const includedFromSearch = counts.searchSkipped ? 0 : (counts.recordsIncluded ?? 0);
   const included = includedFromSearch + fromNotebook;
@@ -73,6 +76,12 @@ export const PrismaFlowDiagram: React.FC<PrismaFlowDiagramProps> = ({ counts, cl
             <span className="font-sans text-xs text-muted-foreground">Excluded</span>
             <FlowBox label="" value={excluded} variant="excluded" compact />
           </div>
+          {notScreened > 0 ? (
+            <div className="flex flex-col items-center gap-1">
+              <span className="font-sans text-xs text-muted-foreground">Not screened</span>
+              <FlowBox label="" value={notScreened} variant="excluded" compact />
+            </div>
+          ) : null}
         </div>
         <Arrow />
         {fromNotebook > 0 ? (

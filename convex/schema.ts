@@ -6,6 +6,8 @@ import {
   ingestionStatusValidator,
   paperRecordValidator,
 } from "./documents/paperRecord";
+import { criterionAssessmentValidator } from "./literatureReview/screeningCriteria";
+import { literatureReviewWorkflowProvenanceValidator } from "./literatureReview/workflowProvenance";
 
 export default defineSchema({
   // Convex Auth tables (users, sessions, accounts, verificationTokens)
@@ -908,25 +910,7 @@ export default defineSchema({
     conversationId: v.optional(v.id("conversations")),
     assistantMessageId: v.optional(v.id("messages")),
     /** PRISMA-style workflow counts and search provenance for report Methods. */
-    workflowProvenance: v.optional(
-      v.object({
-        searchQueries: v.optional(v.array(v.string())),
-        databasesUsed: v.optional(v.array(v.string())),
-        recordsIdentified: v.optional(v.number()),
-        recordsAfterDedupe: v.optional(v.number()),
-        recordsRanked: v.optional(v.number()),
-        recordsScreened: v.optional(v.number()),
-        recordsIncluded: v.optional(v.number()),
-        recordsExcluded: v.optional(v.number()),
-        recordsFromNotebook: v.optional(v.number()),
-        searchSkipped: v.optional(v.boolean()),
-        extractedRowCount: v.optional(v.number()),
-        searchCompletedAt: v.optional(v.number()),
-        rankCompletedAt: v.optional(v.number()),
-        screenCompletedAt: v.optional(v.number()),
-        extractCompletedAt: v.optional(v.number()),
-      })
-    ),
+    workflowProvenance: v.optional(literatureReviewWorkflowProvenanceValidator),
     /** Times this review's workflow was retried; capped so retries can't replace new runs. */
     retryCount: v.optional(v.number()),
     createdAt: v.number(),
@@ -945,6 +929,8 @@ export default defineSchema({
     year: v.optional(v.number()),
     decision: v.union(v.literal("included"), v.literal("excluded")),
     reason: v.string(),
+    /** The paper checked against each eligibility criterion (#351); absent on older rows. */
+    criteria: v.optional(v.array(criterionAssessmentValidator)),
     rank: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_session", ["sessionId"]),
