@@ -9,9 +9,16 @@ import {
   useUpdateDocument,
 } from "../services/documentsApi";
 
-/** Fields that change what a source row shows. Rebuild `sources` only when one of them changes. */
-function documentSignature(d: DocumentSummary): string {
-  return `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${d.sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${d.metadata?.userMessage ?? ""}`;
+/** Structural equality for JSON-like values (Convex query results). */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  return aKeys.every((k) =>
+    sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])
+  );
 }
 
 interface UseSourceManagerProps {
@@ -25,24 +32,49 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   useEffect(() => {
     sourcesRef.current = sources;
   }, [sources]);
-  const prevSignatureRef = useRef("");
+  const prevInputRef = useRef<{
+    documents: readonly DocumentSummary[];
+    notebookId: string | null;
+  } | null>(null);
+  /** Rows added locally whose document is not in `documents` yet. */
+  const localIdsRef = useRef(new Set<string>());
+  /** Rows removed locally whose delete has not finished yet. */
+  const deletingIdsRef = useRef(new Set<string>());
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();
   const removeManyDocuments = useRemoveManyDocuments(notebookId);
   const { error: showError } = useToast();
 
   useEffect(() => {
-    // Keyed by notebook too, so switching between two notebooks with the same (e.g. empty)
-    // list still resets local-only rows such as optimistically added sources.
-    const signature = `${notebookId ?? ""}|${documents.map(documentSignature).join(",")}`;
-    if (signature === prevSignatureRef.current) return;
-    prevSignatureRef.current = signature;
+    // Rebuild only when the content changes, not on every new array, so local renames and
+    // selection survive. Comparing whole documents covers every field `documentToSource` reads.
+    const prevInput = prevInputRef.current;
+    const notebookChanged = prevInput?.notebookId !== notebookId;
+    if (
+      prevInput &&
+      !notebookChanged &&
+      prevInput.documents.length === documents.length &&
+      prevInput.documents.every((d, i) => sameValue(d, documents[i]))
+    ) {
+      return;
+    }
+    prevInputRef.current = { documents, notebookId };
+    // Switching notebooks drops local-only rows, even when both lists are the same (e.g. empty).
+    if (notebookChanged) localIdsRef.current.clear();
+    const serverIds = new Set<string>(documents.map((d) => d._id));
+    for (const id of serverIds) localIdsRef.current.delete(id);
+    const localIds = localIdsRef.current;
+    const deletingIds = deletingIdsRef.current;
     setSources((prev) => {
-      const newSources = documents.map(documentToSource);
-      return newSources.map((source: Source) => ({
-        ...source,
-        selected: prev.find((s) => s.id === source.id)?.selected ?? true,
-      }));
+      const selectedById = new Map(prev.map((s) => [s.id, s.selected]));
+      const localRows = prev.filter((s) => localIds.has(s.id));
+      const serverRows = documents
+        .filter((d) => !deletingIds.has(d._id))
+        .map((d) => {
+          const source = documentToSource(d);
+          return { ...source, selected: selectedById.get(source.id) ?? true };
+        });
+      return [...localRows, ...serverRows];
     });
   }, [documents, notebookId]);
 
@@ -66,6 +98,7 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   }, []);
 
   const handleAddSource = useCallback((source: Source) => {
+    localIdsRef.current.add(source.id);
     setSources((prev) => [source, ...prev]);
   }, []);
 
@@ -73,6 +106,7 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     async (sourceId: string) => {
       const index = sourcesRef.current.findIndex((s) => s.id === sourceId);
       const removed = index >= 0 ? sourcesRef.current[index] : undefined;
+      deletingIdsRef.current.add(sourceId);
       setSources((prev) => prev.filter((s) => s.id !== sourceId));
       try {
         await deleteDocumentMutation(sourceId);
@@ -86,6 +120,9 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
           });
         }
         showError(error instanceof Error ? error.message : "Failed to delete source");
+      } finally {
+        // A Convex mutation resolves after its result reaches the client's queries.
+        deletingIdsRef.current.delete(sourceId);
       }
     },
     [deleteDocumentMutation, showError]
