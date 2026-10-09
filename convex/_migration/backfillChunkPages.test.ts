@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { MAX_STORED_MARKDOWN_CHARS, toStoredMarkdown } from "../documents/storedMarkdown.helpers";
 import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -78,6 +79,8 @@ describe("backfillChunkPages", () => {
         preset: await insertChunk(paged, 4, "Beta on page two.", 0.5, 4),
         // Reached only after the walk passes through the unlabeled documents.
         two: await insertChunk(second, 0, "Two.", 1),
+        // The stored markdown is complete, so a chunk after one that wasn't found is still placed.
+        afterMissing: await insertChunk(paged, 5, "Alpha on page one.", 0),
       };
     });
 
@@ -96,6 +99,7 @@ describe("backfillChunkPages", () => {
         empty: await pageOf(ids.empty),
         preset: await pageOf(ids.preset),
         two: await pageOf(ids.two),
+        afterMissing: await pageOf(ids.afterMissing),
       };
     });
 
@@ -109,7 +113,46 @@ describe("backfillChunkPages", () => {
       empty: undefined,
       preset: 4,
       two: 2,
+      afterMissing: 1,
     });
+  });
+
+  test("in a truncated document, stops at the first chunk past the stored prefix", async () => {
+    const t = convexTest(looseSchema, modules);
+    // Stored copy cut mid-way through page 2; the full text went on past the cap.
+    const truncated = toStoredMarkdown(
+      `${PAGED}\n\n${"x".repeat(MAX_STORED_MARKDOWN_CHARS)}\n\nBeta on page two.`
+    );
+
+    const ids = await t.run(async (ctx) => {
+      const documentId = (await ctx.db.insert("documents", {
+        extractedMarkdown: truncated,
+      } as never)) as Id<"documents">;
+      const insertChunk = (chunkIndex: number, content: string) =>
+        ctx.db.insert("documentChunks", {
+          documentId,
+          chunkIndex,
+          content,
+          relativePosition: 0,
+        } as never);
+      return {
+        inPrefix: await insertChunk(0, "Alpha on page one."),
+        // Straddles the cap, so its text isn't in the stored copy.
+        cut: await insertChunk(1, "xxxx Text that only exists past the cap."),
+        // Past the cap: its text also appears on page 2 of the prefix, which must not be taken as its page.
+        pastCap: await insertChunk(2, "Beta on page two."),
+      };
+    });
+
+    await t.mutation(internal._migration.backfillChunkPages.start, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const pages = await t.run(async (ctx) => ({
+      inPrefix: (await ctx.db.get(ids.inPrefix))?.pageNumber,
+      cut: (await ctx.db.get(ids.cut))?.pageNumber,
+      pastCap: (await ctx.db.get(ids.pastCap))?.pageNumber,
+    }));
+    expect(pages).toEqual({ inPrefix: 1, cut: undefined, pastCap: undefined });
   });
 
   test("walks a document's chunks across several batches", async () => {

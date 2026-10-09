@@ -4,7 +4,8 @@
  * For each document whose `extractedMarkdown` has `**Page N**` labels, every chunk's text is found in the
  * markdown and given the page of the nearest label at or before it. Only chunks without a page are filled, so a
  * page the chunker wrote is never changed. Chunk text and embeddings are untouched; a chunk that can't be
- * found, or whose text repeats on different pages, keeps no page. Safe to rerun.
+ * found, or whose text repeats on different pages, keeps no page. In a document whose stored copy was
+ * truncated, chunks from the first one past the cap onwards keep no page. Safe to rerun.
  *
  *   npx convex run _migration/backfillChunkPages:start
  *
@@ -16,6 +17,7 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalMutation } from "../_generated/server";
 import { chunkPage, hasPageLabels, pageAtOffset } from "../_services/processing/pageLabels";
+import { isTruncatedStoredMarkdown } from "../documents/storedMarkdown.helpers";
 
 /** Chunk rows carry a 1536-float embedding (~13 KB), so 200 rows stay far below the per-function read limit. */
 const CHUNK_BATCH_SIZE = 200;
@@ -64,6 +66,8 @@ export const backfillDocumentChunks = internalMutation({
     const markdown = (await ctx.db.get(documentId))?.extractedMarkdown;
     if (markdown) {
       const lookup = pageAtOffset(markdown);
+      const truncated = isTruncatedStoredMarkdown(markdown);
+      let reachedCap = false;
       const result = await ctx.db
         .query("documentChunks")
         .withIndex("by_document", (q) => q.eq("documentId", documentId))
@@ -72,6 +76,12 @@ export const backfillDocumentChunks = internalMutation({
       for (const chunk of result.page) {
         // The chunker already set an exact page; a text search could pick a repeated passage on another page.
         if (chunk.pageNumber != null) continue;
+        // Chunks are stored in order. In a truncated copy the first chunk whose text is missing marks the cap:
+        // later chunks lie past it, where text repeated from the prefix would take an earlier page.
+        if (truncated && !markdown.includes(chunk.content.trim())) {
+          reachedCap = true;
+          break;
+        }
         // Null when the text isn't found or repeats across pages: a page we can't place stays unset.
         const pageNumber = chunkPage(markdown, chunk.content, lookup);
         if (pageNumber !== null) {
@@ -79,7 +89,7 @@ export const backfillDocumentChunks = internalMutation({
         }
       }
 
-      if (!result.isDone) {
+      if (!result.isDone && !reachedCap) {
         await ctx.scheduler.runAfter(
           0,
           internal._migration.backfillChunkPages.backfillDocumentChunks,
