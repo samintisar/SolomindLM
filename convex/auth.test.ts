@@ -156,5 +156,6 @@ describe("isLocalDevSite", () => {
     expect(isLocalDevSite("https://solomindlm.com")).toBe(false);
     expect(isLocalDevSite("http://localhost.evil.com")).toBe(false);
     expect(isLocalDevSite("not a url")).toBe(false);
+    expect(isLocalDevSite("")).toBe(false);
   });
 });

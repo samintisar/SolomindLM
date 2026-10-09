@@ -53,9 +53,9 @@ function isLocalhostUrl(url: string): boolean {
 
 /**
  * A dev deployment: `SITE_URL` itself is a plain-http localhost origin. Production sets an
- * https `SITE_URL`, so this is false there. Pass `siteUrl()`, which falls back to
- * `http://localhost:5173` when `SITE_URL` is unset, so a deployment without it
- * (e.g. a preview) counts as dev.
+ * https `SITE_URL`, so this is false there. Pass the raw `SITE_URL`, not `siteUrl()`: its
+ * localhost fallback would count a deployment with `SITE_URL` unset (a preview, or a
+ * misconfigured prod) as dev.
  */
 export function isLocalDevSite(site: string): boolean {
   return isLocalhostUrl(site);
@@ -190,7 +190,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     async redirect({ redirectTo }) {
       const bases = [siteUrl(), ...extraOrigins(), ...MOBILE_DEV_WEB_ORIGINS];
 
-      const allowDevTargets = isLocalDevSite(bases[0]);
+      const allowDevTargets = isLocalDevSite(process.env.SITE_URL ?? "");
 
       if (!isAllowedRedirect(redirectTo, bases, { allowDevTargets })) {
         throw new Error(`Invalid redirectTo ${redirectTo} for SITE_URL ${process.env.SITE_URL}`);
