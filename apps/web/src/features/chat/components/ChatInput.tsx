@@ -186,7 +186,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   );
 
   return (
-    <div className="flex w-full min-w-0 max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
+    <div className="w-full min-w-0 max-w-3xl xl:max-w-4xl 2xl:max-w-5xl">
       {/* Labels collapse by the composer's own width (container queries), not the viewport: in the
           tablet three-panel layout the chat column is narrower than a phone screen. */}
       <InputGroup
@@ -272,9 +272,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         </InputGroupAddon>
       </InputGroup>
-      <p className="pointer-events-none px-1 text-center font-sans text-xs leading-snug text-muted-foreground">
-        SolomindLM can be inaccurate; please double check its responses.
-      </p>
     </div>
   );
 };
