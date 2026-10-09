@@ -25,10 +25,38 @@ vi.mock("@/features/chat/useChatStreaming", () => ({
 }));
 vi.mock("@/shared/contexts/useToast", () => ({ useToast: () => ({ error: vi.fn() }) }));
 vi.mock("@/features/sources/components/SourcesPanel", () => ({
-  SourcesPanel: () => <div data-testid="sources-panel" />,
+  SourcesPanel: ({
+    focusSourceRequest,
+    onFocusSourceHandled,
+  }: {
+    focusSourceRequest?: unknown;
+    onFocusSourceHandled?: () => void;
+  }) => (
+    <div data-testid="sources-panel" data-focus={JSON.stringify(focusSourceRequest ?? null)}>
+      <button type="button" onClick={onFocusSourceHandled}>
+        focus handled
+      </button>
+    </div>
+  ),
 }));
 vi.mock("@/features/chat/components/ChatPanel", () => ({
-  ChatPanel: () => <div data-testid="chat-panel" />,
+  ChatPanel: ({
+    onOpenNotebookSource,
+  }: {
+    onOpenNotebookSource?: (
+      documentId: string,
+      focus?: { quote?: string; pageNumber?: number | null }
+    ) => void;
+  }) => (
+    <div data-testid="chat-panel">
+      <button
+        type="button"
+        onClick={() => onOpenNotebookSource?.("doc1", { quote: "the passage", pageNumber: 7 })}
+      >
+        open citation
+      </button>
+    </div>
+  ),
 }));
 vi.mock("@/features/studio/components/StudioPanel", () => ({
   StudioPanel: () => <div data-testid="studio-panel" />,
@@ -124,5 +152,21 @@ describe("NotebookView layout", () => {
     expect(screen.queryByRole("button", { name: "Sources" })).not.toBeInTheDocument();
     expect(screen.getAllByTestId("sources-panel")).toHaveLength(1);
     expect(screen.getAllByTestId("chat-panel")).toHaveLength(1);
+  });
+
+  test("a citation click carries its passage and page into the source focus request", async () => {
+    mockViewport(true);
+    const user = userEvent.setup();
+    renderView();
+    const focusOf = () => JSON.parse(screen.getByTestId("sources-panel").dataset.focus ?? "null");
+
+    await user.click(screen.getByRole("button", { name: "open citation" }));
+    expect(focusOf()).toEqual({ documentId: "doc1", seq: 1, quote: "the passage", pageNumber: 7 });
+
+    // The panel clears the request once handled; a repeat click must still be a new focus.
+    await user.click(screen.getByRole("button", { name: "focus handled" }));
+    expect(focusOf()).toBeNull();
+    await user.click(screen.getByRole("button", { name: "open citation" }));
+    expect(focusOf()).toMatchObject({ documentId: "doc1", seq: 2 });
   });
 });

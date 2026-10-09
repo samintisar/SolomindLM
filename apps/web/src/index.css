@@ -339,6 +339,11 @@
     color: var(--foreground);
     font-family: "Lora", serif;
   }
+
+  /* Cited passage opened from a citation (sources/utils/highlightPassage.ts). */
+  ::highlight(source-passage) {
+    background-color: var(--warning-muted);
+  }
 }
 
 /* Motion tokens. Durations use Tailwind's numeric utilities: duration-120 (micro), duration-200
