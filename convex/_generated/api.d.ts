@@ -92,6 +92,7 @@ import type * as _agents_research_state from "../_agents/research/state.js";
 import type * as _agents_research_steps from "../_agents/research/steps.js";
 import type * as _agents_research_types from "../_agents/research/types.js";
 import type * as _agents_spreadsheet_csvHelpers from "../_agents/spreadsheet/csvHelpers.js";
+import type * as _agents_spreadsheet_presetRequests from "../_agents/spreadsheet/presetRequests.js";
 import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompts.js";
 import type * as _agents_spreadsheet_sourcePacking from "../_agents/spreadsheet/sourcePacking.js";
 import type * as _agents_spreadsheet_title from "../_agents/spreadsheet/title.js";
@@ -405,6 +406,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/research/steps": typeof _agents_research_steps;
   "_agents/research/types": typeof _agents_research_types;
   "_agents/spreadsheet/csvHelpers": typeof _agents_spreadsheet_csvHelpers;
+  "_agents/spreadsheet/presetRequests": typeof _agents_spreadsheet_presetRequests;
   "_agents/spreadsheet/prompts": typeof _agents_spreadsheet_prompts;
   "_agents/spreadsheet/sourcePacking": typeof _agents_spreadsheet_sourcePacking;
   "_agents/spreadsheet/title": typeof _agents_spreadsheet_title;
