@@ -16,6 +16,7 @@ import {
   dropSearchCopiesOfNotebookPapers,
   resolvePaperScope,
 } from "../literatureReview/notebookPapers";
+import type { ScreeningCriterion } from "../literatureReview/screeningCriteria";
 import { literatureReviewWorkflowProvenanceValidator } from "../literatureReview/workflowProvenance";
 import { assertRagEvalGate } from "./_gate";
 
@@ -262,6 +263,7 @@ async function searchRankAndScreen(
     question: string;
     searchQueries: string[];
     notebookPapers: LiteraturePaper[];
+    screeningCriteria: ScreeningCriterion[];
   }
 ): Promise<SearchRankScreenResult> {
   const { sessionId } = args;
@@ -280,6 +282,7 @@ async function searchRankAndScreen(
     patch: {
       searchQueries: args.searchQueries,
       databasesUsed: ["arxiv", "semantic_scholar", "pubmed"],
+      screeningCriteria: args.screeningCriteria,
       recordsIdentified: searchResults.recordsIdentified,
       recordsAfterDedupe: searchResults.recordsAfterDedupe,
       recordsFromNotebook: args.notebookPapers.length,
@@ -306,7 +309,7 @@ async function searchRankAndScreen(
 
   const screened: { papers: LiteraturePaper[] } = await ctx.runAction(
     internal.literatureReview.workflowSteps.screenPapers,
-    { papers: ranked.papers.slice(0, 25), query: args.question }
+    { papers: ranked.papers.slice(0, 25), query: args.question, criteria: args.screeningCriteria }
   );
   const included = screened.papers.filter((paper) => paper.isIncluded === true);
 
@@ -398,10 +401,13 @@ export const runLiteratureReviewEval = action({
     const notebookPaperIds = notebookPaperDocs.map((d) => d._id as Id<"documents">);
     const paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
 
-    const plan: { searchQueries: string[]; suggestedColumns: ConfirmedColumn[] } =
-      await ctx.runAction(internal.literatureReview.workflowSteps.planReview, {
-        query: args.question,
-      });
+    const plan: {
+      searchQueries: string[];
+      suggestedColumns: ConfirmedColumn[];
+      screeningCriteria: ScreeningCriterion[];
+    } = await ctx.runAction(internal.literatureReview.workflowSteps.planReview, {
+      query: args.question,
+    });
     const confirmedColumns: ConfirmedColumn[] = normalizeConfirmedColumns(plan.suggestedColumns);
     const suggestedColumns = toSuggestedColumns(confirmedColumns);
     const sessionId: Id<"literatureReviewSessions"> = await ctx.runMutation(
@@ -424,6 +430,7 @@ export const runLiteratureReviewEval = action({
             notebookId: args.notebookId,
             documentIds: notebookPaperIds,
             query: args.question,
+            criteria: plan.screeningCriteria,
           })
         ).papers
       : [];
@@ -439,6 +446,7 @@ export const runLiteratureReviewEval = action({
           question: args.question,
           searchQueries: plan.searchQueries,
           notebookPapers,
+          screeningCriteria: plan.screeningCriteria,
         });
     if (papersOnly) {
       await ctx.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {

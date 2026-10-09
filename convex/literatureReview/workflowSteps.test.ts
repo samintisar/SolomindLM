@@ -62,6 +62,7 @@ vi.mock("../_utils/CitationEngine.js", () => ({
 import { createLLM } from "../_agents/_shared/llm_factory.js";
 import { invokeWithHttpRetry } from "../_agents/_shared/retry.js";
 import { cachedRerank } from "../_agents/chat/rerankCache.js";
+import { DEFAULT_SCREENING_CRITERIA } from "./screeningCriteria";
 
 const mockCtx = {
   runAction: vi.fn(),
@@ -118,6 +119,20 @@ describe("dedupePapers", () => {
     const result = dedupePapers(papers as any);
     expect(result).toHaveLength(1);
     expect(result[0].score).toBe(0.8);
+  });
+
+  it("keeps the highest citation count seen across copies of a paper", () => {
+    // e.g. an arXiv copy (no count) found before the same paper from a citation index.
+    const papers = [
+      { title: "Paper A", authors: ["A"], doi: "10.1234/a", score: 0.8 },
+      { title: "Paper A", authors: ["A"], doi: "10.1234/a", score: 0.9, citationCount: 2752 },
+      { title: "Paper B", authors: ["B"], score: 0.7, citationCount: 12 },
+      { title: "Paper B", authors: ["B"], score: 0.7, citationCount: 3 },
+    ];
+
+    const result = dedupePapers(papers as any);
+
+    expect(result.map((p: any) => p.citationCount)).toEqual([2752, 12]);
   });
 });
 
@@ -207,6 +222,39 @@ describe("planReviewHandler", () => {
 
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(result.suggestedColumns).toEqual(tailoredColumns);
+  });
+
+  it("returns the eligibility criteria the model derived from the question", async () => {
+    const criteria = [
+      { label: "On topic", description: "Studies the question's phenomenon." },
+      { label: "Empirical", description: "Reports an evaluation." },
+    ];
+    const mockLLM = {
+      withStructuredOutput: vi.fn().mockReturnValue({
+        invoke: vi.fn().mockResolvedValue({
+          reviewTitle: "Title",
+          searchQueries: ["q1"],
+          suggestedColumns: [{ id: "c", name: "C", isVisible: true }],
+          screeningCriteria: criteria,
+        }),
+      }),
+    };
+    (createLLM as any).mockReturnValue(mockLLM as any);
+    (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
+
+    const result = await planReviewHandler(mockCtx, { query: "test query" });
+
+    expect(result.screeningCriteria).toEqual(criteria);
+  });
+
+  it("falls back to default eligibility criteria when planning fails or omits them", async () => {
+    (createLLM as any).mockImplementation(() => {
+      throw new Error("LLM Error");
+    });
+
+    const result = await planReviewHandler(mockCtx, { query: "test query" });
+
+    expect(result.screeningCriteria).toEqual(DEFAULT_SCREENING_CRITERIA);
   });
 });
 
@@ -415,9 +463,53 @@ describe("rankPapersHandler", () => {
       query: "test query",
     });
 
-    expect(cachedRerank).toHaveBeenCalledWith(mockCtx, "test query", expect.any(Array), 30);
-    expect(result.papers[0].score).toBe(0.95);
-    expect(result.papers[1].score).toBe(0.85);
+    expect(result.papers.map((p: { title: string }) => p.title)).toEqual(["B", "A"]);
+  });
+
+  it("asks the reranker to score every paper, not just a top slice", async () => {
+    (cachedRerank as any).mockResolvedValue([]);
+    const papers = Array.from({ length: 40 }, (_, i) => ({
+      title: `Paper ${i}`,
+      authors: ["A"],
+      abstract: "Abstract",
+      score: 0.5,
+    }));
+
+    await rankPapersHandler(mockCtx, { papers, query: "test query" });
+
+    expect(cachedRerank).toHaveBeenCalledWith(mockCtx, "test query", expect.any(Array), 40);
+  });
+
+  it("blends relevance with citation influence", async () => {
+    // Voyage prefers the uncited paper slightly; the widely cited one should still lead.
+    (cachedRerank as any).mockResolvedValue([
+      { id: "0", score: 0.82 },
+      { id: "1", score: 0.78 },
+      { id: "2", score: 0.3 },
+    ]);
+    const year = new Date().getFullYear();
+
+    const result = await rankPapersHandler(mockCtx, {
+      papers: [
+        { title: "Uncited", authors: ["A"], abstract: "a", score: 0, citationCount: 0, year },
+        {
+          title: "Widely cited",
+          authors: ["B"],
+          abstract: "b",
+          score: 0,
+          citationCount: 3000,
+          year: year - 3,
+        },
+        { title: "Off topic", authors: ["C"], abstract: "c", score: 0, citationCount: 5, year },
+      ],
+      query: "test query",
+    });
+
+    expect(result.papers.map((p: { title: string }) => p.title)).toEqual([
+      "Widely cited",
+      "Uncited",
+      "Off topic",
+    ]);
   });
 
   it("falls back to original scores on error", async () => {
@@ -527,7 +619,7 @@ describe("screenPapersHandler", () => {
     );
   });
 
-  it("handles screening failure with conservative fallback", async () => {
+  it("excludes a paper whose screening call failed, with the reason", async () => {
     (createLLM as any).mockReturnValue({} as any);
     (invokeWithHttpRetry as any).mockRejectedValue(new Error("Screening failed"));
 
@@ -536,8 +628,61 @@ describe("screenPapersHandler", () => {
       query: "test query",
     });
 
-    expect(result.papers[0].isIncluded).toBe(true);
-    expect(result.papers[0].includeReason).toContain("conservative fallback");
+    expect(result.papers[0].isIncluded).toBe(false);
+    expect(result.papers[0].includeReason).toMatch(/could not be screened/i);
+  });
+
+  it("checks each paper against the eligibility criteria in the prompt", async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      criteria: [
+        { criterion: 1, status: "met", explanation: "On topic." },
+        { criterion: 2, status: "not_met", explanation: "No evaluation reported." },
+      ],
+      reason: "Relevant.",
+      isIncluded: true,
+    });
+    (createLLM as any).mockReturnValue({
+      withStructuredOutput: vi.fn().mockReturnValue({ invoke: mockInvoke }),
+    } as any);
+    (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
+
+    const result = await screenPapersBatchHandler(mockCtx, {
+      papers: [{ title: "A", authors: ["A"], abstract: "Abstract A", score: 0.8 }],
+      query: "test",
+      batchStartIndex: 3,
+      criteria: [
+        { label: "On topic", description: "Studies the phenomenon." },
+        { label: "Empirical", description: "Reports an evaluation." },
+      ],
+    });
+
+    const prompt = String(mockInvoke.mock.calls[0][0][1].content);
+    expect(prompt).toContain("1. On topic: Studies the phenomenon.");
+    expect(prompt).toContain("2. Empirical: Reports an evaluation.");
+    expect(result.decisions).toEqual([
+      {
+        paperIndex: 3,
+        isIncluded: false,
+        reason: 'Does not meet "Empirical": No evaluation reported.',
+        criteria: [
+          { label: "On topic", status: "met", explanation: "On topic." },
+          { label: "Empirical", status: "not_met", explanation: "No evaluation reported." },
+        ],
+      },
+    ]);
+  });
+
+  it("flags a failed screening call in the batch decisions", async () => {
+    (createLLM as any).mockReturnValue({} as any);
+    (invokeWithHttpRetry as any).mockRejectedValue(new Error("402"));
+
+    const result = await screenPapersBatchHandler(mockCtx, {
+      papers: [{ title: "A", authors: ["A"], abstract: "Abstract A", score: 0.8 }],
+      query: "test",
+      batchStartIndex: 0,
+    });
+
+    expect(result.decisions[0]).toMatchObject({ isIncluded: false, screeningFailed: true });
   });
 
   it("handles empty input", async () => {

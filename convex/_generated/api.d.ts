@@ -234,8 +234,10 @@ import type * as literatureReview_batchSizes from "../literatureReview/batchSize
 import type * as literatureReview_db from "../literatureReview/db.js";
 import type * as literatureReview_llmTuning from "../literatureReview/llmTuning.js";
 import type * as literatureReview_notebookPapers from "../literatureReview/notebookPapers.js";
+import type * as literatureReview_paperRanking from "../literatureReview/paperRanking.js";
 import type * as literatureReview_rankedPapersSnapshot from "../literatureReview/rankedPapersSnapshot.js";
 import type * as literatureReview_reportContext from "../literatureReview/reportContext.js";
+import type * as literatureReview_screeningCriteria from "../literatureReview/screeningCriteria.js";
 import type * as literatureReview_titles from "../literatureReview/titles.js";
 import type * as literatureReview_workflowProvenance from "../literatureReview/workflowProvenance.js";
 import type * as literatureReview_workflowSteps from "../literatureReview/workflowSteps.js";
@@ -545,8 +547,10 @@ declare const fullApi: ApiFromModules<{
   "literatureReview/db": typeof literatureReview_db;
   "literatureReview/llmTuning": typeof literatureReview_llmTuning;
   "literatureReview/notebookPapers": typeof literatureReview_notebookPapers;
+  "literatureReview/paperRanking": typeof literatureReview_paperRanking;
   "literatureReview/rankedPapersSnapshot": typeof literatureReview_rankedPapersSnapshot;
   "literatureReview/reportContext": typeof literatureReview_reportContext;
+  "literatureReview/screeningCriteria": typeof literatureReview_screeningCriteria;
   "literatureReview/titles": typeof literatureReview_titles;
   "literatureReview/workflowProvenance": typeof literatureReview_workflowProvenance;
   "literatureReview/workflowSteps": typeof literatureReview_workflowSteps;

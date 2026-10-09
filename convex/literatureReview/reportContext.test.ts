@@ -99,6 +99,29 @@ describe("reportContext", () => {
     expect(block).toContain("LLM benchmark reliability");
   });
 
+  it("buildPrismaMethodsBlock lists the eligibility criteria papers were screened against", () => {
+    const block = buildPrismaMethodsBlock({
+      searchQueries: ["q"],
+      screeningCriteria: [
+        { label: "On Topic", description: "Directly studies the question." },
+        { label: "Empirical Evidence", description: "Reports an evaluation." },
+      ],
+      recordsScreened: 25,
+      recordsIncluded: 12,
+      recordsExcluded: 13,
+    });
+
+    expect(block).toContain("### Eligibility Criteria");
+    expect(block).toContain("1. **On Topic**: Directly studies the question.");
+    expect(block).toContain("2. **Empirical Evidence**: Reports an evaluation.");
+  });
+
+  it("buildPrismaMethodsBlock omits the eligibility section when no criteria were recorded", () => {
+    const block = buildPrismaMethodsBlock({ searchQueries: ["q"], recordsScreened: 5 });
+
+    expect(block).not.toContain("Eligibility Criteria");
+  });
+
   it("mergeDeterministicReportSections prepends PRISMA methods and study table", () => {
     const merged = mergeDeterministicReportSections(
       [

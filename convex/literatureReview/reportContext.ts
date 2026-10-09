@@ -207,13 +207,25 @@ Data were extracted into a structured evidence table using question-specific col
       ? queries.map((q, i) => `${i + 1}. \`${q}\``).join("\n")
       : "_No search queries were logged._";
 
+  const criteria = provenance.screeningCriteria ?? [];
+  const eligibilitySection =
+    criteria.length > 0
+      ? `### Eligibility Criteria
+
+Titles and abstracts were screened against these criteria; a paper was excluded if it failed any criterion or if its abstract left most of them unconfirmed:
+
+${criteria.map((c, i) => `${i + 1}. **${c.label}**: ${c.description}`).join("\n")}
+
+`
+      : "";
+
   return `### Search Strategy
 
 We searched ${databases} using ${queries.length || "multiple"} structured queries:
 
 ${queryList}
 
-### Study Selection
+${eligibilitySection}### Study Selection
 
 PRISMA-style flow (counts from this review run):
 

@@ -4,11 +4,11 @@
  * Orchestrates the literature review workflow using @convex-dev/workflow.
  *
  * Steps:
- * 1. Plan review (LLM suggests columns + search queries)
+ * 1. Plan review (LLM suggests columns, search queries and eligibility criteria)
  * 2. Checkpoint: await user column confirmation via event
  * 3. Search papers (parallel across sources)
- * 4. Rank papers (Voyage; search step already dedupes)
- * 5. Screen papers (top 30, batch 5)
+ * 4. Rank papers (Voyage relevance blended with citation influence; search step already dedupes)
+ * 5. Screen papers against the eligibility criteria (top 25, batch 5)
  * 6. Extract data (batch 5, write to literatureTableDrafts)
  * 7. Generate table
  * 8. Generate report
@@ -27,6 +27,11 @@ import {
 } from "../../literatureReview/batchSizes.js";
 import { LITERATURE_SCREEN_TOP_N } from "../../literatureReview/llmTuning.js";
 import { dropSearchCopiesOfNotebookPapers } from "../../literatureReview/notebookPapers.js";
+import {
+  resolveScreeningDecisions,
+  type ScreeningCriterion,
+  type ScreeningDecision,
+} from "../../literatureReview/screeningCriteria.js";
 
 export const workflow = new WorkflowManager(components.workflow);
 
@@ -123,6 +128,11 @@ export const literatureReviewWorkflow = workflow
         plan.searchQueries.length > 0
           ? plan.searchQueries
           : [args.query.trim()].filter((q) => q.length > 0);
+      // Eligibility criteria derived from the question (#351). Undefined for a run planned before
+      // criteria existed; leaving them out of step args then keeps its replay journal matching,
+      // and the screening steps fall back to generic criteria.
+      const screeningCriteria: ScreeningCriterion[] | undefined = plan.screeningCriteria;
+      const criteriaArg = screeningCriteria ? { criteria: screeningCriteria } : {};
       await trackStep(
         step,
         args.sessionId,
@@ -182,6 +192,7 @@ export const literatureReviewWorkflow = workflow
               notebookId: args.notebookId,
               documentIds: args.documentIds,
               query: args.query,
+              ...criteriaArg,
             })
           ).papers
         : [];
@@ -238,6 +249,7 @@ export const literatureReviewWorkflow = workflow
           patch: {
             searchQueries: searchQueriesUsed,
             databasesUsed: dbSources,
+            ...(screeningCriteria ? { screeningCriteria } : {}),
             recordsIdentified: searchResults.recordsIdentified,
             recordsAfterDedupe: searchResults.recordsAfterDedupe,
             recordsFromNotebook: notebookPapers.length,
@@ -306,7 +318,7 @@ export const literatureReviewWorkflow = workflow
           `Screening top ${papersToScreen.length} papers`
         );
 
-        const screeningDecisions = new Map<number, { isIncluded: boolean; reason: string }>();
+        const decisionsByIndex = new Map<number, ScreeningDecision>();
         for (let i = 0; i < papersToScreen.length; i += SCREEN_PAPERS_BATCH_SIZE) {
           const batch = papersToScreen.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
           const { decisions } = await step.runAction(
@@ -316,73 +328,43 @@ export const literatureReviewWorkflow = workflow
               query: args.query,
               batchStartIndex: i,
               smartModel: args.smartModel,
+              ...criteriaArg,
             }
           );
-          for (const decision of decisions) {
-            screeningDecisions.set(decision.paperIndex, {
-              isIncluded: decision.isIncluded,
-              reason: decision.reason,
-            });
+          for (const { paperIndex, ...decision } of decisions) {
+            decisionsByIndex.set(paperIndex, decision);
           }
         }
 
-        const screened = {
-          papers: papersToScreen.map(
-            (
-              p: {
-                title: string;
-                authors: string[];
-                year?: number;
-                abstract: string;
-                url: string;
-                source: string;
-                score: number;
-                isIncluded?: boolean;
-                includeReason?: string;
-              },
-              index: number
-            ) => ({
-              ...p,
-              isIncluded: screeningDecisions.get(index)?.isIncluded ?? true,
-              includeReason:
-                screeningDecisions.get(index)?.reason ?? "No screening decision available.",
-            })
-          ),
-        };
-
-        const includedCount = screened.papers.filter(
-          (p: { isIncluded?: boolean }) => p.isIncluded === true
-        ).length;
-        const excludedCount = screened.papers.length - includedCount;
+        // A paper with no decision is excluded as unscreened, never included by default (#351).
+        const { decisions, includedCount, excludedCount, failedCount } = resolveScreeningDecisions(
+          papersToScreen.length,
+          decisionsByIndex
+        );
+        if (papersToScreen.length > 0 && failedCount === papersToScreen.length) {
+          // Every screening call failed (e.g. the model provider is down): stop rather than
+          // write a review from unscreened papers or from none at all.
+          throw new Error("Screening failed for every paper. Please try the review again later.");
+        }
 
         await step.runMutation(internal.literatureReview.db.replaceScreeningDecisions, {
           sessionId: args.sessionId,
-          decisions: screened.papers.map(
-            (
-              p: {
-                title: string;
-                authors: string[];
-                year?: number;
-                isIncluded?: boolean;
-                includeReason?: string;
-              },
-              i: number
-            ) => ({
-              paperIndex: i,
-              title: p.title,
-              authors: p.authors,
-              year: p.year,
-              decision: p.isIncluded === true ? ("included" as const) : ("excluded" as const),
-              reason: p.includeReason ?? "No reason recorded.",
-              rank: i + 1,
-            })
-          ),
+          decisions: papersToScreen.map((p, i) => ({
+            paperIndex: i,
+            title: p.title,
+            authors: p.authors,
+            year: p.year,
+            decision: decisions[i].isIncluded ? ("included" as const) : ("excluded" as const),
+            reason: decisions[i].reason,
+            ...(decisions[i].criteria ? { criteria: decisions[i].criteria } : {}),
+            rank: i + 1,
+          })),
         });
 
         await step.runMutation(internal.literatureReview.db.patchWorkflowProvenance, {
           sessionId: args.sessionId,
           patch: {
-            recordsScreened: screened.papers.length,
+            recordsScreened: papersToScreen.length,
             recordsIncluded: includedCount,
             recordsExcluded: excludedCount,
             screenCompletedAt: Date.now(),
@@ -394,17 +376,22 @@ export const literatureReviewWorkflow = workflow
           args.sessionId,
           "screening",
           "completed",
-          `Screened ${screened.papers.length} papers: ${includedCount} included, ${excludedCount} excluded.`,
+          `Screened ${papersToScreen.length} papers: ${includedCount} included, ${excludedCount} excluded.`,
           {
-            recordsScreened: screened.papers.length,
+            recordsScreened: papersToScreen.length,
             recordsIncluded: includedCount,
             recordsExcluded: excludedCount,
+            ...(failedCount > 0 ? { recordsNotScreened: failedCount } : {}),
           }
         );
 
-        screenedIncluded = screened.papers.filter(
-          (p: { isIncluded?: boolean }) => p.isIncluded === true
-        ) as typeof notebookPapers;
+        screenedIncluded = papersToScreen
+          .map((p, i) => ({
+            ...p,
+            isIncluded: decisions[i].isIncluded,
+            includeReason: decisions[i].reason,
+          }))
+          .filter((p) => p.isIncluded);
       }
 
       // Step 6: Extract data (batch 5, write to literatureTableDrafts). Notebook papers go first.

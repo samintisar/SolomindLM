@@ -1,14 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LiteratureScreeningPanel } from "./LiteratureScreeningPanel";
 
-const api = vi.hoisted(() => ({ decisions: undefined as unknown }));
+const api = vi.hoisted(() => ({ decisions: undefined as unknown, session: undefined as unknown }));
 
 vi.mock("../services/literatureTablesApi", () => ({
-  useLiteratureReviewSession: () => ({ query: "transformers", reviewTitle: "Transformers" }),
+  useLiteratureReviewSession: () => api.session,
   useLiteratureReviewScreeningDecisions: () => api.decisions,
 }));
+
+const CRITERIA = [
+  { label: "On Topic", description: "Directly studies the question's subject." },
+  { label: "Empirical Evidence", description: "Reports an evaluation or experiment." },
+];
 
 const INCLUDED = {
   paperIndex: 0,
@@ -18,6 +23,10 @@ const INCLUDED = {
   year: 2017,
   decision: "included",
   reason: "Directly addresses transformer evaluation with empirical analysis.",
+  criteria: [
+    { label: "On Topic", status: "met", explanation: "Studies transformers directly." },
+    { label: "Empirical Evidence", status: "unclear", explanation: "Abstract is vague." },
+  ],
 };
 const EXCLUDED = {
   ...INCLUDED,
@@ -25,11 +34,20 @@ const EXCLUDED = {
   rank: 2,
   title: "Cooking with LSTMs",
   decision: "excluded",
-  reason: "Different topic.",
+  reason: 'Does not meet "On Topic": About recipes.',
+  criteria: [
+    { label: "On Topic", status: "not_met", explanation: "About recipes." },
+    { label: "Empirical Evidence", status: "met", explanation: "Has experiments." },
+  ],
 };
 
 beforeEach(() => {
   api.decisions = [EXCLUDED, INCLUDED];
+  api.session = {
+    query: "transformers",
+    reviewTitle: "Transformers",
+    workflowProvenance: { screeningCriteria: CRITERIA },
+  };
 });
 
 function renderPanel() {
@@ -49,12 +67,19 @@ describe("LiteratureScreeningPanel", () => {
     expect(screen.getByText("Excluded")).toBeInTheDocument();
   });
 
-  it("expands a row's screening criteria", async () => {
+  it("lists the eligibility criteria the review screened against", () => {
+    renderPanel();
+    const list = screen.getByRole("list", { name: "Eligibility criteria" });
+    expect(within(list).getByText("On Topic")).toBeInTheDocument();
+    expect(within(list).getByText("Reports an evaluation or experiment.")).toBeInTheDocument();
+  });
+
+  it("expands a row's recorded criterion checks", async () => {
     const user = userEvent.setup();
     renderPanel();
     const [toggle] = screen.getAllByRole("button", { name: "View screening criteria" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText(/screening rationale/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Studies transformers directly.")).not.toBeInTheDocument();
     await user.click(toggle);
     const hide = screen.getByRole("button", { name: "Hide screening criteria" });
     expect(hide).toHaveAttribute("aria-expanded", "true");
@@ -62,10 +87,20 @@ describe("LiteratureScreeningPanel", () => {
     expect(controlsId).toBeTruthy();
     const details = document.getElementById(controlsId as string);
     expect(details).not.toBeNull();
-    expect(details?.textContent).toMatch(/screening rationale/);
+    expect(details?.textContent).toContain("Studies transformers directly.");
+    expect(details?.textContent).toContain("Partly met or unclear: ");
   });
 
-  it("exports the decisions as a CSV blob", async () => {
+  it("shows only the reason for decisions recorded without criterion checks", () => {
+    api.decisions = [{ ...INCLUDED, criteria: undefined }];
+    api.session = { query: "transformers", reviewTitle: "Transformers" };
+    renderPanel();
+    expect(screen.getByText(INCLUDED.reason)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View screening criteria" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "Eligibility criteria" })).toBeNull();
+  });
+
+  it("exports the decisions, with their criterion checks, as a CSV blob", async () => {
     const user = userEvent.setup();
     const createObjectURL = vi.fn((_blob: Blob) => "blob:screening");
     const revokeObjectURL = vi.fn();
@@ -77,7 +112,11 @@ describe("LiteratureScreeningPanel", () => {
       renderPanel();
       await user.click(screen.getByRole("button", { name: "Export" }));
       expect(createObjectURL).toHaveBeenCalledTimes(1);
-      expect(createObjectURL.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
+      const blob = createObjectURL.mock.calls[0]?.[0];
+      expect(blob).toBeInstanceOf(Blob);
+      const csv = await (blob as Blob).text();
+      expect(csv.split("\n")[0]).toBe("Rank,Title,Authors,Year,Decision,Reason,Criteria");
+      expect(csv).toContain("On Topic: not met (About recipes.)");
       expect(click).toHaveBeenCalledTimes(1);
     } finally {
       click.mockRestore();

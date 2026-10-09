@@ -29,7 +29,12 @@ import {
   useLiteratureReviewScreeningDecisions,
   useLiteratureReviewSession,
 } from "../services/literatureTablesApi";
-import type { LiteratureScreeningDecision } from "../types/literatureScreening";
+import type {
+  LiteratureScreeningDecision,
+  ScreeningCriterion,
+  ScreeningCriterionCheck,
+  ScreeningCriterionStatus,
+} from "../types/literatureScreening";
 import { formatAuthorsLine } from "../types/rankedPaper";
 
 interface LiteratureScreeningPanelProps {
@@ -37,41 +42,25 @@ interface LiteratureScreeningPanelProps {
   onClose: () => void;
 }
 
-type CriterionStatus = "met" | "partial" | "missed";
-
-type ScreeningCriterion = {
-  label: string;
-  status: CriterionStatus;
-  explanation: string;
-};
-
 const SCREENING_GRID_STYLE = {
   "--screening-cols": "minmax(300px, 0.95fr) minmax(420px, 1fr)",
 } as React.CSSProperties;
 
-const CRITERION_STATUS_LABEL: Record<CriterionStatus, string> = {
+/** Screen-reader prefix for a criterion's icon. */
+const CRITERION_STATUS_LABEL: Record<ScreeningCriterionStatus, string> = {
   met: "Met: ",
-  partial: "Partly met: ",
-  missed: "Not met: ",
+  unclear: "Partly met or unclear: ",
+  not_met: "Not met: ",
 };
 
-const GENERIC_SCREENING_CRITERIA = [
-  "Research Question Focus",
-  "Direct Relevance",
-  "Substantive Evidence",
-  "Sufficient Detail",
-  "Accessible Study",
-  "Not a Duplicate",
-] as const;
+/** Plain-text status for the CSV export. */
+const CRITERION_STATUS_TEXT: Record<ScreeningCriterionStatus, string> = {
+  met: "met",
+  unclear: "unclear",
+  not_met: "not met",
+};
 
-const LLM_BENCHMARK_SCREENING_CRITERIA = [
-  "LLM Benchmark Focus",
-  "Real-world Task Evaluation",
-  "Predictive Power Analysis",
-  "Benchmark Limitation Discussion",
-  "Empirical Evidence",
-  "Multiple LLMs Tested",
-] as const;
+const NO_CRITERIA: ScreeningCriterionCheck[] = [];
 
 export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> = ({
   sessionId,
@@ -92,10 +81,8 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
     });
   }, [screeningDecisions]);
 
-  const criteriaLabels = useMemo(
-    () => getScreeningCriteriaLabels(session?.query),
-    [session?.query]
-  );
+  const eligibilityCriteria: ScreeningCriterion[] =
+    session?.workflowProvenance?.screeningCriteria ?? [];
 
   const isLoading = screeningDecisions === undefined;
   const total = sortedDecisions.length;
@@ -130,12 +117,16 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
         ) : isEmpty ? (
           <EmptyState />
         ) : (
-          <ScreeningDecisionGrid
-            criteriaLabels={criteriaLabels}
-            decisions={sortedDecisions}
-            expandedDecisionKeys={expandedDecisionKeys}
-            onToggleExpanded={toggleDecisionExpanded}
-          />
+          <>
+            {eligibilityCriteria.length > 0 ? (
+              <EligibilityCriteriaSummary criteria={eligibilityCriteria} />
+            ) : null}
+            <ScreeningDecisionGrid
+              decisions={sortedDecisions}
+              expandedDecisionKeys={expandedDecisionKeys}
+              onToggleExpanded={toggleDecisionExpanded}
+            />
+          </>
         )}
       </div>
     </div>
@@ -211,13 +202,37 @@ function EmptyState() {
   );
 }
 
+/** The criteria every paper below was checked against, derived from the research question. */
+function EligibilityCriteriaSummary({ criteria }: { criteria: ScreeningCriterion[] }) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="border-b border-border/50 px-4 py-3">
+      <h3 id={headingId} className="font-sans text-xs font-medium text-muted-foreground">
+        Eligibility criteria
+      </h3>
+      <ol aria-label="Eligibility criteria" className="mt-2 space-y-1.5 text-xs leading-relaxed">
+        {criteria.map((criterion, index) => (
+          <li key={criterion.label} className="flex gap-2">
+            <span className="shrink-0 font-sans tabular-nums text-muted-foreground">
+              {index + 1}.
+            </span>
+            <p className="min-w-0">
+              <span className="font-medium text-foreground">{criterion.label}</span>
+              <span className="sr-only">: </span>
+              <span className="block text-muted-foreground">{criterion.description}</span>
+            </p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ScreeningDecisionGrid({
-  criteriaLabels,
   decisions,
   expandedDecisionKeys,
   onToggleExpanded,
 }: {
-  criteriaLabels: readonly string[];
   decisions: LiteratureScreeningDecision[];
   expandedDecisionKeys: Set<number>;
   onToggleExpanded: (paperIndex: number) => void;
@@ -234,7 +249,6 @@ function ScreeningDecisionGrid({
         {decisions.map((decision) => (
           <ScreeningDecisionRow
             key={decision.paperIndex}
-            criteriaLabels={criteriaLabels}
             decision={decision}
             isExpanded={expandedDecisionKeys.has(decision.paperIndex)}
             onToggleExpanded={() => onToggleExpanded(decision.paperIndex)}
@@ -246,26 +260,19 @@ function ScreeningDecisionGrid({
 }
 
 function ScreeningDecisionRow({
-  criteriaLabels,
   decision,
   isExpanded,
   onToggleExpanded,
 }: {
-  criteriaLabels: readonly string[];
   decision: LiteratureScreeningDecision;
   isExpanded: boolean;
   onToggleExpanded: () => void;
 }) {
-  const criteria = useMemo(
-    () => buildCriteria(criteriaLabels, decision),
-    [criteriaLabels, decision]
-  );
-
   return (
     <li className="grid border-b border-border/50 transition-colors hover:bg-muted/10 @3xl/screening:grid-cols-(--screening-cols)">
       <PaperSummaryCell decision={decision} />
       <ScreeningResultCell
-        criteria={criteria}
+        criteria={decision.criteria ?? NO_CRITERIA}
         decision={decision}
         isExpanded={isExpanded}
         onToggleExpanded={onToggleExpanded}
@@ -315,39 +322,44 @@ function ScreeningResultCell({
   isExpanded,
   onToggleExpanded,
 }: {
-  criteria: ScreeningCriterion[];
+  criteria: ScreeningCriterionCheck[];
   decision: LiteratureScreeningDecision;
   isExpanded: boolean;
   onToggleExpanded: () => void;
 }) {
   const isIncluded = decision.decision === "included";
   const criteriaId = useId();
+  const hasCriteria = criteria.length > 0;
 
   return (
     // Stacked under the paper, indent past its rank badge so the result lines up with the title.
     <div className="py-4 pr-4 pl-13 @3xl/screening:pl-4">
       <p className="text-xs leading-relaxed text-foreground">{decision.reason}</p>
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
-        {criteria.map((criterion) => (
-          <CriterionChip key={criterion.label} criterion={criterion} />
-        ))}
-      </div>
+      {hasCriteria ? (
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
+          {criteria.map((criterion) => (
+            <CriterionChip key={criterion.label} criterion={criterion} />
+          ))}
+        </div>
+      ) : null}
       <div className="mt-3 flex items-center justify-between gap-3">
         <DecisionBadge included={isIncluded} />
-        <Button
-          variant="disclosure"
-          size="xs"
-          onClick={onToggleExpanded}
-          aria-expanded={isExpanded}
-          aria-controls={isExpanded ? criteriaId : undefined}
-        >
-          <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
-            {isExpanded ? "Hide screening criteria" : "View screening criteria"}
-            <ChevronDown className={cn("transition-transform", isExpanded && "rotate-180")} />
-          </span>
-        </Button>
+        {hasCriteria ? (
+          <Button
+            variant="disclosure"
+            size="xs"
+            onClick={onToggleExpanded}
+            aria-expanded={isExpanded}
+            aria-controls={isExpanded ? criteriaId : undefined}
+          >
+            <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+              {isExpanded ? "Hide screening criteria" : "View screening criteria"}
+              <ChevronDown className={cn("transition-transform", isExpanded && "rotate-180")} />
+            </span>
+          </Button>
+        ) : null}
       </div>
-      {isExpanded ? (
+      {hasCriteria && isExpanded ? (
         <div id={criteriaId} className="mt-4 space-y-2.5">
           {criteria.map((criterion) => (
             <CriterionDetail key={criterion.label} criterion={criterion} />
@@ -358,7 +370,7 @@ function ScreeningResultCell({
   );
 }
 
-function CriterionChip({ criterion }: { criterion: ScreeningCriterion }) {
+function CriterionChip({ criterion }: { criterion: ScreeningCriterionCheck }) {
   return (
     <span className="inline-flex items-center gap-1.5 font-sans text-xs leading-none text-muted-foreground">
       <CriterionIcon status={criterion.status} />
@@ -368,7 +380,7 @@ function CriterionChip({ criterion }: { criterion: ScreeningCriterion }) {
   );
 }
 
-function CriterionDetail({ criterion }: { criterion: ScreeningCriterion }) {
+function CriterionDetail({ criterion }: { criterion: ScreeningCriterionCheck }) {
   return (
     <div className="flex gap-2 text-xs leading-relaxed">
       <span className="shrink-0 pt-0.5">
@@ -385,9 +397,9 @@ function CriterionDetail({ criterion }: { criterion: ScreeningCriterion }) {
   );
 }
 
-function CriterionIcon({ status }: { status: CriterionStatus }) {
+function CriterionIcon({ status }: { status: ScreeningCriterionStatus }) {
   if (status === "met") return <Check className="size-3.5 text-success" aria-hidden />;
-  if (status === "partial") return <Minus className="size-3.5 text-warning" aria-hidden />;
+  if (status === "unclear") return <Minus className="size-3.5 text-warning" aria-hidden />;
   return <X className="size-3.5 text-muted-foreground" aria-hidden />;
 }
 
@@ -401,120 +413,15 @@ function DecisionBadge({ included }: { included: boolean }) {
   );
 }
 
-function getScreeningCriteriaLabels(query?: string): readonly string[] {
-  const normalized = query?.toLowerCase() ?? "";
-  if (normalized.includes("llm") && normalized.includes("benchmark")) {
-    return LLM_BENCHMARK_SCREENING_CRITERIA;
-  }
-  return GENERIC_SCREENING_CRITERIA;
-}
-
-function buildCriteria(
-  labels: readonly string[],
-  decision: LiteratureScreeningDecision
-): ScreeningCriterion[] {
-  const reason = decision.reason.toLowerCase();
-  const title = decision.title.toLowerCase();
-  const isIncluded = decision.decision === "included";
-
-  return labels.map((label, index) => {
-    const labelText = label.toLowerCase();
-    const status = inferCriterionStatus({ labelText, reason, title, index, isIncluded });
-    return {
-      label,
-      status,
-      explanation: criterionExplanation(status, decision.reason, isIncluded),
-    };
-  });
-}
-
-function inferCriterionStatus({
-  labelText,
-  reason,
-  title,
-  index,
-  isIncluded,
-}: {
-  labelText: string;
-  reason: string;
-  title: string;
-  index: number;
-  isIncluded: boolean;
-}): CriterionStatus {
-  const text = `${title} ${reason}`;
-  const negative =
-    /\b(no|not|without|insufficient|limited|unclear|tangential|indirect|unavailable|different)\b/.test(
-      reason
-    );
-
-  if (labelText.includes("real-world") || labelText.includes("direct relevance")) {
-    if (
-      /\bnew engineering tasks|not real[-\s]?world|different topic|indirect|tangential\b/.test(text)
-    ) {
-      return "missed";
-    }
-    if (/\breal[-\s]?world|applied|practical|field|deployment|engineering|clinical\b/.test(text)) {
-      return "met";
-    }
-  }
-
-  if (labelText.includes("predictive")) {
-    if (/\b(no|not|without)\b.*\bpredictive|predictive.*\b(no|not|without)\b/.test(text)) {
-      return "missed";
-    }
-    if (/\bpredictive|validity|correlat|forecast|generaliz/.test(text)) return "met";
-  }
-
-  if (labelText.includes("limitation")) {
-    if (/\blimitation|bias|contamination|weakness|challenge|caution/.test(text)) return "met";
-    return isIncluded ? "partial" : "missed";
-  }
-
-  if (labelText.includes("empirical") || labelText.includes("evidence")) {
-    if (
-      /\bempirical|dataset|experiment|evaluation|benchmark|evidence|study|analysis\b/.test(text)
-    ) {
-      return "met";
-    }
-    return isIncluded ? "partial" : "missed";
-  }
-
-  if (labelText.includes("multiple") || labelText.includes("substantive")) {
-    if (/\bmultiple|several|various|across|compar|benchmark|models\b/.test(text)) return "met";
-    return isIncluded ? "partial" : "missed";
-  }
-
-  if (labelText.includes("focus") || labelText.includes("question")) {
-    if (/\bbenchmark|llm|direct|addresses|focus|relevant|related\b/.test(text)) return "met";
-    return isIncluded ? "partial" : "missed";
-  }
-
-  if (negative && !isIncluded && index < 4) return "missed";
-  if (isIncluded) return index === 2 || index === 3 ? "partial" : "met";
-  return index % 3 === 0 ? "partial" : "missed";
-}
-
-function criterionExplanation(
-  status: CriterionStatus,
-  reason: string,
-  isIncluded: boolean
-): string {
-  if (status === "met") {
-    return isIncluded
-      ? `Satisfied by the screening rationale: ${reason}`
-      : `This criterion is addressed, but other criteria led to exclusion.`;
-  }
-  if (status === "partial") {
-    return `Partially addressed; the screening rationale does not provide enough detail to mark this as fully satisfied.`;
-  }
-  return isIncluded
-    ? `Not explicitly supported in the recorded screening rationale.`
-    : `Does not satisfy this criterion based on the recorded screening rationale.`;
+function formatCriteriaForExport(criteria: ScreeningCriterionCheck[] | undefined): string {
+  return (criteria ?? [])
+    .map((c) => `${c.label}: ${CRITERION_STATUS_TEXT[c.status]} (${c.explanation})`)
+    .join("; ");
 }
 
 function exportScreeningDecisions(decisions: LiteratureScreeningDecision[], title: string) {
   if (decisions.length === 0) return;
-  const headers = ["Rank", "Title", "Authors", "Year", "Decision", "Reason"];
+  const headers = ["Rank", "Title", "Authors", "Year", "Decision", "Reason", "Criteria"];
   const rows = decisions.map((decision) => [
     String(decision.rank ?? decision.paperIndex + 1),
     decision.title,
@@ -522,6 +429,7 @@ function exportScreeningDecisions(decisions: LiteratureScreeningDecision[], titl
     decision.year != null ? String(decision.year) : "",
     decision.decision,
     decision.reason,
+    formatCriteriaForExport(decision.criteria),
   ]);
   const csv = [headers, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

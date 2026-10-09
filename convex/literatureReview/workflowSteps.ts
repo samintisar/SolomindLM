@@ -60,6 +60,7 @@ import {
   notebookPaperFromDocument,
   type PdfMetadata,
 } from "./notebookPapers.js";
+import { rankByRelevanceAndInfluence } from "./paperRanking.js";
 import {
   compactPapersForSnapshot,
   compactPapersForWorkflow,
@@ -79,6 +80,18 @@ import {
   type ReportPaperRow,
   validateAndSanitizeReportSections,
 } from "./reportContext.js";
+import {
+  criterionAssessmentValidator,
+  DEFAULT_SCREENING_CRITERIA,
+  decideScreening,
+  formatCriteriaForPrompt,
+  normalizeScreeningCriteria,
+  resolveScreeningDecisions,
+  type ScreeningCriterion,
+  type ScreeningDecision,
+  screeningCriterionValidator,
+  screeningFailureDecision,
+} from "./screeningCriteria.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -134,25 +147,30 @@ const confirmedColumnValidator = v.object({
   isVisible: v.boolean(),
 });
 
-export function dedupePapers<T extends { doi?: string; title: string; authors: string[] }>(
-  papers: T[]
-): T[] {
-  const seenDoi = new Set<string>();
-  const seenTitle = new Set<string>();
+/**
+ * Keeps the first copy of each paper (by DOI, else title + first author). A later copy's higher
+ * citation count is carried over, since a source without counts (e.g. arXiv) is often found
+ * first and ranking weighs citations (#351).
+ */
+export function dedupePapers<
+  T extends { doi?: string; title: string; authors: string[]; citationCount?: number },
+>(papers: T[]): T[] {
+  const kept = new Map<string, number>();
   const out: T[] = [];
   for (const p of papers) {
     const doiKey = p.doi?.toLowerCase().trim();
-    if (doiKey) {
-      if (seenDoi.has(doiKey)) continue;
-      seenDoi.add(doiKey);
+    const first = p.authors[0]?.split(",")[0]?.trim().toLowerCase() ?? "";
+    const key = doiKey ? `doi:${doiKey}` : `title:${p.title.toLowerCase().trim()}|${first}`;
+    const keptIndex = kept.get(key);
+    if (keptIndex === undefined) {
+      kept.set(key, out.length);
       out.push(p);
       continue;
     }
-    const first = p.authors[0]?.split(",")[0]?.trim().toLowerCase() ?? "";
-    const titleKey = `${p.title.toLowerCase().trim()}|${first}`;
-    if (seenTitle.has(titleKey)) continue;
-    seenTitle.add(titleKey);
-    out.push(p);
+    const existing = out[keptIndex];
+    if (p.citationCount != null && p.citationCount > (existing.citationCount ?? -1)) {
+      out[keptIndex] = { ...existing, citationCount: p.citationCount };
+    }
   }
   return out;
 }
@@ -167,7 +185,12 @@ export async function planReviewHandler(
 ) {
   const q = args.query.trim();
   if (q.length === 0) {
-    return { reviewTitle: "Literature Review", searchQueries: [], suggestedColumns: [] };
+    return {
+      reviewTitle: "Literature Review",
+      searchQueries: [],
+      suggestedColumns: [],
+      screeningCriteria: DEFAULT_SCREENING_CRITERIA,
+    };
   }
 
   const logger = createServiceLogger("literatureReview", "planReview");
@@ -223,6 +246,7 @@ export async function planReviewHandler(
       ),
       searchQueries: response.searchQueries,
       suggestedColumns: response.suggestedColumns,
+      screeningCriteria: normalizeScreeningCriteria(response.screeningCriteria),
     };
   } catch (error) {
     logger.error("LLM call failed", error);
@@ -230,6 +254,7 @@ export async function planReviewHandler(
       reviewTitle: fallbackReviewTitleFromQuery(q),
       searchQueries: [q],
       suggestedColumns: [],
+      screeningCriteria: DEFAULT_SCREENING_CRITERIA,
     };
   }
 }
@@ -247,6 +272,7 @@ export const planReview = internalAction({
         isVisible: v.boolean(),
       })
     ),
+    screeningCriteria: v.array(screeningCriterionValidator),
   }),
   handler: planReviewHandler,
 });
@@ -389,18 +415,16 @@ export async function rankPapersHandler(ctx: ActionCtx, args: { papers: any[]; q
       query: args.query.slice(0, 100),
     });
 
-    const reranked = await cachedRerank(ctx, args.query, documents, 30);
+    // Score every paper so all candidates share one relevance scale (#351: scoring only a top
+    // slice left the rest on the search score, a different scale, and sorted the two together).
+    const reranked = await cachedRerank(ctx, args.query, documents, documents.length);
+    const relevanceById = new Map(reranked.map((r) => [r.id, r.score]));
 
-    const scoreMap = new Map(
-      reranked.map((r, i) => [r.id, { score: r.score ?? 30 - i, index: i }])
+    const sorted = rankByRelevanceAndInfluence(
+      args.papers,
+      args.papers.map((_, i) => relevanceById.get(String(i))),
+      new Date().getFullYear()
     );
-
-    const sorted = [...args.papers]
-      .map((p, i) => ({
-        ...p,
-        score: scoreMap.get(String(i))?.score ?? p.score,
-      }))
-      .sort((a, b) => b.score - a.score);
 
     const compacted = compactRankedPapersForWorkflow(sorted);
     logger.info("Reranking complete", {
@@ -428,27 +452,18 @@ export const rankPapers = internalAction({
   handler: rankPapersHandler,
 });
 
-function _conservativeScreeningDecisions(
-  batchStartIndex: number,
-  batchLength: number
-): Array<{ paperIndex: number; isIncluded: boolean; reason: string }> {
-  const reason = "Included by conservative fallback due to screening error.";
-  return Array.from({ length: batchLength }, (_, j) => ({
-    paperIndex: batchStartIndex + j,
-    isIncluded: true,
-    reason,
-  }));
-}
-
+/** Screens one paper against the eligibility criteria; throws when the model call fails. */
 async function screenOnePaperWithLlm(
   paper: { title: string; abstract: string },
-  query: string
-): Promise<{ isIncluded: boolean; reason: string }> {
+  query: string,
+  criteria: ScreeningCriterion[]
+): Promise<ScreeningDecision> {
   const llm = createLLM({
     apiKey: env.TOGETHER_AI_API_KEY,
     mapModel: bulkLlmModel(),
     temperatures: 0.2,
-    maxTokens: 256,
+    // Room for one short check per criterion plus the reason (the old 256 fit a verdict only).
+    maxTokens: 1_200,
     phase: "fast",
   });
 
@@ -457,6 +472,7 @@ async function screenOnePaperWithLlm(
   });
 
   const prompt = SCREEN_SINGLE_PAPER_PROMPT.replace(/{query}/g, query)
+    .replace(/{criteria}/g, () => formatCriteriaForPrompt(criteria))
     .replace(/{title}/g, paper.title)
     .replace(/{abstract}/g, () => truncateForLiteratureLlm(paper.abstract));
 
@@ -474,7 +490,7 @@ async function screenOnePaperWithLlm(
     "screenPapers"
   );
 
-  return { isIncluded: response.isIncluded, reason: response.reason };
+  return decideScreening(response, criteria);
 }
 
 const PDF_METADATA_TEXT_MAX_CHARS = 4_000;
@@ -519,9 +535,15 @@ async function readPdfMetadataWithLlm(text: string): Promise<PdfMetadata> {
  */
 export async function loadNotebookPapersHandler(
   ctx: ActionCtx,
-  args: { notebookId: Id<"notebooks">; documentIds: Id<"documents">[]; query: string }
+  args: {
+    notebookId: Id<"notebooks">;
+    documentIds: Id<"documents">[];
+    query: string;
+    criteria?: ScreeningCriterion[];
+  }
 ): Promise<{ papers: Infer<typeof literaturePaperValidator>[] }> {
   const logger = createServiceLogger("literatureReview", "loadNotebookPapers");
+  const criteria = normalizeScreeningCriteria(args.criteria);
   const docs: NotebookDocumentLike[] = await ctx.runQuery(
     internal.literatureReview.db.getNotebookPaperDocuments,
     {
@@ -547,7 +569,7 @@ export async function loadNotebookPapersHandler(
       const paper = notebookPaperFromDocument(doc, metadata);
       let offTopicReason: string | undefined;
       try {
-        const verdict = await screenOnePaperWithLlm(paper, args.query);
+        const verdict = await screenOnePaperWithLlm(paper, args.query, criteria);
         if (!verdict.isIncluded) offTopicReason = verdict.reason;
       } catch (error) {
         logger.error("Off-topic check failed; leaving the paper unflagged", error, {
@@ -577,10 +599,23 @@ export const loadNotebookPapers = internalAction({
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
     query: v.string(),
+    criteria: v.optional(v.array(screeningCriterionValidator)),
   },
   returns: v.object({ papers: v.array(literaturePaperValidator) }),
   handler: loadNotebookPapersHandler,
 });
+
+const screenPaperDecisionValidator = v.object({
+  paperIndex: v.number(),
+  isIncluded: v.boolean(),
+  reason: v.string(),
+  /** Per-criterion checks, when the screener returned them. */
+  criteria: v.optional(v.array(criterionAssessmentValidator)),
+  /** The paper could not be screened, so it was excluded unchecked. */
+  screeningFailed: v.optional(v.boolean()),
+});
+
+type ScreenPaperDecision = Infer<typeof screenPaperDecisionValidator>;
 
 /** Screens up to five papers per action (parallel per-paper LLM calls). */
 export async function screenPapersBatchHandler(
@@ -590,8 +625,10 @@ export async function screenPapersBatchHandler(
     query: string;
     batchStartIndex: number;
     smartModel?: string;
+    /** Eligibility criteria from planning; generic criteria when absent. */
+    criteria?: ScreeningCriterion[];
   }
-) {
+): Promise<{ decisions: ScreenPaperDecision[] }> {
   const logger = createServiceLogger("literatureReview", "screenPapersBatch");
   const batchLength = args.papers.length;
   logger.info("Screening batch", {
@@ -600,23 +637,23 @@ export async function screenPapersBatchHandler(
   });
 
   if (batchLength === 0) {
-    return { decisions: [] as Array<{ paperIndex: number; isIncluded: boolean; reason: string }> };
+    return { decisions: [] };
   }
 
-  const fallbackReason = "Included by conservative fallback due to screening error.";
+  const criteria = normalizeScreeningCriteria(args.criteria);
   const decisions = await allWithConcurrency(
     args.papers.map((paper, localIndex) => async () => {
       const paperIndex = args.batchStartIndex + localIndex;
       try {
-        const { isIncluded, reason } = await screenOnePaperWithLlm(paper, args.query);
-        return { paperIndex, isIncluded, reason };
+        return { paperIndex, ...(await screenOnePaperWithLlm(paper, args.query, criteria)) };
       } catch (error) {
-        logger.error("Screening failed for paper, using conservative fallback", error, {
+        // Excluded, with the reason recorded: an unscreened paper must not count as included.
+        logger.error("Screening failed for paper; excluding it as unscreened", error, {
           batchStartIndex: args.batchStartIndex,
           paperIndex,
           title: paper.title,
         });
-        return { paperIndex, isIncluded: true, reason: fallbackReason };
+        return { paperIndex, ...screeningFailureDecision() };
       }
     }),
     LITERATURE_BULK_LLM_CONCURRENCY
@@ -625,15 +662,11 @@ export async function screenPapersBatchHandler(
   logger.info("Screening batch complete", {
     batchStartIndex: args.batchStartIndex,
     decisionCount: decisions.length,
+    includedCount: decisions.filter((d) => d.isIncluded).length,
+    failedCount: decisions.filter((d) => d.screeningFailed).length,
   });
   return { decisions };
 }
-
-const screenPaperDecisionValidator = v.object({
-  paperIndex: v.number(),
-  isIncluded: v.boolean(),
-  reason: v.string(),
-});
 
 export const screenPapersBatch = internalAction({
   args: {
@@ -641,6 +674,7 @@ export const screenPapersBatch = internalAction({
     query: v.string(),
     batchStartIndex: v.number(),
     smartModel: v.optional(v.string()),
+    criteria: v.optional(v.array(screeningCriterionValidator)),
   },
   returns: v.object({
     decisions: v.array(screenPaperDecisionValidator),
@@ -648,9 +682,10 @@ export const screenPapersBatch = internalAction({
   handler: screenPapersBatchHandler,
 });
 
+/** Screens all papers in batches (eval / retries; the workflow runs one batch per step). */
 export async function screenPapersHandler(
   ctx: ActionCtx,
-  args: { papers: any[]; query: string; smartModel?: string }
+  args: { papers: any[]; query: string; smartModel?: string; criteria?: ScreeningCriterion[] }
 ) {
   const logger = createServiceLogger("literatureReview", "screenPapers");
 
@@ -664,52 +699,41 @@ export async function screenPapersHandler(
     totalBatches,
   });
 
-  try {
-    const decisions = new Map<number, { isIncluded: boolean; reason: string }>();
-
-    for (let i = 0; i < args.papers.length; i += SCREEN_PAPERS_BATCH_SIZE) {
-      const batch = args.papers.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
-      const { decisions: batchDecisions } = await ctx.runAction(
-        internal.literatureReview.workflowSteps.screenPapersBatch,
-        {
+  const decisions = new Map<number, ScreeningDecision>();
+  for (let i = 0; i < args.papers.length; i += SCREEN_PAPERS_BATCH_SIZE) {
+    const batch = args.papers.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
+    try {
+      const { decisions: batchDecisions }: { decisions: ScreenPaperDecision[] } =
+        await ctx.runAction(internal.literatureReview.workflowSteps.screenPapersBatch, {
           papers: batch,
           query: args.query,
           batchStartIndex: i,
           smartModel: args.smartModel,
-        }
-      );
-
-      for (const decision of batchDecisions) {
-        decisions.set(decision.paperIndex, {
-          isIncluded: decision.isIncluded,
-          reason: decision.reason,
+          ...(args.criteria ? { criteria: args.criteria } : {}),
         });
+      for (const { paperIndex, ...decision } of batchDecisions) {
+        decisions.set(paperIndex, decision);
       }
+    } catch (error) {
+      // Papers in a failed batch get no decision and are excluded as unscreened below.
+      logger.error("Screening batch failed", error, { batchStartIndex: i });
     }
-
-    const screenedPapers = args.papers.map((p, index) => ({
-      ...p,
-      isIncluded: decisions.get(index)?.isIncluded ?? true,
-      includeReason: decisions.get(index)?.reason ?? "No screening decision available.",
-    }));
-
-    logger.info("Screening complete", {
-      paperCount: args.papers.length,
-      includedCount: screenedPapers.filter((p) => p.isIncluded === true).length,
-    });
-
-    return { papers: compactPapersForWorkflow(screenedPapers) };
-  } catch (error) {
-    logger.error("Screening failed entirely, including all papers conservatively", error);
-
-    const fallbackPapers = args.papers.map((p) => ({
-      ...p,
-      isIncluded: true,
-      includeReason: "Included by conservative fallback due to screening error.",
-    }));
-
-    return { papers: compactPapersForWorkflow(fallbackPapers) };
   }
+
+  const resolved = resolveScreeningDecisions(args.papers.length, decisions);
+  const screenedPapers = args.papers.map((p, index) => ({
+    ...p,
+    isIncluded: resolved.decisions[index].isIncluded,
+    includeReason: resolved.decisions[index].reason,
+  }));
+
+  logger.info("Screening complete", {
+    paperCount: args.papers.length,
+    includedCount: resolved.includedCount,
+    failedCount: resolved.failedCount,
+  });
+
+  return { papers: compactPapersForWorkflow(screenedPapers) };
 }
 
 export const screenPapers = internalAction({
@@ -717,6 +741,7 @@ export const screenPapers = internalAction({
     papers: v.array(literaturePaperValidator),
     query: v.string(),
     smartModel: v.optional(v.string()),
+    criteria: v.optional(v.array(screeningCriterionValidator)),
   },
   returns: v.object({ papers: v.array(literaturePaperValidator) }),
   handler: screenPapersHandler,

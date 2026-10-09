@@ -1,9 +1,16 @@
 import { v } from "convex/values";
+import {
+  criterionAssessmentValidator,
+  type ScreeningCriterion,
+  screeningCriterionValidator,
+} from "./screeningCriteria";
 
 /** Persisted PRISMA-style counts and search provenance for a literature review session. */
 export const literatureReviewWorkflowProvenanceValidator = v.object({
   searchQueries: v.optional(v.array(v.string())),
   databasesUsed: v.optional(v.array(v.string())),
+  /** Eligibility criteria papers were screened against (#351). */
+  screeningCriteria: v.optional(v.array(screeningCriterionValidator)),
   recordsIdentified: v.optional(v.number()),
   recordsAfterDedupe: v.optional(v.number()),
   recordsRanked: v.optional(v.number()),
@@ -22,6 +29,8 @@ export const literatureReviewWorkflowProvenanceValidator = v.object({
 export type LiteratureReviewWorkflowProvenance = {
   searchQueries?: string[];
   databasesUsed?: string[];
+  /** Eligibility criteria papers were screened against (#351). */
+  screeningCriteria?: ScreeningCriterion[];
   recordsIdentified?: number;
   recordsAfterDedupe?: number;
   recordsRanked?: number;
@@ -47,5 +56,6 @@ export const screeningDecisionValidator = v.object({
   year: v.optional(v.number()),
   decision: v.union(v.literal("included"), v.literal("excluded")),
   reason: v.string(),
+  criteria: v.optional(v.array(criterionAssessmentValidator)),
   rank: v.optional(v.number()),
 });
