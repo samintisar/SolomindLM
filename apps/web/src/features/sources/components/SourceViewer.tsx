@@ -172,9 +172,11 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     [content]
   );
 
-  // A new citation click: show the text view, where the passage can be found and highlighted.
+  // A new citation click: drop the last citation's highlight (this one's quote may not be found)
+  // and show the text view, where the passage can be found and highlighted.
   useEffect(() => {
     if (focusSeq === undefined) return;
+    clearPassageHighlight();
     setViewMode("markdown");
     setPdfPage(undefined);
   }, [focusSeq]);
@@ -319,12 +321,13 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       )}
 
       {focusPage !== null && !isLoading && !error && (
-        <div className="flex items-center justify-between gap-2 rounded-md border bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-          <span>Page {focusPage}</span>
-          {canShowPdf && (
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-1.5 font-sans text-sm text-muted-foreground">
+          <span>Cited on page {focusPage}</span>
+          {canShowPdf && viewMode === "markdown" && (
             <Button
               variant="ghost"
               size="sm"
+              aria-label={`Open PDF at page ${focusPage}`}
               onClick={() => {
                 setViewMode("pdf");
                 setPdfPage(focusPage);

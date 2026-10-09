@@ -200,4 +200,11 @@ describe("PdfViewer initial page", () => {
     );
     scroll.mockRestore();
   });
+
+  test("renders only the initial page at first, so pages above it keep their placeholder height", async () => {
+    render(<PdfViewer file="blob:test.pdf" initialPage={3} />);
+
+    expect(await screen.findByTestId("page-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("page-1")).not.toBeInTheDocument();
+  });
 });

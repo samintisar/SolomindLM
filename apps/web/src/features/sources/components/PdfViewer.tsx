@@ -93,7 +93,9 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "", init
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
+  // Seed with the page we'll jump to: pages above it stay fixed-height placeholders, so rendering
+  // them can't shift the target after the jump (WebKit has no scroll anchoring to compensate).
+  const [visiblePages, setVisiblePages] = useState<Set<number>>(() => new Set([initialPage ?? 1]));
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [showOutline, setShowOutline] = useState(false);
@@ -132,11 +134,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "", init
     setLoading(false);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the file changes; initialPage is read at reset time
   useEffect(() => {
     setNumPages(0);
     setLoading(true);
     setError(null);
-    setVisiblePages(new Set([1]));
+    setVisiblePages(new Set([initialPage ?? 1]));
     setCurrentPage(1);
     setPageInput("1");
     setShowOutline(false);

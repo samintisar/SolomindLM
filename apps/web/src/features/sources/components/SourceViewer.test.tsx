@@ -40,7 +40,7 @@ vi.mock("@/shared/utils", async (importOriginal) => {
 
 import { sanitizeMarkdown } from "@/shared/utils";
 import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
-import { highlightPassage } from "../utils/highlightPassage";
+import { clearPassageHighlight, highlightPassage } from "../utils/highlightPassage";
 
 function renderViewer(overrides: Partial<ComponentProps<typeof SourceViewer>> = {}) {
   const props: ComponentProps<typeof SourceViewer> = {
@@ -507,6 +507,19 @@ describe("SourceViewer citation focus", () => {
     );
   });
 
+  test("clears the previous highlight when a new citation in the same source arrives", async () => {
+    const { rerender, props } = renderViewer({
+      source: guided,
+      focus: { seq: 1, quote: "Test content", pageNumber: 7 },
+    });
+    await waitFor(() => expect(highlightPassage).toHaveBeenCalled());
+    vi.mocked(clearPassageHighlight).mockClear();
+
+    rerender(<SourceViewer {...props} focus={{ seq: 2, quote: "Another passage" }} />);
+
+    expect(clearPassageHighlight).toHaveBeenCalled();
+  });
+
   test("shows the cited page and opens the PDF there", async () => {
     const user = userEvent.setup();
     renderViewer({
@@ -515,22 +528,54 @@ describe("SourceViewer citation focus", () => {
       focus: { seq: 1, quote: "Test content", pageNumber: 7 },
     });
 
-    expect(screen.getByText("Page 7")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Open PDF" }));
+    expect(screen.getByText("Cited on page 7")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open PDF at page 7" }));
 
     expect(await screen.findByTestId("pdf-viewer")).toHaveAttribute("data-initial-page", "7");
+  });
+
+  test("hides Open PDF once the PDF view is showing", async () => {
+    const user = userEvent.setup();
+    renderViewer({
+      source: guided,
+      pdfStorageId: "storage1",
+      focus: { seq: 1, quote: "Test content", pageNumber: 7 },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open PDF at page 7" }));
+    await screen.findByTestId("pdf-viewer");
+
+    expect(screen.getByText("Cited on page 7")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open PDF at page 7" })).not.toBeInTheDocument();
+  });
+
+  test("a new citation while the PDF is showing switches back to the text view", async () => {
+    const user = userEvent.setup();
+    const { rerender, props } = renderViewer({
+      source: guided,
+      pdfStorageId: "storage1",
+      focus: { seq: 1, quote: "Test content", pageNumber: 7 },
+    });
+    await user.click(await screen.findByRole("button", { name: "Open PDF at page 7" }));
+    await screen.findByTestId("pdf-viewer");
+    expect(screen.queryByText("Test content")).not.toBeInTheDocument();
+
+    rerender(<SourceViewer {...props} focus={{ seq: 2, quote: "Test content", pageNumber: 2 }} />);
+
+    expect(await screen.findByText("Test content")).toBeInTheDocument();
+    expect(screen.queryByTestId("pdf-viewer")).not.toBeInTheDocument();
   });
 
   test("shows the page without Open PDF when there is no stored PDF", () => {
     renderViewer({ source: guided, focus: { seq: 1, quote: "Test content", pageNumber: 7 } });
 
-    expect(screen.getByText("Page 7")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open PDF" })).not.toBeInTheDocument();
+    expect(screen.getByText("Cited on page 7")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Open PDF/ })).not.toBeInTheDocument();
   });
 
   test("shows no page bar when the citation has no page", () => {
     renderViewer({ source: guided, focus: { seq: 1, quote: "Test content" } });
 
-    expect(screen.queryByText(/^Page \d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/page \d+$/)).not.toBeInTheDocument();
   });
 });
