@@ -123,6 +123,27 @@ describe("decideScreening", () => {
     expect(decision.reason).toContain("Studies one approach only.");
   });
 
+  it("lines up checks numbered from 0 with the right criteria", () => {
+    const decision = decideScreening(
+      {
+        isIncluded: true,
+        reason: "Fits.",
+        criteria: CRITERIA.map((_, i) => ({
+          criterion: i,
+          status: i === 0 ? "not_met" : "met",
+          explanation: `Check ${i}.`,
+        })),
+      },
+      CRITERIA
+    );
+
+    expect(decision.isIncluded).toBe(false);
+    expect(decision.criteria?.map((c) => c.status)).toEqual(
+      CRITERIA.map((_, i) => (i === 0 ? "not_met" : "met"))
+    );
+    expect(decision.reason).toContain(CRITERIA[0].label);
+  });
+
   it("respects the screener's exclusion even when every criterion is marked met", () => {
     const decision = decideScreening(
       { isIncluded: false, reason: "A duplicate of another record.", criteria: allMet },

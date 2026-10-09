@@ -60,6 +60,17 @@ describe("rankByRelevanceAndInfluence", () => {
     expect(ranked[0].title).toBe("Widely cited foundational paper");
   });
 
+  it("lets citations decide when relevance scores sit in a narrow band", () => {
+    const papers = [
+      paper("Slightly more relevant, uncited", 0, 2025),
+      paper("Slightly less relevant, widely cited", 500, 2022),
+    ];
+
+    const ranked = rankByRelevanceAndInfluence(papers, [0.84, 0.78], CURRENT_YEAR);
+
+    expect(ranked[0].title).toBe("Slightly less relevant, widely cited");
+  });
+
   it("keeps an off-topic highly cited paper below relevant ones", () => {
     const papers = [
       paper("Relevant uncited paper", 0, 2026),

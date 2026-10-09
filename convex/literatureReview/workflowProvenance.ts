@@ -17,6 +17,8 @@ export const literatureReviewWorkflowProvenanceValidator = v.object({
   recordsScreened: v.optional(v.number()),
   recordsIncluded: v.optional(v.number()),
   recordsExcluded: v.optional(v.number()),
+  /** Screened papers whose screening call failed; excluded, but not counted in recordsExcluded. */
+  recordsNotScreened: v.optional(v.number()),
   recordsFromNotebook: v.optional(v.number()),
   searchSkipped: v.optional(v.boolean()),
   extractedRowCount: v.optional(v.number()),
@@ -37,6 +39,8 @@ export type LiteratureReviewWorkflowProvenance = {
   recordsScreened?: number;
   recordsIncluded?: number;
   recordsExcluded?: number;
+  /** Screened papers whose screening call failed; excluded, but not counted in recordsExcluded. */
+  recordsNotScreened?: number;
   /** Papers from the user's notebook, included without screening (#301). */
   recordsFromNotebook?: number;
   /** True when the review was limited to notebook papers (no database search). */

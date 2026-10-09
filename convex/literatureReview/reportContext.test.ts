@@ -116,6 +116,19 @@ describe("reportContext", () => {
     expect(block).toContain("2. **Empirical Evidence**: Reports an evaluation.");
   });
 
+  it("buildPrismaMethodsBlock counts papers that could not be screened apart from exclusions", () => {
+    const block = buildPrismaMethodsBlock({
+      searchQueries: ["q"],
+      recordsScreened: 25,
+      recordsIncluded: 10,
+      recordsExcluded: 3,
+      recordsNotScreened: 12,
+    });
+
+    expect(block).toContain("| Records excluded | 3 |");
+    expect(block).toContain("| Excluded unscreened (screening call failed) | 12 |");
+  });
+
   it("buildPrismaMethodsBlock omits the eligibility section when no criteria were recorded", () => {
     const block = buildPrismaMethodsBlock({ searchQueries: ["q"], recordsScreened: 5 });
 

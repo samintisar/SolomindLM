@@ -192,7 +192,6 @@ export const literatureReviewWorkflow = workflow
               notebookId: args.notebookId,
               documentIds: args.documentIds,
               query: args.query,
-              ...criteriaArg,
             })
           ).papers
         : [];
@@ -366,7 +365,9 @@ export const literatureReviewWorkflow = workflow
           patch: {
             recordsScreened: papersToScreen.length,
             recordsIncluded: includedCount,
-            recordsExcluded: excludedCount,
+            // Eligibility exclusions only; papers whose screening call failed are counted apart.
+            recordsExcluded: excludedCount - failedCount,
+            ...(failedCount > 0 ? { recordsNotScreened: failedCount } : {}),
             screenCompletedAt: Date.now(),
           },
         });
@@ -376,11 +377,11 @@ export const literatureReviewWorkflow = workflow
           args.sessionId,
           "screening",
           "completed",
-          `Screened ${papersToScreen.length} papers: ${includedCount} included, ${excludedCount} excluded.`,
+          `Screened ${papersToScreen.length} papers: ${includedCount} included, ${excludedCount - failedCount} excluded${failedCount > 0 ? `, ${failedCount} could not be screened` : ""}.`,
           {
             recordsScreened: papersToScreen.length,
             recordsIncluded: includedCount,
-            recordsExcluded: excludedCount,
+            recordsExcluded: excludedCount - failedCount,
             ...(failedCount > 0 ? { recordsNotScreened: failedCount } : {}),
           }
         );

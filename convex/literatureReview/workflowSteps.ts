@@ -153,7 +153,13 @@ const confirmedColumnValidator = v.object({
  * first and ranking weighs citations (#351).
  */
 export function dedupePapers<
-  T extends { doi?: string; title: string; authors: string[]; citationCount?: number },
+  T extends {
+    doi?: string;
+    title: string;
+    authors: string[];
+    citationCount?: number;
+    score?: number;
+  },
 >(papers: T[]): T[] {
   const kept = new Map<string, number>();
   const out: T[] = [];
@@ -169,7 +175,12 @@ export function dedupePapers<
     }
     const existing = out[keptIndex];
     if (p.citationCount != null && p.citationCount > (existing.citationCount ?? -1)) {
-      out[keptIndex] = { ...existing, citationCount: p.citationCount };
+      // The search score weighs citations too; the rerank-failure fallback sorts by it.
+      out[keptIndex] = {
+        ...existing,
+        citationCount: p.citationCount,
+        ...(p.score != null && p.score > (existing.score ?? -Infinity) ? { score: p.score } : {}),
+      };
     }
   }
   return out;
@@ -494,6 +505,9 @@ async function screenOnePaperWithLlm(
 }
 
 const PDF_METADATA_TEXT_MAX_CHARS = 4_000;
+
+/** The off-topic check for the user's own notebook papers: the topic criterion alone. */
+const NOTEBOOK_TOPIC_CRITERIA: ScreeningCriterion[] = [DEFAULT_SCREENING_CRITERIA[0]];
 const PDF_METADATA_TIMEOUT_MS = 45_000;
 
 /** Title, authors and year from the start of an uploaded paper, so its citation key is right. */
@@ -539,11 +553,9 @@ export async function loadNotebookPapersHandler(
     notebookId: Id<"notebooks">;
     documentIds: Id<"documents">[];
     query: string;
-    criteria?: ScreeningCriterion[];
   }
 ): Promise<{ papers: Infer<typeof literaturePaperValidator>[] }> {
   const logger = createServiceLogger("literatureReview", "loadNotebookPapers");
-  const criteria = normalizeScreeningCriteria(args.criteria);
   const docs: NotebookDocumentLike[] = await ctx.runQuery(
     internal.literatureReview.db.getNotebookPaperDocuments,
     {
@@ -569,8 +581,13 @@ export async function loadNotebookPapersHandler(
       const paper = notebookPaperFromDocument(doc, metadata);
       let offTopicReason: string | undefined;
       try {
-        const verdict = await screenOnePaperWithLlm(paper, args.query, criteria);
-        if (!verdict.isIncluded) offTopicReason = verdict.reason;
+        // The user chose these papers, so only the topic is checked, and only a clear "not met"
+        // flags one: an unclear abstract or a missing kind of evidence is not "off topic".
+        const verdict = await screenOnePaperWithLlm(paper, args.query, NOTEBOOK_TOPIC_CRITERIA);
+        const offTopic = verdict.criteria
+          ? verdict.criteria.some((c) => c.status === "not_met")
+          : !verdict.isIncluded;
+        if (offTopic) offTopicReason = verdict.reason;
       } catch (error) {
         logger.error("Off-topic check failed; leaving the paper unflagged", error, {
           documentId: doc._id,
@@ -599,7 +616,6 @@ export const loadNotebookPapers = internalAction({
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
     query: v.string(),
-    criteria: v.optional(v.array(screeningCriterionValidator)),
   },
   returns: v.object({ papers: v.array(literaturePaperValidator) }),
   handler: loadNotebookPapersHandler,

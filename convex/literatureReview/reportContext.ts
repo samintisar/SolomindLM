@@ -201,6 +201,10 @@ Data were extracted into a structured evidence table using question-specific col
       : "not recorded";
   const notebookRow = fromNotebook > 0 ? `| Papers from your notebook | ${fromNotebook} |\n` : "";
   const excluded = provenance.recordsExcluded ?? "not recorded";
+  const notScreenedRow = provenance.recordsNotScreened
+    ? `| Excluded unscreened (screening call failed) | ${provenance.recordsNotScreened} |
+`
+    : "";
 
   const queryList =
     queries.length > 0
@@ -235,7 +239,7 @@ PRISMA-style flow (counts from this review run):
 | After deduplication | ${deduped} |
 | Records screened | ${screened} |
 | Records excluded | ${excluded} |
-${notebookRow}| Studies included | ${included} |
+${notScreenedRow}${notebookRow}| Studies included | ${included} |
 
 ### Data Extraction
 

@@ -35,17 +35,11 @@ function median(values: number[]): number {
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-/** Min-max scale to [0, 1]; a pool with no spread scales to 1 throughout. */
-function minMaxScale(values: number[]): number[] {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min;
-  return values.map((value) => (range > 0 ? (value - min) / range : 1));
-}
-
 /**
  * Sorts papers by `RELEVANCE_WEIGHT * relevance + CITATION_WEIGHT * influence` and writes that
- * blend (0..1) to each paper's `score`. Both signals are scaled across this candidate pool.
+ * blend (0..1) to each paper's `score`. Influence is scaled by the pool's highest; relevance is
+ * the reranker's own 0..1 score, unscaled, so a pool of near-equal scores stays near-equal and
+ * citations can still separate it.
  *
  * `relevance[i]` is the reranker score for `papers[i]`; a missing one counts as the least
  * relevant. A paper with an unknown citation count gets the pool's median influence, so a source
@@ -56,14 +50,10 @@ export function rankByRelevanceAndInfluence<
 >(papers: T[], relevance: Array<number | undefined>, currentYear: number): T[] {
   if (papers.length === 0) return [];
 
-  const scoredIndexes = papers
-    .map((_, i) => i)
-    .filter((i) => relevance[i] != null && Number.isFinite(relevance[i]));
-  const scaledRelevance = minMaxScale(scoredIndexes.map((i) => relevance[i] as number));
-  // A paper the reranker did not score sits at the bottom, even when the pool has no spread.
-  const relevanceScores = papers.map(() => 0);
-  scoredIndexes.forEach((paperIndex, k) => {
-    relevanceScores[paperIndex] = scaledRelevance[k];
+  // A paper the reranker did not score sits at the bottom.
+  const relevanceScores = papers.map((_, i) => {
+    const score = relevance[i];
+    return score != null && Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
   });
 
   const impacts = papers.map((p) => citationImpact(p.citationCount, p.year, currentYear));

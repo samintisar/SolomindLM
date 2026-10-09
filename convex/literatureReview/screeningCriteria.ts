@@ -130,9 +130,13 @@ export function decideScreening(
     };
   }
 
+  // The prompt numbers criteria from 1; a model that numbers from 0 is shifted back into line.
+  const offset = checks.some((check) => check.criterion === 0) ? 1 : 0;
   const byNumber = new Map<number, { status: string; explanation?: string }>();
   checks.forEach((check, position) => {
-    const n = Number.isInteger(check.criterion) ? (check.criterion as number) : position + 1;
+    const n = Number.isInteger(check.criterion)
+      ? (check.criterion as number) + offset
+      : position + 1;
     if (n >= 1 && n <= criteria.length && !byNumber.has(n)) byNumber.set(n, check);
   });
 

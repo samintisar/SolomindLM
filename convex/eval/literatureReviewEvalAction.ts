@@ -430,7 +430,6 @@ export const runLiteratureReviewEval = action({
             notebookId: args.notebookId,
             documentIds: notebookPaperIds,
             query: args.question,
-            criteria: plan.screeningCriteria,
           })
         ).papers
       : [];

@@ -133,6 +133,8 @@ describe("dedupePapers", () => {
     const result = dedupePapers(papers as any);
 
     expect(result.map((p: any) => p.citationCount)).toEqual([2752, 12]);
+    // The search score that counted those citations comes along, for the rerank fallback.
+    expect(result.map((p: any) => p.score)).toEqual([0.9, 0.7]);
   });
 });
 
