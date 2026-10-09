@@ -12,10 +12,11 @@ import {
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
-import { Source } from "@/shared/types";
+import type { Source, SourceFocusTarget } from "@/shared/types";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { extractYouTubeVideoId } from "@/shared/utils/youtubeEmbed";
 import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
+import { clearPassageHighlight, highlightPassage } from "../utils/highlightPassage";
 import { isYouTubeSource } from "../utils/sourceTypes";
 import { PdfViewer } from "./PdfViewer";
 import { YouTubeEmbedUnavailable, YouTubeVideoPreview } from "./YouTubeVideoPreview";
@@ -62,6 +63,13 @@ function isPdfViewMode(value: string): value is PdfViewMode {
   return value === "pdf" || value === "markdown";
 }
 
+/** A citation click to land on; `seq` changes on every click so the same passage can be re-opened. */
+export type SourceFocus = SourceFocusTarget & { seq: number };
+
+/** The markdown renders lazily, so look for the passage a few times before giving up (about 2 s). */
+const PASSAGE_FIND_TRIES = 20;
+const PASSAGE_FIND_INTERVAL_MS = 100;
+
 interface SourceViewerProps {
   source: Source;
   content: string | undefined;
@@ -70,6 +78,8 @@ interface SourceViewerProps {
   isLoading: boolean;
   error: string | undefined;
   onDiscussTopic?: (topic: string) => void;
+  /** Cited passage to scroll to and highlight, with its page. */
+  focus?: SourceFocus | null;
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -79,6 +89,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   isLoading,
   error,
   onDiscussTopic,
+  focus,
 }) => {
   const isPdfSource = source.type === "PDF";
   const canShowPdf = isPdfSource && pdfStorageId;
@@ -88,6 +99,11 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   const [generatingGuide, setGeneratingGuide] = useState(false);
   const [guideError, setGuideError] = useState<string | null>(null);
   const [sourceGuideExpanded, setSourceGuideExpanded] = useState(true);
+  const [pdfPage, setPdfPage] = useState<number | undefined>(undefined);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const focusSeq = focus?.seq;
+  const focusQuote = focus?.quote;
+  const focusPage = focus?.pageNumber ?? null;
   const hasGeneratedRef = useRef(false);
   const getSignedUrl = useGetSignedUrl();
   const generateSourceGuide = useGenerateSourceGuide();
@@ -155,6 +171,33 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     () => sanitizeMarkdown(content || "No content available."),
     [content]
   );
+
+  // A new citation click: show the text view, where the passage can be found and highlighted.
+  useEffect(() => {
+    if (focusSeq === undefined) return;
+    setViewMode("markdown");
+    setPdfPage(undefined);
+  }, [focusSeq]);
+
+  // Find and highlight the cited passage once the markdown has rendered.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-find the passage when the rendered content changes
+  useEffect(() => {
+    if (focusSeq === undefined || !focusQuote || viewMode !== "markdown" || isLoading) return;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = () => {
+      const root = contentRef.current;
+      if (root?.textContent?.trim() && highlightPassage(root, focusQuote)) return;
+      tries += 1;
+      if (tries < PASSAGE_FIND_TRIES) timer = setTimeout(attempt, PASSAGE_FIND_INTERVAL_MS);
+    };
+    timer = setTimeout(attempt, 0);
+    return () => clearTimeout(timer);
+  }, [focusSeq, focusQuote, viewMode, isLoading, sanitizedContent]);
+
+  // Drop the highlight when another source opens or the viewer closes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the cleanup runs when the source changes
+  useEffect(() => clearPassageHighlight, [source.id]);
 
   return (
     <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
@@ -275,6 +318,25 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         </Alert>
       )}
 
+      {focusPage !== null && !isLoading && !error && (
+        <div className="flex items-center justify-between gap-2 rounded-md border bg-muted px-3 py-1.5 text-sm text-muted-foreground">
+          <span>Page {focusPage}</span>
+          {canShowPdf && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setViewMode("pdf");
+                setPdfPage(focusPage);
+              }}
+            >
+              <FileText aria-hidden />
+              Open PDF
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* PDF / Markdown view toggle (PDF sources only when pdfUrl is available) */}
       {canShowPdf && !isLoading && !error && (
         <ToggleGroup
@@ -310,7 +372,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                 Loading PDF…
               </div>
             ) : pdfUrl ? (
-              <PdfViewer file={pdfUrl} />
+              <PdfViewer file={pdfUrl} initialPage={pdfPage} />
             ) : (
               <Alert variant="destructive">
                 <XCircle aria-hidden />
@@ -318,7 +380,10 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
               </Alert>
             )
           ) : (
-            <div className="prose max-w-none font-serif leading-relaxed text-foreground/90 select-text">
+            <div
+              ref={contentRef}
+              className="prose max-w-none font-serif leading-relaxed text-foreground/90 select-text"
+            >
               <Suspense fallback={<Skeleton className="h-4 w-full" />}>
                 <MarkdownRenderer components={SOURCE_MARKDOWN_COMPONENTS}>
                   {sanitizedContent}
