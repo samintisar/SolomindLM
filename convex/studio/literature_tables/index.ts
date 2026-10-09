@@ -23,6 +23,7 @@ import { literatureSearchOptionsValidator } from "../../_model/literatureReviewS
 import { getAuthUserId } from "../../auth";
 import { loadNotebookPaperDocuments } from "../../literatureReview/db";
 import { type PaperScope, resolvePaperScope } from "../../literatureReview/notebookPapers";
+import { criterionAssessmentValidator } from "../../literatureReview/screeningCriteria";
 import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
 import { scheduleLiteratureReviewCompletionPush } from "../../push/notify";
 import { literatureTableToCsv } from "./literatureTableCsv.js";
@@ -1014,6 +1015,7 @@ export const getLiteratureReviewScreeningDecisions = query({
       year: v.optional(v.number()),
       decision: v.union(v.literal("included"), v.literal("excluded")),
       reason: v.string(),
+      criteria: v.optional(v.array(criterionAssessmentValidator)),
       rank: v.optional(v.number()),
     })
   ),
@@ -1042,6 +1044,7 @@ export const getLiteratureReviewScreeningDecisions = query({
       year: r.year,
       decision: r.decision,
       reason: r.reason,
+      ...(r.criteria ? { criteria: r.criteria } : {}),
       rank: r.rank,
     }));
   },

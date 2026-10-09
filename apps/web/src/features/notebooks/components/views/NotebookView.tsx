@@ -1,5 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
@@ -24,6 +24,7 @@ import { STUDIO_TOOLS } from "@/shared/constants";
 import { useToast } from "@/shared/contexts/useToast";
 import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
+import type { SourceFocusTarget } from "@/shared/types";
 import { NotebookPanelSeparator } from "./NotebookPanelSeparator";
 
 // Tailwind's `md` breakpoint (48rem), so panel internals that use `md:` classes agree with the layout.
@@ -253,17 +254,25 @@ function NotebookViewContent() {
     setSourceFocusRequest(null);
   }, []);
 
-  const handleOpenNotebookSourceFromChat = useCallback((documentId: string) => {
-    setIsSourcesOpen(true);
+  // Monotonic across clears of the request, so a repeat click on the same citation is still a new focus.
+  const sourceFocusSeqRef = useRef(0);
 
-    setMobileActiveTab("sources");
+  const handleOpenNotebookSourceFromChat = useCallback(
+    (documentId: string, focus?: SourceFocusTarget) => {
+      setIsSourcesOpen(true);
 
-    setSourceFocusRequest((prev) => ({
-      documentId,
+      setMobileActiveTab("sources");
 
-      seq: (prev?.seq ?? 0) + 1,
-    }));
-  }, []);
+      sourceFocusSeqRef.current += 1;
+      setSourceFocusRequest({
+        documentId,
+        seq: sourceFocusSeqRef.current,
+        quote: focus?.quote,
+        pageNumber: focus?.pageNumber,
+      });
+    },
+    []
+  );
 
   const discussSourceTopic = useCallback(
     (topic: string) => {

@@ -38,6 +38,7 @@ export function CitationCard({
   );
   const previousPreview = reference.metadata?.previousChunkPreview?.trim();
   const nextPreview = reference.metadata?.nextChunkPreview?.trim();
+  const pageNumber = reference.metadata?.pageNumber;
 
   const handleAdd = async () => {
     if (!onAddToNotebook || isAdding) return;
@@ -60,6 +61,7 @@ export function CitationCard({
         <div className="min-w-0 flex-1">
           <p className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Reference {refId}
+            {pageNumber ? ` • p. ${pageNumber}` : ""}
             {sourceHost ? ` • ${sourceHost}` : ""}
           </p>
           {onOpenInSources ? (

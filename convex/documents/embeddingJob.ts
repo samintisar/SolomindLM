@@ -19,8 +19,10 @@ import {
   extractDocumentMetadata,
   getFileExtension,
 } from "../_services/processing/DocumentMetadataExtractor";
+import { maxPageLabel } from "../_services/processing/pageLabels";
 import { StructuralChunker } from "../_services/processing/StructuralChunker";
 import { buildPaperMetadataMarkdown } from "./paperRecord";
+import { toStoredMarkdown } from "./storedMarkdown.helpers";
 
 // File extensions that require OCR processing
 const OCR_FILE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".avif", ".pdf", ".pptx", ".docx"];
@@ -314,18 +316,10 @@ export const docEmbedding = internalAction({
 
       logger.info("Text extraction complete", { contentLength: extractedText.length });
 
-      // Full markdown for source viewer / copy (no overlapping chunk boundaries).
-      // Convex document field limit ~1MB UTF-8; cap stored copy for huge PDFs.
-      const MAX_STORED_MARKDOWN_CHARS = 800_000;
-      let extractedMarkdownForUi = extractedText;
-      if (extractedMarkdownForUi.length > MAX_STORED_MARKDOWN_CHARS) {
-        extractedMarkdownForUi =
-          extractedMarkdownForUi.slice(0, MAX_STORED_MARKDOWN_CHARS) +
-          "\n\n---\n\n**Note:** Display copy was truncated for a very large document. Use **Original PDF** to view the full file.";
-      }
+      // Full markdown for source viewer / copy (no overlapping chunk boundaries), capped for huge PDFs.
       await ctx.runMutation(internal.documents.internal.setExtractedMarkdown, {
         documentId,
-        extractedMarkdown: extractedMarkdownForUi,
+        extractedMarkdown: toStoredMarkdown(extractedText),
       });
 
       // Phase: Chunking
@@ -333,7 +327,11 @@ export const docEmbedding = internalAction({
       currentPhase = "chunking";
 
       const fileExtension = getFileExtension(docDetails.fileName);
-      const docMetadata = extractDocumentMetadata(extractedText, fileExtension);
+      const docMetadata = extractDocumentMetadata(
+        extractedText,
+        fileExtension,
+        maxPageLabel(extractedText) ?? undefined
+      );
       logger.info("Document metadata extracted", {
         wordCount: docMetadata.wordCount,
         readingTime: docMetadata.estimatedReadingTimeMinutes,

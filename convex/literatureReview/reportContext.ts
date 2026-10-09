@@ -201,11 +201,27 @@ Data were extracted into a structured evidence table using question-specific col
       : "not recorded";
   const notebookRow = fromNotebook > 0 ? `| Papers from your notebook | ${fromNotebook} |\n` : "";
   const excluded = provenance.recordsExcluded ?? "not recorded";
+  const notScreenedRow = provenance.recordsNotScreened
+    ? `| Excluded unscreened (screening call failed) | ${provenance.recordsNotScreened} |
+`
+    : "";
 
   const queryList =
     queries.length > 0
       ? queries.map((q, i) => `${i + 1}. \`${q}\``).join("\n")
       : "_No search queries were logged._";
+
+  const criteria = provenance.screeningCriteria ?? [];
+  const eligibilitySection =
+    criteria.length > 0
+      ? `### Eligibility Criteria
+
+Titles and abstracts were screened against these criteria; a paper was excluded if it failed any criterion or if its abstract left most of them unconfirmed:
+
+${criteria.map((c, i) => `${i + 1}. **${c.label}**: ${c.description}`).join("\n")}
+
+`
+      : "";
 
   return `### Search Strategy
 
@@ -213,7 +229,7 @@ We searched ${databases} using ${queries.length || "multiple"} structured querie
 
 ${queryList}
 
-### Study Selection
+${eligibilitySection}### Study Selection
 
 PRISMA-style flow (counts from this review run):
 
@@ -223,7 +239,7 @@ PRISMA-style flow (counts from this review run):
 | After deduplication | ${deduped} |
 | Records screened | ${screened} |
 | Records excluded | ${excluded} |
-${notebookRow}| Studies included | ${included} |
+${notScreenedRow}${notebookRow}| Studies included | ${included} |
 
 ### Data Extraction
 

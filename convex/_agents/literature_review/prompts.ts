@@ -13,24 +13,22 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js
 // ============================================================
 
 /**
- * Schema for screening decisions output.
+ * One paper per LLM call (faster, avoids batch timeouts). The per-criterion checks come first so
+ * the model works through the eligibility criteria before it states a verdict; the include or
+ * exclude decision itself is made in code from these checks (`decideScreening`).
+ * `criterion` and `status` are plain number/string (no enum or integer bounds) to keep the JSON
+ * schema within what Together's structured-output grammar accepts; code normalizes them.
  */
-export const ScreenPapersOutputSchema = z.object({
-  decisions: z.array(
+export const ScreenSinglePaperOutputSchema = z.object({
+  criteria: z.array(
     z.object({
-      paperId: z.string(),
-      isIncluded: z.boolean(),
-      reason: z.string(),
+      criterion: z.number(),
+      status: z.string(),
+      explanation: z.string(),
     })
   ),
-});
-
-export type ScreenPapersOutput = z.infer<typeof ScreenPapersOutputSchema>;
-
-/** One paper per LLM call (faster, avoids batch timeouts). */
-export const ScreenSinglePaperOutputSchema = z.object({
-  isIncluded: z.boolean(),
   reason: z.string(),
+  isIncluded: z.boolean(),
 });
 
 export type ScreenSinglePaperOutput = z.infer<typeof ScreenSinglePaperOutputSchema>;
@@ -81,6 +79,18 @@ export const PlanReviewOutputSchema = z.object({
       isVisible: z.boolean(),
     })
   ),
+  /**
+   * Eligibility criteria for screening, derived from the question. Optional so a plan without
+   * them still parses; code falls back to generic criteria (`normalizeScreeningCriteria`).
+   */
+  screeningCriteria: z
+    .array(
+      z.object({
+        label: z.string(),
+        description: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export type PlanReviewOutput = z.infer<typeof PlanReviewOutputSchema>;
@@ -158,7 +168,7 @@ RESEARCH QUESTION: "{query}"
 
 Respond in the following JSON format exactly (shape only — replace every placeholder with content specific to the research question):
 
-{\n  "reviewTitle": "Concise Academic Title for This Review",\n  "searchQueries": [\n    "targeted search query 1",\n    "targeted search query 2",\n    "targeted search query 3",\n    "targeted search query 4",\n    "targeted search query 5"\n  ],\n  "suggestedColumns": [\n    {\n      "id": "first_concept_snake_case",\n      "name": "First Concept Label",\n      "instructions": "What to extract for this concept, tied to the research question.",\n      "isVisible": true\n    },\n    {\n      "id": "second_concept_snake_case",\n      "name": "Second Concept Label",\n      "instructions": "What to extract for this concept, tied to the research question.",\n      "isVisible": true\n    }\n  ]\n}
+{\n  "reviewTitle": "Concise Academic Title for This Review",\n  "searchQueries": [\n    "targeted search query 1",\n    "targeted search query 2",\n    "targeted search query 3",\n    "targeted search query 4",\n    "targeted search query 5"\n  ],\n  "suggestedColumns": [\n    {\n      "id": "first_concept_snake_case",\n      "name": "First Concept Label",\n      "instructions": "What to extract for this concept, tied to the research question.",\n      "isVisible": true\n    },\n    {\n      "id": "second_concept_snake_case",\n      "name": "Second Concept Label",\n      "instructions": "What to extract for this concept, tied to the research question.",\n      "isVisible": true\n    }\n  ],\n  "screeningCriteria": [\n    {\n      "label": "Short Criterion Label",\n      "description": "One sentence stating what an eligible paper must show, judged from its title and abstract."\n    }\n  ]\n}
 
 Guidelines:
 - reviewTitle: A concise, professional title (max 12 words) that names the review topic. Use title case. Do NOT copy the user's full prompt, instructions (e.g. "include RCT evidence"), or question marks. Focus on the subject (e.g. "Digital Interventions for Depression" not "What digital interventions exist for treating depression? Include RCT evidence").
@@ -171,6 +181,11 @@ Guidelines:
 - Column names should be human-readable and question-specific.
 - Instructions should tell the extractor exactly what to pull from each paper for this review.
 - All columns should have isVisible: true by default.
+- screeningCriteria: 3-5 eligibility criteria for screening papers into this review, derived from the research question. Each is a condition an eligible paper must satisfy, judged from its title and abstract.
+  - Cover the question's core subject (the phenomenon, population, intervention, or method it asks about), the kind of evidence needed to answer it (e.g. an empirical evaluation, a comparison, a measured outcome), and any constraint the question states (time period, setting, population, comparison).
+  - Make each criterion specific enough that a paper merely on a related topic fails it. Do not write criteria that every search result would pass.
+  - Review or survey papers that synthesize evidence on the question can satisfy the evidence criterion.
+  - label: 2-5 words in title case. description: one sentence.
 
 JSON OUTPUT:`;
 
@@ -179,50 +194,32 @@ JSON OUTPUT:`;
 // ============================================================
 
 /**
- * Given a batch of papers and a research question, output
- * inclusion/exclusion decisions with reasons.
+ * Screens one paper against the review's eligibility criteria. The per-criterion checks drive the
+ * decision in code (`decideScreening`), so a verdict of "include" cannot override a failed one.
  */
-export const SCREEN_PAPERS_PROMPT = `CRITICAL OUTPUT FORMAT: You MUST output valid JSON only. Do not include markdown code blocks, explanations, or any text outside the JSON object. The JSON must be parseable by a standard JSON parser.
-
-RESEARCH QUESTION: "{query}"
-
-PAPERS TO SCREEN:
-{papers}
-
-For each paper, respond with an inclusion decision.
-
-Respond in the following JSON format exactly:
-
-{\n  "decisions": [\n    {\n      "paperId": "paper_1",\n      "isIncluded": true,\n      "reason": "Directly addresses the research question with relevant population and intervention."\n    },\n    {\n      "paperId": "paper_2",\n      "isIncluded": false,\n      "reason": "Conference abstract only; insufficient detail for data extraction."\n    }\n  ]\n}
-
-Screening criteria:
-- Include papers that DIRECTLY address the research question with clear relevance and provide substantive information.
-- Exclude papers that are only tangentially related or address a different topic.
-- Do NOT automatically exclude review articles, surveys, or overview papers. For broad research questions asking about technologies, methods, or approaches, review articles can be highly relevant and should be included if they directly address the question with comprehensive coverage.
-- Exclude editorials, commentaries, and opinion pieces unless they contain substantial evidence-based analysis.
-- Exclude papers without accessible full text or with insufficient detail to extract meaningful information.
-- Exclude papers in languages other than English unless translation is available.
-- Exclude duplicate publications (keep the most complete version).
-- Be selective: if a paper's relevance is unclear, marginal, or provides only superficial coverage, EXCLUDE it and note the uncertainty.
-- Aim for a balanced inclusion rate: include papers that clearly contribute to answering the research question, but exclude those with weak or indirect relevance.
-
-JSON OUTPUT:`;
-
 export const SCREEN_SINGLE_PAPER_PROMPT = `CRITICAL OUTPUT FORMAT: You MUST output valid JSON only.
 
 RESEARCH QUESTION: "{query}"
+
+ELIGIBILITY CRITERIA:
+{criteria}
 
 PAPER:
 Title: {title}
 Abstract: {abstract}
 
-Decide if this paper should be included in a systematic review for the research question.
+Check this paper against every eligibility criterion above, using only its title and abstract.
+For each criterion, by its number, give a status:
+- "met": the title or abstract shows the paper satisfies it.
+- "not_met": the title or abstract shows the paper does not satisfy it (for example, it studies a related but different topic, or lacks the kind of evidence the criterion asks for).
+- "unclear": the title and abstract do not say either way.
+Sharing the question's general topic is not enough to meet a criterion; judge what each criterion actually asks for.
 
-Respond in the following JSON format exactly:
+Then give a one-sentence reason for the overall decision, and set isIncluded to true only if the paper meets the criteria.
 
-{\n  "isIncluded": true,\n  "reason": "One sentence explaining the decision."\n}
+Respond in the following JSON format exactly (shape only; replace every value):
 
-Be selective: exclude tangential papers, editorials without evidence, and duplicates. Include review/survey papers when they directly address the question.
+{\n  "criteria": [\n    { "criterion": 1, "status": "met | not_met | unclear", "explanation": "One short sentence grounded in the title or abstract." }\n  ],\n  "reason": "One sentence explaining the decision.",\n  "isIncluded": true\n}
 
 JSON OUTPUT:`;
 

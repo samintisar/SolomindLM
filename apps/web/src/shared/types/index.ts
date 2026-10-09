@@ -61,7 +61,18 @@ export interface ReferenceChunk {
   chunkIndex: number;
   similarity?: number;
   /** Retrieval metadata. The previews are the neighbouring passages' edges the answer also saw. */
-  metadata?: { previousChunkPreview?: string | null; nextChunkPreview?: string | null };
+  metadata?: {
+    previousChunkPreview?: string | null;
+    nextChunkPreview?: string | null;
+    /** Page the passage sits on, for sources with pages (OCR'd PDF, DOCX, PPTX). */
+    pageNumber?: number | null;
+  };
+}
+
+/** Where to land when a source is opened from a citation: the cited passage and its page. */
+export interface SourceFocusTarget {
+  quote?: string;
+  pageNumber?: number | null;
 }
 
 export interface MessageToolCall {

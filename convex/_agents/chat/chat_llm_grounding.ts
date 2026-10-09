@@ -112,44 +112,46 @@ ${structureHint}`;
 }
 
 /**
+ * Whole-word comparison intent. Bare substrings misfire on "differential",
+ * "contrastive" and the like.
+ */
+const COMPARISON_PATTERN =
+  /\b(compare[sd]?|comparing|comparison|contrast(s|ed|ing)?|differ(s|ed|ing)?|differences?|vs\.?|versus)(?=\W|$)/;
+
+/**
  * Provides ultra-concise structure hint based on query type.
  * Includes negative constraints for better adherence.
  */
 export function getStructureHint(query: string): string {
   const lower = query.toLowerCase();
 
-  if (lower.match(/compare|contrast|difference|differ|vs|versus/)) {
-    return `Hint: Structure your comparison with clear sections:
-1. **Core Definition** - What is each thing?
-2. **Key Differences** - How do they fundamentally differ?
-3. **Characteristics/Properties** - What are their distinct features?
-4. **Use Cases/Context** - When is each appropriate?
-5. **Relationships** - How do they relate to each other?
-
-Include a summary table at the end comparing key features.
-Do not write block paragraphs for comparisons.`;
+  if (COMPARISON_PATTERN.test(lower)) {
+    return `Hint: This is a comparison. Shape the answer around exactly what was asked: answer it directly first, then compare the items on the points the question names and the aspects the sources discuss.
+If the question asks for specific details (figures, results, conditions), give them prominently.
+Use a table only when several items share the same attributes.
+Do not add sections the question did not ask for, such as definitions, use cases or relationships.`;
   }
 
-  if (lower.match(/equation|formula|formulas|math|latex|notation|subscript|superscript/)) {
+  if (/\b(equations?|formulas?|math|latex|notation|subscripts?|superscripts?)\b/.test(lower)) {
     return (
       "Hint: Use $...$ for inline and $$...$$ for full display equations; never put $ inside $$; " +
       "do not nest dollar math (e.g. avoid \\cmd($x$)); wrap every symbolic variable in delimiters (write $x$, not bare x)."
     );
   }
 
-  if (lower.match(/^(how|why|explain)/)) {
+  if (/^(how|why|explain)\b/.test(lower)) {
     return "Hint: Definition → mechanism/process → examples (if available in sources). Do not provide generic examples not in sources.";
   }
 
-  if (lower.match(/summarize|overview|main points|key takeaways/)) {
+  if (/\b(summari[sz](e|es|ed|ing)|overview|main points|key takeaways)\b/.test(lower)) {
     return "Hint: Main themes → key findings → gaps or questions.";
   }
 
-  if (lower.match(/^discuss|describe|overview of|types of|kinds of|what are/)) {
+  if (/^discuss\b|\b(describe|overview of|types of|kinds of|what are)\b/.test(lower)) {
     return "Hint: Cover ALL major aspects mentioned in the sources. Use sections or lists for clarity. Check that you have not skipped important topics present in the documents.";
   }
 
-  if (lower.match(/list|enumerate/)) {
+  if (/\b(list|enumerate)\b/.test(lower)) {
     return "Hint: Use numbered or bulleted lists for clarity. Include citations after each item.";
   }
 

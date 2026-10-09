@@ -319,7 +319,7 @@ function StepDetails({
                   ? () => onOpenRankedPapers!(sessionId!)
                   : () => onOpenScreeningDecisions!(sessionId!)
               }
-              className="max-w-full justify-start"
+              className="justify-start"
             >
               {pillContent}
             </Button>
@@ -364,7 +364,7 @@ function StepDetails({
           variant="outline"
           size="chip"
           onClick={onClick}
-          className="max-w-full justify-start"
+          className="justify-start"
         >
           <StepIconForType stepType={stepType} />
           <span className="min-w-0">{details}</span>

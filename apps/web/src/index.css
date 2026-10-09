@@ -339,6 +339,11 @@
     color: var(--foreground);
     font-family: "Lora", serif;
   }
+
+  /* Cited passage opened from a citation (sources/utils/highlightPassage.ts). */
+  ::highlight(source-passage) {
+    background-color: var(--warning-muted);
+  }
 }
 
 /* Motion tokens. Durations use Tailwind's numeric utilities: duration-120 (micro), duration-200
@@ -594,9 +599,10 @@
   }
 }
 
-/* Chat empty state: room for the floating composer plus the iOS home indicator. */
+/* Chat empty state: room for the floating composer (measured by useComposerClearance). The safe-area
+   inset is 0 until the viewport opts into `viewport-fit=cover`; the composer itself has no inset padding. */
 @utility pb-composer-safe {
-  padding-bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--chat-composer-clearance, 12.5rem) + env(safe-area-inset-bottom, 0px));
 }
 
 /* Scroll container that reserves its scrollbar track so content does not shift when it overflows. */
