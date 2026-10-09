@@ -62,15 +62,17 @@ Attribution under the diagram on the page (not inside the exported image): "Temp
 
 ### Count warnings
 
-Pure checks over the form state; each returns `{ field, message }`. Only run when every number the check
-needs is filled in.
+Pure checks over the form state; each returns `{ field, message }`. Blank parts of a sum count as 0, and a
+check runs only when both of its sides have at least one number.
 
 1. Records screened ≠ databases + registers − duplicates − automation − other removed.
-2. Reports sought > records screened − records excluded.
-3. Reports assessed ≠ reports sought − reports not retrieved (per column).
-4. Reports assessed − sum of exclusion reasons, added over both columns, ≠ reports of included studies.
+2. Reports assessed ≠ reports sought − reports not retrieved (per column).
+3. Reports assessed − sum of exclusion reasons, added over both columns, ≠ reports of included studies.
    (The included box is shared, so the check runs on the totals, not per column.)
-5. Studies included > reports of included studies.
+
+Only checks within one unit are kept. Records and reports are different units (one record can lead to
+several reports), and one report can describe several studies, so "reports sought vs records left" and
+"studies vs reports" would flag correct diagrams.
 
 Messages state both numbers, e.g. "Identified 412 − removed 87 = 325, but screened is 320."
 
