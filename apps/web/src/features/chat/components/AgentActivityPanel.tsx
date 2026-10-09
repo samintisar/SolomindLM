@@ -193,13 +193,15 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
         data-agent-activity-panel
       >
         <CollapsibleTrigger asChild>
+          {/* `-ml-4` outdents the hover fill; `max-w-none` lets the inline button use the width that
+              margin frees up (the chip's `max-w-full` would stop it 1rem short of the right edge). */}
           <Button
             id={`${triggerId}-trigger`}
             type="button"
             variant="disclosure"
             size="chip"
             aria-label={headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary}
-            className="group/trigger -ml-4 justify-start"
+            className="group/trigger -ml-4 max-w-none justify-start"
           >
             <span className="min-w-0 wrap-break-word">
               <span>{headerPrimary}</span>

@@ -594,7 +594,8 @@
   }
 }
 
-/* Chat empty state: room for the floating composer (measured by useComposerClearance) plus the iOS home indicator. */
+/* Chat empty state: room for the floating composer (measured by useComposerClearance). The safe-area
+   inset is 0 until the viewport opts into `viewport-fit=cover`; the composer itself has no inset padding. */
 @utility pb-composer-safe {
   padding-bottom: calc(var(--chat-composer-clearance, 12.5rem) + env(safe-area-inset-bottom, 0px));
 }
