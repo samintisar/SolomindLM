@@ -20,6 +20,32 @@ describe("PrismaFlowDiagram", () => {
     expect(screen.getByText("21")).toBeTruthy();
   });
 
+  it("shows papers that could not be screened apart from exclusions", () => {
+    render(
+      <PrismaFlowDiagram
+        counts={{
+          recordsIdentified: 200,
+          recordsAfterDedupe: 100,
+          recordsScreened: 25,
+          recordsExcluded: 3,
+          recordsNotScreened: 12,
+          recordsIncluded: 10,
+        }}
+      />
+    );
+    expect(screen.getByText("Excluded").nextSibling).toHaveTextContent("3");
+    expect(screen.getByText("Not screened").nextSibling).toHaveTextContent("12");
+  });
+
+  it("hides the not-screened box when every paper was screened", () => {
+    render(
+      <PrismaFlowDiagram
+        counts={{ recordsScreened: 30, recordsExcluded: 9, recordsIncluded: 21 }}
+      />
+    );
+    expect(screen.queryByText("Not screened")).toBeNull();
+  });
+
   it("returns null when no counts", () => {
     const { container } = render(<PrismaFlowDiagram counts={{}} />);
     expect(container.firstChild).toBeNull();
