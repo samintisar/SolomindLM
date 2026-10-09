@@ -217,6 +217,14 @@ describe("free tool pages", () => {
     expect(body).toContain('href="/research/ai-literature-review"');
   });
 
+  it("cross-links the literature review intent page to the PRISMA tool", () => {
+    const intentPage = getIntentLandingPageByPath("/research/ai-literature-review");
+    const body = buildIntentLandingPrerenderBody(intentPage!);
+    expect(body).toContain(
+      `<a href="${PRISMA_FLOW_DIAGRAM_PAGE.path}">Free PRISMA flow diagram generator</a>`
+    );
+  });
+
   it("cross-links the flashcards intent page to the tool with its own anchor text", () => {
     const intentPage = getIntentLandingPageByPath("/students/ai-flashcards");
     const body = buildIntentLandingPrerenderBody(intentPage!);

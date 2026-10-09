@@ -754,6 +754,13 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
       source: "Twenty papers on a narrow research question",
       output: "A structured synthesis draft with themes and gaps noted",
     },
+    heroCrossLink: {
+      path: "/tools/prisma-flow-diagram",
+      label: "Need a PRISMA diagram?",
+      description:
+        "Draw a PRISMA 2020 flow diagram from your counts and download it as SVG or PNG, no account needed.",
+      linkLabel: "Free PRISMA flow diagram generator",
+    },
     faqs: [
       {
         question: "Is there a free AI literature review tool?",
