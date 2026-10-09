@@ -1,0 +1,58 @@
+# After Vercel finishes a deployment, request a few paths from it and fail if the security
+# headers from apps/web/vercel.json are missing or routing changed (pages 200, unknown path
+# 404). The CSP smoke test serves the build with headers read from vercel.json itself, so it
+# can't see Vercel silently ignoring them; this job can.
+#
+# Vercel's GitHub integration posts a deployment_status for every preview and production
+# deployment. Previews are behind Deployment Protection, so the job needs the repo secret
+# VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Project Settings → Deployment Protection →
+# Protection Bypass for Automation). Without it the job warns and skips.
+#
+# Advisory: a deployment_status run is not attached to the PR's required checks.
+
+name: Deployed headers
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Deployed security headers
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check for bypass secret
+        id: secret
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET}" ]; then
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set; protected deployments can't be checked. Skipping."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.secret.outputs.run == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+
+      # The check only uses node: built-ins, so no dependency install.
+      - name: Setup Bun
+        if: steps.secret.outputs.run == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: package.json
+
+      - name: Check headers and routing
+        if: steps.secret.outputs.run == 'true'
+        env:
+          DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: bun e2e/csp/check-deployed-headers.ts

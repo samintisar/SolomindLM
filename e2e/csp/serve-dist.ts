@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { vercelGlobalHeaders } from "./vercelHeaders";
 
 const repoRoot = process.cwd();
 const distDir = path.resolve(repoRoot, "apps/web/dist");
@@ -18,17 +19,7 @@ if (!existsSync(path.join(distDir, "index.html"))) {
   process.exit(1);
 }
 
-type HeaderEntry = { source: string; headers: { key: string; value: string }[] };
-const vercelConfig = JSON.parse(
-  readFileSync(path.resolve(repoRoot, "apps/web/vercel.json"), "utf-8")
-) as { headers?: HeaderEntry[] };
-
-// Only the catch-all rule is applied; per-path rules are not used by this app.
-const globalHeaders = Object.fromEntries(
-  (vercelConfig.headers ?? [])
-    .filter((entry) => entry.source === "/(.*)")
-    .flatMap((entry) => entry.headers.map((header) => [header.key, header.value] as const))
-);
+const globalHeaders = vercelGlobalHeaders(repoRoot);
 
 const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",

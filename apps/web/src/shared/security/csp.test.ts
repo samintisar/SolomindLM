@@ -4,27 +4,50 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Static guard for the Content-Security-Policy in apps/web/vercel.json.
+ * Static guard for the security headers in apps/web/vercel.json.
  *
  * Headers only exist on a deployed site, so unit tests and `vite build` never see them.
  * This catches the cheap regressions (a loosened policy, a new third-party script that the
- * policy doesn't allow) at PR time; e2e/csp/csp.spec.ts covers the live page behaviour.
+ * policy doesn't allow, headers declared where Vercel ignores them) at PR time;
+ * e2e/csp/csp.spec.ts covers the live page behaviour and e2e/csp/check-deployed-headers.ts
+ * the headers a real deployment sends.
  */
+
+type Route = {
+  src?: string;
+  handle?: string;
+  headers?: Record<string, string>;
+  continue?: boolean;
+};
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const vercelConfig = JSON.parse(readFileSync(path.join(webRoot, "vercel.json"), "utf-8")) as {
-  headers: { source: string; headers: { key: string; value: string }[] }[];
-};
+  routes?: Route[];
+} & Record<string, unknown>;
 const indexHtml = readFileSync(path.join(webRoot, "index.html"), "utf-8");
+const routes = vercelConfig.routes ?? [];
 
 const CSP_HEADERS = ["content-security-policy", "content-security-policy-report-only"];
 
+// The legacy `routes` array can't be combined with these: Vercel drops them without a build
+// error, which is how the security headers went missing in production.
+const ROUTE_ONLY_CONFLICTS = ["headers", "redirects", "rewrites", "cleanUrls", "trailingSlash"];
+
+/** The catch-all `continue: true` route that adds headers to every response. */
+const headersRouteIndex = routes.findIndex(
+  (route) => route.src === "/(.*)" && route.continue === true && route.headers
+);
+const globalHeaders = Object.fromEntries(
+  Object.entries(routes[headersRouteIndex]?.headers ?? {}).map(([key, value]) => [
+    key.toLowerCase(),
+    value,
+  ])
+);
+
 function cspHeaderValue(): string | undefined {
-  const all = vercelConfig.headers.find((entry) => entry.source === "/(.*)")?.headers ?? [];
   // Prefer the enforcing header when both are present.
   for (const name of CSP_HEADERS) {
-    const found = all.find((header) => header.key.toLowerCase() === name);
-    if (found) return found.value;
+    if (globalHeaders[name]) return globalHeaders[name];
   }
   return undefined;
 }
@@ -40,6 +63,28 @@ function parsePolicy(policy: string): Map<string, string[]> {
 
 const policy = cspHeaderValue();
 const directives = parsePolicy(policy ?? "");
+
+describe("vercel.json security headers", () => {
+  it("does not mix legacy routes with keys Vercel ignores alongside them", () => {
+    const conflicts = ROUTE_ONLY_CONFLICTS.filter((key) => key in vercelConfig);
+    expect(conflicts, "express these as entries in `routes` (headers: continue: true)").toEqual([]);
+  });
+
+  it("are added by a catch-all continue route before the filesystem handler", () => {
+    const filesystemIndex = routes.findIndex((route) => route.handle === "filesystem");
+    expect(
+      headersRouteIndex,
+      'add { "src": "/(.*)", "headers": {...}, "continue": true }'
+    ).toBeGreaterThanOrEqual(0);
+    // Routes after `handle: filesystem` never run for static files (/, /faq, /assets/*).
+    expect(headersRouteIndex).toBeLessThan(filesystemIndex);
+  });
+
+  it("forbid MIME sniffing and framing", () => {
+    expect(globalHeaders["x-content-type-options"]).toBe("nosniff");
+    expect(globalHeaders["x-frame-options"]).toBe("DENY");
+  });
+});
 
 describe("vercel.json Content-Security-Policy", () => {
   it("is set for every route", () => {
