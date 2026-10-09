@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { isAllowedRedirect } from "./auth";
 import schema from "./schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -74,5 +75,25 @@ describe("auth.getSignInOptions", () => {
     const t = convexTest(schema, modules);
 
     expect(await t.query(api.auth.getSignInOptions, {})).toEqual({ apple: false });
+  });
+});
+
+describe("isAllowedRedirect", () => {
+  const PROD_BASES = ["https://solomindlm.com"];
+
+  test("allows a LAN Vite dev server", () => {
+    expect(isAllowedRedirect("http://192.168.1.20:5173/home", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("http://192.168.1.20:5173", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("http://192.168.1.20/home", PROD_BASES)).toBe(true);
+  });
+
+  test("rejects LAN lookalikes", () => {
+    expect(isAllowedRedirect("http://192.168.1.12.evil.com/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.12.evil.com:5173/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.1@evil.com/", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.1:5173@evil.com/", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://user:pass@192.168.1.20:5173/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("https://192.168.1.20:5173/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.20.nip.io:5173/home", PROD_BASES)).toBe(false);
   });
 });

@@ -15,16 +15,28 @@ const MOBILE_DEV_WEB_ORIGINS = [
   "http://localhost:5173",
 ];
 
-const LAN_VITE_ORIGIN = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?/;
+const LAN_HOSTNAME = /^192\.168\.\d{1,3}\.\d{1,3}$/;
 const NATIVE_APP_SCHEME = /^solomindlm:\/\//;
 const EXPO_DEV_SCHEME = /^exp:\/\//;
 
-function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
+/** True for a plain-http `192.168.x.x` URL (a Vite dev server on the LAN), on any port. */
+function isLanUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  const { protocol, hostname, username, password } = parsed;
+  return protocol === "http:" && LAN_HOSTNAME.test(hostname) && !username && !password;
+}
+
+export function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
   if (NATIVE_APP_SCHEME.test(redirectTo) || EXPO_DEV_SCHEME.test(redirectTo)) {
     return true;
   }
 
-  if (LAN_VITE_ORIGIN.test(redirectTo)) {
+  if (isLanUrl(redirectTo)) {
     return true;
   }
 
