@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  chunkPage,
   hasPageLabels,
   leadingPageBreakLength,
-  locateChunkOffset,
   maxPageLabel,
   PAGE_LABEL_LINE,
   pageAtOffset,
@@ -81,24 +81,40 @@ describe("leadingPageBreakLength", () => {
   });
 });
 
-describe("locateChunkOffset", () => {
-  it("finds the chunk text", () => {
-    expect(locateChunkOffset(OCR_MARKDOWN, "Beta on page two.", 0)).toBe(
-      OCR_MARKDOWN.indexOf("Beta")
-    );
+describe("chunkPage", () => {
+  it("returns the page the chunk text sits on", () => {
+    expect(chunkPage(OCR_MARKDOWN, "Beta on page two.")).toBe(2);
+    expect(chunkPage(OCR_MARKDOWN, "  Gamma on page three.\n")).toBe(3);
   });
 
-  it("picks the occurrence closest to the expected offset", () => {
-    const text = "repeat me\n\nmiddle\n\nrepeat me";
-    expect(locateChunkOffset(text, "repeat me", text.length)).toBe(text.lastIndexOf("repeat me"));
-    expect(locateChunkOffset(text, "repeat me", 0)).toBe(0);
+  it("uses the page the text starts on when the chunk opens on a page break", () => {
+    expect(chunkPage(OCR_MARKDOWN, "---\n\n**Page 3**\n\nGamma on page three.")).toBe(3);
   });
 
-  it("trims the chunk and returns -1 when it is absent or empty", () => {
-    expect(locateChunkOffset(OCR_MARKDOWN, "  Gamma on page three.\n", 0)).toBe(
-      OCR_MARKDOWN.indexOf("Gamma")
-    );
-    expect(locateChunkOffset(OCR_MARKDOWN, "not here", 0)).toBe(-1);
-    expect(locateChunkOffset(OCR_MARKDOWN, "   ", 0)).toBe(-1);
+  it("returns null when repeated text sits on different pages, however long the pages are", () => {
+    const uneven = [
+      "**Page 1**",
+      "",
+      `${"Long first page. ".repeat(200)}`,
+      "",
+      "Figure caption repeated.",
+      "",
+      "---",
+      "",
+      "**Page 2**",
+      "",
+      "Figure caption repeated.",
+    ].join("\n");
+    expect(chunkPage(uneven, "Figure caption repeated.")).toBeNull();
+  });
+
+  it("returns the page when repeated text stays on one page", () => {
+    const samePage = "**Page 4**\n\nrepeat me\n\nmiddle\n\nrepeat me";
+    expect(chunkPage(samePage, "repeat me")).toBe(4);
+  });
+
+  it("returns null when the chunk is absent or empty", () => {
+    expect(chunkPage(OCR_MARKDOWN, "not here")).toBeNull();
+    expect(chunkPage(OCR_MARKDOWN, "   ")).toBeNull();
   });
 });

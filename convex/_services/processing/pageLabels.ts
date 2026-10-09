@@ -54,18 +54,24 @@ export function leadingPageBreakLength(chunk: string): number {
   return chunk.trim().match(LEADING_PAGE_BREAK)?.[0].length ?? 0;
 }
 
-/** Offset of `chunk` (trimmed) in `markdown`, choosing the occurrence closest to `expectedOffset`; -1 when absent. */
-export function locateChunkOffset(markdown: string, chunk: string, expectedOffset: number): number {
+/**
+ * Page that `chunk`'s text (trimmed) sits on in `markdown`: the page its text starts on, after any page break
+ * it opens with. When the text occurs more than once, every occurrence must be on the same page; text repeated
+ * across pages (captions, headers, image placeholders) can't be placed, so it returns null, as for absent text.
+ */
+export function chunkPage(
+  markdown: string,
+  chunk: string,
+  lookup: (offset: number) => number | null = pageAtOffset(markdown)
+): number | null {
   const needle = chunk.trim();
-  if (!needle) return -1;
-  let best = -1;
-  let bestDistance = Number.POSITIVE_INFINITY;
+  if (!needle) return null;
+  const textStart = leadingPageBreakLength(chunk);
+  let page: number | null = null;
   for (let i = markdown.indexOf(needle); i !== -1; i = markdown.indexOf(needle, i + 1)) {
-    const distance = Math.abs(i - expectedOffset);
-    if (distance < bestDistance) {
-      best = i;
-      bestDistance = distance;
-    }
+    const here = lookup(i + textStart);
+    if (here === null || (page !== null && here !== page)) return null;
+    page = here;
   }
-  return best;
+  return page;
 }
