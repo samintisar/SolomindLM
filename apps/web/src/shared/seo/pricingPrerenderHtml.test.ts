@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatUsd, PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
+import {
+  formatUsd,
+  PRO_PRICE_USD,
+  PRO_YEARLY_PER_MONTH_USD,
+  PRO_YEARLY_SAVINGS_PERCENT,
+} from "@/features/billing/planPricing";
 import { PLANS } from "@/features/landing/components/home/landingHomeContent";
 import { getBillingFaqs } from "@/features/landing/faqRegistry";
 import { PRICING_PAGE, PRICING_PATH } from "@/features/landing/pricingPageContent";
@@ -14,35 +19,38 @@ const MINIMAL_HTML = `<!doctype html><html><head><title>Old</title></head><body>
 describe("/pricing prerendered body", () => {
   const body = buildPricingPrerenderBody();
 
-  it("shows every plan's price and billing period as text", () => {
+  it("shows every price on the plan cards, with its billing period", () => {
     for (const price of [
       formatUsd(0),
       formatUsd(PRO_YEARLY_PER_MONTH_USD),
       formatUsd(PRO_PRICE_USD.monthly),
-      formatUsd(PRO_PRICE_USD.yearly),
     ]) {
-      expect(body).toContain(price);
+      expect(body).toContain(`<strong>${price}</strong>`);
     }
-    expect(body).toContain(`<td>${formatUsd(PRO_YEARLY_PER_MONTH_USD)} / month</td>`);
-    expect(body).toContain(`<td>${formatUsd(PRO_PRICE_USD.monthly)} / month</td>`);
-    expect(body).toContain("billed once a year");
-    expect(body).toContain("Billed every month");
+    expect(body).toContain(
+      `<li>Annual: <strong>${formatUsd(PRO_YEARLY_PER_MONTH_USD)}</strong> / month, billed yearly (save ${PRO_YEARLY_SAVINGS_PERCENT}%)</li>`
+    );
+    expect(body).toContain(
+      `<li>Monthly: <strong>${formatUsd(PRO_PRICE_USD.monthly)}</strong> / month</li>`
+    );
+    // Free costs the same under both tabs, so it gets one line.
+    expect(body).toContain(`<p><strong>${formatUsd(0)}</strong> forever</p>`);
+    expect(body).toContain(`<p>${PRICING_PAGE.currencyNote}</p>`);
   });
 
-  it("puts the prices in a table with row headers", () => {
-    expect(body).toContain("<table>");
-    expect(body).toContain('<th scope="row">Free</th>');
-    expect(body).toContain('<th scope="row">Pro, billed yearly</th>');
-    expect(body).toContain('<th scope="row">Pro, billed monthly</th>');
-  });
-
-  it("lists every plan with every limit from the plan cards", () => {
+  it("mirrors each plan card: name, description and every limit", () => {
     for (const plan of PLANS) {
       expect(body).toContain(`<h3>${escapeHtml(plan.name)}</h3>`);
+      expect(body).toContain(`<p>${escapeHtml(plan.description)}</p>`);
       for (const feature of plan.features) {
         expect(body).toContain(`<li>${escapeHtml(feature)}</li>`);
       }
     }
+  });
+
+  it("has no separate price table or limits section (the cards carry both)", () => {
+    expect(body).not.toContain("<table>");
+    expect(body.match(/<h2/g)).toHaveLength(3);
   });
 
   it("has one h1, a breadcrumb and the billing FAQ", () => {

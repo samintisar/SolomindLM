@@ -5,11 +5,17 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { type Billing, PLANS, type Plan } from "./landingHomeContent";
+import {
+  BILLING_LABELS,
+  type Billing,
+  PLANS,
+  type Plan,
+  PRICING_HEADLINE,
+} from "./landingHomeContent";
 import { Reveal } from "./Reveal";
 import { Accent, SectionHeading } from "./SectionHeading";
 
-const BILLING_PERIODS: Billing[] = ["annual", "monthly"];
+const BILLING_PERIODS = Object.keys(BILLING_LABELS) as Billing[];
 
 function PlanCard({
   plan,
@@ -57,7 +63,14 @@ function PlanCard({
   );
 }
 
-export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
+export function PricingSection({
+  onGetStarted,
+  note,
+}: {
+  onGetStarted: () => void;
+  /** A small line under the cards (the /pricing page's currency note). */
+  note?: string;
+}) {
   const [billing, setBilling] = useState<Billing>("annual");
   return (
     <section
@@ -71,7 +84,7 @@ export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
           eyebrow="Pricing"
           title={
             <>
-              Start free. <Accent>Upgrade when it's worth it.</Accent>
+              {PRICING_HEADLINE.lead} <Accent>{PRICING_HEADLINE.accent}</Accent>
             </>
           }
         />
@@ -84,8 +97,11 @@ export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
           >
             <div className="flex items-center justify-center gap-3">
               <TabsList aria-label="Billing period">
-                <TabsTrigger value="annual">Annual</TabsTrigger>
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                {BILLING_PERIODS.map((period) => (
+                  <TabsTrigger key={period} value={period}>
+                    {BILLING_LABELS[period]}
+                  </TabsTrigger>
+                ))}
               </TabsList>
               <Badge variant="success">Save {PRO_YEARLY_SAVINGS_PERCENT}%</Badge>
             </div>
@@ -104,6 +120,9 @@ export function PricingSection({ onGetStarted }: { onGetStarted: () => void }) {
               </TabsContent>
             ))}
           </Tabs>
+          {note ? (
+            <p className="mt-6 text-center font-sans text-xs text-muted-foreground">{note}</p>
+          ) : null}
         </Reveal>
       </div>
     </section>

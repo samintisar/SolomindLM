@@ -1,9 +1,52 @@
-import { PLANS } from "@/features/landing/components/home/landingHomeContent";
+import { PRO_YEARLY_SAVINGS_PERCENT } from "@/features/billing/planPricing";
+import {
+  BILLING_LABELS,
+  type Billing,
+  PLANS,
+  type Plan,
+  PRICING_HEADLINE,
+} from "@/features/landing/components/home/landingHomeContent";
 import { getBillingFaqs } from "@/features/landing/faqRegistry";
-import { getPricingRows, PRICING_PAGE } from "@/features/landing/pricingPageContent";
+import { PRICING_PAGE } from "@/features/landing/pricingPageContent";
 import { escapeHtml } from "./seoHtml";
 
-/** Static HTML body for /pricing — every plan, price, billing period and limit as plain text. */
+const BILLING_PERIODS = Object.keys(BILLING_LABELS) as Billing[];
+
+function priceText(plan: Plan, billing: Billing): string {
+  return `<strong>${escapeHtml(plan.price[billing])}</strong> ${escapeHtml(plan.period[billing])}`;
+}
+
+/**
+ * A plan card as text: its price under each billing tab (one line when the tabs agree, as for
+ * Free), its description and its limits.
+ */
+function planCardHtml(plan: Plan): string {
+  const samePrice = BILLING_PERIODS.every(
+    (billing) =>
+      plan.price[billing] === plan.price.annual && plan.period[billing] === plan.period.annual
+  );
+  const priceLines = BILLING_PERIODS.map((billing) => {
+    const savings = billing === "annual" ? ` (save ${PRO_YEARLY_SAVINGS_PERCENT}%)` : "";
+    return `            <li>${escapeHtml(BILLING_LABELS[billing])}: ${priceText(plan, billing)}${savings}</li>`;
+  }).join("\n");
+  const prices = samePrice
+    ? `          <p>${priceText(plan, "annual")}</p>`
+    : `          <ul>\n${priceLines}\n          </ul>`;
+  const features = plan.features
+    .map((feature) => `            <li>${escapeHtml(feature)}</li>`)
+    .join("\n");
+
+  return `        <section>
+          <h3>${escapeHtml(plan.name)}</h3>
+${prices}
+          <p>${escapeHtml(plan.description)}</p>
+          <ul>
+${features}
+          </ul>
+        </section>`;
+}
+
+/** Static HTML body for /pricing: the plan cards (every price, billing period and limit) as text. */
 export function buildPricingPrerenderBody(): string {
   const breadcrumbItems = PRICING_PAGE.breadcrumbs;
   const breadcrumbNav = breadcrumbItems
@@ -13,23 +56,6 @@ export function buildPricingPrerenderBody(): string {
         : `          <li><a href="${escapeHtml(item.path)}">${escapeHtml(item.name)}</a></li>`
     )
     .join("\n");
-
-  const priceRows = getPricingRows()
-    .map(
-      (row) =>
-        `            <tr><th scope="row">${escapeHtml(row.plan)}</th><td>${escapeHtml(row.price)}</td><td>${escapeHtml(row.billing)}</td></tr>`
-    )
-    .join("\n");
-
-  const planSections = PLANS.map(
-    (plan) => `        <section>
-          <h3>${escapeHtml(plan.name)}</h3>
-          <p>${escapeHtml(plan.description)}</p>
-          <ul>
-${plan.features.map((feature) => `            <li>${escapeHtml(feature)}</li>`).join("\n")}
-          </ul>
-        </section>`
-  ).join("\n");
 
   const faqItems = getBillingFaqs()
     .map(
@@ -48,21 +74,11 @@ ${breadcrumbNav}
         <h1>${escapeHtml(PRICING_PAGE.h1)}</h1>
         <p>${escapeHtml(PRICING_PAGE.lede)}</p>
       </header>
-      <section aria-labelledby="seo-prerender-prices">
-        <h2 id="seo-prerender-prices">${escapeHtml(PRICING_PAGE.tableTitle)}</h2>
-        <table>
-          <thead>
-            <tr><th scope="col">Plan</th><th scope="col">Price</th><th scope="col">Billing</th></tr>
-          </thead>
-          <tbody>
-${priceRows}
-          </tbody>
-        </table>
-        <p>Prices in US dollars.</p>
-      </section>
-      <section aria-labelledby="seo-prerender-limits">
-        <h2 id="seo-prerender-limits">${escapeHtml(PRICING_PAGE.limitsTitle)}</h2>
-${planSections}
+      <section aria-labelledby="seo-prerender-plans">
+        <p>Pricing</p>
+        <h2 id="seo-prerender-plans">${escapeHtml(`${PRICING_HEADLINE.lead} ${PRICING_HEADLINE.accent}`)}</h2>
+${PLANS.map(planCardHtml).join("\n")}
+        <p>${escapeHtml(PRICING_PAGE.currencyNote)}</p>
       </section>
       <section aria-labelledby="seo-prerender-faq">
         <h2 id="seo-prerender-faq">Frequently asked questions</h2>

@@ -1,14 +1,9 @@
-import {
-  formatUsd,
-  PRO_PRICE_USD,
-  PRO_YEARLY_PER_MONTH_USD,
-  PRO_YEARLY_SAVINGS_PERCENT,
-} from "@/features/billing/planPricing";
+import { formatUsd, PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
 
 /**
- * Copy and price rows for /pricing. The React page, its prerendered HTML and pricing.md read
- * these, the plan cards' PLANS (limits built from the backend's limit tables) and the billing
- * FAQs; every price comes from billing/planPricing.ts, so none of them can drift.
+ * Copy for /pricing. The React page, its prerendered HTML and pricing.md read this, the plan
+ * cards' PLANS (limits built from the backend's limit tables) and the billing FAQs; every price
+ * comes from billing/planPricing.ts, so none of them can drift.
  */
 
 export const PRICING_PATH = "/pricing";
@@ -29,29 +24,10 @@ export const PRICING_PAGE = {
     { name: "Home", path: "/" },
     { name: "Pricing", path: PRICING_PATH },
   ],
-  tableTitle: "Every price at a glance",
-  limitsTitle: "What each plan includes",
+  /** Shown under the plan cards. */
+  currencyNote: "Prices in US dollars.",
   closing: {
     body: "Create a free account, add your first sources, and upgrade only if you need more.",
     ctaLabel: "Start free",
   },
 };
-
-type PricingRow = {
-  plan: string;
-  price: string;
-  billing: string;
-};
-
-/** One row per way to pay: Free, Pro billed yearly, Pro billed monthly. */
-export function getPricingRows(): PricingRow[] {
-  return [
-    { plan: "Free", price: formatUsd(0), billing: "Free forever, no card required" },
-    {
-      plan: "Pro, billed yearly",
-      price: `${PRO_YEARLY} / month`,
-      billing: `${formatUsd(PRO_PRICE_USD.yearly)} billed once a year (save ${PRO_YEARLY_SAVINGS_PERCENT}%)`,
-    },
-    { plan: "Pro, billed monthly", price: `${PRO_MONTHLY} / month`, billing: "Billed every month" },
-  ];
-}

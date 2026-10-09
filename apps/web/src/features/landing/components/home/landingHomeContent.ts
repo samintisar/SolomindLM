@@ -253,6 +253,12 @@ export const AUDIENCES: Audience[] = [
 
 export type Billing = "annual" | "monthly";
 
+/** The billing switch's tab labels, in tab order. */
+export const BILLING_LABELS: Record<Billing, string> = { annual: "Annual", monthly: "Monthly" };
+
+/** The pricing section's headline; `accent` renders in the accent style. */
+export const PRICING_HEADLINE = { lead: "Start free.", accent: "Upgrade when it's worth it." };
+
 export interface Plan {
   id: "free" | "pro";
   name: string;

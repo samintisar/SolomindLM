@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PLANS } from "./components/home/landingHomeContent";
 import { getBillingFaqs } from "./faqRegistry";
 import { PricingPage } from "./PricingPage";
-import { getPricingRows, PRICING_PAGE } from "./pricingPageContent";
+import { PRICING_PAGE } from "./pricingPageContent";
 
 vi.mock("@/features/auth/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
@@ -44,13 +44,10 @@ describe("PricingPage", () => {
     }
   });
 
-  it("lists every price for both billing periods in one table, as the prerendered page does", () => {
+  it("shows the currency note under the cards and no separate price table", () => {
     renderPage();
-    const table = screen.getByRole("table", { name: PRICING_PAGE.tableTitle });
-    const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows.map((row) => row.textContent)).toEqual(
-      getPricingRows().map((row) => `${row.plan}${row.price}${row.billing}`)
-    );
+    expect(screen.getByText(PRICING_PAGE.currencyNote)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("answers the billing questions", () => {
