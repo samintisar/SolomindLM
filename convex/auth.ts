@@ -19,8 +19,47 @@ const LAN_VITE_ORIGIN = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?/;
 const NATIVE_APP_SCHEME = /^solomindlm:\/\//;
 const EXPO_DEV_SCHEME = /^exp:\/\//;
 
-function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
+/** Hosts a browser on the dev machine reaches a local web dev server on. */
+const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
+
+/** True for a plain-http `localhost` / `127.0.0.1` URL, on any port. */
+function isLocalhostUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  const { protocol, hostname, username, password } = parsed;
+  return protocol === "http:" && LOCALHOST_HOSTNAMES.has(hostname) && !username && !password;
+}
+
+/**
+ * A dev deployment: `SITE_URL` itself is a localhost origin. Production sets an
+ * https `SITE_URL`, so this never holds there.
+ */
+export function isLocalDevSite(site: string): boolean {
+  return isLocalhostUrl(site);
+}
+
+interface RedirectPolicy {
+  /**
+   * Accept `http://localhost:<any port>` and `http://127.0.0.1:<any port>`, so OAuth
+   * returns to the worktree dev server that started it. Dev deployments only.
+   */
+  allowAnyLocalhostPort?: boolean;
+}
+
+export function isAllowedRedirect(
+  redirectTo: string,
+  bases: string[],
+  { allowAnyLocalhostPort = false }: RedirectPolicy = {}
+): boolean {
   if (NATIVE_APP_SCHEME.test(redirectTo) || EXPO_DEV_SCHEME.test(redirectTo)) {
+    return true;
+  }
+
+  if (allowAnyLocalhostPort && isLocalhostUrl(redirectTo)) {
     return true;
   }
 
@@ -133,7 +172,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     async redirect({ redirectTo }) {
       const bases = [siteUrl(), ...extraOrigins(), ...MOBILE_DEV_WEB_ORIGINS];
 
-      if (!isAllowedRedirect(redirectTo, bases)) {
+      const allowAnyLocalhostPort = isLocalDevSite(bases[0]);
+
+      if (!isAllowedRedirect(redirectTo, bases, { allowAnyLocalhostPort })) {
         throw new Error(`Invalid redirectTo ${redirectTo} for SITE_URL ${process.env.SITE_URL}`);
       }
 

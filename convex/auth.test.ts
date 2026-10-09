@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { isAllowedRedirect, isLocalDevSite } from "./auth";
 import schema from "./schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -74,5 +75,50 @@ describe("auth.getSignInOptions", () => {
     const t = convexTest(schema, modules);
 
     expect(await t.query(api.auth.getSignInOptions, {})).toEqual({ apple: false });
+  });
+});
+
+describe("isAllowedRedirect", () => {
+  const PROD_BASES = ["https://solomindlm.com"];
+  const DEV_BASES = ["http://localhost:5173"];
+
+  test("allows relative paths and the configured site", () => {
+    expect(isAllowedRedirect("/home", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("?code=1", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("https://solomindlm.com/home", PROD_BASES)).toBe(true);
+  });
+
+  test("rejects other hosts and lookalikes of the site", () => {
+    expect(isAllowedRedirect("https://evil.com/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("https://solomindlm.com.evil.com/home", PROD_BASES)).toBe(false);
+  });
+
+  test("allows a worktree's localhost port when the site itself is localhost", () => {
+    const opts = { allowAnyLocalhostPort: true };
+    expect(isAllowedRedirect("http://localhost:64402/home", DEV_BASES, opts)).toBe(true);
+    expect(isAllowedRedirect("http://127.0.0.1:5181/home", DEV_BASES, opts)).toBe(true);
+    expect(isAllowedRedirect("http://localhost:64402", DEV_BASES, opts)).toBe(true);
+  });
+
+  test("keeps localhost lookalikes out even on a dev deployment", () => {
+    const opts = { allowAnyLocalhostPort: true };
+    expect(isAllowedRedirect("http://localhost:64402@evil.com/home", DEV_BASES, opts)).toBe(false);
+    expect(isAllowedRedirect("http://localhost.evil.com:64402/home", DEV_BASES, opts)).toBe(false);
+    expect(isAllowedRedirect("https://localhost:64402/home", DEV_BASES, opts)).toBe(false);
+  });
+
+  test("rejects other localhost ports when the site is not localhost", () => {
+    expect(isAllowedRedirect("http://localhost:64402/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://127.0.0.1:5181/home", PROD_BASES)).toBe(false);
+  });
+});
+
+describe("isLocalDevSite", () => {
+  test("is true only for a plain-http localhost site", () => {
+    expect(isLocalDevSite("http://localhost:5173")).toBe(true);
+    expect(isLocalDevSite("http://127.0.0.1:5173")).toBe(true);
+    expect(isLocalDevSite("https://solomindlm.com")).toBe(false);
+    expect(isLocalDevSite("http://localhost.evil.com")).toBe(false);
+    expect(isLocalDevSite("not a url")).toBe(false);
   });
 });

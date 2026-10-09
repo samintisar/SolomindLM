@@ -33,7 +33,9 @@ then `bun run eval:usecases` (needs `RAG_EVAL_OWNER_EMAIL` on the dev deployment
   in `.dev-servers/`), never another worktree's. Pin with `WEB_PORT` / `PORT` / `METRO_PORT`.
 - The web port range is mirrored in `convex/_lib/allowedOrigins.ts` (CORS); widen both together.
 - Playwright targets the current checkout's server.
-- Google/Apple sign-in always returns to `SITE_URL` (:5173), so use email/password in a worktree.
+- Google/Apple sign-in returns to the dev server that started it: on a localhost origin the web client sends
+  its absolute origin as `redirectTo`, and `convex/auth.ts` accepts any `http://localhost` / `127.0.0.1` port
+  while `SITE_URL` itself is localhost (the dev deployment, never prod). Each origin keeps its own session.
 - **One `convex dev` watcher per dev deployment.** Every worktree's `.env.local` points at the same cloud
   dev deployment, and each watcher pushes its own checkout's functions on save, so two watchers
   overwrite each other. `bun run dev:convex` (`scripts/convex-dev.ts`) refuses to start a second watcher
