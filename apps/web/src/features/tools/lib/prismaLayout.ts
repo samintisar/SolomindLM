@@ -1,4 +1,10 @@
-import { type ExclusionReason, formatCount, type PrismaFlowState, reasonLabel } from "./prismaFlow";
+import {
+  type Count,
+  type ExclusionReason,
+  formatCount,
+  type PrismaFlowState,
+  reasonLabel,
+} from "./prismaFlow";
 
 export const DIAGRAM_FONT = "Arial, Helvetica, sans-serif";
 export const FONT_SIZE = 12;
@@ -61,16 +67,27 @@ export function wrapText(text: string, maxChars: number): string[] {
 
 type Cell = { id: string; lines: string[] };
 
-const cell = (id: string, ...texts: string[]): Cell => ({
-  id,
-  lines: texts.flatMap((text) => wrapText(text, BOX_CHARS)),
-});
+/** A box line: plain text, or a label followed by its "(n = …)" count. */
+type Line = string | { label: string; count: Count };
+
+/** Wraps the label, then keeps the count suffix whole: on the last line if it fits, else its own. */
+function wrapLine(line: Line): string[] {
+  if (typeof line === "string") return wrapText(line, BOX_CHARS);
+  const suffix = formatCount(line.count);
+  const lines = wrapText(line.label, BOX_CHARS);
+  const last = lines[lines.length - 1] ?? "";
+  if (last.length + 1 + suffix.length <= BOX_CHARS) lines[lines.length - 1] = `${last} ${suffix}`;
+  else lines.push(suffix);
+  return lines;
+}
+
+const cell = (id: string, ...items: Line[]): Cell => ({ id, lines: items.flatMap(wrapLine) });
 
 const reasonsCell = (id: string, reasons: ExclusionReason[]) =>
   cell(
     id,
     "Reports excluded:",
-    ...reasons.map((reason, i) => `${reasonLabel(reason, i)} ${formatCount(reason.count)}`)
+    ...reasons.map((reason, i) => ({ label: reasonLabel(reason, i), count: reason.count }))
   );
 
 const boxHeight = (lines: number) => BOX_PADDING * 2 + lines * LINE_HEIGHT;
@@ -86,62 +103,68 @@ export function layoutPrismaFlow(state: PrismaFlowState): PrismaLayout {
       cell(
         "identified",
         "Records identified from:",
-        `Databases ${formatCount(main.databases)}`,
-        `Registers ${formatCount(main.registers)}`
+        { label: "Databases", count: main.databases },
+        { label: "Registers", count: main.registers }
       ),
       cell(
         "removed",
         "Records removed before screening:",
-        `Duplicate records removed ${formatCount(main.duplicatesRemoved)}`,
-        `Records marked as ineligible by automation tools ${formatCount(main.automationRemoved)}`,
-        `Records removed for other reasons ${formatCount(main.otherRemoved)}`
+        { label: "Duplicate records removed", count: main.duplicatesRemoved },
+        {
+          label: "Records marked as ineligible by automation tools",
+          count: main.automationRemoved,
+        },
+        { label: "Records removed for other reasons", count: main.otherRemoved }
       ),
       o
         ? cell(
             "other-identified",
             "Records identified from:",
-            `Websites ${formatCount(other.websites)}`,
-            `Organisations ${formatCount(other.organisations)}`,
-            `Citation searching ${formatCount(other.citationSearching)}`
+            { label: "Websites", count: other.websites },
+            { label: "Organisations", count: other.organisations },
+            { label: "Citation searching", count: other.citationSearching }
           )
         : undefined,
       undefined,
     ],
     [
-      cell("screened", `Records screened ${formatCount(main.recordsScreened)}`),
-      cell("excluded", `Records excluded ${formatCount(main.recordsExcluded)}`),
+      cell("screened", { label: "Records screened", count: main.recordsScreened }),
+      cell("excluded", { label: "Records excluded", count: main.recordsExcluded }),
       undefined,
       undefined,
     ],
     [
-      cell("sought", `Reports sought for retrieval ${formatCount(main.reportsSought)}`),
-      cell("not-retrieved", `Reports not retrieved ${formatCount(main.reportsNotRetrieved)}`),
+      cell("sought", { label: "Reports sought for retrieval", count: main.reportsSought }),
+      cell("not-retrieved", { label: "Reports not retrieved", count: main.reportsNotRetrieved }),
       o
-        ? cell("other-sought", `Reports sought for retrieval ${formatCount(other.reportsSought)}`)
+        ? cell("other-sought", {
+            label: "Reports sought for retrieval",
+            count: other.reportsSought,
+          })
         : undefined,
       o
-        ? cell(
-            "other-not-retrieved",
-            `Reports not retrieved ${formatCount(other.reportsNotRetrieved)}`
-          )
+        ? cell("other-not-retrieved", {
+            label: "Reports not retrieved",
+            count: other.reportsNotRetrieved,
+          })
         : undefined,
     ],
     [
-      cell("assessed", `Reports assessed for eligibility ${formatCount(main.reportsAssessed)}`),
+      cell("assessed", { label: "Reports assessed for eligibility", count: main.reportsAssessed }),
       reasonsCell("reports-excluded", state.reasons),
       o
-        ? cell(
-            "other-assessed",
-            `Reports assessed for eligibility ${formatCount(other.reportsAssessed)}`
-          )
+        ? cell("other-assessed", {
+            label: "Reports assessed for eligibility",
+            count: other.reportsAssessed,
+          })
         : undefined,
       o ? reasonsCell("other-reports-excluded", state.otherReasons) : undefined,
     ],
     [
       cell(
         "included",
-        `Studies included in review ${formatCount(main.studiesIncluded)}`,
-        `Reports of included studies ${formatCount(main.reportsIncluded)}`
+        { label: "Studies included in review", count: main.studiesIncluded },
+        { label: "Reports of included studies", count: main.reportsIncluded }
       ),
       undefined,
       undefined,

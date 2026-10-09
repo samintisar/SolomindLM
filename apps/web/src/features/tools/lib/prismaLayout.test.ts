@@ -67,6 +67,19 @@ describe("layoutPrismaFlow", () => {
     ]);
   });
 
+  it("never splits a count across lines", () => {
+    const state = createEmptyPrismaState();
+    state.main.reportsSought = 75;
+    state.main.automationRemoved = 3;
+    const layout = layoutPrismaFlow(state);
+    const box = (id: string) => layout.boxes.find((b) => b.id === id)!;
+    expect(box("sought").lines).toEqual(["Reports sought for retrieval", "(n = 75)"]);
+    expect(box("removed").lines).toContain("automation tools (n = 3)");
+    for (const b of layout.boxes) {
+      for (const line of b.lines) expect(line).not.toMatch(/\(n$|^= /);
+    }
+  });
+
   it("adds the other-methods column, its header and the elbow into Included", () => {
     const state = createEmptyPrismaState();
     state.otherMethods = true;
