@@ -81,33 +81,69 @@ describe("auth.getSignInOptions", () => {
 describe("isAllowedRedirect", () => {
   const PROD_BASES = ["https://solomindlm.com"];
   const DEV_BASES = ["http://localhost:5173"];
+  const DEV = { allowDevTargets: true };
 
-  test("allows relative paths and the configured site", () => {
+  test("allows relative paths, the configured origins and the native app scheme", () => {
     expect(isAllowedRedirect("/home", PROD_BASES)).toBe(true);
     expect(isAllowedRedirect("?code=1", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("https://solomindlm.com", PROD_BASES)).toBe(true);
     expect(isAllowedRedirect("https://solomindlm.com/home", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("https://solomindlm.com?code=1", PROD_BASES)).toBe(true);
+    expect(isAllowedRedirect("solomindlm://", PROD_BASES)).toBe(true);
   });
 
-  test("rejects other hosts and lookalikes of the site", () => {
+  test("rejects other hosts and lookalikes of a configured origin", () => {
     expect(isAllowedRedirect("https://evil.com/home", PROD_BASES)).toBe(false);
     expect(isAllowedRedirect("https://solomindlm.com.evil.com/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("https://solomindlm.com@evil.com/", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("http://solomindlm.com/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("javascript:alert(1)", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("not a url", PROD_BASES)).toBe(false);
   });
 
-  test("allows a worktree's localhost port when the site itself is localhost", () => {
-    const opts = { allowAnyLocalhostPort: true };
-    expect(isAllowedRedirect("http://localhost:64402/home", DEV_BASES, opts)).toBe(true);
-    expect(isAllowedRedirect("http://127.0.0.1:5181/home", DEV_BASES, opts)).toBe(true);
-    expect(isAllowedRedirect("http://localhost:64402", DEV_BASES, opts)).toBe(true);
+  test("allows a LAN Vite dev server and Expo Go on a dev deployment", () => {
+    expect(isAllowedRedirect("http://192.168.1.20:5173/home", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("http://192.168.1.20:5173", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("http://192.168.1.20:5199/home", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("exp://192.168.1.20:8081/--/home", DEV_BASES, DEV)).toBe(true);
+  });
+
+  test("rejects LAN and Expo Go targets on production", () => {
+    expect(isAllowedRedirect("http://192.168.1.20:5173/home", PROD_BASES)).toBe(false);
+    expect(isAllowedRedirect("exp://attacker.example:8081/--/cb", PROD_BASES)).toBe(false);
+  });
+
+  test("rejects LAN lookalikes and non-dev ports even on a dev deployment", () => {
+    expect(isAllowedRedirect("http://192.168.1.12.evil.com:5173/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.1:5173@evil.com/", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://user:pass@192.168.1.20:5173/home", DEV_BASES, DEV)).toBe(
+      false
+    );
+    expect(isAllowedRedirect("https://192.168.1.20:5173/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.20.nip.io:5173/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.1/", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.20:8080/home", DEV_BASES, DEV)).toBe(false);
+  });
+
+  test("rejects malformed and out-of-range LAN addresses", () => {
+    expect(isAllowedRedirect("http://192.168.1.256:5173/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://192.168.1.999:5173/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://[192.168.1.20:5173/home", DEV_BASES, DEV)).toBe(false);
+  });
+
+  test("allows a worktree's localhost port on a dev deployment", () => {
+    expect(isAllowedRedirect("http://localhost:64402/home", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("http://127.0.0.1:5181/home", DEV_BASES, DEV)).toBe(true);
+    expect(isAllowedRedirect("http://localhost:64402", DEV_BASES, DEV)).toBe(true);
   });
 
   test("keeps localhost lookalikes out even on a dev deployment", () => {
-    const opts = { allowAnyLocalhostPort: true };
-    expect(isAllowedRedirect("http://localhost:64402@evil.com/home", DEV_BASES, opts)).toBe(false);
-    expect(isAllowedRedirect("http://localhost.evil.com:64402/home", DEV_BASES, opts)).toBe(false);
-    expect(isAllowedRedirect("https://localhost:64402/home", DEV_BASES, opts)).toBe(false);
+    expect(isAllowedRedirect("http://localhost:64402@evil.com/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("http://localhost.evil.com:64402/home", DEV_BASES, DEV)).toBe(false);
+    expect(isAllowedRedirect("https://localhost:64402/home", DEV_BASES, DEV)).toBe(false);
   });
 
-  test("rejects other localhost ports when the site is not localhost", () => {
+  test("rejects other localhost ports on production", () => {
     expect(isAllowedRedirect("http://localhost:64402/home", PROD_BASES)).toBe(false);
     expect(isAllowedRedirect("http://127.0.0.1:5181/home", PROD_BASES)).toBe(false);
   });

@@ -17,7 +17,7 @@ export const DEFAULT_SITE_URL = "http://localhost:5173";
  * Vite dev ports: 5173 for the main checkout, 5174-5199 for git worktrees.
  * Keep in sync with `DEV_PORT_RANGES.web` in `apps/web/scripts/devPorts.ts`.
  */
-const DEV_WEB_PORTS = { first: 5173, last: 5199 };
+export const DEV_WEB_PORTS = { first: 5173, last: 5199 };
 
 /** Hosts a local Vite dev server is reached on (10.0.2.2 = Android emulator → host). */
 const DEV_WEB_HOSTS = ["localhost", "127.0.0.1", "10.0.2.2"];
