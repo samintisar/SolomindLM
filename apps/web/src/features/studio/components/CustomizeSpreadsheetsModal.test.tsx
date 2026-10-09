@@ -28,7 +28,7 @@ const PROMPT_LABEL = "Describe the spreadsheet you want to create";
 
 const BUILT_IN = [
   { title: "Data Table", id: "data_extraction", start: /^Analyze this text and identify/ },
-  { title: "Comparison", id: "comparison_table", start: /^Analyze this text to identify/ },
+  { title: "Comparison", id: "comparison_table", start: /^Compare the main items/ },
   { title: "Timeline", id: "timeline", start: /^Analyze this text to identify/ },
   { title: "Financial", id: "financial_summary", start: /^Analyze this text to identify/ },
 ] as const;
@@ -77,6 +77,18 @@ describe("CustomizeSpreadsheetsModal", () => {
       expect(config.customPrompt).not.toContain("{chunk}");
     }
     expect(onGenerate).toHaveBeenCalledTimes(BUILT_IN.length);
+  });
+
+  // The card's prompt is sent as the request for the whole table (#451), so it must say what the
+  // rows are across all sources, not tell a chunk reader to list every item it sees.
+  it("sends Comparison a whole-table request: one row per compared item, passing mentions in cells", async () => {
+    const { onGenerate } = renderSpreadsheets();
+    await userEvent.click(screen.getByRole("button", { name: "Comparison" }));
+    const { customPrompt } = onGenerate.mock.calls[0][0];
+    expect(customPrompt).toMatch(/one row per item/);
+    expect(customPrompt).toMatch(/one row per source/);
+    expect(customPrompt).toMatch(/never in rows of their own/);
+    expect(customPrompt).not.toMatch(/this text/i);
   });
 
   it("Create Your Own asks for a prompt, then generates with it", async () => {

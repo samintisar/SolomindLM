@@ -71,18 +71,13 @@ CONCEPT EXTRACTION:`),
     title: "Comparison",
     description:
       "Compare and contrast different concepts, products, or ideas across multiple dimensions.",
-    prompt:
-      cleanPromptForDisplay(`Analyze this text to identify the specific **Items** or **Products** being compared.
-
-GOAL: Group details by Item/Product.
-- Identify the unique items being discussed.
-- Under each item, list every feature, spec, pro, and con mentioned.
-- If a specific metric is mentioned, record the exact number.
-
-Text:
-{chunk}
-
-ITEM DETAILS:`),
+    // Sent as the request for the whole table, so it says what the rows are across all sources.
+    // A chunk-level "list every item discussed" here made a row of every entity mentioned (#451).
+    prompt: `Compare the main items in these sources side by side, one row per item.
+- If there are several sources and each is mainly about its own subject (a paper's method, a product, a company, a policy), the items are those subjects: one row per source. What a source compares its subject against goes in that row's cells.
+- If the sources weigh a shared set of options against each other, or there is only one source, the items are the options being compared.
+- Examples a source walks through, the datasets and tools it uses and the works it cites go in the cells of the item they belong to, never in rows of their own.
+Use columns for the features, specs, metrics (with exact numbers), strengths and weaknesses a reader would weigh when choosing between the items.`,
   },
   {
     id: "timeline",
