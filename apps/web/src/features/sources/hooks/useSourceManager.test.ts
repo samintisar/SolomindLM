@@ -111,6 +111,30 @@ describe("useSourceManager", () => {
     expect(result.current.sources[0].title).toBe("A");
   });
 
+  it("rebuilds a row when its source guide content changes", async () => {
+    const guide = (summary: string) => ({ summary, topics: ["t"], generatedAt: 0 });
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [{ ...doc("a", "A.md"), sourceGuide: guide("Old") }] } }
+    );
+    await waitFor(() => expect(result.current.sources[0].sourceGuide?.summary).toBe("Old"));
+
+    rerender({ documents: [{ ...doc("a", "A.md"), sourceGuide: guide("New") }] });
+    await waitFor(() => expect(result.current.sources[0].sourceGuide?.summary).toBe("New"));
+  });
+
+  it("rebuilds a row when its fileUrl changes", async () => {
+    const page = (fileUrl: string) => ({ ...doc("a", "Page"), fileType: "url", fileUrl });
+    const { result, rerender } = renderHook(
+      ({ documents }) => useSourceManager({ documents, notebookId: "n" }),
+      { initialProps: { documents: [page("https://old.example")] } }
+    );
+    await waitFor(() => expect(result.current.sources[0].url).toBe("https://old.example"));
+
+    rerender({ documents: [page("https://new.example")] });
+    await waitFor(() => expect(result.current.sources[0].url).toBe("https://new.example"));
+  });
+
   it("resets local-only rows when switching between notebooks with the same document list", async () => {
     const empty: DocumentSummary[] = [];
     const { result, rerender } = renderHook(

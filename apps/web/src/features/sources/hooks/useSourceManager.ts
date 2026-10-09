@@ -9,11 +9,6 @@ import {
   useUpdateDocument,
 } from "../services/documentsApi";
 
-/** Fields that change what a source row shows. Rebuild `sources` only when one of them changes. */
-function documentSignature(d: DocumentSummary): string {
-  return `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${d.sourceGuide ? "1" : "0"}:${d.wordCount ?? ""}:${d.totalChunks ?? ""}:${d.metadata?.userMessage ?? ""}`;
-}
-
 interface UseSourceManagerProps {
   documents: readonly DocumentSummary[];
   notebookId: string | null;
@@ -32,9 +27,12 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   const { error: showError } = useToast();
 
   useEffect(() => {
+    // Rebuild only when the content changes, not on every new array, so local renames,
+    // selection and optimistic rows survive. `DocumentSummary` is a small projection, so the
+    // whole list is the signature: it covers every field `documentToSource` reads.
     // Keyed by notebook too, so switching between two notebooks with the same (e.g. empty)
     // list still resets local-only rows such as optimistically added sources.
-    const signature = `${notebookId ?? ""}|${documents.map(documentSignature).join(",")}`;
+    const signature = `${notebookId ?? ""}|${JSON.stringify(documents)}`;
     if (signature === prevSignatureRef.current) return;
     prevSignatureRef.current = signature;
     setSources((prev) => {
