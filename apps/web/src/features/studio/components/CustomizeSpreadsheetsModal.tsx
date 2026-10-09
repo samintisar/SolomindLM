@@ -1,3 +1,4 @@
+import { SPREADSHEET_PRESET_REQUESTS } from "@convex/_agents/spreadsheet/presetRequests";
 import type React from "react";
 import type { StudioDialogTheme } from "./customize/dialogContext";
 import { type PromptFormat, PromptFormatPicker } from "./customize/PromptFormatPicker";
@@ -25,19 +26,6 @@ export interface SpreadsheetConfig {
   customPrompt: string;
 }
 
-// Helper function to clean backend prompts for UI display
-// Removes "Text:\n{chunk}\n\n" and final labels like "CONCEPT EXTRACTION:"
-function cleanPromptForDisplay(prompt: string): string {
-  return prompt
-    .replace(/\nText:\s*\n\{chunk\}\s*\n\n/g, "") // Remove "Text:\n{chunk}\n\n"
-    .replace(/\n\{chunk\}\s*\n\n/g, "") // Also handle case without "Text:"
-    .replace(
-      /\n(CONCEPT EXTRACTION|ITEM DETAILS|EVENT LOG|FINANCIAL NOTES|RESEARCH NOTES):\s*$/g,
-      ""
-    ) // Remove final labels
-    .trim();
-}
-
 const CUSTOM_FORMAT: PromptFormat<SpreadsheetConfig["spreadsheetType"]> = {
   id: "custom",
   title: "Create Your Own",
@@ -45,6 +33,7 @@ const CUSTOM_FORMAT: PromptFormat<SpreadsheetConfig["spreadsheetType"]> = {
   prompt: "",
 };
 
+// Each built-in format sends its whole-table request; the job runs it with no topic narrowing (#451).
 const SPREADSHEET_FORMATS: PromptFormat<SpreadsheetConfig["spreadsheetType"]>[] = [
   CUSTOM_FORMAT,
   {
@@ -52,67 +41,27 @@ const SPREADSHEET_FORMATS: PromptFormat<SpreadsheetConfig["spreadsheetType"]>[] 
     title: "Data Table",
     description:
       "Extract and organize key data points, facts, and figures from your sources into a structured table.",
-    prompt:
-      cleanPromptForDisplay(`Analyze this text and identify the distinct **Concepts** or **Methods** discussed.
-
-GOAL: Summarize the *types* of things found, not every single instance.
-- Identify the distinct concepts (e.g., specific Methods, Theories, or Approaches).
-- For each concept, extract its general definition and key characteristics.
-- If multiple specific examples or datasets are mentioned for one concept, **list them together** under that concept name. 
-- Do not create separate entries for every example; group them by the concept they illustrate.
-
-Text:
-{chunk}
-
-CONCEPT EXTRACTION:`),
+    prompt: SPREADSHEET_PRESET_REQUESTS.data_extraction,
   },
   {
     id: "comparison_table",
     title: "Comparison",
     description:
       "Compare and contrast different concepts, products, or ideas across multiple dimensions.",
-    // Sent as the request for the whole table, so it says what the rows are across all sources.
-    // A chunk-level "list every item discussed" here made a row of every entity mentioned (#451).
-    prompt: `Compare the main items in these sources side by side, one row per item.
-- If there are several sources and each is mainly about its own subject (a paper's method, a product, a company, a policy), the items are those subjects: one row per source. What a source compares its subject against goes in that row's cells.
-- If the sources weigh a shared set of options against each other, or there is only one source, the items are the options being compared.
-- Examples a source walks through, the datasets and tools it uses and the works it cites go in the cells of the item they belong to, never in rows of their own.
-Use columns for the features, specs, metrics (with exact numbers), strengths and weaknesses a reader would weigh when choosing between the items.`,
+    prompt: SPREADSHEET_PRESET_REQUESTS.comparison_table,
   },
   {
     id: "timeline",
     title: "Timeline",
     description:
       "Organize events, milestones, or developments in chronological order with key details.",
-    prompt:
-      cleanPromptForDisplay(`Analyze this text to identify distinct **Time Periods** or **Major Events**.
-
-GOAL: Extract a chronological flow.
-- Identify specific dates or time periods.
-- For each date, describe the main event.
-- If multiple minor details relate to one main event, group them under that event.
-
-Text:
-{chunk}
-
-EVENT LOG:`),
+    prompt: SPREADSHEET_PRESET_REQUESTS.timeline,
   },
   {
     id: "financial_summary",
     title: "Financial",
     description: "Extract and organize financial data, metrics, and figures into a summary table.",
-    prompt:
-      cleanPromptForDisplay(`Analyze this text to identify distinct **Financial Categories** or **Accounts**.
-
-GOAL: Group figures by Category.
-- Identify categories (e.g., broad revenue streams or expense types).
-- List the specific amounts and dates associated with each category.
-- Keep the raw numbers accurate.
-
-Text:
-{chunk}
-
-FINANCIAL NOTES:`),
+    prompt: SPREADSHEET_PRESET_REQUESTS.financial_summary,
   },
 ];
 

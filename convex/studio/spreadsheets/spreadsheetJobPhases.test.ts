@@ -28,7 +28,7 @@ describe("recursiveCollapse", () => {
   it("hands outputs to reduce as-is without any LLM call once the collapse budget is spent", async () => {
     const outputs = ["a", "b", "c"].map(bigOutput);
 
-    const result = await recursiveCollapse(outputs, "data_table", "", createJobDeadline(0));
+    const result = await recursiveCollapse(outputs, "", createJobDeadline(0));
 
     expect(result).toEqual(outputs);
     expect(invokeTogetherText).not.toHaveBeenCalled();
@@ -38,7 +38,7 @@ describe("recursiveCollapse", () => {
     invokeTogetherText.mockResolvedValue("collapsed");
     const outputs = ["a", "b", "c"].map(bigOutput);
 
-    const result = await recursiveCollapse(outputs, "data_table", "", createJobDeadline(540_000));
+    const result = await recursiveCollapse(outputs, "", createJobDeadline(540_000));
 
     expect(invokeTogetherText).toHaveBeenCalledTimes(1);
     expect(result).toEqual(["collapsed", outputs[2]]);
@@ -55,7 +55,7 @@ describe("recursiveCollapse", () => {
     });
     const outputs = ["a", "b", "c", "d", "e", "f"].map(bigOutput);
 
-    const result = await recursiveCollapse(outputs, "data_table", "", deadline);
+    const result = await recursiveCollapse(outputs, "", deadline);
 
     expect(invokeTogetherText).toHaveBeenCalledTimes(1);
     expect(result).toEqual([

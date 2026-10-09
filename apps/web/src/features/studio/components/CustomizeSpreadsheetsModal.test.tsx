@@ -1,3 +1,4 @@
+import { SPREADSHEET_PRESET_REQUESTS } from "@convex/_agents/spreadsheet/presetRequests";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -27,10 +28,10 @@ vi.mock("@/shared/contexts/useToast", () => ({
 const PROMPT_LABEL = "Describe the spreadsheet you want to create";
 
 const BUILT_IN = [
-  { title: "Data Table", id: "data_extraction", start: /^Analyze this text and identify/ },
-  { title: "Comparison", id: "comparison_table", start: /^Compare the main items/ },
-  { title: "Timeline", id: "timeline", start: /^Analyze this text to identify/ },
-  { title: "Financial", id: "financial_summary", start: /^Analyze this text to identify/ },
+  { title: "Data Table", id: "data_extraction" },
+  { title: "Comparison", id: "comparison_table" },
+  { title: "Timeline", id: "timeline" },
+  { title: "Financial", id: "financial_summary" },
 ] as const;
 
 function renderSpreadsheets(isOpen = true) {
@@ -55,16 +56,13 @@ describe("CustomizeSpreadsheetsModal", () => {
     }
   });
 
-  it("generates Data Table straight from its card, with the cleaned built-in prompt", async () => {
+  it("generates Data Table straight from its card, with its built-in request", async () => {
     const { onGenerate } = renderSpreadsheets();
     await userEvent.click(screen.getByText("Data Table", { exact: true }));
-    expect(onGenerate).toHaveBeenCalledWith(
-      expect.objectContaining({ spreadsheetType: "data_extraction" })
-    );
-    const { customPrompt } = onGenerate.mock.calls[0][0];
-    expect(customPrompt).toMatch(/^Analyze this text and identify the distinct \*\*Concepts\*\*/);
-    expect(customPrompt).not.toContain("{chunk}");
-    expect(customPrompt).not.toContain("CONCEPT EXTRACTION:");
+    expect(onGenerate).toHaveBeenCalledWith({
+      spreadsheetType: "data_extraction",
+      customPrompt: SPREADSHEET_PRESET_REQUESTS.data_extraction,
+    });
   });
 
   it("generates every built-in format from its card with its own type and prompt", async () => {
@@ -73,22 +71,9 @@ describe("CustomizeSpreadsheetsModal", () => {
       await userEvent.click(screen.getByRole("button", { name: format.title }));
       const config = onGenerate.mock.lastCall?.[0];
       expect(config.spreadsheetType).toBe(format.id);
-      expect(config.customPrompt).toMatch(format.start);
-      expect(config.customPrompt).not.toContain("{chunk}");
+      expect(config.customPrompt).toBe(SPREADSHEET_PRESET_REQUESTS[format.id]);
     }
     expect(onGenerate).toHaveBeenCalledTimes(BUILT_IN.length);
-  });
-
-  // The card's prompt is sent as the request for the whole table (#451), so it must say what the
-  // rows are across all sources, not tell a chunk reader to list every item it sees.
-  it("sends Comparison a whole-table request: one row per compared item, passing mentions in cells", async () => {
-    const { onGenerate } = renderSpreadsheets();
-    await userEvent.click(screen.getByRole("button", { name: "Comparison" }));
-    const { customPrompt } = onGenerate.mock.calls[0][0];
-    expect(customPrompt).toMatch(/one row per item/);
-    expect(customPrompt).toMatch(/one row per source/);
-    expect(customPrompt).toMatch(/never in rows of their own/);
-    expect(customPrompt).not.toMatch(/this text/i);
   });
 
   it("Create Your Own asks for a prompt, then generates with it", async () => {
@@ -107,9 +92,7 @@ describe("CustomizeSpreadsheetsModal", () => {
     const { onGenerate } = renderSpreadsheets();
     await userEvent.click(screen.getByRole("button", { name: "Edit the Timeline prompt" }));
     expect(onGenerate).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(PROMPT_LABEL) as HTMLTextAreaElement).value).toMatch(
-      /^Analyze this text to identify distinct \*\*Time Periods\*\*/
-    );
+    expect(screen.getByLabelText(PROMPT_LABEL)).toHaveValue(SPREADSHEET_PRESET_REQUESTS.timeline);
     await userEvent.click(screen.getByRole("button", { name: "Back to formats" }));
     expect(screen.getByRole("button", { name: "Data Table" })).toBeInTheDocument();
   });
