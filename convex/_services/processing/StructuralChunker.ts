@@ -2,6 +2,7 @@
 
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { countTokens } from "../../_agents/_shared/tokenizer.js";
+import { PAGE_LABEL_LINE } from "./pageLabels";
 
 /**
  * Chunk-level metadata extracted during chunking.
@@ -55,6 +56,8 @@ interface DocumentSection {
 export class StructuralChunker {
   private headingStack: Array<{ level: number; title: string }> = [];
   private currentPageNumber: number = 1;
+  /** True when the document marks its pages (OCR page labels or form feeds); unpaginated text stores no page. */
+  private paginated = false;
 
   /**
    * Chunk document with structural context.
@@ -72,6 +75,7 @@ export class StructuralChunker {
     // Reset state
     this.headingStack = [];
     this.currentPageNumber = 1;
+    this.paginated = false;
 
     // Parse document into sections (by headings)
     const sections = this.parseIntoSections(document);
@@ -112,7 +116,9 @@ export class StructuralChunker {
   }
 
   /**
-   * Parse document into sections based on headings.
+   * Parse document into sections based on headings and page breaks.
+   * A page break closes the current section and opens one on the new page with the same heading path,
+   * so a section (and every chunk cut from it) sits on exactly one page.
    */
   private parseIntoSections(document: string): DocumentSection[] {
     const lines = document.split("\n");
@@ -126,14 +132,47 @@ export class StructuralChunker {
       startOffset: 0,
     };
 
+    const closeSection = (atPageBreak = false) => {
+      // OCR writes a `---` line before each page label; it belongs to neither page.
+      // Only a trailing one at a page break is dropped, so rules inside a page survive.
+      const content = atPageBreak
+        ? currentSection.content.replace(/(?:^|\n)-{3,}[ \t]*(?:\r?\n)*$/, "\n")
+        : currentSection.content;
+      if (content.trim()) {
+        sections.push({ ...currentSection, content });
+      }
+    };
+
+    const startPage = (pageNumber: number) => {
+      closeSection(true);
+      this.paginated = true;
+      this.currentPageNumber = pageNumber;
+      currentSection = {
+        content: "",
+        headingPath: currentSection.headingPath,
+        level: currentSection.level,
+        pageNumber,
+        startOffset: 0,
+      };
+    };
+
     for (const line of lines) {
+      const pageLabel = line.match(PAGE_LABEL_LINE);
+      if (pageLabel) {
+        startPage(Number(pageLabel[1]));
+        continue;
+      }
+
+      if (line.includes("\x0C") || line.includes("PAGE_BREAK")) {
+        // Form feed or explicit page break marker
+        startPage(this.currentPageNumber + 1);
+        continue;
+      }
+
       // Detect markdown headings
       const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
       if (headingMatch) {
-        // Save previous section if it has content
-        if (currentSection.content.trim()) {
-          sections.push({ ...currentSection });
-        }
+        closeSection();
 
         const level = headingMatch[1].length;
         const title = headingMatch[2].trim();
@@ -149,18 +188,13 @@ export class StructuralChunker {
           pageNumber: this.currentPageNumber,
           startOffset: 0, // Track approximate position if needed
         };
-      } else if (line.includes("\x0C") || line.includes("PAGE_BREAK")) {
-        // Form feed or explicit page break marker
-        this.currentPageNumber++;
       } else {
         currentSection.content += line + "\n";
       }
     }
 
     // Don't forget the last section
-    if (currentSection.content.trim()) {
-      sections.push(currentSection);
-    }
+    closeSection();
 
     return sections;
   }
@@ -202,7 +236,7 @@ export class StructuralChunker {
       chunkLengthChars: content.length,
       wordCount: words.length,
       sentenceCount: sentences.length,
-      pageNumber: section.pageNumber > 1 ? section.pageNumber : null,
+      pageNumber: this.paginated ? section.pageNumber : null,
       sectionTitle:
         section.headingPath.length > 0 ? section.headingPath[section.headingPath.length - 1] : null,
       sectionLevel: section.level > 0 ? section.level : null,

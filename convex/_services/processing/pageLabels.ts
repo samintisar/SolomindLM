@@ -2,9 +2,9 @@
  * Page labels written by Mistral OCR stitching (`MistralOCRService.markdownFromMistralOcrResponse`):
  * a `**Page N**` line opens each page, and pages after the first are preceded by a `---` line.
  */
-export const PAGE_LABEL_LINE = /^\*\*Page (\d+)\*\*[ \t]*$/;
+export const PAGE_LABEL_LINE = /^\*\*Page (\d+)\*\*[ \t]*\r?$/;
 
-const PAGE_LABEL_LINES = /^\*\*Page (\d+)\*\*[ \t]*$/gm;
+const PAGE_LABEL_LINES = new RegExp(PAGE_LABEL_LINE.source, "gm");
 
 function labelStarts(markdown: string): Array<{ offset: number; page: number }> {
   return Array.from(markdown.matchAll(PAGE_LABEL_LINES), (m) => ({
@@ -43,10 +43,11 @@ export function pageAtOffset(markdown: string): (offset: number) => number | nul
   };
 }
 
-const LEADING_PAGE_BREAK = /^(?:[ \t]*(?:-{3,}|\*\*Page \d+\*\*)[ \t]*\n\s*)+/;
+const LEADING_PAGE_BREAK = /^(?:[ \t]*(?:-{3,}|\*\*Page \d+\*\*)[ \t]*\r?\n\s*)+/;
 
 /**
- * Length of the separator and page-label lines that open `chunk` (trimmed). Chunks stored before the chunker
+ * Length of the separator and page-label lines that open `chunk`, counted from the start of the
+ * *trimmed* chunk (so slice `chunk.trim()` with it). Chunks stored before the chunker
  * read page labels can start on a page break; their page is the page their text starts on, after it.
  */
 export function leadingPageBreakLength(chunk: string): number {

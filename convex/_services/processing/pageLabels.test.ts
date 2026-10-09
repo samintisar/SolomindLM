@@ -30,6 +30,7 @@ describe("PAGE_LABEL_LINE", () => {
   it("matches a whole label line and captures the page", () => {
     expect("**Page 12**".match(PAGE_LABEL_LINE)?.[1]).toBe("12");
     expect("**Page 12**  ".match(PAGE_LABEL_LINE)?.[1]).toBe("12");
+    expect("**Page 4**\r".match(PAGE_LABEL_LINE)?.[1]).toBe("4");
   });
 
   it("ignores a label inside a sentence", () => {
@@ -58,6 +59,11 @@ describe("pageAtOffset", () => {
     expect(lookup(OCR_MARKDOWN.indexOf("Gamma"))).toBe(3);
   });
 
+  it("reads labels in CRLF text", () => {
+    const md = "**Page 1**\r\n\r\nA\r\n---\r\n**Page 2**\r\n\r\nB";
+    expect(pageAtOffset(md)(md.indexOf("B"))).toBe(2);
+  });
+
   it("returns null before the first label and for unpaginated text", () => {
     expect(pageAtOffset("intro\n\n**Page 1**\n\nbody")(0)).toBeNull();
     expect(pageAtOffset("no labels")(3)).toBeNull();
@@ -70,6 +76,8 @@ describe("leadingPageBreakLength", () => {
     expect(chunk.slice(leadingPageBreakLength(chunk))).toBe("Gamma on page three.");
     expect(leadingPageBreakLength("**Page 1**\n\nAlpha")).toBe("**Page 1**\n\n".length);
     expect(leadingPageBreakLength("Plain start")).toBe(0);
+    const crlf = "---\r\n\r\n**Page 2**\r\n\r\nX";
+    expect(crlf.slice(leadingPageBreakLength(crlf))).toBe("X");
   });
 });
 
