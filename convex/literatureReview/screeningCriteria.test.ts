@@ -123,6 +123,28 @@ describe("decideScreening", () => {
     expect(decision.reason).toContain("Studies one approach only.");
   });
 
+  it("keeps the stricter answer when a criterion is checked twice", () => {
+    const decision = decideScreening(
+      {
+        isIncluded: true,
+        reason: "Fits.",
+        criteria: [
+          { criterion: 1, status: "met", explanation: "On topic." },
+          { criterion: 1, status: "not_met", explanation: "Studies another topic." },
+          { criterion: 2, status: "met", explanation: "Yes." },
+          { criterion: 3, status: "met", explanation: "Yes." },
+        ],
+      },
+      CRITERIA
+    );
+
+    expect(decision.isIncluded).toBe(false);
+    expect(decision.criteria?.[0]).toMatchObject({
+      status: "not_met",
+      explanation: "Studies another topic.",
+    });
+  });
+
   it("lines up checks numbered from 0 with the right criteria", () => {
     const decision = decideScreening(
       {

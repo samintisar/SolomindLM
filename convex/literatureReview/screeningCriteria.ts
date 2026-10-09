@@ -104,6 +104,8 @@ export function normalizeCriterionStatus(raw: string): CriterionStatus {
   return "unclear";
 }
 
+const STATUS_STRICTNESS: Record<CriterionStatus, number> = { met: 0, unclear: 1, not_met: 2 };
+
 type ScreenerResponse = {
   isIncluded: boolean;
   reason: string;
@@ -131,7 +133,17 @@ export function decideScreening(
     const n = Number.isInteger(check.criterion)
       ? (check.criterion as number) + offset
       : position + 1;
-    if (n >= 1 && n <= criteria.length && !byNumber.has(n)) byNumber.set(n, check);
+    if (n < 1 || n > criteria.length) return;
+    // The same criterion checked twice: the stricter answer stands, so a later "not met" can't be
+    // hidden behind an earlier "met".
+    const previous = byNumber.get(n);
+    if (
+      !previous ||
+      STATUS_STRICTNESS[normalizeCriterionStatus(check.status)] >
+        STATUS_STRICTNESS[normalizeCriterionStatus(previous.status)]
+    ) {
+      byNumber.set(n, check);
+    }
   });
 
   const assessments: CriterionAssessment[] = criteria.map((criterion, i) => {
