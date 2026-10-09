@@ -123,26 +123,30 @@ describe("decideScreening", () => {
     expect(decision.reason).toContain("Studies one approach only.");
   });
 
-  it("keeps the stricter answer when a criterion is checked twice", () => {
-    const decision = decideScreening(
-      {
-        isIncluded: true,
-        reason: "Fits.",
-        criteria: [
-          { criterion: 1, status: "met", explanation: "On topic." },
-          { criterion: 1, status: "not_met", explanation: "Studies another topic." },
-          { criterion: 2, status: "met", explanation: "Yes." },
-          { criterion: 3, status: "met", explanation: "Yes." },
-        ],
-      },
-      CRITERIA
-    );
+  it("keeps the stricter answer when a criterion is checked twice, in either order", () => {
+    const met = { criterion: 1, status: "met", explanation: "On topic." };
+    const notMet = { criterion: 1, status: "not_met", explanation: "Studies another topic." };
+    const rest = [
+      { criterion: 2, status: "met", explanation: "Yes." },
+      { criterion: 3, status: "met", explanation: "Yes." },
+    ];
 
-    expect(decision.isIncluded).toBe(false);
-    expect(decision.criteria?.[0]).toMatchObject({
-      status: "not_met",
-      explanation: "Studies another topic.",
-    });
+    // Both orders, so neither first-answer-wins nor last-answer-wins passes.
+    for (const duplicates of [
+      [met, notMet],
+      [notMet, met],
+    ]) {
+      const decision = decideScreening(
+        { isIncluded: true, reason: "Fits.", criteria: [...duplicates, ...rest] },
+        CRITERIA
+      );
+
+      expect(decision.isIncluded).toBe(false);
+      expect(decision.criteria?.[0]).toMatchObject({
+        status: "not_met",
+        explanation: "Studies another topic.",
+      });
+    }
   });
 
   it("lines up checks numbered from 0 with the right criteria", () => {
