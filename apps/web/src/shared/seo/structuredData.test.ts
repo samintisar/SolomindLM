@@ -30,6 +30,12 @@ describe("generateFAQStructuredData", () => {
       "@type": "Question",
       name: LANDING_FAQS.at(-1)!.question,
     });
+    expect(data).not.toHaveProperty("dateModified");
+  });
+
+  it("carries dateModified when the page gives one", () => {
+    const data = generateFAQStructuredData(LANDING_FAQS, { dateModified: "2026-10-07" });
+    expect(data).toMatchObject({ "@type": "FAQPage", dateModified: "2026-10-07" });
   });
 });
 

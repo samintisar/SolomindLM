@@ -53,6 +53,19 @@ describe("PageHero", () => {
     expect(screen.getByText("Free plan, no card")).toBeInTheDocument();
   });
 
+  it("renders the updated date as a machine-readable <time>", () => {
+    renderHero({ updated: "2026-10-07" });
+    const time = screen.getByText("October 7, 2026");
+    expect(time.tagName).toBe("TIME");
+    expect(time).toHaveAttribute("datetime", "2026-10-07");
+    expect(time.parentElement).toHaveTextContent("Updated October 7, 2026");
+  });
+
+  it("renders no date without `updated`", () => {
+    renderHero();
+    expect(document.querySelector("time")).toBeNull();
+  });
+
   it("renders no button without a CTA", () => {
     renderHero();
     expect(screen.queryByRole("button")).toBeNull();

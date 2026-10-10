@@ -5,6 +5,9 @@ import {
   type IntentLandingPageConfig,
 } from "./intentLandingPages";
 
+/** ISO date the hub pages' copy last changed; a hub can override it with `lastUpdated`. */
+const CLUSTER_HUB_LAST_UPDATED = "2026-10-07";
+
 type ClusterHubGuideLink = {
   path: string;
   label: string;
@@ -33,6 +36,8 @@ export type ClusterHubPageConfig = {
   faqs: FAQItem[];
   ctaLabel: string;
   conversionPromise: string;
+  /** ISO date this hub's copy last changed; defaults to CLUSTER_HUB_LAST_UPDATED. */
+  lastUpdated?: string;
   changefreq?: "weekly" | "monthly";
   priority?: number;
 };
@@ -210,6 +215,14 @@ export function getClusterHubPageByPath(path: string): ClusterHubPageConfig | un
 
 export function getClusterHubPaths(): string[] {
   return CLUSTER_HUB_PAGES.map((page) => page.path);
+}
+
+/**
+ * The one date for a hub page: the visible "Updated" line, the JSON-LD `dateModified` and the
+ * sitemap `lastmod` all read it.
+ */
+export function getClusterHubLastUpdated(page: ClusterHubPageConfig): string {
+  return page.lastUpdated ?? CLUSTER_HUB_LAST_UPDATED;
 }
 
 export function resolveHubSectionPages(

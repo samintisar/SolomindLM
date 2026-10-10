@@ -1,8 +1,10 @@
 import {
   getIntentBreadcrumbItems,
+  getIntentLandingLastUpdated,
   getRelatedIntentPages,
   type IntentLandingPageConfig,
 } from "@/features/landing/intentLandingPages";
+import { buildUpdatedLineHtml } from "./seoDates";
 import { escapeHtml } from "./seoHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
@@ -42,7 +44,8 @@ ${breadcrumbNav}
       </nav>
       <header>
         <h1>${escapeHtml(page.h1)}</h1>
-        <p>${escapeHtml(page.subheadline)}</p>${
+        <p>${escapeHtml(page.subheadline)}</p>
+        ${buildUpdatedLineHtml(getIntentLandingLastUpdated(page))}${
           page.heroCrossLink
             ? `
         <p><strong>${escapeHtml(page.heroCrossLink.label)}</strong> ${escapeHtml(page.heroCrossLink.description)} <a href="${escapeHtml(page.heroCrossLink.path)}">${escapeHtml(page.heroCrossLink.linkLabel)}</a></p>`

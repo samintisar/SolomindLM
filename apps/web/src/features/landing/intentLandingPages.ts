@@ -3,6 +3,9 @@ import type { FAQItem } from "./constants";
 
 export type IntentLandingCluster = "students" | "research";
 
+/** ISO date the tool pages' copy last changed; a page can override it with `lastUpdated`. */
+const INTENT_LANDING_LAST_UPDATED = "2026-10-07";
+
 export type IntentLandingPageConfig = {
   path: string;
   cluster: IntentLandingCluster;
@@ -25,6 +28,8 @@ export type IntentLandingPageConfig = {
   faqs: FAQItem[];
   ctaLabel: string;
   navLabel: string;
+  /** ISO date this page's copy last changed; defaults to INTENT_LANDING_LAST_UPDATED. */
+  lastUpdated?: string;
   changefreq?: "weekly" | "monthly";
   priority?: number;
 };
@@ -895,6 +900,14 @@ export function getIntentLandingPageByPath(path: string): IntentLandingPageConfi
 
 export function getIntentLandingPaths(): string[] {
   return INTENT_LANDING_PAGES.map((page) => page.path);
+}
+
+/**
+ * The one date for a tool page: the visible "Updated" line, the JSON-LD `dateModified` and the
+ * sitemap `lastmod` all read it.
+ */
+export function getIntentLandingLastUpdated(page: IntentLandingPageConfig): string {
+  return page.lastUpdated ?? INTENT_LANDING_LAST_UPDATED;
 }
 
 const CLUSTER_HUB_PATHS: Record<IntentLandingCluster, string> = {
