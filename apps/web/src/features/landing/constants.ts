@@ -10,4 +10,5 @@ export const HOME_RESOURCE_LINKS = [
   { path: "/compare/solomindlm-vs-notebooklm", label: "SolomindLM vs NotebookLM" },
   { path: "/compare", label: "Compare AI study and research tools" },
   { path: "/guides/how-to-study-from-pdfs-with-ai", label: "Study from PDFs with AI" },
+  { path: "/pricing", label: "Pricing: Free and Pro plans" },
 ] as const;

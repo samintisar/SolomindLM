@@ -123,7 +123,7 @@ export const CLUSTER_HUB_PAGES: ClusterHubPageConfig[] = [
       {
         question: "Is there a free plan for students?",
         answer:
-          "Yes. Free accounts include notebooks with per-notebook source limits and daily caps on AI generation. Pro plans raise notebook limits. See pricing on the homepage for current numbers.",
+          "Yes. Free accounts include notebooks with per-notebook source limits and daily caps on AI generation. Pro plans raise notebook limits. See the pricing page for current numbers.",
       },
     ],
     ctaLabel: "Create free account",

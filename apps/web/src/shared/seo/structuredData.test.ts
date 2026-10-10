@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
 import { LANDING_FAQS } from "@/features/landing/faqRegistry";
 import {
   getIntentBreadcrumbItems,
@@ -75,22 +76,38 @@ describe("generateSoftwareApplicationStructuredData", () => {
 
     expect(data["@type"]).toBe("SoftwareApplication");
     expect(data.offers).toHaveLength(3);
+    // Prices come from billing/planPricing.ts, the same source as the pricing cards.
+    // Each offer states what is actually charged per billing period.
+    expect(data.offers.map((offer) => offer.price)).toEqual([
+      "0",
+      String(PRO_PRICE_USD.yearly),
+      String(PRO_PRICE_USD.monthly),
+    ]);
     expect(data.offers[0]).toMatchObject({
       "@type": "Offer",
       name: "Free",
       price: "0",
       priceCurrency: "USD",
     });
+    const [, annual, monthly] = data.offers;
+    expect(annual.priceSpecification).toMatchObject({
+      "@type": "UnitPriceSpecification",
+      price: String(PRO_PRICE_USD.yearly),
+      priceCurrency: "USD",
+      billingDuration: 1,
+      unitCode: "ANN",
+    });
+    // The per-month figure the cards lead with is kept, labeled as an equivalent.
+    expect(annual.description).toContain(`$${PRO_YEARLY_PER_MONTH_USD.toFixed(2)}/month`);
+    expect(monthly.priceSpecification).toMatchObject({
+      "@type": "UnitPriceSpecification",
+      price: String(PRO_PRICE_USD.monthly),
+      priceCurrency: "USD",
+      billingDuration: 1,
+      unitCode: "MON",
+    });
     for (const offer of data.offers.slice(1)) {
-      expect(offer).toMatchObject({
-        "@type": "Offer",
-        priceCurrency: "USD",
-        priceSpecification: {
-          "@type": "UnitPriceSpecification",
-          billingDuration: 1,
-          unitCode: "MON",
-        },
-      });
+      expect(offer).toMatchObject({ "@type": "Offer", priceCurrency: "USD" });
       // "billingDurationUnit" is not a schema.org property and would be silently
       // ignored by structured-data consumers — guard against reintroducing it.
       expect(offer.priceSpecification).not.toHaveProperty("billingDurationUnit");

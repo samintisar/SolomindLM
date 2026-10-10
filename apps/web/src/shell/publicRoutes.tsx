@@ -5,6 +5,8 @@ import { CLUSTER_HUB_PAGES } from "@/features/landing/clusterHubPages";
 import { FaqPage } from "@/features/landing/FaqPage";
 import { IntentLandingPage } from "@/features/landing/IntentLandingPage";
 import { INTENT_LANDING_PAGES } from "@/features/landing/intentLandingPages";
+import { PricingPage } from "@/features/landing/PricingPage";
+import { PRICING_PATH } from "@/features/landing/pricingPageContent";
 import { SeoContentPage } from "@/features/landing/SeoContentPage";
 import { SEO_CONTENT_PAGES } from "@/features/landing/seoContentPages";
 import { PrivacyPolicy } from "@/features/legal/components/PrivacyPolicy";
@@ -44,6 +46,7 @@ export const PUBLIC_ROUTES: RouteObject[] = [
   { path: "/privacy", element: <PrivacyPolicy /> },
   { path: "/terms", element: <TermsOfService /> },
   { path: "/faq", element: <FaqPage /> },
+  { path: PRICING_PATH, element: <PricingPage /> },
   {
     path: "/tools/pdf-to-flashcards",
     element: (

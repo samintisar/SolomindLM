@@ -78,8 +78,8 @@ const CORE_GENERAL_FAQS: RegisteredFaq[] = [
     category: "billing",
     question: "Is there a limit on how much I can upload?",
     answer:
-      "The free plan includes 5 notebooks per account with up to 20 sources per notebook. Pro plans offer 200 notebooks per account with up to 200 sources per notebook. Each plan also includes daily limits on AI-generated content. Check our pricing section for details.",
-    learnMorePath: "/#pricing",
+      "The free plan includes 5 notebooks per account with up to 20 sources per notebook. Pro plans offer 200 notebooks per account with up to 200 sources per notebook. Each plan also includes daily limits on AI-generated content. Check our pricing page for details.",
+    learnMorePath: "/pricing",
     learnMoreLabel: "See pricing",
   },
   {
@@ -195,6 +195,13 @@ function collectRegisteredFaqs(): RegisteredFaq[] {
 
 function sortFaqsForCategory(faqs: RegisteredFaq[]): RegisteredFaq[] {
   return faqs.toSorted((a, b) => a.question.localeCompare(b.question));
+}
+
+/** The billing & plans questions, as the /faq page lists them (the /pricing page repeats them). */
+export function getBillingFaqs(): FAQItem[] {
+  return sortFaqsForCategory(
+    collectRegisteredFaqs().filter((faq) => faq.category === "billing")
+  ).map((faq) => ({ question: faq.question, answer: faq.answer }));
 }
 
 /** All unique FAQs grouped for the /faq page. */
