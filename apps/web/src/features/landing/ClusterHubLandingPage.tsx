@@ -4,6 +4,7 @@ import { SEOMeta } from "@/shared/seo/SEOMeta";
 import {
   type ClusterHubPageConfig,
   type ClusterHubSection,
+  getClusterHubLastUpdated,
   getClusterHubPageByPath,
   resolveHubSectionPages,
 } from "./clusterHubPages";
@@ -48,6 +49,7 @@ export function ClusterHubLandingPage({ pagePath }: ClusterHubLandingPageProps) 
               title={page.h1}
               titleAccent={page.h1Accent}
               lede={page.subheadline}
+              updated={getClusterHubLastUpdated(page)}
               cta={{ label: page.ctaLabel, onClick: openSignup }}
             />
             <section aria-labelledby="tools-title" className="px-6">

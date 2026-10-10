@@ -3,6 +3,7 @@ import {
   getSeoContentLastUpdated,
   type SeoContentPageConfig,
 } from "@/features/landing/seoContentPages";
+import { buildSeoTimeHtml, buildUpdatedLineHtml } from "./seoDates";
 import { escapeHtml } from "./seoHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
@@ -28,7 +29,7 @@ export function buildSeoContentPrerenderBody(page: SeoContentPageConfig): string
 
   const sources =
     page.sources && page.sources.length > 0
-      ? `        <p>${escapeHtml(page.competitorName ?? "Alternative")} details checked ${escapeHtml(getSeoContentLastUpdated(page))} against: ${page.sources
+      ? `        <p>${escapeHtml(page.competitorName ?? "Alternative")} details checked ${buildSeoTimeHtml(getSeoContentLastUpdated(page))} against: ${page.sources
           .map(
             (source) =>
               `<a href="${escapeHtml(source.url)}" rel="noopener noreferrer">${escapeHtml(source.label)}</a>`
@@ -92,6 +93,7 @@ ${breadcrumbNav}
       <header>
         <h1>${escapeHtml(page.h1)}</h1>
         <p>${escapeHtml(page.intro)}</p>
+        ${buildUpdatedLineHtml(getSeoContentLastUpdated(page))}
       </header>
 ${quickAnswer}
 ${comparisonTable}
