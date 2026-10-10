@@ -18,7 +18,15 @@ type Violation = {
   disposition: string;
 };
 
-const PUBLIC_ROUTES = ["/", "/sign-in", "/faq", "/privacy", "/tools/pdf-to-flashcards"];
+// The last entry is served the 404 page, as on Vercel.
+const PUBLIC_ROUTES = [
+  "/",
+  "/sign-in",
+  "/faq",
+  "/privacy",
+  "/tools/pdf-to-flashcards",
+  "/__csp-smoke-not-found",
+];
 
 async function recordViolations(page: Page) {
   // addInitScript runs via CDP, so it is not subject to the page's CSP.
