@@ -1,6 +1,6 @@
 # Free PDF → flashcards tool (no signup) — design
 
-Issue: #93 (part of #87).
+Issue: #93 (part of #486).
 
 ## Goal
 

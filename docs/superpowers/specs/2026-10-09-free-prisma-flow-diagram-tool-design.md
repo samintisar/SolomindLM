@@ -1,6 +1,6 @@
 # Free PRISMA 2020 flow-diagram generator — design
 
-Issue: #459 · Parent: #87 · Date: 2026-10-09
+Issue: #459 · Parent: #486 · Date: 2026-10-09
 
 ## Goal
 
@@ -107,7 +107,7 @@ canonical URL, and survives a reload or a shared link. Writes are debounced (300
 - `shell/publicRoutes.tsx`: lazy route for the page.
 - `public/sitemap.xml` (via `scripts/generate-sitemap.ts`) and `public/llms.txt`: add the URL.
 - Related links: `/research/ai-literature-review`, `/research/academic-paper-discovery` and `/compare`.
-  `/research/ai-literature-review` links back to the tool. #460 will link the Rayyan and Covidence pages
+  `/research/ai-literature-review` links back to the tool. #492 will link the Rayyan and Covidence pages
   here.
 - The native mobile shell redirects away from tool pages, as the flashcards page does.
 
