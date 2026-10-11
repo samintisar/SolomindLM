@@ -56,12 +56,12 @@ async function main(): Promise<void> {
   const token = requireEnv("GITHUB_TOKEN");
   const bypass = requireEnv("VERCEL_AUTOMATION_BYPASS_SECRET");
 
-  const deployments = await github<Deployment[]>(
-    `https://api.github.com/repos/${repo}/deployments?environment=${encodeURIComponent(environment)}&per_page=30`,
-    token
-  );
   const previousUrl = await findPreviousDeploymentUrl({
-    deployments,
+    listDeployments: (page) =>
+      github<Deployment[]>(
+        `https://api.github.com/repos/${repo}/deployments?environment=${encodeURIComponent(environment)}&per_page=100&page=${page}`,
+        token
+      ),
     currentId: deploymentId,
     fetchLatestStatus: async (deployment) =>
       (await github<DeploymentStatus[]>(`${deployment.statuses_url}?per_page=1`, token))[0] ?? null,

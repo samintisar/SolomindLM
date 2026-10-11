@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { canReceiveBypassSecret, findPreviousDeploymentUrl } from "./indexnow-deployments";
 
 const deployment = (id: number) => ({ id, statuses_url: `https://api.github.com/s/${id}` });
+/** Serves `deployments` as one page, then an empty page. */
+const onePage =
+  (...deployments: ReturnType<typeof deployment>[]) =>
+  async (page: number) =>
+    page === 1 ? deployments : [];
 const status = (state: string, id: number) => ({
   state,
   environment_url: `https://solomindlm-d${id}-samintisars-projects.vercel.app`,
@@ -18,7 +23,7 @@ describe("findPreviousDeploymentUrl", () => {
     const fetchLatestStatus = vi.fn(async (d: { id: number }) => statuses[d.id] ?? null);
 
     const url = await findPreviousDeploymentUrl({
-      deployments: [deployment(12), deployment(9), deployment(11), deployment(10)],
+      listDeployments: onePage(deployment(12), deployment(9), deployment(11), deployment(10)),
       currentId: 12,
       fetchLatestStatus,
     });
@@ -30,7 +35,7 @@ describe("findPreviousDeploymentUrl", () => {
 
   it("counts a superseded (inactive) deployment as previously live", async () => {
     const url = await findPreviousDeploymentUrl({
-      deployments: [deployment(5)],
+      listDeployments: onePage(deployment(5)),
       currentId: 6,
       fetchLatestStatus: async () => status("inactive", 5),
     });
@@ -39,11 +44,29 @@ describe("findPreviousDeploymentUrl", () => {
 
   it("returns null when no older deployment succeeded", async () => {
     const url = await findPreviousDeploymentUrl({
-      deployments: [deployment(7), deployment(8)],
+      listDeployments: onePage(deployment(7), deployment(8)),
       currentId: 8,
       fetchLatestStatus: async () => status("error", 7),
     });
     expect(url).toBeNull();
+  });
+
+  it("pages past newer deployments to find the predecessor", async () => {
+    const pages: Record<number, ReturnType<typeof deployment>[]> = {
+      1: [deployment(40), deployment(39)],
+      2: [deployment(21), deployment(20)],
+      3: [deployment(19), deployment(18)],
+    };
+    const listDeployments = vi.fn(async (page: number) => pages[page] ?? []);
+
+    const url = await findPreviousDeploymentUrl({
+      listDeployments,
+      currentId: 20,
+      fetchLatestStatus: async (d) => status("success", d.id),
+    });
+
+    expect(url).toBe("https://solomindlm-d19-samintisars-projects.vercel.app");
+    expect(listDeployments).not.toHaveBeenCalledWith(4);
   });
 });
 

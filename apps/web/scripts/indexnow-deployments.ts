@@ -20,22 +20,32 @@ export function canReceiveBypassSecret(url: string): boolean {
   }
 }
 
+/** Upper bound on pages read, so a broken API can't loop forever. */
+const MAX_DEPLOYMENT_PAGES = 20;
+
 /**
- * URL of the newest deployment older than `currentId` that went live. Vercel leaves superseded
- * production deployments at `success`; GitHub's own auto-inactivation would mark them `inactive`.
+ * URL of the newest deployment older than `currentId` that went live. Pages are newest first, so
+ * the scan reads pages until it finds one or runs out. Vercel leaves superseded production
+ * deployments at `success`; GitHub's own auto-inactivation would mark them `inactive`.
  */
 export async function findPreviousDeploymentUrl(options: {
-  deployments: Deployment[];
+  listDeployments: (page: number) => Promise<Deployment[]>;
   currentId: number;
   fetchLatestStatus: (deployment: Deployment) => Promise<DeploymentStatus | null>;
 }): Promise<string | null> {
-  const older = options.deployments
-    .filter((deployment) => deployment.id < options.currentId)
-    .sort((a, b) => b.id - a.id);
-  for (const deployment of older) {
-    const status = await options.fetchLatestStatus(deployment);
-    if ((status?.state === "success" || status?.state === "inactive") && status.environment_url) {
-      return status.environment_url;
+  for (let page = 1; page <= MAX_DEPLOYMENT_PAGES; page += 1) {
+    const deployments = await options.listDeployments(page);
+    if (deployments.length === 0) {
+      return null;
+    }
+    const older = deployments
+      .filter((deployment) => deployment.id < options.currentId)
+      .sort((a, b) => b.id - a.id);
+    for (const deployment of older) {
+      const status = await options.fetchLatestStatus(deployment);
+      if ((status?.state === "success" || status?.state === "inactive") && status.environment_url) {
+        return status.environment_url;
+      }
     }
   }
   return null;
