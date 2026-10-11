@@ -2262,4 +2262,4 @@ Start the web dev server (`.claude/launch.json` web entry), open `/tools/prisma-
 
 - [ ] **Step 3: Open the PR**
 
-Branch `feature/459-prisma-flow-diagram-tool` → `main`, title `feat(tools): free PRISMA 2020 flow-diagram generator (#459)`, body linking #459 and #87, with screenshots and the test plan.
+Branch `feature/459-prisma-flow-diagram-tool` → `main`, title `feat(tools): free PRISMA 2020 flow-diagram generator (#459)`, body linking #459 and #486, with screenshots and the test plan.

@@ -1666,7 +1666,7 @@ Run: `npx convex run _migration/backfillChunkPages:start`, wait for the schedule
 
 ```bash
 git push -u origin feature/citation-page-click-through
-gh pr create --title "feat(sources): citations open the source at the cited passage and page" --body "<summary, test plan, screenshot; 'Part of #356 (1/4)'; note the backfill command to run on prod after deploy; end with the Claude Code attribution line>"
+gh pr create --title "feat(sources): citations open the source at the cited passage and page" --body "<summary, test plan, screenshot; 'Part of #489 (1/4)'; note the backfill command to run on prod after deploy; end with the Claude Code attribution line>"
 ```
 
 After merge and deploy, run the backfill on production: `npx convex run _migration/backfillChunkPages:start --prod` (ask the user first — it writes to production).
