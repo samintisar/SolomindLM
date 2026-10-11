@@ -12,7 +12,7 @@ import { EmbeddingService } from "../_services/ai/embeddingClient";
 import {
   createChatVectorSearchRunner,
   createFetchDocumentFn,
-  createFetchDocumentTitleFn,
+  createFetchDocumentTitlesFn,
   createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
@@ -161,7 +161,7 @@ export async function streamChatResponse(
     smartModel: resolvedSmartModel,
     outputLanguage: userPrefs?.outputLanguage,
     fetchDocumentFn: createFetchDocumentFn(ctx),
-    fetchDocumentTitleFn: createFetchDocumentTitleFn(ctx),
+    fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx),
   });
 
   // External search

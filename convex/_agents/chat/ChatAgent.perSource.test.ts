@@ -9,7 +9,7 @@ vi.hoisted(() => {
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { ChatAgent } from "./ChatAgent";
 import { MAX_PER_SOURCE_DOCUMENTS, PER_SOURCE_PASSAGES_PER_SEARCH } from "./chatConfig";
-import { perSourceDocumentIds, titlesOfSources } from "./chunkContext";
+import { perSourceDocumentIds, selectedSourceIds, titlesOfSources } from "./chunkContext";
 import type { ReferenceChunk } from "./types";
 
 const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
@@ -41,25 +41,56 @@ describe("perSourceDocumentIds (#450)", () => {
   });
 });
 
-describe("titlesOfSources (#450)", () => {
-  it("names every source in selection order, looking up those with no retrieved passage", async () => {
-    const pool = [passage("react", 0), passage("rag", 4), passage("react", 2)];
-    const lookupTitle = vi.fn(async (id: string) => (id === "missed" ? "missed.pdf" : undefined));
-
-    await expect(
-      titlesOfSources(["rag", "missed", "react", "unprocessed"], pool, lookupTitle)
-    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf", "Untitled source"]);
-    expect(lookupTitle.mock.calls.map(([id]) => id)).toEqual(["missed", "unprocessed"]);
+describe("selectedSourceIds (#450)", () => {
+  it("lists two or more selected sources once each, up to the cap", () => {
+    expect(selectedSourceIds(["rag", "react", "rag"])).toEqual(["rag", "react"]);
+    expect(selectedSourceIds(["rag"])).toEqual([]);
+    expect(selectedSourceIds(undefined)).toEqual([]);
+    const many = Array.from({ length: MAX_PER_SOURCE_DOCUMENTS + 1 }, (_, i) => `d${i}`);
+    expect(selectedSourceIds(many)).toEqual([]);
   });
 });
 
-describe("ChatAgent title lookup for sources to cover (#450)", () => {
-  it("names a paper with no retrieved passage from its document record", async () => {
-    const fetchDocumentTitleFn = vi.fn(async () => "missed.pdf");
-    const agent = new ChatAgent({ fetchDocumentTitleFn });
+describe("titlesOfSources (#450)", () => {
+  it("names every source in selection order, looking up the rest in one call", async () => {
+    const pool = [passage("react", 0), passage("rag", 4), passage("react", 2)];
+    const lookupTitles = vi.fn(async () => ({ missed: "missed.pdf" }));
 
-    await expect(agent["lookupSourceTitle"]("missed")).resolves.toBe("missed.pdf");
-    expect(fetchDocumentTitleFn).toHaveBeenCalledWith("missed");
+    await expect(
+      titlesOfSources(["rag", "missed", "react", "unprocessed"], pool, lookupTitles)
+    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf", "Untitled source"]);
+    expect(lookupTitles).toHaveBeenCalledTimes(1);
+    expect(lookupTitles).toHaveBeenCalledWith(["missed", "unprocessed"]);
+  });
+
+  it("looks nothing up when every source has a passage", async () => {
+    const lookupTitles = vi.fn(async () => ({}));
+
+    await titlesOfSources(["rag"], [passage("rag", 0)], lookupTitles);
+
+    expect(lookupTitles).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatAgent title lookup for selected sources (#450)", () => {
+  it("names sources with no retrieved passage from their document records", async () => {
+    const fetchDocumentTitlesFn = vi.fn(async () => ({ missed: "missed.pdf" }));
+    const agent = new ChatAgent({ fetchDocumentTitlesFn });
+
+    await expect(agent["lookupSourceTitles"](["missed"])).resolves.toEqual({
+      missed: "missed.pdf",
+    });
+    expect(fetchDocumentTitlesFn).toHaveBeenCalledWith(["missed"]);
+  });
+
+  it("names none when the lookup fails", async () => {
+    const agent = new ChatAgent({
+      fetchDocumentTitlesFn: vi.fn(async () => {
+        throw new Error("query failed");
+      }),
+    });
+
+    await expect(agent["lookupSourceTitles"](["missed"])).resolves.toEqual({});
   });
 });
 

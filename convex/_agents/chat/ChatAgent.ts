@@ -11,6 +11,7 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel";
 import { EmbeddingService } from "../../_services/ai/embeddingClient";
 import { countTokens } from "../_shared/tokenizer";
+import type { SelectedSources } from "./chat_llm_grounding.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
@@ -35,6 +36,7 @@ import {
   mergeChunkScores,
   perSourceDocumentIds,
   selectChunksByTokenBudgetWithReservation,
+  selectedSourceIds,
   titlesOfSources,
 } from "./chunkContext.js";
 import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
@@ -71,7 +73,7 @@ export class ChatAgent {
   private embeddingService: EmbeddingService;
   private globalRerankFn?: GlobalRerankFn;
   private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
-  private fetchDocumentTitleFn?: ChatAgentOptions["fetchDocumentTitleFn"];
+  private fetchDocumentTitlesFn?: ChatAgentOptions["fetchDocumentTitlesFn"];
 
   constructor(options?: ChatAgentOptions) {
     const smartModel = resolveSmartModel(options?.smartModel);
@@ -97,15 +99,15 @@ export class ChatAgent {
     this.embeddingService = new EmbeddingService(env.OPENAI_API_KEY);
     this.globalRerankFn = options?.globalRerankFn;
     this.fetchDocumentFn = options?.fetchDocumentFn;
-    this.fetchDocumentTitleFn = options?.fetchDocumentTitleFn;
+    this.fetchDocumentTitlesFn = options?.fetchDocumentTitlesFn;
   }
 
-  /** A selected source's title from its document record; undefined when it can't be found. */
-  private async lookupSourceTitle(documentId: string): Promise<string | undefined> {
+  /** Selected sources' titles from their document records, keyed by id; none when the lookup fails. */
+  private async lookupSourceTitles(documentIds: string[]): Promise<Record<string, string>> {
     try {
-      return await this.fetchDocumentTitleFn?.(documentId);
+      return (await this.fetchDocumentTitlesFn?.(documentIds)) ?? {};
     } catch {
-      return undefined;
+      return {};
     }
   }
 
@@ -815,7 +817,14 @@ export class ChatAgent {
       effectiveTurns,
       rankedChunks,
       logger,
-      await titlesOfSources(sourcesAskedAbout, merged, (id) => this.lookupSourceTitle(id))
+      {
+        // Every selected source is named, so the answer counts them right ("both papers" for
+        // three, #450); only a question about each one asks for a part per source.
+        titles: await titlesOfSources(selectedSourceIds(context.documentIds), merged, (ids) =>
+          this.lookupSourceTitles(ids)
+        ),
+        coverEach: sourcesAskedAbout.length > 0,
+      }
     );
   }
 
@@ -825,7 +834,7 @@ export class ChatAgent {
     recentTurns: Array<{ role: string; content: string }>,
     allChunks: ReferenceChunk[],
     logger: ServiceLogger,
-    sourcesToCover: string[] = []
+    selectedSources?: SelectedSources
   ): AsyncGenerator<StreamChunk> {
     const mode = this.resolveGroundingMode(context);
 
@@ -857,7 +866,7 @@ export class ChatAgent {
       userMessage,
       recentTurns,
       context.chatSettings,
-      sourcesToCover
+      selectedSources
     );
     logger.apiSuccess("ChatLLMWrapper", "generateStructuredResponse", Date.now() - responseStart, {
       responseLength: structuredResponse.answer_markdown.length,
@@ -906,7 +915,7 @@ export class ChatAgent {
             userMessage,
             recentTurns,
             context.chatSettings,
-            sourcesToCover
+            selectedSources
           );
 
           const retrySyntactic = validateGrounding(

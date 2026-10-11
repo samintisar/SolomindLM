@@ -19,28 +19,35 @@ import type { ReferenceChunk } from "./types";
  * search covers.
  */
 export function perSourceDocumentIds(aboutEachSource: boolean, documentIds?: string[]): string[] {
-  const ids = [...new Set(documentIds ?? [])];
-  if (!aboutEachSource || ids.length < 2 || ids.length > MAX_PER_SOURCE_DOCUMENTS) return [];
-  return ids;
+  return aboutEachSource ? selectedSourceIds(documentIds) : [];
 }
 
 /**
- * Titles of the given sources, in the given order. A source retrieval missed entirely is looked up,
- * so the answer still says it has nothing on the question instead of leaving it out (#450); one
- * whose title can't be found still counts, as "Untitled source".
+ * The selected sources the answer is told about (#450): two or more, once each, up to
+ * MAX_PER_SOURCE_DOCUMENTS. Empty otherwise.
+ */
+export function selectedSourceIds(documentIds?: string[]): string[] {
+  const ids = [...new Set(documentIds ?? [])];
+  return ids.length >= 2 && ids.length <= MAX_PER_SOURCE_DOCUMENTS ? ids : [];
+}
+
+/**
+ * Titles of the given sources, in the given order. Sources retrieval missed entirely are looked up
+ * in one call, so the answer still knows they were selected (#450); one whose title can't be found
+ * still counts, as "Untitled source".
  */
 export async function titlesOfSources(
   documentIds: string[],
   chunks: ReferenceChunk[],
-  lookupTitle: (documentId: string) => Promise<string | undefined>
+  lookupTitles: (documentIds: string[]) => Promise<Record<string, string>>
 ): Promise<string[]> {
-  const titles: string[] = [];
-  for (const id of documentIds) {
-    const title =
-      chunks.find((c) => c.documentId === id)?.sourceTitle ?? (await lookupTitle(id))?.trim();
-    titles.push(title || "Untitled source");
+  const found = new Map<string, string>();
+  for (const c of chunks) {
+    if (c.documentId && !found.has(c.documentId)) found.set(c.documentId, c.sourceTitle);
   }
-  return titles;
+  const missing = documentIds.filter((id) => !found.has(id));
+  const looked = missing.length > 0 ? await lookupTitles(missing) : {};
+  return documentIds.map((id) => found.get(id) ?? (looked[id]?.trim() || "Untitled source"));
 }
 
 export function chunkDedupKey(c: ReferenceChunk): string {

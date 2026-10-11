@@ -89,15 +89,18 @@ export function createRerankFn(ctx: ActionCtx): RerankFunction {
   };
 }
 
-/** A document's file name, without loading its chunks (#450: naming a source retrieval missed). */
-export function createFetchDocumentTitleFn(
+/**
+ * Documents' file names keyed by id, in one query and without loading chunks (#450: naming
+ * selected sources retrieval found no passage in).
+ */
+export function createFetchDocumentTitlesFn(
   ctx: ActionCtx
-): NonNullable<ChatAgentOptions["fetchDocumentTitleFn"]> {
-  return async (documentId: string) => {
-    const [doc] = (await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
-      documentIds: [documentId as Id<"documents">],
-    })) as Array<{ fileName?: string } | null>;
-    return doc?.fileName;
+): NonNullable<ChatAgentOptions["fetchDocumentTitlesFn"]> {
+  return async (documentIds: string[]) => {
+    const docs = (await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
+      documentIds: documentIds as Id<"documents">[],
+    })) as Array<{ _id: string; fileName?: string }>;
+    return Object.fromEntries(docs.flatMap((d) => (d.fileName ? [[d._id, d.fileName]] : [])));
   };
 }
 

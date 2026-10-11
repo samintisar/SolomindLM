@@ -2,18 +2,24 @@ import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
 import { passageTextForModel } from "./passageContext.js";
 import type { ReferenceChunk } from "./types";
 
+/** The sources the user selected (#450), and whether the question asks about each of them. */
+export interface SelectedSources {
+  titles: string[];
+  coverEach: boolean;
+}
+
 /**
  * Builds grounding prompt optimized for research/learning contexts.
  * Enhanced with chunk metadata for better context awareness.
  *
- * @param sourcesToCover - Titles of the selected sources when the question asks about each of
- *   them; the answer must cover every one, saying so when a source's passages miss the question
+ * @param selectedSources - Titles of the selected sources, so the answer counts them right; with
+ *   `coverEach`, the answer covers every one, saying so when a source's passages miss the question
  */
 export function buildGroundingPrompt(
   chunks: ReferenceChunk[],
   userMessage: string,
   conversationHistory: Array<{ role: string; content: string }>,
-  sourcesToCover: string[] = []
+  selectedSources?: SelectedSources
 ): string {
   const formattedChunks = chunks
     .map((chunk, index) => {
@@ -109,25 +115,32 @@ ${MARKDOWN_MATH_RULES_BULLETS}
   return `# SOURCE DOCUMENTS
 ${formattedChunks}
 
-${contextSection}${citationReminder}${buildSourcesToCover(sourcesToCover)}# CURRENT QUESTION
+${contextSection}${citationReminder}${buildSelectedSources(selectedSources)}# CURRENT QUESTION
 ${userMessage}
 
 ${structureHint}`;
 }
 
 /**
- * The selected sources a per-source question asks about. Without the list the model only sees
- * the sources that have passages, and drops one whose passages miss the question (#450).
+ * The sources the user selected. Without the list the model only sees the sources that have
+ * passages, so it miscounts them ("both papers" for three) or drops one whose passages miss a
+ * question about each source (#450).
  */
-function buildSourcesToCover(titles: string[]): string {
-  if (titles.length < 2) return "";
+function buildSelectedSources(sources?: SelectedSources): string {
+  if (!sources || sources.titles.length < 2) return "";
+  const { titles, coverEach } = sources;
   const list = titles.map((t) => `- "${t}"`).join("\n");
-  return `# SOURCES TO COVER
-The question asks about each selected source. Cover all ${titles.length}:
+  const coverage = coverEach
+    ? `
+The question asks about each of them. Give each source its own part of the answer, named by its title. If a source has no passages above, or none that address what was asked, say in one sentence that the passages retrieved from it don't cover this (not that the source itself doesn't), instead of leaving it out.
+`
+    : "";
+  return `# SELECTED SOURCES
+The user selected these ${titles.length} sources:
 ${list}
 
-Give each source its own part of the answer, named by its title. If a source has no passages above, or none that address what was asked, say in one sentence that the passages retrieved from it don't cover this (not that the source itself doesn't), instead of leaving it out. Never describe them as fewer sources than this.
-
+When you refer to them as a group, there are ${titles.length}; never describe them as fewer.
+${coverage}
 `;
 }
 

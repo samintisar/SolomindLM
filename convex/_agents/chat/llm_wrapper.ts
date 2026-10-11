@@ -16,7 +16,12 @@ import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { invokeStructuredOutput } from "../_shared/structuredLlm.js";
 import { createTokenUsageAccumulator } from "../_shared/tokenUsageAccumulator.js";
 import { fromProviderUsage, fromTogetherUsage } from "../_shared/usageAggregate.js";
-import { buildGroundingPrompt, estimateTokens, isComplexQuery } from "./chat_llm_grounding.js";
+import {
+  buildGroundingPrompt,
+  estimateTokens,
+  isComplexQuery,
+  type SelectedSources,
+} from "./chat_llm_grounding.js";
 import {
   buildNotebookChatInstructionBlock,
   CORE_SYSTEM_PROMPT,
@@ -334,7 +339,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
     },
-    sourcesToCover: string[] = []
+    selectedSources?: SelectedSources
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Retrying with strict grounding");
     return this._generateStructuredResponse(
@@ -343,7 +348,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       conversationHistory,
       true,
       chatSettings,
-      sourcesToCover
+      selectedSources
     );
   }
 
@@ -364,7 +369,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
     },
-    sourcesToCover: string[] = []
+    selectedSources?: SelectedSources
   ): Promise<ChatResponse> {
     return this._generateStructuredResponse(
       chunks,
@@ -372,7 +377,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       conversationHistory,
       false,
       chatSettings,
-      sourcesToCover
+      selectedSources
     );
   }
 
@@ -386,7 +391,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
     },
-    sourcesToCover: string[] = []
+    selectedSources?: SelectedSources
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Generating structured response with citations (streaming)");
 
@@ -410,7 +415,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       chunks,
       userMessage,
       conversationHistory,
-      sourcesToCover
+      selectedSources
     );
 
     console.log(
@@ -559,7 +564,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         conversationHistory,
         strictGrounding,
         chatSettings,
-        sourcesToCover
+        selectedSources
       );
     }
   }
@@ -575,7 +580,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
     },
-    sourcesToCover: string[] = []
+    selectedSources?: SelectedSources
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Using LangChain fallback (non-streaming)");
 
@@ -597,7 +602,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       chunks,
       userMessage,
       conversationHistory,
-      sourcesToCover
+      selectedSources
     );
     try {
       let fallbackUsage: ReturnType<typeof fromProviderUsage>;

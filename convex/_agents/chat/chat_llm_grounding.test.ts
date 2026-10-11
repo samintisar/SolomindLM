@@ -65,22 +65,39 @@ describe("buildGroundingPrompt sources to cover", () => {
     ({ sourceId: sourceTitle, sourceTitle, content: "text", chunkIndex: 0 }) as ReferenceChunk;
   const question = "What limitations does each paper acknowledge?";
 
-  it("names every source the answer must cover, including one with no passages", () => {
-    const prompt = buildGroundingPrompt(
-      [passage("rag.pdf"), passage("react.pdf")],
-      question,
-      [],
-      ["rag.pdf", "react.pdf", "self-rag.pdf"]
-    );
+  const titles = ["rag.pdf", "react.pdf", "self-rag.pdf"];
 
-    expect(prompt).toContain("# SOURCES TO COVER");
+  it("always names the selected sources and how many there are, without forcing an outline", () => {
+    const prompt = buildGroundingPrompt([passage("rag.pdf")], "What is retrieval?", [], {
+      titles,
+      coverEach: false,
+    });
+
+    expect(prompt).toContain("# SELECTED SOURCES");
     expect(prompt).toContain('- "self-rag.pdf"');
-    expect(prompt).toMatch(/all 3/);
+    expect(prompt).toMatch(/3 sources/);
+    expect(prompt).not.toContain("its own part");
   });
 
-  it("adds nothing when there is no list", () => {
+  it("asks for a part per source when the question is about each one", () => {
+    const prompt = buildGroundingPrompt([passage("rag.pdf"), passage("react.pdf")], question, [], {
+      titles,
+      coverEach: true,
+    });
+
+    expect(prompt).toContain('- "self-rag.pdf"');
+    expect(prompt).toContain("its own part");
+  });
+
+  it("adds nothing for one source or none", () => {
     expect(buildGroundingPrompt([passage("rag.pdf")], question, [])).not.toContain(
-      "SOURCES TO COVER"
+      "SELECTED SOURCES"
     );
+    expect(
+      buildGroundingPrompt([passage("rag.pdf")], question, [], {
+        titles: ["rag.pdf"],
+        coverEach: true,
+      })
+    ).not.toContain("SELECTED SOURCES");
   });
 });

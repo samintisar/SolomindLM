@@ -7,7 +7,7 @@ vi.mock("../_agents/chat/rerankCache.js", () => ({ cachedRerank }));
 
 import {
   createChatVectorSearchRunner,
-  createFetchDocumentTitleFn,
+  createFetchDocumentTitlesFn,
   createRerankFn,
 } from "./_streamSearch";
 
@@ -21,18 +21,19 @@ describe("createRerankFn", () => {
   });
 });
 
-describe("createFetchDocumentTitleFn", () => {
-  it("returns the document's file name without loading its chunks", async () => {
-    const runQuery = vi.fn(async () => [{ _id: "doc-a", fileName: "a.pdf" }]);
+describe("createFetchDocumentTitlesFn", () => {
+  it("returns every document's file name in one query, without loading chunks", async () => {
+    const runQuery = vi.fn(async () => [
+      { _id: "doc-a", fileName: "a.pdf" },
+      { _id: "doc-b", fileName: "b.pdf" },
+    ]);
     const ctx = { runQuery } as unknown as ActionCtx;
 
-    await expect(createFetchDocumentTitleFn(ctx)("doc-a")).resolves.toBe("a.pdf");
+    await expect(createFetchDocumentTitlesFn(ctx)(["doc-a", "doc-b"])).resolves.toEqual({
+      "doc-a": "a.pdf",
+      "doc-b": "b.pdf",
+    });
     expect(runQuery).toHaveBeenCalledTimes(1);
-    await expect(
-      createFetchDocumentTitleFn({ runQuery: vi.fn(async () => []) } as unknown as ActionCtx)(
-        "gone"
-      )
-    ).resolves.toBeUndefined();
   });
 });
 
