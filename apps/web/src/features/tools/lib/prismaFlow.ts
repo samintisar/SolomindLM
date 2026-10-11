@@ -91,7 +91,9 @@ export function createEmptyPrismaState(): PrismaFlowState {
   };
 }
 
-/** True while nothing has been typed: no counts, no named or counted reasons, other methods off. */
+/**
+ * True while nothing has been typed: no counts, the default blank reason rows, other methods off.
+ */
 export function isPrismaStateEmpty(state: PrismaFlowState): boolean {
   const noCounts = (counts: Record<string, Count>) =>
     Object.values(counts).every((value) => value === null);
@@ -99,6 +101,8 @@ export function isPrismaStateEmpty(state: PrismaFlowState): boolean {
     reasons.every((reason) => reason.label.trim() === "" && reason.count === null);
   return (
     !state.otherMethods &&
+    state.reasons.length === DEFAULT_REASON_ROWS &&
+    state.otherReasons.length === DEFAULT_REASON_ROWS &&
     noCounts(state.main) &&
     noCounts(state.other) &&
     noReasons(state.reasons) &&
@@ -185,10 +189,9 @@ export function checkPrismaCounts(state: PrismaFlowState): PrismaWarning[] {
     otherMethods ? [main.reportsAssessed, other.reportsAssessed] : [main.reportsAssessed]
   );
   const reasons = otherMethods ? [...state.reasons, ...state.otherReasons] : state.reasons;
-  const excluded = total(reasons.map((reason) => reason.count));
+  const excluded = total(reasons.map((reason) => reason.count)) ?? 0;
   if (
     assessed !== null &&
-    excluded !== null &&
     main.reportsIncluded !== null &&
     assessed - excluded !== main.reportsIncluded
   ) {

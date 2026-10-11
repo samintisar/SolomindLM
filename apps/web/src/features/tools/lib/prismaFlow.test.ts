@@ -76,6 +76,11 @@ describe("createEmptyPrismaState", () => {
     );
     expect(isPrismaStateEmpty(stateWith((s) => (s.otherMethods = true)))).toBe(false);
   });
+
+  it("is no longer empty once reason rows are removed or added", () => {
+    expect(isPrismaStateEmpty(stateWith((s) => s.reasons.pop()))).toBe(false);
+    expect(isPrismaStateEmpty(stateWith((s) => s.otherReasons.push(newReason())))).toBe(false);
+  });
 });
 
 describe("checkPrismaCounts", () => {
@@ -154,6 +159,19 @@ describe("checkPrismaCounts", () => {
       {
         field: "reportsIncluded",
         message: "Assessed 80 − excluded 35 = 45, but reports of included studies is 40.",
+      },
+    ]);
+  });
+
+  it("counts blank exclusion reasons as 0 in the included check", () => {
+    const state = stateWith((s) => {
+      s.main.reportsAssessed = 70;
+      s.main.reportsIncluded = 40;
+    });
+    expect(checkPrismaCounts(state)).toEqual([
+      {
+        field: "reportsIncluded",
+        message: "Assessed 70 − excluded 0 = 70, but reports of included studies is 40.",
       },
     ]);
   });

@@ -20,10 +20,8 @@ const COLUMN_W = BOX_W * 2 + ARROW_GAP;
 const COLUMN_GAP = 40;
 const HEADER_H = 32;
 const ROW_GAP = 28;
-/** An average Arial glyph is about 0.53em: 6.4px a character at 12px keeps lines inside the box. */
-const CHAR_W = 6.4;
-const BOX_CHARS = Math.floor((BOX_W - BOX_PADDING * 2) / CHAR_W);
-const HEADER_CHARS = Math.floor((COLUMN_W - BOX_PADDING * 2) / CHAR_W);
+const BOX_TEXT_W = BOX_W - BOX_PADDING * 2;
+const HEADER_TEXT_W = COLUMN_W - BOX_PADDING * 2;
 
 export type PrismaBox = {
   id: string;
@@ -44,18 +42,50 @@ export type PrismaLayout = {
   arrows: PrismaArrow[];
 };
 
-/** Greedy word wrap by character count; words longer than a line are split. */
-export function wrapText(text: string, maxChars: number): string[] {
-  const chunk = new RegExp(`.{1,${maxChars}}`, "gu");
+/**
+ * Arial advance widths in em, rounded up by group, so a wrapped line never runs past its box
+ * (capitals and W/M are far wider than the lowercase average).
+ */
+function glyphEm(char: string): number {
+  if (/[\s.,:;!'|ijltfI]/.test(char)) return 0.28;
+  if (/[MWmw@%]/.test(char)) return 0.94;
+  if (/[A-Z]/.test(char)) return 0.78;
+  if (/[⺀-￯]/.test(char)) return 1;
+  return 0.58;
+}
+
+/** Estimated rendered width of `text` in px at FONT_SIZE. */
+export function textWidth(text: string): number {
+  let em = 0;
+  for (const char of text) em += glyphEm(char);
+  return em * FONT_SIZE;
+}
+
+/** Splits a word wider than a line into line-wide pieces. */
+function splitWord(word: string, maxWidth: number): string[] {
+  const parts: string[] = [];
+  let part = "";
+  for (const char of word) {
+    if (part && textWidth(part + char) > maxWidth) {
+      parts.push(part);
+      part = char;
+    } else part += char;
+  }
+  if (part) parts.push(part);
+  return parts;
+}
+
+/** Greedy word wrap to `maxWidth` px; words wider than a line are split. */
+export function wrapText(text: string, maxWidth: number): string[] {
   const words = text
     .split(/\s+/)
     .filter(Boolean)
-    .flatMap((word) => (word.length <= maxChars ? [word] : (word.match(chunk) ?? [])));
+    .flatMap((word) => (textWidth(word) <= maxWidth ? [word] : splitWord(word, maxWidth)));
   const lines: string[] = [];
   let line = "";
   for (const word of words) {
     if (!line) line = word;
-    else if (line.length + 1 + word.length <= maxChars) line += ` ${word}`;
+    else if (textWidth(`${line} ${word}`) <= maxWidth) line += ` ${word}`;
     else {
       lines.push(line);
       line = word;
@@ -72,11 +102,11 @@ type Line = string | { label: string; count: Count };
 
 /** Wraps the label, then keeps the count suffix whole: on the last line if it fits, else its own. */
 function wrapLine(line: Line): string[] {
-  if (typeof line === "string") return wrapText(line, BOX_CHARS);
+  if (typeof line === "string") return wrapText(line, BOX_TEXT_W);
   const suffix = formatCount(line.count);
-  const lines = wrapText(line.label, BOX_CHARS);
+  const lines = wrapText(line.label, BOX_TEXT_W);
   const last = lines[lines.length - 1] ?? "";
-  if (last.length + 1 + suffix.length <= BOX_CHARS) lines[lines.length - 1] = `${last} ${suffix}`;
+  if (textWidth(`${last} ${suffix}`) <= BOX_TEXT_W) lines[lines.length - 1] = `${last} ${suffix}`;
   else lines.push(suffix);
   return lines;
 }
@@ -184,7 +214,7 @@ export function layoutPrismaFlow(state: PrismaFlowState): PrismaLayout {
     y: MARGIN,
     w: COLUMN_W,
     h: HEADER_H,
-    lines: wrapText(text, HEADER_CHARS),
+    lines: wrapText(text, HEADER_TEXT_W),
   });
   const boxes: PrismaBox[] = [
     header("header-main", mainX, "Identification of studies via databases and registers"),

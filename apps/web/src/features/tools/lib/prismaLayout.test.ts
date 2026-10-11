@@ -1,17 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyPrismaState } from "./prismaFlow";
-import { layoutPrismaFlow, wrapText } from "./prismaLayout";
+import { layoutPrismaFlow, textWidth, wrapText } from "./prismaLayout";
 
 describe("wrapText", () => {
   it("wraps greedily on spaces", () => {
-    expect(wrapText("Records marked as ineligible by automation tools (n = 3)", 32)).toEqual([
+    expect(wrapText("Records marked as ineligible by automation tools (n = 3)", 210)).toEqual([
       "Records marked as ineligible by",
       "automation tools (n = 3)",
     ]);
   });
 
+  it("wraps capitals and wide letters sooner, so no line runs past the box", () => {
+    for (const text of ["WRONG POPULATION OR INTERVENTION", "W".repeat(40)]) {
+      const lines = wrapText(text, 210);
+      expect(lines.length, text).toBeGreaterThan(1);
+      for (const line of lines) expect(textWidth(line), line).toBeLessThanOrEqual(210);
+    }
+  });
+
   it("splits a word longer than the line", () => {
-    expect(wrapText("abcdefghij", 4)).toEqual(["abcd", "efgh", "ij"]);
+    expect(wrapText("abcdeghkno", 28)).toEqual(["abcd", "eghk", "no"]);
   });
 
   it("keeps one empty line for empty text", () => {

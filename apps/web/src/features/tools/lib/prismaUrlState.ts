@@ -78,6 +78,10 @@ export function encodePrismaState(state: PrismaFlowState): string {
   return `${HASH_PARAM}=${toBase64Url(JSON.stringify(wire))}`;
 }
 
+/** True when a location hash carries the diagram parameter, valid or not (not an in-page anchor). */
+export const hasPrismaHash = (hash: string) =>
+  new URLSearchParams(hash.replace(/^#/, "")).has(HASH_PARAM);
+
 /** Reads a location hash; null when it holds no valid diagram. Never throws. */
 export function decodePrismaState(hash: string): PrismaFlowState | null {
   const encoded = new URLSearchParams(hash.replace(/^#/, "")).get(HASH_PARAM);

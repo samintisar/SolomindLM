@@ -18,11 +18,10 @@ import {
   isPrismaStateEmpty,
   type PrismaFlowState,
 } from "../lib/prismaFlow";
-import { decodePrismaState, encodePrismaState } from "../lib/prismaUrlState";
+import { decodePrismaState, encodePrismaState, hasPrismaHash } from "../lib/prismaUrlState";
 import { PRISMA_FLOW_DIAGRAM_PAGE as PAGE } from "../toolPages";
 
 const FILE_NAME = "prisma-2020-flow-diagram";
-const HASH_WRITE_DELAY_MS = 300;
 
 const hashFor = (state: PrismaFlowState) =>
   isPrismaStateEmpty(state) ? "" : `#${encodePrismaState(state)}`;
@@ -37,17 +36,29 @@ export default function PrismaFlowDiagramPage() {
   const toast = useToast();
   const warnings = useMemo(() => checkPrismaCounts(state), [state]);
 
-  // Keep the diagram in the URL so a reload or a shared link reopens it.
+  // Keep the diagram in the URL so a reload or a shared link reopens it. Written on every change,
+  // not debounced: a link clicked right after typing must not leave the last edit out of history.
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const { pathname, search, hash } = window.location;
-      const next = hashFor(state);
-      if (next !== hash) {
-        window.history.replaceState(window.history.state, "", `${pathname}${search}${next}`);
-      }
-    }, HASH_WRITE_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    const { pathname, search, hash } = window.location;
+    const next = hashFor(state);
+    // A blank diagram leaves an in-page anchor such as #faq-heading alone.
+    if (next === hash || (next === "" && !hasPrismaHash(hash))) return;
+    try {
+      window.history.replaceState(window.history.state, "", `${pathname}${search}${next}`);
+    } catch {
+      // Safari throws when replaceState is called too often; the next edit writes it again.
+    }
   }, [state]);
+
+  // Pasting a shared link into this tab changes only the hash, so the page doesn't reload.
+  useEffect(() => {
+    const loadFromHash = () => {
+      const shared = decodePrismaState(window.location.hash);
+      if (shared) setState(shared);
+    };
+    window.addEventListener("hashchange", loadFromHash);
+    return () => window.removeEventListener("hashchange", loadFromHash);
+  }, []);
 
   if (isNativeShell()) {
     if (isLoading) return <div className="min-h-screen bg-background" />;
@@ -65,6 +76,21 @@ export default function PrismaFlowDiagramPage() {
     } catch {
       toast.error("Couldn't make the PNG. Download the SVG instead.");
     }
+  };
+
+  const reset = () => {
+    if (isPrismaStateEmpty(state)) return;
+    const previous = state;
+    setState(createEmptyPrismaState());
+    const id = toast.info("Diagram cleared.", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          setState(previous);
+          toast.dismiss(id);
+        },
+      },
+    });
   };
 
   const copyLink = async () => {
@@ -122,7 +148,7 @@ export default function PrismaFlowDiagramPage() {
                   <Button variant="outline" onClick={copyLink}>
                     <Link2 /> Copy link
                   </Button>
-                  <Button variant="ghost" onClick={() => setState(createEmptyPrismaState())}>
+                  <Button variant="ghost" onClick={reset}>
                     <RotateCcw /> Reset
                   </Button>
                 </div>

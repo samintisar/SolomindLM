@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyPrismaState, MAX_COUNT, MAX_REASONS, type PrismaFlowState } from "./prismaFlow";
-import { decodePrismaState, encodePrismaState } from "./prismaUrlState";
+import { decodePrismaState, encodePrismaState, hasPrismaHash } from "./prismaUrlState";
 
 const withoutIds = (state: PrismaFlowState) => ({
   ...state,
@@ -42,6 +42,13 @@ describe("prisma URL state", () => {
       expect(decodePrismaState(hash)).toBeNull();
     }
   );
+
+  it("tells a diagram hash, even a broken one, from an in-page anchor", () => {
+    expect(hasPrismaHash(`#${encodePrismaState(createEmptyPrismaState())}`)).toBe(true);
+    expect(hasPrismaHash("#d=not*base64")).toBe(true);
+    expect(hasPrismaHash("#faq-heading")).toBe(false);
+    expect(hasPrismaHash("")).toBe(false);
+  });
 
   it("returns null for an unknown version or an oversized hash", () => {
     expect(decodePrismaState(`#d=${toBase64Url(JSON.stringify({ v: 2 }))}`)).toBeNull();

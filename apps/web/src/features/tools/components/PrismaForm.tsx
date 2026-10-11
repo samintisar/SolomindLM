@@ -58,10 +58,10 @@ type CountFieldProps = {
 };
 
 /** Calls `onChange` only for a valid count; other input leaves the field as it was. */
-const onCountInput = (onChange: (value: Count) => void) => (input: string) => {
+function applyCount(input: string, onChange: (value: Count) => void) {
   const count = parseCount(input);
   if (count !== undefined) onChange(count);
-};
+}
 
 function CountField({ id, label, value, onChange, warning }: CountFieldProps) {
   const warningId = `${id}-warning`;
@@ -74,7 +74,7 @@ function CountField({ id, label, value, onChange, warning }: CountFieldProps) {
         autoComplete="off"
         placeholder="n"
         value={value ?? ""}
-        onChange={(event) => onCountInput(onChange)(event.target.value)}
+        onChange={(event) => applyCount(event.target.value, onChange)}
         aria-describedby={warning ? warningId : undefined}
       />
       {/* Always mounted so a warning that appears while typing is announced. */}
@@ -122,7 +122,7 @@ function ReasonsEditor({ namePrefix, reasons, onChange }: ReasonsEditorProps) {
             placeholder="n"
             value={reason.count ?? ""}
             onChange={(event) =>
-              onCountInput((count) => update(reason.id, { count }))(event.target.value)
+              applyCount(event.target.value, (count) => update(reason.id, { count }))
             }
           />
           <Button
@@ -165,7 +165,9 @@ type PrismaFormProps = {
 };
 
 export function PrismaForm({ state, warnings, onChange }: PrismaFormProps) {
-  const warningFor = (field: string) => warnings.find((w) => w.field === field)?.message;
+  // Typed so a misspelled or renamed warning field fails to compile instead of hiding the warning.
+  const warningFor = (field: PrismaWarning["field"] | keyof MainCounts) =>
+    warnings.find((w) => w.field === field)?.message;
   const setMain = (key: keyof MainCounts, value: Count) =>
     onChange({ ...state, main: { ...state.main, [key]: value } });
   const setOther = (key: keyof OtherCounts, value: Count) =>
