@@ -1,0 +1,124 @@
+# OCR image understanding — design
+
+Slice 1 of 2 of the Mistral OCR upgrade. Slice 2 (text quality: header/footer separation, hyperlinks, low-confidence
+warnings) gets its own spec and PR.
+
+## Goal
+
+Images carry meaning into retrieval. A chart, diagram, photo or whiteboard uploaded as a source, and every figure
+inside a PDF, PPTX or DOCX, is described in text where it appears, so chat, studio and citations can use it. A file
+with nothing readable fails visibly instead of becoming an empty source.
+
+## Problem
+
+- Every OCR call goes through `MistralOCRService.callOcrEndpoint` (`convex/_services/extraction/MistralOCRService.ts`),
+  used by uploaded files (`documents/embeddingJob.ts`), PDF links (`_services/extraction/urlSource.ts`) and
+  open-access papers (`_services/extraction/AcademicLoaderService.ts`). It returns text only.
+- OCR leaves an `![img-0.jpeg](img-0.jpeg)` placeholder for each figure; `stripMistralOcrMedia` deletes it. Every
+  chart and diagram in a document is dropped.
+- A standalone image (`.png`, `.jpg`, `.jpeg`, `.avif`) with little text — a chart, diagram or photo — yields almost
+  nothing. Page stitching adds a `**Page 1**` label, so the result is never empty: the source is embedded with no
+  content and nothing tells the user. For the same reason, `urlSource`'s "PDF OCR returned no text" check never fires.
+- Images are sent as `type: "document_url"`; the documented input for images is `type: "image_url"`.
+
+## Design
+
+### 1. Request
+
+`MistralOCRService` keeps its interface: `processDocument(url, options?)` returns markdown. `options.kind` is
+`"image" | "document"` (default `"document"`); `embeddingJob` passes `"image"` for image extensions (the extension list
+moves to one exported constant shared with `OCR_FILE_EXTENSIONS`). Other callers are unchanged.
+
+A pure `buildOcrRequestBody(url, kind)` builds the body:
+
+- `kind: "image"` → `document: { type: "image_url", image_url: url }`; otherwise
+  `document: { type: "document_url", document_url: url }`.
+- Always: `model: "mistral-ocr-latest"` (not pinned), `table_format: "markdown"`, `include_image_base64: false`,
+  and `bbox_annotation_format` with the figure schema below.
+- `kind: "image"` only: `document_annotation_format` with the same schema, describing the whole image.
+
+Figure schema (strict JSON schema, `additionalProperties: false`, all fields required):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `kind` | enum: `chart`, `diagram`, `table`, `photo`, `screenshot`, `equation`, `logo`, `other` | What the image is |
+| `description` | string | What it shows, in one or two sentences |
+| `details` | string | Visible text, labels, axis titles, values and trends a reader needs to answer questions about it; empty for decorative images |
+
+Field descriptions are generic and must work for any source: no subject-specific wording, no references to eval
+fixtures (AGENTS.md, Prompt authoring).
+
+The annotated request's timeout rises from 60s to 180s (the probe's measured latency can adjust it). Timeouts are not
+retried by `invokeWithHttpRetry`; the plain fallback in section 3 uses 120s, so the worst case (annotated timeout,
+then fallback) is about 300s, inside the 600s action limit with room for chunking and embedding.
+
+### 2. Response
+
+A pure `inlineOcrFigures(markdown, images)` runs per page next to `inlineOcrTables`, before page stitching:
+
+- For each image with a usable annotation, replace its `![id](id)` placeholder in place with:
+
+  ```markdown
+  > **Figure (chart):** Bar chart comparing quarterly revenue across three regions.
+  > Details: Q1–Q4 on the x-axis; EMEA rises from 1.2M to 2.0M; APAC flat at about 0.8M.
+  ```
+
+  The `Details:` line is omitted when `details` is empty. Replacement uses a function replacer, so `$` in a
+  description is literal.
+- An image whose placeholder is missing gets its block appended at the end of its page (same rule as tables).
+- Skipped (placeholder left for the stripper, as today): `kind: "logo"`, empty `description`, or an annotation that
+  is missing or fails to parse. A parse failure is logged with the image id.
+- The annotation is read from `image_annotation` or `bbox_annotation`, as a JSON string or an object. The probe
+  confirms which one OCR 4.1 returns; the parser keeps accepting both.
+- For `kind: "image"`, a usable `document_annotation` is rendered in the same block format at the top of page 1,
+  before the OCR text.
+
+`stripMistralOcrMedia` still runs last and removes leftover placeholders; description blocks are plain text and pass
+through. Descriptions stay inside their `**Page N**` section, so `StructuralChunker` page assignment and citation
+pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows the descriptions.
+`docMetadata.hasImages` becomes accurate as a side effect.
+
+### 3. Failures
+
+- **Nothing readable.** `hasOcrContent(markdown)` is false when nothing remains after removing page labels, `---`
+  separators and whitespace. The service then throws `UserFacingSourceError` (`convex/_lib/sourceFailure.ts`) with:
+  "We couldn't find any text or images to read in this file. If it's a photo, try a clearer or higher-resolution
+  version." `embeddingJob` already stores `userMessage` for the source viewer. `urlSource` must surface this
+  message rather than wrap it into a generic error, and `AcademicLoaderService` must still fall back to its web
+  scrape when OCR throws.
+- **Annotations rejected or too slow.** A 4xx response to the annotated request (other than 429), or its timeout,
+  triggers one plain request without `bbox_annotation_format` / `document_annotation_format` (120s timeout), logged
+  as a warning. That is today's behavior, so annotations never lose a document that ingests now. 429 and 5xx keep
+  using `invokeWithHttpRetry`.
+- **One bad annotation.** Skipped as in section 2; the rest of the document is unaffected.
+
+### 4. Probe (first implementation step, not committed)
+
+A scratchpad script calls the OCR endpoint with the dev key on: a text screenshot, a chart, a diagram, a handwritten
+page, a photo, and a multi-figure PDF. It records the annotation field name and shape, whether image ids match
+placeholders, what a photo returns, and the latency added by annotations (which may adjust the 180s timeout). If a photo yields
+neither text nor a usable document annotation, stop and add a single vision-chat description for standalone images
+(approach C) before continuing.
+
+## Testing
+
+TDD in `convex/_services/extraction/MistralOCRService.test.ts`:
+
+- `inlineOcrFigures`: in-place replacement; annotation as string and as object, under either field name; logo,
+  empty and malformed annotations skipped; missing placeholder → page end; `$` kept literal; empty `details` omits the
+  `Details:` line.
+- `buildOcrRequestBody`: `image_url` vs `document_url`; `document_annotation_format` only for images.
+- `hasOcrContent`: labels and separators only → false; figure blocks only → true.
+- Fallback: mocked `fetch` returning 400 (and, separately, aborting on timeout) for the annotated request, then 200 →
+  one plain request without annotation formats; 429 does not trigger the fallback.
+- Empty extraction → `UserFacingSourceError`; `urlSource` and `AcademicLoaderService` tests cover the new error.
+
+Gates: `typecheck:convex`, `typecheck:web`, `test:convex`, then one targeted `eval:rag --case …` whose sources contain
+figures, to confirm retrieval does not regress. Ingestion has no prompt cache, so no `cacheVersions` bump.
+
+## Out of scope
+
+- Slice 2: `extract_header` / `extract_footer`, keeping hyperlinks, confidence-score warnings.
+- Block-level bounding boxes and citation highlighting on the page image.
+- Re-processing existing sources. Users can Refresh a source to re-ingest it.
+- Pinning an OCR model version.
