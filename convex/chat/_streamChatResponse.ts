@@ -16,6 +16,7 @@ import {
   createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
+  documentIdsInNotebook,
   loadHybridSearchConfig,
 } from "./_streamSearch";
 import { discoverChatExternalSources } from "./_streamSources";
@@ -66,6 +67,15 @@ export async function streamChatResponse(
     notebookId: notebookIdTyped,
   });
   chatStreamLog.info("stream_start", { streamId });
+
+  // Selected ids come from the client: keep the notebook's own, so another notebook's titles or
+  // text never reach the answer.
+  const notebookDocumentIds = await documentIdsInNotebook(
+    ctx,
+    notebookIdTyped,
+    userId as Id<"users">,
+    documentIds
+  );
 
   // Get conversation history
   const { messages: messageList } = await ctx.runQuery(internal.chat.index.getMessagesInternal, {
@@ -217,7 +227,7 @@ export async function streamChatResponse(
         userId,
         noteId: notebookId,
         conversationHistory,
-        documentIds: includeNotebook ? documentIds : [],
+        documentIds: includeNotebook ? notebookDocumentIds : [],
         enableNotebookSearch: includeNotebook,
         groundingMode: notebookGrounding,
         externalChunks: externalChunks.length > 0 ? externalChunks : undefined,

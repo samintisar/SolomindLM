@@ -90,8 +90,28 @@ export function createRerankFn(ctx: ActionCtx): RerankFunction {
 }
 
 /**
+ * The selected document ids that belong to the notebook. Chat reads selected documents by id
+ * (their titles, their full text), so an id from another notebook must not get that far.
+ */
+export async function documentIdsInNotebook(
+  ctx: ActionCtx,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">,
+  documentIds: string[] | undefined
+): Promise<string[] | undefined> {
+  if (!documentIds?.length) return documentIds;
+  const docs = (await ctx.runQuery(
+    internal.documents.internal.listDocumentsForNotebookReadInternal,
+    { notebookId, userId }
+  )) as Array<{ _id: string }>;
+  const inNotebook = new Set(docs.map((d) => d._id));
+  return documentIds.filter((id) => inNotebook.has(id));
+}
+
+/**
  * Documents' file names keyed by id, in one query and without loading chunks (#450: naming
- * selected sources retrieval found no passage in).
+ * selected sources retrieval found no passage in). Callers pass ids already checked with
+ * documentIdsInNotebook.
  */
 export function createFetchDocumentTitlesFn(
   ctx: ActionCtx

@@ -102,11 +102,21 @@ export class ChatAgent {
     this.fetchDocumentTitlesFn = options?.fetchDocumentTitlesFn;
   }
 
-  /** Selected sources' titles from their document records, keyed by id; none when the lookup fails. */
-  private async lookupSourceTitles(documentIds: string[]): Promise<Record<string, string>> {
+  /**
+   * Selected sources' titles from their document records, keyed by id. A failed lookup is logged
+   * and names none: the sources still count, as "Untitled source", and the answer goes ahead.
+   */
+  private async lookupSourceTitles(
+    documentIds: string[],
+    logger: ServiceLogger
+  ): Promise<Record<string, string>> {
     try {
       return (await this.fetchDocumentTitlesFn?.(documentIds)) ?? {};
-    } catch {
+    } catch (e) {
+      logger.warn("Source title lookup failed", {
+        documentIds: documentIds.length,
+        error: String(e),
+      });
       return {};
     }
   }
@@ -821,7 +831,7 @@ export class ChatAgent {
         // Every selected source is named, so the answer counts them right ("both papers" for
         // three, #450); only a question about each one asks for a part per source.
         titles: await titlesOfSources(selectedSourceIds(context.documentIds), merged, (ids) =>
-          this.lookupSourceTitles(ids)
+          this.lookupSourceTitles(ids, logger)
         ),
         coverEach: sourcesAskedAbout.length > 0,
       }

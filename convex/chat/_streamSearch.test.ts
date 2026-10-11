@@ -9,6 +9,7 @@ import {
   createChatVectorSearchRunner,
   createFetchDocumentTitlesFn,
   createRerankFn,
+  documentIdsInNotebook,
 } from "./_streamSearch";
 
 describe("createRerankFn", () => {
@@ -18,6 +19,34 @@ describe("createRerankFn", () => {
     await createRerankFn({} as ActionCtx)("query", docs);
 
     expect(cachedRerank).toHaveBeenCalledWith(expect.anything(), "query", docs, 37);
+  });
+});
+
+describe("documentIdsInNotebook", () => {
+  it("keeps only selected ids that belong to the notebook", async () => {
+    const runQuery = vi.fn(async () => [{ _id: "doc-a" }, { _id: "doc-b" }]);
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(
+      documentIdsInNotebook(ctx, "nb-1" as Id<"notebooks">, "u-1" as Id<"users">, [
+        "doc-a",
+        "doc-elsewhere",
+        "doc-b",
+      ])
+    ).resolves.toEqual(["doc-a", "doc-b"]);
+  });
+
+  it("leaves no selection as no selection, without a query", async () => {
+    const runQuery = vi.fn();
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(
+      documentIdsInNotebook(ctx, "nb-1" as Id<"notebooks">, "u-1" as Id<"users">, undefined)
+    ).resolves.toBeUndefined();
+    await expect(
+      documentIdsInNotebook(ctx, "nb-1" as Id<"notebooks">, "u-1" as Id<"users">, [])
+    ).resolves.toEqual([]);
+    expect(runQuery).not.toHaveBeenCalled();
   });
 });
 

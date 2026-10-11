@@ -22,6 +22,8 @@ const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
   similarity: 0.5,
 });
 
+const logger = createServiceLogger("ChatAgent", "test");
+
 // The retrieval planner decides whether a question is about each selected source.
 describe("perSourceDocumentIds (#450)", () => {
   it("returns the selected sources when the planner says the question is about each one", () => {
@@ -77,20 +79,25 @@ describe("ChatAgent title lookup for selected sources (#450)", () => {
     const fetchDocumentTitlesFn = vi.fn(async () => ({ missed: "missed.pdf" }));
     const agent = new ChatAgent({ fetchDocumentTitlesFn });
 
-    await expect(agent["lookupSourceTitles"](["missed"])).resolves.toEqual({
+    await expect(agent["lookupSourceTitles"](["missed"], logger)).resolves.toEqual({
       missed: "missed.pdf",
     });
     expect(fetchDocumentTitlesFn).toHaveBeenCalledWith(["missed"]);
   });
 
-  it("names none when the lookup fails", async () => {
+  it("logs a failed lookup and names none, so the sources still count", async () => {
     const agent = new ChatAgent({
       fetchDocumentTitlesFn: vi.fn(async () => {
         throw new Error("query failed");
       }),
     });
+    const warn = vi.spyOn(logger, "warn");
 
-    await expect(agent["lookupSourceTitles"](["missed"])).resolves.toEqual({});
+    await expect(agent["lookupSourceTitles"](["missed"], logger)).resolves.toEqual({});
+    expect(warn).toHaveBeenCalledWith(
+      "Source title lookup failed",
+      expect.objectContaining({ error: expect.stringContaining("query failed") })
+    );
   });
 });
 
@@ -118,7 +125,6 @@ describe("ChatAgent per-source retrieval (#450)", () => {
     conversationHistory: [],
     documentIds: ["rag", "react", "self-rag"],
   };
-  const logger = createServiceLogger("ChatAgent", "test");
 
   it("adds each listed source's own best passages to the sub-query's results", async () => {
     const searchDocument = vi.fn(async (documentId: string) =>
