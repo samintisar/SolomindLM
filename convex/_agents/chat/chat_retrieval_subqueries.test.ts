@@ -29,6 +29,7 @@ describe("asksAboutEachSource", () => {
     "Where do the two reports differ on inflation?",
     "Which methods do these papers use?",
     "Do the three articles agree on the dose?",
+    "Compare my two papers on sample size",
   ])("asks about each source: %s", (q) => {
     expect(asksAboutEachSource(q)).toBe(true);
   });
@@ -40,6 +41,9 @@ describe("asksAboutEachSource", () => {
     "What does the paper say about dropout?",
     "According to the sources, when was the treaty signed?",
     "How does each layer of the network work?",
+    "According to my sources, what causes inflation?",
+    "Search my documents for the dosage",
+    "Summarize each chapter",
   ])("does not: %s", (q) => {
     expect(asksAboutEachSource(q)).toBe(false);
   });

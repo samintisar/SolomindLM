@@ -17,8 +17,8 @@ describe("createRerankFn", () => {
   });
 });
 
-// #450: a per-source search must reach the source's own passages, not the notebook's top hits.
-describe("createChatVectorSearchRunner with one document", () => {
+// #450: a search over selected sources must reach their own passages, not the notebook's top hits.
+describe("createChatVectorSearchRunner with selected documents", () => {
   const notebookId = "nb-1" as Id<"notebooks">;
   const chunk = (id: string, documentId: string, notebook = notebookId) => ({
     _id: id,
@@ -50,6 +50,31 @@ describe("createChatVectorSearchRunner with one document", () => {
     expect(opts.limit).toBe(4);
     expect(opts.filter({ eq: (f, v) => [f, v] })).toEqual(["documentId", "doc-a"]);
     expect(rows.map((r) => r.sourceTitle)).toEqual(["a.pdf"]);
+  });
+
+  it("filters a search over several documents to those documents", async () => {
+    const { ctx, vectorSearch } = fakeCtx([{ _id: "c1", _score: 0.6 }], [chunk("c1", "doc-a")]);
+
+    await createChatVectorSearchRunner(ctx, notebookId)([0.1], 4, ["doc-a", "doc-b"]);
+
+    const [, , opts] = vectorSearch.mock.calls[0] as unknown as [
+      string,
+      string,
+      {
+        limit: number;
+        filter: (q: {
+          eq: (f: string, v: string) => unknown;
+          or: (...e: unknown[]) => unknown;
+        }) => unknown;
+      },
+    ];
+    expect(opts.limit).toBe(4);
+    expect(opts.filter({ eq: (f, v) => [f, v], or: (...e) => ({ or: e }) })).toEqual({
+      or: [
+        ["documentId", "doc-a"],
+        ["documentId", "doc-b"],
+      ],
+    });
   });
 
   it("drops a chunk from another notebook", async () => {

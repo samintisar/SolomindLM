@@ -24,11 +24,19 @@ export function perSourceDocumentIds(question: string, documentIds?: string[]): 
   return asksAboutEachSource(question) ? ids : [];
 }
 
-/** Titles of the given sources that have at least one retrieved passage, in the given order. */
-export function titlesOfSources(documentIds: string[], chunks: ReferenceChunk[]): string[] {
+/**
+ * Titles of the given sources, in the given order. A source retrieval missed entirely is looked up,
+ * so the answer still says it has nothing on the question instead of leaving it out (#450).
+ */
+export async function titlesOfSources(
+  documentIds: string[],
+  chunks: ReferenceChunk[],
+  lookupTitle: (documentId: string) => Promise<string | undefined>
+): Promise<string[]> {
   const titles: string[] = [];
   for (const id of documentIds) {
-    const title = chunks.find((c) => c.documentId === id)?.sourceTitle;
+    const title =
+      chunks.find((c) => c.documentId === id)?.sourceTitle ?? (await lookupTitle(id))?.trim();
     if (title) titles.push(title);
   }
   return titles;

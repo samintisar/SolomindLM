@@ -14,10 +14,11 @@ const COUNTED_LIST_TAIL = new RegExp(
   "i"
 );
 
+// Whole sources only: "each chapter" usually means the chapters inside one book.
 const SOURCE_NOUN =
-  "(?:papers?|sources?|documents?|docs?|stud(?:y|ies)|articles?|files?|readings?|chapters?|reports?|books?|texts?|transcripts?|pdfs?|trials?|videos?|lectures?)";
+  "(?:papers?|sources?|documents?|docs?|stud(?:y|ies)|articles?|files?|readings?|reports?|books?|texts?|transcripts?|pdfs?|trials?|videos?|lectures?)";
 const SOURCE_NOUN_PLURAL =
-  "(?:papers|sources|documents|docs|studies|articles|files|readings|chapters|reports|books|texts|transcripts|pdfs|trials|videos|lectures)";
+  "(?:papers|sources|documents|docs|studies|articles|files|readings|reports|books|texts|transcripts|pdfs|trials|videos|lectures)";
 
 /** "each paper", "every one of my sources", "each of my four papers". */
 const EACH_SOURCE = new RegExp(
@@ -25,9 +26,12 @@ const EACH_SOURCE = new RegExp(
   "i"
 );
 
-/** "both studies", "all three sources", "these papers", "the two reports" (a bare "the papers" is too common). */
+/**
+ * "both studies", "all three sources", "these papers", "the two reports", "my two papers". A bare
+ * "the papers" or "my sources" ("according to my sources, …") is too common in topic questions.
+ */
 const SET_OF_SOURCES = new RegExp(
-  `\\b(?:(?:both|all|these|those|my|our|your)\\s+(?:${COUNT_QUANT}\\s+)?|the\\s+${COUNT_QUANT}\\s+)(?:\\w+\\s+)?${SOURCE_NOUN_PLURAL}\\b`,
+  `\\b(?:(?:both|all|these|those)\\s+(?:${COUNT_QUANT}\\s+)?|(?:the|my|our|your)\\s+${COUNT_QUANT}\\s+)(?:\\w+\\s+)?${SOURCE_NOUN_PLURAL}\\b`,
   "i"
 );
 

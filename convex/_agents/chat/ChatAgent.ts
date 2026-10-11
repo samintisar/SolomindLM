@@ -250,6 +250,46 @@ export class ChatAgent {
   }
 
   /**
+   * Each listed source's own best passages for a sub-query (#450). They only add to the pool, so
+   * a failed or late search is logged with its error and the sub-query keeps what else it found.
+   * Never rejects.
+   */
+  private async searchEachSource(
+    documentIds: string[],
+    embedding: number[],
+    remainingMs: () => number,
+    logger: ServiceLogger
+  ): Promise<ReferenceChunk[]> {
+    if (documentIds.length === 0) return [];
+    try {
+      const settled = await withTimeout(
+        Promise.allSettled(
+          documentIds.map((id) =>
+            this.vectorSearch.searchDocument(id, embedding, PER_SOURCE_PASSAGES_PER_SEARCH)
+          )
+        ),
+        remainingMs(),
+        "per_source_search"
+      );
+      const found: ReferenceChunk[] = [];
+      for (const [i, r] of settled.entries()) {
+        if (r.status === "fulfilled") found.push(...r.value);
+        else {
+          logger.warn("Per-source search failed", {
+            documentId: documentIds[i],
+            error: String(r.reason),
+          });
+        }
+      }
+      return found;
+    } catch (e) {
+      // String(e) keeps the error type: a timeout reads "Error: per_source_search timed out …".
+      logger.warn("Per-source searches failed", { error: String(e) });
+      return [];
+    }
+  }
+
+  /**
    * HyDE + hybrid search for one sub-query; rerank skipped (merged + global rerank later).
    *
    * @param perSourceIds - Selected sources to also search one by one with the sub-query, so a
@@ -288,6 +328,13 @@ export class ChatAgent {
     );
 
     if (context.documentIds?.length) {
+      // Needs only the embedding, so it runs alongside the keyword-expanded searches below.
+      const perSourceResults = this.searchEachSource(
+        perSourceIds,
+        hydeEmbedding,
+        remainingMs,
+        logger
+      );
       const expandedQueries = expandQueryWithKeywords(query);
       const allResults: ReferenceChunk[] = [];
       const seenChunkKeys = new Set<string>();
@@ -314,36 +361,11 @@ export class ChatAgent {
           }
         }
       }
-      if (perSourceIds.length > 0) {
-        // Per-source passages only add to the pool: a failed or late search keeps what was found.
-        try {
-          const perSource = await withTimeout(
-            Promise.allSettled(
-              perSourceIds.map((id) =>
-                this.vectorSearch.searchDocument(id, hydeEmbedding, PER_SOURCE_PASSAGES_PER_SEARCH)
-              )
-            ),
-            remainingMs(),
-            "per_source_search"
-          );
-          for (const [i, r] of perSource.entries()) {
-            if (r.status === "rejected") {
-              logger.warn("Per-source search failed", {
-                documentId: perSourceIds[i],
-                error: String(r.reason),
-              });
-              continue;
-            }
-            for (const chunk of r.value) {
-              const key = chunkDedupKey(chunk);
-              if (!seenChunkKeys.has(key)) {
-                allResults.push(chunk);
-                seenChunkKeys.add(key);
-              }
-            }
-          }
-        } catch (e) {
-          logger.warn("Per-source search timed out", { error: String(e) });
+      for (const chunk of await perSourceResults) {
+        const key = chunkDedupKey(chunk);
+        if (!seenChunkKeys.has(key)) {
+          allResults.push(chunk);
+          seenChunkKeys.add(key);
         }
       }
       logger.apiSuccess(
@@ -779,7 +801,11 @@ export class ChatAgent {
       effectiveTurns,
       rankedChunks,
       logger,
-      titlesOfSources(sourcesAskedAbout, merged)
+      await titlesOfSources(
+        sourcesAskedAbout,
+        merged,
+        async (id) => (await this.fetchFullDocumentContent(id))?.title
+      )
     );
   }
 

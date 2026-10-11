@@ -43,19 +43,22 @@ describe("perSourceDocumentIds (#450)", () => {
 });
 
 describe("titlesOfSources (#450)", () => {
-  it("names each source that has a retrieved passage, in selection order", () => {
+  it("names every source in selection order, looking up those with no retrieved passage", async () => {
     const pool = [passage("react", 0), passage("rag", 4), passage("react", 2)];
+    const lookupTitle = vi.fn(async (id: string) => (id === "missed" ? "missed.pdf" : undefined));
 
-    expect(titlesOfSources(["rag", "react", "unprocessed"], pool)).toEqual([
-      "rag.pdf",
-      "react.pdf",
-    ]);
+    await expect(
+      titlesOfSources(["rag", "missed", "react", "unprocessed"], pool, lookupTitle)
+    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf"]);
+    expect(lookupTitle.mock.calls.map(([id]) => id)).toEqual(["missed", "unprocessed"]);
   });
 });
 
 describe("ChatAgent per-source retrieval (#450)", () => {
-  function agentWith(searchDocument: ReturnType<typeof vi.fn>) {
-    const search = vi.fn(async () => [passage("self-rag", 0), passage("react", 1)]);
+  function agentWith(
+    searchDocument: ReturnType<typeof vi.fn>,
+    search = vi.fn(async () => [passage("self-rag", 0), passage("react", 1)])
+  ) {
     const agent = new ChatAgent({
       vectorSearchHandler: { search, searchDocument } as unknown as NonNullable<
         ConstructorParameters<typeof ChatAgent>[0]
@@ -118,6 +121,26 @@ describe("ChatAgent per-source retrieval (#450)", () => {
       "self-rag-0",
       "self-rag-9",
     ]);
+  });
+
+  it("starts the per-source searches alongside the hybrid search, not after it", async () => {
+    const searchDocument = vi.fn(async () => []);
+    const perSourceCallsWhenHybridStarted: number[] = [];
+    const search = vi.fn(async () => {
+      perSourceCallsWhenHybridStarted.push(searchDocument.mock.calls.length);
+      return [passage("react", 1)];
+    });
+    const agent = agentWith(searchDocument, search);
+
+    await agent["runSubqueryRetrieval"](
+      "limitations acknowledged in paper",
+      context,
+      logger,
+      false,
+      ["rag", "react"]
+    );
+
+    expect(perSourceCallsWhenHybridStarted[0]).toBe(2);
   });
 
   it("searches no single source when none are listed", async () => {
