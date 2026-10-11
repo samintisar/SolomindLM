@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { IntentLandingPage } from "./IntentLandingPage";
-import { getIntentLandingPageByPath, getRelatedIntentPages } from "./intentLandingPages";
+import {
+  getIntentLandingLastUpdated,
+  getIntentLandingPageByPath,
+  getRelatedIntentPages,
+} from "./intentLandingPages";
 
 vi.mock("@/features/auth/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
@@ -40,6 +44,13 @@ describe("IntentLandingPage", () => {
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
     expect(headings[0]).toHaveTextContent(page.h1);
+  });
+
+  it("shows the page's last-updated date", () => {
+    renderPage(page.path);
+    const time = document.querySelector("time");
+    expect(time).toHaveAttribute("datetime", getIntentLandingLastUpdated(page));
+    expect(time?.parentElement).toHaveTextContent(/^Updated [A-Z][a-z]+ \d{1,2}, \d{4}$/);
   });
 
   it("shows breadcrumbs: Home and Students as links, the tool as the current page", () => {

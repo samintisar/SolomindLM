@@ -1,8 +1,22 @@
+import { PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
 import { SEO_BASE_URL, SEO_DEFAULT_DESCRIPTION, SEO_DEFAULT_OG_IMAGE } from "./seoConstants";
 
-export const generateFAQStructuredData = (faqs: Array<{ question: string; answer: string }>) => ({
+/** schema.org prices are plain decimals: 0 → "0", 15 → "15", 7.5 → "7.50". */
+function schemaPrice(amount: number): string {
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
+/**
+ * FAQPage is a WebPage, so a page whose main JSON-LD node is its FAQ carries `dateModified` here
+ * (tool and hub pages); article pages put it on their Article node instead.
+ */
+export const generateFAQStructuredData = (
+  faqs: Array<{ question: string; answer: string }>,
+  options: { dateModified?: string } = {}
+) => ({
   "@context": "https://schema.org",
   "@type": "FAQPage",
+  ...(options.dateModified ? { dateModified: options.dateModified } : {}),
   mainEntity: faqs.map((faq) => ({
     "@type": "Question",
     name: faq.question,
@@ -51,24 +65,30 @@ export const generateSoftwareApplicationStructuredData = () => ({
       price: "0",
       priceCurrency: "USD",
     },
+    // Each offer states the amount charged per billing period (UN/CEFACT ANN = year, MON = month).
     {
       "@type": "Offer",
       name: "Pro (annual billing)",
-      price: "7.50",
+      description: `Billed $${schemaPrice(PRO_PRICE_USD.yearly)} once a year, equivalent to $${schemaPrice(PRO_YEARLY_PER_MONTH_USD)}/month.`,
+      price: schemaPrice(PRO_PRICE_USD.yearly),
       priceCurrency: "USD",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
+        price: schemaPrice(PRO_PRICE_USD.yearly),
+        priceCurrency: "USD",
         billingDuration: 1,
-        unitCode: "MON",
+        unitCode: "ANN",
       },
     },
     {
       "@type": "Offer",
       name: "Pro (monthly billing)",
-      price: "15",
+      price: schemaPrice(PRO_PRICE_USD.monthly),
       priceCurrency: "USD",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
+        price: schemaPrice(PRO_PRICE_USD.monthly),
+        priceCurrency: "USD",
         billingDuration: 1,
         unitCode: "MON",
       },

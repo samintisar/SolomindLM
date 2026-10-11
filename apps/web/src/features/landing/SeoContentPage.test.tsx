@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { SeoContentPage } from "./SeoContentPage";
-import { getSeoContentPageByPath } from "./seoContentPages";
+import { getSeoContentLastUpdated, getSeoContentPageByPath } from "./seoContentPages";
 
 vi.mock("@/features/auth/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
@@ -159,6 +159,14 @@ describe("SeoContentPage: guide", () => {
     const hero = heroOf(screen.getByRole("heading", { level: 1 }));
     await userEvent.click(within(hero).getByRole("button", { name: page.ctaLabel }));
     expect(screen.getByRole("dialog", { name: "Sign up" })).toBeInTheDocument();
+  });
+
+  it("shows the date the article JSON-LD gives as dateModified", () => {
+    renderPage(path);
+    const hero = heroOf(screen.getByRole("heading", { level: 1 }));
+    const time = hero.querySelector("time");
+    expect(time).toHaveAttribute("datetime", getSeoContentLastUpdated(page));
+    expect(time?.parentElement).toHaveTextContent(/^Updated [A-Z][a-z]+ \d{1,2}, \d{4}$/);
   });
 });
 

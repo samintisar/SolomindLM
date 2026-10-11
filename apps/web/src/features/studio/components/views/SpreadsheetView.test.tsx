@@ -64,13 +64,14 @@ afterEach(() => {
 });
 
 describe("SpreadsheetView", () => {
-  it("renders a completed note's grid with its title and a download button", () => {
+  it("renders a completed note's grid and a download button, leaving the title to the panel header", () => {
     render(<SpreadsheetView note={makeNote()} />);
     expect(screen.getByRole("grid", { name: "Spreadsheet" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Name/ })).toBeInTheDocument();
     expect(cell(1, 0)).toHaveTextContent("Apple");
     expect(cell(2, 1)).toHaveTextContent("5");
-    expect(screen.getByText("Fruit")).toBeInTheDocument();
+    expect(screen.queryByText("Fruit")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download CSV" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Add row/ })).toBeInTheDocument();
   });
@@ -324,12 +325,5 @@ describe("SpreadsheetView", () => {
       click.mockRestore();
       Object.assign(URL, original);
     }
-  });
-
-  it("calls onBack from the mobile back button", () => {
-    const onBack = vi.fn();
-    render(<SpreadsheetView note={makeNote()} onBack={onBack} />);
-    fireEvent.click(screen.getByRole("button", { name: "Back to Studio" }));
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

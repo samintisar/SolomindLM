@@ -191,6 +191,59 @@ describe("injectPrerenderBody", () => {
   });
 });
 
+/** `dateModified` from the page's JSON-LD (Article node, else the FAQPage node). */
+function jsonLdDateModified(path: string): string {
+  const page = getPublicSeoPageByPath(path);
+  if (!page) throw new Error(`No SEO page at ${path}`);
+  const nodes = (
+    Array.isArray(page.structuredData) ? page.structuredData : [page.structuredData]
+  ) as Record<string, unknown>[];
+  const dated = nodes.find((node) => typeof node.dateModified === "string");
+  if (!dated) throw new Error(`No dateModified in JSON-LD for ${path}`);
+  return dated.dateModified as string;
+}
+
+describe("visible updated date", () => {
+  const datedPaths = [
+    "/students/ai-flashcards",
+    "/research/ai-literature-review",
+    "/guides/how-to-study-from-pdfs-with-ai",
+    "/guides/how-to-do-an-ai-literature-review",
+    "/students",
+    "/research",
+    "/compare",
+  ];
+
+  it.each(datedPaths)(
+    "%s shows the JSON-LD dateModified as a <time> in the prerendered body",
+    (path) => {
+      const dateModified = jsonLdDateModified(path);
+      const body = buildPublicSeoPrerenderBody(path);
+
+      expect(body).toContain(`Updated <time datetime="${dateModified}">`);
+      // The sitemap reads `lastmod`, so it must be the same date.
+      expect(getPublicSeoPageByPath(path)!.lastmod).toBe(dateModified);
+    }
+  );
+
+  it("dates every tool page, guide and hub in the prerendered body", () => {
+    const paths = [...getIntentLandingPaths(), ...getClusterHubPaths(), ...getSeoContentPaths()];
+    for (const path of paths) {
+      const dateModified = jsonLdDateModified(path);
+      expect(buildPublicSeoPrerenderBody(path)).toContain(`<time datetime="${dateModified}">`);
+      expect(getPublicSeoPageByPath(path)!.lastmod).toBe(dateModified);
+    }
+  });
+
+  it("prints the compare 'checked' date in words, as the React page does", () => {
+    const page = getSeoContentPageByPath("/compare/solomindlm-vs-notebooklm")!;
+    const body = buildSeoContentPrerenderBody(page);
+    expect(body).toMatch(
+      /details checked <time datetime="\d{4}-\d{2}-\d{2}">[A-Z][a-z]+ \d{1,2}, \d{4}<\/time> against:/
+    );
+  });
+});
+
 describe("free tool pages", () => {
   it("registers /tools/pdf-to-flashcards with tool, how-to, FAQ and breadcrumb data", () => {
     const page = getPublicSeoPageByPath(PDF_TO_FLASHCARDS_PAGE.path);

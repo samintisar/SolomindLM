@@ -18,6 +18,7 @@ type Violation = {
   disposition: string;
 };
 
+// The last entry is served the 404 page, as on Vercel.
 const PUBLIC_ROUTES = [
   "/",
   "/sign-in",
@@ -25,6 +26,7 @@ const PUBLIC_ROUTES = [
   "/privacy",
   "/tools/pdf-to-flashcards",
   "/tools/prisma-flow-diagram",
+  "/__csp-smoke-not-found",
 ];
 
 async function recordViolations(page: Page) {

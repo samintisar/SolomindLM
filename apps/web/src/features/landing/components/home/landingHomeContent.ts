@@ -23,6 +23,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/features/billing/planFeatures";
+import { formatUsd, PRO_PRICE_USD, PRO_YEARLY_PER_MONTH_USD } from "@/features/billing/planPricing";
 import type { CoverTone, Tone } from "./tone";
 
 /** Nav anchors. `target` is a section id on the home page. */
@@ -252,6 +253,12 @@ export const AUDIENCES: Audience[] = [
 
 export type Billing = "annual" | "monthly";
 
+/** The billing switch's tab labels, in tab order. */
+export const BILLING_LABELS: Record<Billing, string> = { annual: "Annual", monthly: "Monthly" };
+
+/** The pricing section's headline; `accent` renders in the accent style. */
+export const PRICING_HEADLINE = { lead: "Start free.", accent: "Upgrade when it's worth it." };
+
 export interface Plan {
   id: "free" | "pro";
   name: string;
@@ -263,13 +270,16 @@ export interface Plan {
   featured: boolean;
 }
 
-/** Feature lists are built from the backend's limit tables (see billing/planFeatures.ts). */
+/**
+ * Feature lists are built from the backend's limit tables (billing/planFeatures.ts), prices from
+ * billing/planPricing.ts.
+ */
 export const PLANS: Plan[] = [
   {
     id: "free",
     name: "Free",
     description: "Everything you need to try it on a real course.",
-    price: { annual: "$0", monthly: "$0" },
+    price: { annual: formatUsd(0), monthly: formatUsd(0) },
     period: { annual: "forever", monthly: "forever" },
     features: FREE_PLAN_FEATURES,
     cta: "Start free",
@@ -279,8 +289,14 @@ export const PLANS: Plan[] = [
     id: "pro",
     name: "Pro",
     description: "For a full course load, or a thesis.",
-    price: { annual: "$7.50", monthly: "$15" },
-    period: { annual: "/ month, billed yearly", monthly: "/ month" },
+    price: {
+      annual: formatUsd(PRO_YEARLY_PER_MONTH_USD),
+      monthly: formatUsd(PRO_PRICE_USD.monthly),
+    },
+    period: {
+      annual: `/ month, billed ${formatUsd(PRO_PRICE_USD.yearly)} yearly`,
+      monthly: "/ month",
+    },
     features: PRO_PLAN_FEATURES,
     cta: "Get Pro",
     featured: true,

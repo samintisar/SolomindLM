@@ -443,6 +443,10 @@ export function getSeoContentBreadcrumbItems(
   ];
 }
 
+/**
+ * The one date for a guide or comparison page: the visible "Updated" line, the article JSON-LD
+ * `dateModified` and the sitemap `lastmod` all read it.
+ */
 export function getSeoContentLastUpdated(page: SeoContentPageConfig): string {
   return page.lastUpdated ?? SEO_CONTENT_LAST_UPDATED;
 }

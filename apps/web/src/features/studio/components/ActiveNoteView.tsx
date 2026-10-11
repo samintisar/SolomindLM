@@ -264,9 +264,9 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     );
   }
 
-  // Spreadsheet view (no onBack on mobile - StudioPanelHeader provides single header)
+  // Spreadsheet view (StudioPanelHeader shows its title and back button)
   if (isSpreadsheetNote(activeNote)) {
-    return <SpreadsheetView note={activeNote} onBack={undefined} />;
+    return <SpreadsheetView note={activeNote} />;
   }
 
   // User note view (saved chats and manual notes)

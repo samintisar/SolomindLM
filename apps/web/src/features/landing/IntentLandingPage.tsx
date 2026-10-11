@@ -12,6 +12,7 @@ import { Reveal } from "./components/home/Reveal";
 import { Accent, SectionHeading } from "./components/home/SectionHeading";
 import {
   getIntentBreadcrumbItems,
+  getIntentLandingLastUpdated,
   getIntentLandingPageByPath,
   getRelatedIntentPages,
   type IntentLandingCluster,
@@ -45,6 +46,7 @@ export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
               title={page.h1}
               titleAccent={page.h1Accent}
               lede={page.subheadline}
+              updated={getIntentLandingLastUpdated(page)}
               cta={{ label: page.ctaLabel, onClick: openSignup }}
             />
             <section aria-label="How it works" className="px-6">

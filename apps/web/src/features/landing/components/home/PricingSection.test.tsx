@@ -8,6 +8,8 @@ describe("PricingSection", () => {
     render(<PricingSection onGetStarted={vi.fn()} />);
     expect(screen.getByRole("tab", { name: "Annual" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("$7.50")).toBeInTheDocument();
+    // The yearly charge itself is disclosed next to the per-month equivalent.
+    expect(screen.getByText("/ month, billed $90 yearly")).toBeInTheDocument();
     expect(screen.getByText("Best value")).toBeInTheDocument();
     expect(screen.getByText("Save 50%")).toBeInTheDocument();
   });

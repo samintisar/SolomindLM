@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ClusterHubLandingPage } from "./ClusterHubLandingPage";
-import { getClusterHubPageByPath, resolveHubSectionPages } from "./clusterHubPages";
+import {
+  getClusterHubLastUpdated,
+  getClusterHubPageByPath,
+  resolveHubSectionPages,
+} from "./clusterHubPages";
 
 vi.mock("@/features/auth/useAuth", () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
@@ -58,6 +62,12 @@ describe("ClusterHubLandingPage", () => {
     expect(h1s[0]).toHaveTextContent(students.h1);
     expect(heroOf(h1s[0])).toHaveTextContent("For students");
     expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
+  });
+
+  it("shows the hub's last-updated date in the hero", () => {
+    renderHub("/students");
+    const time = heroOf(screen.getByRole("heading", { level: 1 })).querySelector("time");
+    expect(time).toHaveAttribute("datetime", getClusterHubLastUpdated(students));
   });
 
   it("numbers each tool group, counts its tools and links a card per tool", () => {

@@ -50,7 +50,7 @@ const FOOTER_TAGLINE = "An AI study and research partner that works from the mat
 
 const PRODUCT_LINKS = [
   { label: "Features", to: "/#features" },
-  { label: "Pricing", to: "/#pricing" },
+  { label: "Pricing", to: "/pricing" },
   { label: "FAQ", to: "/faq" },
 ] as const;
 

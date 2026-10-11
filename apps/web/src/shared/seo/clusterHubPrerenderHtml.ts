@@ -1,7 +1,9 @@
 import {
   type ClusterHubPageConfig,
+  getClusterHubLastUpdated,
   resolveHubSectionPages,
 } from "@/features/landing/clusterHubPages";
+import { buildUpdatedLineHtml } from "./seoDates";
 import { escapeHtml } from "./seoHtml";
 
 /** Static HTML body for cluster hub pages — injected at build time into prerendered index.html. */
@@ -59,6 +61,7 @@ ${guideLinks}
         <p>${escapeHtml(clusterLabel)}</p>
         <h1>${escapeHtml(page.h1)}</h1>
         <p>${escapeHtml(page.subheadline)}</p>
+        ${buildUpdatedLineHtml(getClusterHubLastUpdated(page))}
       </header>
       <section aria-labelledby="seo-prerender-summary">
         <h2 id="seo-prerender-summary">Overview</h2>

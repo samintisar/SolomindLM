@@ -26,9 +26,9 @@ describe("LandingPage", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("renders a section for every nav anchor and the footer's /#features and /#pricing links", () => {
+  it("renders a section for every nav anchor and the footer's /#features link", () => {
     const { container } = renderPage();
-    for (const target of [...NAV_ITEMS.map((item) => item.target), "features", "pricing"]) {
+    for (const target of [...NAV_ITEMS.map((item) => item.target), "features"]) {
       expect(container.querySelector(`section#${target}`)).not.toBeNull();
     }
   });

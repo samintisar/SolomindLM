@@ -6,6 +6,12 @@ import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { canOfferPurchases } from "@/utils/platformDetection";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "../planFeatures";
 import {
+  formatUsd,
+  PRO_PRICE_USD,
+  PRO_YEARLY_PER_MONTH_USD,
+  PRO_YEARLY_SAVINGS_PERCENT,
+} from "../planPricing";
+import {
   useCancelSubscription,
   useCreateCheckout,
   useCreatePortalSession,
@@ -179,7 +185,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <PlanCard
                   title="Free"
                   subtitle={status?.hasSubscription ? "Your previous plan" : "Get started today"}
-                  price="$0"
+                  price={formatUsd(0)}
                   featuresLabel="Included:"
                   features={FREE_PLAN_FEATURES}
                   action={
@@ -197,9 +203,9 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <PlanCard
                   title="Yearly"
                   subtitle="Best value – billed once per year"
-                  price="$7.50"
-                  priceNote="($90/year)"
-                  badge="Save 50%"
+                  price={formatUsd(PRO_YEARLY_PER_MONTH_USD)}
+                  priceNote={`(${formatUsd(PRO_PRICE_USD.yearly)}/year)`}
+                  badge={`Save ${PRO_YEARLY_SAVINGS_PERCENT}%`}
                   highlighted
                   featuresLabel="Everything included:"
                   features={PRO_PLAN_FEATURES}
@@ -224,7 +230,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <PlanCard
                   title="Monthly"
                   subtitle="Billed every month"
-                  price="$15"
+                  price={formatUsd(PRO_PRICE_USD.monthly)}
                   proChecks
                   featuresLabel="Everything included:"
                   features={PRO_PLAN_FEATURES}

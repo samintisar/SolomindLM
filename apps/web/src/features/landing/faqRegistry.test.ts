@@ -69,6 +69,6 @@ describe("faqRegistry", () => {
     expect(privacyFaq?.learnMoreLabel).toBe("Read privacy policy");
     expect(privacyFaq?.learnMorePath).toBe("/privacy");
     expect(uploadLimitFaq?.learnMoreLabel).toBe("See pricing");
-    expect(uploadLimitFaq?.learnMorePath).toBe("/#pricing");
+    expect(uploadLimitFaq?.learnMorePath).toBe("/pricing");
   });
 });
