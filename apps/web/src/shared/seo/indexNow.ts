@@ -1,3 +1,4 @@
+import { type IndexNowPersistedState, parseSitemapState } from "./indexNowState";
 import { getIndexablePublicSeoPages } from "./publicSeoPages";
 import { SEO_BASE_URL } from "./seoConstants";
 import { canonicalUrl } from "./seoHtml";
@@ -9,7 +10,8 @@ const INDEXNOW_KEY_PATTERN = /^[a-zA-Z0-9-]{8,128}$/;
 
 export type IndexNowUrlEntry = {
   url: string;
-  lastmod: string;
+  /** The registry's own date; absent when the page has none (the sitemap then uses the build date). */
+  lastmod: string | undefined;
 };
 
 export type IndexNowSubmitResult = {
@@ -38,12 +40,38 @@ export function getIndexNowKeyLocation(key: string, baseUrl: string = SEO_BASE_U
 }
 
 /** Canonical public SEO URLs — same source as sitemap and prerender. */
-export function getPublicSeoCanonicalUrlEntries(buildDate?: string): IndexNowUrlEntry[] {
-  const resolvedBuildDate = buildDate ?? new Date().toISOString().slice(0, 10);
+export function getPublicSeoCanonicalUrlEntries(): IndexNowUrlEntry[] {
   return getIndexablePublicSeoPages().map((page) => ({
     url: canonicalUrl(SEO_BASE_URL, page.path),
-    lastmod: page.lastmod ?? resolvedBuildDate,
+    lastmod: page.lastmod,
   }));
+}
+
+const PUBLISHED_SITEMAP_TIMEOUT_MS = 10_000;
+
+/**
+ * The sitemap production is serving right now, i.e. what the previous deploy published.
+ * Returns null on any failure so the caller can submit nothing rather than everything.
+ */
+export async function fetchPublishedSitemapState(
+  options: { baseUrl?: string; fetchImpl?: typeof fetch; timeoutMs?: number } = {}
+): Promise<IndexNowPersistedState | null> {
+  const {
+    baseUrl = SEO_BASE_URL,
+    fetchImpl = fetch,
+    timeoutMs = PUBLISHED_SITEMAP_TIMEOUT_MS,
+  } = options;
+  try {
+    const response = await fetchImpl(`${baseUrl}/sitemap.xml`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return parseSitemapState(await response.text());
+  } catch {
+    return null;
+  }
 }
 
 export function filterIndexableUrls(urls: string[], host: string = getIndexNowHost()): string[] {

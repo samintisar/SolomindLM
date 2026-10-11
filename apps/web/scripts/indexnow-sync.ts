@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   describeIndexNowStatus,
+  fetchPublishedSitemapState,
   getIndexNowKeyLocation,
   getPublicSeoCanonicalUrlEntries,
   isValidIndexNowKey,
@@ -15,19 +16,12 @@ import {
   type IndexNowQueueFile,
   mergeIndexNowQueue,
 } from "../src/shared/seo/indexNowQueue.ts";
-import {
-  collectChangedCanonicalUrls,
-  diffIndexNowUrls,
-  entriesToState,
-  type IndexNowPersistedState,
-} from "../src/shared/seo/indexNowState.ts";
+import { selectChangedIndexNowUrls } from "../src/shared/seo/indexNowState.ts";
 import { SEO_BASE_URL } from "../src/shared/seo/seoConstants.ts";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(scriptDir, "../dist");
-const statePath = path.resolve(scriptDir, "indexnow-state.json");
 const queuePath = path.resolve(scriptDir, ".indexnow-queue.json");
-const buildDate = new Date().toISOString().slice(0, 10);
 
 function readJsonFile<T>(filePath: string): T | null {
   if (!fs.existsSync(filePath)) {
@@ -54,10 +48,6 @@ function writeKeyVerificationFile(key: string): void {
   console.log(
     `[indexnow-sync] Wrote key file to dist/${keyFileName} (${getIndexNowKeyLocation(key, SEO_BASE_URL)})`
   );
-}
-
-function loadState(): IndexNowPersistedState | null {
-  return readJsonFile<IndexNowPersistedState>(statePath);
 }
 
 function loadQueue(): IndexNowQueueFile | null {
@@ -120,22 +110,25 @@ async function main(): Promise<void> {
 
   writeKeyVerificationFile(key);
 
-  const currentEntries = getPublicSeoCanonicalUrlEntries(buildDate);
-  const previousState = loadState();
-  const diff = diffIndexNowUrls(currentEntries, previousState);
-  const changedUrls = collectChangedCanonicalUrls(diff);
+  // Compare against what production serves now (the previous deploy). The build container is
+  // discarded, so no state written here would survive to the next build.
+  const published = await fetchPublishedSitemapState();
+  if (!published) {
+    console.warn(
+      `[indexnow-sync] Could not read ${SEO_BASE_URL}/sitemap.xml; submitting no new URLs this build`
+    );
+  }
+  const changedUrls = selectChangedIndexNowUrls(getPublicSeoCanonicalUrlEntries(), published);
 
   let queue = loadQueue() ?? { urls: [] };
   if (changedUrls.length > 0) {
     queue = mergeIndexNowQueue(queue, changedUrls);
     console.log(
-      `[indexnow-sync] Enqueued ${changedUrls.length} changed URL(s) (added=${diff.added.length}, updated=${diff.updated.length}, removed=${diff.removed.length})`
+      `[indexnow-sync] Enqueued ${changedUrls.length} changed URL(s): ${changedUrls.join(", ")}`
     );
   } else {
-    console.log("[indexnow-sync] No public SEO URL changes detected");
+    console.log("[indexnow-sync] No public SEO URL changes since the live sitemap");
   }
-
-  writeJsonFile(statePath, entriesToState(currentEntries));
 
   if (!shouldSubmitToIndexNow()) {
     saveQueue(queue);

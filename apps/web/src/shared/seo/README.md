@@ -24,10 +24,15 @@ Public SEO URLs use the same canonical list as the sitemap (`getIndexablePublicS
 
 On each production build:
 
-1. `scripts/indexnow-sync.ts` diffs the registry against `scripts/indexnow-state.json`
-2. Added, materially updated (`lastmod` changed), and removed URLs are enqueued (deduped)
-3. The queue is flushed to `https://api.indexnow.org/indexnow` in batches
-4. `{INDEXNOW_KEY}.txt` is written to `dist/` for host verification
+1. `scripts/indexnow-sync.ts` fetches the live `https://www.solomindlm.com/sitemap.xml` (what the
+   previous production deploy published) and diffs the registry against it. Build containers are
+   thrown away, so a state file written during the build would never persist.
+2. Added, removed, and materially updated URLs are enqueued (deduped). "Updated" means the page's own
+   `lastmod` in the registry changed; a page with no `lastmod` is only submitted when it is new, since
+   the sitemap stamps it with the build date on every build.
+3. If the live sitemap can't be fetched, nothing is submitted (never everything).
+4. The queue is flushed to `https://api.indexnow.org/indexnow` in batches
+5. `{INDEXNOW_KEY}.txt` is written to `dist/` for host verification
 
 Setup:
 
