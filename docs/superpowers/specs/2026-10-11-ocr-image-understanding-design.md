@@ -83,9 +83,9 @@ pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows 
 - **Nothing readable.** `hasOcrContent(markdown)` is false when nothing remains after removing page labels, `---`
   separators and whitespace. The service then throws `UserFacingSourceError` (`convex/_lib/sourceFailure.ts`) with:
   "We couldn't find any text or images to read in this file. If it's a photo, try a clearer or higher-resolution
-  version." `embeddingJob` already stores `userMessage` for the source viewer. `urlSource` must surface this
-  message rather than wrap it into a generic error, and `AcademicLoaderService` must still fall back to its web
-  scrape when OCR throws.
+  version." `embeddingJob` already stores `userMessage` for the source viewer. `urlSource` is unchanged: it wraps
+  any OCR error in its link-specific "couldn't read the PDF at this link" message, which fits links better.
+  `AcademicLoaderService` is unchanged: it already falls back to a web scrape when OCR throws.
 - **Annotations rejected or too slow.** A 4xx response to the annotated request (other than 429), or its timeout,
   triggers one plain request without `bbox_annotation_format` / `document_annotation_format` (120s timeout), logged
   as a warning. That is today's behavior, so annotations never lose a document that ingests now. 429 and 5xx keep
@@ -111,7 +111,8 @@ TDD in `convex/_services/extraction/MistralOCRService.test.ts`:
 - `hasOcrContent`: labels and separators only → false; figure blocks only → true.
 - Fallback: mocked `fetch` returning 400 (and, separately, aborting on timeout) for the annotated request, then 200 →
   one plain request without annotation formats; 429 does not trigger the fallback.
-- Empty extraction → `UserFacingSourceError`; `urlSource` and `AcademicLoaderService` tests cover the new error.
+- Empty extraction → `UserFacingSourceError` with the "nothing readable" message. Existing `urlSource` and
+  `AcademicLoaderService` tests already cover an OCR call that throws.
 
 Gates: `typecheck:convex`, `typecheck:web`, `test:convex`, then one targeted `eval:rag --case …` whose sources contain
 figures, to confirm retrieval does not regress. Ingestion has no prompt cache, so no `cacheVersions` bump.
