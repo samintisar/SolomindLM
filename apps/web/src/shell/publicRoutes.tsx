@@ -11,6 +11,8 @@ import { SeoContentPage } from "@/features/landing/SeoContentPage";
 import { SEO_CONTENT_PAGES } from "@/features/landing/seoContentPages";
 import { PrivacyPolicy } from "@/features/legal/components/PrivacyPolicy";
 import { TermsOfService } from "@/features/legal/components/TermsOfService";
+import { ToolsHubPage } from "@/features/tools/pages/ToolsHubPage";
+import { TOOLS_HUB_PATH } from "@/features/tools/toolsHubPage";
 import { LandingRoute } from "./LandingRoute";
 
 /** Dev-only ui gallery (/dev/design). A build-time constant so production builds drop the chunk. */
@@ -48,6 +50,7 @@ export const PUBLIC_ROUTES: RouteObject[] = [
   { path: "/terms", element: <TermsOfService /> },
   { path: "/faq", element: <FaqPage /> },
   { path: PRICING_PATH, element: <PricingPage /> },
+  { path: TOOLS_HUB_PATH, element: <ToolsHubPage /> },
   {
     path: "/tools/pdf-to-flashcards",
     element: (

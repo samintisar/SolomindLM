@@ -5,6 +5,7 @@ import {
 } from "@/features/landing/seoContentPages";
 import { buildSeoTimeHtml, buildUpdatedLineHtml } from "./seoDates";
 import { escapeHtml } from "./seoHtml";
+import { buildPrerenderFreeToolsNavHtml } from "./toolsHubPrerenderHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
 export function buildSeoContentPrerenderBody(page: SeoContentPageConfig): string {
@@ -114,6 +115,7 @@ ${relatedLinks}
       </section>
       <footer>
         <p><a href="/">SolomindLM home</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }

@@ -7,12 +7,18 @@ import { isPublicPath } from "./isPublicPath";
 import { DESIGN_GALLERY_ENABLED } from "./publicRoutes";
 
 describe("isPublicPath", () => {
-  it.each(["/", "/sign-in", "/privacy", "/terms", "/faq", "/pricing", "/tools/pdf-to-flashcards"])(
-    "treats %s as public",
-    (path) => {
-      expect(isPublicPath(path)).toBe(true);
-    }
-  );
+  it.each([
+    "/",
+    "/sign-in",
+    "/privacy",
+    "/terms",
+    "/faq",
+    "/pricing",
+    "/tools",
+    "/tools/pdf-to-flashcards",
+  ])("treats %s as public", (path) => {
+    expect(isPublicPath(path)).toBe(true);
+  });
 
   it("treats every intent, cluster hub, SEO content and tool page as public", () => {
     const paths = [
@@ -38,7 +44,7 @@ describe("isPublicPath", () => {
     "/admin/feedback",
     "/unknown",
     "/faq/extra",
-    "/tools",
+    "/tools/unknown-tool",
   ])("treats %s as an app route", (path) => {
     expect(isPublicPath(path)).toBe(false);
   });

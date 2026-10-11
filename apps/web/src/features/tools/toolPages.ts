@@ -1,5 +1,3 @@
-import type { BreadcrumbItem } from "@/shared/seo/structuredData";
-
 /** Copy and config for a free no-signup tool page: used by the page, the SEO registry and prerender. */
 export type ToolPageConfig = {
   path: string;
@@ -210,12 +208,4 @@ export const FREE_TOOL_PAGES: ToolPageConfig[] = [PDF_TO_FLASHCARDS_PAGE, PRISMA
 
 export function getToolPageByPath(path: string): ToolPageConfig | undefined {
   return FREE_TOOL_PAGES.find((page) => page.path === path);
-}
-
-/** No /tools index page exists, so the trail is Home → tool. */
-export function getToolBreadcrumbItems(page: ToolPageConfig): BreadcrumbItem[] {
-  return [
-    { name: "Home", path: "/" },
-    { name: page.h1, path: page.path },
-  ];
 }

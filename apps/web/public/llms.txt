@@ -2,7 +2,7 @@
 
 > SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers. Upload or import sources into notebooks, chat with your materials, and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and more—all grounded in the documents you provide. Free to start; no credit card required.
 
-Last-updated: 2026-10-09
+Last-updated: 2026-10-11
 Category: AI learning and research assistant
 Audience: Students, researchers, knowledge workers
 
@@ -38,6 +38,7 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 ### Cluster hubs
 - Student study tools (hub): https://www.solomindlm.com/students
 - Research tools (hub): https://www.solomindlm.com/research
+- Free tools, no signup (hub): https://www.solomindlm.com/tools
 
 ### Free tools
 - Free PDF to flashcards maker (no signup; Anki, Quizlet and CSV export): https://www.solomindlm.com/tools/pdf-to-flashcards

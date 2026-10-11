@@ -5,6 +5,7 @@ import {
 } from "@/features/landing/clusterHubPages";
 import { buildUpdatedLineHtml } from "./seoDates";
 import { escapeHtml } from "./seoHtml";
+import { buildPrerenderFreeToolsNavHtml } from "./toolsHubPrerenderHtml";
 
 /** Static HTML body for cluster hub pages — injected at build time into prerendered index.html. */
 export function buildClusterHubPrerenderBody(page: ClusterHubPageConfig): string {
@@ -84,6 +85,7 @@ ${faqItems}
       </section>
       <footer>
         <p><a href="/">SolomindLM home</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }

@@ -1,5 +1,6 @@
 import { getFaqCategoriesWithItems } from "@/features/landing/faqRegistry";
 import { escapeHtml } from "./seoHtml";
+import { buildPrerenderFreeToolsNavHtml } from "./toolsHubPrerenderHtml";
 
 export function buildFaqPrerenderBody(): string {
   const categories = getFaqCategoriesWithItems();
@@ -25,6 +26,7 @@ export function buildFaqPrerenderBody(): string {
 ${sections}
       <footer>
         <p><a href="/">SolomindLM home</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }

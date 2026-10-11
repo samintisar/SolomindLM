@@ -152,6 +152,33 @@ export const generateBreadcrumbStructuredData = (items: BreadcrumbItem[]) => ({
   })),
 });
 
+/** A hub page whose main content is a list of links: CollectionPage with an ItemList of its pages. */
+export const generateCollectionPageStructuredData = (args: {
+  name: string;
+  description: string;
+  path: string;
+  dateModified: string;
+  items: { name: string; path: string }[];
+}) => ({
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: args.name,
+  description: args.description,
+  url: `${SEO_BASE_URL}${args.path}`,
+  dateModified: args.dateModified,
+  isPartOf: { "@type": "WebSite", name: "SolomindLM", url: SEO_BASE_URL },
+  mainEntity: {
+    "@type": "ItemList",
+    numberOfItems: args.items.length,
+    itemListElement: args.items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      url: `${SEO_BASE_URL}${item.path}`,
+    })),
+  },
+});
+
 export const generateWebApplicationStructuredData = (args: {
   name: string;
   description: string;
