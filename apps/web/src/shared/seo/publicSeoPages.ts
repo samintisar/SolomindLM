@@ -53,7 +53,7 @@ export type PublicSeoPage = {
   noindex?: boolean;
   changefreq?: "daily" | "weekly" | "monthly";
   priority?: number;
-  /** ISO date (YYYY-MM-DD); sitemap generator may override with build date. */
+  /** ISO date (YYYY-MM-DD) the page last changed; without it the sitemap omits `<lastmod>`. */
   lastmod?: string;
   structuredData?: Record<string, unknown> | Record<string, unknown>[];
 };

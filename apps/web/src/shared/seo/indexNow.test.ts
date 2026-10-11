@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  fetchPublishedSitemapState,
   filterIndexableUrls,
   getIndexNowHost,
   getIndexNowKeyLocation,
@@ -8,7 +9,13 @@ import {
   submitIndexNow,
 } from "./indexNow";
 import { dedupeIndexNowUrls, drainIndexNowQueue, mergeIndexNowQueue } from "./indexNowQueue";
-import { collectChangedCanonicalUrls, diffIndexNowUrls, entriesToState } from "./indexNowState";
+import {
+  collectChangedCanonicalUrls,
+  diffIndexNowUrls,
+  parseSitemapState,
+  selectChangedIndexNowUrls,
+} from "./indexNowState";
+import { getIndexablePublicSeoPages } from "./publicSeoPages";
 import { SEO_BASE_URL } from "./seoConstants";
 import { canonicalUrl } from "./seoHtml";
 
@@ -34,9 +41,52 @@ describe("indexNow helpers", () => {
   });
 
   it("builds canonical URL entries from the public SEO registry", () => {
-    const entries = getPublicSeoCanonicalUrlEntries("2026-06-08");
+    const entries = getPublicSeoCanonicalUrlEntries();
     expect(entries.some((entry) => entry.url === `${SEO_BASE_URL}/`)).toBe(true);
     expect(entries.every((entry) => entry.url.startsWith(`${SEO_BASE_URL}/`))).toBe(true);
+  });
+
+  it("keeps only the registry's own lastmod, never a build date", () => {
+    const pages = getIndexablePublicSeoPages();
+    const entries = getPublicSeoCanonicalUrlEntries();
+    expect(entries.map((entry) => entry.lastmod)).toEqual(pages.map((page) => page.lastmod));
+  });
+});
+
+describe("fetchPublishedSitemapState", () => {
+  const sitemapUrl = `${SEO_BASE_URL}/sitemap.xml`;
+
+  it("parses the live sitemap into the published state", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          `<urlset><url><loc>${SEO_BASE_URL}/</loc><lastmod>2026-10-10</lastmod></url></urlset>`,
+          { status: 200 }
+        )
+      );
+
+    const state = await fetchPublishedSitemapState({ fetchImpl });
+
+    expect(fetchImpl).toHaveBeenCalledWith(sitemapUrl, expect.anything());
+    expect(state).toEqual({ urls: { [`${SEO_BASE_URL}/`]: { lastmod: "2026-10-10" } } });
+  });
+
+  it("returns null when the sitemap responds with an error", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response("nope", { status: 503 }));
+    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
+  });
+
+  it("returns null when a 200 response is not a sitemap", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response("<html><body>Maintenance</body></html>", { status: 200 }));
+    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
+  });
+
+  it("returns null when the request throws", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error("network down"));
+    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
   });
 });
 
@@ -47,11 +97,13 @@ describe("indexNow state diff", () => {
       { url: `${SEO_BASE_URL}/privacy`, lastmod: "2026-06-07" },
       { url: `${SEO_BASE_URL}/faq`, lastmod: "2026-06-08" },
     ];
-    const previous = entriesToState([
-      { url: `${SEO_BASE_URL}/`, lastmod: "2026-06-08" },
-      { url: `${SEO_BASE_URL}/privacy`, lastmod: "2026-06-06" },
-      { url: `${SEO_BASE_URL}/terms`, lastmod: "2026-06-06" },
-    ]);
+    const previous = {
+      urls: {
+        [`${SEO_BASE_URL}/`]: { lastmod: "2026-06-08" },
+        [`${SEO_BASE_URL}/privacy`]: { lastmod: "2026-06-06" },
+        [`${SEO_BASE_URL}/terms`]: { lastmod: "2026-06-06" },
+      },
+    };
 
     const diff = diffIndexNowUrls(current, previous);
     expect(diff.added).toEqual([`${SEO_BASE_URL}/faq`]);
@@ -62,6 +114,130 @@ describe("indexNow state diff", () => {
       `${SEO_BASE_URL}/privacy`,
       `${SEO_BASE_URL}/terms`,
     ]);
+  });
+
+  it("never treats an undated page that is already published as updated", () => {
+    const current = [{ url: `${SEO_BASE_URL}/`, lastmod: undefined }];
+    const previous = { urls: { [`${SEO_BASE_URL}/`]: { lastmod: "2026-10-10" } } };
+
+    expect(diffIndexNowUrls(current, previous).updated).toEqual([]);
+  });
+
+  it("still adds an undated page that is not published yet", () => {
+    const current = [{ url: `${SEO_BASE_URL}/tools`, lastmod: undefined }];
+
+    expect(diffIndexNowUrls(current, { urls: {} }).added).toEqual([`${SEO_BASE_URL}/tools`]);
+  });
+
+  it("treats a page that gains a lastmod as updated", () => {
+    const current = [{ url: `${SEO_BASE_URL}/faq`, lastmod: "2026-10-11" }];
+    const previous = { urls: { [`${SEO_BASE_URL}/faq`]: { lastmod: "" } } };
+
+    expect(diffIndexNowUrls(current, previous).updated).toEqual([`${SEO_BASE_URL}/faq`]);
+  });
+});
+
+describe("parseSitemapState", () => {
+  it("maps each <loc> to its <lastmod>", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${SEO_BASE_URL}/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <changefreq>weekly</changefreq>
+  </url>
+
+  <url>
+    <loc>${SEO_BASE_URL}/privacy</loc>
+    <lastmod>2026-06-06</lastmod>
+  </url>
+</urlset>`;
+
+    expect(parseSitemapState(xml)).toEqual({
+      urls: {
+        [`${SEO_BASE_URL}/`]: { lastmod: "2026-10-10" },
+        [`${SEO_BASE_URL}/privacy`]: { lastmod: "2026-06-06" },
+      },
+    });
+  });
+});
+
+describe("parseSitemapState validation", () => {
+  it("returns null for an HTML page", () => {
+    expect(parseSitemapState("<!doctype html><html><body>Not found</body></html>")).toBeNull();
+  });
+
+  it("returns null for a truncated sitemap", () => {
+    expect(parseSitemapState(`<urlset><url><loc>${SEO_BASE_URL}/</loc>`)).toBeNull();
+  });
+
+  it("returns null when other content surrounds the <urlset> root", () => {
+    expect(parseSitemapState("<urlset></urlset><html>error</html>")).toBeNull();
+    expect(parseSitemapState("<html><urlset></urlset></html>")).toBeNull();
+  });
+
+  it("keeps a valid sitemap with no URLs as an empty state", () => {
+    expect(parseSitemapState('<?xml version="1.0"?><urlset></urlset>')).toEqual({ urls: {} });
+  });
+
+  it("accepts comments before and after the <urlset> root", () => {
+    expect(
+      parseSitemapState(
+        '<?xml version="1.0"?>\n<!-- generator -->\n<urlset></urlset>\n<!-- end -->'
+      )
+    ).toEqual({ urls: {} });
+  });
+
+  it("returns null for an unterminated comment or XML declaration", () => {
+    expect(parseSitemapState("<!-- open <urlset></urlset>")).toBeNull();
+    expect(parseSitemapState('<?xml version="1.0" <urlset></urlset>')).toBeNull();
+  });
+
+  it("returns null when the root is not exactly <urlset>", () => {
+    expect(parseSitemapState("<urlsetx></urlset>")).toBeNull();
+  });
+
+  it("returns null for a <url> block that is never closed", () => {
+    expect(
+      parseSitemapState(
+        `<urlset><url><loc>${SEO_BASE_URL}/a</loc><url><loc>${SEO_BASE_URL}/b</loc></url></urlset>`
+      )
+    ).toBeNull();
+  });
+
+  it("rejects many unclosed <url> tags in linear time", () => {
+    const xml = `<urlset>${"<url>".repeat(20_000)}</urlset>`;
+    const start = performance.now();
+    expect(parseSitemapState(xml)).toBeNull();
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+});
+
+describe("selectChangedIndexNowUrls", () => {
+  it("submits nothing when every page matches the published sitemap", () => {
+    const current = getPublicSeoCanonicalUrlEntries();
+    const published = {
+      urls: Object.fromEntries(
+        current.map((entry) => [entry.url, { lastmod: entry.lastmod ?? "2026-10-10" }])
+      ),
+    };
+
+    expect(selectChangedIndexNowUrls(current, published)).toEqual([]);
+  });
+
+  it("submits exactly the page whose lastmod changed", () => {
+    const current = [
+      { url: `${SEO_BASE_URL}/privacy`, lastmod: "2026-10-11" },
+      { url: `${SEO_BASE_URL}/terms`, lastmod: "2026-06-06" },
+    ];
+    const published = {
+      urls: {
+        [`${SEO_BASE_URL}/privacy`]: { lastmod: "2026-06-06" },
+        [`${SEO_BASE_URL}/terms`]: { lastmod: "2026-06-06" },
+      },
+    };
+
+    expect(selectChangedIndexNowUrls(current, published)).toEqual([`${SEO_BASE_URL}/privacy`]);
   });
 });
 

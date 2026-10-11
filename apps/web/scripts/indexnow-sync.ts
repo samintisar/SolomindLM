@@ -5,8 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   describeIndexNowStatus,
+  fetchPublishedSitemapState,
   getIndexNowKeyLocation,
   getPublicSeoCanonicalUrlEntries,
+  type IndexNowSubmitResult,
   isValidIndexNowKey,
   submitIndexNowBatches,
 } from "../src/shared/seo/indexNow.ts";
@@ -15,19 +17,12 @@ import {
   type IndexNowQueueFile,
   mergeIndexNowQueue,
 } from "../src/shared/seo/indexNowQueue.ts";
-import {
-  collectChangedCanonicalUrls,
-  diffIndexNowUrls,
-  entriesToState,
-  type IndexNowPersistedState,
-} from "../src/shared/seo/indexNowState.ts";
+import { selectChangedIndexNowUrls } from "../src/shared/seo/indexNowState.ts";
 import { SEO_BASE_URL } from "../src/shared/seo/seoConstants.ts";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(scriptDir, "../dist");
-const statePath = path.resolve(scriptDir, "indexnow-state.json");
 const queuePath = path.resolve(scriptDir, ".indexnow-queue.json");
-const buildDate = new Date().toISOString().slice(0, 10);
 
 function readJsonFile<T>(filePath: string): T | null {
   if (!fs.existsSync(filePath)) {
@@ -56,10 +51,6 @@ function writeKeyVerificationFile(key: string): void {
   );
 }
 
-function loadState(): IndexNowPersistedState | null {
-  return readJsonFile<IndexNowPersistedState>(statePath);
-}
-
 function loadQueue(): IndexNowQueueFile | null {
   return readJsonFile<IndexNowQueueFile>(queuePath);
 }
@@ -80,7 +71,13 @@ async function flushQueue(key: string, queue: IndexNowQueueFile): Promise<IndexN
     return drainedQueue;
   }
 
-  const results = await submitIndexNowBatches(urls, { key });
+  let results: IndexNowSubmitResult[];
+  try {
+    results = await submitIndexNowBatches(urls, { key });
+  } catch (error) {
+    console.error("[indexnow-sync] IndexNow request failed:", error);
+    return mergeIndexNowQueue(drainedQueue, urls);
+  }
   for (const result of results) {
     if (result.urlCount === 0) {
       continue;
@@ -98,13 +95,8 @@ async function flushQueue(key: string, queue: IndexNowQueueFile): Promise<IndexN
   const failed = results.some(
     (result) => result.urlCount > 0 && result.status !== 200 && result.status !== 202
   );
-  if (failed) {
-    const retryQueue = mergeIndexNowQueue(drainedQueue, urls);
-    saveQueue(retryQueue);
-    throw new Error("IndexNow submission failed; URLs re-queued for retry");
-  }
-
-  return drainedQueue;
+  // Never fail the build over IndexNow: a 429 or outage would block the release.
+  return failed ? mergeIndexNowQueue(drainedQueue, urls) : drainedQueue;
 }
 
 async function main(): Promise<void> {
@@ -120,29 +112,33 @@ async function main(): Promise<void> {
 
   writeKeyVerificationFile(key);
 
-  const currentEntries = getPublicSeoCanonicalUrlEntries(buildDate);
-  const previousState = loadState();
-  const diff = diffIndexNowUrls(currentEntries, previousState);
-  const changedUrls = collectChangedCanonicalUrls(diff);
+  if (!shouldSubmitToIndexNow()) {
+    console.log(
+      "[indexnow-sync] Skipped submission (set VERCEL_ENV=production or INDEXNOW_SUBMIT=true to submit)"
+    );
+    return;
+  }
+
+  // Compare against what production serves now (the previous deploy). The build container is
+  // discarded, so no state written here would survive to the next build.
+  const published = await fetchPublishedSitemapState();
+  if (!published) {
+    // Nothing from this build persists, so these changes are lost rather than retried later.
+    console.warn(
+      `[indexnow-sync] Could not read ${SEO_BASE_URL}/sitemap.xml; this deploy's URL changes will not be submitted`
+    );
+    return;
+  }
+  const changedUrls = selectChangedIndexNowUrls(getPublicSeoCanonicalUrlEntries(), published);
 
   let queue = loadQueue() ?? { urls: [] };
   if (changedUrls.length > 0) {
     queue = mergeIndexNowQueue(queue, changedUrls);
     console.log(
-      `[indexnow-sync] Enqueued ${changedUrls.length} changed URL(s) (added=${diff.added.length}, updated=${diff.updated.length}, removed=${diff.removed.length})`
+      `[indexnow-sync] Enqueued ${changedUrls.length} changed URL(s): ${changedUrls.join(", ")}`
     );
   } else {
-    console.log("[indexnow-sync] No public SEO URL changes detected");
-  }
-
-  writeJsonFile(statePath, entriesToState(currentEntries));
-
-  if (!shouldSubmitToIndexNow()) {
-    saveQueue(queue);
-    console.log(
-      "[indexnow-sync] Skipped submission (set VERCEL_ENV=production or INDEXNOW_SUBMIT=true to flush)"
-    );
-    return;
+    console.log("[indexnow-sync] No public SEO URL changes since the live sitemap");
   }
 
   if (queue.urls.length === 0) {
@@ -152,7 +148,11 @@ async function main(): Promise<void> {
 
   queue = await flushQueue(key, queue);
   saveQueue(queue);
-  console.log("[indexnow-sync] Queue flushed");
+  console.log(
+    queue.urls.length === 0
+      ? "[indexnow-sync] Queue flushed"
+      : `[indexnow-sync] ${queue.urls.length} URL(s) not accepted; kept in .indexnow-queue.json (local runs only)`
+  );
 }
 
 main().catch((error: unknown) => {
