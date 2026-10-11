@@ -109,7 +109,102 @@ export const PDF_TO_FLASHCARDS_PAGE: ToolPageConfig = {
   ],
 };
 
-export const FREE_TOOL_PAGES: ToolPageConfig[] = [PDF_TO_FLASHCARDS_PAGE];
+export const PRISMA_FLOW_DIAGRAM_PAGE: ToolPageConfig = {
+  path: "/tools/prisma-flow-diagram",
+  navLabel: "PRISMA flow diagram",
+  title: "Free PRISMA 2020 Flow Diagram Generator — No Signup, SVG & PNG | SolomindLM",
+  description:
+    "Make a PRISMA 2020 flow diagram for your systematic review in the browser. Type your counts, check the arithmetic, and download SVG or PNG. Free, no account.",
+  keywords:
+    "prisma flow diagram generator, prisma 2020 flow diagram, prisma diagram maker, prisma flowchart, systematic review flow diagram, prisma template",
+  h1: "Free PRISMA 2020 Flow Diagram Generator",
+  intro:
+    "Type the counts from your search and screening, and the diagram draws itself in the PRISMA 2020 layout. Download it as SVG or PNG for your manuscript. Free, no account, nothing uploaded.",
+  steps: [
+    {
+      name: "Enter what your searches found",
+      text: "Add the records from databases and registers, and the duplicates and other records you removed before screening.",
+    },
+    {
+      name: "Add screening and eligibility",
+      text: "Fill in records screened and excluded, reports sought, not retrieved and assessed, and name each reason for excluding reports.",
+    },
+    {
+      name: "Check the warnings",
+      text: "If a box doesn't add up, a note under the field shows the arithmetic. The diagram always draws exactly what you typed.",
+    },
+    {
+      name: "Download or share",
+      text: "Download an SVG for print or a PNG for slides, or copy a link that reopens your diagram.",
+    },
+  ],
+  sections: [
+    {
+      heading: "What goes in each box",
+      paragraphs: [
+        "Identification counts the records your searches returned and the records removed before screening: duplicates, records an automation tool marked ineligible, and records removed for other reasons.",
+        "Screening follows records through title and abstract screening, then reports through full-text retrieval and eligibility assessment. Every report you exclude at eligibility needs a reason. Included gives the number of studies in the review and the reports of those studies.",
+      ],
+    },
+    {
+      heading: "Databases and registers, or other methods too",
+      paragraphs: [
+        "Switch on other methods if you also found studies through websites, organisations or citation searching. The diagram adds a second column for them, and both columns feed the same Included box.",
+      ],
+    },
+    {
+      heading: "PRISMA 2020 versus PRISMA 2009",
+      paragraphs: [
+        "PRISMA 2020 separates records (titles and abstracts) from reports (full-text documents), adds study registers, adds the optional other-methods column, and asks for the records removed before screening by type. If your journal still asks for the 2009 diagram, check its author instructions.",
+      ],
+    },
+    {
+      heading: "Using the diagram in your manuscript",
+      paragraphs: [
+        "SVG stays sharp at any size and opens in Word, PowerPoint, Inkscape and Illustrator. PNG is exported at twice the on-screen size. Cite the template as Page MJ, McKenzie JE, Bossuyt PM, et al. The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. BMJ 2021;372:n71.",
+        "The diagram is a reporting aid: drawing it doesn't make a review follow the PRISMA statement. Report the full checklist alongside it.",
+      ],
+    },
+  ],
+  faqs: [
+    {
+      question: "Is this PRISMA flow diagram generator free?",
+      answer: "Yes. Make and download as many diagrams as you like. No account, no watermark.",
+    },
+    {
+      question: "Are my numbers uploaded?",
+      answer:
+        "No. The diagram is drawn in your browser. Your counts are kept in the part of the link after #, which browsers never send to a server.",
+    },
+    {
+      question: "Which PRISMA template does it use?",
+      answer:
+        "The PRISMA 2020 flow diagram for new systematic reviews, with databases and registers only or with other methods as well. The templates for updated reviews are not supported yet.",
+    },
+    {
+      question: "Can I edit the diagram after downloading it?",
+      answer:
+        "Yes. The SVG keeps every box and line as an editable shape in Inkscape, Illustrator or PowerPoint. To change a count, it is usually quicker to reopen your link and download again.",
+    },
+    {
+      question: "How do I cite the PRISMA 2020 template?",
+      answer:
+        "Page MJ, McKenzie JE, Bossuyt PM, et al. The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. BMJ 2021;372:n71. The template is licensed CC BY 4.0.",
+    },
+    {
+      question: "Why does a box show a warning?",
+      answer:
+        "Its count doesn't match the arithmetic of the boxes above it, for example records screened should equal records identified minus records removed. The warning is a check, not a block: fix the number or leave it if your review counted differently.",
+    },
+  ],
+  related: [
+    { path: "/research/ai-literature-review", label: "AI literature review with screening" },
+    { path: "/research/academic-paper-discovery", label: "Find papers for your review" },
+    { path: "/compare", label: "Compare research tools" },
+  ],
+};
+
+export const FREE_TOOL_PAGES: ToolPageConfig[] = [PDF_TO_FLASHCARDS_PAGE, PRISMA_FLOW_DIAGRAM_PAGE];
 
 export function getToolPageByPath(path: string): ToolPageConfig | undefined {
   return FREE_TOOL_PAGES.find((page) => page.path === path);

@@ -42,6 +42,7 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 
 ### Free tools
 - Free PDF to flashcards maker (no signup; Anki, Quizlet and CSV export): https://www.solomindlm.com/tools/pdf-to-flashcards
+- Free PRISMA 2020 flow diagram generator (no signup; SVG and PNG export, other-methods column): https://www.solomindlm.com/tools/prisma-flow-diagram
 
 ### Compare and guides
 - All comparisons: https://www.solomindlm.com/compare
