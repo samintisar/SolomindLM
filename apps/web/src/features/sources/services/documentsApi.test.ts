@@ -58,6 +58,36 @@ const {
   uploadText,
 } = await import("./documentsApi");
 
+/**
+ * A local store keyed by query args only: the mocked `api` hands out a fresh proxy per access, so
+ * queries can't be told apart by reference. List and detail args differ in shape, so keys don't clash.
+ */
+function createLocalStore(entries: Array<[args: object, value: unknown]>) {
+  const store = new Map(entries.map(([args, value]) => [JSON.stringify(args), value]));
+  return {
+    getQuery: (_query: unknown, args: object) => store.get(JSON.stringify(args)),
+    setQuery: (_query: unknown, args: object, value: unknown) => {
+      store.set(JSON.stringify(args), value);
+    },
+    read: (args: object) => store.get(JSON.stringify(args)),
+  };
+}
+
+/** Mocks `useMutation(...).withOptimisticUpdate` and returns the optimistic updater it receives. */
+function captureOptimisticUpdate() {
+  let updater: ((localStore: unknown, args: unknown) => void) | undefined;
+  mockUseMutation.mockReturnValue({
+    withOptimisticUpdate: vi.fn((fn) => {
+      updater = fn;
+      return vi.fn();
+    }),
+  });
+  return (localStore: unknown, args: unknown) => {
+    if (!updater) throw new Error("withOptimisticUpdate was not called");
+    updater(localStore, args);
+  };
+}
+
 describe("documentsApi hooks", () => {
   beforeEach(() => {
     mockUseQuery.mockReset();
@@ -150,7 +180,7 @@ describe("documentsApi hooks", () => {
       const mockWithOptimistic = vi.fn().mockReturnValue(mockUpdate);
       mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
 
-      const { result } = renderHook(() => useUpdateDocument());
+      const { result } = renderHook(() => useUpdateDocument("nb-1"));
       const updated = await result.current("doc-1", { title: "New Title" });
 
       expect(mockWithOptimistic).toHaveBeenCalled();
@@ -158,6 +188,29 @@ describe("documentsApi hooks", () => {
         expect.objectContaining({ id: "doc-1", title: "New Title" })
       );
       expect(updated?.fileName).toBe("New Title");
+    });
+
+    it("renames the document in the notebook's source list and detail view", () => {
+      const runOptimisticUpdate = captureOptimisticUpdate();
+      renderHook(() => useUpdateDocument("nb-1"));
+      const localStore = createLocalStore([
+        [
+          { notebookId: "nb-1" },
+          [
+            { _id: "doc-1", fileName: "Old Title" },
+            { _id: "doc-2", fileName: "Other" },
+          ],
+        ],
+        [{ id: "doc-1" }, { _id: "doc-1", fileName: "Old Title" }],
+      ]);
+
+      runOptimisticUpdate(localStore, { id: "doc-1", title: "New Title" });
+
+      expect(localStore.read({ notebookId: "nb-1" })).toEqual([
+        { _id: "doc-1", fileName: "New Title" },
+        { _id: "doc-2", fileName: "Other" },
+      ]);
+      expect(localStore.read({ id: "doc-1" })).toEqual({ _id: "doc-1", fileName: "New Title" });
     });
   });
 
@@ -167,24 +220,49 @@ describe("documentsApi hooks", () => {
       const mockWithOptimistic = vi.fn().mockReturnValue(mockRemove);
       mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
 
-      const { result } = renderHook(() => useDeleteDocument());
+      const { result } = renderHook(() => useDeleteDocument("nb-1"));
       await result.current("doc-1");
 
       expect(mockWithOptimistic).toHaveBeenCalled();
       expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: "doc-1" }));
     });
 
-    it("keeps the same function across rerenders", () => {
+    it("removes the document from the notebook's source list and clears its detail view", () => {
+      const runOptimisticUpdate = captureOptimisticUpdate();
+      renderHook(() => useDeleteDocument("nb-1"));
+      const localStore = createLocalStore([
+        [
+          { notebookId: "nb-1" },
+          [
+            { _id: "doc-1", fileName: "Deleted" },
+            { _id: "doc-2", fileName: "Kept" },
+          ],
+        ],
+        [{ id: "doc-1" }, { _id: "doc-1", fileName: "Deleted" }],
+      ]);
+
+      runOptimisticUpdate(localStore, { id: "doc-1" });
+
+      expect(localStore.read({ notebookId: "nb-1" })).toEqual([{ _id: "doc-2", fileName: "Kept" }]);
+      expect(localStore.read({ id: "doc-1" })).toBeNull();
+    });
+
+    it("keeps the same function across rerenders until notebookId changes", () => {
       // Like Convex, withOptimisticUpdate builds a new function on every call.
       const mockWithOptimistic = vi.fn(() => vi.fn());
       mockUseMutation.mockReturnValue({ withOptimisticUpdate: mockWithOptimistic });
 
-      const { result, rerender } = renderHook(() => useDeleteDocument());
+      const { result, rerender } = renderHook(
+        ({ notebookId }: { notebookId: string }) => useDeleteDocument(notebookId),
+        { initialProps: { notebookId: "nb-1" } }
+      );
       const first = result.current;
-      rerender();
-
+      rerender({ notebookId: "nb-1" });
       expect(result.current).toBe(first);
       expect(mockWithOptimistic).toHaveBeenCalledTimes(1);
+
+      rerender({ notebookId: "nb-2" });
+      expect(result.current).not.toBe(first);
     });
   });
 
@@ -218,6 +296,18 @@ describe("documentsApi hooks", () => {
 
       rerender({ notebookId: "nb-2" });
       expect(result.current).not.toBe(first);
+    });
+
+    it("removes the documents from the notebook's source list", () => {
+      const runOptimisticUpdate = captureOptimisticUpdate();
+      renderHook(() => useRemoveManyDocuments("nb-1"));
+      const localStore = createLocalStore([
+        [{ notebookId: "nb-1" }, [{ _id: "doc-1" }, { _id: "doc-2" }, { _id: "doc-3" }]],
+      ]);
+
+      runOptimisticUpdate(localStore, { ids: ["doc-1", "doc-3"] });
+
+      expect(localStore.read({ notebookId: "nb-1" })).toEqual([{ _id: "doc-2" }]);
     });
 
     it("returns early for empty array", async () => {

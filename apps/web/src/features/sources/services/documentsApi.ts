@@ -95,9 +95,21 @@ export function useCreateDocument() {
 }
 
 /**
- * Update a document (rename) with optimistic update
+ * Args of the notebook's source-list subscription (`AppShell`). Optimistic updates are keyed by
+ * query + args, so they must write to exactly these args to reach the rendered list.
  */
-export function useUpdateDocument() {
+function useNotebookListArgs(notebookId: string | null) {
+  return useMemo(
+    () => (notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {}),
+    [notebookId]
+  );
+}
+
+/**
+ * Update a document (rename) with an optimistic update to the notebook's source list.
+ */
+export function useUpdateDocument(notebookId: string | null) {
+  const listArgs = useNotebookListArgs(notebookId);
   const updateMutation = useMutation(api.documents.index.update);
   const update = useMemo(
     () =>
@@ -105,11 +117,11 @@ export function useUpdateDocument() {
         const { id, title } = args;
 
         // Update list view
-        const listResult = localStore.getQuery(api.documents.listSummary.listSummary, {});
+        const listResult = localStore.getQuery(api.documents.listSummary.listSummary, listArgs);
         if (listResult) {
           localStore.setQuery(
             api.documents.listSummary.listSummary,
-            {},
+            listArgs,
             listResult.map((doc: DocumentSummary) =>
               doc._id === id ? { ...doc, fileName: title } : doc
             )
@@ -122,7 +134,7 @@ export function useUpdateDocument() {
           localStore.setQuery(api.documents.index.get, { id }, { ...document, fileName: title });
         }
       }),
-    [updateMutation]
+    [updateMutation, listArgs]
   );
 
   return useCallback(
@@ -134,19 +146,20 @@ export function useUpdateDocument() {
 }
 
 /**
- * Delete a document with optimistic update
+ * Delete a document with an optimistic update to the notebook's source list.
  */
-export function useDeleteDocument() {
+export function useDeleteDocument(notebookId: string | null) {
+  const listArgs = useNotebookListArgs(notebookId);
   const removeMutation = useMutation(api.documents.index.remove);
   const remove = useMemo(
     () =>
       removeMutation.withOptimisticUpdate((localStore, args) => {
         // Optimistically remove from list
-        const listResult = localStore.getQuery(api.documents.listSummary.listSummary, {});
+        const listResult = localStore.getQuery(api.documents.listSummary.listSummary, listArgs);
         if (listResult) {
           localStore.setQuery(
             api.documents.listSummary.listSummary,
-            {},
+            listArgs,
             listResult.filter((doc: DocumentSummary) => doc._id !== args.id)
           );
         }
@@ -154,7 +167,7 @@ export function useDeleteDocument() {
         // Clear detail view
         localStore.setQuery(api.documents.index.get, { id: args.id }, null);
       }),
-    [removeMutation]
+    [removeMutation, listArgs]
   );
 
   return useCallback(
@@ -166,13 +179,10 @@ export function useDeleteDocument() {
 }
 
 /**
- * Delete multiple documents with optimistic list updates (notebook-scoped list args).
+ * Delete multiple documents with an optimistic update to the notebook's source list.
  */
 export function useRemoveManyDocuments(notebookId: string | null) {
-  const listArgs = useMemo(
-    () => (notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {}),
-    [notebookId]
-  );
+  const listArgs = useNotebookListArgs(notebookId);
   const removeManyMutation = useMutation(api.documents.index.removeMany);
   const removeMany = useMemo(
     () =>
