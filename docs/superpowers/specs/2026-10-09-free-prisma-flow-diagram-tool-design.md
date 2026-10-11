@@ -1,12 +1,12 @@
 # Free PRISMA 2020 flow-diagram generator — design
 
-Issue: #459 · Parent: #87 (SEO organic growth) · Date: 2026-10-09
+Issue: #459 · Parent: #87 · Date: 2026-10-09
 
 ## Goal
 
 A public, no-signup page at `/tools/prisma-flow-diagram` where a reviewer types their counts and downloads
-a PRISMA 2020 flow diagram as SVG or PNG. It targets "prisma flow diagram generator" searches and leads
-into SolomindLM's literature review, which produces these counts automatically.
+a PRISMA 2020 flow diagram as SVG or PNG. It links to SolomindLM's literature review, which produces these
+counts automatically.
 
 The tool runs entirely in the browser: no Convex function, no LLM call, no rate limit, no Turnstile.
 

@@ -1,7 +1,6 @@
 # Citation pages and click-through — design
 
-Part of #356 (cited extraction table), slice 1 of 4. Also delivers growth-plan feature #3, "citations that open the
-PDF at the exact page and passage".
+Part of #356 (cited extraction table), slice 1 of 4.
 
 ## Goal
 

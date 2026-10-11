@@ -1,6 +1,6 @@
 # Free PDF → flashcards tool (no signup) — design
 
-Issue: #93 (part of #87). Growth plan: organic initiative #1 — "flashcard maker" (~22K/mo), "pdf to flashcards".
+Issue: #93 (part of #87).
 
 ## Goal
 

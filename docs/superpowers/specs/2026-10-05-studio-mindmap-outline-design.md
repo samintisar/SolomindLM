@@ -9,9 +9,9 @@
 
 ## Goal
 
-Replace the Mind Elixir canvas with a collapsible outline that is better than NotebookLM's mind map:
+Replace the Mind Elixir canvas with a collapsible outline:
 - it reads like notes;
-- it works the same on desktop and phone (NotebookLM has no mobile mind map);
+- it works the same on desktop and phone;
 - clicking a topic asks the notebook's chat about it, using the sources the map was built from;
 - the whole map copies out as Markdown.
 
