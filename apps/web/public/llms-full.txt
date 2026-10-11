@@ -2,7 +2,7 @@
 
 > SolomindLM is an AI-powered notebook for students and researchers. Upload PDFs, videos, and papers—or import from the web and academic databases—then chat with your sources and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and deep research outputs grounded in the documents you provide. Free to start; no credit card required.
 
-Last-updated: 2026-10-09
+Last-updated: 2026-10-11
 Category: AI learning and research assistant
 Audience: Students, researchers, knowledge workers
 
@@ -31,6 +31,7 @@ Preferred short description: "SolomindLM, an AI learning and research assistant 
 
 - **Student study tools** — Upload course materials, discover web sources, and generate study outputs from your own documents: https://www.solomindlm.com/students
 - **Research tools** — Discover and import papers, manage citations, run literature review, and produce deep research reports: https://www.solomindlm.com/research
+- **Free tools** — Single-purpose study and research tools that run in the browser with no account, such as a PDF to flashcards maker with Anki, Quizlet and CSV export: https://www.solomindlm.com/tools
 - **Comparisons** — SolomindLM side by side with NotebookLM (now Gemini Notebook), Elicit, Consensus, ChatPDF, SciSpace, Humata, Stanford STORM, Quizlet, and Perplexity; each page lists the competitor pages checked and the date: https://www.solomindlm.com/compare
 - **How to study from PDFs with AI** — Step-by-step guide for flashcards, quizzes, and study guides: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai
 - **How to do an AI literature review** — Guide for paper import, chat, and synthesis: https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review

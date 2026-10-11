@@ -6,6 +6,7 @@ import { PRICING_PATH } from "@/features/landing/pricingPageContent";
 import { getSeoContentPageByPath } from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
 import { getToolPageByPath } from "@/features/tools/toolPages";
+import { getToolsHubLinks, TOOLS_HUB_PAGE, TOOLS_HUB_PATH } from "@/features/tools/toolsHubPage";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
@@ -14,6 +15,10 @@ import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
 import { buildSeoContentPrerenderBody } from "./seoContentPrerenderHtml";
 import { escapeHtml } from "./seoHtml";
 import { buildToolPrerenderBody } from "./toolPrerenderHtml";
+import {
+  buildPrerenderFreeToolsNavHtml,
+  buildToolsHubPrerenderBody,
+} from "./toolsHubPrerenderHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
 export function buildHomePrerenderBody(): string {
@@ -25,6 +30,13 @@ export function buildHomePrerenderBody(): string {
   const resourceLinks = HOME_RESOURCE_LINKS.map(
     (link) => `          <li><a href="${link.path}">${escapeHtml(link.label)}</a></li>`
   ).join("\n");
+
+  const toolLinks = getToolsHubLinks()
+    .map(
+      (link) =>
+        `          <li><a href="${escapeHtml(link.path)}">${escapeHtml(link.label)}</a>: ${escapeHtml(link.description)}</li>`
+    )
+    .join("\n");
 
   return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
@@ -38,12 +50,20 @@ export function buildHomePrerenderBody(): string {
 ${resourceLinks}
         </ul>
       </section>
+      <section aria-labelledby="seo-prerender-free-tools">
+        <h2 id="seo-prerender-free-tools">${escapeHtml(TOOLS_HUB_PAGE.h1)}</h2>
+        <p>No account needed. <a href="${TOOLS_HUB_PATH}">See all free tools</a></p>
+        <ul>
+${toolLinks}
+        </ul>
+      </section>
       <section aria-labelledby="seo-prerender-faq">
         <h2 id="seo-prerender-faq">Frequently asked questions</h2>
 ${faqItems}
       </section>
       <footer>
         <p><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }
@@ -68,6 +88,7 @@ export function buildLegalPrerenderBody(title: string, path: "/privacy" | "/term
       </header>
       <footer>
         <p><a href="/">SolomindLM home</a> · <a href="${other.href}">${escapeHtml(other.label)}</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }
@@ -98,6 +119,9 @@ export function buildPublicSeoPrerenderBody(path: string): string | undefined {
   }
   if (path === PRICING_PATH) {
     return pinLightTheme(buildPricingPrerenderBody());
+  }
+  if (path === TOOLS_HUB_PATH) {
+    return pinLightTheme(buildToolsHubPrerenderBody());
   }
 
   const hubPage = getClusterHubPageByPath(path);

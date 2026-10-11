@@ -9,6 +9,7 @@ import {
 import { getBillingFaqs } from "@/features/landing/faqRegistry";
 import { PRICING_PAGE } from "@/features/landing/pricingPageContent";
 import { escapeHtml } from "./seoHtml";
+import { buildPrerenderFreeToolsNavHtml } from "./toolsHubPrerenderHtml";
 
 const BILLING_PERIODS = Object.keys(BILLING_LABELS) as Billing[];
 
@@ -90,6 +91,7 @@ ${faqItems}
       </section>
       <footer>
         <p><a href="/">SolomindLM home</a> · <a href="/faq">FAQ</a> · <a href="/terms">Terms of Service</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }

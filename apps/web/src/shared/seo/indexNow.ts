@@ -1,16 +1,10 @@
-import { getIndexablePublicSeoPages } from "./publicSeoPages";
+import { type IndexNowPersistedState, parseSitemapState } from "./indexNowState";
 import { SEO_BASE_URL } from "./seoConstants";
-import { canonicalUrl } from "./seoHtml";
 
 const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
 const INDEXNOW_MAX_URLS_PER_REQUEST = 10_000;
 
 const INDEXNOW_KEY_PATTERN = /^[a-zA-Z0-9-]{8,128}$/;
-
-export type IndexNowUrlEntry = {
-  url: string;
-  lastmod: string;
-};
 
 export type IndexNowSubmitResult = {
   status: number;
@@ -37,13 +31,26 @@ export function getIndexNowKeyLocation(key: string, baseUrl: string = SEO_BASE_U
   return `${baseUrl}/${key}.txt`;
 }
 
-/** Canonical public SEO URLs — same source as sitemap and prerender. */
-export function getPublicSeoCanonicalUrlEntries(buildDate?: string): IndexNowUrlEntry[] {
-  const resolvedBuildDate = buildDate ?? new Date().toISOString().slice(0, 10);
-  return getIndexablePublicSeoPages().map((page) => ({
-    url: canonicalUrl(SEO_BASE_URL, page.path),
-    lastmod: page.lastmod ?? resolvedBuildDate,
-  }));
+const SITEMAP_TIMEOUT_MS = 10_000;
+
+/** One deployment's `sitemap.xml`, or null on any failure (network, non-2xx, not a `<urlset>`). */
+export async function fetchSitemapState(
+  deploymentUrl: string,
+  options: { fetchImpl?: typeof fetch; headers?: Record<string, string>; timeoutMs?: number } = {}
+): Promise<IndexNowPersistedState | null> {
+  const { fetchImpl = fetch, headers = {}, timeoutMs = SITEMAP_TIMEOUT_MS } = options;
+  try {
+    const response = await fetchImpl(`${deploymentUrl}/sitemap.xml`, {
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return parseSitemapState(await response.text());
+  } catch {
+    return null;
+  }
 }
 
 export function filterIndexableUrls(urls: string[], host: string = getIndexNowHost()): string[] {

@@ -20,20 +20,29 @@ You can add a helper (e.g. `generateNotebookMetadata(notebook)`) in `SEOMeta.tsx
 
 ## IndexNow
 
-Public SEO URLs use the same canonical list as the sitemap (`getIndexablePublicSeoPages()` → `canonicalUrl()`).
+IndexNow reads the same URL list as search engines: `sitemap.xml`, generated from
+`getIndexablePublicSeoPages()` by `buildSitemapXml()`.
 
-On each production build:
-
-1. `scripts/indexnow-sync.ts` diffs the registry against `scripts/indexnow-state.json`
-2. Added, materially updated (`lastmod` changed), and removed URLs are enqueued (deduped)
-3. The queue is flushed to `https://api.indexnow.org/indexnow` in batches
-4. `{INDEXNOW_KEY}.txt` is written to `dist/` for host verification
+1. During the build, `scripts/write-indexnow-key.ts` writes `{INDEXNOW_KEY}.txt` to `dist/` for host
+   verification. Nothing is submitted at build time: the new deployment isn't live yet, and the build
+   container keeps no state.
+2. After Vercel reports a successful production deploy, `.github/workflows/indexnow.yml` runs
+   `scripts/indexnow-post-deploy.ts`. It finds the previous production deployment through the GitHub
+   Deployments API and diffs the two deployments' `sitemap.xml`.
+3. Added, removed, and re-dated URLs are submitted to `https://api.indexnow.org/indexnow`. "Re-dated"
+   means the page's `lastmod` changed. The sitemap omits `<lastmod>` for a page without one, so such a
+   page is only submitted when it is new or when it gains a date.
+4. If a sitemap can't be read or IndexNow rejects the request, the job fails. Deployments are
+   immutable, so re-running it diffs the same two deployments and retries.
 
 Setup:
 
 1. `bun run --cwd apps/web indexnow:generate-key`
-2. Add `INDEXNOW_KEY` to Vercel production environment variables
-3. Deploy; confirm `https://www.solomindlm.com/{INDEXNOW_KEY}.txt` returns the raw key
-4. Verify submissions in Bing Webmaster Tools → IndexNow
+2. Add the key as `INDEXNOW_KEY` to Vercel production environment variables and as a GitHub repo
+   secret
+3. `VERCEL_AUTOMATION_BYPASS_SECRET` must be set on the `vercel-preview-bypass` GitHub environment
+   (shared with `deployed-headers.yml`)
+4. Deploy; confirm `https://www.solomindlm.com/{INDEXNOW_KEY}.txt` returns the raw key
+5. Verify submissions in Bing Webmaster Tools → IndexNow
 
-Only public marketing/docs URLs are submitted — never authenticated app routes. Preview builds skip submission unless `INDEXNOW_SUBMIT=true`.
+Only URLs in the sitemap are submitted — never authenticated app routes. Preview deployments are never submitted.
