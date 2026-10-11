@@ -28,14 +28,33 @@ describe("PrismaForm", () => {
     expect(diagramText()).toContain("Records screened (n = 325)");
   });
 
-  it("shows a warning next to a count that doesn't add up", async () => {
+  it("ignores a pasted sign or decimal instead of storing a different number", async () => {
     const user = userEvent.setup();
     render(<Harness />);
+    const field = screen.getByLabelText("Records screened");
+    await user.click(field);
+    await user.paste("-5");
+    await user.paste("1.5");
+    expect(field).toHaveValue("");
+    expect(diagramText()).toContain("Records screened (n = )");
+  });
+
+  it("announces a warning through a live region that is there before it appears", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Harness />);
+    const region = container.querySelector("#prisma-recordsScreened-warning");
+    expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toBeEmptyDOMElement();
+
     await user.type(screen.getByLabelText("Records from databases"), "100");
     await user.type(screen.getByLabelText("Records screened"), "90");
-    expect(
-      screen.getByText("Identified 100 − removed 0 = 100, but records screened is 90.")
-    ).toBeInTheDocument();
+    expect(region).toHaveTextContent(
+      "Identified 100 − removed 0 = 100, but records screened is 90."
+    );
+    expect(screen.getByLabelText("Records screened")).toHaveAttribute(
+      "aria-describedby",
+      "prisma-recordsScreened-warning"
+    );
   });
 
   it("names, adds and removes exclusion reasons", async () => {

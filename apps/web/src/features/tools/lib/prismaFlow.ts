@@ -106,8 +106,13 @@ export function isPrismaStateEmpty(state: PrismaFlowState): boolean {
   );
 }
 
-/** Reads a typed count: digits only (commas and spaces ignored), capped at MAX_COUNT; blank → null. */
-export function parseCount(input: string): Count {
+/**
+ * Reads a typed count: digits with optional comma or space separators, capped at MAX_COUNT.
+ * Blank → null. Anything else (a sign, a decimal point, letters) → undefined: not a count, so the
+ * caller keeps the previous value rather than storing a number the user didn't enter.
+ */
+export function parseCount(input: string): Count | undefined {
+  if (/[^\d,\s]/.test(input)) return undefined;
   const digits = input.replace(/\D/g, "");
   if (digits === "") return null;
   return Math.min(Number(digits), MAX_COUNT);

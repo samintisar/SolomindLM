@@ -25,9 +25,15 @@ describe("parseCount", () => {
     expect(parseCount("007")).toBe(7);
   });
 
-  it("returns null for blank or digit-free input", () => {
+  it("returns null for blank input", () => {
     expect(parseCount("")).toBeNull();
-    expect(parseCount("abc")).toBeNull();
+    expect(parseCount("   ")).toBeNull();
+  });
+
+  it("rejects anything that isn't a whole, non-negative count", () => {
+    for (const input of ["-5", "+3", "1.5", "2e3", "abc", "3a"]) {
+      expect(parseCount(input), input).toBeUndefined();
+    }
   });
 
   it("caps huge numbers", () => {

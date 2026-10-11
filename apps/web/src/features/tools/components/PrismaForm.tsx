@@ -57,6 +57,12 @@ type CountFieldProps = {
   warning?: string;
 };
 
+/** Calls `onChange` only for a valid count; other input leaves the field as it was. */
+const onCountInput = (onChange: (value: Count) => void) => (input: string) => {
+  const count = parseCount(input);
+  if (count !== undefined) onChange(count);
+};
+
 function CountField({ id, label, value, onChange, warning }: CountFieldProps) {
   const warningId = `${id}-warning`;
   return (
@@ -68,14 +74,17 @@ function CountField({ id, label, value, onChange, warning }: CountFieldProps) {
         autoComplete="off"
         placeholder="n"
         value={value ?? ""}
-        onChange={(event) => onChange(parseCount(event.target.value))}
+        onChange={(event) => onCountInput(onChange)(event.target.value)}
         aria-describedby={warning ? warningId : undefined}
       />
-      {warning ? (
-        <p id={warningId} className="text-sm text-warning-muted-foreground">
-          {warning}
-        </p>
-      ) : null}
+      {/* Always mounted so a warning that appears while typing is announced. */}
+      <p
+        id={warningId}
+        aria-live="polite"
+        className={warning ? "text-sm text-warning-muted-foreground" : "sr-only"}
+      >
+        {warning}
+      </p>
     </div>
   );
 }
@@ -112,7 +121,9 @@ function ReasonsEditor({ namePrefix, reasons, onChange }: ReasonsEditorProps) {
             autoComplete="off"
             placeholder="n"
             value={reason.count ?? ""}
-            onChange={(event) => update(reason.id, { count: parseCount(event.target.value) })}
+            onChange={(event) =>
+              onCountInput((count) => update(reason.id, { count }))(event.target.value)
+            }
           />
           <Button
             type="button"
