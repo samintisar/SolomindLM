@@ -1,21 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  fetchPublishedSitemapState,
+  fetchSitemapState,
   filterIndexableUrls,
   getIndexNowHost,
   getIndexNowKeyLocation,
-  getPublicSeoCanonicalUrlEntries,
   isValidIndexNowKey,
   submitIndexNow,
 } from "./indexNow";
-import { dedupeIndexNowUrls, drainIndexNowQueue, mergeIndexNowQueue } from "./indexNowQueue";
 import {
+  changedSitemapUrls,
   collectChangedCanonicalUrls,
   diffIndexNowUrls,
   parseSitemapState,
-  selectChangedIndexNowUrls,
 } from "./indexNowState";
-import { getIndexablePublicSeoPages } from "./publicSeoPages";
 import { SEO_BASE_URL } from "./seoConstants";
 import { canonicalUrl } from "./seoHtml";
 
@@ -39,24 +36,13 @@ describe("indexNow helpers", () => {
     );
     expect(filtered).toEqual([privacyUrl]);
   });
-
-  it("builds canonical URL entries from the public SEO registry", () => {
-    const entries = getPublicSeoCanonicalUrlEntries();
-    expect(entries.some((entry) => entry.url === `${SEO_BASE_URL}/`)).toBe(true);
-    expect(entries.every((entry) => entry.url.startsWith(`${SEO_BASE_URL}/`))).toBe(true);
-  });
-
-  it("keeps only the registry's own lastmod, never a build date", () => {
-    const pages = getIndexablePublicSeoPages();
-    const entries = getPublicSeoCanonicalUrlEntries();
-    expect(entries.map((entry) => entry.lastmod)).toEqual(pages.map((page) => page.lastmod));
-  });
 });
 
-describe("fetchPublishedSitemapState", () => {
-  const sitemapUrl = `${SEO_BASE_URL}/sitemap.xml`;
+describe("fetchSitemapState", () => {
+  const deploymentUrl = "https://solomindlm-abc123-samintisars-projects.vercel.app";
+  const sitemapUrl = `${deploymentUrl}/sitemap.xml`;
 
-  it("parses the live sitemap into the published state", async () => {
+  it("parses the deployment's sitemap with the given headers", async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValue(
@@ -66,27 +52,33 @@ describe("fetchPublishedSitemapState", () => {
         )
       );
 
-    const state = await fetchPublishedSitemapState({ fetchImpl });
+    const state = await fetchSitemapState(deploymentUrl, {
+      fetchImpl,
+      headers: { "x-vercel-protection-bypass": "secret" },
+    });
 
-    expect(fetchImpl).toHaveBeenCalledWith(sitemapUrl, expect.anything());
+    expect(fetchImpl).toHaveBeenCalledWith(
+      sitemapUrl,
+      expect.objectContaining({ headers: { "x-vercel-protection-bypass": "secret" } })
+    );
     expect(state).toEqual({ urls: { [`${SEO_BASE_URL}/`]: { lastmod: "2026-10-10" } } });
   });
 
   it("returns null when the sitemap responds with an error", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response("nope", { status: 503 }));
-    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
+    expect(await fetchSitemapState(deploymentUrl, { fetchImpl })).toBeNull();
   });
 
   it("returns null when a 200 response is not a sitemap", async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValue(new Response("<html><body>Maintenance</body></html>", { status: 200 }));
-    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
+    expect(await fetchSitemapState(deploymentUrl, { fetchImpl })).toBeNull();
   });
 
   it("returns null when the request throws", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("network down"));
-    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
+    expect(await fetchSitemapState(deploymentUrl, { fetchImpl })).toBeNull();
   });
 });
 
@@ -188,6 +180,14 @@ describe("parseSitemapState validation", () => {
     ).toEqual({ urls: {} });
   });
 
+  it("ignores <url> text inside comments around the root", () => {
+    expect(
+      parseSitemapState(
+        `<!-- <url> --><urlset><url><loc>${SEO_BASE_URL}/</loc></url></urlset><!-- </url><url> -->`
+      )
+    ).toEqual({ urls: { [`${SEO_BASE_URL}/`]: { lastmod: "" } } });
+  });
+
   it("returns null for an unterminated comment or XML declaration", () => {
     expect(parseSitemapState("<!-- open <urlset></urlset>")).toBeNull();
     expect(parseSitemapState('<?xml version="1.0" <urlset></urlset>')).toBeNull();
@@ -213,43 +213,34 @@ describe("parseSitemapState validation", () => {
   });
 });
 
-describe("selectChangedIndexNowUrls", () => {
-  it("submits nothing when every page matches the published sitemap", () => {
-    const current = getPublicSeoCanonicalUrlEntries();
-    const published = {
-      urls: Object.fromEntries(
-        current.map((entry) => [entry.url, { lastmod: entry.lastmod ?? "2026-10-10" }])
-      ),
-    };
-
-    expect(selectChangedIndexNowUrls(current, published)).toEqual([]);
+describe("changedSitemapUrls", () => {
+  const sitemap = (urls: Record<string, string>) => ({
+    urls: Object.fromEntries(
+      Object.entries(urls).map(([path, lastmod]) => [`${SEO_BASE_URL}${path}`, { lastmod }])
+    ),
   });
 
-  it("submits exactly the page whose lastmod changed", () => {
-    const current = [
-      { url: `${SEO_BASE_URL}/privacy`, lastmod: "2026-10-11" },
-      { url: `${SEO_BASE_URL}/terms`, lastmod: "2026-06-06" },
-    ];
-    const published = {
-      urls: {
-        [`${SEO_BASE_URL}/privacy`]: { lastmod: "2026-06-06" },
-        [`${SEO_BASE_URL}/terms`]: { lastmod: "2026-06-06" },
-      },
-    };
-
-    expect(selectChangedIndexNowUrls(current, published)).toEqual([`${SEO_BASE_URL}/privacy`]);
+  it("returns nothing when the two deployments' sitemaps match", () => {
+    const urls = { "/": "", "/privacy": "2026-06-06" };
+    expect(changedSitemapUrls(sitemap(urls), sitemap(urls))).toEqual([]);
   });
-});
 
-describe("indexNow queue", () => {
-  it("deduplicates and drains queued URLs", () => {
-    const merged = mergeIndexNowQueue({ urls: ["/a", "/b"] }, ["/b", "/c"]);
-    expect(merged.urls).toEqual(["/a", "/b", "/c"]);
-    expect(dedupeIndexNowUrls(["/a", "/a", "/b"])).toEqual(["/a", "/b"]);
+  it("returns added, removed, and re-dated URLs", () => {
+    const previous = sitemap({ "/privacy": "2026-06-06", "/terms": "2026-06-06", "/old": "" });
+    const current = sitemap({ "/privacy": "2026-10-11", "/terms": "2026-06-06", "/tools": "" });
 
-    const drained = drainIndexNowQueue(merged);
-    expect(drained.urls).toEqual(["/a", "/b", "/c"]);
-    expect(drained.queue).toEqual({ urls: [] });
+    expect(changedSitemapUrls(previous, current)).toEqual([
+      `${SEO_BASE_URL}/tools`,
+      `${SEO_BASE_URL}/privacy`,
+      `${SEO_BASE_URL}/old`,
+    ]);
+  });
+
+  it("returns a page that gains a lastmod but not one that stays undated", () => {
+    const previous = sitemap({ "/": "", "/faq": "" });
+    const current = sitemap({ "/": "", "/faq": "2026-10-11" });
+
+    expect(changedSitemapUrls(previous, current)).toEqual([`${SEO_BASE_URL}/faq`]);
   });
 });
 
