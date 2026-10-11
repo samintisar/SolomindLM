@@ -24,3 +24,20 @@ export class EmptyLlmResponseError extends Error {
     this.completionTokens = details.completionTokens;
   }
 }
+
+/**
+ * A structured (`json_schema` / `json_object`) request came back without a JSON payload. With
+ * `finishReason` `"length"` and reasoning on, the model spent the budget thinking before it wrote
+ * the object. The message stays fixed because callers match it as text.
+ */
+export class MissingStructuredJsonError extends Error {
+  readonly model: string;
+  readonly finishReason?: string;
+
+  constructor(details: { model: string; finishReason?: string }) {
+    super("LLM API returned no JSON payload for structured response");
+    this.name = "MissingStructuredJsonError";
+    this.model = details.model;
+    this.finishReason = details.finishReason;
+  }
+}

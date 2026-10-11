@@ -707,7 +707,9 @@ export async function runFinalizeQuizPhase(
       },
     });
 
-    // Expand candidates into full questions with distractors
+    // Expand candidates into full questions with distractors. Reasoning stays off: one question is a
+    // short JSON fill, and reasoning shares max_tokens with the answer, so it could use the whole
+    // budget and drop the question (#201).
     const structuredExpandLLM = createStructuredLLM<QuizQuestion>(
       QuizQuestionSchema,
       "quiz_question",
@@ -715,7 +717,7 @@ export async function runFinalizeQuizPhase(
         model: env.QUIZ_LLM,
         maxTokens: 4_096,
         temperature: 0.3,
-        reasoningEnabled: true,
+        reasoningEnabled: false,
         onUsage: (usage) => {
           reduceUsage = addTokenUsage(reduceUsage, usage);
         },

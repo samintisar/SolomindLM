@@ -6,6 +6,7 @@
 
 import { env } from "../../_lib/env";
 import { mergeModelKwargs } from "./llm_factory.js";
+import { MissingStructuredJsonError } from "./llmErrors.js";
 
 // ============================================================
 // Types
@@ -315,7 +316,10 @@ async function executeTogetherLlmRequest(
           reasoningPreview:
             typeof msg?.reasoning === "string" ? msg.reasoning.slice(0, 120) : undefined,
         });
-        throw new Error("LLM API returned no JSON payload for structured response");
+        throw new MissingStructuredJsonError({
+          model: options.model,
+          finishReason: choice?.finish_reason,
+        });
       }
 
       if (!content.trim() && !hasStructuredJson) {
