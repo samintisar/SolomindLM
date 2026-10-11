@@ -49,8 +49,18 @@ describe("titlesOfSources (#450)", () => {
 
     await expect(
       titlesOfSources(["rag", "missed", "react", "unprocessed"], pool, lookupTitle)
-    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf"]);
+    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf", "Untitled source"]);
     expect(lookupTitle.mock.calls.map(([id]) => id)).toEqual(["missed", "unprocessed"]);
+  });
+});
+
+describe("ChatAgent title lookup for sources to cover (#450)", () => {
+  it("names a paper with no retrieved passage from its document record", async () => {
+    const fetchDocumentTitleFn = vi.fn(async () => "missed.pdf");
+    const agent = new ChatAgent({ fetchDocumentTitleFn });
+
+    await expect(agent["lookupSourceTitle"]("missed")).resolves.toBe("missed.pdf");
+    expect(fetchDocumentTitleFn).toHaveBeenCalledWith("missed");
   });
 });
 
@@ -141,6 +151,24 @@ describe("ChatAgent per-source retrieval (#450)", () => {
     );
 
     expect(perSourceCallsWhenHybridStarted[0]).toBe(2);
+  });
+
+  it("keeps the sources that answered when another one runs out of time", async () => {
+    const searchDocument = vi.fn((documentId: string) =>
+      documentId === "rag"
+        ? new Promise<ReferenceChunk[]>(() => {})
+        : Promise.resolve([passage(documentId, 3)])
+    );
+    const agent = agentWith(searchDocument);
+
+    const found: ReferenceChunk[] = await agent["searchEachSource"](
+      ["rag", "react", "self-rag"],
+      [0.1],
+      () => 20,
+      logger
+    );
+
+    expect(found.map((c) => c.id).sort()).toEqual(["react-3", "self-rag-3"]);
   });
 
   it("searches no single source when none are listed", async () => {

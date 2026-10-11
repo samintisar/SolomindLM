@@ -30,6 +30,8 @@ describe("asksAboutEachSource", () => {
     "Which methods do these papers use?",
     "Do the three articles agree on the dose?",
     "Compare my two papers on sample size",
+    "What limitations do all of the selected papers acknowledge?",
+    "What do both of my studies conclude?",
   ])("asks about each source: %s", (q) => {
     expect(asksAboutEachSource(q)).toBe(true);
   });

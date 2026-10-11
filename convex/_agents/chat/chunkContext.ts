@@ -26,7 +26,8 @@ export function perSourceDocumentIds(question: string, documentIds?: string[]): 
 
 /**
  * Titles of the given sources, in the given order. A source retrieval missed entirely is looked up,
- * so the answer still says it has nothing on the question instead of leaving it out (#450).
+ * so the answer still says it has nothing on the question instead of leaving it out (#450); one
+ * whose title can't be found still counts, as "Untitled source".
  */
 export async function titlesOfSources(
   documentIds: string[],
@@ -37,7 +38,7 @@ export async function titlesOfSources(
   for (const id of documentIds) {
     const title =
       chunks.find((c) => c.documentId === id)?.sourceTitle ?? (await lookupTitle(id))?.trim();
-    if (title) titles.push(title);
+    titles.push(title || "Untitled source");
   }
   return titles;
 }

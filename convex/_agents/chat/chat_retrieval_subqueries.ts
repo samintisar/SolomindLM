@@ -27,11 +27,12 @@ const EACH_SOURCE = new RegExp(
 );
 
 /**
- * "both studies", "all three sources", "these papers", "the two reports", "my two papers". A bare
- * "the papers" or "my sources" ("according to my sources, …") is too common in topic questions.
+ * "both studies", "all three sources", "all of the selected papers", "these papers", "the two
+ * reports", "my two papers". A bare "the papers" or "my sources" ("according to my sources, …") is
+ * too common in topic questions.
  */
 const SET_OF_SOURCES = new RegExp(
-  `\\b(?:(?:both|all|these|those)\\s+(?:${COUNT_QUANT}\\s+)?|(?:the|my|our|your)\\s+${COUNT_QUANT}\\s+)(?:\\w+\\s+)?${SOURCE_NOUN_PLURAL}\\b`,
+  `\\b(?:(?:both|all|these|those)\\s+(?:of\\s+(?:the|my|our|your|these|those)\\s+)?(?:${COUNT_QUANT}\\s+)?|(?:the|my|our|your)\\s+${COUNT_QUANT}\\s+)(?:\\w+\\s+)?${SOURCE_NOUN_PLURAL}\\b`,
   "i"
 );
 

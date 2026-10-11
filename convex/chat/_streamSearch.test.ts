@@ -5,7 +5,11 @@ import type { ActionCtx } from "../_generated/server";
 const { cachedRerank } = vi.hoisted(() => ({ cachedRerank: vi.fn(async () => []) }));
 vi.mock("../_agents/chat/rerankCache.js", () => ({ cachedRerank }));
 
-import { createChatVectorSearchRunner, createRerankFn } from "./_streamSearch";
+import {
+  createChatVectorSearchRunner,
+  createFetchDocumentTitleFn,
+  createRerankFn,
+} from "./_streamSearch";
 
 describe("createRerankFn", () => {
   it("asks the reranker to score every candidate, so no chunk keeps a different score scale", async () => {
@@ -14,6 +18,21 @@ describe("createRerankFn", () => {
     await createRerankFn({} as ActionCtx)("query", docs);
 
     expect(cachedRerank).toHaveBeenCalledWith(expect.anything(), "query", docs, 37);
+  });
+});
+
+describe("createFetchDocumentTitleFn", () => {
+  it("returns the document's file name without loading its chunks", async () => {
+    const runQuery = vi.fn(async () => [{ _id: "doc-a", fileName: "a.pdf" }]);
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(createFetchDocumentTitleFn(ctx)("doc-a")).resolves.toBe("a.pdf");
+    expect(runQuery).toHaveBeenCalledTimes(1);
+    await expect(
+      createFetchDocumentTitleFn({ runQuery: vi.fn(async () => []) } as unknown as ActionCtx)(
+        "gone"
+      )
+    ).resolves.toBeUndefined();
   });
 });
 

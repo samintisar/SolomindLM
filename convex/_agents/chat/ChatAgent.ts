@@ -71,6 +71,7 @@ export class ChatAgent {
   private embeddingService: EmbeddingService;
   private globalRerankFn?: GlobalRerankFn;
   private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
+  private fetchDocumentTitleFn?: ChatAgentOptions["fetchDocumentTitleFn"];
 
   constructor(options?: ChatAgentOptions) {
     const smartModel = resolveSmartModel(options?.smartModel);
@@ -96,6 +97,16 @@ export class ChatAgent {
     this.embeddingService = new EmbeddingService(env.OPENAI_API_KEY);
     this.globalRerankFn = options?.globalRerankFn;
     this.fetchDocumentFn = options?.fetchDocumentFn;
+    this.fetchDocumentTitleFn = options?.fetchDocumentTitleFn;
+  }
+
+  /** A selected source's title from its document record; undefined when it can't be found. */
+  private async lookupSourceTitle(documentId: string): Promise<string | undefined> {
+    try {
+      return await this.fetchDocumentTitleFn?.(documentId);
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -262,14 +273,16 @@ export class ChatAgent {
   ): Promise<ReferenceChunk[]> {
     if (documentIds.length === 0) return [];
     try {
-      const settled = await withTimeout(
-        Promise.allSettled(
-          documentIds.map((id) =>
-            this.vectorSearch.searchDocument(id, embedding, PER_SOURCE_PASSAGES_PER_SEARCH)
+      // Each search has its own deadline, so one slow source doesn't drop the ones that answered.
+      const deadlineMs = remainingMs();
+      const settled = await Promise.allSettled(
+        documentIds.map((id) =>
+          withTimeout(
+            this.vectorSearch.searchDocument(id, embedding, PER_SOURCE_PASSAGES_PER_SEARCH),
+            deadlineMs,
+            "per_source_search"
           )
-        ),
-        remainingMs(),
-        "per_source_search"
+        )
       );
       const found: ReferenceChunk[] = [];
       for (const [i, r] of settled.entries()) {
@@ -283,8 +296,8 @@ export class ChatAgent {
       }
       return found;
     } catch (e) {
-      // String(e) keeps the error type: a timeout reads "Error: per_source_search timed out …".
-      logger.warn("Per-source searches failed", { error: String(e) });
+      // Only the pipeline deadline having passed already ("search_pipeline timed out …").
+      logger.warn("Per-source searches skipped", { error: String(e) });
       return [];
     }
   }
@@ -801,11 +814,7 @@ export class ChatAgent {
       effectiveTurns,
       rankedChunks,
       logger,
-      await titlesOfSources(
-        sourcesAskedAbout,
-        merged,
-        async (id) => (await this.fetchFullDocumentContent(id))?.title
-      )
+      await titlesOfSources(sourcesAskedAbout, merged, (id) => this.lookupSourceTitle(id))
     );
   }
 

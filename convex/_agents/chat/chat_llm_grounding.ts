@@ -126,7 +126,7 @@ function buildSourcesToCover(titles: string[]): string {
 The question asks about each selected source. Cover all ${titles.length}:
 ${list}
 
-Give each source its own part of the answer, named by its title. If none of a source's passages address what was asked, say so for that source in one sentence instead of leaving it out. Never describe them as fewer sources than this.
+Give each source its own part of the answer, named by its title. If a source has no passages above, or none that address what was asked, say in one sentence that the passages retrieved from it don't cover this (not that the source itself doesn't), instead of leaving it out. Never describe them as fewer sources than this.
 
 `;
 }

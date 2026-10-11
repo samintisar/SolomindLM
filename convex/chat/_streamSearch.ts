@@ -89,6 +89,18 @@ export function createRerankFn(ctx: ActionCtx): RerankFunction {
   };
 }
 
+/** A document's file name, without loading its chunks (#450: naming a source retrieval missed). */
+export function createFetchDocumentTitleFn(
+  ctx: ActionCtx
+): NonNullable<ChatAgentOptions["fetchDocumentTitleFn"]> {
+  return async (documentId: string) => {
+    const [doc] = (await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
+      documentIds: [documentId as Id<"documents">],
+    })) as Array<{ fileName?: string } | null>;
+    return doc?.fileName;
+  };
+}
+
 /** Loads a document's full text (its chunks in order) for chat's full-document expansion. */
 export function createFetchDocumentFn(
   ctx: ActionCtx
