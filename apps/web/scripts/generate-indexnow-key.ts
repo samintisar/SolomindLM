@@ -19,5 +19,5 @@ function generateIndexNowKey(length = 32): string {
 const key = generateIndexNowKey();
 console.log(key);
 console.error(
-  "[generate-indexnow-key] Add to Vercel production env as INDEXNOW_KEY, then redeploy to write the key file and enable submissions."
+  "[generate-indexnow-key] Add as INDEXNOW_KEY to Vercel production env (writes the key file) and as a GitHub repo secret (enables submissions), then redeploy."
 );

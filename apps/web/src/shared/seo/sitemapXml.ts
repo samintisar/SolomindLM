@@ -4,7 +4,7 @@ import { canonicalUrl } from "./seoHtml";
 
 /**
  * sitemap.xml for the given pages. A page without a registry `lastmod` gets no `<lastmod>`: a
- * build date would claim the page changed on every deploy, and IndexNow diffs these dates.
+ * build date would claim the page changed on every deploy, and IndexNow submissions diff these dates.
  */
 export function buildSitemapXml(pages: PublicSeoPage[]): string {
   const urls = pages

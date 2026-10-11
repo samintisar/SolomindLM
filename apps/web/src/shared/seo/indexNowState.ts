@@ -1,6 +1,10 @@
-import type { IndexNowUrlEntry } from "./indexNow";
+export type IndexNowUrlEntry = {
+  url: string;
+  /** The page's own date; absent when the sitemap has no `<lastmod>` for it. */
+  lastmod: string | undefined;
+};
 
-/** What production last published: canonical URL → its sitemap `lastmod`. */
+/** One deployment's sitemap: canonical URL → its `<lastmod>` ("" when absent). */
 export type IndexNowPersistedState = {
   urls: Record<string, { lastmod: string }>;
 };
@@ -131,10 +135,14 @@ export function collectChangedCanonicalUrls(diff: IndexNowUrlDiff): string[] {
   return [...new Set([...diff.added, ...diff.updated, ...diff.removed])];
 }
 
-/** URLs to submit for this deploy: what changed since the published sitemap. */
-export function selectChangedIndexNowUrls(
-  current: IndexNowUrlEntry[],
-  published: IndexNowPersistedState
+/** URLs to submit after a deploy: what changed between the previous and new deployment's sitemaps. */
+export function changedSitemapUrls(
+  previous: IndexNowPersistedState,
+  current: IndexNowPersistedState
 ): string[] {
-  return collectChangedCanonicalUrls(diffIndexNowUrls(current, published));
+  const entries = Object.entries(current.urls).map(([url, { lastmod }]) => ({
+    url,
+    lastmod: lastmod || undefined,
+  }));
+  return collectChangedCanonicalUrls(diffIndexNowUrls(entries, previous));
 }

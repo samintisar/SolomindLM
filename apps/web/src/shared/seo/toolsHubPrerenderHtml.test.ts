@@ -12,10 +12,10 @@ import {
   TOOLS_HUB_PAGE,
   TOOLS_HUB_PATH,
 } from "@/features/tools/toolsHubPage";
-import { getPublicSeoCanonicalUrlEntries } from "./indexNow";
 import { getIndexablePublicSeoPages, getPublicSeoPageByPath } from "./publicSeoPages";
 import { buildHomePrerenderBody, buildPublicSeoPrerenderBody } from "./publicSeoPrerenderHtml";
 import { SEO_BASE_URL } from "./seoConstants";
+import { buildSitemapXml } from "./sitemapXml";
 import {
   buildPrerenderFreeToolsNavHtml,
   buildToolsHubPrerenderBody,
@@ -59,8 +59,8 @@ describe("/tools hub registration", () => {
   it("is an indexable page, so it is in sitemap.xml and the IndexNow URL list", () => {
     const page = getIndexablePublicSeoPages().find((item) => item.path === TOOLS_HUB_PATH);
     expect(page).toMatchObject({ title: TOOLS_HUB_PAGE.title, lastmod: TOOLS_HUB_LAST_UPDATED });
-    expect(getPublicSeoCanonicalUrlEntries().map((entry) => entry.url)).toContain(
-      `${SEO_BASE_URL}${TOOLS_HUB_PATH}`
+    expect(buildSitemapXml(getIndexablePublicSeoPages())).toContain(
+      `<loc>${SEO_BASE_URL}${TOOLS_HUB_PATH}</loc>`
     );
   });
 
