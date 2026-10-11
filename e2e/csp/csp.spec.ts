@@ -25,6 +25,7 @@ const PUBLIC_ROUTES = [
   "/faq",
   "/privacy",
   "/tools/pdf-to-flashcards",
+  "/tools/prisma-flow-diagram",
   "/__csp-smoke-not-found",
 ];
 

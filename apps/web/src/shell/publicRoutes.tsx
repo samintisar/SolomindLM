@@ -26,6 +26,7 @@ const AuthPage = lazy(() =>
 
 // Free tools: own chunk so the marketing shell doesn't ship pdfjs or the tool UI.
 const PdfToFlashcardsPage = lazy(() => import("@/features/tools/pages/PdfToFlashcardsPage"));
+const PrismaFlowDiagramPage = lazy(() => import("@/features/tools/pages/PrismaFlowDiagramPage"));
 
 const pageFallback = <div className="min-h-screen bg-background" />;
 
@@ -52,6 +53,14 @@ export const PUBLIC_ROUTES: RouteObject[] = [
     element: (
       <Suspense fallback={pageFallback}>
         <PdfToFlashcardsPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/tools/prisma-flow-diagram",
+    element: (
+      <Suspense fallback={pageFallback}>
+        <PrismaFlowDiagramPage />
       </Suspense>
     ),
   },
