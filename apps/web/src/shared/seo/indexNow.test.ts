@@ -128,6 +128,13 @@ describe("indexNow state diff", () => {
 
     expect(diffIndexNowUrls(current, { urls: {} }).added).toEqual([`${SEO_BASE_URL}/tools`]);
   });
+
+  it("treats a page that gains a lastmod as updated", () => {
+    const current = [{ url: `${SEO_BASE_URL}/faq`, lastmod: "2026-10-11" }];
+    const previous = { urls: { [`${SEO_BASE_URL}/faq`]: { lastmod: "" } } };
+
+    expect(diffIndexNowUrls(current, previous).updated).toEqual([`${SEO_BASE_URL}/faq`]);
+  });
 });
 
 describe("parseSitemapState", () => {
@@ -172,14 +179,41 @@ describe("parseSitemapState validation", () => {
   it("keeps a valid sitemap with no URLs as an empty state", () => {
     expect(parseSitemapState('<?xml version="1.0"?><urlset></urlset>')).toEqual({ urls: {} });
   });
+
+  it("accepts comments before and after the <urlset> root", () => {
+    expect(
+      parseSitemapState(
+        '<?xml version="1.0"?>\n<!-- generator -->\n<urlset></urlset>\n<!-- end -->'
+      )
+    ).toEqual({ urls: {} });
+  });
+
+  it("returns null for an unterminated comment or XML declaration", () => {
+    expect(parseSitemapState("<!-- open <urlset></urlset>")).toBeNull();
+    expect(parseSitemapState('<?xml version="1.0" <urlset></urlset>')).toBeNull();
+  });
+
+  it("returns null when the root is not exactly <urlset>", () => {
+    expect(parseSitemapState("<urlsetx></urlset>")).toBeNull();
+  });
+
+  it("returns null for a <url> block that is never closed", () => {
+    expect(
+      parseSitemapState(
+        `<urlset><url><loc>${SEO_BASE_URL}/a</loc><url><loc>${SEO_BASE_URL}/b</loc></url></urlset>`
+      )
+    ).toBeNull();
+  });
+
+  it("rejects many unclosed <url> tags in linear time", () => {
+    const xml = `<urlset>${"<url>".repeat(20_000)}</urlset>`;
+    const start = performance.now();
+    expect(parseSitemapState(xml)).toBeNull();
+    expect(performance.now() - start).toBeLessThan(500);
+  });
 });
 
 describe("selectChangedIndexNowUrls", () => {
-  it("submits nothing when the published sitemap is unknown", () => {
-    const current = [{ url: `${SEO_BASE_URL}/privacy`, lastmod: "2026-06-06" }];
-    expect(selectChangedIndexNowUrls(current, null)).toEqual([]);
-  });
-
   it("submits nothing when every page matches the published sitemap", () => {
     const current = getPublicSeoCanonicalUrlEntries();
     const published = {

@@ -10,7 +10,7 @@ const INDEXNOW_KEY_PATTERN = /^[a-zA-Z0-9-]{8,128}$/;
 
 export type IndexNowUrlEntry = {
   url: string;
-  /** The registry's own date; absent when the page has none (the sitemap then uses the build date). */
+  /** The registry's own date; absent when the page has none (the sitemap then omits it). */
   lastmod: string | undefined;
 };
 

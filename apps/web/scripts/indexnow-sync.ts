@@ -8,6 +8,7 @@ import {
   fetchPublishedSitemapState,
   getIndexNowKeyLocation,
   getPublicSeoCanonicalUrlEntries,
+  type IndexNowSubmitResult,
   isValidIndexNowKey,
   submitIndexNowBatches,
 } from "../src/shared/seo/indexNow.ts";
@@ -70,7 +71,13 @@ async function flushQueue(key: string, queue: IndexNowQueueFile): Promise<IndexN
     return drainedQueue;
   }
 
-  const results = await submitIndexNowBatches(urls, { key });
+  let results: IndexNowSubmitResult[];
+  try {
+    results = await submitIndexNowBatches(urls, { key });
+  } catch (error) {
+    console.error("[indexnow-sync] IndexNow request failed:", error);
+    return mergeIndexNowQueue(drainedQueue, urls);
+  }
   for (const result of results) {
     if (result.urlCount === 0) {
       continue;
@@ -88,13 +95,8 @@ async function flushQueue(key: string, queue: IndexNowQueueFile): Promise<IndexN
   const failed = results.some(
     (result) => result.urlCount > 0 && result.status !== 200 && result.status !== 202
   );
-  if (failed) {
-    const retryQueue = mergeIndexNowQueue(drainedQueue, urls);
-    saveQueue(retryQueue);
-    throw new Error("IndexNow submission failed; URLs re-queued for retry");
-  }
-
-  return drainedQueue;
+  // Never fail the build over IndexNow: a 429 or outage would block the release.
+  return failed ? mergeIndexNowQueue(drainedQueue, urls) : drainedQueue;
 }
 
 async function main(): Promise<void> {
@@ -110,13 +112,20 @@ async function main(): Promise<void> {
 
   writeKeyVerificationFile(key);
 
+  if (!shouldSubmitToIndexNow()) {
+    console.log(
+      "[indexnow-sync] Skipped submission (set VERCEL_ENV=production or INDEXNOW_SUBMIT=true to submit)"
+    );
+    return;
+  }
+
   // Compare against what production serves now (the previous deploy). The build container is
   // discarded, so no state written here would survive to the next build.
   const published = await fetchPublishedSitemapState();
   if (!published) {
-    // Keep any queued URLs for the next build or `indexnow:flush`; submit nothing this time.
+    // Nothing from this build persists, so these changes are lost rather than retried later.
     console.warn(
-      `[indexnow-sync] Could not read ${SEO_BASE_URL}/sitemap.xml; submitting nothing this build`
+      `[indexnow-sync] Could not read ${SEO_BASE_URL}/sitemap.xml; this deploy's URL changes will not be submitted`
     );
     return;
   }
@@ -132,14 +141,6 @@ async function main(): Promise<void> {
     console.log("[indexnow-sync] No public SEO URL changes since the live sitemap");
   }
 
-  if (!shouldSubmitToIndexNow()) {
-    saveQueue(queue);
-    console.log(
-      "[indexnow-sync] Skipped submission (set VERCEL_ENV=production or INDEXNOW_SUBMIT=true to flush)"
-    );
-    return;
-  }
-
   if (queue.urls.length === 0) {
     console.log("[indexnow-sync] Queue empty; nothing to submit");
     return;
@@ -147,7 +148,11 @@ async function main(): Promise<void> {
 
   queue = await flushQueue(key, queue);
   saveQueue(queue);
-  console.log("[indexnow-sync] Queue flushed");
+  console.log(
+    queue.urls.length === 0
+      ? "[indexnow-sync] Queue flushed"
+      : `[indexnow-sync] ${queue.urls.length} URL(s) not accepted; kept in .indexnow-queue.json (local runs only)`
+  );
 }
 
 main().catch((error: unknown) => {

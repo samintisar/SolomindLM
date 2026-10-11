@@ -11,8 +11,6 @@ export type IndexNowUrlDiff = {
   removed: string[];
 };
 
-const SITEMAP_URL_OPEN_PATTERN = /<url>/g;
-const SITEMAP_URL_PATTERN = /<url>([\s\S]*?)<\/url>/g;
 const SITEMAP_LOC_PATTERN = /<loc>\s*([^<]+?)\s*<\/loc>/;
 const SITEMAP_LASTMOD_PATTERN = /<lastmod>\s*([^<]+?)\s*<\/lastmod>/;
 
@@ -51,6 +49,29 @@ function isWholeUrlsetDocument(xml: string): boolean {
   );
 }
 
+/** The body of each `<url>` block, or null if one is never closed. Linear indexOf scan. */
+function readUrlBlocks(xml: string): string[] | null {
+  const blocks: string[] = [];
+  let from = 0;
+  for (;;) {
+    const open = xml.indexOf("<url>", from);
+    if (open === -1) {
+      return blocks;
+    }
+    const start = open + "<url>".length;
+    const close = xml.indexOf("</url>", start);
+    if (close === -1) {
+      return null;
+    }
+    const block = xml.slice(start, close);
+    if (block.includes("<url>")) {
+      return null;
+    }
+    blocks.push(block);
+    from = close + "</url>".length;
+  }
+}
+
 /**
  * Reads `<loc>` → `<lastmod>` pairs from a sitemap.xml body. Returns null for anything that is not
  * a complete `<urlset>` (an HTML error page, a truncated body), so the caller can't mistake it for
@@ -60,13 +81,13 @@ export function parseSitemapState(xml: string): IndexNowPersistedState | null {
   if (!isWholeUrlsetDocument(xml)) {
     return null;
   }
-  const blocks = [...xml.matchAll(SITEMAP_URL_PATTERN)];
-  if (blocks.length !== (xml.match(SITEMAP_URL_OPEN_PATTERN)?.length ?? 0)) {
+  const blocks = readUrlBlocks(xml);
+  if (!blocks) {
     return null;
   }
 
   const urls: IndexNowPersistedState["urls"] = {};
-  for (const [, block] of blocks) {
+  for (const block of blocks) {
     const loc = SITEMAP_LOC_PATTERN.exec(block)?.[1];
     if (!loc) {
       return null;
@@ -77,8 +98,8 @@ export function parseSitemapState(xml: string): IndexNowPersistedState | null {
 }
 
 /**
- * A page counts as updated only when its own registry `lastmod` changed. A page without one is
- * stamped with the build date in the sitemap, so comparing it would mark it changed on every build.
+ * A page counts as updated only when its own registry `lastmod` changed. A page without one has no
+ * date to compare, so it is only submitted when it is added or removed.
  */
 export function diffIndexNowUrls(
   current: IndexNowUrlEntry[],
@@ -110,16 +131,10 @@ export function collectChangedCanonicalUrls(diff: IndexNowUrlDiff): string[] {
   return [...new Set([...diff.added, ...diff.updated, ...diff.removed])];
 }
 
-/**
- * URLs to submit for this deploy. With no published sitemap to compare against, submit nothing:
- * resubmitting every page is what IndexNow asks sites not to do.
- */
+/** URLs to submit for this deploy: what changed since the published sitemap. */
 export function selectChangedIndexNowUrls(
   current: IndexNowUrlEntry[],
-  published: IndexNowPersistedState | null
+  published: IndexNowPersistedState
 ): string[] {
-  if (!published) {
-    return [];
-  }
   return collectChangedCanonicalUrls(diffIndexNowUrls(current, published));
 }

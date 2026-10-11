@@ -22,18 +22,23 @@ You can add a helper (e.g. `generateNotebookMetadata(notebook)`) in `SEOMeta.tsx
 
 Public SEO URLs use the same canonical list as the sitemap (`getIndexablePublicSeoPages()` → `canonicalUrl()`).
 
-On each production build:
+On each production build (other builds only write the key file):
 
 1. `scripts/indexnow-sync.ts` fetches the live `https://www.solomindlm.com/sitemap.xml` (what the
    previous production deploy published) and diffs the registry against it. Build containers are
    thrown away, so a state file written during the build would never persist.
-2. Added, removed, and materially updated URLs are enqueued (deduped). "Updated" means the page's own
-   `lastmod` in the registry changed; a page with no `lastmod` is only submitted when it is new, since
-   the sitemap stamps it with the build date on every build.
+2. Added, removed, and materially updated URLs are submitted. "Updated" means the page's own
+   `lastmod` in the registry changed. The sitemap omits `<lastmod>` for a page without one, so such a
+   page is only submitted when it is new or when it gains a date.
 3. If the live sitemap can't be fetched or isn't a complete `<urlset>` (e.g. an HTML error page),
-   nothing is submitted (never everything) and the queue is kept for the next build.
-4. The queue is flushed to `https://api.indexnow.org/indexnow` in batches
+   nothing is submitted (never everything). Nothing outlives the build, so that deploy's changes are
+   not retried; redeploying is the way to resend them.
+4. URLs are sent to `https://api.indexnow.org/indexnow` in batches. A rejected or failed request is
+   logged but never fails the build.
 5. `{INDEXNOW_KEY}.txt` is written to `dist/` for host verification
+
+Submission happens during the build, before the new deployment is live, so a crawler that fetches an
+added URL immediately can still hit the previous deployment.
 
 Setup:
 
