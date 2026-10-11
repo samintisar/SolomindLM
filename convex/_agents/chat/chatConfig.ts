@@ -26,6 +26,20 @@ export const MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT = 4000;
 export const MULTI_SOURCE_MAX_EXTRA_TOKENS = 12000;
 
 /**
+ * Most selected sources a per-source question ("what does each paper say about X?") searches one
+ * by one; with more, retrieval stays notebook-wide and the answer covers what it finds.
+ */
+export const MAX_PER_SOURCE_DOCUMENTS = 10;
+
+/**
+ * Passages each per-source search adds to the rerank pool, per sub-query. At 4, a paper whose
+ * limitations sit in a "Broader Impact" section never had them reach the rerank (#450); at 10
+ * they did in every run. With three sources the pool stayed about the size of a notebook-wide
+ * search's; it grows with each source, up to MAX_PER_SOURCE_DOCUMENTS × this per sub-query.
+ */
+export const PER_SOURCE_PASSAGES_PER_SEARCH = 10;
+
+/**
  * Tokens for whole neighbouring passages added beside selected ones, so text the model would
  * only see as a neighbour preview can be cited (and a reader opening the citation sees it).
  */

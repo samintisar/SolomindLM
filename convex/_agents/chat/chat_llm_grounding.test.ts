@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getStructureHint } from "./chat_llm_grounding";
+import { buildGroundingPrompt, getStructureHint } from "./chat_llm_grounding";
+import type { ReferenceChunk } from "./types";
 
 const isComparisonHint = (hint: string) => hint.startsWith("Hint: This is a comparison.");
 
@@ -54,5 +55,32 @@ describe("getStructureHint", () => {
 
   it("returns no hint for a plain factual question", () => {
     expect(getStructureHint("Which dataset was used?")).toBe("");
+  });
+});
+
+// #450: a source whose passages miss the question was dropped without a word ("both papers"
+// for three selected papers).
+describe("buildGroundingPrompt sources to cover", () => {
+  const passage = (sourceTitle: string) =>
+    ({ sourceId: sourceTitle, sourceTitle, content: "text", chunkIndex: 0 }) as ReferenceChunk;
+  const question = "What limitations does each paper acknowledge?";
+
+  it("names every source the answer must cover, including one with no passages", () => {
+    const prompt = buildGroundingPrompt(
+      [passage("rag.pdf"), passage("react.pdf")],
+      question,
+      [],
+      ["rag.pdf", "react.pdf", "self-rag.pdf"]
+    );
+
+    expect(prompt).toContain("# SOURCES TO COVER");
+    expect(prompt).toContain('- "self-rag.pdf"');
+    expect(prompt).toMatch(/all 3/);
+  });
+
+  it("adds nothing when there is no list", () => {
+    expect(buildGroundingPrompt([passage("rag.pdf")], question, [])).not.toContain(
+      "SOURCES TO COVER"
+    );
   });
 });

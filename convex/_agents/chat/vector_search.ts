@@ -285,6 +285,33 @@ export class VectorSearchHandler {
     return finalResults;
   }
 
+  /**
+   * One document's best passages for an embedding already computed (no keyword search, no
+   * rerank). Per-source questions run this for each selected source, so a source whose wording
+   * ranks below the others still reaches the global rerank (#450).
+   */
+  async searchDocument(
+    documentId: string,
+    embedding: number[],
+    limit: number
+  ): Promise<ReferenceChunk[]> {
+    const raw = await this.vectorSearchRunner(embedding, limit, [documentId]);
+    return raw
+      .filter((r) => r.documentId === documentId)
+      .slice(0, limit)
+      .map((r) => ({
+        id: String(r._id),
+        sourceId: String(r._id),
+        documentId: r.documentId,
+        sourceTitle: r.sourceTitle ?? "Document",
+        sourceUrl: r.sourceUrl,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        similarity: r._score ?? 0,
+        metadata: r.metadata,
+      }));
+  }
+
   protected deduplicateResults(
     results: (VectorSearchRawResult & { similarity?: number })[]
   ): (VectorSearchRawResult & { similarity?: number })[] {

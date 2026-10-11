@@ -21,6 +21,7 @@ import {
   MAX_CHUNKS_HARD_LIMIT,
   MAX_NEIGHBOUR_PASSAGES,
   NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+  PER_SOURCE_PASSAGES_PER_SEARCH,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
@@ -32,7 +33,9 @@ import {
   chunkRankingScore,
   documentsWithRerankedPassages,
   mergeChunkScores,
+  perSourceDocumentIds,
   selectChunksByTokenBudgetWithReservation,
+  titlesOfSources,
 } from "./chunkContext.js";
 import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
 import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
@@ -248,12 +251,16 @@ export class ChatAgent {
 
   /**
    * HyDE + hybrid search for one sub-query; rerank skipped (merged + global rerank later).
+   *
+   * @param perSourceIds - Selected sources to also search one by one with the sub-query, so a
+   *   source that words its answer differently from the others still reaches the rerank (#450)
    */
   private async runSubqueryRetrieval(
     query: string,
     context: ChatAgentContext,
     logger: ServiceLogger,
-    isListQuery: boolean = false
+    isListQuery: boolean = false,
+    perSourceIds: string[] = []
   ): Promise<ReferenceChunk[]> {
     const pipelineDeadline = Date.now() + SEARCH_PIPELINE_TIMEOUT_MS;
     const remainingMs = () => {
@@ -305,6 +312,38 @@ export class ChatAgent {
             allResults.push(chunk);
             seenChunkKeys.add(key);
           }
+        }
+      }
+      if (perSourceIds.length > 0) {
+        // Per-source passages only add to the pool: a failed or late search keeps what was found.
+        try {
+          const perSource = await withTimeout(
+            Promise.allSettled(
+              perSourceIds.map((id) =>
+                this.vectorSearch.searchDocument(id, hydeEmbedding, PER_SOURCE_PASSAGES_PER_SEARCH)
+              )
+            ),
+            remainingMs(),
+            "per_source_search"
+          );
+          for (const [i, r] of perSource.entries()) {
+            if (r.status === "rejected") {
+              logger.warn("Per-source search failed", {
+                documentId: perSourceIds[i],
+                error: String(r.reason),
+              });
+              continue;
+            }
+            for (const chunk of r.value) {
+              const key = chunkDedupKey(chunk);
+              if (!seenChunkKeys.has(key)) {
+                allResults.push(chunk);
+                seenChunkKeys.add(key);
+              }
+            }
+          }
+        } catch (e) {
+          logger.warn("Per-source search timed out", { error: String(e) });
         }
       }
       logger.apiSuccess(
@@ -559,6 +598,15 @@ export class ChatAgent {
     const attachedSet = new Set(context.attachedDocumentIds ?? []);
     const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
     const ragContext = { ...context, documentIds: ragDocumentIds };
+    // "What does each paper say about X?": search each selected source too, and have the answer
+    // cover every one (#450).
+    const sourcesAskedAbout = perSourceDocumentIds(userMessage, context.documentIds);
+    const perSourceSearchIds = sourcesAskedAbout.filter((id) => !attachedSet.has(id));
+    if (sourcesAskedAbout.length > 0) {
+      logger.info("Question asks about each selected source", {
+        sources: sourcesAskedAbout.length,
+      });
+    }
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
@@ -579,7 +627,9 @@ export class ChatAgent {
       yield { type: "status", status: "retrieving", message: "Searching your materials…" };
 
       const settled = await Promise.allSettled(
-        subqueries.map((sq) => this.runSubqueryRetrieval(sq, ragContext, logger, isListQuery))
+        subqueries.map((sq) =>
+          this.runSubqueryRetrieval(sq, ragContext, logger, isListQuery, perSourceSearchIds)
+        )
       );
 
       for (let i = 0; i < settled.length; i++) {
@@ -728,7 +778,8 @@ export class ChatAgent {
       userMessage,
       effectiveTurns,
       rankedChunks,
-      logger
+      logger,
+      titlesOfSources(sourcesAskedAbout, merged)
     );
   }
 
@@ -737,7 +788,8 @@ export class ChatAgent {
     userMessage: string,
     recentTurns: Array<{ role: string; content: string }>,
     allChunks: ReferenceChunk[],
-    logger: ServiceLogger
+    logger: ServiceLogger,
+    sourcesToCover: string[] = []
   ): AsyncGenerator<StreamChunk> {
     const mode = this.resolveGroundingMode(context);
 
@@ -768,7 +820,8 @@ export class ChatAgent {
       citationChunks,
       userMessage,
       recentTurns,
-      context.chatSettings
+      context.chatSettings,
+      sourcesToCover
     );
     logger.apiSuccess("ChatLLMWrapper", "generateStructuredResponse", Date.now() - responseStart, {
       responseLength: structuredResponse.answer_markdown.length,
@@ -816,7 +869,8 @@ export class ChatAgent {
             citationChunks,
             userMessage,
             recentTurns,
-            context.chatSettings
+            context.chatSettings,
+            sourcesToCover
           );
 
           const retrySyntactic = validateGrounding(

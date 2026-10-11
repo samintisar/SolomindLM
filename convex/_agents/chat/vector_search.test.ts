@@ -64,3 +64,48 @@ describe("VectorSearchHandler.rerankResults", () => {
     expect(rerankFn).toHaveBeenCalledTimes(1);
   });
 });
+
+// #450: a source that words the question's topic differently is searched on its own.
+describe("VectorSearchHandler.searchDocument", () => {
+  it("asks the runner for one document's best passages and returns them as references", async () => {
+    const runner = vi.fn(async () => [
+      {
+        _id: "c1",
+        _score: 0.6,
+        content: "downsides",
+        chunkIndex: 3,
+        documentId: "doc-a",
+        sourceTitle: "a.pdf",
+      },
+      {
+        _id: "c2",
+        _score: 0.5,
+        content: "collapse",
+        chunkIndex: 9,
+        documentId: "doc-a",
+        sourceTitle: "a.pdf",
+      },
+    ]);
+    const handler = new VectorSearchHandler({}, undefined, runner);
+
+    const found = await handler.searchDocument("doc-a", [0.1, 0.2], 4);
+
+    expect(runner).toHaveBeenCalledWith([0.1, 0.2], 4, ["doc-a"]);
+    expect(found.map((c) => [c.documentId, c.chunkIndex, c.similarity, c.sourceTitle])).toEqual([
+      ["doc-a", 3, 0.6, "a.pdf"],
+      ["doc-a", 9, 0.5, "a.pdf"],
+    ]);
+  });
+
+  it("keeps only the requested document even if the runner returns others", async () => {
+    const runner = vi.fn(async () => [
+      { _id: "c1", _score: 0.9, content: "x", chunkIndex: 0, documentId: "doc-b" },
+      { _id: "c2", _score: 0.5, content: "y", chunkIndex: 1, documentId: "doc-a" },
+    ]);
+    const handler = new VectorSearchHandler({}, undefined, runner);
+
+    const found = await handler.searchDocument("doc-a", [0.1], 4);
+
+    expect(found.map((c) => c.documentId)).toEqual(["doc-a"]);
+  });
+});

@@ -168,6 +168,26 @@ export const researchersFixtures: EvalFixture[] = [
   },
   {
     ...base,
+    id: "researchers/chat-each-paper-limitations",
+    split: "train",
+    runner: "chat",
+    question: "What limitations does each paper acknowledge?",
+    // One limitation per paper, so the answer only passes if every selected source is covered.
+    // NHANES states its limitations without a "Limitations" heading (#450).
+    expectedItems: ["middle-income", "chronic pain", "blinding", "cross-sectional"],
+    expectedAnswer:
+      "Pearce 2022: only self-reported activity, little data at high doses, lower- and middle-income countries " +
+      "underrepresented. Laird 2023 (TILDA): self-reported activity and depressive symptoms, no chronic pain or " +
+      "sleep data, cohort design cannot show causality, no race or ethnicity data. Lambert 2018 (eMotion): sample " +
+      "not representative, no blinding, PHQ-8 instead of PHQ-9. Rutherford 2022 (NHANES): cross-sectional design " +
+      "cannot infer causality, recall bias in self-reported activity.",
+    expectedBehavior:
+      "Gives each of the four papers its own limitations, attributed to the right study; does not describe the " +
+      "set as fewer papers or leave one out.",
+    tags: tags("chat", "synthesis", "multi-source"),
+  },
+  {
+    ...base,
     id: "researchers/spreadsheet-meta-analysis-risk",
     split: "train",
     runner: "spreadsheet",

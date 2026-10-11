@@ -120,14 +120,20 @@ export function createChatVectorSearchRunner(
     limit: number,
     docIds?: string[]
   ): Promise<ChatVectorSearchResult[]> => {
-    const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
+    // One document (a per-source search, #450) is searched on its own; several are filtered out
+    // of the notebook's top hits.
+    const singleDocumentId = docIds?.length === 1 ? (docIds[0] as Id<"documents">) : undefined;
+    const limitToFetch = singleDocumentId
+      ? limit
+      : docIds?.length
+        ? Math.max(limit * 3, 75)
+        : limit;
 
     const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
-      // Convex vector search filter typing is generated from the index schema;
-      // using explicit any to avoid brittle type coupling.
-      filter: (q: any) => q.eq("notebookId", notebookId),
+      filter: (q) =>
+        singleDocumentId ? q.eq("documentId", singleDocumentId) : q.eq("notebookId", notebookId),
     });
 
     log?.debug("vector_search_raw", { count: results.length });
@@ -157,7 +163,8 @@ export function createChatVectorSearchRunner(
 
     for (const r of results as VectorSearchHit[]) {
       const chunk = chunkMap.get(r._id);
-      if (!chunk) continue;
+      // A document filter does not scope to the notebook, so check it here.
+      if (!chunk || chunk.notebookId !== notebookId) continue;
 
       rowsWithoutTitle.push({
         _id: r._id,
