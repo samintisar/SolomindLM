@@ -220,7 +220,7 @@ Question: ${query}`;
   async generateRetrievalSubqueries(
     userMessage: string,
     conversationHistory: Array<{ role: string; content: string }> = []
-  ): Promise<{ subqueries: string[]; rerankQuery?: string }> {
+  ): Promise<{ subqueries: string[]; rerankQuery?: string; aboutEachSource?: boolean }> {
     const fallback = { subqueries: [userMessage.trim() || "study material"] };
     const trimmed = userMessage.trim();
     if (!trimmed) return fallback;
@@ -259,18 +259,20 @@ IMPORTANT: For list/enumeration questions (e.g. "list all X", "what are the N Y"
 
 Also optionally set "rerankQuery": a single English line that captures the full user intent for reranking (defaults to the user message if omitted).
 
+Set "aboutEachSource": true when answering needs each of the user's sources (papers, documents, readings) taken one at a time: what each says or does, or how they compare or agree. Set it false when the question is about a topic, wherever it appears in the sources.
+
 User question: ${trimmed}
 
 Recent conversation (context):
 ${historySnippet || "(none)"}
 
-Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
+Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "aboutEachSource": boolean}`;
 
     const messages: Array<{ role: "system" | "user"; content: string }> = [
       {
         role: "system",
         content:
-          'Reply with ONLY a JSON object: {"subqueries": string[], "rerankQuery"?: string}. No markdown fences, no tools, no extra text.',
+          'Reply with ONLY a JSON object: {"subqueries": string[], "rerankQuery"?: string, "aboutEachSource": boolean}. No markdown fences, no tools, no extra text.',
       },
       { role: "user", content: prompt },
     ];

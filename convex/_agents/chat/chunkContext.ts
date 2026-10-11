@@ -1,7 +1,6 @@
 "use node";
 
 import { countTokens } from "../_shared/tokenizer";
-import { asksAboutEachSource } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
   MAX_CHUNKS_HARD_LIMIT,
@@ -15,13 +14,14 @@ import type { ReferenceChunk } from "./types";
 
 /**
  * The selected sources a question asks about one by one ("what limitations does each paper
- * acknowledge?"): each gets its own search and a part of the answer (#450). Empty for topic
- * questions, a single source, or more sources than per-source search covers.
+ * acknowledge?"), as judged by the retrieval planner: each gets its own search and a part of the
+ * answer (#450). Empty for topic questions, a single source, or more sources than per-source
+ * search covers.
  */
-export function perSourceDocumentIds(question: string, documentIds?: string[]): string[] {
+export function perSourceDocumentIds(aboutEachSource: boolean, documentIds?: string[]): string[] {
   const ids = [...new Set(documentIds ?? [])];
-  if (ids.length < 2 || ids.length > MAX_PER_SOURCE_DOCUMENTS) return [];
-  return asksAboutEachSource(question) ? ids : [];
+  if (!aboutEachSource || ids.length < 2 || ids.length > MAX_PER_SOURCE_DOCUMENTS) return [];
+  return ids;
 }
 
 /**

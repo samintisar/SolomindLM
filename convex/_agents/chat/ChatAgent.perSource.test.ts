@@ -22,11 +22,10 @@ const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
   similarity: 0.5,
 });
 
-const QUESTION = "What limitations does each paper acknowledge?";
-
+// The retrieval planner decides whether a question is about each selected source.
 describe("perSourceDocumentIds (#450)", () => {
-  it("returns the selected sources for a question about each of them", () => {
-    expect(perSourceDocumentIds(QUESTION, ["rag", "react", "self-rag"])).toEqual([
+  it("returns the selected sources when the planner says the question is about each one", () => {
+    expect(perSourceDocumentIds(true, ["rag", "react", "rag", "self-rag"])).toEqual([
       "rag",
       "react",
       "self-rag",
@@ -34,11 +33,11 @@ describe("perSourceDocumentIds (#450)", () => {
   });
 
   it("returns none for a topic question, one source, or more sources than it can cover", () => {
-    expect(perSourceDocumentIds("What is retrieval?", ["rag", "react"])).toEqual([]);
-    expect(perSourceDocumentIds(QUESTION, ["rag"])).toEqual([]);
-    expect(perSourceDocumentIds(QUESTION, undefined)).toEqual([]);
+    expect(perSourceDocumentIds(false, ["rag", "react"])).toEqual([]);
+    expect(perSourceDocumentIds(true, ["rag"])).toEqual([]);
+    expect(perSourceDocumentIds(true, undefined)).toEqual([]);
     const many = Array.from({ length: MAX_PER_SOURCE_DOCUMENTS + 1 }, (_, i) => `d${i}`);
-    expect(perSourceDocumentIds(QUESTION, many)).toEqual([]);
+    expect(perSourceDocumentIds(true, many)).toEqual([]);
   });
 });
 

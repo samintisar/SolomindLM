@@ -633,15 +633,9 @@ export class ChatAgent {
     const attachedSet = new Set(context.attachedDocumentIds ?? []);
     const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
     const ragContext = { ...context, documentIds: ragDocumentIds };
-    // "What does each paper say about X?": search each selected source too, and have the answer
-    // cover every one (#450).
-    const sourcesAskedAbout = perSourceDocumentIds(userMessage, context.documentIds);
-    const perSourceSearchIds = sourcesAskedAbout.filter((id) => !attachedSet.has(id));
-    if (sourcesAskedAbout.length > 0) {
-      logger.info("Question asks about each selected source", {
-        sources: sourcesAskedAbout.length,
-      });
-    }
+    // "What does each paper say about X?", as judged by the planner: search each selected source
+    // too, and have the answer cover every one (#450).
+    let sourcesAskedAbout: string[] = [];
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
@@ -650,6 +644,13 @@ export class ChatAgent {
       const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns);
       rerankQueryOpt = plan.rerankQuery;
       const { subqueries } = plan;
+      sourcesAskedAbout = perSourceDocumentIds(plan.aboutEachSource === true, context.documentIds);
+      const perSourceSearchIds = sourcesAskedAbout.filter((id) => !attachedSet.has(id));
+      if (sourcesAskedAbout.length > 0) {
+        logger.info("Question asks about each selected source", {
+          sources: sourcesAskedAbout.length,
+        });
+      }
       logger.apiSuccess(
         "ChatLLMWrapper",
         "generateRetrievalSubqueries",
