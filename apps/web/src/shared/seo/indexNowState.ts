@@ -11,17 +11,31 @@ export type IndexNowUrlDiff = {
   removed: string[];
 };
 
+const SITEMAP_URLSET_PATTERN = /<urlset[\s>][\s\S]*<\/urlset>/;
+const SITEMAP_URL_OPEN_PATTERN = /<url>/g;
 const SITEMAP_URL_PATTERN = /<url>([\s\S]*?)<\/url>/g;
 const SITEMAP_LOC_PATTERN = /<loc>\s*([^<]+?)\s*<\/loc>/;
 const SITEMAP_LASTMOD_PATTERN = /<lastmod>\s*([^<]+?)\s*<\/lastmod>/;
 
-/** Reads `<loc>` → `<lastmod>` pairs from a sitemap.xml body. */
-export function parseSitemapState(xml: string): IndexNowPersistedState {
+/**
+ * Reads `<loc>` → `<lastmod>` pairs from a sitemap.xml body. Returns null for anything that is not
+ * a complete `<urlset>` (an HTML error page, a truncated body), so the caller can't mistake it for
+ * an empty sitemap and treat every page as new.
+ */
+export function parseSitemapState(xml: string): IndexNowPersistedState | null {
+  if (!SITEMAP_URLSET_PATTERN.test(xml)) {
+    return null;
+  }
+  const blocks = [...xml.matchAll(SITEMAP_URL_PATTERN)];
+  if (blocks.length !== (xml.match(SITEMAP_URL_OPEN_PATTERN)?.length ?? 0)) {
+    return null;
+  }
+
   const urls: IndexNowPersistedState["urls"] = {};
-  for (const [, block] of xml.matchAll(SITEMAP_URL_PATTERN)) {
+  for (const [, block] of blocks) {
     const loc = SITEMAP_LOC_PATTERN.exec(block)?.[1];
     if (!loc) {
-      continue;
+      return null;
     }
     urls[loc] = { lastmod: SITEMAP_LASTMOD_PATTERN.exec(block)?.[1] ?? "" };
   }

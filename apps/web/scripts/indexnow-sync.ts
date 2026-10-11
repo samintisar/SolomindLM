@@ -114,9 +114,11 @@ async function main(): Promise<void> {
   // discarded, so no state written here would survive to the next build.
   const published = await fetchPublishedSitemapState();
   if (!published) {
+    // Keep any queued URLs for the next build or `indexnow:flush`; submit nothing this time.
     console.warn(
-      `[indexnow-sync] Could not read ${SEO_BASE_URL}/sitemap.xml; submitting no new URLs this build`
+      `[indexnow-sync] Could not read ${SEO_BASE_URL}/sitemap.xml; submitting nothing this build`
     );
+    return;
   }
   const changedUrls = selectChangedIndexNowUrls(getPublicSeoCanonicalUrlEntries(), published);
 

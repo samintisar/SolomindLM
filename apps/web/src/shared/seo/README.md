@@ -30,7 +30,8 @@ On each production build:
 2. Added, removed, and materially updated URLs are enqueued (deduped). "Updated" means the page's own
    `lastmod` in the registry changed; a page with no `lastmod` is only submitted when it is new, since
    the sitemap stamps it with the build date on every build.
-3. If the live sitemap can't be fetched, nothing is submitted (never everything).
+3. If the live sitemap can't be fetched or isn't a complete `<urlset>` (e.g. an HTML error page),
+   nothing is submitted (never everything) and the queue is kept for the next build.
 4. The queue is flushed to `https://api.indexnow.org/indexnow` in batches
 5. `{INDEXNOW_KEY}.txt` is written to `dist/` for host verification
 

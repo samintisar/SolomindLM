@@ -77,6 +77,13 @@ describe("fetchPublishedSitemapState", () => {
     expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
   });
 
+  it("returns null when a 200 response is not a sitemap", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response("<html><body>Maintenance</body></html>", { status: 200 }));
+    expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
+  });
+
   it("returns null when the request throws", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("network down"));
     expect(await fetchPublishedSitemapState({ fetchImpl })).toBeNull();
@@ -145,6 +152,20 @@ describe("parseSitemapState", () => {
         [`${SEO_BASE_URL}/privacy`]: { lastmod: "2026-06-06" },
       },
     });
+  });
+});
+
+describe("parseSitemapState validation", () => {
+  it("returns null for an HTML page", () => {
+    expect(parseSitemapState("<!doctype html><html><body>Not found</body></html>")).toBeNull();
+  });
+
+  it("returns null for a truncated sitemap", () => {
+    expect(parseSitemapState(`<urlset><url><loc>${SEO_BASE_URL}/</loc>`)).toBeNull();
+  });
+
+  it("keeps a valid sitemap with no URLs as an empty state", () => {
+    expect(parseSitemapState('<?xml version="1.0"?><urlset></urlset>')).toEqual({ urls: {} });
   });
 });
 
