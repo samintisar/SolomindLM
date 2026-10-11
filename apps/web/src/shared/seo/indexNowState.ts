@@ -11,7 +11,9 @@ export type IndexNowUrlDiff = {
   removed: string[];
 };
 
-const SITEMAP_URLSET_PATTERN = /<urlset[\s>][\s\S]*<\/urlset>/;
+/** The whole body must be one `<urlset>` root, with only an XML declaration or comments around it. */
+const SITEMAP_URLSET_PATTERN =
+  /^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<urlset[\s>][\s\S]*<\/urlset>\s*(?:<!--[\s\S]*?-->\s*)*$/;
 const SITEMAP_URL_OPEN_PATTERN = /<url>/g;
 const SITEMAP_URL_PATTERN = /<url>([\s\S]*?)<\/url>/g;
 const SITEMAP_LOC_PATTERN = /<loc>\s*([^<]+?)\s*<\/loc>/;

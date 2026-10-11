@@ -164,6 +164,11 @@ describe("parseSitemapState validation", () => {
     expect(parseSitemapState(`<urlset><url><loc>${SEO_BASE_URL}/</loc>`)).toBeNull();
   });
 
+  it("returns null when other content surrounds the <urlset> root", () => {
+    expect(parseSitemapState("<urlset></urlset><html>error</html>")).toBeNull();
+    expect(parseSitemapState("<html><urlset></urlset></html>")).toBeNull();
+  });
+
   it("keeps a valid sitemap with no URLs as an empty state", () => {
     expect(parseSitemapState('<?xml version="1.0"?><urlset></urlset>')).toEqual({ urls: {} });
   });
