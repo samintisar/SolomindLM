@@ -20,6 +20,8 @@ type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
 export const VECTOR_MATCH_THRESHOLD = 0.4;
 const SELECTED_DOC_THRESHOLD_FACTOR = 0.7;
 const LAST_RESORT_THRESHOLD_FACTOR = 0.5;
+/** Convex allows 64 filter expressions per vector search; one is kept for the `or`. */
+const MAX_VECTOR_FILTER_EXPRESSIONS = 63;
 
 export interface ChatVectorSearchResult {
   _id: Id<"documentChunks">;
@@ -120,14 +122,23 @@ export function createChatVectorSearchRunner(
     limit: number,
     docIds?: string[]
   ): Promise<ChatVectorSearchResult[]> => {
-    const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
+    // Selected documents are searched among themselves, so other sources in the notebook cannot
+    // take every slot (#450). Past the filter-expression limit, they are filtered out of the
+    // notebook's top hits instead.
+    const scopedIds =
+      docIds?.length && docIds.length <= MAX_VECTOR_FILTER_EXPRESSIONS
+        ? (docIds as Id<"documents">[])
+        : undefined;
+    const limitToFetch = scopedIds ? limit : docIds?.length ? Math.max(limit * 3, 75) : limit;
 
     const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
-      // Convex vector search filter typing is generated from the index schema;
-      // using explicit any to avoid brittle type coupling.
-      filter: (q: any) => q.eq("notebookId", notebookId),
+      filter: (q) => {
+        if (!scopedIds) return q.eq("notebookId", notebookId);
+        if (scopedIds.length === 1) return q.eq("documentId", scopedIds[0]);
+        return q.or(...scopedIds.map((id) => q.eq("documentId", id)));
+      },
     });
 
     log?.debug("vector_search_raw", { count: results.length });
@@ -157,7 +168,8 @@ export function createChatVectorSearchRunner(
 
     for (const r of results as VectorSearchHit[]) {
       const chunk = chunkMap.get(r._id);
-      if (!chunk) continue;
+      // A document filter does not scope to the notebook, so check it here.
+      if (!chunk || chunk.notebookId !== notebookId) continue;
 
       rowsWithoutTitle.push({
         _id: r._id,

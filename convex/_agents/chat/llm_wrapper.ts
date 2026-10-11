@@ -331,7 +331,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       instructionMode: "default" | "learningGuide" | "custom";
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
-    }
+    },
+    sourcesToCover: string[] = []
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Retrying with strict grounding");
     return this._generateStructuredResponse(
@@ -339,7 +340,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       userMessage,
       conversationHistory,
       true,
-      chatSettings
+      chatSettings,
+      sourcesToCover
     );
   }
 
@@ -359,14 +361,16 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       instructionMode: "default" | "learningGuide" | "custom";
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
-    }
+    },
+    sourcesToCover: string[] = []
   ): Promise<ChatResponse> {
     return this._generateStructuredResponse(
       chunks,
       userMessage,
       conversationHistory,
       false,
-      chatSettings
+      chatSettings,
+      sourcesToCover
     );
   }
 
@@ -379,7 +383,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       instructionMode: "default" | "learningGuide" | "custom";
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
-    }
+    },
+    sourcesToCover: string[] = []
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Generating structured response with citations (streaming)");
 
@@ -399,7 +404,12 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
-    const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
+    const groundedPrompt = buildGroundingPrompt(
+      chunks,
+      userMessage,
+      conversationHistory,
+      sourcesToCover
+    );
 
     console.log(
       "[ChatLLMWrapper] Full grounded prompt (first 2000 chars):",
@@ -546,7 +556,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         userMessage,
         conversationHistory,
         strictGrounding,
-        chatSettings
+        chatSettings,
+        sourcesToCover
       );
     }
   }
@@ -561,7 +572,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       instructionMode: "default" | "learningGuide" | "custom";
       customInstructions?: string;
       responseLength: "default" | "longer" | "shorter";
-    }
+    },
+    sourcesToCover: string[] = []
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Using LangChain fallback (non-streaming)");
 
@@ -579,7 +591,12 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
-    const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
+    const groundedPrompt = buildGroundingPrompt(
+      chunks,
+      userMessage,
+      conversationHistory,
+      sourcesToCover
+    );
     try {
       let fallbackUsage: ReturnType<typeof fromProviderUsage>;
       const parsed = await invokeStructuredOutput({

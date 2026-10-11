@@ -1,15 +1,46 @@
 "use node";
 
 import { countTokens } from "../_shared/tokenizer";
+import { asksAboutEachSource } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
   MAX_CHUNKS_HARD_LIMIT,
+  MAX_PER_SOURCE_DOCUMENTS,
   MIN_PASSAGES_PER_DOCUMENT,
   MIN_RELEVANCE_THRESHOLD,
   MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
   MULTI_SOURCE_MAX_EXTRA_TOKENS,
 } from "./chatConfig.js";
 import type { ReferenceChunk } from "./types";
+
+/**
+ * The selected sources a question asks about one by one ("what limitations does each paper
+ * acknowledge?"): each gets its own search and a part of the answer (#450). Empty for topic
+ * questions, a single source, or more sources than per-source search covers.
+ */
+export function perSourceDocumentIds(question: string, documentIds?: string[]): string[] {
+  const ids = [...new Set(documentIds ?? [])];
+  if (ids.length < 2 || ids.length > MAX_PER_SOURCE_DOCUMENTS) return [];
+  return asksAboutEachSource(question) ? ids : [];
+}
+
+/**
+ * Titles of the given sources, in the given order. A source retrieval missed entirely is looked up,
+ * so the answer still says it has nothing on the question instead of leaving it out (#450).
+ */
+export async function titlesOfSources(
+  documentIds: string[],
+  chunks: ReferenceChunk[],
+  lookupTitle: (documentId: string) => Promise<string | undefined>
+): Promise<string[]> {
+  const titles: string[] = [];
+  for (const id of documentIds) {
+    const title =
+      chunks.find((c) => c.documentId === id)?.sourceTitle ?? (await lookupTitle(id))?.trim();
+    if (title) titles.push(title);
+  }
+  return titles;
+}
 
 export function chunkDedupKey(c: ReferenceChunk): string {
   return `${c.sourceId}:${c.chunkIndex}`;

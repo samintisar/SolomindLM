@@ -21,6 +21,7 @@ import {
   MAX_CHUNKS_HARD_LIMIT,
   MAX_NEIGHBOUR_PASSAGES,
   NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+  PER_SOURCE_PASSAGES_PER_SEARCH,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
@@ -32,7 +33,9 @@ import {
   chunkRankingScore,
   documentsWithRerankedPassages,
   mergeChunkScores,
+  perSourceDocumentIds,
   selectChunksByTokenBudgetWithReservation,
+  titlesOfSources,
 } from "./chunkContext.js";
 import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
 import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
@@ -247,13 +250,57 @@ export class ChatAgent {
   }
 
   /**
+   * Each listed source's own best passages for a sub-query (#450). They only add to the pool, so
+   * a failed or late search is logged with its error and the sub-query keeps what else it found.
+   * Never rejects.
+   */
+  private async searchEachSource(
+    documentIds: string[],
+    embedding: number[],
+    remainingMs: () => number,
+    logger: ServiceLogger
+  ): Promise<ReferenceChunk[]> {
+    if (documentIds.length === 0) return [];
+    try {
+      const settled = await withTimeout(
+        Promise.allSettled(
+          documentIds.map((id) =>
+            this.vectorSearch.searchDocument(id, embedding, PER_SOURCE_PASSAGES_PER_SEARCH)
+          )
+        ),
+        remainingMs(),
+        "per_source_search"
+      );
+      const found: ReferenceChunk[] = [];
+      for (const [i, r] of settled.entries()) {
+        if (r.status === "fulfilled") found.push(...r.value);
+        else {
+          logger.warn("Per-source search failed", {
+            documentId: documentIds[i],
+            error: String(r.reason),
+          });
+        }
+      }
+      return found;
+    } catch (e) {
+      // String(e) keeps the error type: a timeout reads "Error: per_source_search timed out …".
+      logger.warn("Per-source searches failed", { error: String(e) });
+      return [];
+    }
+  }
+
+  /**
    * HyDE + hybrid search for one sub-query; rerank skipped (merged + global rerank later).
+   *
+   * @param perSourceIds - Selected sources to also search one by one with the sub-query, so a
+   *   source that words its answer differently from the others still reaches the rerank (#450)
    */
   private async runSubqueryRetrieval(
     query: string,
     context: ChatAgentContext,
     logger: ServiceLogger,
-    isListQuery: boolean = false
+    isListQuery: boolean = false,
+    perSourceIds: string[] = []
   ): Promise<ReferenceChunk[]> {
     const pipelineDeadline = Date.now() + SEARCH_PIPELINE_TIMEOUT_MS;
     const remainingMs = () => {
@@ -281,6 +328,13 @@ export class ChatAgent {
     );
 
     if (context.documentIds?.length) {
+      // Needs only the embedding, so it runs alongside the keyword-expanded searches below.
+      const perSourceResults = this.searchEachSource(
+        perSourceIds,
+        hydeEmbedding,
+        remainingMs,
+        logger
+      );
       const expandedQueries = expandQueryWithKeywords(query);
       const allResults: ReferenceChunk[] = [];
       const seenChunkKeys = new Set<string>();
@@ -305,6 +359,13 @@ export class ChatAgent {
             allResults.push(chunk);
             seenChunkKeys.add(key);
           }
+        }
+      }
+      for (const chunk of await perSourceResults) {
+        const key = chunkDedupKey(chunk);
+        if (!seenChunkKeys.has(key)) {
+          allResults.push(chunk);
+          seenChunkKeys.add(key);
         }
       }
       logger.apiSuccess(
@@ -559,6 +620,15 @@ export class ChatAgent {
     const attachedSet = new Set(context.attachedDocumentIds ?? []);
     const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
     const ragContext = { ...context, documentIds: ragDocumentIds };
+    // "What does each paper say about X?": search each selected source too, and have the answer
+    // cover every one (#450).
+    const sourcesAskedAbout = perSourceDocumentIds(userMessage, context.documentIds);
+    const perSourceSearchIds = sourcesAskedAbout.filter((id) => !attachedSet.has(id));
+    if (sourcesAskedAbout.length > 0) {
+      logger.info("Question asks about each selected source", {
+        sources: sourcesAskedAbout.length,
+      });
+    }
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
@@ -579,7 +649,9 @@ export class ChatAgent {
       yield { type: "status", status: "retrieving", message: "Searching your materials…" };
 
       const settled = await Promise.allSettled(
-        subqueries.map((sq) => this.runSubqueryRetrieval(sq, ragContext, logger, isListQuery))
+        subqueries.map((sq) =>
+          this.runSubqueryRetrieval(sq, ragContext, logger, isListQuery, perSourceSearchIds)
+        )
       );
 
       for (let i = 0; i < settled.length; i++) {
@@ -728,7 +800,12 @@ export class ChatAgent {
       userMessage,
       effectiveTurns,
       rankedChunks,
-      logger
+      logger,
+      await titlesOfSources(
+        sourcesAskedAbout,
+        merged,
+        async (id) => (await this.fetchFullDocumentContent(id))?.title
+      )
     );
   }
 
@@ -737,7 +814,8 @@ export class ChatAgent {
     userMessage: string,
     recentTurns: Array<{ role: string; content: string }>,
     allChunks: ReferenceChunk[],
-    logger: ServiceLogger
+    logger: ServiceLogger,
+    sourcesToCover: string[] = []
   ): AsyncGenerator<StreamChunk> {
     const mode = this.resolveGroundingMode(context);
 
@@ -768,7 +846,8 @@ export class ChatAgent {
       citationChunks,
       userMessage,
       recentTurns,
-      context.chatSettings
+      context.chatSettings,
+      sourcesToCover
     );
     logger.apiSuccess("ChatLLMWrapper", "generateStructuredResponse", Date.now() - responseStart, {
       responseLength: structuredResponse.answer_markdown.length,
@@ -816,7 +895,8 @@ export class ChatAgent {
             citationChunks,
             userMessage,
             recentTurns,
-            context.chatSettings
+            context.chatSettings,
+            sourcesToCover
           );
 
           const retrySyntactic = validateGrounding(

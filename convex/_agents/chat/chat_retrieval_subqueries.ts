@@ -14,6 +14,36 @@ const COUNTED_LIST_TAIL = new RegExp(
   "i"
 );
 
+// Whole sources only: "each chapter" usually means the chapters inside one book.
+const SOURCE_NOUN =
+  "(?:papers?|sources?|documents?|docs?|stud(?:y|ies)|articles?|files?|readings?|reports?|books?|texts?|transcripts?|pdfs?|trials?|videos?|lectures?)";
+const SOURCE_NOUN_PLURAL =
+  "(?:papers|sources|documents|docs|studies|articles|files|readings|reports|books|texts|transcripts|pdfs|trials|videos|lectures)";
+
+/** "each paper", "every one of my sources", "each of my four papers". */
+const EACH_SOURCE = new RegExp(
+  `\\b(?:each|every|either|neither)\\s+(?:one\\s+)?(?:of\\s+)?(?:(?:my|the|these|those|our|your)\\s+)?(?:${COUNT_QUANT}\\s+)?(?:\\w+\\s+)?${SOURCE_NOUN}\\b`,
+  "i"
+);
+
+/**
+ * "both studies", "all three sources", "these papers", "the two reports", "my two papers". A bare
+ * "the papers" or "my sources" ("according to my sources, …") is too common in topic questions.
+ */
+const SET_OF_SOURCES = new RegExp(
+  `\\b(?:(?:both|all|these|those)\\s+(?:${COUNT_QUANT}\\s+)?|(?:the|my|our|your)\\s+${COUNT_QUANT}\\s+)(?:\\w+\\s+)?${SOURCE_NOUN_PLURAL}\\b`,
+  "i"
+);
+
+/**
+ * Whether the question is about each of the selected sources ("what limitations does each paper
+ * acknowledge?") rather than a topic that several sources may cover. Such questions get a search
+ * inside every selected source and an answer that covers each one (#450).
+ */
+export function asksAboutEachSource(message: string): boolean {
+  return EACH_SOURCE.test(message) || SET_OF_SOURCES.test(message);
+}
+
 /**
  * Many user turns are a single retrieval intent; skipping the JSON decomposition call avoids
  * extra latency and flaky fast-model 503s when status pages still show "Up".

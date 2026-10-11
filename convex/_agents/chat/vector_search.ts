@@ -72,6 +72,23 @@ const DEFAULT_CONFIG: Required<VectorSearchConfig> = {
   maxResults: 7,
 };
 
+function toReferenceChunk(
+  r: VectorSearchRawResult & { similarity?: number },
+  id: string
+): ReferenceChunk {
+  return {
+    id,
+    sourceId: String(r._id),
+    documentId: r.documentId,
+    sourceTitle: r.sourceTitle ?? "Document",
+    sourceUrl: r.sourceUrl,
+    content: r.content,
+    chunkIndex: r.chunkIndex,
+    similarity: r.similarity,
+    metadata: r.metadata,
+  };
+}
+
 // ============================================================
 // Vector Search Class
 // ============================================================
@@ -224,18 +241,7 @@ export class VectorSearchHandler {
     const finalResults: ReferenceChunk[] = limited.map((r) => {
       const key = `${r._id}-${r.chunkIndex}`;
       const originalPosition = originalPositionMap.get(key) ?? 0;
-      return {
-        id: String(originalPosition),
-        sourceId: String(r._id),
-        documentId: r.documentId,
-        sourceTitle: r.sourceTitle ?? "Document",
-        sourceUrl: r.sourceUrl,
-        content: r.content,
-        chunkIndex: r.chunkIndex,
-        similarity: r.similarity,
-        // Include chunk metadata
-        metadata: r.metadata,
-      };
+      return toReferenceChunk(r, String(originalPosition));
     });
 
     const latencyMs = Date.now() - t0;
@@ -283,6 +289,23 @@ export class VectorSearchHandler {
     }
 
     return finalResults;
+  }
+
+  /**
+   * One document's best passages for an embedding already computed (no keyword search, no
+   * rerank). Per-source questions run this for each selected source, so a source whose wording
+   * ranks below the others still reaches the global rerank (#450).
+   */
+  async searchDocument(
+    documentId: string,
+    embedding: number[],
+    limit: number
+  ): Promise<ReferenceChunk[]> {
+    const raw = await this.vectorSearchRunner(embedding, limit, [documentId]);
+    return raw
+      .filter((r) => r.documentId === documentId)
+      .slice(0, limit)
+      .map((r) => toReferenceChunk({ ...r, similarity: r._score ?? 0 }, String(r._id)));
   }
 
   protected deduplicateResults(

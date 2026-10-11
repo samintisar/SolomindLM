@@ -197,7 +197,8 @@ export default defineSchema({
     .vectorIndex("by_embedding", {
       dimensions: 1536, // NOTE: dimensions (plural), not dimension - OpenAI text-embedding-3-small, native size (not truncated)
       vectorField: "embedding",
-      filterFields: ["userId", "notebookId"],
+      // documentId: per-source chat searches look inside one selected source (#450)
+      filterFields: ["userId", "notebookId", "documentId"],
     })
     .searchIndex("search_content", {
       searchField: "content",

@@ -5,11 +5,15 @@ import type { ReferenceChunk } from "./types";
 /**
  * Builds grounding prompt optimized for research/learning contexts.
  * Enhanced with chunk metadata for better context awareness.
+ *
+ * @param sourcesToCover - Titles of the selected sources when the question asks about each of
+ *   them; the answer must cover every one, saying so when a source's passages miss the question
  */
 export function buildGroundingPrompt(
   chunks: ReferenceChunk[],
   userMessage: string,
-  conversationHistory: Array<{ role: string; content: string }>
+  conversationHistory: Array<{ role: string; content: string }>,
+  sourcesToCover: string[] = []
 ): string {
   const formattedChunks = chunks
     .map((chunk, index) => {
@@ -105,10 +109,26 @@ ${MARKDOWN_MATH_RULES_BULLETS}
   return `# SOURCE DOCUMENTS
 ${formattedChunks}
 
-${contextSection}${citationReminder}# CURRENT QUESTION
+${contextSection}${citationReminder}${buildSourcesToCover(sourcesToCover)}# CURRENT QUESTION
 ${userMessage}
 
 ${structureHint}`;
+}
+
+/**
+ * The selected sources a per-source question asks about. Without the list the model only sees
+ * the sources that have passages, and drops one whose passages miss the question (#450).
+ */
+function buildSourcesToCover(titles: string[]): string {
+  if (titles.length < 2) return "";
+  const list = titles.map((t) => `- "${t}"`).join("\n");
+  return `# SOURCES TO COVER
+The question asks about each selected source. Cover all ${titles.length}:
+${list}
+
+Give each source its own part of the answer, named by its title. If none of a source's passages address what was asked, say so for that source in one sentence instead of leaving it out. Never describe them as fewer sources than this.
+
+`;
 }
 
 /**
