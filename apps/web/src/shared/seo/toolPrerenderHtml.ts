@@ -1,5 +1,6 @@
 import type { ToolPageConfig } from "@/features/tools/toolPages";
 import { escapeHtml } from "./seoHtml";
+import { buildPrerenderFreeToolsNavHtml } from "./toolsHubPrerenderHtml";
 
 /** Static crawler body for a free tool page: H1, steps, sections, FAQ and related links. */
 export function buildToolPrerenderBody(page: ToolPageConfig): string {
@@ -51,6 +52,7 @@ ${related}
       </section>
       <footer>
         <p><a href="/">SolomindLM home</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }

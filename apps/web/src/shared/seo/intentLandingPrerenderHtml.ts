@@ -6,6 +6,7 @@ import {
 } from "@/features/landing/intentLandingPages";
 import { buildUpdatedLineHtml } from "./seoDates";
 import { escapeHtml } from "./seoHtml";
+import { buildPrerenderFreeToolsNavHtml } from "./toolsHubPrerenderHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
 export function buildIntentLandingPrerenderBody(page: IntentLandingPageConfig): string {
@@ -83,6 +84,7 @@ ${relatedLinks}
       }
       <footer>
         <p><a href="/">SolomindLM home</a></p>
+${buildPrerenderFreeToolsNavHtml()}
       </footer>
       </article>\n    </main>`;
 }

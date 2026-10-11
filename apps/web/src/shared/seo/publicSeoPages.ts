@@ -13,7 +13,14 @@ import {
   SEO_CONTENT_PAGES,
 } from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
-import { FREE_TOOL_PAGES, getToolBreadcrumbItems } from "@/features/tools/toolPages";
+import { FREE_TOOL_PAGES } from "@/features/tools/toolPages";
+import {
+  getToolBreadcrumbItems,
+  getToolsHubBreadcrumbItems,
+  getToolsHubLinks,
+  TOOLS_HUB_LAST_UPDATED,
+  TOOLS_HUB_PAGE,
+} from "@/features/tools/toolsHubPage";
 import {
   SEO_DEFAULT_DESCRIPTION,
   SEO_DEFAULT_KEYWORDS,
@@ -23,6 +30,7 @@ import {
 import {
   generateArticleStructuredData,
   generateBreadcrumbStructuredData,
+  generateCollectionPageStructuredData,
   generateFAQStructuredData,
   generateHowToStructuredData,
   generateOrganizationStructuredData,
@@ -126,6 +134,27 @@ const TOOL_SEO_PAGES: PublicSeoPage[] = FREE_TOOL_PAGES.map((page) => ({
   ],
 }));
 
+const TOOLS_HUB_SEO_PAGE: PublicSeoPage = {
+  path: TOOLS_HUB_PAGE.path,
+  title: TOOLS_HUB_PAGE.title,
+  description: TOOLS_HUB_PAGE.description,
+  keywords: TOOLS_HUB_PAGE.keywords,
+  changefreq: "weekly",
+  priority: 0.9,
+  lastmod: TOOLS_HUB_LAST_UPDATED,
+  structuredData: [
+    generateBreadcrumbStructuredData(getToolsHubBreadcrumbItems()),
+    generateCollectionPageStructuredData({
+      name: TOOLS_HUB_PAGE.h1,
+      description: TOOLS_HUB_PAGE.description,
+      path: TOOLS_HUB_PAGE.path,
+      dateModified: TOOLS_HUB_LAST_UPDATED,
+      items: getToolsHubLinks().map((link) => ({ name: link.label, path: link.path })),
+    }),
+    generateFAQStructuredData(TOOLS_HUB_PAGE.faqs, { dateModified: TOOLS_HUB_LAST_UPDATED }),
+  ],
+};
+
 const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
   {
     path: "/",
@@ -182,6 +211,7 @@ const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
   },
   ...CLUSTER_HUB_SEO_PAGES,
   ...INTENT_SEO_PAGES,
+  TOOLS_HUB_SEO_PAGE,
   ...TOOL_SEO_PAGES,
   ...SEO_CONTENT_SEO_PAGES,
 ];
