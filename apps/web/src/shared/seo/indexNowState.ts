@@ -19,38 +19,39 @@ const SITEMAP_LOC_PATTERN = /<loc>\s*([^<]+?)\s*<\/loc>/;
 const SITEMAP_LASTMOD_PATTERN = /<lastmod>\s*([^<]+?)\s*<\/lastmod>/;
 
 /**
- * True when the body is one `<urlset>` root with only an XML declaration or comments around it.
- * A plain scan rather than one anchored regex, which backtracks badly on repeated comments.
+ * The `<urlset>` root element when it is the whole document apart from an XML declaration and
+ * comments, else null. Returning the bare root keeps `<url>` text inside those comments out of the
+ * scan. A plain scan rather than one anchored regex, which backtracks badly on repeated comments.
  */
-function isWholeUrlsetDocument(xml: string): boolean {
+function extractUrlsetRoot(xml: string): string | null {
   let body = xml.trim();
   if (body.startsWith("<?xml")) {
     const end = body.indexOf("?>");
     if (end === -1) {
-      return false;
+      return null;
     }
     body = body.slice(end + 2).trimStart();
   }
   while (body.startsWith("<!--")) {
     const end = body.indexOf("-->");
     if (end === -1) {
-      return false;
+      return null;
     }
     body = body.slice(end + 3).trimStart();
   }
   while (body.endsWith("-->")) {
     const start = body.lastIndexOf("<!--");
     if (start === -1) {
-      return false;
+      return null;
     }
     body = body.slice(0, start).trimEnd();
   }
   const afterName = body.charAt("<urlset".length);
-  return (
+  const isRoot =
     body.startsWith("<urlset") &&
     (afterName === ">" || /\s/.test(afterName)) &&
-    body.endsWith("</urlset>")
-  );
+    body.endsWith("</urlset>");
+  return isRoot ? body : null;
 }
 
 /** The body of each `<url>` block, or null if one is never closed. Linear indexOf scan. */
@@ -82,10 +83,11 @@ function readUrlBlocks(xml: string): string[] | null {
  * an empty sitemap and treat every page as new.
  */
 export function parseSitemapState(xml: string): IndexNowPersistedState | null {
-  if (!isWholeUrlsetDocument(xml)) {
+  const root = extractUrlsetRoot(xml);
+  if (root === null) {
     return null;
   }
-  const blocks = readUrlBlocks(xml);
+  const blocks = readUrlBlocks(root);
   if (!blocks) {
     return null;
   }

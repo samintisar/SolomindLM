@@ -180,6 +180,14 @@ describe("parseSitemapState validation", () => {
     ).toEqual({ urls: {} });
   });
 
+  it("ignores <url> text inside comments around the root", () => {
+    expect(
+      parseSitemapState(
+        `<!-- <url> --><urlset><url><loc>${SEO_BASE_URL}/</loc></url></urlset><!-- </url><url> -->`
+      )
+    ).toEqual({ urls: { [`${SEO_BASE_URL}/`]: { lastmod: "" } } });
+  });
+
   it("returns null for an unterminated comment or XML declaration", () => {
     expect(parseSitemapState("<!-- open <urlset></urlset>")).toBeNull();
     expect(parseSitemapState('<?xml version="1.0" <urlset></urlset>')).toBeNull();
