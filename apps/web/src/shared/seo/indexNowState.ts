@@ -11,13 +11,45 @@ export type IndexNowUrlDiff = {
   removed: string[];
 };
 
-/** The whole body must be one `<urlset>` root, with only an XML declaration or comments around it. */
-const SITEMAP_URLSET_PATTERN =
-  /^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<urlset[\s>][\s\S]*<\/urlset>\s*(?:<!--[\s\S]*?-->\s*)*$/;
 const SITEMAP_URL_OPEN_PATTERN = /<url>/g;
 const SITEMAP_URL_PATTERN = /<url>([\s\S]*?)<\/url>/g;
 const SITEMAP_LOC_PATTERN = /<loc>\s*([^<]+?)\s*<\/loc>/;
 const SITEMAP_LASTMOD_PATTERN = /<lastmod>\s*([^<]+?)\s*<\/lastmod>/;
+
+/**
+ * True when the body is one `<urlset>` root with only an XML declaration or comments around it.
+ * A plain scan rather than one anchored regex, which backtracks badly on repeated comments.
+ */
+function isWholeUrlsetDocument(xml: string): boolean {
+  let body = xml.trim();
+  if (body.startsWith("<?xml")) {
+    const end = body.indexOf("?>");
+    if (end === -1) {
+      return false;
+    }
+    body = body.slice(end + 2).trimStart();
+  }
+  while (body.startsWith("<!--")) {
+    const end = body.indexOf("-->");
+    if (end === -1) {
+      return false;
+    }
+    body = body.slice(end + 3).trimStart();
+  }
+  while (body.endsWith("-->")) {
+    const start = body.lastIndexOf("<!--");
+    if (start === -1) {
+      return false;
+    }
+    body = body.slice(0, start).trimEnd();
+  }
+  const afterName = body.charAt("<urlset".length);
+  return (
+    body.startsWith("<urlset") &&
+    (afterName === ">" || /\s/.test(afterName)) &&
+    body.endsWith("</urlset>")
+  );
+}
 
 /**
  * Reads `<loc>` → `<lastmod>` pairs from a sitemap.xml body. Returns null for anything that is not
@@ -25,7 +57,7 @@ const SITEMAP_LASTMOD_PATTERN = /<lastmod>\s*([^<]+?)\s*<\/lastmod>/;
  * an empty sitemap and treat every page as new.
  */
 export function parseSitemapState(xml: string): IndexNowPersistedState | null {
-  if (!SITEMAP_URLSET_PATTERN.test(xml)) {
+  if (!isWholeUrlsetDocument(xml)) {
     return null;
   }
   const blocks = [...xml.matchAll(SITEMAP_URL_PATTERN)];
