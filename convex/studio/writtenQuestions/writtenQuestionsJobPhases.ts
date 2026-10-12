@@ -8,7 +8,7 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { sanitizeUserInput } from "../../_agents/_shared/index";
+import { invokeWithTimeout, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
@@ -41,7 +41,9 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
+import { invokeStudioLlm, invokeWithinBudget } from "../_job/invokeStudioLlm";
+import { createJobDeadline } from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("WrittenQuestionsGraph");
@@ -61,7 +63,12 @@ const WrittenQuestionIdSelectionSchema = z.object({
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
+  // Finalization must end (saved or marked failed) before Convex's 600s action
+  // limit, which kills the action without running its catch block.
+  FINALIZE_BUDGET_MS: 540_000,
+  REDUCE_TIMEOUT_MS: 480_000, // all selection attempts together
+  SAVE_RESERVE_MS: 30_000, // held back from selection for title generation + saving
+  TITLE_TIMEOUT_MS: 20_000,
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 30,
   // Match LangGraph routing.ts — 2.5× over-generation gives dedupe headroom to land at target
@@ -605,6 +612,8 @@ export async function runFinalizeWrittenQuestionsPhase(
 
   logger.info("Starting finalization phase");
 
+  const deadline = createJobDeadline(CONFIG.FINALIZE_BUDGET_MS);
+
   try {
     // Get written questions with map results
     const writtenQuestion = await ctx.runQuery(internal.studio.writtenQuestions.index.getInternal, {
@@ -707,13 +716,13 @@ export async function runFinalizeWrittenQuestionsPhase(
       console.log(`[WrittenQuestionsJob] Selection prompt: ${selectionPrompt.length} chars`);
 
       const startTime = Date.now();
-      const selectionResponse = await invokeStudioLlm({
+      const selectionResponse = await invokeWithinBudget({
         invoke: () =>
           structuredSelectLLM.invoke([
             new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
             new HumanMessage(selectionPrompt),
           ]),
-        timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+        timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, CONFIG.SAVE_RESERVE_MS),
         phaseLabel: "WrittenQuestionsSelect",
         retry: { maxAttempts: 2, baseDelayMs: 1000 },
       });
@@ -782,9 +791,11 @@ export async function runFinalizeWrittenQuestionsPhase(
           .map((q) => q.question)
           .join(" ")
           .substring(0, 2000);
-        title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-          chunk: titleContent,
-        });
+        title = await invokeWithTimeout(
+          () => generateTitleFromChunk(titleContent),
+          deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
+          "WrittenQuestionsTitle"
+        );
       } catch (_e) {
         console.log("[WrittenQuestionsJob] Title generation failed, using default");
       }

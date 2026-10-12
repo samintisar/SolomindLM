@@ -6,7 +6,11 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
+import {
+  allWithConcurrency,
+  invokeWithTimeout,
+  sanitizeUserInput,
+} from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
@@ -39,7 +43,9 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
+import { invokeStudioLlm, invokeWithinBudget } from "../_job/invokeStudioLlm";
+import { createJobDeadline } from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("QuizGraph");
@@ -51,8 +57,14 @@ const { packChunks, validateChunks } = createStudioChunkHelpers("QuizGraph");
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 400_000, // ~6.7 minutes
-  EXPAND_TIMEOUT_MS: 60_000, // 60 seconds per question expansion
+  // Finalization must end (saved or marked failed) before Convex's 600s action
+  // limit, which kills the action without running its catch block.
+  FINALIZE_BUDGET_MS: 540_000,
+  REDUCE_TIMEOUT_MS: 400_000, // all selection attempts together
+  EXPAND_RESERVE_MS: 150_000, // held back from selection: expansion waves + save
+  EXPAND_TIMEOUT_MS: 120_000, // all attempts of one question expansion together
+  SAVE_RESERVE_MS: 30_000, // held back from expansion for title generation + saving
+  TITLE_TIMEOUT_MS: 20_000,
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 20,
   BUFFER_MULTIPLIER: 1.2,
@@ -563,6 +575,8 @@ export async function runFinalizeQuizPhase(
 
   logger.info("Starting finalization phase");
 
+  const deadline = createJobDeadline(CONFIG.FINALIZE_BUDGET_MS);
+
   try {
     // Get quiz with map results
     const quiz = await ctx.runQuery(internal.studio.quizzes.index.getInternal, { id: quizId });
@@ -656,13 +670,13 @@ export async function runFinalizeQuizPhase(
     });
 
     const startTime = Date.now();
-    const selectionResponse = await invokeStudioLlm({
+    const selectionResponse = await invokeWithinBudget({
       invoke: () =>
         (structuredSelectLLM as any).invoke([
           new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
           new HumanMessage(selectionPrompt),
         ]),
-      timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, CONFIG.EXPAND_RESERVE_MS),
       phaseLabel: "QuizSelect",
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
     });
@@ -731,7 +745,9 @@ export async function runFinalizeQuizPhase(
         return async () => {
           try {
             const prompt = getExpandPrompt(candidate);
-            return await invokeStudioLlm({
+            // Expansions queued behind earlier waves get only what is left, so the
+            // last wave cannot push past the deadline.
+            return await invokeWithinBudget({
               invoke: () =>
                 (structuredExpandLLM as any).invoke([
                   new SystemMessage(
@@ -739,7 +755,7 @@ export async function runFinalizeQuizPhase(
                   ),
                   new HumanMessage(prompt),
                 ]),
-              timeoutMs: CONFIG.EXPAND_TIMEOUT_MS,
+              timeoutMs: deadline.stepTimeoutMs(CONFIG.EXPAND_TIMEOUT_MS, CONFIG.SAVE_RESERVE_MS),
               phaseLabel: "QuizExpand",
               retry: { maxAttempts: 2, baseDelayMs: 1000 },
             });
@@ -780,9 +796,11 @@ export async function runFinalizeQuizPhase(
         .map((q) => q.question)
         .join(" ")
         .substring(0, 2000);
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: titleContent,
-      });
+      title = await invokeWithTimeout(
+        () => generateTitleFromChunk(titleContent),
+        deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
+        "QuizTitle"
+      );
     } catch (_e) {
       console.log("[QuizJob] Title generation failed, using default");
     }
