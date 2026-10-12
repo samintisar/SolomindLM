@@ -8,6 +8,12 @@ import {
 
 const TABLE = "| Indicator | 2025 | 2026 |\n| --- | --- | --- |\n| Brent ($/b) | $69 | $91 |";
 
+const CHART = {
+  kind: "chart",
+  description: "Revenue by region.",
+  details: "EMEA rises from 1.2M to 2.0M.",
+};
+
 describe("markdownFromMistralOcrResponse", () => {
   it("labels and joins pages", () => {
     expect(
@@ -60,13 +66,36 @@ describe("markdownFromMistralOcrResponse", () => {
     });
     expect(md).toBe(`**Page 1**\n\ntext\n\n${TABLE}`);
   });
-});
 
-const CHART = {
-  kind: "chart",
-  description: "Revenue by region.",
-  details: "EMEA rises from 1.2M to 2.0M.",
-};
+  it("inlines figure descriptions on their page", () => {
+    const md = markdownFromMistralOcrResponse({
+      pages: [
+        { markdown: "one" },
+        {
+          markdown: "![img-0.jpeg](img-0.jpeg)",
+          images: [{ id: "img-0.jpeg", image_annotation: JSON.stringify(CHART) }],
+        },
+      ],
+    });
+    expect(md).toBe(`**Page 1**\n\none\n\n---\n\n**Page 2**\n\n${figureBlock(CHART)}`);
+  });
+
+  it("reports malformed figure annotations through the option", () => {
+    const onMalformedAnnotation = vi.fn();
+    markdownFromMistralOcrResponse(
+      {
+        pages: [
+          {
+            markdown: "![img-0.jpeg](img-0.jpeg)",
+            images: [{ id: "img-0.jpeg", image_annotation: "{bad" }],
+          },
+        ],
+      },
+      { onMalformedAnnotation }
+    );
+    expect(onMalformedAnnotation).toHaveBeenCalledWith("img-0.jpeg");
+  });
+});
 
 describe("parseFigureAnnotation", () => {
   it("reads an annotation given as a JSON string", () => {

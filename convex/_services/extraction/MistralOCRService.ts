@@ -104,18 +104,25 @@ function inlineOcrTables(markdown: string, tables: MistralOcrTable[] | undefined
   return md;
 }
 
-/**
- * Stitch OCR pages into one markdown string with visible page labels (HTML comments are hidden when rendered).
- */
-export function markdownFromMistralOcrResponse(data: {
-  pages?: Array<{ markdown?: string; tables?: MistralOcrTable[] }>;
+export type MistralOcrResponse = {
+  pages?: Array<{ markdown?: string; tables?: MistralOcrTable[]; images?: MistralOcrImage[] }>;
   markdown?: string;
   text?: string;
-}): string {
+};
+
+/**
+ * Stitch OCR pages into one markdown string with visible page labels (HTML comments are hidden when rendered).
+ * Tables and figure descriptions are put back where OCR left their placeholders.
+ */
+export function markdownFromMistralOcrResponse(
+  data: MistralOcrResponse,
+  options: { onMalformedAnnotation?: (imageId: string) => void } = {}
+): string {
   if (data?.pages && Array.isArray(data.pages) && data.pages.length > 0) {
     return data.pages
       .map((page, index) => {
-        const md = inlineOcrTables(page.markdown || "", page.tables);
+        const withTables = inlineOcrTables(page.markdown || "", page.tables);
+        const md = inlineOcrFigures(withTables, page.images, options.onMalformedAnnotation);
         const label = `**Page ${index + 1}**`;
         return index === 0 ? `${label}\n\n${md}` : `---\n\n${label}\n\n${md}`;
       })
