@@ -34,7 +34,6 @@ import {
   chunkRankingScore,
   documentsWithRerankedPassages,
   mergeChunkScores,
-  perSourceDocumentIds,
   selectChunksByTokenBudgetWithReservation,
   selectedSourceIds,
   titlesOfSources,
@@ -645,22 +644,28 @@ export class ChatAgent {
     const attachedSet = new Set(context.attachedDocumentIds ?? []);
     const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
     const ragContext = { ...context, documentIds: ragDocumentIds };
-    // "What does each paper say about X?", as judged by the planner: search each selected source
-    // too, and have the answer cover every one (#450).
-    let sourcesAskedAbout: string[] = [];
+    // The selected sources the answer is told about; when the planner judges the question to be
+    // about each of them ("what does each paper say about X?"), each is also searched on its own
+    // and the answer covers every one (#450).
+    const selectedSources = selectedSourceIds(context.documentIds);
+    let coverEachSource = false;
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
 
       const subqueryStart = Date.now();
-      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns);
+      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns, {
+        severalSourcesSelected: selectedSources.length > 0,
+      });
       rerankQueryOpt = plan.rerankQuery;
       const { subqueries } = plan;
-      sourcesAskedAbout = perSourceDocumentIds(plan.aboutEachSource === true, context.documentIds);
-      const perSourceSearchIds = sourcesAskedAbout.filter((id) => !attachedSet.has(id));
-      if (sourcesAskedAbout.length > 0) {
+      coverEachSource = plan.aboutEachSource === true && selectedSources.length > 0;
+      const perSourceSearchIds = coverEachSource
+        ? selectedSources.filter((id) => !attachedSet.has(id))
+        : [];
+      if (coverEachSource) {
         logger.info("Question asks about each selected source", {
-          sources: sourcesAskedAbout.length,
+          sources: selectedSources.length,
         });
       }
       logger.apiSuccess(
@@ -830,10 +835,10 @@ export class ChatAgent {
       {
         // Every selected source is named, so the answer counts them right ("both papers" for
         // three, #450); only a question about each one asks for a part per source.
-        titles: await titlesOfSources(selectedSourceIds(context.documentIds), merged, (ids) =>
+        titles: await titlesOfSources(selectedSources, merged, (ids) =>
           this.lookupSourceTitles(ids, logger)
         ),
-        coverEach: sourcesAskedAbout.length > 0,
+        coverEach: coverEachSource,
       }
     );
   }

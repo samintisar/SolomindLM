@@ -90,48 +90,58 @@ export function createRerankFn(ctx: ActionCtx): RerankFunction {
 }
 
 /**
- * The selected document ids that belong to the notebook. Chat reads selected documents by id
- * (their titles, their full text), so an id from another notebook must not get that far.
+ * The selected document ids that belong to the notebook, reading only the selected rows. Chat
+ * reads selected documents by id (their titles, their full text), so an id from another notebook
+ * must not get that far.
  */
 export async function documentIdsInNotebook(
   ctx: ActionCtx,
   notebookId: Id<"notebooks">,
-  userId: Id<"users">,
   documentIds: string[] | undefined
 ): Promise<string[] | undefined> {
   if (!documentIds?.length) return documentIds;
-  const docs = (await ctx.runQuery(
-    internal.documents.internal.listDocumentsForNotebookReadInternal,
-    { notebookId, userId }
-  )) as Array<{ _id: string }>;
-  const inNotebook = new Set(docs.map((d) => d._id));
+  const docs = await ctx.runQuery(internal.documents.internal.listNotebookDocumentTitles, {
+    notebookId,
+    documentIds,
+  });
+  const inNotebook = new Set<string>(docs.map((d) => d._id));
   return documentIds.filter((id) => inNotebook.has(id));
 }
 
 /**
- * Documents' file names keyed by id, in one query and without loading chunks (#450: naming
- * selected sources retrieval found no passage in). Callers pass ids already checked with
- * documentIdsInNotebook.
+ * The notebook's documents' file names keyed by id, in one query and without loading chunks
+ * (#450: naming selected sources retrieval found no passage in). An id outside the notebook, or
+ * deleted since, gets no title.
  */
 export function createFetchDocumentTitlesFn(
-  ctx: ActionCtx
+  ctx: ActionCtx,
+  notebookId: Id<"notebooks">
 ): NonNullable<ChatAgentOptions["fetchDocumentTitlesFn"]> {
   return async (documentIds: string[]) => {
-    const docs = (await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
-      documentIds: documentIds as Id<"documents">[],
-    })) as Array<{ _id: string; fileName?: string }>;
-    return Object.fromEntries(docs.flatMap((d) => (d.fileName ? [[d._id, d.fileName]] : [])));
+    const docs = await ctx.runQuery(internal.documents.internal.listNotebookDocumentTitles, {
+      notebookId,
+      documentIds,
+    });
+    return Object.fromEntries(docs.map((d) => [d._id, d.fileName]));
   };
 }
 
-/** Loads a document's full text (its chunks in order) for chat's full-document expansion. */
+/**
+ * Loads a document's full text (its chunks in order) and title, for chat's full-document
+ * expansion and @-attached sources (named by their file name, not "Attached document").
+ */
 export function createFetchDocumentFn(
   ctx: ActionCtx
 ): NonNullable<ChatAgentOptions["fetchDocumentFn"]> {
   return async (documentId: string) => {
-    const chunks = await ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
-      documentId: documentId as Id<"documents">,
-    });
+    const [chunks, [doc]] = await Promise.all([
+      ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
+        documentId: documentId as Id<"documents">,
+      }),
+      ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
+        documentIds: [documentId as Id<"documents">],
+      }),
+    ]);
     if (!chunks || chunks.length === 0) return null;
 
     const sortedChunks = chunks.sort(
@@ -143,6 +153,7 @@ export function createFetchDocumentFn(
       documentId: documentId as Id<"documents">,
       content,
       chunkCount: chunks.length,
+      title: doc?.fileName,
     };
   };
 }

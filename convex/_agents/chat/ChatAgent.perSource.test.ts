@@ -9,7 +9,7 @@ vi.hoisted(() => {
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { ChatAgent } from "./ChatAgent";
 import { MAX_PER_SOURCE_DOCUMENTS, PER_SOURCE_PASSAGES_PER_SEARCH } from "./chatConfig";
-import { perSourceDocumentIds, selectedSourceIds, titlesOfSources } from "./chunkContext";
+import { selectedSourceIds, titlesOfSources } from "./chunkContext";
 import type { ReferenceChunk } from "./types";
 
 const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
@@ -23,25 +23,6 @@ const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
 });
 
 const logger = createServiceLogger("ChatAgent", "test");
-
-// The retrieval planner decides whether a question is about each selected source.
-describe("perSourceDocumentIds (#450)", () => {
-  it("returns the selected sources when the planner says the question is about each one", () => {
-    expect(perSourceDocumentIds(true, ["rag", "react", "rag", "self-rag"])).toEqual([
-      "rag",
-      "react",
-      "self-rag",
-    ]);
-  });
-
-  it("returns none for a topic question, one source, or more sources than it can cover", () => {
-    expect(perSourceDocumentIds(false, ["rag", "react"])).toEqual([]);
-    expect(perSourceDocumentIds(true, ["rag"])).toEqual([]);
-    expect(perSourceDocumentIds(true, undefined)).toEqual([]);
-    const many = Array.from({ length: MAX_PER_SOURCE_DOCUMENTS + 1 }, (_, i) => `d${i}`);
-    expect(perSourceDocumentIds(true, many)).toEqual([]);
-  });
-});
 
 describe("selectedSourceIds (#450)", () => {
   it("lists two or more selected sources once each, up to the cap", () => {

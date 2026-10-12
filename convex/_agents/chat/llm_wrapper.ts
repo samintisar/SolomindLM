@@ -224,13 +224,16 @@ Question: ${query}`;
    */
   async generateRetrievalSubqueries(
     userMessage: string,
-    conversationHistory: Array<{ role: string; content: string }> = []
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    options: { severalSourcesSelected?: boolean } = {}
   ): Promise<{ subqueries: string[]; rerankQuery?: string; aboutEachSource?: boolean }> {
     const fallback = { subqueries: [userMessage.trim() || "study material"] };
     const trimmed = userMessage.trim();
     if (!trimmed) return fallback;
 
-    if (trivialRetrievalSubqueryMessage(trimmed)) {
+    // With several sources selected, even a short question may be about each of them ("what did
+    // these papers conclude?"), and only the planner decides that (#450).
+    if (!options.severalSourcesSelected && trivialRetrievalSubqueryMessage(trimmed)) {
       console.log("[ChatLLMWrapper] Skipping subquery decomposition (single-intent query)");
       return { subqueries: [trimmed] };
     }

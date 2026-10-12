@@ -7,6 +7,7 @@ vi.mock("../_agents/chat/rerankCache.js", () => ({ cachedRerank }));
 
 import {
   createChatVectorSearchRunner,
+  createFetchDocumentFn,
   createFetchDocumentTitlesFn,
   createRerankFn,
   documentIdsInNotebook,
@@ -23,46 +24,67 @@ describe("createRerankFn", () => {
 });
 
 describe("documentIdsInNotebook", () => {
-  it("keeps only selected ids that belong to the notebook", async () => {
-    const runQuery = vi.fn(async () => [{ _id: "doc-a" }, { _id: "doc-b" }]);
-    const ctx = { runQuery } as unknown as ActionCtx;
+  const notebookId = "nb-1" as Id<"notebooks">;
 
-    await expect(
-      documentIdsInNotebook(ctx, "nb-1" as Id<"notebooks">, "u-1" as Id<"users">, [
-        "doc-a",
-        "doc-elsewhere",
-        "doc-b",
-      ])
-    ).resolves.toEqual(["doc-a", "doc-b"]);
-  });
-
-  it("leaves no selection as no selection, without a query", async () => {
-    const runQuery = vi.fn();
-    const ctx = { runQuery } as unknown as ActionCtx;
-
-    await expect(
-      documentIdsInNotebook(ctx, "nb-1" as Id<"notebooks">, "u-1" as Id<"users">, undefined)
-    ).resolves.toBeUndefined();
-    await expect(
-      documentIdsInNotebook(ctx, "nb-1" as Id<"notebooks">, "u-1" as Id<"users">, [])
-    ).resolves.toEqual([]);
-    expect(runQuery).not.toHaveBeenCalled();
-  });
-});
-
-describe("createFetchDocumentTitlesFn", () => {
-  it("returns every document's file name in one query, without loading chunks", async () => {
+  it("keeps the selected ids the notebook query returns, reading only those", async () => {
+    // The query returns only the selected documents that are in the notebook.
     const runQuery = vi.fn(async () => [
       { _id: "doc-a", fileName: "a.pdf" },
       { _id: "doc-b", fileName: "b.pdf" },
     ]);
     const ctx = { runQuery } as unknown as ActionCtx;
 
-    await expect(createFetchDocumentTitlesFn(ctx)(["doc-a", "doc-b"])).resolves.toEqual({
-      "doc-a": "a.pdf",
-      "doc-b": "b.pdf",
+    await expect(
+      documentIdsInNotebook(ctx, notebookId, ["doc-a", "doc-elsewhere", "doc-b"])
+    ).resolves.toEqual(["doc-a", "doc-b"]);
+    expect(runQuery).toHaveBeenCalledWith(expect.anything(), {
+      notebookId,
+      documentIds: ["doc-a", "doc-elsewhere", "doc-b"],
     });
+  });
+
+  it("leaves no selection as no selection, without a query", async () => {
+    const runQuery = vi.fn();
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(documentIdsInNotebook(ctx, notebookId, undefined)).resolves.toBeUndefined();
+    await expect(documentIdsInNotebook(ctx, notebookId, [])).resolves.toEqual([]);
+    expect(runQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("createFetchDocumentFn", () => {
+  it("returns the document's title with its text, so attached sources are named", async () => {
+    const runQuery = vi.fn(async (_fn: unknown, args: Record<string, unknown>) =>
+      "chunkIds" in args || !("documentIds" in args)
+        ? [
+            { chunkIndex: 1, content: "second" },
+            { chunkIndex: 0, content: "first" },
+          ]
+        : [{ _id: "doc-a", fileName: "a.pdf" }]
+    );
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(createFetchDocumentFn(ctx)("doc-a")).resolves.toMatchObject({
+      content: "first\n\nsecond",
+      title: "a.pdf",
+    });
+  });
+});
+
+describe("createFetchDocumentTitlesFn", () => {
+  it("returns the notebook documents' file names in one query, without loading chunks", async () => {
+    const runQuery = vi.fn(async () => [{ _id: "doc-a", fileName: "a.pdf" }]);
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(
+      createFetchDocumentTitlesFn(ctx, "nb-1" as Id<"notebooks">)(["doc-a", "doc-gone"])
+    ).resolves.toEqual({ "doc-a": "a.pdf" });
     expect(runQuery).toHaveBeenCalledTimes(1);
+    expect(runQuery).toHaveBeenCalledWith(expect.anything(), {
+      notebookId: "nb-1",
+      documentIds: ["doc-a", "doc-gone"],
+    });
   });
 });
 

@@ -388,6 +388,29 @@ export const getDocumentDetails = internalQuery({
 });
 
 /**
+ * Internal: the selected documents that are in the notebook, with their titles, reading only the
+ * selected rows (#450). Ids come from the client, so malformed, deleted or other notebooks' ids are
+ * dropped rather than trusted.
+ */
+export const listNotebookDocumentTitles = internalQuery({
+  args: {
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const rows: Array<{ _id: Id<"documents">; fileName: string }> = [];
+    for (const raw of new Set(args.documentIds)) {
+      const id = ctx.db.normalizeId("documents", raw);
+      const doc = id ? await ctx.db.get(id) : null;
+      if (doc && doc.notebookId === args.notebookId) {
+        rows.push({ _id: doc._id, fileName: doc.fileName });
+      }
+    }
+    return rows;
+  },
+});
+
+/**
  * Internal: Get document titles by IDs (for chat reference tooltips)
  */
 export const getDocumentsByIds = internalQuery({

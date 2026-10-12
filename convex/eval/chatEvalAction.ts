@@ -209,7 +209,7 @@ export const runChatEval = action({
       vectorSearchHandler: hybridSearch,
       globalRerankFn: spyGlobalRerankFn,
       fetchDocumentFn: createFetchDocumentFn(ctx),
-      fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx),
+      fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx, notebookIdTyped),
     });
 
     // ── Consume the full generator stream ──

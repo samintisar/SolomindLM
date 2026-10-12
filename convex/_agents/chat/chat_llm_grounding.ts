@@ -28,7 +28,7 @@ export function buildGroundingPrompt(
       const typeLabel = docType ? ` (${docType})` : "";
 
       const sourceLabel = chunk.sourceUrl?.startsWith("http") ? "[Web] " : "";
-      let contextHeader = `${sourceLabel}[${index + 1}] From "${chunk.sourceTitle}"${typeLabel}`;
+      let contextHeader = `${sourceLabel}[${index + 1}] From "${promptSafeTitle(chunk.sourceTitle)}"${typeLabel}`;
 
       if (meta?.headingPath && meta.headingPath.length > 0) {
         contextHeader += ` > ${meta.headingPath.join(" > ")}`;
@@ -129,7 +129,7 @@ ${structureHint}`;
 function buildSelectedSources(sources?: SelectedSources): string {
   if (!sources || sources.titles.length < 2) return "";
   const { titles, coverEach } = sources;
-  const list = titles.map((t) => `- "${asListedTitle(t)}"`).join("\n");
+  const list = titles.map((t) => `- "${promptSafeTitle(t)}"`).join("\n");
   const coverage = coverEach
     ? `
 The question asks about each of them. Give each source its own part of the answer, named by its title. If a source has no passages above, or none that address what was asked, say in one sentence that the passages retrieved from it don't cover this (not that the source itself doesn't), instead of leaving it out.
@@ -144,8 +144,8 @@ ${coverage}
 `;
 }
 
-/** A title on one quoted line: a filename can't break out of the list into a heading of its own. */
-function asListedTitle(title: string): string {
+/** A title on one quoted line: a filename can't break out of a header or list into a prompt section. */
+function promptSafeTitle(title: string): string {
   return title.replace(/\s+/g, " ").replace(/"/g, "'").trim().slice(0, 200);
 }
 

@@ -13,18 +13,9 @@ import {
 import type { ReferenceChunk } from "./types";
 
 /**
- * The selected sources a question asks about one by one ("what limitations does each paper
- * acknowledge?"), as judged by the retrieval planner: each gets its own search and a part of the
- * answer (#450). Empty for topic questions, a single source, or more sources than per-source
- * search covers.
- */
-export function perSourceDocumentIds(aboutEachSource: boolean, documentIds?: string[]): string[] {
-  return aboutEachSource ? selectedSourceIds(documentIds) : [];
-}
-
-/**
  * The selected sources the answer is told about (#450): two or more, once each, up to
- * MAX_PER_SOURCE_DOCUMENTS. Empty otherwise.
+ * MAX_PER_SOURCE_DOCUMENTS. Empty otherwise. When the planner judges a question to be about each
+ * of them, each is also searched on its own and gets a part of the answer.
  */
 export function selectedSourceIds(documentIds?: string[]): string[] {
   const ids = [...new Set(documentIds ?? [])];
