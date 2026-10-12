@@ -470,3 +470,32 @@ export async function uploadText(notebookId: string, text: string): Promise<Uplo
     status: "success",
   };
 }
+
+/** Look for a paper source's open-access full text again. */
+export function useFindPaperFullText() {
+  const run = useMutation(api.documents.paperFullText.findFullText);
+  return useCallback(
+    (documentId: string) => run({ documentId: documentId as Id<"documents"> }),
+    [run]
+  );
+}
+
+/** Upload a PDF and attach it to a paper source; resolves to `{ ok }` or `{ ok: false, reason }`. */
+export function useAttachPaperPdf() {
+  const generateUploadUrl = useMutation(api.documents.index.generateUploadUrl);
+  const attach = useMutation(api.documents.paperFullText.attachPdf);
+  return useCallback(
+    async (documentId: string, file: File) => {
+      const uploadUrl = await generateUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/pdf" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      return attach({ documentId: documentId as Id<"documents">, storageId });
+    },
+    [generateUploadUrl, attach]
+  );
+}

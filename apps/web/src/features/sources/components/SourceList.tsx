@@ -27,6 +27,8 @@ interface SourceListProps {
   onViewSource: (id: string) => void;
   onDeleteSource: (id: string, title: string) => void;
   onRefreshSource: (id: string) => void;
+  onFindFullText: (id: string) => void;
+  onUploadPdf: (id: string) => void;
   onRenameSource: (id: string, newTitle: string) => void;
   allSelected: boolean;
   renamingId: string | null;
@@ -55,6 +57,8 @@ export const SourceList: React.FC<SourceListProps> = ({
   onViewSource,
   onDeleteSource,
   onRefreshSource,
+  onFindFullText,
+  onUploadPdf,
   onRenameSource,
   allSelected,
   renamingId,
@@ -209,6 +213,8 @@ export const SourceList: React.FC<SourceListProps> = ({
               onStartRename={onStartRename}
               isMenuOpen={openMenuId === source.id}
               onRefreshSource={onRefreshSource}
+              onFindFullText={onFindFullText}
+              onUploadPdf={onUploadPdf}
             />
           ))}
         </ItemGroup>

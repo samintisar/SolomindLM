@@ -139,4 +139,32 @@ describe("SourceListItem", () => {
     setup({}, paper({ ingestionStatus: "metadata_only", fulltextStatus: "external_only" }));
     expect(screen.getByText(/Abstract only/)).toBeInTheDocument();
   });
+
+  it("offers Find full text and Upload PDF for an abstract-only paper", async () => {
+    const onFindFullText = vi.fn();
+    const onUploadPdf = vi.fn();
+    setup(
+      { isMenuOpen: true, onFindFullText, onUploadPdf },
+      paper({ ingestionStatus: "metadata_only" })
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Find full text" }));
+    expect(onFindFullText).toHaveBeenCalledWith("s1");
+  });
+
+  it("uploads a PDF from the menu", async () => {
+    const onUploadPdf = vi.fn();
+    setup(
+      { isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf },
+      paper({ ingestionStatus: "metadata_only" })
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Upload PDF" }));
+    expect(onUploadPdf).toHaveBeenCalledWith("s1");
+  });
+
+  it("doesn't offer them for a paper that has full text", async () => {
+    setup({ isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf: vi.fn() }, paper({}));
+    await screen.findByRole("menuitem", { name: "Rename" });
+    expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
+  });
 });

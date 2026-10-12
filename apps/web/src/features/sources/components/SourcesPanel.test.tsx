@@ -53,6 +53,8 @@ vi.mock("../services/documentsApi", () => ({
   useIngestFromGoogleDrive: () => vi.fn(),
   useRefreshNotebookRemoteSources: () => vi.fn(),
   useRefreshRemoteSource: () => vi.fn(),
+  useFindPaperFullText: () => vi.fn(),
+  useAttachPaperPdf: () => vi.fn(),
 }));
 vi.mock("./add-source/AddSourceDialog", () => ({ AddSourceDialog: () => null }));
 vi.mock("./discover/DiscoverSourcesDialog", () => ({ DiscoverSourcesDialog: () => null }));

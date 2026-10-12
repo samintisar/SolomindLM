@@ -1,11 +1,13 @@
 import {
   File,
   FileText,
+  FileUp,
   Globe,
   GraduationCap,
   MoreVertical,
   Pencil,
   RefreshCw,
+  Search,
   Trash2,
   Youtube,
 } from "lucide-react";
@@ -45,6 +47,10 @@ interface SourceListItemProps {
   onView: (id: string) => void;
   onDelete: (id: string, title: string) => void;
   onRefreshSource: (id: string) => void;
+  /** Abstract-only papers: look for open-access full text again. */
+  onFindFullText?: (id: string) => void;
+  /** Abstract-only papers: attach a PDF the user has. */
+  onUploadPdf?: (id: string) => void;
   onMenuOpenChange: (id: string, open: boolean) => void;
   onStartRename: (sourceId: string) => void;
   isMenuOpen: boolean;
@@ -61,6 +67,8 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   onView,
   onDelete,
   onRefreshSource,
+  onFindFullText,
+  onUploadPdf,
   onMenuOpenChange,
   onStartRename,
   isMenuOpen,
@@ -145,6 +153,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   };
 
   const paperHint = paperMetaHint();
+  const isAbstractOnlyPaper = paperHint === "Abstract only" && status === "completed";
 
   return (
     <Item role="listitem" data-source-id={source.id} size="sm">
@@ -240,6 +249,18 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               }
             }}
           >
+            {isAbstractOnlyPaper && onFindFullText && (
+              <DropdownMenuItem onSelect={() => onFindFullText(source.id)}>
+                <Search />
+                Find full text
+              </DropdownMenuItem>
+            )}
+            {isAbstractOnlyPaper && onUploadPdf && (
+              <DropdownMenuItem onSelect={() => onUploadPdf(source.id)}>
+                <FileUp />
+                Upload PDF
+              </DropdownMenuItem>
+            )}
             {canRemoteRefresh && (
               <DropdownMenuItem onSelect={() => onRefreshSource(source.id)}>
                 <RefreshCw />
