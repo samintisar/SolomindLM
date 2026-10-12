@@ -26,14 +26,17 @@ vi.mock("convex/browser", () => ({
   }),
 }));
 
-// Mock the Convex API
-function deepProxy(): any {
+// Mock the Convex API. Each path is one stable proxy that stringifies to its path, so tests can
+// tell queries apart (`api.documents.index.get` vs `api.documents.listSummary.listSummary`).
+function deepProxy(path = "api"): any {
+  const children = new Map<PropertyKey, unknown>();
   return new Proxy(
     {},
     {
       get(_target, prop) {
-        if (prop === Symbol.toPrimitive) return () => "api";
-        return deepProxy();
+        if (prop === Symbol.toPrimitive) return () => path;
+        if (!children.has(prop)) children.set(prop, deepProxy(`${path}.${String(prop)}`));
+        return children.get(prop);
       },
     }
   );
@@ -57,19 +60,20 @@ const {
   uploadUrl,
   uploadText,
 } = await import("./documentsApi");
+const { api } = await import("@convex/_generated/api");
+const listQuery = api.documents.listSummary.listSummary;
+const getQuery = api.documents.index.get;
 
-/**
- * A local store keyed by query args only: the mocked `api` hands out a fresh proxy per access, so
- * queries can't be told apart by reference. List and detail args differ in shape, so keys don't clash.
- */
-function createLocalStore(entries: Array<[args: object, value: unknown]>) {
-  const store = new Map(entries.map(([args, value]) => [JSON.stringify(args), value]));
+/** A local store keyed by query and args, like Convex's optimistic-update store. */
+function createLocalStore(entries: Array<[query: unknown, args: object, value: unknown]>) {
+  const key = (query: unknown, args: object) => `${String(query)} ${JSON.stringify(args)}`;
+  const store = new Map(entries.map(([query, args, value]) => [key(query, args), value]));
   return {
-    getQuery: (_query: unknown, args: object) => store.get(JSON.stringify(args)),
-    setQuery: (_query: unknown, args: object, value: unknown) => {
-      store.set(JSON.stringify(args), value);
+    getQuery: (query: unknown, args: object) => store.get(key(query, args)),
+    setQuery: (query: unknown, args: object, value: unknown) => {
+      store.set(key(query, args), value);
     },
-    read: (args: object) => store.get(JSON.stringify(args)),
+    read: (query: unknown, args: object) => store.get(key(query, args)),
   };
 }
 
@@ -195,22 +199,26 @@ describe("documentsApi hooks", () => {
       renderHook(() => useUpdateDocument("nb-1"));
       const localStore = createLocalStore([
         [
+          listQuery,
           { notebookId: "nb-1" },
           [
             { _id: "doc-1", fileName: "Old Title" },
             { _id: "doc-2", fileName: "Other" },
           ],
         ],
-        [{ id: "doc-1" }, { _id: "doc-1", fileName: "Old Title" }],
+        [getQuery, { id: "doc-1" }, { _id: "doc-1", fileName: "Old Title" }],
       ]);
 
       runOptimisticUpdate(localStore, { id: "doc-1", title: "New Title" });
 
-      expect(localStore.read({ notebookId: "nb-1" })).toEqual([
+      expect(localStore.read(listQuery, { notebookId: "nb-1" })).toEqual([
         { _id: "doc-1", fileName: "New Title" },
         { _id: "doc-2", fileName: "Other" },
       ]);
-      expect(localStore.read({ id: "doc-1" })).toEqual({ _id: "doc-1", fileName: "New Title" });
+      expect(localStore.read(getQuery, { id: "doc-1" })).toEqual({
+        _id: "doc-1",
+        fileName: "New Title",
+      });
     });
   });
 
@@ -232,19 +240,22 @@ describe("documentsApi hooks", () => {
       renderHook(() => useDeleteDocument("nb-1"));
       const localStore = createLocalStore([
         [
+          listQuery,
           { notebookId: "nb-1" },
           [
             { _id: "doc-1", fileName: "Deleted" },
             { _id: "doc-2", fileName: "Kept" },
           ],
         ],
-        [{ id: "doc-1" }, { _id: "doc-1", fileName: "Deleted" }],
+        [getQuery, { id: "doc-1" }, { _id: "doc-1", fileName: "Deleted" }],
       ]);
 
       runOptimisticUpdate(localStore, { id: "doc-1" });
 
-      expect(localStore.read({ notebookId: "nb-1" })).toEqual([{ _id: "doc-2", fileName: "Kept" }]);
-      expect(localStore.read({ id: "doc-1" })).toBeNull();
+      expect(localStore.read(listQuery, { notebookId: "nb-1" })).toEqual([
+        { _id: "doc-2", fileName: "Kept" },
+      ]);
+      expect(localStore.read(getQuery, { id: "doc-1" })).toBeNull();
     });
 
     it("keeps the same function across rerenders until notebookId changes", () => {
@@ -302,12 +313,12 @@ describe("documentsApi hooks", () => {
       const runOptimisticUpdate = captureOptimisticUpdate();
       renderHook(() => useRemoveManyDocuments("nb-1"));
       const localStore = createLocalStore([
-        [{ notebookId: "nb-1" }, [{ _id: "doc-1" }, { _id: "doc-2" }, { _id: "doc-3" }]],
+        [listQuery, { notebookId: "nb-1" }, [{ _id: "doc-1" }, { _id: "doc-2" }, { _id: "doc-3" }]],
       ]);
 
       runOptimisticUpdate(localStore, { ids: ["doc-1", "doc-3"] });
 
-      expect(localStore.read({ notebookId: "nb-1" })).toEqual([{ _id: "doc-2" }]);
+      expect(localStore.read(listQuery, { notebookId: "nb-1" })).toEqual([{ _id: "doc-2" }]);
     });
 
     it("returns early for empty array", async () => {
