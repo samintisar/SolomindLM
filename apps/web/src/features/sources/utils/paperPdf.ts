@@ -12,3 +12,12 @@ export function isPdfFile(file: { name: string; type: string }): boolean {
   const unknownType = type === "" || type === "application/octet-stream";
   return unknownType && file.name.toLowerCase().endsWith(".pdf");
 }
+
+/**
+ * Whether the file's bytes start like a PDF (`%PDF-` within the first 1 KB, as readers allow).
+ * The upload is always sent as `application/pdf`, so this is what catches a renamed non-PDF.
+ */
+export async function hasPdfSignature(file: Blob): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+  return new TextDecoder("latin1").decode(head).includes("%PDF-");
+}

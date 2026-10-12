@@ -255,7 +255,9 @@ export const docEmbedding = internalAction({
           throw new Error("paper_record document missing paperRecord");
         }
 
-        let currentStorageId = docDetails.storageId;
+        // The PDF the source had before this run is kept until a replacement has given full text.
+        const originalStorageId = docDetails.storageId;
+        let currentStorageId = originalStorageId;
         const result = await ingestPaper(
           {
             title: docDetails.fileName || "Research paper",
@@ -271,7 +273,6 @@ export const docEmbedding = internalAction({
               const storageId = await ctx.storage.store(
                 new Blob([bytes], { type: "application/pdf" })
               );
-              const previous = currentStorageId;
               try {
                 await ctx.runMutation(internal.documents.paperFullText.setPaperStorage, {
                   documentId,
@@ -282,23 +283,14 @@ export const docEmbedding = internalAction({
                 throw e;
               }
               currentStorageId = storageId;
-              if (previous && previous !== storageId) {
-                try {
-                  await ctx.storage.delete(previous as Id<"_storage">);
-                } catch (e) {
-                  logger.warn("Could not delete the replaced PDF", {
-                    storageId: previous,
-                    error: e instanceof Error ? e.message : String(e),
-                  });
-                }
-              }
               return storageId;
             },
             detachPdf: async (storageId) => {
               await ctx.runMutation(internal.documents.paperFullText.setPaperStorage, {
                 documentId,
+                storageId: originalStorageId,
               });
-              currentStorageId = undefined;
+              currentStorageId = originalStorageId;
               await ctx.storage.delete(storageId as Id<"_storage">);
             },
             ocrStoredPdf: async (storageId) => {
@@ -323,6 +315,20 @@ export const docEmbedding = internalAction({
           fulltextStatus: fulltextStatusAfterIngest(result.outcome, docDetails.fulltextStatus),
           ...(result.outcome === "full_text" ? { fullTextSource: result.fullTextSource } : {}),
         });
+        if (
+          result.outcome === "full_text" &&
+          originalStorageId &&
+          currentStorageId !== originalStorageId
+        ) {
+          try {
+            await ctx.storage.delete(originalStorageId as Id<"_storage">);
+          } catch (e) {
+            logger.warn("Could not delete the replaced PDF", {
+              storageId: originalStorageId,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
         logger.phaseComplete("extraction", {
           contentLength: extractedText.length,
           outcome: result.outcome,

@@ -13,6 +13,8 @@ import {
 } from "./paperIngest";
 
 const longText = Array.from({ length: 2_000 }, (_, i) => `w${i}`).join(" ");
+/** OCR of a real paper: long enough to pass the open-access PDF length floor. */
+const OCR_TEXT = `OCR ${longText}`;
 const pdfBytes = new TextEncoder().encode("%PDF-1.7") as Uint8Array<ArrayBuffer>;
 
 const input = (over: Partial<PaperIngestInput> = {}): PaperIngestInput => ({
@@ -41,7 +43,7 @@ function makeDeps(over: Partial<PaperIngestDeps> = {}): PaperIngestDeps {
     fetchCandidate: vi.fn().mockResolvedValue({ type: "unusable", reason: "HTTP 403" }),
     attachPdf: vi.fn().mockResolvedValue("storage_new"),
     detachPdf: vi.fn().mockResolvedValue(undefined),
-    ocrStoredPdf: vi.fn().mockResolvedValue("OCR text"),
+    ocrStoredPdf: vi.fn().mockResolvedValue(OCR_TEXT),
     scrape: vi.fn().mockResolvedValue({ title: "Page", content: "too short" }),
     now: () => 0,
     ...over,
@@ -60,7 +62,7 @@ describe("ingestPaper", () => {
     );
     expect(out).toEqual({
       outcome: "full_text",
-      content: "OCR text",
+      content: OCR_TEXT,
       fullTextSource: { method: "oa_pdf", host: "arxiv.org" },
     });
     expect(deps.ocrStoredPdf).toHaveBeenCalledWith("storage_1");
@@ -91,7 +93,7 @@ describe("ingestPaper", () => {
     expect(deps.ocrStoredPdf).toHaveBeenCalledWith("storage_new");
     expect(out).toEqual({
       outcome: "full_text",
-      content: "OCR text",
+      content: OCR_TEXT,
       fullTextSource: {
         method: "oa_pdf",
         url: "https://arxiv.org/pdf/1304.1068",
@@ -211,7 +213,9 @@ describe("ingestPaper", () => {
     const deps = makeDeps({
       resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
       fetchCandidate: vi.fn().mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "x" }),
-      ocrStoredPdf: vi.fn().mockRejectedValue(new Error("Mistral 500")),
+      ocrStoredPdf: vi
+        .fn()
+        .mockRejectedValue(new ExternalServiceError("mistral", "Bad PDF", { statusCode: 400 })),
       scrape: vi.fn().mockRejectedValue(new Error("Supadata down")),
     });
     const out = await ingestPaper(input(), deps, logger);
@@ -221,7 +225,45 @@ describe("ingestPaper", () => {
     expect(out.content).toContain("Full text was not ingested");
   });
 
+  it("rejects an open-access PDF too short to be the paper, and deletes it", async () => {
+    const deps = makeDeps({
+      resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+      fetchCandidate: vi.fn().mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "x" }),
+      ocrStoredPdf: vi.fn().mockResolvedValue("This article is available on request."),
+    });
+    const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+    expect(deps.detachPdf).toHaveBeenCalledWith("storage_new");
+    expect(out.outcome).toBe("abstract_only");
+  });
+
+  it.each([
+    ["a 503", new ExternalServiceError("mistral", "Mistral 503", { statusCode: 503 })],
+    ["a timeout", new Error("Mistral OCR request timed out")],
+  ])("rethrows %s on an open-access PDF's OCR after deleting it", async (_label, error) => {
+    const deps = makeDeps({
+      resolveCandidates: vi
+        .fn()
+        .mockResolvedValue([candidate(), candidate({ url: "https://b/2" })]),
+      fetchCandidate: vi.fn().mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "x" }),
+      ocrStoredPdf: vi.fn().mockRejectedValue(error),
+    });
+    await expect(ingestPaper(input(), deps, logger)).rejects.toThrow(error.message);
+    expect(deps.detachPdf).toHaveBeenCalledWith("storage_new");
+    expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
+  });
+
   describe("a stored PDF", () => {
+    it("rethrows a timed-out OCR of the stored PDF", async () => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockRejectedValue(new Error("Mistral OCR request timed out")),
+        resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+      });
+      await expect(ingestPaper(input({ storageId: "storage_1" }), deps, logger)).rejects.toThrow(
+        "timed out"
+      );
+      expect(deps.attachPdf).not.toHaveBeenCalled();
+    });
+
     it("rethrows a transient OCR error on the stored PDF, without touching storage", async () => {
       const deps = makeDeps({
         ocrStoredPdf: vi
@@ -248,7 +290,7 @@ describe("ingestPaper", () => {
       const deps = makeDeps({
         ocrStoredPdf: vi.fn().mockImplementation(async (id: string) => {
           if (id === "storage_1") throw error;
-          return "OCR text";
+          return OCR_TEXT;
         }),
         resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
         fetchCandidate: vi.fn().mockResolvedValue({
@@ -265,7 +307,7 @@ describe("ingestPaper", () => {
       expect(deps.attachPdf).toHaveBeenCalledWith(pdfBytes);
       expect(out).toMatchObject({
         outcome: "full_text",
-        content: "OCR text",
+        content: OCR_TEXT,
         fullTextSource: { method: "oa_pdf" },
       });
     });
@@ -299,7 +341,7 @@ describe("ingestPaper", () => {
       const deps = makeDeps({
         ocrStoredPdf: vi
           .fn()
-          .mockImplementation(async (id: string) => (id === "storage_1" ? "  " : "OCR text")),
+          .mockImplementation(async (id: string) => (id === "storage_1" ? "  " : OCR_TEXT)),
         resolveCandidates: vi
           .fn()
           .mockResolvedValue([candidate({ url: "https://a.example/1.pdf", host: "a.example" })]),
@@ -316,7 +358,7 @@ describe("ingestPaper", () => {
       const deps = makeDeps({
         ocrStoredPdf: vi
           .fn()
-          .mockImplementation(async (id: string) => (id === "storage_1" ? "" : "OCR text")),
+          .mockImplementation(async (id: string) => (id === "storage_1" ? "" : OCR_TEXT)),
         resolveCandidates: vi
           .fn()
           .mockResolvedValue([candidate({ url: "https://a.example/view", kind: "html" })]),

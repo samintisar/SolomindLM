@@ -7,16 +7,19 @@
  * Scraped text must pass `isFullTextLength`. All I/O comes in through `deps`, so this is unit-tested
  * without Convex; `embeddingJob` supplies the real storage, OCR and scraper.
  *
- * A transient OCR failure on the PDF already stored (5xx, 429, network) propagates: the caller marks
- * the source failed and the user can retry. A permanent failure (a corrupt PDF, a missing file) or
- * empty text lets the ladder carry on, so a working open-access PDF can replace the unreadable
- * file. Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps enough of
+ * A transient OCR failure (5xx, 429, network, timeout) propagates, on the stored PDF or an open-access
+ * one: the caller marks the source failed and the user can retry. A permanent failure (a corrupt PDF,
+ * a missing file) or empty text lets the ladder carry on, so a working open-access PDF can replace the
+ * unreadable file. The replaced PDF is only deleted once the ingest has succeeded (`embeddingJob`). Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps enough of
  * Convex's 600 s action limit to chunk and embed the result.
  */
 
 import { isHttpAwareRetryableError } from "../_agents/_shared/retry";
 import type { FetchedCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
-import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTest";
+import {
+  isFullTextLength,
+  isPlausiblePdfText,
+} from "../_services/extraction/openAccess/fullTextTest";
 import {
   candidateKey,
   type OaCandidate,
@@ -47,9 +50,9 @@ export interface PaperIngestInput {
 export interface PaperIngestDeps {
   resolveCandidates(input: OaResolverInput): Promise<OaCandidate[]>;
   fetchCandidate(url: string): Promise<FetchedCandidate>;
-  /** Stores PDF bytes, points the document at them (replacing any earlier PDF), returns the storage id. */
+  /** Stores PDF bytes and points the document at them, returns the storage id. Deletes nothing. */
   attachPdf(bytes: Uint8Array<ArrayBuffer>): Promise<string>;
-  /** Deletes a stored PDF and clears the document's storage id. */
+  /** Deletes a PDF stored by `attachPdf` and points the document back at the PDF it had before. */
   detachPdf(storageId: string): Promise<void>;
   ocrStoredPdf(storageId: string): Promise<string>;
   scrape(url: string): Promise<{ title?: string; content: string }>;
@@ -69,6 +72,16 @@ type FullTextResult = Extract<PaperIngestResult, { outcome: "full_text" }>;
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** OCR failures worth retrying later: HTTP 429/5xx, network errors and timeouts. */
+function isTransientOcrError(error: Error): boolean {
+  return (
+    isHttpAwareRetryableError(error) ||
+    error.name === "AbortError" ||
+    error.name === "TimeoutError" ||
+    /\btim(?:ed|e)[ -]?out\b/i.test(error.message)
+  );
+}
+
 /** Drops undefined fields so the object is a valid Convex value. */
 function compactSource(source: FullTextSource): FullTextSource {
   return Object.fromEntries(
@@ -84,6 +97,7 @@ function hostOf(url: string): string | undefined {
   }
 }
 
+/** OCR text, or null for a permanent failure or no text. Throws a transient failure. */
 async function ocrText(
   deps: PaperIngestDeps,
   storageId: string,
@@ -94,7 +108,9 @@ async function ocrText(
     if (!text) logger.warn("PDF OCR returned no text", { storageId });
     return text || null;
   } catch (e) {
-    logger.warn("PDF OCR failed", { storageId, error: errorMessage(e) });
+    const error = e instanceof Error ? e : new Error(String(e));
+    if (isTransientOcrError(error)) throw error;
+    logger.warn("PDF OCR failed", { storageId, error: error.message });
     return null;
   }
 }
@@ -156,7 +172,20 @@ async function tryCandidate(
       logger.warn("Storing open-access PDF failed", { url: candidate.url, error: errorMessage(e) });
       return null;
     }
-    const text = await ocrText(deps, storageId, logger);
+    let text: string | null = null;
+    let transientError: unknown;
+    try {
+      text = await ocrText(deps, storageId, logger);
+    } catch (e) {
+      transientError = e;
+    }
+    if (text && !isPlausiblePdfText(text, abstract)) {
+      logger.info("Open-access PDF is too short to be the paper", {
+        url: candidate.url,
+        contentLength: text.length,
+      });
+      text = null;
+    }
     if (text) {
       return {
         outcome: "full_text",
@@ -175,6 +204,7 @@ async function tryCandidate(
       .catch((e) =>
         logger.warn("Deleting unreadable PDF failed", { storageId, error: errorMessage(e) })
       );
+    if (transientError !== undefined) throw transientError;
     return null;
   }
 
@@ -232,7 +262,7 @@ export async function ingestPaper(
       text = (await deps.ocrStoredPdf(input.storageId)).trim();
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
-      if (isHttpAwareRetryableError(error)) throw error;
+      if (isTransientOcrError(error)) throw error;
       logger.warn("Stored PDF OCR failed permanently; trying other routes", {
         storageId: input.storageId,
         error: error.message,

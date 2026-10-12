@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPdfFile, MAX_PAPER_PDF_BYTES } from "./paperPdf";
+import { hasPdfSignature, isPdfFile, MAX_PAPER_PDF_BYTES } from "./paperPdf";
 
 describe("isPdfFile", () => {
   it("accepts the PDF media types, ignoring case and parameters", () => {
@@ -19,6 +19,13 @@ describe("isPdfFile", () => {
   it("rejects other types, even when named .pdf", () => {
     expect(isPdfFile({ name: "a.pdf", type: "image/png" })).toBe(false);
     expect(isPdfFile({ name: "a.txt", type: "text/plain" })).toBe(false);
+  });
+
+  it("checks the bytes for a PDF header", async () => {
+    expect(await hasPdfSignature(new Blob(["%PDF-1.7\n..."]))).toBe(true);
+    expect(await hasPdfSignature(new Blob(["junk before %PDF-1.4"]))).toBe(true);
+    expect(await hasPdfSignature(new Blob(["<!doctype html><html>"]))).toBe(false);
+    expect(await hasPdfSignature(new Blob([]))).toBe(false);
   });
 
   it("caps uploads at 50 MB", () => {

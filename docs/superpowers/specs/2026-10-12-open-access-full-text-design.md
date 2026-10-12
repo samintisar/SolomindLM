@@ -96,17 +96,18 @@ yields full text:
 
 1. **Stored PDF** — if the document has a `storageId` (from "Upload PDF" or an earlier import), OCR it via
    `ctx.storage.getUrl`. Keeps the document's existing `fullTextSource` when it is `oa_pdf` or `uploaded_pdf`;
-   otherwise records `{ method: "uploaded_pdf" }`. A transient OCR error (5xx, 429, network) is rethrown and
+   otherwise records `{ method: "uploaded_pdf" }`. A transient OCR error (5xx, 429, network, timeout) is rethrown and
    fails the source, so the user can retry without losing the file. A permanent error (a corrupt PDF, a missing
    file) or empty text falls through to the next steps, and a working open-access PDF may then replace the
-   unreadable one.
+   unreadable one; the old file is deleted only after the replacement has given full text.
 2. **Candidates** — run the resolver, then try candidates in order, at most 6 attempts, inside the overall
    deadline below:
    - `pdf`: store the bytes in Convex storage, set the document's `storageId`, OCR from the storage URL. Accept if
-     the OCR text is non-empty. Source `{ method: "oa_pdf", url, version, license, host }`.
+     the OCR text has at least 500 words and twice the abstract's (a cover sheet or notice fails). Source `{ method: "oa_pdf", url, version, license, host }`.
    - `html`: scrape `finalUrl` with the existing scraper (`scrapeWebPageInternal`). Accept if it passes the
      full-text test. Source `{ method: "oa_html", … }`.
-   - A PDF that fails OCR is deleted from storage before moving on.
+   - A PDF that fails OCR is deleted from storage (the document points back at its earlier PDF) before moving
+     on; a transient OCR error is rethrown after the delete, as in step 1.
    - Candidate URLs are tracked (including where a redirect ended) so the landing page is not scraped twice.
 3. **Landing page** — scrape `fileUrl || landingPageUrl` if not already tried and at least 60 s of the deadline
    remain; accept under the full-text test.

@@ -30,7 +30,7 @@ import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTes
 import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
 import { resetDocumentForReembed } from "../documents/internal";
 
-/** Stored markdown can be ~800 KB per document; 4 per batch stays well under the read limit. */
+/** Stored markdown can be ~800 KB per paper; 4 per batch stays well under the read limit. */
 const BATCH_SIZE = 4;
 const RE_RESOLVE_SPACING_MS = 10_000;
 
@@ -99,11 +99,11 @@ export const scan = internalMutation({
   handler: async (ctx, args) => {
     const result = await ctx.db
       .query("documents")
+      .withIndex("by_fileType", (q) => q.eq("fileType", "paper_record"))
       .paginate({ cursor: args.cursor, numItems: BATCH_SIZE });
     const counts = { ...args.counts };
 
     for (const doc of result.page) {
-      if (doc.fileType !== "paper_record") continue;
       counts.scanned++;
       const relabel = needsAbstractOnlyRelabel(doc);
       const queue = args.reResolve && shouldQueueReResolve(doc);

@@ -16,7 +16,7 @@ import {
   useRefreshRemoteSource,
 } from "../services/documentsApi";
 import { useSourcesContext } from "../useSourcesContext";
-import { isPdfFile, MAX_PAPER_PDF_BYTES } from "../utils/paperPdf";
+import { hasPdfSignature, isPdfFile, MAX_PAPER_PDF_BYTES } from "../utils/paperPdf";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { AddSourceDialog } from "./add-source/AddSourceDialog";
 import { DiscoverSourcesDialog } from "./discover/DiscoverSourcesDialog";
@@ -312,6 +312,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
       if (!file || !documentId) return;
       if (!isPdfFile(file)) return showError("Choose a PDF file.");
       if (file.size > MAX_PAPER_PDF_BYTES) return showError("That PDF is over 50 MB.");
+      if (!(await hasPdfSignature(file).catch(() => false))) return showError("Choose a PDF file.");
       const uploadingId = loading("Uploading the PDF…");
       let notify: () => void;
       try {

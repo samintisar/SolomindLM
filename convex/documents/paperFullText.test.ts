@@ -196,6 +196,15 @@ describe("documents.paperFullText.findFullText", () => {
     ).rejects.toThrow();
   });
 
+  test("rejects a paper with no paper record (a forked copy)", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t, { paperRecord: undefined, status: "failed" });
+    await expect(
+      asUser(t, userId).mutation(api.documents.paperFullText.findFullText, { documentId })
+    ).rejects.toThrow(/no details to look up/);
+    expect((await t.run((ctx) => ctx.db.get(documentId)))?.status).toBe("failed");
+  });
+
   test("is rate limited per user", async () => {
     const t = makeT();
     const { userId, documentId } = await seedPaper(t);
@@ -249,15 +258,31 @@ describe("documents.paperFullText.attachPdf", () => {
     expect((await t.run((ctx) => ctx.db.get(documentId)))?.storageId).toBeUndefined();
   });
 
-  test("rejects another user's paper without touching the upload", async () => {
+  test("refuses another user's paper and deletes the stranger's own upload", async () => {
     const t = makeT();
     const { documentId } = await seedPaper(t);
     const stranger = await t.run((ctx) => ctx.db.insert("users", { name: "Other" }));
     const storageId = await storeFile(t, "%PDF-1.7", "application/pdf");
-    await expect(
-      asUser(t, stranger).mutation(api.documents.paperFullText.attachPdf, { documentId, storageId })
-    ).rejects.toThrow();
-    expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+    const res = await asUser(t, stranger).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+    expect(res).toEqual({ ok: false, reason: "You can't edit this notebook." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).toBeNull();
+    expect((await t.run((ctx) => ctx.db.get(documentId)))?.storageId).toBeUndefined();
+  });
+
+  test("deletes the upload when the source was deleted meanwhile", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "%PDF-1.7", "application/pdf");
+    await t.run((ctx) => ctx.db.delete(documentId));
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+    expect(res).toEqual({ ok: false, reason: "This source no longer exists." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).toBeNull();
   });
 
   test("leaves a blob another document references alone (PDF or not)", async () => {

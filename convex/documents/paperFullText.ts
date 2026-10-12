@@ -56,17 +56,24 @@ const FRESH_UPLOAD_MS = 15 * 60_000;
 
 const UPLOAD_MISSING = "The upload didn't arrive. Try again.";
 
+const SOURCE_MISSING = "This source no longer exists.";
+
 const userError = (message: string) => toConvexError(new InputValidationError(message));
+
+async function requireUserId(ctx: MutationCtx): Promise<Id<"users">> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw userError("Sign in to do this.");
+  return userId;
+}
 
 /** The caller's source, if they can edit its notebook. Throws when they can't. */
 async function editableSource(
   ctx: MutationCtx,
   documentId: Id<"documents">
 ): Promise<{ userId: Id<"users">; doc: Doc<"documents"> }> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Unauthenticated");
+  const userId = await requireUserId(ctx);
   const doc = await ctx.db.get(documentId);
-  if (!doc) throw new Error("Document not found");
+  if (!doc) throw userError(SOURCE_MISSING);
   await assertCanEditNotebook(ctx, doc.notebookId, userId);
   return { userId, doc };
 }
@@ -74,6 +81,8 @@ async function editableSource(
 /** Why this source can't be re-ingested right now, or null when it can. */
 function paperStateProblem(doc: Doc<"documents">): string | null {
   if (doc.fileType !== "paper_record") return "Only paper sources have this option.";
+  // Forked notebooks copy paper sources without their paper record, which the ingest needs.
+  if (!doc.paperRecord) return "This paper has no details to look up. Add it again from search.";
   if (doc.status === "pending" || doc.status === "processing") {
     return "This source is still being processed.";
   }
@@ -106,7 +115,7 @@ export const attachPdf = mutation({
     v.object({ ok: v.literal(false), reason: v.string() })
   ),
   handler: async (ctx, args) => {
-    const { userId, doc } = await editableSource(ctx, args.documentId);
+    const userId = await requireUserId(ctx);
 
     // A blob some record already references isn't a fresh upload: leave it alone, never delete it.
     const referencedByDocument = await ctx.db
@@ -132,6 +141,15 @@ export const attachPdf = mutation({
       }
       return { ok: false as const, reason };
     };
+
+    // Report a missing source or lost access through `reject`, so the fresh upload is deleted.
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) return reject(SOURCE_MISSING);
+    try {
+      await assertCanEditNotebook(ctx, doc.notebookId, userId);
+    } catch {
+      return reject("You can't edit this notebook.");
+    }
 
     const problem = paperStateProblem(doc);
     if (problem) return reject(problem);

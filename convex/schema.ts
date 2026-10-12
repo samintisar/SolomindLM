@@ -162,6 +162,8 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
     .index("by_notebook_and_status", ["notebookId", "status"])
+    // Paper sources across notebooks (the #480 backfill)
+    .index("by_fileType", ["fileType"])
     // Documents with storageId set (file uploads)
     .index("by_storage", ["storageId"]),
 
