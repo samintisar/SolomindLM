@@ -204,6 +204,69 @@ export function hasOcrContent(markdown: string): boolean {
   );
 }
 
+const OCR_MODEL = "mistral-ocr-latest";
+
+/** File extensions OCR reads as a single image rather than a paged document. */
+export const IMAGE_FILE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".avif"];
+
+export type OcrInputKind = "image" | "document";
+
+/** Storage URLs carry no extension, so callers decide the input kind from the file name. */
+export function ocrInputKindForFile(fileName: string): OcrInputKind {
+  const ext = fileName.toLowerCase().slice(fileName.lastIndexOf("."));
+  return IMAGE_FILE_EXTENSIONS.includes(ext) ? "image" : "document";
+}
+
+/** Schema for a figure description; its field descriptions steer the annotating model for any source. */
+const FIGURE_ANNOTATION_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "figure_annotation",
+    strict: true,
+    schema: {
+      title: "FigureAnnotation",
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "description", "details"],
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["chart", "diagram", "table", "photo", "screenshot", "equation", "logo", "other"],
+          description: "What the image is.",
+        },
+        description: {
+          type: "string",
+          description: "What the image shows, in one or two plain sentences.",
+        },
+        details: {
+          type: "string",
+          description:
+            "Text, labels, axis titles, values and trends visible in the image that a reader would need to answer questions about it. Empty for decorative images.",
+        },
+      },
+    },
+  },
+};
+
+export function buildOcrRequestBody(
+  url: string,
+  kind: OcrInputKind,
+  annotate: boolean
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: OCR_MODEL,
+    document:
+      kind === "image"
+        ? { type: "image_url", image_url: url }
+        : { type: "document_url", document_url: url },
+    table_format: "markdown",
+    include_image_base64: false,
+  };
+  // No document_annotation_format: it restates the OCR text and invents content for photos.
+  if (annotate) body.bbox_annotation_format = FIGURE_ANNOTATION_FORMAT;
+  return body;
+}
+
 export class MistralOCRService {
   private apiKey: string;
   private baseUrl = "https://api.mistral.ai/v1";

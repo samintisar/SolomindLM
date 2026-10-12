@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildOcrRequestBody,
   figureBlock,
   hasOcrContent,
   inlineOcrFigures,
   markdownFromMistralOcrResponse,
+  ocrInputKindForFile,
   parseFigureAnnotation,
 } from "./MistralOCRService";
 
@@ -220,5 +222,41 @@ describe("hasOcrContent", () => {
 
   it("is true when a page has only a figure description", () => {
     expect(hasOcrContent(`**Page 1**\n\n${figureBlock(CHART)}`)).toBe(true);
+  });
+});
+
+describe("ocrInputKindForFile", () => {
+  it("treats image extensions as images, case-insensitively", () => {
+    for (const name of ["a.png", "b.JPG", "c.jpeg", "d.avif"])
+      expect(ocrInputKindForFile(name)).toBe("image");
+  });
+
+  it("treats everything else as a document", () => {
+    for (const name of ["a.pdf", "b.pptx", "c.docx", "no-extension"]) {
+      expect(ocrInputKindForFile(name)).toBe("document");
+    }
+  });
+});
+
+describe("buildOcrRequestBody", () => {
+  it("sends documents as document_url with figure annotations", () => {
+    const body = buildOcrRequestBody("https://x/a.pdf", "document", true);
+    expect(body.document).toEqual({ type: "document_url", document_url: "https://x/a.pdf" });
+    expect(body.model).toBe("mistral-ocr-latest");
+    expect(body.table_format).toBe("markdown");
+    expect(body).toHaveProperty("bbox_annotation_format");
+    expect(body).not.toHaveProperty("document_annotation_format");
+  });
+
+  it("sends images as image_url with figure annotations", () => {
+    const body = buildOcrRequestBody("https://x/storage/abc", "image", true);
+    expect(body.document).toEqual({ type: "image_url", image_url: "https://x/storage/abc" });
+    expect(body).toHaveProperty("bbox_annotation_format");
+    expect(body).not.toHaveProperty("document_annotation_format");
+  });
+
+  it("leaves out annotation formats for the plain fallback request", () => {
+    const body = buildOcrRequestBody("https://x/storage/abc", "image", false);
+    expect(body).not.toHaveProperty("bbox_annotation_format");
   });
 });
