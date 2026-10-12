@@ -1,12 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ExternalServiceError } from "../../_lib/errors";
+import { UserFacingSourceError } from "../../_lib/sourceFailure";
 import {
   buildOcrRequestBody,
   figureBlock,
   hasOcrContent,
   inlineOcrFigures,
+  MistralOCRService,
+  MistralOcrTimeoutError,
   markdownFromMistralOcrResponse,
+  NOTHING_READABLE_MESSAGE,
   ocrInputKindForFile,
   parseFigureAnnotation,
+  shouldRetryWithoutAnnotations,
 } from "./MistralOCRService";
 
 const TABLE = "| Indicator | 2025 | 2026 |\n| --- | --- | --- |\n| Brent ($/b) | $69 | $91 |";
@@ -258,5 +264,110 @@ describe("buildOcrRequestBody", () => {
   it("leaves out annotation formats for the plain fallback request", () => {
     const body = buildOcrRequestBody("https://x/storage/abc", "image", false);
     expect(body).not.toHaveProperty("bbox_annotation_format");
+  });
+});
+
+describe("shouldRetryWithoutAnnotations", () => {
+  const http = (status: number) =>
+    new ExternalServiceError("mistral", `mistral HTTP ${status}`, { statusCode: status });
+
+  it("falls back on a rejected request or a timeout", () => {
+    expect(shouldRetryWithoutAnnotations(http(400))).toBe(true);
+    expect(shouldRetryWithoutAnnotations(http(422))).toBe(true);
+    expect(shouldRetryWithoutAnnotations(new MistralOcrTimeoutError())).toBe(true);
+  });
+
+  it("does not fall back on rate limits, server errors or unknown errors", () => {
+    expect(shouldRetryWithoutAnnotations(http(429))).toBe(false);
+    expect(shouldRetryWithoutAnnotations(http(503))).toBe(false);
+    expect(shouldRetryWithoutAnnotations(new Error("boom"))).toBe(false);
+  });
+});
+
+describe("MistralOCRService.processDocument", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const ok = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  const rejected = (status: number) =>
+    new Response(JSON.stringify({ message: "rejected" }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  const sentBody = (fetchMock: ReturnType<typeof vi.fn>, call: number) =>
+    JSON.parse((fetchMock.mock.calls[call][1] as RequestInit).body as string);
+
+  it("asks for annotations and returns figure descriptions inline", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      ok({
+        pages: [
+          {
+            markdown: "![img-0.jpeg](img-0.jpeg)",
+            images: [{ id: "img-0.jpeg", image_annotation: JSON.stringify(CHART) }],
+          },
+        ],
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const md = await new MistralOCRService("key").processDocument("https://x/a.pdf");
+
+    expect(md).toBe(`**Page 1**\n\n${figureBlock(CHART)}`);
+    expect(sentBody(fetchMock, 0)).toHaveProperty("bbox_annotation_format");
+  });
+
+  it("sends image uploads as image_url", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").processDocument("https://x/storage/abc", { kind: "image" });
+
+    expect(sentBody(fetchMock, 0).document).toEqual({
+      type: "image_url",
+      image_url: "https://x/storage/abc",
+    });
+  });
+
+  it("retries once without annotations when they are rejected", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(422))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const md = await new MistralOCRService("key").processDocument("https://x/a.pdf");
+
+    expect(md).toBe("**Page 1**\n\ntext");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+  });
+
+  it("retries once without annotations when the annotated request times out", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error("The operation was aborted"), { name: "AbortError" })
+      )
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const md = await new MistralOCRService("key").processDocument("https://x/a.pdf");
+
+    expect(md).toBe("**Page 1**\n\ntext");
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+  });
+
+  it("fails with a user-facing message when nothing is readable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "" }] })));
+
+    const err = await new MistralOCRService("key")
+      .processDocument("https://x/storage/abc", { kind: "image" })
+      .catch((e) => e);
+
+    expect(err).toBeInstanceOf(UserFacingSourceError);
+    expect(err.userMessage).toBe(NOTHING_READABLE_MESSAGE);
   });
 });

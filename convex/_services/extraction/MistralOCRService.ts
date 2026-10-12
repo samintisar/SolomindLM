@@ -1,8 +1,9 @@
 "use node";
 
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
-import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
+import { createExternalServiceErrorFromResponse, ExternalServiceError } from "../../_lib/errors";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { UserFacingSourceError } from "../../_lib/sourceFailure";
 import { PAGE_LABEL_LINE } from "../processing/pageLabels";
 
 type MistralOcrTable = { id?: string; content?: string; format?: string };
@@ -194,7 +195,10 @@ function stripMistralOcrMedia(text: string): string {
 
 const PAGE_LABEL_LINES = new RegExp(PAGE_LABEL_LINE.source, "gm");
 
-/** Whether stitched OCR markdown holds anything beyond page labels and separators. */
+/**
+ * Whether stitched OCR markdown holds anything beyond page labels and separators. Run it after
+ * `stripMistralOcrMedia`: leftover image placeholders would otherwise count as content.
+ */
 export function hasOcrContent(markdown: string): boolean {
   return (
     markdown
@@ -267,24 +271,50 @@ export function buildOcrRequestBody(
   return body;
 }
 
+/** Annotations add a vision pass per figure; the plain fallback is the request that worked before them. */
+const ANNOTATED_TIMEOUT_MS = 180_000;
+const PLAIN_TIMEOUT_MS = 120_000;
+
+export const NOTHING_READABLE_MESSAGE =
+  "We couldn't find any text or images to read in this file. If it's a photo, try a clearer or higher-resolution version.";
+
+export class MistralOcrTimeoutError extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super("Mistral OCR request timed out", options);
+    this.name = "MistralOcrTimeoutError";
+  }
+}
+
+/**
+ * Whether a failed annotated request should be retried as plain OCR: a rejected request (4xx other
+ * than 429) or a timeout. Rate limits and server errors are retried by `invokeWithHttpRetry` instead.
+ */
+export function shouldRetryWithoutAnnotations(error: unknown): boolean {
+  if (error instanceof MistralOcrTimeoutError) return true;
+  if (!(error instanceof ExternalServiceError) || error.statusCode === undefined) return false;
+  return error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 429;
+}
+
 export class MistralOCRService {
   private apiKey: string;
   private baseUrl = "https://api.mistral.ai/v1";
-  private model = "mistral-ocr-latest";
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
 
-  private async callOcrEndpoint(documentUrl: string): Promise<string> {
+  private async callOcrEndpoint(
+    body: Record<string, unknown>,
+    timeoutMs: number
+  ): Promise<MistralOcrResponse> {
     const logger = createServiceLogger("mistral", "ocr");
 
     return invokeWithHttpRetry(async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const t0 = Date.now();
-        logger.apiCall("mistral", "/ocr", { model: this.model });
+        logger.apiCall("mistral", "/ocr", { model: OCR_MODEL });
 
         const response = await fetch(`${this.baseUrl}/ocr`, {
           method: "POST",
@@ -292,15 +322,7 @@ export class MistralOCRService {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            model: this.model,
-            document: {
-              type: "document_url",
-              document_url: documentUrl,
-            },
-            table_format: "markdown",
-            include_image_base64: false,
-          }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
@@ -320,14 +342,12 @@ export class MistralOCRService {
         }
 
         logger.apiSuccess("mistral", "/ocr", Date.now() - t0, {});
-
-        const content = markdownFromMistralOcrResponse(data);
-        return stripMistralOcrMedia(content);
+        return data as MistralOcrResponse;
       } catch (error) {
         clearTimeout(timeoutId);
         if (error instanceof Error) {
           if (error.name === "AbortError") {
-            throw new Error("Mistral OCR request timed out", { cause: error });
+            throw new MistralOcrTimeoutError({ cause: error });
           }
           throw error;
         }
@@ -336,11 +356,43 @@ export class MistralOCRService {
     }, "mistral_ocr");
   }
 
-  async processDocument(fileUrl: string): Promise<string> {
-    return this.callOcrEndpoint(fileUrl);
+  /**
+   * OCR a file into page-labelled markdown with figure descriptions. `kind` must be "image" for
+   * PNG/JPEG/AVIF files (see `ocrInputKindForFile`). Throws `UserFacingSourceError` when the file
+   * has no text and no describable images.
+   */
+  async processDocument(url: string, options: { kind?: OcrInputKind } = {}): Promise<string> {
+    const kind = options.kind ?? "document";
+    const logger = createServiceLogger("mistral", "ocr");
+
+    let data: MistralOcrResponse;
+    try {
+      data = await this.callOcrEndpoint(buildOcrRequestBody(url, kind, true), ANNOTATED_TIMEOUT_MS);
+    } catch (error) {
+      if (!shouldRetryWithoutAnnotations(error)) throw error;
+      logger.warn("OCR with figure annotations failed; retrying without annotations", {
+        kind,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      data = await this.callOcrEndpoint(buildOcrRequestBody(url, kind, false), PLAIN_TIMEOUT_MS);
+    }
+
+    const markdown = stripMistralOcrMedia(
+      markdownFromMistralOcrResponse(data, {
+        onMalformedAnnotation: (imageId) =>
+          logger.warn("Skipped a malformed figure annotation", { imageId }),
+      })
+    );
+    if (!hasOcrContent(markdown)) {
+      throw new UserFacingSourceError(
+        NOTHING_READABLE_MESSAGE,
+        "Mistral OCR returned no text or figure descriptions"
+      );
+    }
+    return markdown;
   }
 
   async processFromUrl(url: string): Promise<string> {
-    return this.callOcrEndpoint(url);
+    return this.processDocument(url);
   }
 }
