@@ -53,9 +53,9 @@ fixtures (AGENTS.md, Prompt authoring).
 
 The annotated request's timeout rises from 60s to 120s (the probe measured 13s for a 24-page paper with 22 figures,
 so this is headroom for long documents). The plain fallback in section 3 keeps today's 60s. Timeouts are not retried
-by `invokeWithHttpRetry`, so the usual worst case (annotated timeout, then fallback) is about 180s. The pathological
-case — `invokeWithHttpRetry`'s 3 attempts each ending in a slow 5xx, on both calls — is 3 × 120s + 3 × 60s = 540s,
-still inside the 600s action limit.
+by `invokeWithHttpRetry`, so the usual worst case (annotated timeout, then fallback) is about 180s. The annotated call
+is capped at 2 attempts (the plain one keeps 3), so the pathological case — every attempt ending in a slow 5xx — is
+2 × 120s + 3 × 60s = 420s, which leaves the embedding job time to chunk and embed inside the 600s action limit.
 
 ### 2. Response
 
@@ -79,7 +79,6 @@ A pure `inlineOcrFigures(markdown, images)` runs per page next to `inlineOcrTabl
 `stripMistralOcrMedia` still runs last and removes leftover placeholders; description blocks are plain text and pass
 through. Descriptions stay inside their `**Page N**` section, so `StructuralChunker` page assignment and citation
 pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows the descriptions.
-`docMetadata.hasImages` becomes accurate as a side effect.
 
 ### 3. Failures
 
@@ -90,9 +89,10 @@ pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows 
   any OCR error in its link-specific "couldn't read the PDF at this link" message, which fits links better.
   `AcademicLoaderService` is unchanged: it already falls back to a web scrape when OCR throws.
 - **Annotations rejected or too slow.** A 4xx response to the annotated request (other than 429), or its timeout,
-  triggers one plain request without `bbox_annotation_format` (60s timeout), logged
-  as a warning. That is today's behavior, so annotations never lose a document that ingests now. 429 and 5xx keep
-  using `invokeWithHttpRetry`.
+  triggers one plain request (60s timeout), logged as a warning. The plain request is exactly the pre-annotation one:
+  no `bbox_annotation_format`, and `document_url` for every file, images included (they were sent that way before),
+  so annotations or the new `image_url` input never lose a document that ingests now. 429 and 5xx keep using
+  `invokeWithHttpRetry`.
 - **One bad annotation.** Skipped as in section 2; the rest of the document is unaffected.
 
 ### 4. Probe findings (2026-10-12, `mistral-ocr-latest`)

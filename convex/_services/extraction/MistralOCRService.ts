@@ -273,10 +273,12 @@ export function buildOcrRequestBody(
 
 /**
  * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
- * request that worked before them. `invokeWithHttpRetry` makes up to 3 attempts per call, so the worst case
- * (3 slow 5xx on each call) is 3 × 120s + 3 × 60s = 540s, inside the 600s action limit.
+ * request that worked before them, with its old 60s timeout and 3 attempts. Capping the annotated call at 2
+ * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 120s + 3 × 60s = 420s, which leaves the
+ * embedding job time to chunk and embed inside the 600s action limit.
  */
 const ANNOTATED_TIMEOUT_MS = 120_000;
+const ANNOTATED_MAX_ATTEMPTS = 2;
 const PLAIN_TIMEOUT_MS = 60_000;
 
 export const NOTHING_READABLE_MESSAGE =
@@ -309,55 +311,60 @@ export class MistralOCRService {
 
   private async callOcrEndpoint(
     body: Record<string, unknown>,
-    timeoutMs: number
+    timeoutMs: number,
+    maxAttempts?: number
   ): Promise<MistralOcrResponse> {
     const logger = createServiceLogger("mistral", "ocr");
 
-    return invokeWithHttpRetry(async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const t0 = Date.now();
-        logger.apiCall("mistral", "/ocr", { model: OCR_MODEL });
+    return invokeWithHttpRetry(
+      async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const t0 = Date.now();
+          logger.apiCall("mistral", "/ocr", { model: OCR_MODEL });
 
-        const response = await fetch(`${this.baseUrl}/ocr`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
+          const response = await fetch(`${this.baseUrl}/ocr`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
 
-        clearTimeout(timeoutId);
+          clearTimeout(timeoutId);
 
-        const data = await response.json();
+          const data = await response.json();
 
-        if (!response.ok) {
-          const details = data ? JSON.stringify(data) : response.statusText;
-          logger.apiError("mistral", "/ocr", new Error(`HTTP ${response.status}`));
-          throw createExternalServiceErrorFromResponse(
-            "mistral",
-            response.status,
-            "/ocr",
-            details.slice(0, 400)
-          );
-        }
-
-        logger.apiSuccess("mistral", "/ocr", Date.now() - t0, {});
-        return data as MistralOcrResponse;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        if (error instanceof Error) {
-          if (error.name === "AbortError") {
-            throw new MistralOcrTimeoutError({ cause: error });
+          if (!response.ok) {
+            const details = data ? JSON.stringify(data) : response.statusText;
+            logger.apiError("mistral", "/ocr", new Error(`HTTP ${response.status}`));
+            throw createExternalServiceErrorFromResponse(
+              "mistral",
+              response.status,
+              "/ocr",
+              details.slice(0, 400)
+            );
           }
-          throw error;
+
+          logger.apiSuccess("mistral", "/ocr", Date.now() - t0, {});
+          return data as MistralOcrResponse;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error instanceof Error) {
+            if (error.name === "AbortError") {
+              throw new MistralOcrTimeoutError({ cause: error });
+            }
+            throw error;
+          }
+          throw new Error("Failed to process document with Mistral OCR", { cause: error });
         }
-        throw new Error("Failed to process document with Mistral OCR", { cause: error });
-      }
-    }, "mistral_ocr");
+      },
+      "mistral_ocr",
+      maxAttempts ? { maxAttempts } : undefined
+    );
   }
 
   /**
@@ -371,14 +378,22 @@ export class MistralOCRService {
 
     let data: MistralOcrResponse;
     try {
-      data = await this.callOcrEndpoint(buildOcrRequestBody(url, kind, true), ANNOTATED_TIMEOUT_MS);
+      data = await this.callOcrEndpoint(
+        buildOcrRequestBody(url, kind, true),
+        ANNOTATED_TIMEOUT_MS,
+        ANNOTATED_MAX_ATTEMPTS
+      );
     } catch (error) {
       if (!shouldRetryWithoutAnnotations(error)) throw error;
       logger.warn("OCR with figure annotations failed; retrying without annotations", {
         kind,
         error: error instanceof Error ? error.message : String(error),
       });
-      data = await this.callOcrEndpoint(buildOcrRequestBody(url, kind, false), PLAIN_TIMEOUT_MS);
+      // Exactly the request that worked before annotations, images included (they were sent as documents).
+      data = await this.callOcrEndpoint(
+        buildOcrRequestBody(url, "document", false),
+        PLAIN_TIMEOUT_MS
+      );
     }
 
     const markdown = stripMistralOcrMedia(

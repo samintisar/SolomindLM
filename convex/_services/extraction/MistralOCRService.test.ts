@@ -345,6 +345,26 @@ describe("MistralOCRService.processDocument", () => {
     expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
   });
 
+  it("falls back to the pre-annotation request for images: document_url, no annotations", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(400))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").processDocument("https://x/storage/abc", { kind: "image" });
+
+    expect(sentBody(fetchMock, 0).document).toEqual({
+      type: "image_url",
+      image_url: "https://x/storage/abc",
+    });
+    expect(sentBody(fetchMock, 1).document).toEqual({
+      type: "document_url",
+      document_url: "https://x/storage/abc",
+    });
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+  });
+
   it("retries once without annotations when the annotated request times out", async () => {
     const fetchMock = vi
       .fn()
