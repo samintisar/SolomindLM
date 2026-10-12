@@ -9,6 +9,7 @@
  */
 
 import { invokeWithRetry, invokeWithTimeout, type RetryConfig } from "../../_agents/_shared/index";
+import { createJobDeadline } from "./jobDeadline";
 
 /** Documented defaults for Studio LLM retries (exponential backoff inside invokeWithRetry). */
 const STUDIO_LLM_DEFAULT_RETRY: Pick<RetryConfig, "maxAttempts" | "baseDelayMs"> = {
@@ -53,4 +54,28 @@ export async function invokeStudioLlm<T>(options: InvokeStudioLlmOptions<T>): Pr
     retryConfig,
     phaseLabel
   );
+}
+
+/**
+ * Runs a studio LLM call with `timeoutMs` bounding all retry attempts together,
+ * not just each attempt, so a flaky provider cannot push past the job deadline.
+ *
+ * Each attempt only gets what is left of the shared budget, and no attempt starts
+ * once it is spent (the timeout error is non-retryable), so the retry loop ends
+ * with the budget instead of carrying on in the background.
+ */
+export function invokeWithinBudget<T>(options: InvokeStudioLlmOptions<T>): Promise<T> {
+  const budget = createJobDeadline(options.timeoutMs);
+  return invokeStudioLlm({
+    ...options,
+    invoke: () => {
+      const remainingMs = budget.remainingMs();
+      if (remainingMs <= 0) {
+        return Promise.reject(
+          new Error(`${options.phaseLabel} timeout after ${options.timeoutMs}ms`)
+        );
+      }
+      return invokeWithTimeout(options.invoke, remainingMs, options.phaseLabel);
+    },
+  });
 }

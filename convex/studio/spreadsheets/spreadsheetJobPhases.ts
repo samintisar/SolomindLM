@@ -40,7 +40,7 @@ import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
 import { planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
-import { type InvokeStudioLlmOptions, invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm, invokeWithinBudget } from "../_job/invokeStudioLlm";
 import { createJobDeadline, type JobDeadline } from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
@@ -804,28 +804,4 @@ export async function recursiveCollapse(
   );
 
   return recursiveCollapse(collapsed, customPrompt, deadline, language, onUsage);
-}
-
-/**
- * Runs a studio LLM call with `timeoutMs` bounding all retry attempts together,
- * not just each attempt, so a flaky provider cannot push past the job deadline.
- *
- * Each attempt only gets what is left of the shared budget, and no attempt starts
- * once it is spent (the timeout error is non-retryable), so the retry loop ends
- * with the budget instead of carrying on in the background.
- */
-export function invokeWithinBudget<T>(options: InvokeStudioLlmOptions<T>): Promise<T> {
-  const budget = createJobDeadline(options.timeoutMs);
-  return invokeStudioLlm({
-    ...options,
-    invoke: () => {
-      const remainingMs = budget.remainingMs();
-      if (remainingMs <= 0) {
-        return Promise.reject(
-          new Error(`${options.phaseLabel} timeout after ${options.timeoutMs}ms`)
-        );
-      }
-      return invokeWithTimeout(options.invoke, remainingMs, options.phaseLabel);
-    },
-  });
 }

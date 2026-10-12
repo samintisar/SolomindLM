@@ -3,7 +3,10 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { env } from "../../_lib/env.js";
-import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
+import { planCollapseGroups, shouldStopCollapsing } from "../../studio/_job/collapsePlan";
+import { invokeWithinBudget } from "../../studio/_job/invokeStudioLlm";
+import type { JobDeadline } from "../../studio/_job/jobDeadline";
+import { allWithConcurrency } from "../_shared/concurrency.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction";
 import type { JobLogger } from "../_shared/logging.js";
 import type { TokenUsage } from "../_shared/usageAggregate.js";
@@ -29,57 +32,96 @@ export interface CollapseReduceDeps {
   estimateTokens: (text: string) => number;
   logger: JobLogger;
   onUsage?: (usage: TokenUsage) => void;
+  /** Wall-clock budget for the whole finalize action; collapse rounds stop before it runs out. */
+  deadline: JobDeadline;
 }
 
+/**
+ * Merges map outputs round by round until they are small enough to refine.
+ *
+ * Every collapse group holds at least two outputs, so each round at least halves
+ * the output count even when the LLM drops no cards; collapse calls only get the
+ * time left after `REFINE_RESERVE_MS`, and a group that fails or runs out of time
+ * passes its cards through unchanged.
+ */
 export async function recursiveCollapse(
   outputs: Flashcard[][],
   deps: CollapseReduceDeps,
   topic?: string,
   language?: string
 ): Promise<Flashcard[][]> {
-  const totalTokens = outputs.reduce(
-    (sum, flashcards) => sum + deps.estimateTokens(formatFlashcardsAsText(flashcards)),
-    0
-  );
+  const estimateCards = (flashcards: Flashcard[]) =>
+    deps.estimateTokens(formatFlashcardsAsText(flashcards));
 
-  if (totalTokens <= FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS) {
+  if (shouldStopCollapsing(outputs, FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS, estimateCards)) {
     return outputs;
   }
 
-  const targetGroupTokens = FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS * 0.8;
-  const collapsed: Flashcard[][] = [];
-  let currentGroup: Flashcard[][] = [];
-  let currentTokens = 0;
+  const collapseCallBudgetMs = () =>
+    deps.deadline.stepTimeoutMs(
+      FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
+      FLASHCARD_CONFIG.REFINE_RESERVE_MS
+    );
 
-  for (const flashcards of outputs) {
-    const tokens = deps.estimateTokens(formatFlashcardsAsText(flashcards));
-    if (currentTokens + tokens > targetGroupTokens && currentGroup.length > 0) {
-      collapsed.push(await collapseGroup(currentGroup, deps, topic, language));
-      currentGroup = [flashcards];
-      currentTokens = tokens;
-    } else {
-      currentGroup.push(flashcards);
-      currentTokens += tokens;
-    }
+  if (collapseCallBudgetMs() < FLASHCARD_CONFIG.MIN_COLLAPSE_CALL_MS) {
+    deps.logger.info(`Out of collapse time budget, refining ${outputs.length} outputs as-is`, {
+      agent: "FlashcardGraph",
+      phase: "collapse_budget_spent",
+      outputCount: outputs.length,
+    });
+    return outputs;
   }
 
-  if (currentGroup.length > 0) {
-    collapsed.push(await collapseGroup(currentGroup, deps, topic, language));
-  }
+  const groups = planCollapseGroups(
+    outputs,
+    FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS,
+    estimateCards
+  );
+
+  const collapsed = await allWithConcurrency(
+    groups.map((group, idx) => async () => {
+      const merged = group.flat();
+      if (group.length === 1) {
+        return merged; // Trailing singleton: nothing to merge
+      }
+      // Groups queued behind earlier waves start later, so re-check the budget
+      // here instead of firing a call that would be abandoned almost at once.
+      const timeoutMs = collapseCallBudgetMs();
+      if (timeoutMs < FLASHCARD_CONFIG.MIN_COLLAPSE_CALL_MS) {
+        deps.logger.info(`Collapse group ${idx} skipped: out of time budget`, {
+          agent: "FlashcardGraph",
+          phase: "collapse_group_skipped",
+          groupIndex: idx,
+        });
+        return merged;
+      }
+      try {
+        return await collapseGroup(group, deps, timeoutMs, topic, language);
+      } catch (error) {
+        deps.logger.warn(`Collapse group ${idx} failed, keeping its cards uncollapsed`, {
+          agent: "FlashcardGraph",
+          phase: "collapse_group_failed",
+          groupIndex: idx,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return merged;
+      }
+    }),
+    FLASHCARD_CONFIG.COLLAPSE_CONCURRENCY
+  );
 
   return recursiveCollapse(collapsed, deps, topic, language);
 }
 
+/** One collapse LLM call over `group`, bounded (retries included) by `timeoutMs`. */
 export async function collapseGroup(
   group: Flashcard[][],
   deps: CollapseReduceDeps,
+  timeoutMs: number,
   topic?: string,
   language?: string
 ): Promise<Flashcard[]> {
-  const allCards: Flashcard[] = [];
-  for (const flashcards of group) {
-    allCards.push(...flashcards);
-  }
+  const allCards = group.flat();
 
   deps.logger.info(`Collapsing ${group.length} outputs (${allCards.length} cards)`, {
     agent: "FlashcardGraph",
@@ -118,25 +160,19 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
     maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
     onUsage: deps.onUsage,
   });
-  const response = (await invokeWithRetry(
-    () =>
-      invokeWithTimeout(
-        () =>
-          structuredLlm.invoke([
-            new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ]),
-        FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
-        "FlashcardCollapseGroup"
-      ),
-    {
-      maxAttempts: 2,
-      baseDelayMs: 1000,
-    },
-    "FlashcardCollapseGroup"
-  )) as FlashcardResponse;
+  const response = (await invokeWithinBudget({
+    invoke: () =>
+      structuredLlm.invoke([
+        new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
+        new HumanMessage(prompt),
+      ]),
+    timeoutMs,
+    phaseLabel: "FlashcardCollapseGroup",
+    retry: { maxAttempts: 2 },
+  })) as FlashcardResponse;
 
-  return response.flashcards;
+  // A collapse may only shrink a group; an LLM that pads the set is cut back.
+  return response.flashcards.slice(0, allCards.length);
 }
 
 export async function refineFlashcardSelection(
@@ -144,6 +180,7 @@ export async function refineFlashcardSelection(
   targetCount: number,
   difficulty: string,
   deps: CollapseReduceDeps,
+  timeoutMs: number,
   topic?: string,
   language?: string
 ): Promise<Flashcard[]> {
@@ -219,23 +256,16 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
     onUsage: deps.onUsage,
   });
-  const response = await invokeWithRetry(
-    () =>
-      invokeWithTimeout(
-        () =>
-          structuredLlm.invoke([
-            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ]),
-        FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
-        "FlashcardRefineSelection"
-      ),
-    {
-      maxAttempts: 2,
-      baseDelayMs: 1000,
-    },
-    "FlashcardRefineSelection"
-  );
+  const response = await invokeWithinBudget({
+    invoke: () =>
+      structuredLlm.invoke([
+        new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+        new HumanMessage(prompt),
+      ]),
+    timeoutMs,
+    phaseLabel: "FlashcardRefineSelection",
+    retry: { maxAttempts: 2 },
+  });
 
   // Refining rewrites and merges cards, which can reintroduce answer leaks; drop
   // them here so the backfill below replaces them with already-validated cards.
