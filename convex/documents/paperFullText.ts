@@ -51,10 +51,12 @@ export const recordPaperIngest = internalMutation({
 
 const RATE_LIMITED = "You've looked for full text often in the last hour. Try again later.";
 
+const UPLOAD_MISSING = "The upload didn't arrive. Try again.";
+
 const userError = (message: string) => toConvexError(new InputValidationError(message));
 
-/** The caller's paper source, if they can edit it and it isn't mid-ingest. */
-async function editablePaper(
+/** The caller's source, if they can edit its notebook. Throws when they can't. */
+async function editableSource(
   ctx: MutationCtx,
   documentId: Id<"documents">
 ): Promise<{ userId: Id<"users">; doc: Doc<"documents"> }> {
@@ -63,11 +65,16 @@ async function editablePaper(
   const doc = await ctx.db.get(documentId);
   if (!doc) throw new Error("Document not found");
   await assertCanEditNotebook(ctx, doc.notebookId, userId);
-  if (doc.fileType !== "paper_record") throw userError("Only paper sources have this option.");
-  if (doc.status === "pending" || doc.status === "processing") {
-    throw userError("This source is still being processed.");
-  }
   return { userId, doc };
+}
+
+/** Why this source can't be re-ingested right now, or null when it can. */
+function paperStateProblem(doc: Doc<"documents">): string | null {
+  if (doc.fileType !== "paper_record") return "Only paper sources have this option.";
+  if (doc.status === "pending" || doc.status === "processing") {
+    return "This source is still being processed.";
+  }
+  return null;
 }
 
 /** Looks for open-access full text again (re-runs the whole paper ingest). */
@@ -75,7 +82,9 @@ export const findFullText = mutation({
   args: { documentId: v.id("documents") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId } = await editablePaper(ctx, args.documentId);
+    const { userId, doc } = await editableSource(ctx, args.documentId);
+    const problem = paperStateProblem(doc);
+    if (problem) throw userError(problem);
     const { ok } = await rateLimiter.limit(ctx, "paperFullText", { key: userId });
     if (!ok) throw userError(RATE_LIMITED);
     await resetDocumentForReembed(ctx, { documentId: args.documentId, delayMs: 0 });
@@ -94,16 +103,29 @@ export const attachPdf = mutation({
     v.object({ ok: v.literal(false), reason: v.string() })
   ),
   handler: async (ctx, args) => {
-    const { userId } = await editablePaper(ctx, args.documentId);
+    const { userId, doc } = await editableSource(ctx, args.documentId);
+
+    // A blob any document already references isn't a fresh upload: leave it alone, never delete it.
+    const referenced = await ctx.db
+      .query("documents")
+      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (referenced) return { ok: false as const, reason: UPLOAD_MISSING };
 
     const reject = async (reason: string) => {
       await ctx.storage.delete(args.storageId);
       return { ok: false as const, reason };
     };
 
+    const problem = paperStateProblem(doc);
+    if (problem) return reject(problem);
+
     const file = await ctx.db.system.get(args.storageId);
-    if (!file) return { ok: false as const, reason: "The upload didn't arrive. Try again." };
-    if (file.contentType !== "application/pdf") return reject("Choose a PDF file.");
+    if (!file) return { ok: false as const, reason: UPLOAD_MISSING };
+    const type = file.contentType?.split(";")[0].trim().toLowerCase();
+    if (type !== "application/pdf" && type !== "application/x-pdf") {
+      return reject("Choose a PDF file.");
+    }
     if (file.size > MAX_PDF_BYTES) return reject("That PDF is over 50 MB.");
 
     const { ok } = await rateLimiter.limit(ctx, "paperFullText", { key: userId });

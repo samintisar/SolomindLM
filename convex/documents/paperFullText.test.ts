@@ -4,6 +4,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
+import { MAX_PDF_BYTES } from "../_services/extraction/openAccess/fetchOaCandidate";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
@@ -53,12 +54,17 @@ async function seedPaper(
   });
 }
 
-/** convex-test drops the Blob's content type, so write it onto the `_storage` row ourselves. */
-async function storeFile(t: T, body: string, contentType: string): Promise<Id<"_storage">> {
+/** convex-test drops the Blob's content type, so write it (and any size override) onto the `_storage` row. */
+async function storeFile(
+  t: T,
+  body: string,
+  contentType: string,
+  extra: { size?: number } = {}
+): Promise<Id<"_storage">> {
   return t.run(async (ctx) => {
     const storageId = await ctx.storage.store(new Blob([body], { type: contentType }));
     // biome-ignore lint/suspicious/noExplicitAny: convex-test lets us patch system tables
-    await (ctx.db as any).patch(storageId, { contentType });
+    await (ctx.db as any).patch(storageId, { contentType, ...extra });
     return storageId;
   });
 }
@@ -252,5 +258,135 @@ describe("documents.paperFullText.attachPdf", () => {
       asUser(t, stranger).mutation(api.documents.paperFullText.attachPdf, { documentId, storageId })
     ).rejects.toThrow();
     expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+  });
+
+  test("leaves a blob another document references alone (PDF or not)", async () => {
+    const t = makeT();
+    const victim = await seedPaper(t);
+    const attacker = await seedPaper(t);
+
+    for (const [body, type] of [
+      ["%PDF-1.7", "application/pdf"],
+      ["hello", "text/plain"],
+    ] as const) {
+      const storageId = await storeFile(t, body, type);
+      await t.run((ctx) => ctx.db.patch(victim.documentId, { storageId }));
+
+      const res = await asUser(t, attacker.userId).mutation(api.documents.paperFullText.attachPdf, {
+        documentId: attacker.documentId,
+        storageId,
+      });
+
+      expect(res).toEqual({ ok: false, reason: "The upload didn't arrive. Try again." });
+      expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+      expect((await t.run((ctx) => ctx.db.get(victim.documentId)))?.storageId).toBe(storageId);
+      expect((await t.run((ctx) => ctx.db.get(attacker.documentId)))?.storageId).toBeUndefined();
+    }
+  });
+
+  test("the document's own current PDF can't be re-attached", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "%PDF-1.7", "application/pdf");
+    await t.run((ctx) => ctx.db.patch(documentId, { storageId }));
+
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+
+    expect(res).toEqual({ ok: false, reason: "The upload didn't arrive. Try again." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+    expect(await t.run((ctx) => ctx.db.get(documentId))).toMatchObject({
+      storageId,
+      status: "completed",
+    });
+  });
+
+  test("deletes the upload when the source isn't a paper or is still processing", async () => {
+    const t = makeT();
+    const notPaper = await seedPaper(t, { fileType: "url" });
+    const a = await storeFile(t, "%PDF-1.7", "application/pdf");
+    expect(
+      await asUser(t, notPaper.userId).mutation(api.documents.paperFullText.attachPdf, {
+        documentId: notPaper.documentId,
+        storageId: a,
+      })
+    ).toEqual({ ok: false, reason: "Only paper sources have this option." });
+    expect(await t.run((ctx) => ctx.db.system.get(a))).toBeNull();
+
+    const busy = await seedPaper(t, { status: "processing" });
+    const b = await storeFile(t, "%PDF-1.7", "application/pdf");
+    expect(
+      await asUser(t, busy.userId).mutation(api.documents.paperFullText.attachPdf, {
+        documentId: busy.documentId,
+        storageId: b,
+      })
+    ).toEqual({ ok: false, reason: "This source is still being processed." });
+    expect(await t.run((ctx) => ctx.db.system.get(b))).toBeNull();
+  });
+
+  test("accepts a content type with parameters", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "%PDF-1.7", "Application/PDF; charset=binary");
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+    expect(res).toEqual({ ok: true });
+  });
+
+  test("refuses an oversize PDF and deletes it", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "%PDF-1.7", "application/pdf", {
+      size: MAX_PDF_BYTES + 1,
+    });
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+    expect(res).toEqual({ ok: false, reason: "That PDF is over 50 MB." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).toBeNull();
+  });
+
+  test("when rate limited, deletes the upload and reports it", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    for (let i = 0; i < 20; i++) {
+      const id = await storeFile(t, "%PDF-1.7", "application/pdf");
+      await t.run((ctx) => ctx.db.patch(documentId, { status: "completed" }));
+      const ok = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+        documentId,
+        storageId: id,
+      });
+      expect(ok).toEqual({ ok: true });
+    }
+    await t.run((ctx) => ctx.db.patch(documentId, { status: "completed" }));
+    const storageId = await storeFile(t, "%PDF-1.7", "application/pdf");
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+    expect(res).toMatchObject({ ok: false });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).toBeNull();
+  });
+
+  test("deletes the PDF it replaces", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const oldId = await storeFile(t, "%PDF-old", "application/pdf");
+    await t.run((ctx) => ctx.db.patch(documentId, { storageId: oldId }));
+    const newId = await storeFile(t, "%PDF-new", "application/pdf");
+
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId: newId,
+    });
+
+    expect(res).toEqual({ ok: true });
+    expect(await t.run((ctx) => ctx.db.system.get(oldId))).toBeNull();
+    expect((await t.run((ctx) => ctx.db.get(documentId)))?.storageId).toBe(newId);
   });
 });
