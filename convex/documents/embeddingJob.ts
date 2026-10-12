@@ -16,6 +16,7 @@ import { AudioTranscriptionService } from "../_services/extraction/AudioTranscri
 import { MistralOCRService } from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
 import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
+import { resolveHostAddresses } from "../_services/extraction/openAccess/resolveHost";
 import { extractUrlSource } from "../_services/extraction/urlSource";
 import {
   extractDocumentMetadata,
@@ -268,7 +269,7 @@ export const docEmbedding = internalAction({
           },
           {
             resolveCandidates: resolveOpenAccessCandidates,
-            fetchCandidate: (url) => fetchOaCandidate(url),
+            fetchCandidate: (url) => fetchOaCandidate(url, { resolveHost: resolveHostAddresses }),
             attachPdf: async (bytes) => {
               const storageId = await ctx.storage.store(
                 new Blob([bytes], { type: "application/pdf" })

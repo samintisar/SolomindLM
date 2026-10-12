@@ -21,6 +21,7 @@ import {
   openAccessUserAgent,
   resolveOpenAccessCandidates,
 } from "../_services/extraction/openAccess/OpenAccessResolver";
+import { resolveHostAddresses } from "../_services/extraction/openAccess/resolveHost";
 import { MAX_CANDIDATE_ATTEMPTS } from "../documents/paperIngest";
 
 const SAMPLE_SIZE = 200;
@@ -63,7 +64,8 @@ export const run = internalAction({
           return { skipped: true as const, before: false, after: null, candidates: 0 };
         }
         const oaUrl = work.open_access?.oa_url;
-        const before = oaUrl ? (await fetchOaCandidate(oaUrl)).type === "pdf" : false;
+        const fetchOpts = { resolveHost: resolveHostAddresses };
+        const before = oaUrl ? (await fetchOaCandidate(oaUrl, fetchOpts)).type === "pdf" : false;
 
         let after: "oa_pdf" | "oa_html" | null = null;
         const candidates = await resolveOpenAccessCandidates({
@@ -71,7 +73,7 @@ export const run = internalAction({
           pdfUrl: oaUrl ?? undefined,
         });
         for (const candidate of candidates.slice(0, MAX_CANDIDATE_ATTEMPTS)) {
-          const fetched = await fetchOaCandidate(candidate.url);
+          const fetched = await fetchOaCandidate(candidate.url, fetchOpts);
           if (fetched.type === "pdf") {
             after = "oa_pdf";
             break;

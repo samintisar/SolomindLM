@@ -164,6 +164,7 @@ import type * as _services_extraction_openAccess_OpenAccessResolver from "../_se
 import type * as _services_extraction_openAccess_fetchOaCandidate from "../_services/extraction/openAccess/fetchOaCandidate.js";
 import type * as _services_extraction_openAccess_fullTextTest from "../_services/extraction/openAccess/fullTextTest.js";
 import type * as _services_extraction_openAccess_publicUrl from "../_services/extraction/openAccess/publicUrl.js";
+import type * as _services_extraction_openAccess_resolveHost from "../_services/extraction/openAccess/resolveHost.js";
 import type * as _services_extraction_urlSource from "../_services/extraction/urlSource.js";
 import type * as _services_extractors from "../_services/extractors.js";
 import type * as _services_grading_WrittenQuestionsGradingService from "../_services/grading/WrittenQuestionsGradingService.js";
@@ -489,6 +490,7 @@ declare const fullApi: ApiFromModules<{
   "_services/extraction/openAccess/fetchOaCandidate": typeof _services_extraction_openAccess_fetchOaCandidate;
   "_services/extraction/openAccess/fullTextTest": typeof _services_extraction_openAccess_fullTextTest;
   "_services/extraction/openAccess/publicUrl": typeof _services_extraction_openAccess_publicUrl;
+  "_services/extraction/openAccess/resolveHost": typeof _services_extraction_openAccess_resolveHost;
   "_services/extraction/urlSource": typeof _services_extraction_urlSource;
   "_services/extractors": typeof _services_extractors;
   "_services/grading/WrittenQuestionsGradingService": typeof _services_grading_WrittenQuestionsGradingService;

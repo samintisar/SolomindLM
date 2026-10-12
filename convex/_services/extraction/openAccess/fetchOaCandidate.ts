@@ -4,7 +4,7 @@
  */
 
 import { openAccessUserAgent } from "./OpenAccessResolver";
-import { isPublicHttpUrl } from "./publicUrl";
+import { hostNeedingResolution, isBlockedIpAddress, isPublicHttpUrl } from "./publicUrl";
 
 /** Mistral OCR accepts documents up to 50 MB. */
 export const MAX_PDF_BYTES = 50 * 1024 * 1024;
@@ -31,13 +31,34 @@ function concat(parts: Uint8Array[], total: number): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
+export interface FetchOaCandidateOptions {
+  timeoutMs?: number;
+  /**
+   * Resolves a hostname to its addresses (Node's `dns.lookup`), so a public name pointing at a private
+   * address is refused before connecting. Absent where DNS isn't available; the URL check still applies.
+   */
+  resolveHost?: (hostname: string) => Promise<string[]>;
+}
+
+/** Whether `url` passes the destination policy, including what its hostname resolves to. */
+async function isAllowedDestination(
+  url: string,
+  resolveHost: FetchOaCandidateOptions["resolveHost"]
+): Promise<boolean> {
+  if (!isPublicHttpUrl(url)) return false;
+  const host = resolveHost ? hostNeedingResolution(url) : null;
+  if (!host || !resolveHost) return true;
+  const addresses = await resolveHost(host).catch(() => [] as string[]);
+  return addresses.length > 0 && !addresses.some(isBlockedIpAddress);
+}
+
 function head(bytes: Uint8Array): string {
   return new TextDecoder("latin1").decode(bytes.subarray(0, SNIFF_BYTES));
 }
 
 export async function fetchOaCandidate(
   url: string,
-  timeoutMs = FETCH_TIMEOUT_MS
+  { timeoutMs = FETCH_TIMEOUT_MS, resolveHost }: FetchOaCandidateOptions = {}
 ): Promise<FetchedCandidate> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -47,7 +68,9 @@ export async function fetchOaCandidate(
     let finalUrl = url;
     let res: Response | undefined;
     for (let hop = 0; ; hop++) {
-      if (!isPublicHttpUrl(finalUrl)) return { type: "unusable", reason: "blocked_destination" };
+      if (!(await isAllowedDestination(finalUrl, resolveHost))) {
+        return { type: "unusable", reason: "blocked_destination" };
+      }
       res = await fetch(finalUrl, {
         redirect: "manual",
         signal: controller.signal,

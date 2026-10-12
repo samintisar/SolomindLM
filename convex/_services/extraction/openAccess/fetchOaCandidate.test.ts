@@ -57,6 +57,34 @@ describe("fetchOaCandidate", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("refuses a public name that resolves to a private address, on every hop", async () => {
+    const resolveHost = vi.fn(async (host: string) =>
+      host === "evil.example.org" ? ["93.184.216.34", "10.0.0.7"] : ["93.184.216.34"]
+    );
+    expect(await fetchOaCandidate("https://evil.example.org/a.pdf", { resolveHost })).toEqual({
+      type: "unusable",
+      reason: "blocked_destination",
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(null, { status: 302, headers: { location: "https://evil.example.org/x" } })
+    );
+    expect(await fetchOaCandidate("https://repo.example.org/a.pdf", { resolveHost })).toEqual({
+      type: "unusable",
+      reason: "blocked_destination",
+    });
+    expect(resolveHost).toHaveBeenLastCalledWith("evil.example.org");
+  });
+
+  it("refuses a name that doesn't resolve", async () => {
+    const resolveHost = vi.fn().mockRejectedValue(new Error("ENOTFOUND"));
+    expect(await fetchOaCandidate("https://nowhere.example.org/a", { resolveHost })).toEqual({
+      type: "unusable",
+      reason: "blocked_destination",
+    });
+  });
+
   it("gives up after too many redirects", async () => {
     mockFetch.mockImplementation(
       async () => new Response(null, { status: 302, headers: { location: "/again" } })
