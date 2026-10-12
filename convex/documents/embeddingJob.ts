@@ -13,7 +13,11 @@ import {
 import { sourceFailureMessage } from "../_lib/sourceFailure";
 import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
-import { MistralOCRService } from "../_services/extraction/MistralOCRService";
+import {
+  IMAGE_FILE_EXTENSIONS,
+  MistralOCRService,
+  ocrInputKindForFile,
+} from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
 import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
 import { resolveHostAddresses } from "../_services/extraction/openAccess/resolveHost";
@@ -28,7 +32,7 @@ import { fulltextStatusAfterIngest, ingestPaper } from "./paperIngest";
 import { toStoredMarkdown } from "./storedMarkdown.helpers";
 
 // File extensions that require OCR processing
-const OCR_FILE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".avif", ".pdf", ".pptx", ".docx"];
+const OCR_FILE_EXTENSIONS = [...IMAGE_FILE_EXTENSIONS, ".pdf", ".pptx", ".docx"];
 
 const AUDIO_FILE_EXTENSIONS = [".wav", ".mp3", ".m4a", ".webm", ".flac"];
 
@@ -203,7 +207,9 @@ export const docEmbedding = internalAction({
             throw new Error("Could not get file URL for document: " + documentId);
           }
 
-          extractedText = await mistralOCR.processDocument(fileUrl);
+          extractedText = await mistralOCR.processDocument(fileUrl, {
+            kind: ocrInputKindForFile(docDetails.fileName),
+          });
           logger.phaseComplete("extraction", {
             contentLength: extractedText.length,
             method: "OCR",

@@ -4,7 +4,7 @@
  */
 export const PAGE_LABEL_LINE = /^\*\*Page (\d+)\*\*[ \t]*\r?$/;
 
-const PAGE_LABEL_LINES = new RegExp(PAGE_LABEL_LINE.source, "gm");
+export const PAGE_LABEL_LINES = new RegExp(PAGE_LABEL_LINE.source, "gm");
 
 function labelStarts(markdown: string): Array<{ offset: number; page: number }> {
   return Array.from(markdown.matchAll(PAGE_LABEL_LINES), (m) => ({

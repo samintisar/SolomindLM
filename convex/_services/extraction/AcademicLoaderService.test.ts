@@ -24,9 +24,7 @@ describe("AcademicLoaderService.loadPaper", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({
-        pages: [{ markdown: "OCR extracted text from PDF" }],
-      }),
+      text: async () => JSON.stringify({ pages: [{ markdown: "OCR extracted text from PDF" }] }),
     } as Response);
 
     const service = new AcademicLoaderService();
