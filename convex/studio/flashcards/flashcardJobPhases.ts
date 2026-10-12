@@ -7,7 +7,7 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { invokeWithTimeout, sanitizeUserInput } from "../../_agents/_shared/index";
+import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
@@ -18,10 +18,6 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import {
-  recursiveCollapse,
-  refineFlashcardSelection,
-} from "../../_agents/flashcard/collapseReduceLlm";
 import { FLASHCARD_CONFIG } from "../../_agents/flashcard/config";
 import {
   groupFlashcardsByTopic,
@@ -42,10 +38,15 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
-import { createJobDeadline } from "../_job/jobDeadline";
+import { pickSpread } from "../_job/collapsePlan";
+import { generateTitleWithinDeadline, invokeStudioLlm } from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { fitCardsForRefine, recursiveCollapse, refineFlashcardSelection } from "./collapseReduce";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("FlashcardGraph");
 
@@ -502,7 +503,7 @@ export async function runFinalizeFlashcardPhase(
 
   logger.info("Starting finalization phase");
 
-  const deadline = createJobDeadline(FLASHCARD_CONFIG.FINALIZE_BUDGET_MS);
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
 
   try {
     // Get flashcard with map results
@@ -608,16 +609,25 @@ export async function runFinalizeFlashcardPhase(
         `[FlashcardJob] Skipping smart reduce: ${dedupedFlashcards.length} deduped cards already near target ${cardCount}`
       );
     } else {
+      const refineInput = fitCardsForRefine(dedupedFlashcards, countTokens);
+      if (refineInput.length < dedupedFlashcards.length) {
+        logger.info(
+          `Refine input capped at ${refineInput.length} of ${dedupedFlashcards.length} cards`,
+          {
+            agent: "FlashcardGraph",
+            phase: "refine_input_capped",
+            dedupedCount: dedupedFlashcards.length,
+            refineCount: refineInput.length,
+          }
+        );
+      }
       try {
         finalFlashcards = await refineFlashcardSelection(
-          dedupedFlashcards,
+          refineInput,
           cardCount,
           difficulty,
           collapseReduceDeps,
-          deadline.stepTimeoutMs(
-            FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
-            FLASHCARD_CONFIG.SAVE_RESERVE_MS
-          ),
+          deadline.stepTimeoutMs(FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
           sanitizedTopic,
           language
         );
@@ -633,7 +643,7 @@ export async function runFinalizeFlashcardPhase(
         finalFlashcards = [];
       }
       if (finalFlashcards.length === 0) {
-        finalFlashcards = dedupedFlashcards.slice(0, cardCount);
+        finalFlashcards = pickSpread(dedupedFlashcards, cardCount);
       }
     }
 
@@ -649,9 +659,9 @@ export async function runFinalizeFlashcardPhase(
     const flashcardsText = formatFlashcardsAsText(finalFlashcards);
     let title = "Flashcards";
     try {
-      title = await invokeWithTimeout(
-        () => generateTitleFromChunk(flashcardsText.substring(0, 2000)),
-        deadline.stepTimeoutMs(FLASHCARD_CONFIG.TITLE_TIMEOUT_MS),
+      title = await generateTitleWithinDeadline(
+        deadline,
+        flashcardsText.substring(0, 2000),
         "FlashcardTitle"
       );
     } catch (_e) {

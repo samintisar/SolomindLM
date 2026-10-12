@@ -4,7 +4,7 @@
  * Report generation phase implementations (invoked from thin `job.ts` registrations).
  */
 
-import { invokeWithTimeout, sanitizeUserInput } from "../../_agents/_shared/index";
+import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { fillTemplate } from "../../_agents/_shared/promptTemplate";
@@ -27,9 +27,16 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
-import { invokeStudioLlm, invokeWithinBudget } from "../_job/invokeStudioLlm";
-import { createJobDeadline } from "../_job/jobDeadline";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { isFailedMapResult } from "./mapResultUtils.js";
 
@@ -41,10 +48,7 @@ const CONFIG = {
   // Convex kills actions at 600s without running their catch blocks, so every
   // LLM call has to give up early enough for the action to record the outcome.
   PER_CHUNK_TIMEOUT_MS: 540_000,
-  FINALIZE_BUDGET_MS: 540_000,
   REDUCE_TIMEOUT_MS: 480_000, // all reduce attempts together
-  SAVE_RESERVE_MS: 30_000, // held back from reduce for title generation + saving
-  TITLE_TIMEOUT_MS: 20_000,
   MAX_OUTPUT_TOKENS: 32_000,
   MIN_SUMMARY_LENGTH: 50,
 } as const;
@@ -441,7 +445,7 @@ export async function runFinalizeReportPhase(
 
   logger.info("Starting finalization phase");
 
-  const deadline = createJobDeadline(CONFIG.FINALIZE_BUDGET_MS);
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
 
   try {
     const report = await ctx.runQuery(internal.studio.reports.index.getInternal, { id: reportId });
@@ -548,7 +552,7 @@ export async function runFinalizeReportPhase(
             reduceUsage = usage;
           },
         }),
-      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, CONFIG.SAVE_RESERVE_MS),
+      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
       phaseLabel: "ReportReduce",
       onRetry: (attempt, error) => {
         console.log(`[ReportJob] Reduce retry ${attempt}/3: ${error.message}`);
@@ -568,9 +572,9 @@ export async function runFinalizeReportPhase(
 
     let title = "Report";
     try {
-      title = await invokeWithTimeout(
-        () => generateTitleFromChunk(combinedContent.substring(0, 2000)),
-        deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
+      title = await generateTitleWithinDeadline(
+        deadline,
+        combinedContent.substring(0, 2000),
         "ReportTitle"
       );
     } catch {
