@@ -44,7 +44,7 @@ institutional proxies. These adjacent bugs get their own issues:
 
 ## Design
 
-### 1. Candidate resolution — `convex/_services/extraction/OpenAccessResolver.ts`
+### 1. Candidate resolution — `convex/_services/extraction/openAccess/OpenAccessResolver.ts`
 
 Input: `{ doi?, openAlexId?, pdfUrl?, landingPageUrl? }` from the paper record.
 
@@ -61,14 +61,16 @@ Lookups, in parallel, each with a 10 s timeout and at most one retry on 429/5xx 
 Derived candidates:
 
 - An arXiv location (host `arxiv.org`, or an arXiv `pmh_id`) gives `https://arxiv.org/pdf/{id}` as a PDF candidate.
-- A PMCID gives `https://pmc.ncbi.nlm.nih.gov/articles/PMC{n}/` as an HTML candidate.
+- A PMCID, or a PMC / Europe PMC link in a location (including `pmh_id`s and Europe PMC render URLs), gives
+  `https://pmc.ncbi.nlm.nih.gov/articles/PMC{n}/` as an HTML candidate.
 
 Output: an ordered, de-duplicated list of `OaCandidate = { url, kind: "pdf" | "html", version?, license?, host }`.
 
 - Order by version: published, accepted, submitted, unknown. Within a version, PDF before HTML.
 - The paper record's own `pdfUrl` is included as a PDF candidate at its matched version (unknown if no location
   matches it).
-- URLs are compared after normalising scheme, trailing slash and `http`→`https`.
+- URLs are compared by host, path and query, ignoring scheme, trailing slash and fragment. A candidate keeps the
+  scheme it was published with (`http` is not rewritten); when a duplicate arrives as `https`, the `https` form wins.
 - With neither DOI nor OpenAlex id, the list is the record's `pdfUrl` (if any).
 - Lookup failures are logged and produce no candidates; the resolver never throws.
 
@@ -76,12 +78,13 @@ Contact email: new optional env var `OPEN_ACCESS_CONTACT_EMAIL` in `convex/_lib/
 `support@solomindlm.com`, used for both APIs. Unpaywall allows 100,000 calls/day; import volume is far below that,
 and each import makes exactly one Unpaywall call.
 
-### 2. Fetching a candidate — `convex/_services/extraction/fetchOaCandidate.ts`
+### 2. Fetching a candidate — `convex/_services/extraction/openAccess/fetchOaCandidate.ts`
 
 `GET` with a 30 s timeout, a `SolomindLM/1.0 (mailto:{contact})` user agent, redirects followed, and a 50 MB cap
 (stop reading and report `too_large` past it). Classify the response:
 
-- body starts with `%PDF-` → `{ type: "pdf", bytes }`
+- body starts with `%PDF-` (the first 1 KB is read and sniffed, so a leading BOM or whitespace is tolerated)
+  → `{ type: "pdf", bytes }`
 - `text/html` (or sniffed HTML) → `{ type: "html", finalUrl }`
 - anything else, non-2xx, timeout → `{ type: "unusable", reason }`
 
@@ -92,18 +95,32 @@ The `paper_record` branch of `embeddingJob` moves into `ingestPaper(ctx, doc, de
 yields full text:
 
 1. **Stored PDF** — if the document has a `storageId` (from "Upload PDF" or an earlier import), OCR it via
-   `ctx.storage.getUrl`. Keeps the document's existing `fullTextSource` (an `oa_pdf` stored by an earlier import)
-   or, when there is none, records `{ method: "uploaded_pdf" }`.
-2. **Candidates** — run the resolver, then try candidates in order, at most 6 attempts and 180 s in total:
+   `ctx.storage.getUrl`. Keeps the document's existing `fullTextSource` when it is `oa_pdf` or `uploaded_pdf`;
+   otherwise records `{ method: "uploaded_pdf" }`. A transient OCR error (5xx, 429, network) is rethrown and
+   fails the source, so the user can retry without losing the file. A permanent error (a corrupt PDF, a missing
+   file) or empty text falls through to the next steps, and a working open-access PDF may then replace the
+   unreadable one.
+2. **Candidates** — run the resolver, then try candidates in order, at most 6 attempts, inside the overall
+   deadline below:
    - `pdf`: store the bytes in Convex storage, set the document's `storageId`, OCR from the storage URL. Accept if
      the OCR text is non-empty. Source `{ method: "oa_pdf", url, version, license, host }`.
    - `html`: scrape `finalUrl` with the existing scraper (`scrapeWebPageInternal`). Accept if it passes the
      full-text test. Source `{ method: "oa_html", … }`.
    - A PDF that fails OCR is deleted from storage before moving on.
-3. **Landing page** — scrape `fileUrl || landingPageUrl` if not already tried; accept under the full-text test.
+   - Candidate URLs are tracked (including where a redirect ended) so the landing page is not scraped twice.
+3. **Landing page** — scrape `fileUrl || landingPageUrl` if not already tried and at least 60 s of the deadline
+   remain; accept under the full-text test.
    Source `{ method: "landing_page", url }`.
 4. **Abstract** — store `buildPaperMetadataMarkdown(pr, title)` (which carries the "full text was not ingested"
    note); outcome `abstract_only`.
+
+**Deadline.** Steps 1-3 share one 420 s deadline measured from the start of `ingestPaper`, leaving the embedding
+job at least 180 s for chunking and embedding inside Convex's 600 s action limit. Before each candidate attempt
+there must be room for its worst case: 220 s for a PDF (30 s fetch plus Mistral OCR with retries), 90 s for HTML
+(30 s fetch plus a scrape). A PDF candidate that no longer fits is skipped and a later HTML one may still run;
+when not even an HTML attempt fits, the loop stops. A PDF that turns up behind an HTML candidate is stored and
+OCR'd only if 190 s remain. Skipped candidates don't count toward the 6 attempts. Resolver and fetch exceptions
+are caught and treated as "no candidates" / "unusable".
 
 **Full-text test** (`isFullTextLength(text, abstract)`): word count ≥ 1,500 **and** ≥ 3 × the abstract's word count.
 Applies to scraped text only; OCR of a real PDF is accepted when non-empty.
@@ -135,15 +152,18 @@ Applies to scraped text only; OCR of a real PDF is accepted when non-empty.
 
 ### 6. Actions on abstract-only sources
 
-Shown in the source's `⋯` menu and as an inline link next to the "Abstract only" hint.
+Shown in the source's `⋯` menu only (the "Abstract only" hint sits inside the row's open-source button, which
+can't contain another control, so there is no inline link). They are also offered on failed paper rows.
 
 - **Find full text** → new public mutation `documents.paperFullText.findFullText({ documentId })`. Checks the caller
-  can edit the notebook, the document is a `paper_record`, and a per-user rate limit (`findPaperFullText`, 20/hour) in
+  can edit the notebook, the document is a `paper_record`, and a per-user rate limit (`paperFullText`, 20/hour) in
   `convex/_lib/rateLimits.ts`. Calls `prepareDocumentReembed` (no new storage) to re-run ingest.
 - **Upload PDF** → file picker → `generateUploadUrl` → new public mutation
   `documents.paperFullText.attachPdf({ documentId, storageId })`. Same access check; reads the blob's `_storage`
-  system record and rejects anything not `application/pdf` or over 50 MB (deleting the rejected blob). Calls
-  `prepareDocumentReembed` with `newStorageId`, which deletes any previously stored PDF. Step 1 of the ingest order
+  system record and rejects anything not a PDF or over 50 MB. It only accepts a fresh, unreferenced upload: a blob
+  that any `documents` or `audioOverviews` row references is refused and never deleted, and a rejected blob is
+  deleted only if it was uploaded less than 15 minutes ago. Calls `prepareDocumentReembed` with `newStorageId`,
+  which deletes any previously stored PDF. Step 1 of the ingest order
   then uses it.
 
 Both show the source's normal processing state while ingest re-runs.
@@ -152,12 +172,15 @@ Both show the source's normal processing state while ingest re-runs.
 
 Internal functions run by hand with `npx convex run`, dev first, then prod. Each takes `dryRun` and logs counts.
 
-- **Relabel** — paginate `documents` (100 per batch, self-scheduling). For `paper_record` rows with
+- **Relabel** — paginate `documents` (4 per batch, since stored markdown can be large; self-scheduling). For `paper_record` rows with
   `ingestionStatus: "ingested"` and no `fullTextSource`, apply the full-text test to `extractedMarkdown` against the
   abstract; failing rows become `metadata_only` / `unavailable`. No external calls.
-- **Re-resolve** — for `metadata_only` papers with a DOI or OpenAlex id, run the resolver only. If it returns any
-  candidate other than the record's own `pdfUrl`, schedule `prepareDocumentReembed` with `delayMs` spaced 10 s apart.
-  Log candidates found and re-ingests scheduled.
+- **Re-resolve** (opt in with `reResolve: true`, same pass) — only for papers relabeled in this pass that are
+  completed and have a DOI, an OpenAlex id or a PDF link; papers that were already `metadata_only` were tried by the
+  new pipeline and are never queued. Each is queued 10 s apart. The queued action runs the resolver with the
+  record's ids and its own `pdfUrl` (the old pipeline never checked that link's output), re-checks that the row is
+  still an abstract-only paper, and re-ingests when it finds any candidate. A relabel-only run gives up re-resolve
+  for the papers it relabels. Counts are logged as one JSON line.
 
 ### 8. Measurement — `convex/eval/openAccessCoverage.ts`
 
@@ -167,14 +190,20 @@ OpenAlex (`/works?sample=200&seed=480&filter=has_doi:true,type:article`), then f
 - **Before**: the provider link the old path would have used (OpenAlex `open_access.oa_url`) downloads as `%PDF`.
 - **After**: the new order reaches a `%PDF` candidate or an HTML candidate passing the full-text test.
 
-It skips OCR to keep cost down. It reports the two shares and a breakdown by method; the numbers go in the PR.
+It skips OCR to keep cost down. It runs in batches of 15 papers (`offset`, `limit`) with a 450 s batch deadline,
+skipping papers that would start after it, to stay inside the 600 s action limit. Each batch reports `total`,
+`skipped`, `attempted`, `before`, `after`, `afterPdf`, `afterHtml`; compute the two shares over `attempted`, not
+`total`, and break them down by method. The numbers go in the PR.
 
 ## Error handling
 
 - Resolver lookups, candidate fetches, storage writes, OCR and scrapes each fail into "try the next step"; only an
   unexpected exception outside them fails the ingest (existing `failed` handling).
 - Every step logs through `serviceLogger` with the document's `requestId`, including which candidate succeeded.
-- The 180 s candidate budget keeps the whole embedding job inside Convex's 600 s action limit.
+- The 420 s ingest deadline with per-attempt reserves keeps the whole embedding job inside Convex's 600 s action
+  limit.
+- A transient OCR failure on an already-stored PDF fails the source (retryable by the user); a permanent one or
+  empty text falls through and a working open-access PDF may replace the file.
 
 ## Testing
 
@@ -185,7 +214,7 @@ TDD, `*.test.ts` next to source:
 - `fetchOaCandidate`: `%PDF` detection, HTML, size cap, non-2xx, timeout.
 - `isFullTextLength`.
 - `paperIngest`: each step's success and fall-through with mocked services; stored PDF first; failed-OCR PDF deleted;
-  budget and attempt caps; outcome and `fullTextSource`.
+  deadline, reserves and attempt caps; stored-PDF transient vs permanent errors; outcome and `fullTextSource`.
 - `findFullText` / `attachPdf` (convex-test): access, non-paper rejection, rate limit, content-type and size checks.
 - Backfill relabel decision.
 - Web: `SourceListItem` labels, tooltip and actions; `documentToSource`; citation marker; `notebookPapers` labelling.
