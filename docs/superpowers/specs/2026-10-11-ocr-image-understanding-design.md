@@ -51,10 +51,11 @@ Figure schema (strict JSON schema, `additionalProperties: false`, all fields req
 Field descriptions are generic and must work for any source: no subject-specific wording, no references to eval
 fixtures (AGENTS.md, Prompt authoring).
 
-The annotated request's timeout rises from 60s to 180s (the probe measured 13s for a 24-page paper with 22 figures,
-so this is headroom for long documents). Timeouts are not
-retried by `invokeWithHttpRetry`; the plain fallback in section 3 uses 120s, so the worst case (annotated timeout,
-then fallback) is about 300s, inside the 600s action limit with room for chunking and embedding.
+The annotated request's timeout rises from 60s to 120s (the probe measured 13s for a 24-page paper with 22 figures,
+so this is headroom for long documents). The plain fallback in section 3 keeps today's 60s. Timeouts are not retried
+by `invokeWithHttpRetry`, so the usual worst case (annotated timeout, then fallback) is about 180s. The pathological
+case — `invokeWithHttpRetry`'s 3 attempts each ending in a slow 5xx, on both calls — is 3 × 120s + 3 × 60s = 540s,
+still inside the 600s action limit.
 
 ### 2. Response
 
@@ -89,7 +90,7 @@ pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows 
   any OCR error in its link-specific "couldn't read the PDF at this link" message, which fits links better.
   `AcademicLoaderService` is unchanged: it already falls back to a web scrape when OCR throws.
 - **Annotations rejected or too slow.** A 4xx response to the annotated request (other than 429), or its timeout,
-  triggers one plain request without `bbox_annotation_format` (120s timeout), logged
+  triggers one plain request without `bbox_annotation_format` (60s timeout), logged
   as a warning. That is today's behavior, so annotations never lose a document that ingests now. 429 and 5xx keep
   using `invokeWithHttpRetry`.
 - **One bad annotation.** Skipped as in section 2; the rest of the document is unaffected.

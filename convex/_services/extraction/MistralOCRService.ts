@@ -271,9 +271,13 @@ export function buildOcrRequestBody(
   return body;
 }
 
-/** Annotations add a vision pass per figure; the plain fallback is the request that worked before them. */
-const ANNOTATED_TIMEOUT_MS = 180_000;
-const PLAIN_TIMEOUT_MS = 120_000;
+/**
+ * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
+ * request that worked before them. `invokeWithHttpRetry` makes up to 3 attempts per call, so the worst case
+ * (3 slow 5xx on each call) is 3 × 120s + 3 × 60s = 540s, inside the 600s action limit.
+ */
+const ANNOTATED_TIMEOUT_MS = 120_000;
+const PLAIN_TIMEOUT_MS = 60_000;
 
 export const NOTHING_READABLE_MESSAGE =
   "We couldn't find any text or images to read in this file. If it's a photo, try a clearer or higher-resolution version.";
