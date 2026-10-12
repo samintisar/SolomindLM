@@ -365,6 +365,38 @@ describe("MistralOCRService.processDocument", () => {
     expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
   });
 
+  it("times out a response whose body stalls after the headers arrive", async () => {
+    vi.useFakeTimers();
+    try {
+      const stalledBody = (_url: string, init: RequestInit) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise((_, reject) =>
+              init.signal?.addEventListener("abort", () =>
+                reject(
+                  Object.assign(new Error("The operation was aborted"), { name: "AbortError" })
+                )
+              )
+            ),
+        });
+      const fetchMock = vi
+        .fn()
+        .mockImplementationOnce(stalledBody)
+        .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const pending = new MistralOCRService("key").processDocument("https://x/a.pdf");
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      await expect(pending).resolves.toBe("**Page 1**\n\ntext");
+      expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("retries once without annotations when the annotated request times out", async () => {
     const fetchMock = vi
       .fn()

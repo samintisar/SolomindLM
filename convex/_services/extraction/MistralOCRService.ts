@@ -274,8 +274,9 @@ export function buildOcrRequestBody(
 /**
  * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
  * request that worked before them, with its old 60s timeout and 3 attempts. Capping the annotated call at 2
- * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 120s + 3 × 60s = 420s, which leaves the
- * embedding job time to chunk and embed inside the 600s action limit.
+ * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 120s + 3 × 60s = 420s, plus at most ~5s of
+ * retry backoff (1s and 2s delays, ±25% jitter), which leaves the embedding job time to chunk and embed inside the
+ * 600s action limit. Each attempt's timeout covers reading the body too, so these bounds hold.
  */
 const ANNOTATED_TIMEOUT_MS = 120_000;
 const ANNOTATED_MAX_ATTEMPTS = 2;
@@ -334,8 +335,7 @@ export class MistralOCRService {
             signal: controller.signal,
           });
 
-          clearTimeout(timeoutId);
-
+          // The timer stays armed while the body streams in: a response that stalls after its headers still times out.
           const data = await response.json();
 
           if (!response.ok) {
@@ -352,7 +352,6 @@ export class MistralOCRService {
           logger.apiSuccess("mistral", "/ocr", Date.now() - t0, {});
           return data as MistralOcrResponse;
         } catch (error) {
-          clearTimeout(timeoutId);
           if (error instanceof Error) {
             if (error.name === "AbortError") {
               throw new MistralOcrTimeoutError({ cause: error });
@@ -360,6 +359,8 @@ export class MistralOCRService {
             throw error;
           }
           throw new Error("Failed to process document with Mistral OCR", { cause: error });
+        } finally {
+          clearTimeout(timeoutId);
         }
       },
       "mistral_ocr",
