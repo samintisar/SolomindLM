@@ -221,7 +221,7 @@ describe("ingestPaper", () => {
     expect(out.content).toContain("Full text was not ingested");
   });
 
-  describe("a stored PDF is never lost", () => {
+  describe("a stored PDF", () => {
     it("rethrows a transient OCR error on the stored PDF, without touching storage", async () => {
       const deps = makeDeps({
         ocrStoredPdf: vi
@@ -244,18 +244,41 @@ describe("ingestPaper", () => {
         new ExternalServiceError("mistral", "Bad PDF", { statusCode: 400 }),
       ],
       ["a missing stored file", new Error("Stored PDF not found")],
-    ])("falls through to non-PDF routes on %s, keeping the file", async (_label, error) => {
+    ])("lets an open-access PDF replace a stored PDF that fails with %s", async (_label, error) => {
       const deps = makeDeps({
-        ocrStoredPdf: vi.fn().mockRejectedValue(error),
+        ocrStoredPdf: vi.fn().mockImplementation(async (id: string) => {
+          if (id === "storage_1") throw error;
+          return "OCR text";
+        }),
         resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+        fetchCandidate: vi.fn().mockResolvedValue({
+          type: "pdf",
+          bytes: pdfBytes,
+          finalUrl: "https://arxiv.org/pdf/1304.1068",
+        }),
       });
       const out = await ingestPaper(
         input({ storageId: "storage_1", fileUrl: undefined }),
         deps,
         logger
       );
-      expect(deps.fetchCandidate).not.toHaveBeenCalled();
-      expect(deps.attachPdf).not.toHaveBeenCalled();
+      expect(deps.attachPdf).toHaveBeenCalledWith(pdfBytes);
+      expect(out).toMatchObject({
+        outcome: "full_text",
+        content: "OCR text",
+        fullTextSource: { method: "oa_pdf" },
+      });
+    });
+
+    it("ends abstract-only when a permanently unreadable stored PDF has no replacement", async () => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockRejectedValue(new Error("Stored PDF not found")),
+      });
+      const out = await ingestPaper(
+        input({ storageId: "storage_1", fileUrl: undefined }),
+        deps,
+        logger
+      );
       expect(deps.detachPdf).not.toHaveBeenCalled();
       expect(out.outcome).toBe("abstract_only");
     });
@@ -272,32 +295,28 @@ describe("ingestPaper", () => {
       });
     });
 
-    it("skips PDF candidates when the stored PDF has no text, but still uses HTML ones", async () => {
+    it("tries PDF candidates when the stored PDF has no text, and the copy replaces it", async () => {
       const deps = makeDeps({
-        ocrStoredPdf: vi.fn().mockResolvedValue("  "),
-        resolveCandidates: vi.fn().mockResolvedValue([
-          candidate({ url: "https://a.example/1.pdf", host: "a.example" }),
-          candidate({
-            url: "https://pmc.example/articles/PMC1/",
-            kind: "html",
-            host: "pmc.example",
-          }),
-        ]),
+        ocrStoredPdf: vi
+          .fn()
+          .mockImplementation(async (id: string) => (id === "storage_1" ? "  " : "OCR text")),
+        resolveCandidates: vi
+          .fn()
+          .mockResolvedValue([candidate({ url: "https://a.example/1.pdf", host: "a.example" })]),
         fetchCandidate: vi
           .fn()
-          .mockResolvedValue({ type: "html", finalUrl: "https://pmc.example/articles/PMC1/" }),
-        scrape: vi.fn().mockResolvedValue({ title: "PMC", content: longText }),
+          .mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "https://a.example/1.pdf" }),
       });
       const out = await ingestPaper(input({ storageId: "storage_1" }), deps, logger);
-      expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
-      expect(deps.fetchCandidate).toHaveBeenCalledWith("https://pmc.example/articles/PMC1/");
-      expect(deps.attachPdf).not.toHaveBeenCalled();
-      expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "oa_html" } });
+      expect(deps.attachPdf).toHaveBeenCalledTimes(1);
+      expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "oa_pdf" } });
     });
 
-    it("doesn't replace the stored PDF when an HTML candidate actually serves a PDF", async () => {
+    it("uses a PDF that an HTML candidate serves when the stored PDF is empty", async () => {
       const deps = makeDeps({
-        ocrStoredPdf: vi.fn().mockResolvedValue(""),
+        ocrStoredPdf: vi
+          .fn()
+          .mockImplementation(async (id: string) => (id === "storage_1" ? "" : "OCR text")),
         resolveCandidates: vi
           .fn()
           .mockResolvedValue([candidate({ url: "https://a.example/view", kind: "html" })]),
@@ -310,8 +329,8 @@ describe("ingestPaper", () => {
         deps,
         logger
       );
-      expect(deps.attachPdf).not.toHaveBeenCalled();
-      expect(out.outcome).toBe("abstract_only");
+      expect(deps.attachPdf).toHaveBeenCalledTimes(1);
+      expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "oa_pdf" } });
     });
 
     it("records a stored PDF with a stale non-PDF source as uploaded", async () => {

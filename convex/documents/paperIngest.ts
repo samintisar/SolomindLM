@@ -7,11 +7,11 @@
  * Scraped text must pass `isFullTextLength`. All I/O comes in through `deps`, so this is unit-tested
  * without Convex; `embeddingJob` supplies the real storage, OCR and scraper.
  *
- * A PDF that is already stored is never replaced. If its OCR fails transiently (5xx, 429, network)
- * the error propagates: the caller marks the source failed and the user can retry. If the OCR error
- * is permanent (a corrupt PDF, a missing file) or yields no text, the file is kept and the ladder
- * only tries non-PDF routes, ending at the abstract. Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps
- * enough of Convex's 600 s action limit to chunk and embed the result.
+ * A transient OCR failure on the PDF already stored (5xx, 429, network) propagates: the caller marks
+ * the source failed and the user can retry. A permanent failure (a corrupt PDF, a missing file) or
+ * empty text lets the ladder carry on, so a working open-access PDF can replace the unreadable
+ * file. Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps enough of
+ * Convex's 600 s action limit to chunk and embed the result.
  */
 
 import { isHttpAwareRetryableError } from "../_agents/_shared/retry";
@@ -125,8 +125,6 @@ interface AttemptContext {
   /** `candidateKey`s of every page already looked at, including where redirects ended up. */
   tried: Set<string>;
   deadline: number;
-  /** A PDF is stored on the source and must not be replaced. */
-  keepStoredPdf: boolean;
 }
 
 async function tryCandidate(
@@ -147,10 +145,6 @@ async function tryCandidate(
   if (fetched.type !== "unusable") tried.add(candidateKey(fetched.finalUrl));
 
   if (fetched.type === "pdf") {
-    if (ctx.keepStoredPdf) {
-      logger.info("Skipping a PDF; the source already has one stored", { url: candidate.url });
-      return null;
-    }
     if (deps.now() + PDF_OCR_RESERVE_MS > ctx.deadline) {
       logger.info("Skipping a fetched PDF; too little time left to OCR it", { url: candidate.url });
       return null;
@@ -231,9 +225,7 @@ export async function ingestPaper(
   const abstract = pr.abstract ?? "";
   const deadline = deps.now() + INGEST_DEADLINE_MS;
 
-  // 1. A PDF already on the source. A failed OCR throws: the file must not be replaced by a
-  // download, and the caller's failure path lets the user retry.
-  let keepStoredPdf = false;
+  // 1. A PDF already on the source. A transient OCR failure throws so the caller can retry.
   if (input.storageId) {
     let text = "";
     try {
@@ -241,7 +233,7 @@ export async function ingestPaper(
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
       if (isHttpAwareRetryableError(error)) throw error;
-      logger.warn("Stored PDF OCR failed permanently", {
+      logger.warn("Stored PDF OCR failed permanently; trying other routes", {
         storageId: input.storageId,
         error: error.message,
       });
@@ -257,14 +249,11 @@ export async function ingestPaper(
             : { method: "uploaded_pdf" },
       };
     }
-    logger.warn("Stored PDF gave no text; keeping the file and trying other routes", {
-      storageId: input.storageId,
-    });
-    keepStoredPdf = true;
+    logger.warn("Stored PDF gave no text; trying other routes", { storageId: input.storageId });
   }
 
   // 2. Open-access candidates.
-  const ctx: AttemptContext = { abstract, deps, logger, tried: new Set(), deadline, keepStoredPdf };
+  const ctx: AttemptContext = { abstract, deps, logger, tried: new Set(), deadline };
   const candidates = await resolveCandidatesSafely(pr, deps, logger);
   let attempts = 0;
   for (const candidate of candidates) {
@@ -274,7 +263,7 @@ export async function ingestPaper(
       logger.info("Out of time for open-access candidates", { attempts });
       break;
     }
-    if (candidate.kind === "pdf" && (keepStoredPdf || remaining < PDF_ATTEMPT_RESERVE_MS)) {
+    if (candidate.kind === "pdf" && remaining < PDF_ATTEMPT_RESERVE_MS) {
       continue;
     }
     attempts++;
