@@ -41,7 +41,17 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { pickSpread } from "../_job/collapsePlan";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("WrittenQuestionsGraph");
@@ -61,7 +71,7 @@ const WrittenQuestionIdSelectionSchema = z.object({
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
+  REDUCE_TIMEOUT_MS: 480_000, // all selection attempts together
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 30,
   // Match LangGraph routing.ts — 2.5× over-generation gives dedupe headroom to land at target
@@ -605,6 +615,8 @@ export async function runFinalizeWrittenQuestionsPhase(
 
   logger.info("Starting finalization phase");
 
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
+
   try {
     // Get written questions with map results
     const writtenQuestion = await ctx.runQuery(internal.studio.writtenQuestions.index.getInternal, {
@@ -707,25 +719,39 @@ export async function runFinalizeWrittenQuestionsPhase(
       console.log(`[WrittenQuestionsJob] Selection prompt: ${selectionPrompt.length} chars`);
 
       const startTime = Date.now();
-      const selectionResponse = await invokeStudioLlm({
-        invoke: () =>
-          structuredSelectLLM.invoke([
-            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
-            new HumanMessage(selectionPrompt),
-          ]),
-        timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-        phaseLabel: "WrittenQuestionsSelect",
-        retry: { maxAttempts: 2, baseDelayMs: 1000 },
-      });
+      try {
+        const selectionResponse = await invokeWithinBudget({
+          invoke: () =>
+            structuredSelectLLM.invoke([
+              new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+              new HumanMessage(selectionPrompt),
+            ]),
+          timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+          phaseLabel: "WrittenQuestionsSelect",
+          retry: { maxAttempts: 2, baseDelayMs: 1000 },
+        });
 
-      finalQuestions = applySelectedQuestionIds(
-        dedupedQuestions,
-        selectionResponse.selectedIds,
-        questionCount
-      );
+        // applySelectedQuestionIds fills gaps from the front of the pool, so check
+        // that at least one returned id is real before trusting it.
+        const knownIds = new Set(dedupedQuestions.map((q) => q.id));
+        if (!selectionResponse.selectedIds.some((id) => knownIds.has(id))) {
+          throw new Error("LLM returned zero valid selected question IDs");
+        }
 
-      if (finalQuestions.length === 0) {
-        throw new Error("LLM returned zero valid selected question IDs");
+        finalQuestions = applySelectedQuestionIds(
+          dedupedQuestions,
+          selectionResponse.selectedIds,
+          questionCount
+        );
+      } catch (error) {
+        // The deduped pool already holds more questions than requested, so a failed
+        // or timed-out selection still yields a full set.
+        logger.phaseError("selection", error, {
+          fallback: "spread_deduped_questions",
+          dedupedCount: dedupedQuestions.length,
+          targetCount: questionCount,
+        });
+        finalQuestions = pickSpread(dedupedQuestions, questionCount);
       }
 
       reduceLatencyMs = Date.now() - startTime;
@@ -782,9 +808,7 @@ export async function runFinalizeWrittenQuestionsPhase(
           .map((q) => q.question)
           .join(" ")
           .substring(0, 2000);
-        title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-          chunk: titleContent,
-        });
+        title = await generateTitleWithinDeadline(deadline, titleContent, "WrittenQuestionsTitle");
       } catch (_e) {
         console.log("[WrittenQuestionsJob] Title generation failed, using default");
       }

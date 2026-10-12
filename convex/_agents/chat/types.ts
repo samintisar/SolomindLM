@@ -108,6 +108,8 @@ export interface ChatAgentOptions {
     title?: string;
     sourceUrl?: string;
   } | null>;
+  /** Titles of documents, keyed by id: selected sources retrieval found no passage in */
+  fetchDocumentTitlesFn?: (documentIds: string[]) => Promise<Record<string, string>>;
   /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
   outputLanguage?: string;
 }

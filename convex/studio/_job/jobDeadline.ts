@@ -6,6 +6,13 @@
  * timeout so the action always gets back to its own error handling in time.
  */
 
+/** Budget for one finalize action: ends (saved or marked failed) well before the 600s kill. */
+export const STUDIO_FINALIZE_BUDGET_MS = 540_000;
+/** Held back from a finalize phase's last LLM step for title generation and saving. */
+export const STUDIO_SAVE_RESERVE_MS = 30_000;
+/** Cap for the title call that runs just before saving. */
+export const STUDIO_TITLE_TIMEOUT_MS = 20_000;
+
 export type JobDeadline = {
   /** Milliseconds left in the budget (never negative). */
   remainingMs(): number;

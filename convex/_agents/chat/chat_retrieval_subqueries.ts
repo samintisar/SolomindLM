@@ -3,6 +3,8 @@ import { z } from "zod";
 export const RetrievalSubqueriesSchema = z.object({
   subqueries: z.array(z.string()).min(1).max(6),
   rerankQuery: z.string().optional(),
+  /** The question wants an answer for each of the user's selected sources (#450). */
+  aboutEachSource: z.boolean().optional(),
 });
 
 /** Digits or common English count words (lecture notes often say "four tasks" not "4 tasks"). */
@@ -13,36 +15,6 @@ const COUNTED_LIST_TAIL = new RegExp(
   `\\b${COUNT_QUANT}\\s+(?:\\w+\\s+){0,6}?(items?|patterns?|types?|categories?|methods?|techniques?|strategies?|principles?|rules?|steps?|stages?|phases?|elements?|factors?|components?|ways?|kinds?|forms?|approaches?|practices?|examples?|topics?|tasks?|points?|criteria|architectures?|embeddings?|linkages?|concepts?|ideas?|reasons?|benefits?|features?|characteristics?|properties?|aspects?|dimensions?|domains?|areas?|fields?|themes?|subjects?|questions?|problems?|challenges?|solutions?|answers?)\\b`,
   "i"
 );
-
-// Whole sources only: "each chapter" usually means the chapters inside one book.
-const SOURCE_NOUN =
-  "(?:papers?|sources?|documents?|docs?|stud(?:y|ies)|articles?|files?|readings?|reports?|books?|texts?|transcripts?|pdfs?|trials?|videos?|lectures?)";
-const SOURCE_NOUN_PLURAL =
-  "(?:papers|sources|documents|docs|studies|articles|files|readings|reports|books|texts|transcripts|pdfs|trials|videos|lectures)";
-
-/** "each paper", "every one of my sources", "each of my four papers". */
-const EACH_SOURCE = new RegExp(
-  `\\b(?:each|every|either|neither)\\s+(?:one\\s+)?(?:of\\s+)?(?:(?:my|the|these|those|our|your)\\s+)?(?:${COUNT_QUANT}\\s+)?(?:\\w+\\s+)?${SOURCE_NOUN}\\b`,
-  "i"
-);
-
-/**
- * "both studies", "all three sources", "these papers", "the two reports", "my two papers". A bare
- * "the papers" or "my sources" ("according to my sources, …") is too common in topic questions.
- */
-const SET_OF_SOURCES = new RegExp(
-  `\\b(?:(?:both|all|these|those)\\s+(?:${COUNT_QUANT}\\s+)?|(?:the|my|our|your)\\s+${COUNT_QUANT}\\s+)(?:\\w+\\s+)?${SOURCE_NOUN_PLURAL}\\b`,
-  "i"
-);
-
-/**
- * Whether the question is about each of the selected sources ("what limitations does each paper
- * acknowledge?") rather than a topic that several sources may cover. Such questions get a search
- * inside every selected source and an answer that covers each one (#450).
- */
-export function asksAboutEachSource(message: string): boolean {
-  return EACH_SOURCE.test(message) || SET_OF_SOURCES.test(message);
-}
 
 /**
  * Many user turns are a single retrieval intent; skipping the JSON decomposition call avoids
@@ -95,7 +67,7 @@ export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
  */
 export function parseRetrievalSubqueriesFromLlmContent(
   rawContent: string
-): { subqueries: string[]; rerankQuery?: string } | null {
+): { subqueries: string[]; rerankQuery?: string; aboutEachSource: boolean } | null {
   let text = rawContent;
   try {
     // Strip both <think>…</think> (Qwen-style) and <redacted_thinking>…</redacted_thinking>
@@ -132,6 +104,7 @@ export function parseRetrievalSubqueriesFromLlmContent(
     return {
       subqueries: subs.slice(0, 6),
       rerankQuery: rq || undefined,
+      aboutEachSource: parsed.data.aboutEachSource === true,
     };
   } catch (err) {
     console.warn("[chat_retrieval_subqueries] parse fallback: exception", {

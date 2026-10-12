@@ -12,9 +12,11 @@ import { EmbeddingService } from "../_services/ai/embeddingClient";
 import {
   createChatVectorSearchRunner,
   createFetchDocumentFn,
+  createFetchDocumentTitlesFn,
   createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
+  documentIdsInNotebook,
   loadHybridSearchConfig,
 } from "./_streamSearch";
 import { discoverChatExternalSources } from "./_streamSources";
@@ -66,11 +68,17 @@ export async function streamChatResponse(
   });
   chatStreamLog.info("stream_start", { streamId });
 
-  // Get conversation history
-  const { messages: messageList } = await ctx.runQuery(internal.chat.index.getMessagesInternal, {
-    conversationId,
-    limit: CHAT_HISTORY_FETCH_LIMIT,
-  });
+  const includeNotebook = (sourcePolicy?.channels ?? ["notebook"]).includes("notebook");
+
+  // Get conversation history, and the selected ids that are the notebook's own: ids come from the
+  // client, so another notebook's titles or text never reach the answer.
+  const [{ messages: messageList }, notebookDocumentIds] = await Promise.all([
+    ctx.runQuery(internal.chat.index.getMessagesInternal, {
+      conversationId,
+      limit: CHAT_HISTORY_FETCH_LIMIT,
+    }),
+    includeNotebook ? documentIdsInNotebook(ctx, notebookIdTyped, documentIds) : [],
+  ]);
 
   const fullHistory = messageList
     .filter((m: { role: string }) => m.role !== "system")
@@ -160,10 +168,10 @@ export async function streamChatResponse(
     smartModel: resolvedSmartModel,
     outputLanguage: userPrefs?.outputLanguage,
     fetchDocumentFn: createFetchDocumentFn(ctx),
+    fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx, notebookIdTyped),
   });
 
   // External search
-  const includeNotebook = (sourcePolicy?.channels ?? ["notebook"]).includes("notebook");
   const { sources: externalSources, chunks: externalChunks } = await discoverChatExternalSources(
     ctx,
     message,
@@ -215,7 +223,7 @@ export async function streamChatResponse(
         userId,
         noteId: notebookId,
         conversationHistory,
-        documentIds: includeNotebook ? documentIds : [],
+        documentIds: notebookDocumentIds,
         enableNotebookSearch: includeNotebook,
         groundingMode: notebookGrounding,
         externalChunks: externalChunks.length > 0 ? externalChunks : undefined,
