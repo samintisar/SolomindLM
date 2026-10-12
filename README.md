@@ -302,6 +302,7 @@ Create `.env.local` in the project root for dev (prod uses `.env`). See `.env.ex
 | `VOYAGE_API_KEY`          | Voyage AI reranking API key (`rerank-3`) | [Voyage AI](https://www.voyageai.com) |
 | `SEMANTIC_SCHOLAR_API_KEY`| Semantic Scholar (optional)   | [Semantic Scholar](https://www.semanticscholar.org/product/api) |
 | `PUBMED_EMAIL`            | PubMed API contact (optional) | Your team email                           |
+| `OPEN_ACCESS_CONTACT_EMAIL`| Unpaywall / OpenAlex lookup contact (optional; defaults to support@solomindlm.com) | Your team email |
 
 #### Optional Services
 
