@@ -167,4 +167,21 @@ describe("SourceListItem", () => {
     expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
   });
+
+  it("also gives the full-text source to assistive tech as hidden text in the description", () => {
+    setup(
+      {},
+      paper({ fullTextSource: { method: "oa_pdf", version: "acceptedVersion", license: "cc-by" } })
+    );
+    const hidden = screen.getByText(/Accepted manuscript · CC BY/);
+    expect(hidden).toHaveClass("sr-only");
+    expect(screen.getByRole("button", { name: /A paper/ })).toHaveAccessibleDescription(
+      /Full text.*Accepted manuscript · CC BY/
+    );
+  });
+
+  it("adds no hidden source text when there is nothing to say", () => {
+    setup({}, paper({}));
+    expect(document.querySelector(".sr-only")).toBeNull();
+  });
 });

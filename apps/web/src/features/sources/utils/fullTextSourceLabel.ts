@@ -8,10 +8,21 @@ const VERSION_LABEL: Record<NonNullable<FullTextSource["version"]>, string> = {
   submittedVersion: "Preprint",
 };
 
-/** "cc-by-nc" → "CC BY-NC"; other licence strings pass through. */
+/** Unpaywall / OpenAlex licence slugs that aren't Creative Commons. */
+const NAMED_LICENSE: Record<string, string> = {
+  "publisher-specific-oa": "Publisher licence",
+  "implied-oa": "Open access",
+  "other-oa": "Open licence",
+};
+
+/** "cc-by-nc" → "CC BY-NC", "cc0" → "CC0"; other licence strings pass through. */
 function licenseLabel(license: string): string {
-  const m = license.trim().match(/^cc[-_ ]?(.*)$/i);
-  if (!m) return license.trim();
+  const trimmed = license.trim();
+  const named = NAMED_LICENSE[trimmed.toLowerCase()];
+  if (named) return named;
+  if (/^cc0$/i.test(trimmed)) return "CC0";
+  const m = trimmed.match(/^cc[-_ ]?(.*)$/i);
+  if (!m) return trimmed;
   return m[1] ? `CC ${m[1].toUpperCase()}` : "CC";
 }
 

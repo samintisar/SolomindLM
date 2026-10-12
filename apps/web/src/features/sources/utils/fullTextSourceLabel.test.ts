@@ -24,4 +24,15 @@ describe("fullTextSourceLabel", () => {
   it("is undefined with nothing to say", () => {
     expect(fullTextSourceLabel(undefined)).toBeUndefined();
   });
+
+  it("labels licences", () => {
+    const label = (license: string) =>
+      fullTextSourceLabel({ method: "oa_pdf", version: "publishedVersion", license });
+    expect(label("cc0")).toBe("Published version · CC0");
+    expect(label("cc-by-sa")).toBe("Published version · CC BY-SA");
+    expect(label("publisher-specific-oa")).toBe("Published version · Publisher licence");
+    expect(label("implied-oa")).toBe("Published version · Open access");
+    expect(label("other-oa")).toBe("Published version · Open licence");
+    expect(label("some-new-licence")).toBe("Published version · some-new-licence");
+  });
 });

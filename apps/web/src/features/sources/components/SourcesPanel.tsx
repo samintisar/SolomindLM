@@ -16,6 +16,7 @@ import {
   useRefreshRemoteSource,
 } from "../services/documentsApi";
 import { useSourcesContext } from "../useSourcesContext";
+import { isPdfFile, MAX_PAPER_PDF_BYTES } from "../utils/paperPdf";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { AddSourceDialog } from "./add-source/AddSourceDialog";
 import { DiscoverSourcesDialog } from "./discover/DiscoverSourcesDialog";
@@ -309,8 +310,9 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
       const documentId = pdfTargetRef.current;
       pdfTargetRef.current = null;
       if (!file || !documentId) return;
-      if (file.type !== "application/pdf") return showError("Choose a PDF file.");
-      if (file.size > 50 * 1024 * 1024) return showError("That PDF is over 50 MB.");
+      if (!isPdfFile(file)) return showError("Choose a PDF file.");
+      if (file.size > MAX_PAPER_PDF_BYTES) return showError("That PDF is over 50 MB.");
+      showInfo("Uploading the PDF…");
       try {
         const result = await attachPaperPdf(documentId, file);
         if (result.ok) showInfo("Reading the PDF you added.");
@@ -496,7 +498,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
       <input
         ref={pdfInputRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,.pdf"
         className="hidden"
         aria-hidden
         tabIndex={-1}

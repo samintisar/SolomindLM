@@ -153,6 +153,8 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   };
 
   const paperHint = paperMetaHint();
+  const fullTextLabel =
+    paperHint === "Full text" ? fullTextSourceLabel(source.paper?.fullTextSource) : undefined;
   const isAbstractOnlyPaper = paperHint === "Abstract only" && status === "completed";
 
   return (
@@ -200,16 +202,10 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                 </span>{" "}
                 <span>• {source.date}</span>
                 {paperHint && status === "completed" && (
-                  <span
-                    className="font-normal normal-case tracking-normal"
-                    title={
-                      paperHint === "Full text"
-                        ? fullTextSourceLabel(source.paper?.fullTextSource)
-                        : undefined
-                    }
-                  >
+                  <span className="font-normal normal-case tracking-normal" title={fullTextLabel}>
                     {" "}
                     · {paperHint}
+                    {fullTextLabel && <span className="sr-only"> · {fullTextLabel}</span>}
                   </span>
                 )}
               </span>
