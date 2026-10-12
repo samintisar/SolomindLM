@@ -817,6 +817,8 @@ export const getNotebookPaperText = internalQuery({
     return notebookPaperText({
       extractedMarkdown: doc.extractedMarkdown?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
       paperRecord: doc.paperRecord,
+      fileType: doc.fileType,
+      ingestionStatus: doc.ingestionStatus,
     });
   },
 });

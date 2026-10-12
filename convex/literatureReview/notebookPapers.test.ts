@@ -99,6 +99,27 @@ describe("notebookPaperText", () => {
   it("falls back to the abstract when there is no extracted text", () => {
     expect(notebookPaperText({ paperRecord: { abstract: "An abstract." } })).toBe("An abstract.");
   });
+
+  it("returns nothing for an abstract-only paper, so extraction labels it Abstract", () => {
+    expect(
+      notebookPaperText({
+        fileType: "paper_record",
+        ingestionStatus: "metadata_only",
+        extractedMarkdown: "# Title\n\n## Abstract\nAn abstract.",
+        paperRecord: { abstract: "An abstract." },
+      })
+    ).toBe("");
+  });
+
+  it("returns the full text of an ingested paper", () => {
+    expect(
+      notebookPaperText({
+        fileType: "paper_record",
+        ingestionStatus: "ingested",
+        extractedMarkdown: "Full article text",
+      })
+    ).toBe("Full article text");
+  });
 });
 
 describe("dropSearchCopiesOfNotebookPapers", () => {
