@@ -2,6 +2,7 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
+  fullTextSourceValidator,
   fulltextStatusValidator,
   ingestionStatusValidator,
   paperRecordValidator,
@@ -143,6 +144,8 @@ export default defineSchema({
     fulltextStatus: v.optional(fulltextStatusValidator),
     /** Ingest pipeline outcome for paper_record (orthogonal to `status` processing flag) */
     ingestionStatus: v.optional(ingestionStatusValidator),
+    /** Paper full text provenance: uploaded PDF, open-access PDF/HTML, or landing page. Absent = abstract only. */
+    fullTextSource: v.optional(fullTextSourceValidator),
     /** AI-generated source guide (lazy-cached): summary + topic chips */
     sourceGuide: v.optional(
       v.object({

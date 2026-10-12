@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 
 /** Bibliographic + OA resolver fields for discovery-added papers (OpenAlex-first). */
 export const paperRecordValidator = v.object({
@@ -28,6 +28,30 @@ export const ingestionStatusValidator = v.union(
   v.literal("metadata_only"),
   v.literal("failed")
 );
+
+/** Open-access version, as Unpaywall and OpenAlex name it. */
+export const fullTextVersionValidator = v.union(
+  v.literal("publishedVersion"),
+  v.literal("acceptedVersion"),
+  v.literal("submittedVersion")
+);
+
+/** Where a paper source's full text came from (set only when full text was ingested). */
+export const fullTextSourceValidator = v.object({
+  method: v.union(
+    v.literal("uploaded_pdf"),
+    v.literal("oa_pdf"),
+    v.literal("oa_html"),
+    v.literal("landing_page")
+  ),
+  url: v.optional(v.string()),
+  version: v.optional(fullTextVersionValidator),
+  license: v.optional(v.string()),
+  host: v.optional(v.string()),
+});
+
+export type FullTextVersion = Infer<typeof fullTextVersionValidator>;
+export type FullTextSource = Infer<typeof fullTextSourceValidator>;
 
 export type PaperRecord = {
   abstract: string;

@@ -37,6 +37,8 @@ export const env = {
   // Academic APIs
   SEMANTIC_SCHOLAR_API_KEY: process.env.SEMANTIC_SCHOLAR_API_KEY || "",
   PUBMED_EMAIL: process.env.PUBMED_EMAIL || "",
+  /** Contact email sent to Unpaywall (required) and OpenAlex (polite pool) when resolving open-access copies. */
+  OPEN_ACCESS_CONTACT_EMAIL: process.env.OPEN_ACCESS_CONTACT_EMAIL || "support@solomindlm.com",
 
   // Mistral (OCR)
   MISTRAL_API_KEY: process.env.MISTRAL_API_KEY || "",

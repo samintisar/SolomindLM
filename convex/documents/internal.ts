@@ -380,6 +380,7 @@ export const getDocumentDetails = internalQuery({
       paperRecord: doc.paperRecord,
       fulltextStatus: doc.fulltextStatus,
       ingestionStatus: doc.ingestionStatus,
+      fullTextSource: doc.fullTextSource,
       extractedMarkdown: doc.extractedMarkdown,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,

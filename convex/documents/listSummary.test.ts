@@ -205,4 +205,41 @@ describe("documents.listSummary.listSummary", () => {
     expect(rows[0].fileName).toBe(`mine-${total - 1}`);
     expect(rows.every((row) => row.fileName.startsWith("mine-"))).toBe(true);
   });
+
+  test("returns the open-access source a paper's full text came from", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    await t.run(async (ctx) =>
+      ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Nanometre-scale thermometry in a living cell",
+        fileType: "paper_record",
+        status: "completed",
+        ingestionStatus: "ingested",
+        fulltextStatus: "available",
+        fullTextSource: {
+          method: "oa_pdf",
+          url: "https://arxiv.org/pdf/1304.1068",
+          version: "submittedVersion",
+          host: "arxiv.org",
+        },
+        paperRecord: { abstract: "A", authors: [], isOa: true },
+        createdAt: 1,
+        updatedAt: 1,
+      })
+    );
+
+    const rows = await withAuth(t, userId).query(api.documents.listSummary.listSummary, {
+      notebookId,
+    });
+
+    expect(rows[0].fullTextSource).toEqual({
+      method: "oa_pdf",
+      url: "https://arxiv.org/pdf/1304.1068",
+      version: "submittedVersion",
+      host: "arxiv.org",
+    });
+  });
 });
