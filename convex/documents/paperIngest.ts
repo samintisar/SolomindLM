@@ -7,12 +7,14 @@
  * Scraped text must pass `isFullTextLength`. All I/O comes in through `deps`, so this is unit-tested
  * without Convex; `embeddingJob` supplies the real storage, OCR and scraper.
  *
- * A PDF that is already stored is never replaced: if its OCR throws the error propagates (the
- * caller marks the source failed and the user can retry), and if it yields no text the ladder only
- * tries non-PDF routes. Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps
+ * A PDF that is already stored is never replaced. If its OCR fails transiently (5xx, 429, network)
+ * the error propagates: the caller marks the source failed and the user can retry. If the OCR error
+ * is permanent (a corrupt PDF, a missing file) or yields no text, the file is kept and the ladder
+ * only tries non-PDF routes, ending at the abstract. Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps
  * enough of Convex's 600 s action limit to chunk and embed the result.
  */
 
+import { isHttpAwareRetryableError } from "../_agents/_shared/retry";
 import type { FetchedCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
 import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTest";
 import {
@@ -233,7 +235,17 @@ export async function ingestPaper(
   // download, and the caller's failure path lets the user retry.
   let keepStoredPdf = false;
   if (input.storageId) {
-    const text = (await deps.ocrStoredPdf(input.storageId)).trim();
+    let text = "";
+    try {
+      text = (await deps.ocrStoredPdf(input.storageId)).trim();
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      if (isHttpAwareRetryableError(error)) throw error;
+      logger.warn("Stored PDF OCR failed permanently", {
+        storageId: input.storageId,
+        error: error.message,
+      });
+    }
     if (text) {
       const recorded = input.fullTextSource;
       return {
@@ -245,7 +257,7 @@ export async function ingestPaper(
             : { method: "uploaded_pdf" },
       };
     }
-    logger.warn("Stored PDF OCR returned no text; keeping the file and trying other routes", {
+    logger.warn("Stored PDF gave no text; keeping the file and trying other routes", {
       storageId: input.storageId,
     });
     keepStoredPdf = true;

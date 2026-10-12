@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ExternalServiceError } from "../_lib/errors";
 import type { OaCandidate } from "../_services/extraction/openAccess/OpenAccessResolver";
 import {
   fulltextStatusAfterIngest,
@@ -221,9 +222,13 @@ describe("ingestPaper", () => {
   });
 
   describe("a stored PDF is never lost", () => {
-    it("rethrows when OCR of the stored PDF fails, without touching storage", async () => {
+    it("rethrows a transient OCR error on the stored PDF, without touching storage", async () => {
       const deps = makeDeps({
-        ocrStoredPdf: vi.fn().mockRejectedValue(new Error("Mistral 503")),
+        ocrStoredPdf: vi
+          .fn()
+          .mockRejectedValue(
+            new ExternalServiceError("mistral", "Mistral 503", { statusCode: 503 })
+          ),
         resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
       });
       await expect(ingestPaper(input({ storageId: "storage_1" }), deps, logger)).rejects.toThrow(
@@ -231,6 +236,40 @@ describe("ingestPaper", () => {
       );
       expect(deps.attachPdf).not.toHaveBeenCalled();
       expect(deps.detachPdf).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        "a 4xx from the OCR service",
+        new ExternalServiceError("mistral", "Bad PDF", { statusCode: 400 }),
+      ],
+      ["a missing stored file", new Error("Stored PDF not found")],
+    ])("falls through to non-PDF routes on %s, keeping the file", async (_label, error) => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockRejectedValue(error),
+        resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+      });
+      const out = await ingestPaper(
+        input({ storageId: "storage_1", fileUrl: undefined }),
+        deps,
+        logger
+      );
+      expect(deps.fetchCandidate).not.toHaveBeenCalled();
+      expect(deps.attachPdf).not.toHaveBeenCalled();
+      expect(deps.detachPdf).not.toHaveBeenCalled();
+      expect(out.outcome).toBe("abstract_only");
+    });
+
+    it("still scrapes the landing page after a permanent OCR error on the stored PDF", async () => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockRejectedValue(new Error("Stored PDF not found")),
+        scrape: vi.fn().mockResolvedValue({ title: "Article", content: longText }),
+      });
+      const out = await ingestPaper(input({ storageId: "storage_1" }), deps, logger);
+      expect(out).toMatchObject({
+        outcome: "full_text",
+        fullTextSource: { method: "landing_page" },
+      });
     });
 
     it("skips PDF candidates when the stored PDF has no text, but still uses HTML ones", async () => {
