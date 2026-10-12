@@ -647,7 +647,8 @@ export class ChatAgent {
     // The selected sources the answer is told about; when the planner judges the question to be
     // about each of them ("what does each paper say about X?"), each is also searched on its own
     // and the answer covers every one (#450).
-    const selectedSources = selectedSourceIds(context.documentIds);
+    // None when notebook search is off: sources that weren't searched aren't named.
+    const selectedSources = enableNotebookSearch ? selectedSourceIds(context.documentIds) : [];
     let coverEachSource = false;
 
     if (enableNotebookSearch) {
