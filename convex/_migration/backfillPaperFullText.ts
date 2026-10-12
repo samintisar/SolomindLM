@@ -1,29 +1,31 @@
 /**
  * Migration (#480): fix the labels on paper sources stored before open-access resolution, then
- * look for full text again for those that only hold an abstract.
+ * look for full text again for the ones it relabels.
  *
  * Before #480 every paper was marked `ingested`, even when only its abstract stub (or a paywall page)
  * was stored. Relabel: an `ingested` paper with no `fullTextSource` whose stored text fails the
- * full-text test becomes `metadata_only`. No external calls. Re-resolve (opt in): for each completed
- * abstract-only paper with a DOI or OpenAlex id, run the resolver; if it finds a copy other than the
- * PDF link the first import already tried, re-ingest. Re-resolves are spaced 10 s apart.
+ * full-text test becomes `metadata_only`. No external calls. Re-resolve (opt in, same pass): each
+ * paper relabeled in this pass that is completed and has a DOI, an OpenAlex id or a PDF link is
+ * queued, spaced 10 s apart. The queued action runs the resolver with the record's ids and its own
+ * PDF link (the old pipeline never checked that link's output) and re-ingests when it finds any
+ * candidate, provided the row is still an abstract-only paper. Papers that were already
+ * `metadata_only` were tried by the new pipeline and are never queued, so rerunning finds nothing
+ * new to relabel and queues nothing.
  *
  *   npx convex run _migration/backfillPaperFullText:start '{"dryRun": true, "reResolve": true}'
- *   npx convex run _migration/backfillPaperFullText:start '{"dryRun": false}'
  *   npx convex run _migration/backfillPaperFullText:start '{"dryRun": false, "reResolve": true}'
+ *   npx convex run _migration/backfillPaperFullText:start '{"dryRun": false}'   # relabel only
  *
- * Counts are logged as one JSON line when the scan ends. Safe to rerun.
+ * Counts are logged as one JSON line when the scan ends. A dry run counts `queued` without scheduling.
  */
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
-import { internalAction, internalMutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTest";
-import {
-  candidateKey,
-  resolveOpenAccessCandidates,
-} from "../_services/extraction/openAccess/OpenAccessResolver";
+import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
+import { resetDocumentForReembed } from "../documents/internal";
 
 /** Stored markdown can be ~800 KB per document; 4 per batch stays well under the read limit. */
 const BATCH_SIZE = 4;
@@ -49,16 +51,27 @@ export function needsAbstractOnlyRelabel(
   );
 }
 
-export function hasResolvableId(pr: { doi?: string; openAlexId?: string } | undefined): boolean {
+function hasResolvableId(pr: { doi?: string; openAlexId?: string } | undefined): boolean {
   return Boolean(pr?.doi?.trim() || pr?.openAlexId?.trim());
 }
 
-export function hasNewCandidate(
-  candidates: Array<{ url: string }>,
-  triedPdfUrl: string | undefined
+/** A relabeled, completed paper the resolver has something to look up for (an id or its own PDF link). */
+export function shouldQueueReResolve(
+  doc: Pick<
+    Doc<"documents">,
+    | "fileType"
+    | "status"
+    | "ingestionStatus"
+    | "fullTextSource"
+    | "extractedMarkdown"
+    | "paperRecord"
+  >
 ): boolean {
-  const tried = triedPdfUrl ? candidateKey(triedPdfUrl) : undefined;
-  return candidates.some((c) => candidateKey(c.url) !== tried);
+  return (
+    needsAbstractOnlyRelabel(doc) &&
+    doc.status === "completed" &&
+    (hasResolvableId(doc.paperRecord) || Boolean(doc.paperRecord?.pdfUrl?.trim()))
+  );
 }
 
 export const start = internalMutation({
@@ -89,11 +102,11 @@ export const scan = internalMutation({
     for (const doc of result.page) {
       if (doc.fileType !== "paper_record") continue;
       counts.scanned++;
-      let abstractOnly = doc.ingestionStatus === "metadata_only";
+      const relabel = needsAbstractOnlyRelabel(doc);
+      const queue = args.reResolve && shouldQueueReResolve(doc);
 
-      if (needsAbstractOnlyRelabel(doc)) {
+      if (relabel) {
         counts.relabeled++;
-        abstractOnly = true;
         if (!args.dryRun) {
           await ctx.db.patch(doc._id, {
             ingestionStatus: "metadata_only",
@@ -104,12 +117,7 @@ export const scan = internalMutation({
         }
       }
 
-      if (
-        args.reResolve &&
-        abstractOnly &&
-        doc.status === "completed" &&
-        hasResolvableId(doc.paperRecord)
-      ) {
+      if (queue) {
         if (!args.dryRun) {
           await ctx.scheduler.runAfter(
             counts.queued * RE_RESOLVE_SPACING_MS,
@@ -141,21 +149,56 @@ export const scan = internalMutation({
   },
 });
 
-/** Re-ingests one abstract-only paper when the resolver finds a copy the first import didn't try. */
+/** What the re-resolve action needs from a document; null when it has been deleted. */
+export const getReResolveInput = internalQuery({
+  args: { documentId: v.id("documents") },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) return null;
+    return {
+      fileType: doc.fileType,
+      ingestionStatus: doc.ingestionStatus,
+      paperRecord: doc.paperRecord,
+    };
+  },
+});
+
+/** Re-ingests a paper unless it was deleted, replaced or already re-ingested since it was queued. */
+export const reingestIfStillAbstractOnly = internalMutation({
+  args: { documentId: v.id("documents") },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (
+      !doc ||
+      doc.fileType !== "paper_record" ||
+      doc.status !== "completed" ||
+      doc.ingestionStatus !== "metadata_only"
+    ) {
+      return false;
+    }
+    await resetDocumentForReembed(ctx, { documentId: args.documentId, delayMs: 0 });
+    return true;
+  },
+});
+
+/** Looks for a copy of one relabeled paper and re-ingests it when the resolver finds any candidate. */
 export const reResolve = internalAction({
   args: { documentId: v.id("documents") },
   handler: async (ctx, args) => {
-    const doc = await ctx.runQuery(internal.documents.internal.getDocumentDetails, {
+    const doc = await ctx.runQuery(internal._migration.backfillPaperFullText.getReResolveInput, {
       documentId: args.documentId,
     });
-    const pr = doc.paperRecord;
-    if (doc.ingestionStatus !== "metadata_only" || !pr) return;
+    const pr = doc?.paperRecord;
+    if (!doc || doc.fileType !== "paper_record" || doc.ingestionStatus !== "metadata_only" || !pr) {
+      return;
+    }
 
     const candidates = await resolveOpenAccessCandidates({
       doi: pr.doi,
       openAlexId: pr.openAlexId,
+      pdfUrl: pr.pdfUrl,
     });
-    const reingest = hasNewCandidate(candidates, pr.pdfUrl);
+    const reingest = candidates.length > 0;
     console.log(
       JSON.stringify({
         migration: "backfillPaperFullText.reResolve",
@@ -165,9 +208,8 @@ export const reResolve = internalAction({
       })
     );
     if (reingest) {
-      await ctx.runMutation(internal.documents.internal.prepareDocumentReembed, {
+      await ctx.runMutation(internal._migration.backfillPaperFullText.reingestIfStillAbstractOnly, {
         documentId: args.documentId,
-        delayMs: 0,
       });
     }
   },
