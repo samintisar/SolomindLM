@@ -3,12 +3,18 @@
 import { v } from "convex/values";
 import { extractJsonObjectString, uncachedLlmCall } from "../../_agents/_shared/cachedLlm";
 import { invokeWithRetry } from "../../_agents/_shared/index";
+import { MissingStructuredJsonError } from "../../_agents/_shared/llmErrors";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { isRetryableError } from "../../_agents/_shared/retry";
 import {
   aggregateStudioJobTelemetry,
   withStudioTelemetryMetadata,
 } from "../../_agents/_shared/studioJobTelemetry";
-import { fromProviderUsage } from "../../_agents/_shared/usageAggregate";
+import {
+  addTokenUsage,
+  fromProviderUsage,
+  type TokenUsage,
+} from "../../_agents/_shared/usageAggregate";
 import { internal } from "../../_generated/api";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
@@ -204,6 +210,10 @@ export const generateInfographicImage = internalAction({
       // Extract key concepts and design visual infographic
       logger.phaseStart("content_analysis");
       const designStartTime = Date.now();
+      // Reasoning shares max_tokens with the answer; if it runs out before the JSON, retry without it.
+      let designReasoningEnabled = true;
+      /** Tokens a length-truncated design attempt used before the retry. */
+      let failedDesignUsage: TokenUsage | undefined;
       const designResponse = await invokeWithRetry(
         () =>
           uncachedLlmCall({
@@ -256,12 +266,25 @@ Return JSON: {
               },
             ],
             temperature: 0.7,
-            reasoningEnabled: true,
+            reasoningEnabled: designReasoningEnabled,
             responseFormat: { type: "json_object" },
           }),
         {
           maxAttempts: 3,
           baseDelayMs: 2000,
+          retryableErrors: (error) => {
+            if (
+              designReasoningEnabled &&
+              error instanceof MissingStructuredJsonError &&
+              error.finishReason === "length"
+            ) {
+              designReasoningEnabled = false;
+              const usage = fromProviderUsage(error.usage);
+              if (usage) failedDesignUsage = addTokenUsage(failedDesignUsage, usage);
+              return true;
+            }
+            return isRetryableError(error);
+          },
           onRetry: (attempt, error, delayMs) => {
             logger.warn(`Design generation retry ${attempt}/3 after ${delayMs}ms`, {
               attempt,
@@ -278,7 +301,10 @@ Return JSON: {
         designResponse.content ||
         "{}";
       const design = parseLlmJson(designContent) as Record<string, any>;
-      const designUsage = fromProviderUsage(designResponse.usage);
+      const responseUsage = fromProviderUsage(designResponse.usage);
+      const designUsage = failedDesignUsage
+        ? addTokenUsage(failedDesignUsage, responseUsage)
+        : responseUsage;
       const designLatencyMs = Date.now() - designStartTime;
       if (!design.image_prompt) {
         throw new Error(

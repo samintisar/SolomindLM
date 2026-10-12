@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { uncachedLlmCall } from "./cachedLlm.js";
+import { MissingStructuredJsonError } from "./llmErrors.js";
 
 vi.mock("../../_lib/env.js", () => ({
   env: { TOGETHER_AI_API_KEY: "test-key" },
@@ -119,5 +120,38 @@ describe("uncachedLlmCall structured responses", () => {
     ).rejects.toThrow(/no JSON payload for structured response/i);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the finish reason when reasoning used the whole budget before any JSON", async () => {
+    fetchMock.mockResolvedValue(
+      mockTogetherResponse({
+        choices: [
+          {
+            message: { content: "We need answer only JSON. Need create", reasoning: "" },
+            finish_reason: "length",
+          },
+        ],
+        usage: { prompt_tokens: 900, completion_tokens: 4_096, total_tokens: 4_996 },
+      })
+    );
+
+    const error = await uncachedLlmCall({
+      model: "deepseek-ai/DeepSeek-V4.1-Flash",
+      messages: [{ role: "user", content: "write one question" }],
+      temperature: 0.3,
+      maxTokens: 4_096,
+      reasoningEnabled: true,
+      responseFormat: {
+        type: "json_schema",
+        json_schema: { name: "test_schema", schema: { type: "object" } },
+      },
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(MissingStructuredJsonError);
+    expect(error).toMatchObject({
+      model: "deepseek-ai/DeepSeek-V4.1-Flash",
+      finishReason: "length",
+      usage: { promptTokens: 900, completionTokens: 4_096, totalTokens: 4_996 },
+    });
   });
 });
