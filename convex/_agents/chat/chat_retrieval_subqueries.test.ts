@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { asksAboutEachSource, trivialRetrievalSubqueryMessage } from "./chat_retrieval_subqueries";
+import {
+  parseRetrievalSubqueriesFromLlmContent,
+  trivialRetrievalSubqueryMessage,
+} from "./chat_retrieval_subqueries";
 
 describe("trivialRetrievalSubqueryMessage", () => {
   it("keeps short single-intent questions on the fast path", () => {
@@ -18,33 +21,20 @@ describe("trivialRetrievalSubqueryMessage", () => {
   });
 });
 
-// #450: questions about every selected source get a search inside each source and an answer
-// part per source; questions that only mention several things do not.
-describe("asksAboutEachSource", () => {
-  it.each([
-    "What limitations does each paper acknowledge?",
-    "How did each of my four papers measure physical activity?",
-    "What do both studies conclude about sample size?",
-    "Summarise all three sources",
-    "Where do the two reports differ on inflation?",
-    "Which methods do these papers use?",
-    "Do the three articles agree on the dose?",
-    "Compare my two papers on sample size",
-  ])("asks about each source: %s", (q) => {
-    expect(asksAboutEachSource(q)).toBe(true);
+// #450: the planner says whether the question is about each selected source.
+describe("parseRetrievalSubqueriesFromLlmContent", () => {
+  it("reads the planner's per-source flag", () => {
+    expect(
+      parseRetrievalSubqueriesFromLlmContent(
+        '{"subqueries": ["limitations of the study"], "aboutEachSource": true}'
+      )
+    ).toEqual({ subqueries: ["limitations of the study"], aboutEachSource: true });
   });
 
-  it.each([
-    "What is retrieval-augmented generation?",
-    "Compare mitosis and meiosis",
-    "Explain every step of glycolysis",
-    "What does the paper say about dropout?",
-    "According to the sources, when was the treaty signed?",
-    "How does each layer of the network work?",
-    "According to my sources, what causes inflation?",
-    "Search my documents for the dosage",
-    "Summarize each chapter",
-  ])("does not: %s", (q) => {
-    expect(asksAboutEachSource(q)).toBe(false);
+  it("treats a missing flag as a topic question", () => {
+    expect(
+      parseRetrievalSubqueriesFromLlmContent('{"subqueries": ["retrieval augmented generation"]}')
+        ?.aboutEachSource
+    ).toBe(false);
   });
 });
