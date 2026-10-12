@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { markdownFromMistralOcrResponse } from "./MistralOCRService";
+import { describe, expect, it, vi } from "vitest";
+import {
+  figureBlock,
+  inlineOcrFigures,
+  markdownFromMistralOcrResponse,
+  parseFigureAnnotation,
+} from "./MistralOCRService";
 
 const TABLE = "| Indicator | 2025 | 2026 |\n| --- | --- | --- |\n| Brent ($/b) | $69 | $91 |";
 
@@ -54,5 +59,120 @@ describe("markdownFromMistralOcrResponse", () => {
       pages: [{ markdown: "text", tables: [{ id: "tbl-0.md", content: TABLE }] }],
     });
     expect(md).toBe(`**Page 1**\n\ntext\n\n${TABLE}`);
+  });
+});
+
+const CHART = {
+  kind: "chart",
+  description: "Revenue by region.",
+  details: "EMEA rises from 1.2M to 2.0M.",
+};
+
+describe("parseFigureAnnotation", () => {
+  it("reads an annotation given as a JSON string", () => {
+    expect(parseFigureAnnotation(JSON.stringify(CHART))).toEqual({
+      status: "ok",
+      annotation: CHART,
+    });
+  });
+
+  it("reads an annotation given as an object", () => {
+    expect(parseFigureAnnotation(CHART)).toEqual({ status: "ok", annotation: CHART });
+  });
+
+  it("collapses whitespace so the description stays on one blockquote line", () => {
+    const parsed = parseFigureAnnotation({
+      kind: "diagram",
+      description: "A\n  flow\tchart.",
+      details: " x \n y ",
+    });
+    expect(parsed).toEqual({
+      status: "ok",
+      annotation: { kind: "diagram", description: "A flow chart.", details: "x y" },
+    });
+  });
+
+  it("skips absent, empty and logo annotations", () => {
+    expect(parseFigureAnnotation(undefined)).toEqual({ status: "skip" });
+    expect(parseFigureAnnotation("")).toEqual({ status: "skip" });
+    expect(parseFigureAnnotation({ ...CHART, description: "  " })).toEqual({ status: "skip" });
+    expect(parseFigureAnnotation({ ...CHART, kind: "logo" })).toEqual({ status: "skip" });
+  });
+
+  it("flags unparseable or wrongly shaped annotations as malformed", () => {
+    expect(parseFigureAnnotation("{not json")).toEqual({ status: "malformed" });
+    expect(parseFigureAnnotation(42)).toEqual({ status: "malformed" });
+    expect(parseFigureAnnotation({ kind: "chart" })).toEqual({ status: "malformed" });
+  });
+
+  it("defaults a missing kind to other and missing details to empty", () => {
+    expect(parseFigureAnnotation({ description: "A map." })).toEqual({
+      status: "ok",
+      annotation: { kind: "other", description: "A map.", details: "" },
+    });
+  });
+});
+
+describe("figureBlock", () => {
+  it("renders a description and details as a blockquote", () => {
+    expect(figureBlock(CHART)).toBe(
+      "> **Figure (chart):** Revenue by region.\n> Details: EMEA rises from 1.2M to 2.0M."
+    );
+  });
+
+  it("omits the details line when details are empty", () => {
+    expect(figureBlock({ ...CHART, details: "" })).toBe("> **Figure (chart):** Revenue by region.");
+  });
+});
+
+describe("inlineOcrFigures", () => {
+  const BLOCK = figureBlock(CHART);
+
+  it("replaces the placeholder in place, under either annotation field name", () => {
+    for (const field of ["image_annotation", "bbox_annotation"]) {
+      const md = inlineOcrFigures("Intro\n\n![img-0.jpeg](img-0.jpeg)\n\nOutro", [
+        { id: "img-0.jpeg", [field]: JSON.stringify(CHART) },
+      ]);
+      expect(md).toBe(`Intro\n\n${BLOCK}\n\nOutro`);
+    }
+  });
+
+  it("leaves the placeholder for the media stripper when the figure is skipped", () => {
+    const md = inlineOcrFigures("![img-0.jpeg](img-0.jpeg)", [
+      { id: "img-0.jpeg", image_annotation: { ...CHART, kind: "logo" } },
+    ]);
+    expect(md).toBe("![img-0.jpeg](img-0.jpeg)");
+  });
+
+  it("reports malformed annotations by image id", () => {
+    const onMalformed = vi.fn();
+    inlineOcrFigures(
+      "![img-0.jpeg](img-0.jpeg)",
+      [{ id: "img-0.jpeg", image_annotation: "{bad" }],
+      onMalformed
+    );
+    expect(onMalformed).toHaveBeenCalledWith("img-0.jpeg");
+  });
+
+  it("appends a figure whose placeholder is missing at the end of the page", () => {
+    const md = inlineOcrFigures("text", [{ id: "img-3.jpeg", image_annotation: CHART }]);
+    expect(md).toBe(`text\n\n${BLOCK}`);
+  });
+
+  it("keeps dollar signs in descriptions literal", () => {
+    const md = inlineOcrFigures("![a](a)", [
+      {
+        id: "a",
+        image_annotation: { kind: "chart", description: "Price $& and $$.", details: "" },
+      },
+    ]);
+    expect(md).toBe("> **Figure (chart):** Price $& and $$.");
+  });
+
+  it("matches ids with regex characters literally", () => {
+    const md = inlineOcrFigures("![x](img-(1).png)", [
+      { id: "img-(1).png", image_annotation: CHART },
+    ]);
+    expect(md).toBe(BLOCK);
   });
 });

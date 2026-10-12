@@ -6,6 +6,85 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 
 type MistralOcrTable = { id?: string; content?: string; format?: string };
 
+/** OCR returns a figure's annotation under one of these names, as a JSON string or an object. */
+type MistralOcrImage = { id?: string; image_annotation?: unknown; bbox_annotation?: unknown };
+
+export interface FigureAnnotation {
+  kind: string;
+  description: string;
+  details: string;
+}
+
+type ParsedFigureAnnotation =
+  | { status: "ok"; annotation: FigureAnnotation }
+  | { status: "skip" }
+  | { status: "malformed" };
+
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * A figure annotation worth keeping. Absent, empty and logo annotations are skipped (decoration);
+ * an annotation that isn't JSON or lacks a description is malformed.
+ */
+export function parseFigureAnnotation(raw: unknown): ParsedFigureAnnotation {
+  if (raw === undefined || raw === null || raw === "") return { status: "skip" };
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return { status: "malformed" };
+    }
+  }
+  if (typeof value !== "object" || value === null) return { status: "malformed" };
+  const { kind, description, details } = value as Record<string, unknown>;
+  if (typeof description !== "string") return { status: "malformed" };
+  const text = oneLine(description);
+  if (!text || kind === "logo") return { status: "skip" };
+  return {
+    status: "ok",
+    annotation: {
+      kind: typeof kind === "string" && kind.trim() ? oneLine(kind) : "other",
+      description: text,
+      details: typeof details === "string" ? oneLine(details) : "",
+    },
+  };
+}
+
+/** A figure description as a blockquote, so chunks and the source viewer show it as quoted figure text. */
+export function figureBlock(annotation: FigureAnnotation): string {
+  const head = `> **Figure (${annotation.kind}):** ${annotation.description}`;
+  return annotation.details ? `${head}\n> Details: ${annotation.details}` : head;
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * OCR leaves `![img-0.jpeg](img-0.jpeg)` where each figure was. Put the figure's description there;
+ * a described figure without a placeholder goes at the page end. Skipped figures keep their
+ * placeholder, which `stripMistralOcrMedia` removes.
+ */
+export function inlineOcrFigures(
+  markdown: string,
+  images: MistralOcrImage[] | undefined,
+  onMalformed?: (imageId: string) => void
+): string {
+  let md = markdown;
+  for (const image of images ?? []) {
+    if (!image.id) continue;
+    const parsed = parseFigureAnnotation(image.image_annotation ?? image.bbox_annotation);
+    if (parsed.status === "malformed") onMalformed?.(image.id);
+    if (parsed.status !== "ok") continue;
+    const block = figureBlock(parsed.annotation);
+    const placeholder = new RegExp(`!\\[[^\\]]*\\]\\(${escapeRegExp(image.id)}\\)`);
+    // Function replacer: descriptions can contain "$", which a string replacement would interpret.
+    md = placeholder.test(md)
+      ? md.replace(placeholder, () => block)
+      : `${md.trimEnd()}\n\n${block}`;
+  }
+  return md;
+}
+
 /**
  * With `table_format` set, OCR returns each table in `tables` and leaves a link
  * placeholder (`[tbl-0.md](tbl-0.md)`) in the page markdown. Put the table back
