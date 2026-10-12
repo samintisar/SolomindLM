@@ -120,6 +120,28 @@ describe("candidatesFromLocations", () => {
     expect(out).toHaveLength(2);
   });
 
+  it("maps the Europe PMC article and render-service URL forms to the PMC article page", () => {
+    const out = candidatesFromLocations(
+      [
+        { landingUrl: "https://europepmc.org/article/PMC/PMC4221854" },
+        { pdfUrl: "https://europepmc.org/backend/ptpmcrender.fcgi?accid=PMC555&blobtype=pdf" },
+      ],
+      []
+    );
+    expect(out.map((c) => [c.url, c.kind])).toEqual([
+      ["https://pmc.ncbi.nlm.nih.gov/articles/PMC4221854/", "html"],
+      ["https://pmc.ncbi.nlm.nih.gov/articles/PMC555/", "html"],
+    ]);
+  });
+
+  it("upgrades an http duplicate to https without adopting the other copy's path", () => {
+    const out = candidatesFromLocations(
+      [{ pdfUrl: "http://a.example/x.pdf" }, { pdfUrl: "https://a.example/x.pdf/" }],
+      []
+    );
+    expect(out.map((c) => c.url)).toEqual(["https://a.example/x.pdf"]);
+  });
+
   it("turns Europe PMC article URLs into the PMC article page", () => {
     const out = candidatesFromLocations(
       [

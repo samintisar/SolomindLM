@@ -83,9 +83,11 @@ function arxivIdFromPmh(pmhId: string | null | undefined): string | undefined {
 }
 
 function pmcNumberFromUrl(url: string | null | undefined): string | undefined {
-  return url?.match(
-    /(?:\/pmc\/articles\/|pmc\.ncbi\.nlm\.nih\.gov\/articles\/|europepmc\.org\/articles\/)(?:PMC)?(\d+)/i
-  )?.[1];
+  return (
+    url?.match(
+      /(?:\/pmc\/articles\/|pmc\.ncbi\.nlm\.nih\.gov\/articles\/|europepmc\.org\/articles\/|europepmc\.org\/article\/PMC\/)(?:PMC)?(\d+)/i
+    )?.[1] ?? url?.match(/europepmc\.org\/backend\/ptpmcrender\.fcgi\?(?:.*&)?accid=PMC(\d+)/i)?.[1]
+  );
 }
 
 function pmcNumberFromPmh(pmhId: string | null | undefined): string | undefined {
@@ -110,7 +112,8 @@ export function candidatesFromLocations(
     const license = loc?.license?.trim() || undefined;
     const existing = byKey.get(key);
     if (existing) {
-      if (url.startsWith("https:") && existing.url.startsWith("http:")) existing.url = url;
+      if (url.startsWith("https:") && existing.url.startsWith("http:"))
+        existing.url = existing.url.replace(/^http:/i, "https:");
       existing.version ??= version;
       existing.license ??= license;
       return;
