@@ -4,7 +4,7 @@
 
 **Goal:** Describe images and figures in text during OCR, so standalone image uploads and figures inside PDFs, PPTX and DOCX reach retrieval, and fail visibly when a file has nothing readable.
 
-**Architecture:** All changes sit in `convex/_services/extraction/MistralOCRService.ts`, behind its existing `processDocument(url)` interface. The OCR request adds Mistral's `bbox_annotation_format` (plus `document_annotation_format` for standalone images); the response stitcher replaces each `![img-N](img-N)` placeholder with a blockquote description, next to the existing table inlining. An annotated request that is rejected (4xx, not 429) or times out falls back once to today's plain request. `embeddingJob` passes an `image`/`document` hint because Convex storage URLs carry no extension.
+**Architecture:** All changes sit in `convex/_services/extraction/MistralOCRService.ts`, behind its existing `processDocument(url)` interface. The OCR request adds Mistral's `bbox_annotation_format`; the response stitcher replaces each `![img-N](img-N)` placeholder with a blockquote description, next to the existing table inlining. An annotated request that is rejected (4xx, not 429) or times out falls back once to today's plain request. `embeddingJob` passes an `image`/`document` hint because Convex storage URLs carry no extension.
 
 **Tech Stack:** Convex actions (`"use node"`), Mistral OCR REST API (`mistral-ocr-latest`), Vitest (`bun run test:convex`), Bun.
 
@@ -24,7 +24,11 @@
 
 ---
 
-### Task 0: Probe the real API (scratch only, nothing committed)
+### Task 0: Probe the real API (scratch only, nothing committed) — DONE 2026-10-12
+
+Findings are in the spec, section 4. Outcome: annotations come back as `image_annotation` JSON strings, the `enum`
+schema is accepted, placeholders always match, latency is low. `document_annotation_format` was dropped from the
+design (it describes the OCR text, not the picture); standalone photo description moved to a follow-up PR.
 
 The parser accepts the annotation under `image_annotation` or `bbox_annotation`, as a string or object, but we need to know what OCR 4.1 actually returns, whether the strict schema with an `enum` is accepted, and what a photo yields.
 
@@ -372,7 +376,7 @@ git commit -m "feat(ocr): parse figure annotations and inline them as descriptio
 
 ---
 
-### Task 2: Wire figures and the whole-image description into page stitching
+### Task 2: Wire figure descriptions into page stitching
 
 **Files:**
 - Modify: `convex/_services/extraction/MistralOCRService.ts` (`markdownFromMistralOcrResponse`)
@@ -393,25 +397,13 @@ Add inside the existing `describe("markdownFromMistralOcrResponse", …)` block:
     expect(md).toBe(`**Page 1**\n\none\n\n---\n\n**Page 2**\n\n${figureBlock(CHART)}`);
   });
 
-  it("puts a whole-image description at the top of page 1", () => {
-    const photo = { kind: "photo", description: "A whiteboard with a flow diagram.", details: "Boxes: Input, Model, Output." };
-    const md = markdownFromMistralOcrResponse({
-      pages: [{ markdown: "Input → Model" }],
-      document_annotation: JSON.stringify(photo),
-    });
-    expect(md).toBe(`**Page 1**\n\n${figureBlock(photo)}\n\nInput → Model`);
-  });
-
-  it("uses the whole-image description alone when OCR found no text", () => {
-    const photo = { kind: "photo", description: "A mountain lake at dawn.", details: "" };
-    const md = markdownFromMistralOcrResponse({ pages: [{ markdown: "" }], document_annotation: photo });
-    expect(md).toBe(`**Page 1**\n\n${figureBlock(photo)}`);
-  });
-
-  it("reports a malformed whole-image description", () => {
+  it("reports malformed figure annotations through the option", () => {
     const onMalformedAnnotation = vi.fn();
-    markdownFromMistralOcrResponse({ pages: [{ markdown: "x" }], document_annotation: "{bad" }, { onMalformedAnnotation });
-    expect(onMalformedAnnotation).toHaveBeenCalledWith("document");
+    markdownFromMistralOcrResponse(
+      { pages: [{ markdown: "![img-0.jpeg](img-0.jpeg)", images: [{ id: "img-0.jpeg", image_annotation: "{bad" }] }] },
+      { onMalformedAnnotation }
+    );
+    expect(onMalformedAnnotation).toHaveBeenCalledWith("img-0.jpeg");
   });
 ```
 
@@ -420,7 +412,7 @@ Add inside the existing `describe("markdownFromMistralOcrResponse", …)` block:
 - [ ] **Step 2: Run the tests to confirm they fail**
 
 Run: `bun run test:convex -- convex/_services/extraction/MistralOCRService.test.ts`
-Expected: FAIL. Figures stay as placeholders and `document_annotation` is ignored.
+Expected: FAIL. Figures stay as placeholders.
 
 - [ ] **Step 3: Implement**
 
@@ -431,36 +423,27 @@ export type MistralOcrResponse = {
   pages?: Array<{ markdown?: string; tables?: MistralOcrTable[]; images?: MistralOcrImage[] }>;
   markdown?: string;
   text?: string;
-  /** Whole-document annotation; requested only for standalone images. */
-  document_annotation?: unknown;
 };
 
 /**
  * Stitch OCR pages into one markdown string with visible page labels (HTML comments are hidden when rendered).
- * Tables and figure descriptions are put back where OCR left their placeholders; a whole-image description
- * opens page 1.
+ * Tables and figure descriptions are put back where OCR left their placeholders.
  */
 export function markdownFromMistralOcrResponse(
   data: MistralOcrResponse,
   options: { onMalformedAnnotation?: (imageId: string) => void } = {}
 ): string {
-  const whole = parseFigureAnnotation(data?.document_annotation);
-  if (whole.status === "malformed") options.onMalformedAnnotation?.("document");
-  const lead = whole.status === "ok" ? figureBlock(whole.annotation) : "";
-  const withLead = (md: string) => (lead ? (md.trim() ? `${lead}\n\n${md}` : lead) : md);
-
   if (data?.pages && Array.isArray(data.pages) && data.pages.length > 0) {
     return data.pages
       .map((page, index) => {
         const withTables = inlineOcrTables(page.markdown || "", page.tables);
-        const withFigures = inlineOcrFigures(withTables, page.images, options.onMalformedAnnotation);
-        const md = index === 0 ? withLead(withFigures) : withFigures;
+        const md = inlineOcrFigures(withTables, page.images, options.onMalformedAnnotation);
         const label = `**Page ${index + 1}**`;
         return index === 0 ? `${label}\n\n${md}` : `---\n\n${label}\n\n${md}`;
       })
       .join("\n\n");
   }
-  return withLead(data.markdown || data.text || "");
+  return data.markdown || data.text || "";
 }
 ```
 
@@ -472,7 +455,7 @@ Expected: PASS. The existing "labels and joins pages" test must still produce `*
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -m "feat(ocr): stitch figure and whole-image descriptions into OCR pages" -- convex/_services/extraction/MistralOCRService.ts convex/_services/extraction/MistralOCRService.test.ts
+git commit -m "feat(ocr): stitch figure descriptions into OCR pages" -- convex/_services/extraction/MistralOCRService.ts convex/_services/extraction/MistralOCRService.test.ts
 ```
 
 ---
@@ -548,7 +531,7 @@ git commit -m "feat(ocr): detect OCR output with no readable content" -- convex/
 - Modify: `convex/_services/extraction/MistralOCRService.ts`
 - Test: `convex/_services/extraction/MistralOCRService.test.ts`
 
-If Task 0 showed the `enum` is rejected, use the plain-string `kind` from Task 0 Step 4 in `FIGURE_ANNOTATION_FORMAT` below.
+Task 0 confirmed the strict schema with the `kind` enum is accepted.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -577,17 +560,16 @@ describe("buildOcrRequestBody", () => {
     expect(body).not.toHaveProperty("document_annotation_format");
   });
 
-  it("sends images as image_url and asks for a whole-image description", () => {
+  it("sends images as image_url with figure annotations", () => {
     const body = buildOcrRequestBody("https://x/storage/abc", "image", true);
     expect(body.document).toEqual({ type: "image_url", image_url: "https://x/storage/abc" });
     expect(body).toHaveProperty("bbox_annotation_format");
-    expect(body).toHaveProperty("document_annotation_format");
+    expect(body).not.toHaveProperty("document_annotation_format");
   });
 
   it("leaves out annotation formats for the plain fallback request", () => {
     const body = buildOcrRequestBody("https://x/storage/abc", "image", false);
     expect(body).not.toHaveProperty("bbox_annotation_format");
-    expect(body).not.toHaveProperty("document_annotation_format");
   });
 });
 ```
@@ -660,10 +642,8 @@ export function buildOcrRequestBody(
     table_format: "markdown",
     include_image_base64: false,
   };
-  if (annotate) {
-    body.bbox_annotation_format = FIGURE_ANNOTATION_FORMAT;
-    if (kind === "image") body.document_annotation_format = FIGURE_ANNOTATION_FORMAT;
-  }
+  // No document_annotation_format: it restates the OCR text and invents content for photos.
+  if (annotate) body.bbox_annotation_format = FIGURE_ANNOTATION_FORMAT;
   return body;
 }
 ```
