@@ -88,8 +88,16 @@ export const run = internalAction({
                 after = "oa_html";
                 break;
               }
-            } catch {
-              // A failed scrape is a miss; try the next candidate.
+            } catch (error) {
+              // A failed scrape is a miss; log it so a systematic scraper failure shows up.
+              console.warn(
+                JSON.stringify({
+                  eval: "openAccessCoverage.scrapeError",
+                  doi: work.doi,
+                  url: fetched.finalUrl,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              );
             }
           }
         }
