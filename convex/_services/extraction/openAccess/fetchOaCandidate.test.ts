@@ -28,6 +28,45 @@ describe("fetchOaCandidate", () => {
     expect(mockFetch.mock.calls[0][1].headers["User-Agent"]).toMatch(/^SolomindLM\/1\.0 \(mailto:/);
   });
 
+  it("follows redirects by hand and reports where they ended", async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: "/files/a.pdf" } })
+      )
+      .mockResolvedValueOnce(new Response(enc.encode("%PDF-1.7"), { status: 200 }));
+    const out = await fetchOaCandidate("https://repo.example.org/download/1");
+    expect(out).toMatchObject({ type: "pdf", finalUrl: "https://repo.example.org/files/a.pdf" });
+    expect(mockFetch.mock.calls[0][1].redirect).toBe("manual");
+    expect(mockFetch.mock.calls[1][0]).toBe("https://repo.example.org/files/a.pdf");
+  });
+
+  it("refuses a private destination, before the request or behind a redirect", async () => {
+    expect(await fetchOaCandidate("http://169.254.169.254/latest/meta-data/")).toEqual({
+      type: "unusable",
+      reason: "blocked_destination",
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(null, { status: 301, headers: { location: "http://127.0.0.1:8080/admin" } })
+    );
+    expect(await fetchOaCandidate("https://repo.example.org/a.pdf")).toEqual({
+      type: "unusable",
+      reason: "blocked_destination",
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives up after too many redirects", async () => {
+    mockFetch.mockImplementation(
+      async () => new Response(null, { status: 302, headers: { location: "/again" } })
+    );
+    expect(await fetchOaCandidate("https://repo.example.org/loop")).toEqual({
+      type: "unusable",
+      reason: "too_many_redirects",
+    });
+  });
+
   it("calls a .pdf URL that serves an HTML page html, not pdf", async () => {
     mockFetch.mockResolvedValue(
       new Response("<!DOCTYPE html><html><title>Article</title></html>", {

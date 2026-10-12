@@ -4,11 +4,14 @@
  */
 
 import { openAccessUserAgent } from "./OpenAccessResolver";
+import { isPublicHttpUrl } from "./publicUrl";
 
 /** Mistral OCR accepts documents up to 50 MB. */
 export const MAX_PDF_BYTES = 50 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 30_000;
 const SNIFF_BYTES = 1024;
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 export type FetchedCandidate =
   | { type: "pdf"; bytes: Uint8Array<ArrayBuffer>; finalUrl: string }
@@ -40,19 +43,29 @@ export async function fetchOaCandidate(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        "User-Agent": openAccessUserAgent(),
-        Accept: "application/pdf,text/html;q=0.9,*/*;q=0.5",
-      },
-    });
+    // Redirects are followed by hand so every hop passes the destination policy.
+    let finalUrl = url;
+    let res: Response | undefined;
+    for (let hop = 0; ; hop++) {
+      if (!isPublicHttpUrl(finalUrl)) return { type: "unusable", reason: "blocked_destination" };
+      res = await fetch(finalUrl, {
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "User-Agent": openAccessUserAgent(),
+          Accept: "application/pdf,text/html;q=0.9,*/*;q=0.5",
+        },
+      });
+      const location = REDIRECT_STATUSES.has(res.status) ? res.headers.get("location") : null;
+      if (!location) break;
+      await res.body?.cancel();
+      if (hop >= MAX_REDIRECTS) return { type: "unusable", reason: "too_many_redirects" };
+      finalUrl = new URL(location, finalUrl).toString();
+    }
     if (!res.ok) {
       await res.body?.cancel();
       return { type: "unusable", reason: `HTTP ${res.status}` };
     }
-    const finalUrl = res.url || url;
     const declared = Number(res.headers.get("content-length") ?? "");
     if (Number.isFinite(declared) && declared > MAX_PDF_BYTES) {
       await res.body?.cancel();

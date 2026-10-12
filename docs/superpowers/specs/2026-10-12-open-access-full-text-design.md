@@ -80,8 +80,10 @@ and each import makes exactly one Unpaywall call.
 
 ### 2. Fetching a candidate — `convex/_services/extraction/openAccess/fetchOaCandidate.ts`
 
-`GET` with a 30 s timeout, a `SolomindLM/1.0 (mailto:{contact})` user agent, redirects followed, and a 50 MB cap
-(stop reading and report `too_large` past it). Classify the response:
+`GET` with a 30 s timeout, a `SolomindLM/1.0 (mailto:{contact})` user agent, and a 50 MB cap (stop reading and
+report `too_large` past it). Redirects (up to 5) are followed by hand: the first URL and every redirect target must
+pass `isPublicHttpUrl` (`publicUrl.ts`: http(s) only, no loopback, private, link-local, CGNAT, multicast or
+internal-only hosts), else `blocked_destination`. Classify the response:
 
 - body starts with `%PDF-` (the first 1 KB is read and sniffed, so a leading BOM or whitespace is tolerated)
   → `{ type: "pdf", bytes }`
@@ -124,7 +126,10 @@ OCR'd only if 190 s remain. Skipped candidates don't count toward the 6 attempts
 are caught and treated as "no candidates" / "unusable".
 
 **Full-text test** (`isFullTextLength(text, abstract)`): word count ≥ 1,500 **and** ≥ 3 × the abstract's word count.
-Applies to scraped text only; OCR of a real PDF is accepted when non-empty.
+Applies to scraped text only. OCR of an open-access PDF must pass a lower bar (`isPlausiblePdfText`): ≥ 500 words
+**and** ≥ 2 × the abstract's word count, so a cover sheet or notice fails. OCR of a stored PDF (uploaded, or kept
+from an earlier import) is accepted when non-empty. Words are counted with the CJK-aware `countWords` from
+`convex/_lib/freeToolBounds.ts`.
 
 `AcademicLoaderService` is unchanged and keeps serving deep research and evals.
 
