@@ -1,11 +1,13 @@
 import {
   File,
   FileText,
+  FileUp,
   Globe,
   GraduationCap,
   MoreVertical,
   Pencil,
   RefreshCw,
+  Search,
   Trash2,
   Youtube,
 } from "lucide-react";
@@ -32,6 +34,7 @@ import {
 } from "@/shared/components/ui/item";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Source } from "@/shared/types";
+import { fullTextSourceLabel } from "../utils/fullTextSourceLabel";
 
 interface SourceListItemProps {
   source: Source;
@@ -44,6 +47,10 @@ interface SourceListItemProps {
   onView: (id: string) => void;
   onDelete: (id: string, title: string) => void;
   onRefreshSource: (id: string) => void;
+  /** Abstract-only papers: look for open-access full text again. */
+  onFindFullText?: (id: string) => void;
+  /** Abstract-only papers: attach a PDF the user has. */
+  onUploadPdf?: (id: string) => void;
   onMenuOpenChange: (id: string, open: boolean) => void;
   onStartRename: (sourceId: string) => void;
   isMenuOpen: boolean;
@@ -60,6 +67,8 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   onView,
   onDelete,
   onRefreshSource,
+  onFindFullText,
+  onUploadPdf,
   onMenuOpenChange,
   onStartRename,
   isMenuOpen,
@@ -138,16 +147,19 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
     if (source.type !== "PAPER" || !source.paper) return null;
     if (status === "processing" || source.paper.ingestionStatus === "pending") return null;
     if (status === "failed" || source.paper.ingestionStatus === "failed") return null;
-    if (source.paper.ingestionStatus === "metadata_only") {
-      return source.paper.fulltextStatus === "external_only" ? "External" : "Abstract";
-    }
-    if (source.paper.ingestionStatus === "ingested") {
-      return source.paper.fulltextStatus === "available" ? "Full text" : "Indexed";
-    }
+    if (source.paper.ingestionStatus === "metadata_only") return "Abstract only";
+    if (source.paper.ingestionStatus === "ingested") return "Full text";
     return null;
   };
 
   const paperHint = paperMetaHint();
+  const fullTextLabel =
+    paperHint === "Full text" ? fullTextSourceLabel(source.paper?.fullTextSource) : undefined;
+  const isAbstractOnlyPaper = paperHint === "Abstract only" && status === "completed";
+  // A paper whose (re-)ingest failed has to be able to retry, or the user is stuck with Rename/Delete.
+  const isFailedPaper =
+    source.type === "PAPER" && (status === "failed" || source.paper?.ingestionStatus === "failed");
+  const canGetFullText = isAbstractOnlyPaper || isFailedPaper;
 
   return (
     <Item role="listitem" data-source-id={source.id} size="sm">
@@ -194,7 +206,11 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                 </span>{" "}
                 <span>• {source.date}</span>
                 {paperHint && status === "completed" && (
-                  <span className="font-normal normal-case tracking-normal"> · {paperHint}</span>
+                  <span className="font-normal normal-case tracking-normal" title={fullTextLabel}>
+                    {" "}
+                    · {paperHint}
+                    {fullTextLabel && <span className="sr-only"> · {fullTextLabel}</span>}
+                  </span>
                 )}
               </span>
             </ItemDescription>
@@ -233,6 +249,18 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               }
             }}
           >
+            {canGetFullText && onFindFullText && (
+              <DropdownMenuItem onSelect={() => onFindFullText(source.id)}>
+                <Search />
+                {isFailedPaper ? "Try again" : "Find full text"}
+              </DropdownMenuItem>
+            )}
+            {canGetFullText && onUploadPdf && (
+              <DropdownMenuItem onSelect={() => onUploadPdf(source.id)}>
+                <FileUp />
+                Upload PDF
+              </DropdownMenuItem>
+            )}
             {canRemoteRefresh && (
               <DropdownMenuItem onSelect={() => onRefreshSource(source.id)}>
                 <RefreshCw />

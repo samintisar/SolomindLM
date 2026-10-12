@@ -119,4 +119,105 @@ describe("SourceListItem", () => {
     await userEvent.type(input, "{Escape}");
     expect(p.onRenameCancel).toHaveBeenCalled();
   });
+
+  const paper = (over: Partial<NonNullable<Source["paper"]>>): Partial<Source> => ({
+    type: "PAPER",
+    title: "A paper",
+    paper: { ingestionStatus: "ingested", fulltextStatus: "available", ...over },
+  });
+
+  it("labels a paper with full text, with its version and licence as a tooltip", () => {
+    setup(
+      {},
+      paper({ fullTextSource: { method: "oa_pdf", version: "acceptedVersion", license: "cc-by" } })
+    );
+    const hint = screen.getByText(/Full text/);
+    expect(hint).toHaveAttribute("title", "Accepted manuscript · CC BY");
+  });
+
+  it("labels an abstract-only paper, whatever was guessed when it was added", () => {
+    setup({}, paper({ ingestionStatus: "metadata_only", fulltextStatus: "external_only" }));
+    expect(screen.getByText(/Abstract only/)).toBeInTheDocument();
+  });
+
+  it("offers Find full text and Upload PDF for an abstract-only paper", async () => {
+    const onFindFullText = vi.fn();
+    const onUploadPdf = vi.fn();
+    setup(
+      { isMenuOpen: true, onFindFullText, onUploadPdf },
+      paper({ ingestionStatus: "metadata_only" })
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Find full text" }));
+    expect(onFindFullText).toHaveBeenCalledWith("s1");
+  });
+
+  it("uploads a PDF from the menu", async () => {
+    const onUploadPdf = vi.fn();
+    setup(
+      { isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf },
+      paper({ ingestionStatus: "metadata_only" })
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Upload PDF" }));
+    expect(onUploadPdf).toHaveBeenCalledWith("s1");
+  });
+
+  it("doesn't offer them for a paper that has full text", async () => {
+    setup({ isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf: vi.fn() }, paper({}));
+    await screen.findByRole("menuitem", { name: "Rename" });
+    expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
+  });
+
+  it("also gives the full-text source to assistive tech as hidden text in the description", () => {
+    setup(
+      {},
+      paper({ fullTextSource: { method: "oa_pdf", version: "acceptedVersion", license: "cc-by" } })
+    );
+    const hidden = screen.getByText(/Accepted manuscript · CC BY/);
+    expect(hidden).toHaveClass("sr-only");
+    expect(screen.getByRole("button", { name: /A paper/ })).toHaveAccessibleDescription(
+      /Full text.*Accepted manuscript · CC BY/
+    );
+  });
+
+  it("adds no hidden source text when there is nothing to say", () => {
+    setup({}, paper({}));
+    const hint = screen.getByText(/Full text/);
+    expect(hint.querySelector(".sr-only")).toBeNull();
+  });
+
+  it("lets a failed paper try again or take a PDF", async () => {
+    const onFindFullText = vi.fn();
+    const onUploadPdf = vi.fn();
+    setup(
+      { isMenuOpen: true, onFindFullText, onUploadPdf },
+      { ...paper({ ingestionStatus: "failed" }), status: "failed" }
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Try again" }));
+    expect(onFindFullText).toHaveBeenCalledWith("s1");
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Upload PDF" }));
+    expect(onUploadPdf).toHaveBeenCalledWith("s1");
+    expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer them while a paper is processing", async () => {
+    setup(
+      { isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf: vi.fn() },
+      { ...paper({ ingestionStatus: "pending" }), status: "processing" }
+    );
+    await screen.findByRole("menuitem", { name: "Rename" });
+    expect(screen.queryByRole("menuitem", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer them for a failed source that isn't a paper", async () => {
+    setup(
+      { isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf: vi.fn() },
+      { status: "failed" }
+    );
+    await screen.findByRole("menuitem", { name: "Rename" });
+    expect(screen.queryByRole("menuitem", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
+  });
 });

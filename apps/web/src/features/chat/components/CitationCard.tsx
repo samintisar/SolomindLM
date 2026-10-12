@@ -21,6 +21,8 @@ interface CitationCardProps {
   onOpenInSources?: () => void;
   /** When set, shows "Add to notebook" for an external source. A returned promise shows a pending state. */
   onAddToNotebook?: () => void | Promise<unknown>;
+  /** The cited source is a paper that holds only its abstract. */
+  abstractOnly?: boolean;
 }
 
 /** Content of the citation popover: source header, scrollable excerpt, optional add action. */
@@ -29,6 +31,7 @@ export function CitationCard({
   reference,
   onOpenInSources,
   onAddToNotebook,
+  abstractOnly,
 }: CitationCardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const sourceHost = useMemo(() => getSourceHost(reference.sourceUrl), [reference.sourceUrl]);
@@ -61,6 +64,7 @@ export function CitationCard({
         <div className="min-w-0 flex-1">
           <p className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
             Reference {refId}
+            {abstractOnly ? " • Abstract only" : ""}
             {pageNumber ? ` • p. ${pageNumber}` : ""}
             {sourceHost ? ` • ${sourceHost}` : ""}
           </p>

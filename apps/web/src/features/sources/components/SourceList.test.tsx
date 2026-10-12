@@ -30,6 +30,8 @@ function Harness({ onRenameSource }: { onRenameSource: (id: string, title: strin
       onViewSource={vi.fn()}
       onDeleteSource={vi.fn()}
       onRefreshSource={vi.fn()}
+      onFindFullText={vi.fn()}
+      onUploadPdf={vi.fn()}
       onRenameSource={(id, title) => {
         onRenameSource(id, title);
         setRenamingId(null);
@@ -126,6 +128,8 @@ function props(overrides: Partial<ListProps> = {}): ListProps {
     onViewSource: vi.fn(),
     onDeleteSource: vi.fn(),
     onRefreshSource: vi.fn(),
+    onFindFullText: vi.fn(),
+    onUploadPdf: vi.fn(),
     onRenameSource: vi.fn(),
     allSelected: false,
     renamingId: null,

@@ -1,0 +1,34 @@
+import { describe, expect, it } from "vitest";
+import { hasPdfSignature, isPdfFile, MAX_PAPER_PDF_BYTES } from "./paperPdf";
+
+describe("isPdfFile", () => {
+  it("accepts the PDF media types, ignoring case and parameters", () => {
+    expect(isPdfFile({ name: "a.pdf", type: "application/pdf" })).toBe(true);
+    expect(isPdfFile({ name: "a.pdf", type: "Application/PDF; charset=binary" })).toBe(true);
+    expect(isPdfFile({ name: "a", type: "application/x-pdf" })).toBe(true);
+  });
+
+  it("falls back to the extension when the browser reports no type", () => {
+    expect(isPdfFile({ name: "Paper.PDF", type: "" })).toBe(true);
+    expect(isPdfFile({ name: "paper.docx", type: "" })).toBe(false);
+    expect(isPdfFile({ name: "Paper.pdf", type: "application/octet-stream" })).toBe(true);
+    expect(isPdfFile({ name: "paper.bin", type: "application/octet-stream" })).toBe(false);
+    expect(isPdfFile({ name: "pdf", type: "" })).toBe(false);
+  });
+
+  it("rejects other types, even when named .pdf", () => {
+    expect(isPdfFile({ name: "a.pdf", type: "image/png" })).toBe(false);
+    expect(isPdfFile({ name: "a.txt", type: "text/plain" })).toBe(false);
+  });
+
+  it("checks the bytes for a PDF header", async () => {
+    expect(await hasPdfSignature(new Blob(["%PDF-1.7\n..."]))).toBe(true);
+    expect(await hasPdfSignature(new Blob(["junk before %PDF-1.4"]))).toBe(true);
+    expect(await hasPdfSignature(new Blob(["<!doctype html><html>"]))).toBe(false);
+    expect(await hasPdfSignature(new Blob([]))).toBe(false);
+  });
+
+  it("caps uploads at 50 MB", () => {
+    expect(MAX_PAPER_PDF_BYTES).toBe(50 * 1024 * 1024);
+  });
+});

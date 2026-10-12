@@ -4,7 +4,11 @@ import { query } from "../_generated/server";
 import { canReadNotebook } from "../_lib/notebookAccess";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { getAuthUserId } from "../auth";
-import { fulltextStatusValidator, ingestionStatusValidator } from "./paperRecord";
+import {
+  fullTextSourceValidator,
+  fulltextStatusValidator,
+  ingestionStatusValidator,
+} from "./paperRecord";
 
 /**
  * One row of the live sources list. It carries only what the list UI reads (source rows, chat
@@ -25,6 +29,7 @@ const documentSummaryValidator = v.object({
   totalChunks: v.optional(v.number()),
   fulltextStatus: v.optional(fulltextStatusValidator),
   ingestionStatus: v.optional(ingestionStatusValidator),
+  fullTextSource: v.optional(fullTextSourceValidator),
   /** Identifiers only, for discovery dedupe. */
   paperRecord: v.optional(
     v.object({
@@ -61,6 +66,7 @@ function toDocumentSummary(doc: Doc<"documents">): DocumentSummary {
     totalChunks: doc.totalChunks,
     fulltextStatus: doc.fulltextStatus,
     ingestionStatus: doc.ingestionStatus,
+    fullTextSource: doc.fullTextSource,
     paperRecord: doc.paperRecord
       ? { doi: doc.paperRecord.doi, openAlexId: doc.paperRecord.openAlexId }
       : undefined,

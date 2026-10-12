@@ -40,6 +40,14 @@ export interface Source {
     openAlexId?: string;
     fulltextStatus?: "available" | "unavailable" | "external_only";
     ingestionStatus?: "pending" | "ingested" | "metadata_only" | "failed";
+    /** Where the full text came from; absent for abstract-only papers. */
+    fullTextSource?: {
+      method: "uploaded_pdf" | "oa_pdf" | "oa_html" | "landing_page";
+      url?: string;
+      version?: "publishedVersion" | "acceptedVersion" | "submittedVersion";
+      license?: string;
+      host?: string;
+    };
   };
   /** AI-generated summary and topics for the source (NotebookLM-style) */
   sourceGuide?: SourceGuide;

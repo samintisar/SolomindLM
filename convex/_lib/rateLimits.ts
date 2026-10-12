@@ -82,6 +82,8 @@ export const RATE_LIMIT_CONFIG: Record<string, LimitConfig> = {
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
   /** In-app feedback submissions (per user, per hour) */
   feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
+  /** "Find full text" / "Upload PDF" on a paper source (per user, per hour); each re-runs OCR and lookups */
+  paperFullText: { kind: "fixed window", rate: 20, period: HOUR },
   /** Free no-signup flashcard tool: runs per salted-hash IP per day */
   freeToolFlashcardsIp: { kind: "fixed window", rate: FREE_FLASHCARD_IP_DAILY_LIMIT, period: DAY },
   /** Free no-signup flashcard tool: all anonymous runs per day (cost circuit breaker, single key) */

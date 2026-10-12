@@ -46,6 +46,62 @@ export const userCanAccessStorage = internalQuery({
 });
 
 /**
+ * Clear chunks, optionally swap the Convex storage blob, reset doc fields, schedule embedding.
+ * A new blob also clears `fullTextSource` (an uploaded PDF replaces whatever was there); a plain
+ * reprocess keeps it, so a stored open-access PDF keeps its provenance.
+ */
+export async function resetDocumentForReembed(
+  ctx: MutationCtx,
+  args: { documentId: Id<"documents">; delayMs: number; newStorageId?: string }
+): Promise<void> {
+  const doc = await ctx.db.get(args.documentId);
+  if (!doc) throw new Error("Document not found");
+
+  if (args.newStorageId !== undefined) {
+    if (doc.storageId) {
+      await ctx.storage.delete(doc.storageId as Id<"_storage">);
+    }
+    await ctx.db.patch(args.documentId, {
+      storageId: args.newStorageId,
+      fullTextSource: undefined,
+      updatedAt: Date.now(),
+    });
+  }
+
+  await deleteAllChunksForDocument(ctx, args.documentId);
+
+  const before = await ctx.db.get(args.documentId);
+  await ctx.db.patch(args.documentId, {
+    status: "pending",
+    error: undefined,
+    wordCount: undefined,
+    estimatedReadingTimeMinutes: undefined,
+    totalPages: undefined,
+    totalChunks: undefined,
+    hasCodeBlocks: undefined,
+    hasMathNotation: undefined,
+    hasTables: undefined,
+    hasImages: undefined,
+    language: undefined,
+    documentStructure: undefined,
+    maxHeadingLevel: undefined,
+    metadata: undefined,
+    extractedMarkdown: undefined,
+    ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
+    updatedAt: Date.now(),
+  });
+
+  const after = await ctx.db.get(args.documentId);
+  if (!after) throw new Error("Document not found");
+
+  await ctx.scheduler.runAfter(args.delayMs, internal.documents.embeddingJob.docEmbedding, {
+    documentId: args.documentId,
+    userId: after.userId,
+    notebookId: after.notebookId,
+  });
+}
+
+/**
  * Internal: Clear chunks, optionally swap Convex storage blob, reset doc fields, schedule embedding.
  */
 export const prepareDocumentReembed = internalMutation({
@@ -54,52 +110,7 @@ export const prepareDocumentReembed = internalMutation({
     delayMs: v.number(),
     newStorageId: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db.get(args.documentId);
-    if (!doc) throw new Error("Document not found");
-
-    if (args.newStorageId !== undefined) {
-      if (doc.storageId) {
-        await ctx.storage.delete(doc.storageId as Id<"_storage">);
-      }
-      await ctx.db.patch(args.documentId, {
-        storageId: args.newStorageId,
-        updatedAt: Date.now(),
-      });
-    }
-
-    await deleteAllChunksForDocument(ctx, args.documentId);
-
-    const before = await ctx.db.get(args.documentId);
-    await ctx.db.patch(args.documentId, {
-      status: "pending",
-      error: undefined,
-      wordCount: undefined,
-      estimatedReadingTimeMinutes: undefined,
-      totalPages: undefined,
-      totalChunks: undefined,
-      hasCodeBlocks: undefined,
-      hasMathNotation: undefined,
-      hasTables: undefined,
-      hasImages: undefined,
-      language: undefined,
-      documentStructure: undefined,
-      maxHeadingLevel: undefined,
-      metadata: undefined,
-      extractedMarkdown: undefined,
-      ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
-      updatedAt: Date.now(),
-    });
-
-    const after = await ctx.db.get(args.documentId);
-    if (!after) throw new Error("Document not found");
-
-    await ctx.scheduler.runAfter(args.delayMs, internal.documents.embeddingJob.docEmbedding, {
-      documentId: args.documentId,
-      userId: after.userId,
-      notebookId: after.notebookId,
-    });
-  },
+  handler: async (ctx, args) => resetDocumentForReembed(ctx, args),
 });
 
 /**
@@ -380,6 +391,7 @@ export const getDocumentDetails = internalQuery({
       paperRecord: doc.paperRecord,
       fulltextStatus: doc.fulltextStatus,
       ingestionStatus: doc.ingestionStatus,
+      fullTextSource: doc.fullTextSource,
       extractedMarkdown: doc.extractedMarkdown,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,

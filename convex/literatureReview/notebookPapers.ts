@@ -33,6 +33,7 @@ export interface NotebookDocumentLike {
   paperRecord?: PaperRecordLike;
   sourceGuide?: { summary?: string };
   extractedMarkdown?: string;
+  ingestionStatus?: string;
 }
 
 /** Metadata read from an uploaded PDF's first page. */
@@ -99,10 +100,17 @@ export function notebookPaperFromDocument(
   };
 }
 
-/** The text extraction reads for a notebook paper: its own text, or its abstract. */
+/**
+ * The full text extraction reads for a notebook paper, or "" when it has none — the caller then
+ * uses the abstract and labels it as such. A paper source holding only its abstract stub counts
+ * as having none (#480).
+ */
 export function notebookPaperText(
-  doc: Pick<NotebookDocumentLike, "extractedMarkdown" | "paperRecord">
+  doc: Pick<NotebookDocumentLike, "extractedMarkdown" | "paperRecord" | "ingestionStatus"> & {
+    fileType?: string;
+  }
 ): string {
+  if (doc.fileType === "paper_record" && doc.ingestionStatus === "metadata_only") return "";
   const text = startOfText(doc.extractedMarkdown, NOTEBOOK_PAPER_TEXT_MAX_CHARS);
   return text || (doc.paperRecord?.abstract ?? "").trim();
 }

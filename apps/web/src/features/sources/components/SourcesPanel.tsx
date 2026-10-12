@@ -2,17 +2,21 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useToast } from "@/shared/contexts/useToast";
 import type { SourceFocusTarget } from "@/shared/types";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import { useSourceContent } from "../hooks/useSourceContent";
 import { useSourceSearch } from "../hooks/useSourceSearch";
 import { useSourceUpload } from "../hooks/useSourceUpload";
 import {
+  useAttachPaperPdf,
   useDocument,
   useDocumentContent,
+  useFindPaperFullText,
   useIngestFromGoogleDrive,
   useRefreshNotebookRemoteSources,
   useRefreshRemoteSource,
 } from "../services/documentsApi";
 import { useSourcesContext } from "../useSourcesContext";
+import { hasPdfSignature, isPdfFile, MAX_PAPER_PDF_BYTES } from "../utils/paperPdf";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { AddSourceDialog } from "./add-source/AddSourceDialog";
 import { DiscoverSourcesDialog } from "./discover/DiscoverSourcesDialog";
@@ -55,7 +59,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
     onDeleteSelectedSources,
     onRenameSource,
   } = useSourcesContext();
-  const { success, error: showError, info: showInfo } = useToast();
+  const { success, error: showError, info: showInfo, loading, dismiss } = useToast();
 
   // View state
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
@@ -75,6 +79,10 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
   const ingestFromDrive = useIngestFromGoogleDrive();
   const refreshNotebookRemote = useRefreshNotebookRemoteSources();
   const refreshRemoteSource = useRefreshRemoteSource();
+  const findPaperFullText = useFindPaperFullText();
+  const attachPaperPdf = useAttachPaperPdf();
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const pdfTargetRef = useRef<string | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
 
   const handleGoogleDriveFiles = useCallback(
@@ -275,6 +283,57 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
     [sources, refreshRemoteSource, showInfo, showError]
   );
 
+  const handleFindFullText = useCallback(
+    async (sourceId: string) => {
+      try {
+        await findPaperFullText(sourceId);
+        showInfo("Looking for the full text again.");
+      } catch (err) {
+        const parsed = parseServiceError(err);
+        showError(
+          parsed ? getServiceErrorMessage(parsed) : "Couldn't look for the full text. Try again."
+        );
+      }
+    },
+    [findPaperFullText, showInfo, showError]
+  );
+
+  const handleUploadPdf = useCallback((sourceId: string) => {
+    pdfTargetRef.current = sourceId;
+    pdfInputRef.current?.click();
+  }, []);
+
+  const handlePdfChosen = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      const documentId = pdfTargetRef.current;
+      pdfTargetRef.current = null;
+      if (!file || !documentId) return;
+      if (!isPdfFile(file)) return showError("Choose a PDF file.");
+      if (file.size > MAX_PAPER_PDF_BYTES) return showError("That PDF is over 50 MB.");
+      if (!(await hasPdfSignature(file).catch(() => false))) return showError("Choose a PDF file.");
+      const uploadingId = loading("Uploading the PDF…");
+      let notify: () => void;
+      try {
+        const result = await attachPaperPdf(documentId, file);
+        notify = result.ok
+          ? () => showInfo("Reading the PDF you added.")
+          : () => showError(result.reason);
+      } catch (err) {
+        const parsed = parseServiceError(err);
+        const message = parsed
+          ? getServiceErrorMessage(parsed)
+          : "Couldn't add the PDF. Try again.";
+        notify = () => showError(message);
+      } finally {
+        dismiss(uploadingId);
+      }
+      notify();
+    },
+    [attachPaperPdf, loading, dismiss, showInfo, showError]
+  );
+
   const handleToggleSource = (sourceId: string) => {
     onToggleSource(sourceId);
   };
@@ -386,6 +445,8 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
               onViewSource={handleViewSource}
               onDeleteSource={handleDeleteSource}
               onRefreshSource={handleRefreshSource}
+              onFindFullText={handleFindFullText}
+              onUploadPdf={handleUploadPdf}
               onRenameSource={handleRenameSource}
               allSelected={allSelected}
               renamingId={renamingId}
@@ -443,6 +504,15 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
         }}
       />
 
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        aria-hidden
+        tabIndex={-1}
+        onChange={handlePdfChosen}
+      />
       {isGoogleDrivePickerConfigured ? (
         <GoogleDrivePicker ref={googleDriveRef} onFilesSelected={handleGoogleDriveFiles} />
       ) : null}

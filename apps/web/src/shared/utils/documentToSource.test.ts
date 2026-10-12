@@ -33,4 +33,19 @@ describe("documentToSource failureReason", () => {
     });
     expect(source.failureReason).toBe("Something went wrong while processing this source.");
   });
+
+  it("carries a paper's full-text source", () => {
+    const source = documentToSource({
+      _id: "d1",
+      fileName: "A paper",
+      fileType: "paper_record",
+      status: "completed",
+      createdAt: 0,
+      ingestionStatus: "ingested",
+      fulltextStatus: "available",
+      fullTextSource: { method: "oa_pdf", version: "acceptedVersion" },
+      paperRecord: { doi: "10.1/x" },
+    });
+    expect(source.paper?.fullTextSource).toEqual({ method: "oa_pdf", version: "acceptedVersion" });
+  });
 });
