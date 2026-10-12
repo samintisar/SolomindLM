@@ -59,7 +59,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
     onDeleteSelectedSources,
     onRenameSource,
   } = useSourcesContext();
-  const { success, error: showError, info: showInfo } = useToast();
+  const { success, error: showError, info: showInfo, loading, dismiss } = useToast();
 
   // View state
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
@@ -312,17 +312,25 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
       if (!file || !documentId) return;
       if (!isPdfFile(file)) return showError("Choose a PDF file.");
       if (file.size > MAX_PAPER_PDF_BYTES) return showError("That PDF is over 50 MB.");
-      showInfo("Uploading the PDF…");
+      const uploadingId = loading("Uploading the PDF…");
+      let notify: () => void;
       try {
         const result = await attachPaperPdf(documentId, file);
-        if (result.ok) showInfo("Reading the PDF you added.");
-        else showError(result.reason);
+        notify = result.ok
+          ? () => showInfo("Reading the PDF you added.")
+          : () => showError(result.reason);
       } catch (err) {
         const parsed = parseServiceError(err);
-        showError(parsed ? getServiceErrorMessage(parsed) : "Couldn't add the PDF. Try again.");
+        const message = parsed
+          ? getServiceErrorMessage(parsed)
+          : "Couldn't add the PDF. Try again.";
+        notify = () => showError(message);
+      } finally {
+        dismiss(uploadingId);
       }
+      notify();
     },
-    [attachPaperPdf, showInfo, showError]
+    [attachPaperPdf, loading, dismiss, showInfo, showError]
   );
 
   const handleToggleSource = (sourceId: string) => {

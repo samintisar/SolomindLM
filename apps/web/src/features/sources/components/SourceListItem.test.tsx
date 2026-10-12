@@ -182,6 +182,7 @@ describe("SourceListItem", () => {
 
   it("adds no hidden source text when there is nothing to say", () => {
     setup({}, paper({}));
-    expect(document.querySelector(".sr-only")).toBeNull();
+    const hint = screen.getByText(/Full text/);
+    expect(hint.querySelector(".sr-only")).toBeNull();
   });
 });

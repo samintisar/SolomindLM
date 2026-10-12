@@ -11,6 +11,8 @@ describe("isPdfFile", () => {
   it("falls back to the extension when the browser reports no type", () => {
     expect(isPdfFile({ name: "Paper.PDF", type: "" })).toBe(true);
     expect(isPdfFile({ name: "paper.docx", type: "" })).toBe(false);
+    expect(isPdfFile({ name: "Paper.pdf", type: "application/octet-stream" })).toBe(true);
+    expect(isPdfFile({ name: "paper.bin", type: "application/octet-stream" })).toBe(false);
     expect(isPdfFile({ name: "pdf", type: "" })).toBe(false);
   });
 
