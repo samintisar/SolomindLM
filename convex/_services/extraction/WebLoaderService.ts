@@ -1,9 +1,21 @@
 "use node";
 import { Supadata, SupadataError } from "@supadata/js";
 import { invokeWithRetry } from "../../_agents/_shared/retry.js";
+import { invokeWithTimeout } from "../../_agents/_shared/timeout.js";
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { validateUrl } from "../../_lib/utils/urlValidation.js";
+
+/**
+ * One Supadata scrape call may take this long. The SDK takes no abort signal, so a timed-out request is
+ * abandoned rather than cancelled.
+ */
+export const SCRAPE_ATTEMPT_TIMEOUT_MS = 30_000;
+/**
+ * A whole scrape, rate-limit retries included, ends within this. Paper ingest (`paperIngest.ts`) budgets
+ * 60 s for a landing-page scrape and 90 s for an open-access HTML candidate (30 s download + scrape).
+ */
+export const SCRAPE_BUDGET_MS = 55_000;
 
 export interface WebPageMeta {
   title: string;
@@ -134,12 +146,19 @@ export class WebLoaderService {
     }
 
     const logger = createServiceLogger("web_loader", "loadWebPageWithMeta");
+    const deadline = Date.now() + SCRAPE_BUDGET_MS;
     return invokeWithRetry(
-      () => this.loadWebPageWithMetaInternal(url),
+      () =>
+        invokeWithTimeout(
+          () => this.loadWebPageWithMetaInternal(url),
+          Math.min(SCRAPE_ATTEMPT_TIMEOUT_MS, deadline - Date.now()),
+          "Supadata web scrape"
+        ),
       {
         maxAttempts: 5,
         baseDelayMs: 2000,
         jitter: true,
+        deadline,
         retryableErrors: (err) =>
           /limit exceeded|rate limit|too many requests|429/i.test(err.message),
         onRetry: (attempt, error, delayMs) =>
@@ -259,7 +278,7 @@ export class WebLoaderService {
    */
   private async fetchTitleFromMetadata(url: string): Promise<string> {
     try {
-      const metadata = await (this.supadata as any).metadata({ url });
+      const metadata = await this.supadata.metadata({ url });
       return metadata?.title ?? "";
     } catch {
       return "";

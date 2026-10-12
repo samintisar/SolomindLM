@@ -32,11 +32,11 @@ export const MAX_CANDIDATE_ATTEMPTS = 6;
 export const INGEST_DEADLINE_MS = 420_000;
 /** Worst case for a PDF candidate: 30 s fetch + Mistral OCR with retries (about 3 x 60 s + backoff). */
 export const PDF_ATTEMPT_RESERVE_MS = 220_000;
-/** Worst case for an HTML candidate: 30 s fetch + a Supadata scrape. */
+/** Worst case for an HTML candidate: 30 s fetch + a Supadata scrape (`SCRAPE_BUDGET_MS`, 55 s). */
 export const HTML_ATTEMPT_RESERVE_MS = 90_000;
 /** Time needed to store and OCR a PDF once it has been downloaded (the fetch is already spent). */
 const PDF_OCR_RESERVE_MS = 190_000;
-/** Time needed for the landing-page scrape. */
+/** Time needed for the landing-page scrape (`SCRAPE_BUDGET_MS`, 55 s). */
 const LANDING_RESERVE_MS = 60_000;
 
 export interface PaperIngestInput {

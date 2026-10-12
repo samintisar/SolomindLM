@@ -128,6 +128,33 @@ describe("invokeWithRetry", () => {
     );
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it("stops retrying instead of waiting past the deadline", async () => {
+    const fn = vi.fn().mockRejectedValue(new Error("rate limit"));
+    const onRetry = vi.fn();
+    const start = Date.now();
+    await expect(
+      invokeWithRetry(
+        fn,
+        { maxAttempts: 5, baseDelayMs: 10_000, onRetry, deadline: start + 1_000 },
+        "test"
+      )
+    ).rejects.toThrow("rate limit");
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(Date.now() - start).toBeLessThan(500);
+  });
+
+  it("keeps retrying while the next attempt starts before the deadline", async () => {
+    const fn = vi.fn().mockRejectedValueOnce(new Error("rate limit")).mockResolvedValue("ok");
+    const result = await invokeWithRetry(
+      fn,
+      { maxAttempts: 2, baseDelayMs: 10, deadline: Date.now() + 5_000 },
+      "test"
+    );
+    expect(result).toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("RetryPolicies", () => {
