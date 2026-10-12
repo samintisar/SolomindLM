@@ -233,6 +233,16 @@ describe("inlineOcrFigures", () => {
     expect(md).toBe("| **Figure (chart):** a \\\\\\| b |");
   });
 
+  it("keeps a figure whose placeholder is followed directly by a file name", () => {
+    const md = inlineOcrFigures(
+      "![img-0.jpeg](img-0.jpeg)chart.png",
+      [{ id: "img-0.jpeg", image_annotation: CHART }],
+      undefined,
+      (text) => text.replace(/\S+\.png/g, "").trim()
+    );
+    expect(md).toBe(BLOCK);
+  });
+
   it("describes a figure in the middle of a sentence on one line", () => {
     const md = inlineOcrFigures("See ![img-0.jpeg](img-0.jpeg) below.", [
       { id: "img-0.jpeg", image_annotation: { ...CHART, details: "" } },

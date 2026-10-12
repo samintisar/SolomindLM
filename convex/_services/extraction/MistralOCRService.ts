@@ -69,10 +69,13 @@ function figureInline(annotation: FigureAnnotation): string {
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Private-use marks hold each figure's place while `cleanText` runs; no media regex touches them. */
-const figureMark = (index: number) => `${index}`;
-const FIGURE_MARK_ON_OWN_LINE = /^[ \t]*(\d+)[ \t]*$/gm;
-const FIGURE_MARK = /(\d+)/g;
+/**
+ * Private-use marks hold each figure's place while `cleanText` runs. The spaces around a mark keep it a token of its
+ * own, so a media pattern such as `\S*\.png` can't swallow it with an adjacent file name; the spaces go with it.
+ */
+const figureMark = (index: number) => ` \uE000${index}\uE001 `;
+const FIGURE_MARK_ON_OWN_LINE = /^[ \t]*\uE000(\d+)\uE001[ \t]*$/gm;
+const FIGURE_MARK = / ?\uE000(\d+)\uE001 ?/g;
 
 /**
  * OCR leaves `![img-0.jpeg](img-0.jpeg)` where each figure was. Put the figure's description there: a blockquote
