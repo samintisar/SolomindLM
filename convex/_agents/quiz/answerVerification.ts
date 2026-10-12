@@ -49,6 +49,12 @@ export const VERIFY_SYSTEM_PROMPT =
 
 const OPTION_NUMBERS = ["(1)", "(2)", "(3)", "(4)"];
 
+/**
+ * Shorter passages cannot back a verdict: the judge would reject a correct
+ * question only because the passage is missing, so these stay unchecked.
+ */
+const MIN_SNIPPET_CHARS = 40;
+
 /** Tags that frame each question's data in the prompt. */
 const DATA_TAG = /<(\/?)(item|passage|question|option|keyed_answer|explanation)\b/gi;
 
@@ -102,15 +108,22 @@ export async function verifyQuizQuestions(
   }
 ): Promise<QuestionVerification[]> {
   const batchSize = deps.batchSize ?? 8;
-  const batches: VerifiableQuestion[][] = [];
-  for (let start = 0; start < items.length; start += batchSize) {
-    batches.push(items.slice(start, start + batchSize));
+  const results: QuestionVerification[] = items.map(() => ({
+    status: "unchecked",
+    reason: "source passage too short to check against",
+  }));
+  const checkable = items.flatMap((item, index) =>
+    item.snippet.trim().length >= MIN_SNIPPET_CHARS ? [index] : []
+  );
+  const batches: number[][] = [];
+  for (let start = 0; start < checkable.length; start += batchSize) {
+    batches.push(checkable.slice(start, start + batchSize));
   }
 
   const batchResults = await allWithConcurrency(
     batches.map((batch, batchIndex) => async (): Promise<QuestionVerification[]> => {
       try {
-        const response = await deps.judge(getVerificationPrompt(batch));
+        const response = await deps.judge(getVerificationPrompt(batch.map((i) => items[i])));
         return batch.map((_, index) => {
           const verdict = response.verdicts.find((v) => v.id === index + 1);
           if (!verdict) {
@@ -128,7 +141,12 @@ export async function verifyQuizQuestions(
     deps.concurrency ?? 4
   );
 
-  return batchResults.flat();
+  batches.forEach((batch, batchIndex) => {
+    batch.forEach((itemIndex, position) => {
+      results[itemIndex] = batchResults[batchIndex][position];
+    });
+  });
+  return results;
 }
 
 /** Up to `count` items spread evenly across `pool`, so a refill does not favour the first sources. */

@@ -62,7 +62,9 @@ const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 400_000, // ~6.7 minutes
-  EXPAND_TIMEOUT_MS: 60_000, // 60 seconds per question expansion
+  // Per question expansion attempt. Timeouts are not retried, so a slow provider
+  // gives up after 60s; the backfill reserve below assumes this bound.
+  EXPAND_TIMEOUT_MS: 60_000,
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 20,
   BUFFER_MULTIPLIER: 1.2,
@@ -898,8 +900,17 @@ export async function runFinalizeQuizPhase(
       if (pool.length > 0 && deadline.remainingMs() >= CONFIG.BACKFILL_MIN_REMAINING_MS) {
         const refill = pickSpread(pool, Math.ceil(deficit * CONFIG.BACKFILL_BUFFER_MULTIPLIER));
         const refillQuestions = toVerifiable(refill, await expandCandidates(refill, true));
-        backfillStatuses = await verifyQuestions(refillQuestions);
-        const refillKept = keepVerified(refillQuestions, backfillStatuses).slice(0, deficit);
+        const refillStatuses = await verifyQuestions(refillQuestions);
+        // Use refill questions in order until the deficit is filled; only those
+        // looked at count towards the verification totals.
+        let used = 0;
+        let usable = 0;
+        while (used < refillQuestions.length && usable < deficit) {
+          if (refillStatuses[used].status !== "failed") usable++;
+          used++;
+        }
+        backfillStatuses = refillStatuses.slice(0, used);
+        const refillKept = keepVerified(refillQuestions.slice(0, used), backfillStatuses);
         backfilledCount = refillKept.length;
         finalQuestions.push(...refillKept);
       } else {

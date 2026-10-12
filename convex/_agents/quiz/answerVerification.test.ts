@@ -8,7 +8,7 @@ import {
 } from "./answerVerification";
 
 const item = (n: number): VerifiableQuestion => ({
-  snippet: `Passage ${n}: the source text.`,
+  snippet: `Passage ${n}: the source text this question was written from.`,
   question: {
     question: `Question ${n}?`,
     options: [`Right ${n}`, `Wrong ${n}a`, `Wrong ${n}b`, `Wrong ${n}c`],
@@ -40,7 +40,9 @@ describe("getVerificationPrompt", () => {
     ]);
 
     expect(prompt).toContain('<item id="1">');
-    expect(prompt).toContain("<passage>\nPassage 1: the source text.\n</passage>");
+    expect(prompt).toContain(
+      "<passage>\nPassage 1: the source text this question was written from.\n</passage>"
+    );
     expect(prompt).toContain('<option n="4">Wrong 1c</option>');
     expect(prompt).toContain('<keyed_answer n="1">(1) Right 1</keyed_answer>');
     expect(prompt).toContain('<item id="2">');
@@ -123,6 +125,20 @@ describe("verifyQuizQuestions", () => {
     });
 
     expect(statuses.map((s) => s.status)).toEqual(["unchecked", "failed"]);
+  });
+
+  it("leaves questions with a missing or too-short passage unchecked without judging them", async () => {
+    const judge = vi.fn(judgeFailing([1, 2, 3]));
+
+    const statuses = await verifyQuizQuestions(
+      [{ ...item(1), snippet: "" }, item(2), { ...item(3), snippet: "Too short." }],
+      { judge }
+    );
+
+    expect(statuses.map((s) => s.status)).toEqual(["unchecked", "failed", "unchecked"]);
+    expect(judge).toHaveBeenCalledTimes(1);
+    expect(judge.mock.calls[0][0]).toContain("Passage 2");
+    expect(judge.mock.calls[0][0]).not.toContain("Too short.");
   });
 
   it("skips the judge entirely for an empty list", async () => {
