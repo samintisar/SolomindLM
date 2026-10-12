@@ -103,4 +103,65 @@ describe("invokeStructuredOutput", () => {
     const reasoning = uncachedLlmCall.mock.calls.map((call) => call[0]?.reasoningEnabled);
     expect(reasoning).toEqual([true, true]);
   });
+
+  it("retries with reasoning off when a reasoning-on response stops at the token limit mid-JSON", async () => {
+    uncachedLlmCall
+      .mockResolvedValueOnce({
+        content: '{"topics": ["A"',
+        structuredJson: '{"topics": ["A"',
+        finishReason: "length",
+      })
+      .mockResolvedValueOnce({ content: "", structuredJson: validPayload });
+    const onReasoningDisabled = vi.fn();
+
+    await invokeStructuredOutput({
+      systemPrompt: "sys",
+      userPrompt: "user",
+      schema: TestSchema,
+      schemaName: "test_schema",
+      reasoningEnabled: true,
+      onReasoningDisabled,
+    });
+
+    const reasoning = uncachedLlmCall.mock.calls.map((call) => call[0]?.reasoningEnabled);
+    expect(reasoning).toEqual([true, false]);
+    expect(onReasoningDisabled).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports token usage for failed attempts as well as the successful one", async () => {
+    uncachedLlmCall
+      .mockRejectedValueOnce(
+        new MissingStructuredJsonError({
+          model: "reasoning-model",
+          finishReason: "length",
+          usage: { promptTokens: 1_000, completionTokens: 4_096, totalTokens: 5_096 },
+        })
+      )
+      .mockResolvedValueOnce({
+        content: "not json",
+        structuredJson: "",
+        usage: { promptTokens: 1_000, completionTokens: 20, totalTokens: 1_020 },
+      })
+      .mockResolvedValueOnce({
+        content: "",
+        structuredJson: validPayload,
+        usage: { promptTokens: 1_000, completionTokens: 300, totalTokens: 1_300 },
+      });
+    const onUsage = vi.fn();
+
+    await invokeStructuredOutput({
+      systemPrompt: "sys",
+      userPrompt: "user",
+      schema: TestSchema,
+      schemaName: "test_schema",
+      reasoningEnabled: true,
+      onUsage,
+    });
+
+    expect(onUsage.mock.calls.map((call) => call[0])).toEqual([
+      { prompt: 1_000, completion: 4_096, total: 5_096 },
+      { prompt: 1_000, completion: 20, total: 1_020 },
+      { prompt: 1_000, completion: 300, total: 1_300 },
+    ]);
+  });
 });

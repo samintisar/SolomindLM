@@ -3,7 +3,9 @@
 import { v } from "convex/values";
 import { extractJsonObjectString, uncachedLlmCall } from "../../_agents/_shared/cachedLlm";
 import { invokeWithRetry } from "../../_agents/_shared/index";
+import { MissingStructuredJsonError } from "../../_agents/_shared/llmErrors";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { isRetryableError } from "../../_agents/_shared/retry";
 import {
   aggregateStudioJobTelemetry,
   withStudioTelemetryMetadata,
@@ -204,6 +206,8 @@ export const generateInfographicImage = internalAction({
       // Extract key concepts and design visual infographic
       logger.phaseStart("content_analysis");
       const designStartTime = Date.now();
+      // Reasoning shares max_tokens with the answer; if it runs out before the JSON, retry without it.
+      let designReasoningEnabled = true;
       const designResponse = await invokeWithRetry(
         () =>
           uncachedLlmCall({
@@ -256,12 +260,23 @@ Return JSON: {
               },
             ],
             temperature: 0.7,
-            reasoningEnabled: true,
+            reasoningEnabled: designReasoningEnabled,
             responseFormat: { type: "json_object" },
           }),
         {
           maxAttempts: 3,
           baseDelayMs: 2000,
+          retryableErrors: (error) => {
+            if (
+              designReasoningEnabled &&
+              error instanceof MissingStructuredJsonError &&
+              error.finishReason === "length"
+            ) {
+              designReasoningEnabled = false;
+              return true;
+            }
+            return isRetryableError(error);
+          },
           onRetry: (attempt, error, delayMs) => {
             logger.warn(`Design generation retry ${attempt}/3 after ${delayMs}ms`, {
               attempt,

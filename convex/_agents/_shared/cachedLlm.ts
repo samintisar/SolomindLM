@@ -304,6 +304,19 @@ async function executeTogetherLlmRequest(
 
       const hasStructuredJson = Boolean(structuredJson?.trim());
 
+      const usageRaw = data.usage;
+      const usage =
+        usageRaw &&
+        typeof usageRaw.prompt_tokens === "number" &&
+        typeof usageRaw.completion_tokens === "number" &&
+        typeof usageRaw.total_tokens === "number"
+          ? {
+              promptTokens: usageRaw.prompt_tokens,
+              completionTokens: usageRaw.completion_tokens,
+              totalTokens: usageRaw.total_tokens,
+            }
+          : undefined;
+
       if (wantsStructuredJson && !hasStructuredJson) {
         if (!content.trim()) {
           logEmptyTogetherAssistant(options.model, choice);
@@ -319,25 +332,13 @@ async function executeTogetherLlmRequest(
         throw new MissingStructuredJsonError({
           model: options.model,
           finishReason: choice?.finish_reason,
+          usage,
         });
       }
 
       if (!content.trim() && !hasStructuredJson) {
         logEmptyTogetherAssistant(options.model, choice);
       }
-
-      const usageRaw = data.usage;
-      const usage =
-        usageRaw &&
-        typeof usageRaw.prompt_tokens === "number" &&
-        typeof usageRaw.completion_tokens === "number" &&
-        typeof usageRaw.total_tokens === "number"
-          ? {
-              promptTokens: usageRaw.prompt_tokens,
-              completionTokens: usageRaw.completion_tokens,
-              totalTokens: usageRaw.total_tokens,
-            }
-          : undefined;
 
       return {
         content,

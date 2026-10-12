@@ -131,6 +131,7 @@ describe("uncachedLlmCall structured responses", () => {
             finish_reason: "length",
           },
         ],
+        usage: { prompt_tokens: 900, completion_tokens: 4_096, total_tokens: 4_996 },
       })
     );
 
@@ -150,6 +151,7 @@ describe("uncachedLlmCall structured responses", () => {
     expect(error).toMatchObject({
       model: "deepseek-ai/DeepSeek-V4.1-Flash",
       finishReason: "length",
+      usage: { promptTokens: 900, completionTokens: 4_096, totalTokens: 4_996 },
     });
   });
 });

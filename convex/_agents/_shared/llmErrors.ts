@@ -33,11 +33,18 @@ export class EmptyLlmResponseError extends Error {
 export class MissingStructuredJsonError extends Error {
   readonly model: string;
   readonly finishReason?: string;
+  /** Tokens the failed call still used, so callers can count them. */
+  readonly usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 
-  constructor(details: { model: string; finishReason?: string }) {
+  constructor(details: {
+    model: string;
+    finishReason?: string;
+    usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  }) {
     super("LLM API returned no JSON payload for structured response");
     this.name = "MissingStructuredJsonError";
     this.model = details.model;
     this.finishReason = details.finishReason;
+    this.usage = details.usage;
   }
 }
