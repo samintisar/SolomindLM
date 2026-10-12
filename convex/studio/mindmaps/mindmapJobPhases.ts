@@ -6,11 +6,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import {
-  invokeWithTimeout,
-  sanitizeUserInput,
-  validateWithPreset,
-} from "../../_agents/_shared/index";
+import { sanitizeUserInput, validateWithPreset } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { fillTemplate } from "../../_agents/_shared/promptTemplate";
@@ -37,9 +33,16 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
-import { invokeStudioLlm, invokeWithinBudget } from "../_job/invokeStudioLlm";
-import { createJobDeadline } from "../_job/jobDeadline";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { conceptsFromSource, createSmartFallback } from "./mindmapFallback";
 
@@ -52,12 +55,7 @@ const { packChunks, validateChunks } = createStudioChunkHelpers("MindMapGraph");
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  // Finalization must end (saved or marked failed) before Convex's 600s action
-  // limit, which kills the action without running its catch block.
-  FINALIZE_BUDGET_MS: 540_000,
   REDUCE_TIMEOUT_MS: 480_000, // all reduce attempts together
-  SAVE_RESERVE_MS: 30_000, // held back from reduce for title generation + saving
-  TITLE_TIMEOUT_MS: 20_000,
 } as const;
 
 export type MindmapGenerationPhaseArgs = {
@@ -519,7 +517,7 @@ export async function runFinalizeMindMapPhase(
 
   logger.info("Starting finalization phase");
 
-  const deadline = createJobDeadline(CONFIG.FINALIZE_BUDGET_MS);
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
 
   try {
     // Get mindmap with map results
@@ -617,7 +615,7 @@ export async function runFinalizeMindMapPhase(
               reduceUsage = usage;
             },
           }),
-        timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, CONFIG.SAVE_RESERVE_MS),
+        timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
         phaseLabel: "MindMapReduce",
       });
 
@@ -657,11 +655,7 @@ export async function runFinalizeMindMapPhase(
         finalMindMap,
         allExtractions.map((e) => `${e.main_theme}: ${e.summary}`)
       );
-      title = await invokeWithTimeout(
-        () => generateTitleFromChunk(titleContent),
-        deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
-        "MindMapTitle"
-      );
+      title = await generateTitleWithinDeadline(deadline, titleContent, "MindMapTitle");
     } catch (_e) {
       console.log("[MindMapJob] Title generation failed, using default");
     }
