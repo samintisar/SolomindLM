@@ -77,6 +77,8 @@ const CONFIG = {
   MIN_VERIFY_CALL_MS: 20_000, // below this, questions stay unchecked
   SAVE_RESERVE_MS: 30_000, // held back for title generation + saving
   BACKFILL_MIN_REMAINING_MS: 210_000, // expand (60s) + verify (120s) + save (30s)
+  BACKFILL_EXPAND_RESERVE_MS: 150_000, // held back from refill expansions: verify + save
+  MIN_EXPAND_CALL_MS: 15_000, // refill expansions below this per-call budget are skipped
   BACKFILL_BUFFER_MULTIPLIER: 1.5,
 } as const;
 
@@ -751,10 +753,22 @@ export async function runFinalizeQuizPhase(
       }
     );
 
-    const expandCandidates = (candidates: QuizCandidate[]) =>
+    /**
+     * Expands candidates into full questions. With `withinDeadline`, each call gets
+     * one attempt bounded by the time left after the verify + save reserve, and calls
+     * that would start with too little time are skipped (later waves of a refill).
+     */
+    const expandCandidates = (candidates: QuizCandidate[], withinDeadline = false) =>
       allWithConcurrency(
         candidates.map((candidate, index) => {
           return async (): Promise<QuizQuestion | null> => {
+            const timeoutMs = withinDeadline
+              ? deadline.stepTimeoutMs(CONFIG.EXPAND_TIMEOUT_MS, CONFIG.BACKFILL_EXPAND_RESERVE_MS)
+              : CONFIG.EXPAND_TIMEOUT_MS;
+            if (timeoutMs < CONFIG.MIN_EXPAND_CALL_MS) {
+              console.log(`[QuizJob] Skipped expanding candidate ${index}: out of time budget`);
+              return null;
+            }
             try {
               const prompt = getExpandPrompt(candidate);
               return await invokeStudioLlm({
@@ -765,9 +779,9 @@ export async function runFinalizeQuizPhase(
                     ),
                     new HumanMessage(prompt),
                   ]),
-                timeoutMs: CONFIG.EXPAND_TIMEOUT_MS,
+                timeoutMs,
                 phaseLabel: "QuizExpand",
-                retry: { maxAttempts: 2, baseDelayMs: 1000 },
+                retry: { maxAttempts: withinDeadline ? 1 : 2, baseDelayMs: 1000 },
               });
             } catch (error) {
               console.log(`[QuizJob] Failed to expand candidate ${index}: ${error}`);
@@ -883,7 +897,7 @@ export async function runFinalizeQuizPhase(
       const pool = allCandidates.filter((candidate) => !selectedSet.has(candidate));
       if (pool.length > 0 && deadline.remainingMs() >= CONFIG.BACKFILL_MIN_REMAINING_MS) {
         const refill = pickSpread(pool, Math.ceil(deficit * CONFIG.BACKFILL_BUFFER_MULTIPLIER));
-        const refillQuestions = toVerifiable(refill, await expandCandidates(refill));
+        const refillQuestions = toVerifiable(refill, await expandCandidates(refill, true));
         backfillStatuses = await verifyQuestions(refillQuestions);
         const refillKept = keepVerified(refillQuestions, backfillStatuses).slice(0, deficit);
         backfilledCount = refillKept.length;
