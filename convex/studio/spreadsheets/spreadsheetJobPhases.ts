@@ -6,11 +6,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import {
-  allWithConcurrency,
-  invokeWithTimeout,
-  sanitizeUserInput,
-} from "../../_agents/_shared/index";
+import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { fillTemplate } from "../../_agents/_shared/promptTemplate";
@@ -38,10 +34,18 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
 import { planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
-import { invokeStudioLlm, invokeWithinBudget } from "../_job/invokeStudioLlm";
-import { createJobDeadline, type JobDeadline } from "../_job/jobDeadline";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  type JobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("SpreadsheetGraph");
@@ -56,13 +60,8 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
   COLLAPSE_CONCURRENCY: 5,
-  // Finalization must end (saved or marked failed) before Convex's 600s action
-  // limit, which kills the action without running its catch block.
-  FINALIZE_BUDGET_MS: 540_000,
   REDUCE_RESERVE_MS: 270_000, // held back from collapse rounds: up to 240s of reduce + save
   MIN_COLLAPSE_CALL_MS: 60_000, // skip collapse calls below this per-call budget
-  SAVE_RESERVE_MS: 30_000, // held back from reduce for title generation + saving
-  TITLE_TIMEOUT_MS: 20_000,
   // Largest combined collapse output sent to the reduce call; beyond this the
   // prompt cannot fit the model context alongside a 32k-token response.
   REDUCE_MAX_INPUT_TOKENS: 100_000,
@@ -504,7 +503,7 @@ export async function runFinalizeSpreadsheetPhase(
 
   logger.info("Starting finalization phase");
 
-  const deadline = createJobDeadline(CONFIG.FINALIZE_BUDGET_MS);
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
 
   try {
     // Get spreadsheet with map results
@@ -622,7 +621,7 @@ export async function runFinalizeSpreadsheetPhase(
             reduceUsage = addTokenUsage(reduceUsage, usage);
           },
         }),
-      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, CONFIG.SAVE_RESERVE_MS),
+      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
       phaseLabel: "SpreadsheetReduce",
     });
 
@@ -657,11 +656,7 @@ export async function runFinalizeSpreadsheetPhase(
     const titleSource = spreadsheetTitleSource(finalOutput, customPrompt ?? "") || allOutputs[0];
     if (titleSource) {
       try {
-        title = await invokeWithTimeout(
-          () => generateTitleFromChunk(titleSource),
-          deadline.stepTimeoutMs(CONFIG.TITLE_TIMEOUT_MS),
-          "SpreadsheetTitle"
-        );
+        title = await generateTitleWithinDeadline(deadline, titleSource, "SpreadsheetTitle");
       } catch (_e) {
         console.log("[SpreadsheetJob] Title generation failed, using default");
       }

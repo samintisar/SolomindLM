@@ -2,21 +2,17 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { env } from "../../_lib/env.js";
-import { planCollapseGroups, shouldStopCollapsing } from "../../studio/_job/collapsePlan";
-import { invokeWithinBudget } from "../../studio/_job/invokeStudioLlm";
-import type { JobDeadline } from "../../studio/_job/jobDeadline";
-import { allWithConcurrency } from "../_shared/concurrency.js";
-import { withLanguageInstruction } from "../_shared/languageInstruction";
-import type { JobLogger } from "../_shared/logging.js";
-import type { TokenUsage } from "../_shared/usageAggregate.js";
-import { FLASHCARD_CONFIG } from "./config.js";
+import { allWithConcurrency } from "../../_agents/_shared/concurrency.js";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import type { JobLogger } from "../../_agents/_shared/logging.js";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate.js";
+import { FLASHCARD_CONFIG } from "../../_agents/flashcard/config.js";
 import {
   detectSimilarFlashcards,
   groupFlashcardsByTopic,
   isUsableFlashcard,
-} from "./flashcardHeuristics.js";
-import { formatFlashcardsAsText } from "./formatFlashcards.js";
+} from "../../_agents/flashcard/flashcardHeuristics.js";
+import { formatFlashcardsAsText } from "../../_agents/flashcard/formatFlashcards.js";
 import {
   ANSWER_NOT_ON_FRONT_RULES,
   COLLAPSE_SYSTEM_PROMPT,
@@ -24,8 +20,12 @@ import {
   FlashcardArraySchema,
   type FlashcardResponse,
   REDUCE_SYSTEM_PROMPT,
-} from "./prompts.js";
-import { createStructuredLLM } from "./structuredLlm.js";
+} from "../../_agents/flashcard/prompts.js";
+import { createStructuredLLM } from "../../_agents/flashcard/structuredLlm.js";
+import { env } from "../../_lib/env.js";
+import { pickSpread, planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
+import { invokeWithinBudget } from "../_job/invokeStudioLlm";
+import type { JobDeadline } from "../_job/jobDeadline";
 
 export interface CollapseReduceDeps {
   smartLlm: ChatTogetherAI;
@@ -50,8 +50,14 @@ export async function recursiveCollapse(
   topic?: string,
   language?: string
 ): Promise<Flashcard[][]> {
-  const estimateCards = (flashcards: Flashcard[]) =>
-    deps.estimateTokens(formatFlashcardsAsText(flashcards));
+  // Count each output once per round; the stop check and the grouping both need it.
+  const tokenCounts = new Map(
+    outputs.map((flashcards) => [
+      flashcards,
+      deps.estimateTokens(formatFlashcardsAsText(flashcards)),
+    ])
+  );
+  const estimateCards = (flashcards: Flashcard[]) => tokenCounts.get(flashcards) ?? 0;
 
   if (shouldStopCollapsing(outputs, FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS, estimateCards)) {
     return outputs;
@@ -111,6 +117,25 @@ export async function recursiveCollapse(
   );
 
   return recursiveCollapse(collapsed, deps, topic, language);
+}
+
+/**
+ * An evenly spaced subset of `cards` small enough for the refine prompt to fit the
+ * model context, so a deck whose collapse ran out of time still covers every source.
+ */
+export function fitCardsForRefine(
+  cards: Flashcard[],
+  estimateTokens: (text: string) => number
+): Flashcard[] {
+  const totalTokens = estimateTokens(formatFlashcardsAsText(cards));
+  if (totalTokens <= FLASHCARD_CONFIG.REFINE_MAX_INPUT_TOKENS) {
+    return cards;
+  }
+  const keep = Math.max(
+    1,
+    Math.floor((cards.length * FLASHCARD_CONFIG.REFINE_MAX_INPUT_TOKENS) / totalTokens)
+  );
+  return pickSpread(cards, keep);
 }
 
 /** One collapse LLM call over `group`, bounded (retries included) by `timeoutMs`. */

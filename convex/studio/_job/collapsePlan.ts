@@ -2,7 +2,7 @@
  * Grouping plan for Studio collapse phases (pure; no LLM calls). An output is
  * whatever one collapse step consumes: a text block, or a list of flashcards.
  * @see ../spreadsheets/spreadsheetJobPhases.ts `recursiveCollapse`
- * @see ../../_agents/flashcard/collapseReduceLlm.ts `recursiveCollapse`
+ * @see ../flashcards/collapseReduce.ts `recursiveCollapse`
  */
 
 type EstimateTokens<T> = (output: T) => number;
@@ -60,4 +60,16 @@ export function planCollapseGroups<T>(
   }
 
   return groups;
+}
+
+/** Up to `count` items spread evenly across `items`, so a cut does not favour the first sources. */
+export function pickSpread<T>(items: T[], count: number): T[] {
+  if (count <= 0) {
+    return [];
+  }
+  if (count >= items.length) {
+    return [...items];
+  }
+  const step = items.length / count;
+  return Array.from({ length: count }, (_, i) => items[Math.floor(i * step)]);
 }

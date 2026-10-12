@@ -9,7 +9,8 @@
  */
 
 import { invokeWithRetry, invokeWithTimeout, type RetryConfig } from "../../_agents/_shared/index";
-import { createJobDeadline } from "./jobDeadline";
+import { generateTitleFromChunk } from "../../_services/ai/titleGenerator";
+import { createJobDeadline, type JobDeadline, STUDIO_TITLE_TIMEOUT_MS } from "./jobDeadline";
 
 /** Documented defaults for Studio LLM retries (exponential backoff inside invokeWithRetry). */
 const STUDIO_LLM_DEFAULT_RETRY: Pick<RetryConfig, "maxAttempts" | "baseDelayMs"> = {
@@ -78,4 +79,17 @@ export function invokeWithinBudget<T>(options: InvokeStudioLlmOptions<T>): Promi
       return invokeWithTimeout(options.invoke, remainingMs, options.phaseLabel);
     },
   });
+}
+
+/** Generates a job title inline, capped at STUDIO_TITLE_TIMEOUT_MS and by what is left of `deadline`. */
+export function generateTitleWithinDeadline(
+  deadline: JobDeadline,
+  text: string,
+  phaseLabel: string
+): Promise<string> {
+  return invokeWithTimeout(
+    () => generateTitleFromChunk(text),
+    deadline.stepTimeoutMs(STUDIO_TITLE_TIMEOUT_MS),
+    phaseLabel
+  );
 }

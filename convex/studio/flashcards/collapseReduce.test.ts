@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createJobDeadline } from "../../studio/_job/jobDeadline";
-import type { JobLogger } from "../_shared/logging";
-import { type CollapseReduceDeps, recursiveCollapse } from "./collapseReduceLlm";
-import type { Flashcard } from "./prompts";
+import type { JobLogger } from "../../_agents/_shared/logging";
+import type { Flashcard } from "../../_agents/flashcard/prompts";
+import { createJobDeadline } from "../_job/jobDeadline";
+import { type CollapseReduceDeps, fitCardsForRefine, recursiveCollapse } from "./collapseReduce";
 
 const { invokeCollapse } = vi.hoisted(() => ({ invokeCollapse: vi.fn() }));
 
-vi.mock("./structuredLlm", () => ({
+vi.mock("../../_agents/flashcard/structuredLlm", () => ({
   createStructuredLLM: () => ({ invoke: invokeCollapse }),
 }));
 
@@ -136,5 +136,24 @@ describe("recursiveCollapse", () => {
     const result = await recursiveCollapse(outputs, makeDeps(540_000));
 
     expect(result).toEqual([[...outputs[0], ...outputs[1]], outputs[2]]);
+  });
+});
+
+describe("fitCardsForRefine", () => {
+  it("leaves a card set that fits the refine budget alone", () => {
+    const deck = cards("a", 40);
+
+    expect(fitCardsForRefine(deck, () => 1_000)).toBe(deck);
+  });
+
+  it("cuts an oversized set to an evenly spread subset that fits", () => {
+    const deck = cards("a", 100);
+
+    // 240k estimated tokens against a 60k budget keeps a quarter of the cards.
+    const fitted = fitCardsForRefine(deck, () => 240_000);
+
+    expect(fitted).toHaveLength(25);
+    expect(fitted[0]).toBe(deck[0]);
+    expect(fitted[24]).toBe(deck[96]);
   });
 });
