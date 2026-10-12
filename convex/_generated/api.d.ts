@@ -221,6 +221,7 @@ import type * as eval__studioRowCreators from "../eval/_studioRowCreators.js";
 import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
 import type * as eval_chatEvalTelemetry from "../eval/chatEvalTelemetry.js";
 import type * as eval_literatureReviewEvalAction from "../eval/literatureReviewEvalAction.js";
+import type * as eval_openAccessCoverage from "../eval/openAccessCoverage.js";
 import type * as eval_researchEvalAction from "../eval/researchEvalAction.js";
 import type * as eval_retrieveClock from "../eval/retrieveClock.js";
 import type * as eval_seedEvalAction from "../eval/seedEvalAction.js";
@@ -543,6 +544,7 @@ declare const fullApi: ApiFromModules<{
   "eval/chatEvalAction": typeof eval_chatEvalAction;
   "eval/chatEvalTelemetry": typeof eval_chatEvalTelemetry;
   "eval/literatureReviewEvalAction": typeof eval_literatureReviewEvalAction;
+  "eval/openAccessCoverage": typeof eval_openAccessCoverage;
   "eval/researchEvalAction": typeof eval_researchEvalAction;
   "eval/retrieveClock": typeof eval_retrieveClock;
   "eval/seedEvalAction": typeof eval_seedEvalAction;
