@@ -10,7 +10,11 @@ import {
   aggregateStudioJobTelemetry,
   withStudioTelemetryMetadata,
 } from "../../_agents/_shared/studioJobTelemetry";
-import { fromProviderUsage } from "../../_agents/_shared/usageAggregate";
+import {
+  addTokenUsage,
+  fromProviderUsage,
+  type TokenUsage,
+} from "../../_agents/_shared/usageAggregate";
 import { internal } from "../../_generated/api";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
@@ -208,6 +212,8 @@ export const generateInfographicImage = internalAction({
       const designStartTime = Date.now();
       // Reasoning shares max_tokens with the answer; if it runs out before the JSON, retry without it.
       let designReasoningEnabled = true;
+      /** Tokens a length-truncated design attempt used before the retry. */
+      let failedDesignUsage: TokenUsage | undefined;
       const designResponse = await invokeWithRetry(
         () =>
           uncachedLlmCall({
@@ -273,6 +279,8 @@ Return JSON: {
               error.finishReason === "length"
             ) {
               designReasoningEnabled = false;
+              const usage = fromProviderUsage(error.usage);
+              if (usage) failedDesignUsage = addTokenUsage(failedDesignUsage, usage);
               return true;
             }
             return isRetryableError(error);
@@ -293,7 +301,10 @@ Return JSON: {
         designResponse.content ||
         "{}";
       const design = parseLlmJson(designContent) as Record<string, any>;
-      const designUsage = fromProviderUsage(designResponse.usage);
+      const responseUsage = fromProviderUsage(designResponse.usage);
+      const designUsage = failedDesignUsage
+        ? addTokenUsage(failedDesignUsage, responseUsage)
+        : responseUsage;
       const designLatencyMs = Date.now() - designStartTime;
       if (!design.image_prompt) {
         throw new Error(
