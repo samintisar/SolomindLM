@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planCollapseGroups, shouldStopCollapsing } from "./collapsePlan";
+import { pickSpread, planCollapseGroups, shouldStopCollapsing } from "./collapsePlan";
 
 // One "token" per character keeps the arithmetic in these tests obvious.
 const estimate = (text: string) => text.length;
@@ -74,5 +74,21 @@ describe("planCollapseGroups", () => {
     }
 
     expect(outputs.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("pickSpread", () => {
+  it("returns every item when asked for at least as many", () => {
+    expect(pickSpread([1, 2, 3], 5)).toEqual([1, 2, 3]);
+  });
+
+  it("spreads picks across the list instead of taking the front", () => {
+    const items = Array.from({ length: 10 }, (_, i) => i);
+    expect(pickSpread(items, 2)).toEqual([0, 5]);
+    expect(pickSpread(items, 3)).toEqual([0, 3, 6]);
+  });
+
+  it("returns nothing for a non-positive count", () => {
+    expect(pickSpread([1, 2, 3], 0)).toEqual([]);
   });
 });

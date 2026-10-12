@@ -9,7 +9,7 @@ vi.hoisted(() => {
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { ChatAgent } from "./ChatAgent";
 import { MAX_PER_SOURCE_DOCUMENTS, PER_SOURCE_PASSAGES_PER_SEARCH } from "./chatConfig";
-import { perSourceDocumentIds, titlesOfSources } from "./chunkContext";
+import { selectedSourceIds, titlesOfSources } from "./chunkContext";
 import type { ReferenceChunk } from "./types";
 
 const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
@@ -22,35 +22,63 @@ const passage = (documentId: string, chunkIndex: number): ReferenceChunk => ({
   similarity: 0.5,
 });
 
-const QUESTION = "What limitations does each paper acknowledge?";
+const logger = createServiceLogger("ChatAgent", "test");
 
-describe("perSourceDocumentIds (#450)", () => {
-  it("returns the selected sources for a question about each of them", () => {
-    expect(perSourceDocumentIds(QUESTION, ["rag", "react", "self-rag"])).toEqual([
-      "rag",
-      "react",
-      "self-rag",
-    ]);
-  });
-
-  it("returns none for a topic question, one source, or more sources than it can cover", () => {
-    expect(perSourceDocumentIds("What is retrieval?", ["rag", "react"])).toEqual([]);
-    expect(perSourceDocumentIds(QUESTION, ["rag"])).toEqual([]);
-    expect(perSourceDocumentIds(QUESTION, undefined)).toEqual([]);
+describe("selectedSourceIds (#450)", () => {
+  it("lists two or more selected sources once each, up to the cap", () => {
+    expect(selectedSourceIds(["rag", "react", "rag"])).toEqual(["rag", "react"]);
+    expect(selectedSourceIds(["rag"])).toEqual([]);
+    expect(selectedSourceIds(undefined)).toEqual([]);
     const many = Array.from({ length: MAX_PER_SOURCE_DOCUMENTS + 1 }, (_, i) => `d${i}`);
-    expect(perSourceDocumentIds(QUESTION, many)).toEqual([]);
+    expect(selectedSourceIds(many)).toEqual([]);
   });
 });
 
 describe("titlesOfSources (#450)", () => {
-  it("names every source in selection order, looking up those with no retrieved passage", async () => {
+  it("names every source in selection order, looking up the rest in one call", async () => {
     const pool = [passage("react", 0), passage("rag", 4), passage("react", 2)];
-    const lookupTitle = vi.fn(async (id: string) => (id === "missed" ? "missed.pdf" : undefined));
+    const lookupTitles = vi.fn(async () => ({ missed: "missed.pdf" }));
 
     await expect(
-      titlesOfSources(["rag", "missed", "react", "unprocessed"], pool, lookupTitle)
-    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf"]);
-    expect(lookupTitle.mock.calls.map(([id]) => id)).toEqual(["missed", "unprocessed"]);
+      titlesOfSources(["rag", "missed", "react", "unprocessed"], pool, lookupTitles)
+    ).resolves.toEqual(["rag.pdf", "missed.pdf", "react.pdf", "Untitled source"]);
+    expect(lookupTitles).toHaveBeenCalledTimes(1);
+    expect(lookupTitles).toHaveBeenCalledWith(["missed", "unprocessed"]);
+  });
+
+  it("looks nothing up when every source has a passage", async () => {
+    const lookupTitles = vi.fn(async () => ({}));
+
+    await titlesOfSources(["rag"], [passage("rag", 0)], lookupTitles);
+
+    expect(lookupTitles).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatAgent title lookup for selected sources (#450)", () => {
+  it("names sources with no retrieved passage from their document records", async () => {
+    const fetchDocumentTitlesFn = vi.fn(async () => ({ missed: "missed.pdf" }));
+    const agent = new ChatAgent({ fetchDocumentTitlesFn });
+
+    await expect(agent["lookupSourceTitles"](["missed"], logger)).resolves.toEqual({
+      missed: "missed.pdf",
+    });
+    expect(fetchDocumentTitlesFn).toHaveBeenCalledWith(["missed"]);
+  });
+
+  it("logs a failed lookup and names none, so the sources still count", async () => {
+    const agent = new ChatAgent({
+      fetchDocumentTitlesFn: vi.fn(async () => {
+        throw new Error("query failed");
+      }),
+    });
+    const warn = vi.spyOn(logger, "warn");
+
+    await expect(agent["lookupSourceTitles"](["missed"], logger)).resolves.toEqual({});
+    expect(warn).toHaveBeenCalledWith(
+      "Source title lookup failed",
+      expect.objectContaining({ error: expect.stringContaining("query failed") })
+    );
   });
 });
 
@@ -78,7 +106,6 @@ describe("ChatAgent per-source retrieval (#450)", () => {
     conversationHistory: [],
     documentIds: ["rag", "react", "self-rag"],
   };
-  const logger = createServiceLogger("ChatAgent", "test");
 
   it("adds each listed source's own best passages to the sub-query's results", async () => {
     const searchDocument = vi.fn(async (documentId: string) =>
@@ -141,6 +168,24 @@ describe("ChatAgent per-source retrieval (#450)", () => {
     );
 
     expect(perSourceCallsWhenHybridStarted[0]).toBe(2);
+  });
+
+  it("keeps the sources that answered when another one runs out of time", async () => {
+    const searchDocument = vi.fn((documentId: string) =>
+      documentId === "rag"
+        ? new Promise<ReferenceChunk[]>(() => {})
+        : Promise.resolve([passage(documentId, 3)])
+    );
+    const agent = agentWith(searchDocument);
+
+    const found: ReferenceChunk[] = await agent["searchEachSource"](
+      ["rag", "react", "self-rag"],
+      [0.1],
+      () => 20,
+      logger
+    );
+
+    expect(found.map((c) => c.id).sort()).toEqual(["react-3", "self-rag-3"]);
   });
 
   it("searches no single source when none are listed", async () => {

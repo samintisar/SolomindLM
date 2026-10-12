@@ -18,10 +18,6 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import {
-  recursiveCollapse,
-  refineFlashcardSelection,
-} from "../../_agents/flashcard/collapseReduceLlm";
 import { FLASHCARD_CONFIG } from "../../_agents/flashcard/config";
 import {
   groupFlashcardsByTopic,
@@ -42,8 +38,15 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { pickSpread } from "../_job/collapsePlan";
+import { generateTitleWithinDeadline, invokeStudioLlm } from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { fitCardsForRefine, recursiveCollapse, refineFlashcardSelection } from "./collapseReduce";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("FlashcardGraph");
 
@@ -500,6 +503,8 @@ export async function runFinalizeFlashcardPhase(
 
   logger.info("Starting finalization phase");
 
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
+
   try {
     // Get flashcard with map results
     const flashcard = await ctx.runQuery(internal.studio.flashcards.index.getInternal, {
@@ -574,6 +579,7 @@ export async function runFinalizeFlashcardPhase(
       onUsage: (usage: TokenUsage) => {
         reduceUsage = addTokenUsage(reduceUsage, usage);
       },
+      deadline,
     };
 
     const startTime = Date.now();
@@ -603,14 +609,42 @@ export async function runFinalizeFlashcardPhase(
         `[FlashcardJob] Skipping smart reduce: ${dedupedFlashcards.length} deduped cards already near target ${cardCount}`
       );
     } else {
-      finalFlashcards = await refineFlashcardSelection(
-        dedupedFlashcards,
-        cardCount,
-        difficulty,
-        collapseReduceDeps,
-        sanitizedTopic,
-        language
-      );
+      const refineInput = fitCardsForRefine(dedupedFlashcards, countTokens);
+      if (refineInput.length < dedupedFlashcards.length) {
+        logger.info(
+          `Refine input capped at ${refineInput.length} of ${dedupedFlashcards.length} cards`,
+          {
+            agent: "FlashcardGraph",
+            phase: "refine_input_capped",
+            dedupedCount: dedupedFlashcards.length,
+            refineCount: refineInput.length,
+          }
+        );
+      }
+      try {
+        finalFlashcards = await refineFlashcardSelection(
+          refineInput,
+          cardCount,
+          difficulty,
+          collapseReduceDeps,
+          deadline.stepTimeoutMs(FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+          sanitizedTopic,
+          language
+        );
+      } catch (error) {
+        // Every deduped card already passed the usability checks, so a failed or
+        // timed-out refine still leaves a deck worth saving.
+        logger.phaseError("refine_selection", error, {
+          agent: "FlashcardGraph",
+          fallback: "deduped_cards",
+          dedupedCount: dedupedFlashcards.length,
+          targetCount: cardCount,
+        });
+        finalFlashcards = [];
+      }
+      if (finalFlashcards.length === 0) {
+        finalFlashcards = pickSpread(dedupedFlashcards, cardCount);
+      }
     }
 
     const elapsed = Date.now() - startTime;
@@ -625,9 +659,11 @@ export async function runFinalizeFlashcardPhase(
     const flashcardsText = formatFlashcardsAsText(finalFlashcards);
     let title = "Flashcards";
     try {
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: flashcardsText.substring(0, 2000),
-      });
+      title = await generateTitleWithinDeadline(
+        deadline,
+        flashcardsText.substring(0, 2000),
+        "FlashcardTitle"
+      );
     } catch (_e) {
       console.log("[FlashcardJob] Title generation failed, using default");
     }

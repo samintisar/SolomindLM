@@ -28,6 +28,7 @@ import { academicDiscoverSources } from "../_services/search/AcademicSearchServi
 import {
   createChatVectorSearchRunner,
   createFetchDocumentFn,
+  createFetchDocumentTitlesFn,
   createRerankFn,
 } from "../chat/_streamSearch";
 import { assertRagEvalGate } from "./_gate";
@@ -208,6 +209,7 @@ export const runChatEval = action({
       vectorSearchHandler: hybridSearch,
       globalRerankFn: spyGlobalRerankFn,
       fetchDocumentFn: createFetchDocumentFn(ctx),
+      fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx, notebookIdTyped),
     });
 
     // ── Consume the full generator stream ──

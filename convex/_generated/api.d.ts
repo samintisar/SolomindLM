@@ -61,7 +61,6 @@ import type * as _agents_chat_streamSlice from "../_agents/chat/streamSlice.js";
 import type * as _agents_chat_types from "../_agents/chat/types.js";
 import type * as _agents_chat_vector_search from "../_agents/chat/vector_search.js";
 import type * as _agents_chat_withTimeout from "../_agents/chat/withTimeout.js";
-import type * as _agents_flashcard_collapseReduceLlm from "../_agents/flashcard/collapseReduceLlm.js";
 import type * as _agents_flashcard_config from "../_agents/flashcard/config.js";
 import type * as _agents_flashcard_flashcardDefects from "../_agents/flashcard/flashcardDefects.js";
 import type * as _agents_flashcard_flashcardHeuristics from "../_agents/flashcard/flashcardHeuristics.js";
@@ -77,6 +76,7 @@ import type * as _agents_mindmap_prompts from "../_agents/mindmap/prompts.js";
 import type * as _agents_mindmap_state from "../_agents/mindmap/state.js";
 import type * as _agents_mindmap_structuredLlm from "../_agents/mindmap/structuredLlm.js";
 import type * as _agents_mindmap_title from "../_agents/mindmap/title.js";
+import type * as _agents_quiz_answerVerification from "../_agents/quiz/answerVerification.js";
 import type * as _agents_quiz_config from "../_agents/quiz/config.js";
 import type * as _agents_quiz_optionLabels from "../_agents/quiz/optionLabels.js";
 import type * as _agents_quiz_prompts from "../_agents/quiz/prompts.js";
@@ -273,6 +273,7 @@ import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhase
 import type * as studio_audio_index from "../studio/audio/index.js";
 import type * as studio_audio_job from "../studio/audio/job.js";
 import type * as studio_audio_synthesisChunks from "../studio/audio/synthesisChunks.js";
+import type * as studio_flashcards_collapseReduce from "../studio/flashcards/collapseReduce.js";
 import type * as studio_flashcards_flashcardJobPhases from "../studio/flashcards/flashcardJobPhases.js";
 import type * as studio_flashcards_index from "../studio/flashcards/index.js";
 import type * as studio_flashcards_job from "../studio/flashcards/job.js";
@@ -377,7 +378,6 @@ declare const fullApi: ApiFromModules<{
   "_agents/chat/types": typeof _agents_chat_types;
   "_agents/chat/vector_search": typeof _agents_chat_vector_search;
   "_agents/chat/withTimeout": typeof _agents_chat_withTimeout;
-  "_agents/flashcard/collapseReduceLlm": typeof _agents_flashcard_collapseReduceLlm;
   "_agents/flashcard/config": typeof _agents_flashcard_config;
   "_agents/flashcard/flashcardDefects": typeof _agents_flashcard_flashcardDefects;
   "_agents/flashcard/flashcardHeuristics": typeof _agents_flashcard_flashcardHeuristics;
@@ -393,6 +393,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/mindmap/state": typeof _agents_mindmap_state;
   "_agents/mindmap/structuredLlm": typeof _agents_mindmap_structuredLlm;
   "_agents/mindmap/title": typeof _agents_mindmap_title;
+  "_agents/quiz/answerVerification": typeof _agents_quiz_answerVerification;
   "_agents/quiz/config": typeof _agents_quiz_config;
   "_agents/quiz/optionLabels": typeof _agents_quiz_optionLabels;
   "_agents/quiz/prompts": typeof _agents_quiz_prompts;
@@ -589,6 +590,7 @@ declare const fullApi: ApiFromModules<{
   "studio/audio/index": typeof studio_audio_index;
   "studio/audio/job": typeof studio_audio_job;
   "studio/audio/synthesisChunks": typeof studio_audio_synthesisChunks;
+  "studio/flashcards/collapseReduce": typeof studio_flashcards_collapseReduce;
   "studio/flashcards/flashcardJobPhases": typeof studio_flashcards_flashcardJobPhases;
   "studio/flashcards/index": typeof studio_flashcards_index;
   "studio/flashcards/job": typeof studio_flashcards_job;

@@ -1,20 +1,22 @@
 /**
- * Grouping plan for Studio collapse phases (pure; no LLM calls).
+ * Grouping plan for Studio collapse phases (pure; no LLM calls). An output is
+ * whatever one collapse step consumes: a text block, or a list of flashcards.
  * @see ../spreadsheets/spreadsheetJobPhases.ts `recursiveCollapse`
+ * @see ../flashcards/collapseReduce.ts `recursiveCollapse`
  */
 
-type EstimateTokens = (text: string) => number;
+type EstimateTokens<T> = (output: T) => number;
 
 /** True once the outputs are few or small enough to hand straight to the reduce step. */
-export function shouldStopCollapsing(
-  outputs: string[],
+export function shouldStopCollapsing<T>(
+  outputs: T[],
   targetTokens: number,
-  estimateTokens: EstimateTokens
+  estimateTokens: EstimateTokens<T>
 ): boolean {
   if (outputs.length <= 2) {
     return true;
   }
-  const totalTokens = outputs.reduce((sum, text) => sum + estimateTokens(text), 0);
+  const totalTokens = outputs.reduce((sum, output) => sum + estimateTokens(output), 0);
   return totalTokens <= targetTokens;
 }
 
@@ -31,13 +33,13 @@ export function shouldStopCollapsing(
  * singleton is left as its own group (callers pass it through unchanged) rather
  * than merged into an already-full group.
  */
-export function planCollapseGroups(
-  outputs: string[],
+export function planCollapseGroups<T>(
+  outputs: T[],
   targetTokens: number,
-  estimateTokens: EstimateTokens
-): string[][] {
-  const groups: string[][] = [];
-  let currentGroup: string[] = [];
+  estimateTokens: EstimateTokens<T>
+): T[][] {
+  const groups: T[][] = [];
+  let currentGroup: T[] = [];
   let currentTokens = 0;
 
   for (const output of outputs) {
@@ -58,4 +60,16 @@ export function planCollapseGroups(
   }
 
   return groups;
+}
+
+/** Up to `count` items spread evenly across `items`, so a cut does not favour the first sources. */
+export function pickSpread<T>(items: T[], count: number): T[] {
+  if (count <= 0) {
+    return [];
+  }
+  if (count >= items.length) {
+    return [...items];
+  }
+  const step = items.length / count;
+  return Array.from({ length: count }, (_, i) => items[Math.floor(i * step)]);
 }

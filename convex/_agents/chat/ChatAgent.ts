@@ -11,6 +11,7 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel";
 import { EmbeddingService } from "../../_services/ai/embeddingClient";
 import { countTokens } from "../_shared/tokenizer";
+import type { SelectedSources } from "./chat_llm_grounding.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
@@ -33,8 +34,8 @@ import {
   chunkRankingScore,
   documentsWithRerankedPassages,
   mergeChunkScores,
-  perSourceDocumentIds,
   selectChunksByTokenBudgetWithReservation,
+  selectedSourceIds,
   titlesOfSources,
 } from "./chunkContext.js";
 import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
@@ -71,6 +72,7 @@ export class ChatAgent {
   private embeddingService: EmbeddingService;
   private globalRerankFn?: GlobalRerankFn;
   private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
+  private fetchDocumentTitlesFn?: ChatAgentOptions["fetchDocumentTitlesFn"];
 
   constructor(options?: ChatAgentOptions) {
     const smartModel = resolveSmartModel(options?.smartModel);
@@ -96,6 +98,26 @@ export class ChatAgent {
     this.embeddingService = new EmbeddingService(env.OPENAI_API_KEY);
     this.globalRerankFn = options?.globalRerankFn;
     this.fetchDocumentFn = options?.fetchDocumentFn;
+    this.fetchDocumentTitlesFn = options?.fetchDocumentTitlesFn;
+  }
+
+  /**
+   * Selected sources' titles from their document records, keyed by id. A failed lookup is logged
+   * and names none: the sources still count, as "Untitled source", and the answer goes ahead.
+   */
+  private async lookupSourceTitles(
+    documentIds: string[],
+    logger: ServiceLogger
+  ): Promise<Record<string, string>> {
+    try {
+      return (await this.fetchDocumentTitlesFn?.(documentIds)) ?? {};
+    } catch (e) {
+      logger.warn("Source title lookup failed", {
+        documentIds: documentIds.length,
+        error: String(e),
+      });
+      return {};
+    }
   }
 
   /**
@@ -262,14 +284,16 @@ export class ChatAgent {
   ): Promise<ReferenceChunk[]> {
     if (documentIds.length === 0) return [];
     try {
-      const settled = await withTimeout(
-        Promise.allSettled(
-          documentIds.map((id) =>
-            this.vectorSearch.searchDocument(id, embedding, PER_SOURCE_PASSAGES_PER_SEARCH)
+      // Each search has its own deadline, so one slow source doesn't drop the ones that answered.
+      const deadlineMs = remainingMs();
+      const settled = await Promise.allSettled(
+        documentIds.map((id) =>
+          withTimeout(
+            this.vectorSearch.searchDocument(id, embedding, PER_SOURCE_PASSAGES_PER_SEARCH),
+            deadlineMs,
+            "per_source_search"
           )
-        ),
-        remainingMs(),
-        "per_source_search"
+        )
       );
       const found: ReferenceChunk[] = [];
       for (const [i, r] of settled.entries()) {
@@ -283,8 +307,8 @@ export class ChatAgent {
       }
       return found;
     } catch (e) {
-      // String(e) keeps the error type: a timeout reads "Error: per_source_search timed out …".
-      logger.warn("Per-source searches failed", { error: String(e) });
+      // Only the pipeline deadline having passed already ("search_pipeline timed out …").
+      logger.warn("Per-source searches skipped", { error: String(e) });
       return [];
     }
   }
@@ -620,23 +644,31 @@ export class ChatAgent {
     const attachedSet = new Set(context.attachedDocumentIds ?? []);
     const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
     const ragContext = { ...context, documentIds: ragDocumentIds };
-    // "What does each paper say about X?": search each selected source too, and have the answer
-    // cover every one (#450).
-    const sourcesAskedAbout = perSourceDocumentIds(userMessage, context.documentIds);
-    const perSourceSearchIds = sourcesAskedAbout.filter((id) => !attachedSet.has(id));
-    if (sourcesAskedAbout.length > 0) {
-      logger.info("Question asks about each selected source", {
-        sources: sourcesAskedAbout.length,
-      });
-    }
+    // The selected sources the answer is told about; when the planner judges the question to be
+    // about each of them ("what does each paper say about X?"), each is also searched on its own
+    // and the answer covers every one (#450).
+    // None when notebook search is off: sources that weren't searched aren't named.
+    const selectedSources = enableNotebookSearch ? selectedSourceIds(context.documentIds) : [];
+    let coverEachSource = false;
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
 
       const subqueryStart = Date.now();
-      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns);
+      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns, {
+        severalSourcesSelected: selectedSources.length > 0,
+      });
       rerankQueryOpt = plan.rerankQuery;
       const { subqueries } = plan;
+      coverEachSource = plan.aboutEachSource === true && selectedSources.length > 0;
+      const perSourceSearchIds = coverEachSource
+        ? selectedSources.filter((id) => !attachedSet.has(id))
+        : [];
+      if (coverEachSource) {
+        logger.info("Question asks about each selected source", {
+          sources: selectedSources.length,
+        });
+      }
       logger.apiSuccess(
         "ChatLLMWrapper",
         "generateRetrievalSubqueries",
@@ -801,11 +833,14 @@ export class ChatAgent {
       effectiveTurns,
       rankedChunks,
       logger,
-      await titlesOfSources(
-        sourcesAskedAbout,
-        merged,
-        async (id) => (await this.fetchFullDocumentContent(id))?.title
-      )
+      {
+        // Every selected source is named, so the answer counts them right ("both papers" for
+        // three, #450); only a question about each one asks for a part per source.
+        titles: await titlesOfSources(selectedSources, merged, (ids) =>
+          this.lookupSourceTitles(ids, logger)
+        ),
+        coverEach: coverEachSource,
+      }
     );
   }
 
@@ -815,7 +850,7 @@ export class ChatAgent {
     recentTurns: Array<{ role: string; content: string }>,
     allChunks: ReferenceChunk[],
     logger: ServiceLogger,
-    sourcesToCover: string[] = []
+    selectedSources?: SelectedSources
   ): AsyncGenerator<StreamChunk> {
     const mode = this.resolveGroundingMode(context);
 
@@ -847,7 +882,7 @@ export class ChatAgent {
       userMessage,
       recentTurns,
       context.chatSettings,
-      sourcesToCover
+      selectedSources
     );
     logger.apiSuccess("ChatLLMWrapper", "generateStructuredResponse", Date.now() - responseStart, {
       responseLength: structuredResponse.answer_markdown.length,
@@ -896,7 +931,7 @@ export class ChatAgent {
             userMessage,
             recentTurns,
             context.chatSettings,
-            sourcesToCover
+            selectedSources
           );
 
           const retrySyntactic = validateGrounding(

@@ -33,7 +33,16 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { conceptsFromSource, createSmartFallback } from "./mindmapFallback";
 
@@ -46,7 +55,7 @@ const { packChunks, validateChunks } = createStudioChunkHelpers("MindMapGraph");
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
+  REDUCE_TIMEOUT_MS: 480_000, // all reduce attempts together
 } as const;
 
 export type MindmapGenerationPhaseArgs = {
@@ -508,6 +517,8 @@ export async function runFinalizeMindMapPhase(
 
   logger.info("Starting finalization phase");
 
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
+
   try {
     // Get mindmap with map results
     const mindmap = await ctx.runQuery(internal.studio.mindmaps.index.getInternal, {
@@ -588,7 +599,7 @@ export async function runFinalizeMindMapPhase(
 
     try {
       const startTime = Date.now();
-      const markdown = await invokeStudioLlm({
+      const markdown = await invokeWithinBudget({
         invoke: () =>
           invokeTogetherText({
             systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
@@ -604,7 +615,7 @@ export async function runFinalizeMindMapPhase(
               reduceUsage = usage;
             },
           }),
-        timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+        timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
         phaseLabel: "MindMapReduce",
       });
 
@@ -644,9 +655,7 @@ export async function runFinalizeMindMapPhase(
         finalMindMap,
         allExtractions.map((e) => `${e.main_theme}: ${e.summary}`)
       );
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: titleContent,
-      });
+      title = await generateTitleWithinDeadline(deadline, titleContent, "MindMapTitle");
     } catch (_e) {
       console.log("[MindMapJob] Title generation failed, using default");
     }
