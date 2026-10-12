@@ -10,6 +10,8 @@
 
 **Spec:** [`docs/superpowers/specs/2026-10-11-ocr-image-understanding-design.md`](../specs/2026-10-11-ocr-image-understanding-design.md)
 
+> **After review:** the shipped code changed after this plan was executed: the annotated timeout is 90s, 5xx and most 4xx (not 401/403/404/413/429) fall back to plain OCR, responses are read as text, media stripping runs per page before descriptions go in, one-line descriptions keep table rows intact, and `processFromUrl` is gone. The spec and the code are authoritative; the task code below is the plan as executed.
+
 ---
 
 ## File map

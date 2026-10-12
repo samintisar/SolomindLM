@@ -51,11 +51,13 @@ Figure schema (strict JSON schema, `additionalProperties: false`, all fields req
 Field descriptions are generic and must work for any source: no subject-specific wording, no references to eval
 fixtures (AGENTS.md, Prompt authoring).
 
-The annotated request's timeout rises from 60s to 120s (the probe measured 13s for a 24-page paper with 22 figures,
+The annotated request's timeout rises from 60s to 90s (the probe measured 13s for a 24-page paper with 22 figures,
 so this is headroom for long documents). The plain fallback in section 3 keeps today's 60s. Timeouts are not retried
-by `invokeWithHttpRetry`, so the usual worst case (annotated timeout, then fallback) is about 180s. The annotated call
+by `invokeWithHttpRetry`, so the usual worst case (annotated timeout, then fallback) is about 150s. The annotated call
 is capped at 2 attempts (the plain one keeps 3), so the pathological case — every attempt ending in a slow 5xx — is
-2 × 120s + 3 × 60s = 420s, which leaves the embedding job time to chunk and embed inside the 600s action limit.
+2 × 90s + 3 × 60s = 360s. That leaves ~235s of the 600s action limit for a web scrape before OCR (`urlSource`, links
+that serve a PDF) or after it (`AcademicLoaderService`'s fallback), then chunking and embedding. Each attempt's
+timeout covers reading the response body.
 
 ### 2. Response
 
@@ -68,16 +70,18 @@ A pure `inlineOcrFigures(markdown, images)` runs per page next to `inlineOcrTabl
   > Details: Q1–Q4 on the x-axis; EMEA rises from 1.2M to 2.0M; APAC flat at about 0.8M.
   ```
 
-  The `Details:` line is omitted when `details` is empty. Replacement uses a function replacer, so `$` in a
-  description is literal.
+  The `Details:` line is omitted when `details` is empty. A placeholder that shares its line with other text (a table
+  cell, a sentence) gets the same text on one line, with `|` escaped, so table rows stay intact. Replacement uses a
+  function replacer, so `$` in a description is literal.
 - An image whose placeholder is missing gets its block appended at the end of its page (same rule as tables).
 - Skipped (placeholder left for the stripper, as today): `kind: "logo"`, empty `description`, or an annotation that
   is missing or fails to parse. A parse failure is logged with the image id.
-- The annotation is read from `image_annotation` (what OCR 4.1 returns, as a JSON string) or `bbox_annotation` (the
-  name in Mistral's docs), as a JSON string or an object.
+- The annotation is read from `image_annotation` (what OCR 4.1 returns, as a JSON string) or, when that is empty,
+  `bbox_annotation` (the name in Mistral's docs), as a JSON string or an object.
 
-`stripMistralOcrMedia` still runs last and removes leftover placeholders; description blocks are plain text and pass
-through. Descriptions stay inside their `**Page N**` section, so `StructuralChunker` page assignment and citation
+`stripMistralOcrMedia` runs on each page's OCR text while the described figures' places are held by marks, then the
+descriptions go in. It removes leftover placeholders but never edits a description (its file-name and media-URL
+patterns would otherwise delete visible values such as `report.pdf` from `Details`). Descriptions stay inside their `**Page N**` section, so `StructuralChunker` page assignment and citation
 pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows the descriptions.
 
 ### 3. Failures
@@ -88,11 +92,13 @@ pages are unaffected. `extractedMarkdown` (the source viewer's text view) shows 
   version." `embeddingJob` already stores `userMessage` for the source viewer. `urlSource` is unchanged: it wraps
   any OCR error in its link-specific "couldn't read the PDF at this link" message, which fits links better.
   `AcademicLoaderService` is unchanged: it already falls back to a web scrape when OCR throws.
-- **Annotations rejected or too slow.** A 4xx response to the annotated request (other than 429), or its timeout,
-  triggers one plain request (60s timeout), logged as a warning. The plain request is exactly the pre-annotation one:
-  no `bbox_annotation_format`, and `document_url` for every file, images included (they were sent that way before),
-  so annotations or the new `image_url` input never lose a document that ingests now. 429 and 5xx keep using
-  `invokeWithHttpRetry`.
+- **Annotations rejected, failing or too slow.** A timeout, a 5xx that outlasts `invokeWithHttpRetry`'s 2 annotated
+  attempts, or a 4xx the annotations may have caused triggers one plain request (60s timeout, 3 attempts), logged as
+  a warning. 401, 403, 404, 413 and 429 do not: the plain request would get them too. The plain request is exactly the
+  pre-annotation one: no `bbox_annotation_format`, and `document_url` for every file, images included (they were
+  sent that way before), so annotations or the new `image_url` input never lose a document that ingests now.
+- **Error bodies that aren't JSON.** The response is read as text, so a gateway's HTML 502 still becomes a
+  status-coded error that is retried (or falls back) like any other.
 - **One bad annotation.** Skipped as in section 2; the rest of the document is unaffected.
 
 ### 4. Probe findings (2026-10-12, `mistral-ocr-latest`)

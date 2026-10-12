@@ -213,6 +213,40 @@ describe("inlineOcrFigures", () => {
     ]);
     expect(md).toBe(BLOCK);
   });
+
+  it("keeps a table row on one line, with pipes in the description escaped", () => {
+    const md = inlineOcrFigures("| A | ![img-0.jpeg](img-0.jpeg) |", [
+      { id: "img-0.jpeg", image_annotation: { ...CHART, description: "Q1 | Q2." } },
+    ]);
+    expect(md).toBe(
+      "| A | **Figure (chart):** Q1 \\| Q2. Details: EMEA rises from 1.2M to 2.0M. |"
+    );
+  });
+
+  it("describes a figure in the middle of a sentence on one line", () => {
+    const md = inlineOcrFigures("See ![img-0.jpeg](img-0.jpeg) below.", [
+      { id: "img-0.jpeg", image_annotation: { ...CHART, details: "" } },
+    ]);
+    expect(md).toBe("See **Figure (chart):** Revenue by region. below.");
+  });
+
+  it("reads bbox_annotation when image_annotation is empty", () => {
+    const md = inlineOcrFigures("![img-0.jpeg](img-0.jpeg)", [
+      { id: "img-0.jpeg", image_annotation: "", bbox_annotation: CHART },
+    ]);
+    expect(md).toBe(BLOCK);
+  });
+
+  it("cleans the OCR text but not the descriptions", () => {
+    const shot = { kind: "screenshot", description: "A browser.", details: "Shows chart.png" };
+    const md = inlineOcrFigures(
+      "logo.png\n\n![img-0.jpeg](img-0.jpeg)",
+      [{ id: "img-0.jpeg", image_annotation: shot }],
+      undefined,
+      (text) => text.replace(/\S+\.png/g, "").trim()
+    );
+    expect(md).toBe(figureBlock(shot));
+  });
 });
 
 describe("hasOcrContent", () => {
@@ -271,15 +305,17 @@ describe("shouldRetryWithoutAnnotations", () => {
   const http = (status: number) =>
     new ExternalServiceError("mistral", `mistral HTTP ${status}`, { statusCode: status });
 
-  it("falls back on a rejected request or a timeout", () => {
+  it("falls back on a rejected request, a server error or a timeout", () => {
     expect(shouldRetryWithoutAnnotations(http(400))).toBe(true);
     expect(shouldRetryWithoutAnnotations(http(422))).toBe(true);
+    expect(shouldRetryWithoutAnnotations(http(503))).toBe(true);
     expect(shouldRetryWithoutAnnotations(new MistralOcrTimeoutError())).toBe(true);
   });
 
-  it("does not fall back on rate limits, server errors or unknown errors", () => {
-    expect(shouldRetryWithoutAnnotations(http(429))).toBe(false);
-    expect(shouldRetryWithoutAnnotations(http(503))).toBe(false);
+  it("does not fall back on errors plain OCR would get too, or unknown errors", () => {
+    for (const status of [401, 403, 404, 413, 429]) {
+      expect(shouldRetryWithoutAnnotations(http(status))).toBe(false);
+    }
     expect(shouldRetryWithoutAnnotations(new Error("boom"))).toBe(false);
   });
 });
@@ -372,7 +408,7 @@ describe("MistralOCRService.processDocument", () => {
         Promise.resolve({
           ok: true,
           status: 200,
-          json: () =>
+          text: () =>
             new Promise((_, reject) =>
               init.signal?.addEventListener("abort", () =>
                 reject(
@@ -388,7 +424,7 @@ describe("MistralOCRService.processDocument", () => {
       vi.stubGlobal("fetch", fetchMock);
 
       const pending = new MistralOCRService("key").processDocument("https://x/a.pdf");
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(90_000);
 
       await expect(pending).resolves.toBe("**Page 1**\n\ntext");
       expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
@@ -410,6 +446,83 @@ describe("MistralOCRService.processDocument", () => {
 
     expect(md).toBe("**Page 1**\n\ntext");
     expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+  });
+
+  describe("with retries", () => {
+    afterEach(() => vi.useRealTimers());
+
+    /** Runs processDocument while fake timers skip the retry backoff; resolves to its result or error. */
+    const settle = async (fetchMock: ReturnType<typeof vi.fn>) => {
+      vi.useFakeTimers();
+      vi.stubGlobal("fetch", fetchMock);
+      const pending = new MistralOCRService("key")
+        .processDocument("https://x/a.pdf")
+        .catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(10_000);
+      return pending;
+    };
+
+    it("tries the annotated request twice on server errors, then falls back to plain OCR", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(rejected(503))
+        .mockResolvedValueOnce(rejected(503))
+        .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+
+      expect(await settle(fetchMock)).toBe("**Page 1**\n\ntext");
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(sentBody(fetchMock, 1)).toHaveProperty("bbox_annotation_format");
+      expect(sentBody(fetchMock, 2)).not.toHaveProperty("bbox_annotation_format");
+    });
+
+    it("does not fall back on rate limits, and stops after two annotated attempts", async () => {
+      const fetchMock = vi.fn().mockImplementation(async () => rejected(429));
+
+      expect(await settle(fetchMock)).toBeInstanceOf(ExternalServiceError);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not fall back when the file can't be fetched", async () => {
+      const fetchMock = vi.fn().mockImplementation(async () => rejected(404));
+
+      expect(await settle(fetchMock)).toBeInstanceOf(ExternalServiceError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries a gateway error with an HTML body", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("<html>Bad Gateway</html>", { status: 502 }))
+        .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+
+      expect(await settle(fetchMock)).toBe("**Page 1**\n\ntext");
+      expect(sentBody(fetchMock, 1)).toHaveProperty("bbox_annotation_format");
+    });
+  });
+
+  it("strips media references from the OCR text but not from figure descriptions", async () => {
+    const shot = {
+      kind: "screenshot",
+      description: "A browser window.",
+      details: "Address bar shows https://example.org/report.pdf; icon labelled chart.png",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        ok({
+          pages: [
+            {
+              markdown: "Intro logo.png\n\n![img-0.jpeg](img-0.jpeg)",
+              images: [{ id: "img-0.jpeg", image_annotation: JSON.stringify(shot) }],
+            },
+          ],
+        })
+      )
+    );
+
+    const md = await new MistralOCRService("key").processDocument("https://x/a.pdf");
+
+    expect(md).toBe(`**Page 1**\n\nIntro \n\n${figureBlock(shot)}`);
   });
 
   it("fails with a user-facing message when nothing is readable", async () => {

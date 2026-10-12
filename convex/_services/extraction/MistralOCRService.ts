@@ -4,7 +4,7 @@ import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { createExternalServiceErrorFromResponse, ExternalServiceError } from "../../_lib/errors";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { UserFacingSourceError } from "../../_lib/sourceFailure";
-import { PAGE_LABEL_LINE } from "../processing/pageLabels";
+import { PAGE_LABEL_LINES } from "../processing/pageLabels";
 
 type MistralOcrTable = { id?: string; content?: string; format?: string };
 
@@ -59,31 +59,55 @@ export function figureBlock(annotation: FigureAnnotation): string {
   return annotation.details ? `${head}\n> Details: ${annotation.details}` : head;
 }
 
+/** A figure description on one line, for a placeholder that shares its line (a table cell, a sentence). */
+function figureInline(annotation: FigureAnnotation): string {
+  const head = `**Figure (${annotation.kind}):** ${annotation.description}`;
+  const text = annotation.details ? `${head} Details: ${annotation.details}` : head;
+  return text.replace(/\|/g, "\\|");
+}
+
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Private-use marks hold each figure's place while `cleanText` runs; no media regex touches them. */
+const figureMark = (index: number) => `${index}`;
+const FIGURE_MARK_ON_OWN_LINE = /^[ \t]*(\d+)[ \t]*$/gm;
+const FIGURE_MARK = /(\d+)/g;
+
 /**
- * OCR leaves `![img-0.jpeg](img-0.jpeg)` where each figure was. Put the figure's description there;
- * a described figure without a placeholder goes at the page end. Skipped figures keep their
- * placeholder, which `stripMistralOcrMedia` removes.
+ * OCR leaves `![img-0.jpeg](img-0.jpeg)` where each figure was. Put the figure's description there: a blockquote
+ * when the placeholder has its own line, one line otherwise, so table rows and sentences stay intact. A described
+ * figure without a placeholder goes at the page end. Skipped figures keep their placeholder, which
+ * `stripMistralOcrMedia` removes. `cleanText` runs on the OCR text before the descriptions go in, so it never
+ * edits them.
  */
 export function inlineOcrFigures(
   markdown: string,
   images: MistralOcrImage[] | undefined,
-  onMalformed?: (imageId: string) => void
+  onMalformed?: (imageId: string) => void,
+  cleanText: (text: string) => string = (text) => text
 ): string {
+  const placed: FigureAnnotation[] = [];
+  const unplaced: FigureAnnotation[] = [];
   let md = markdown;
   for (const image of images ?? []) {
     if (!image.id) continue;
-    const parsed = parseFigureAnnotation(image.image_annotation ?? image.bbox_annotation);
+    // `||`: an empty image_annotation must not hide a bbox_annotation.
+    const parsed = parseFigureAnnotation(image.image_annotation || image.bbox_annotation);
     if (parsed.status === "malformed") onMalformed?.(image.id);
     if (parsed.status !== "ok") continue;
-    const block = figureBlock(parsed.annotation);
     const placeholder = new RegExp(`!\\[[^\\]]*\\]\\(${escapeRegExp(image.id)}\\)`);
-    // Function replacer: descriptions can contain "$", which a string replacement would interpret.
-    md = placeholder.test(md)
-      ? md.replace(placeholder, () => block)
-      : `${md.trimEnd()}\n\n${block}`;
+    if (placeholder.test(md)) {
+      md = md.replace(placeholder, figureMark(placed.length));
+      placed.push(parsed.annotation);
+    } else {
+      unplaced.push(parsed.annotation);
+    }
   }
+  // Function replacers: descriptions can contain "$", which a string replacement would interpret.
+  md = cleanText(md)
+    .replace(FIGURE_MARK_ON_OWN_LINE, (_, i) => figureBlock(placed[Number(i)]))
+    .replace(FIGURE_MARK, (_, i) => figureInline(placed[Number(i)]));
+  for (const annotation of unplaced) md = `${md.trimEnd()}\n\n${figureBlock(annotation)}`;
   return md;
 }
 
@@ -114,23 +138,33 @@ export type MistralOcrResponse = {
 
 /**
  * Stitch OCR pages into one markdown string with visible page labels (HTML comments are hidden when rendered).
- * Tables and figure descriptions are put back where OCR left their placeholders.
+ * Tables and figure descriptions are put back where OCR left their placeholders. `cleanText` runs on each page's
+ * OCR text, but not on the figure descriptions.
  */
 export function markdownFromMistralOcrResponse(
   data: MistralOcrResponse,
-  options: { onMalformedAnnotation?: (imageId: string) => void } = {}
+  options: {
+    onMalformedAnnotation?: (imageId: string) => void;
+    cleanText?: (text: string) => string;
+  } = {}
 ): string {
   if (data?.pages && Array.isArray(data.pages) && data.pages.length > 0) {
     return data.pages
       .map((page, index) => {
         const withTables = inlineOcrTables(page.markdown || "", page.tables);
-        const md = inlineOcrFigures(withTables, page.images, options.onMalformedAnnotation);
+        const md = inlineOcrFigures(
+          withTables,
+          page.images,
+          options.onMalformedAnnotation,
+          options.cleanText
+        );
         const label = `**Page ${index + 1}**`;
         return index === 0 ? `${label}\n\n${md}` : `---\n\n${label}\n\n${md}`;
       })
       .join("\n\n");
   }
-  return data.markdown || data.text || "";
+  const text = data.markdown || data.text || "";
+  return options.cleanText ? options.cleanText(text) : text;
 }
 
 /**
@@ -192,8 +226,6 @@ function stripMistralOcrMedia(text: string): string {
       .trim()
   );
 }
-
-const PAGE_LABEL_LINES = new RegExp(PAGE_LABEL_LINE.source, "gm");
 
 /**
  * Whether stitched OCR markdown holds anything beyond page labels and separators. Run it after
@@ -274,11 +306,12 @@ export function buildOcrRequestBody(
 /**
  * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
  * request that worked before them, with its old 60s timeout and 3 attempts. Capping the annotated call at 2
- * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 120s + 3 × 60s = 420s, plus at most ~5s of
- * retry backoff (1s and 2s delays, ±25% jitter), which leaves the embedding job time to chunk and embed inside the
- * 600s action limit. Each attempt's timeout covers reading the body too, so these bounds hold.
+ * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 90s + 3 × 60s = 360s, plus at most ~5s of
+ * retry backoff (1s and 2s delays, ±25% jitter). That leaves ~235s of the embedding job's 600s action limit for a
+ * web scrape before OCR (links that serve a PDF, `urlSource`) or after it (`AcademicLoaderService`'s fallback),
+ * then chunking and embedding. Each attempt's timeout covers reading the body too, so these bounds hold.
  */
-const ANNOTATED_TIMEOUT_MS = 120_000;
+const ANNOTATED_TIMEOUT_MS = 90_000;
 const ANNOTATED_MAX_ATTEMPTS = 2;
 const PLAIN_TIMEOUT_MS = 60_000;
 
@@ -292,14 +325,20 @@ export class MistralOcrTimeoutError extends Error {
   }
 }
 
+/** Rejections the plain request would get too: bad key, no access, unfetchable URL, file too large, rate limit. */
+const STATUSES_PLAIN_OCR_SHARES = [401, 403, 404, 413, 429];
+
 /**
- * Whether a failed annotated request should be retried as plain OCR: a rejected request (4xx other
- * than 429) or a timeout. Rate limits and server errors are retried by `invokeWithHttpRetry` instead.
+ * Whether a failed annotated request should be retried as plain OCR: a timeout, a server error that outlasted
+ * `invokeWithHttpRetry` (the annotation pass can fail where plain OCR works), or a rejection the annotations
+ * may have caused.
  */
 export function shouldRetryWithoutAnnotations(error: unknown): boolean {
   if (error instanceof MistralOcrTimeoutError) return true;
   if (!(error instanceof ExternalServiceError) || error.statusCode === undefined) return false;
-  return error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 429;
+  const status = error.statusCode;
+  if (status >= 500) return true;
+  return status >= 400 && status < 500 && !STATUSES_PLAIN_OCR_SHARES.includes(status);
 }
 
 export class MistralOCRService {
@@ -336,21 +375,21 @@ export class MistralOCRService {
           });
 
           // The timer stays armed while the body streams in: a response that stalls after its headers still times out.
-          const data = await response.json();
+          // Read text, not JSON: error bodies from gateways are HTML and must still become a status-coded error.
+          const raw = await response.text();
 
           if (!response.ok) {
-            const details = data ? JSON.stringify(data) : response.statusText;
             logger.apiError("mistral", "/ocr", new Error(`HTTP ${response.status}`));
             throw createExternalServiceErrorFromResponse(
               "mistral",
               response.status,
               "/ocr",
-              details.slice(0, 400)
+              (raw || response.statusText).slice(0, 400)
             );
           }
 
           logger.apiSuccess("mistral", "/ocr", Date.now() - t0, {});
-          return data as MistralOcrResponse;
+          return JSON.parse(raw) as MistralOcrResponse;
         } catch (error) {
           if (error instanceof Error) {
             if (error.name === "AbortError") {
@@ -397,12 +436,11 @@ export class MistralOCRService {
       );
     }
 
-    const markdown = stripMistralOcrMedia(
-      markdownFromMistralOcrResponse(data, {
-        onMalformedAnnotation: (imageId) =>
-          logger.warn("Skipped a malformed figure annotation", { imageId }),
-      })
-    );
+    const markdown = markdownFromMistralOcrResponse(data, {
+      onMalformedAnnotation: (imageId) =>
+        logger.warn("Skipped a malformed figure annotation", { imageId }),
+      cleanText: stripMistralOcrMedia,
+    });
     if (!hasOcrContent(markdown)) {
       throw new UserFacingSourceError(
         NOTHING_READABLE_MESSAGE,
@@ -410,9 +448,5 @@ export class MistralOCRService {
       );
     }
     return markdown;
-  }
-
-  async processFromUrl(url: string): Promise<string> {
-    return this.processDocument(url);
   }
 }
