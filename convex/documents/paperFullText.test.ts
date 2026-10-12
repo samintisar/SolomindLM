@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { internal } from "../_generated/api";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
@@ -51,6 +51,20 @@ async function seedPaper(
     });
     return { userId, notebookId, documentId };
   });
+}
+
+/** convex-test drops the Blob's content type, so write it onto the `_storage` row ourselves. */
+async function storeFile(t: T, body: string, contentType: string): Promise<Id<"_storage">> {
+  return t.run(async (ctx) => {
+    const storageId = await ctx.storage.store(new Blob([body], { type: contentType }));
+    // biome-ignore lint/suspicious/noExplicitAny: convex-test lets us patch system tables
+    await (ctx.db as any).patch(storageId, { contentType });
+    return storageId;
+  });
+}
+
+function asUser(t: T, userId: Id<"users">) {
+  return t.withIdentity({ subject: `${userId as string}|session1` });
 }
 
 describe("documents.paperFullText internal", () => {
@@ -132,5 +146,111 @@ describe("documents.paperFullText internal", () => {
     doc = await t.run((ctx) => ctx.db.get(documentId));
     expect(doc?.storageId).toBe(storageId);
     expect(doc?.fullTextSource).toBeUndefined();
+  });
+});
+
+describe("documents.paperFullText.findFullText", () => {
+  beforeEach(() => {
+    // Fake timers keep the scheduled docEmbedding job from running (it would call real APIs).
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("resets an abstract-only paper for another ingest", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    await asUser(t, userId).mutation(api.documents.paperFullText.findFullText, { documentId });
+    const doc = await t.run((ctx) => ctx.db.get(documentId));
+    expect(doc).toMatchObject({ status: "pending", ingestionStatus: "pending" });
+  });
+
+  test("rejects another user's paper", async () => {
+    const t = makeT();
+    const { documentId } = await seedPaper(t);
+    const stranger = await t.run((ctx) => ctx.db.insert("users", { name: "Other" }));
+    await expect(
+      asUser(t, stranger).mutation(api.documents.paperFullText.findFullText, { documentId })
+    ).rejects.toThrow();
+  });
+
+  test("rejects sources that aren't papers, and papers still processing", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t, { fileType: "url" });
+    await expect(
+      asUser(t, userId).mutation(api.documents.paperFullText.findFullText, { documentId })
+    ).rejects.toThrow();
+
+    const busy = await seedPaper(t, { status: "processing" });
+    await expect(
+      asUser(t, busy.userId).mutation(api.documents.paperFullText.findFullText, {
+        documentId: busy.documentId,
+      })
+    ).rejects.toThrow();
+  });
+
+  test("is rate limited per user", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    for (let i = 0; i < 20; i++) {
+      await t.run((ctx) => ctx.db.patch(documentId, { status: "completed" }));
+      await asUser(t, userId).mutation(api.documents.paperFullText.findFullText, { documentId });
+    }
+    await t.run((ctx) => ctx.db.patch(documentId, { status: "completed" }));
+    await expect(
+      asUser(t, userId).mutation(api.documents.paperFullText.findFullText, { documentId })
+    ).rejects.toThrow();
+  });
+});
+
+describe("documents.paperFullText.attachPdf", () => {
+  beforeEach(() => {
+    // Fake timers keep the scheduled docEmbedding job from running (it would call real APIs).
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("attaches a PDF and re-ingests from it", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "%PDF-1.7", "application/pdf");
+
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+
+    expect(res).toEqual({ ok: true });
+    const doc = await t.run((ctx) => ctx.db.get(documentId));
+    expect(doc).toMatchObject({ storageId, status: "pending", ingestionStatus: "pending" });
+  });
+
+  test("refuses a file that isn't a PDF and deletes the upload", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "hello", "text/plain");
+
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+
+    expect(res).toEqual({ ok: false, reason: "Choose a PDF file." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).toBeNull();
+    expect((await t.run((ctx) => ctx.db.get(documentId)))?.storageId).toBeUndefined();
+  });
+
+  test("rejects another user's paper without touching the upload", async () => {
+    const t = makeT();
+    const { documentId } = await seedPaper(t);
+    const stranger = await t.run((ctx) => ctx.db.insert("users", { name: "Other" }));
+    const storageId = await storeFile(t, "%PDF-1.7", "application/pdf");
+    await expect(
+      asUser(t, stranger).mutation(api.documents.paperFullText.attachPdf, { documentId, storageId })
+    ).rejects.toThrow();
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
   });
 });
