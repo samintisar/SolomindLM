@@ -27,7 +27,16 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { isFailedMapResult } from "./mapResultUtils.js";
 
@@ -36,8 +45,10 @@ const { packChunks, validateChunks } = createStudioChunkHelpers("ReportGraph");
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   MAP_MAX_OUTPUT_TOKENS: 16_384,
-  PER_CHUNK_TIMEOUT_MS: 600_000, // 10 minutes
-  REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
+  // Convex kills actions at 600s without running their catch blocks, so every
+  // LLM call has to give up early enough for the action to record the outcome.
+  PER_CHUNK_TIMEOUT_MS: 540_000,
+  REDUCE_TIMEOUT_MS: 480_000, // all reduce attempts together
   MAX_OUTPUT_TOKENS: 32_000,
   MIN_SUMMARY_LENGTH: 50,
 } as const;
@@ -434,6 +445,8 @@ export async function runFinalizeReportPhase(
 
   logger.info("Starting finalization phase");
 
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
+
   try {
     const report = await ctx.runQuery(internal.studio.reports.index.getInternal, { id: reportId });
     if (!report) {
@@ -526,7 +539,7 @@ export async function runFinalizeReportPhase(
 
     const startTime = Date.now();
     let reduceUsage: TokenUsage | undefined;
-    let content = await invokeStudioLlm({
+    let content = await invokeWithinBudget({
       invoke: () =>
         invokeTogetherText({
           systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
@@ -539,7 +552,7 @@ export async function runFinalizeReportPhase(
             reduceUsage = usage;
           },
         }),
-      timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
       phaseLabel: "ReportReduce",
       onRetry: (attempt, error) => {
         console.log(`[ReportJob] Reduce retry ${attempt}/3: ${error.message}`);
@@ -559,9 +572,11 @@ export async function runFinalizeReportPhase(
 
     let title = "Report";
     try {
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: combinedContent.substring(0, 2000),
-      });
+      title = await generateTitleWithinDeadline(
+        deadline,
+        combinedContent.substring(0, 2000),
+        "ReportTitle"
+      );
     } catch {
       console.log("[ReportJob] Title generation failed, using default");
     }
