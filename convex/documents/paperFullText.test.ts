@@ -389,4 +389,46 @@ describe("documents.paperFullText.attachPdf", () => {
     expect(await t.run((ctx) => ctx.db.system.get(oldId))).toBeNull();
     expect((await t.run((ctx) => ctx.db.get(documentId)))?.storageId).toBe(newId);
   });
+
+  test("leaves an audio overview's file alone", async () => {
+    const t = makeT();
+    const victim = await seedPaper(t);
+    const attacker = await seedPaper(t);
+    const storageId = await storeFile(t, "ID3", "audio/mpeg");
+    await t.run((ctx) =>
+      ctx.db.insert("audioOverviews", {
+        userId: victim.userId,
+        notebookId: victim.notebookId,
+        title: "Overview",
+        status: "completed",
+        audioStorageId: storageId,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+    );
+
+    const res = await asUser(t, attacker.userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId: attacker.documentId,
+      storageId,
+    });
+
+    expect(res).toEqual({ ok: false, reason: "The upload didn't arrive. Try again." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+  });
+
+  test("never deletes a blob that isn't a fresh upload", async () => {
+    const t = makeT();
+    const { userId, documentId } = await seedPaper(t);
+    const storageId = await storeFile(t, "hello", "text/plain");
+    // Older than the 15-minute fresh-upload window; nothing references it.
+    vi.setSystemTime(Date.now() + 16 * 60_000);
+
+    const res = await asUser(t, userId).mutation(api.documents.paperFullText.attachPdf, {
+      documentId,
+      storageId,
+    });
+
+    expect(res).toEqual({ ok: false, reason: "Choose a PDF file." });
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+  });
 });

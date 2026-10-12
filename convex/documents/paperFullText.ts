@@ -51,6 +51,9 @@ export const recordPaperIngest = internalMutation({
 
 const RATE_LIMITED = "You've looked for full text often in the last hour. Try again later.";
 
+/** How recently a blob must have been uploaded for `attachPdf` to delete it when refusing it. */
+const FRESH_UPLOAD_MS = 15 * 60_000;
+
 const UPLOAD_MISSING = "The upload didn't arrive. Try again.";
 
 const userError = (message: string) => toConvexError(new InputValidationError(message));
@@ -105,23 +108,34 @@ export const attachPdf = mutation({
   handler: async (ctx, args) => {
     const { userId, doc } = await editableSource(ctx, args.documentId);
 
-    // A blob any document already references isn't a fresh upload: leave it alone, never delete it.
-    const referenced = await ctx.db
+    // A blob some record already references isn't a fresh upload: leave it alone, never delete it.
+    const referencedByDocument = await ctx.db
       .query("documents")
       .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
       .first();
-    if (referenced) return { ok: false as const, reason: UPLOAD_MISSING };
+    const referencedByAudio = await ctx.db
+      .query("audioOverviews")
+      .withIndex("by_audioStorageId", (q) => q.eq("audioStorageId", args.storageId))
+      .first();
+    if (referencedByDocument || referencedByAudio) {
+      return { ok: false as const, reason: UPLOAD_MISSING };
+    }
 
+    const file = await ctx.db.system.get(args.storageId);
+    if (!file) return { ok: false as const, reason: UPLOAD_MISSING };
+
+    // Backstop for blobs referenced from tables we don't check: only an upload made moments ago
+    // can be deleted here.
     const reject = async (reason: string) => {
-      await ctx.storage.delete(args.storageId);
+      if (file._creationTime > Date.now() - FRESH_UPLOAD_MS) {
+        await ctx.storage.delete(args.storageId);
+      }
       return { ok: false as const, reason };
     };
 
     const problem = paperStateProblem(doc);
     if (problem) return reject(problem);
 
-    const file = await ctx.db.system.get(args.storageId);
-    if (!file) return { ok: false as const, reason: UPLOAD_MISSING };
     const type = file.contentType?.split(";")[0].trim().toLowerCase();
     if (type !== "application/pdf" && type !== "application/x-pdf") {
       return reject("Choose a PDF file.");
