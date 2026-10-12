@@ -101,10 +101,13 @@ export const run = internalAction({
       5
     );
 
+    const skipped = results.filter((r) => r.skipped).length;
     const summary = {
       offset,
       total: results.length,
-      skipped: results.filter((r) => r.skipped).length,
+      skipped,
+      /** Papers actually measured; compute coverage shares over this, not `total`. */
+      attempted: results.length - skipped,
       before: results.filter((r) => r.before).length,
       after: results.filter((r) => r.after).length,
       afterPdf: results.filter((r) => r.after === "oa_pdf").length,

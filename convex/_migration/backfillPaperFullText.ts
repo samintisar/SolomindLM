@@ -16,7 +16,10 @@
  *   npx convex run _migration/backfillPaperFullText:start '{"dryRun": false, "reResolve": true}'
  *   npx convex run _migration/backfillPaperFullText:start '{"dryRun": false}'   # relabel only
  *
- * Counts are logged as one JSON line when the scan ends. A dry run counts `queued` without scheduling.
+ * A relabel-only run gives up re-resolve for the papers it relabels: a later run won't queue them
+ * (they're no longer `ingested`), so only "Find full text" recovers them. Pass `reResolve: true` on
+ * the real run. Counts are logged as one JSON line when the scan ends. A dry run counts `queued`
+ * without scheduling.
  */
 
 import { v } from "convex/values";
