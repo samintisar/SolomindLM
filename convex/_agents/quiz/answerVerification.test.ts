@@ -141,6 +141,15 @@ describe("verifyQuizQuestions", () => {
     expect(judge.mock.calls[0][0]).not.toContain("Too short.");
   });
 
+  it("leaves a question unchecked when its stored candidate has no snippet at all", async () => {
+    const judge = vi.fn(judgeFailing([]));
+    const missing = { ...item(1), snippet: undefined } as unknown as VerifiableQuestion;
+
+    const statuses = await verifyQuizQuestions([missing, item(2)], { judge });
+
+    expect(statuses.map((s) => s.status)).toEqual(["unchecked", "passed"]);
+  });
+
   it("skips the judge entirely for an empty list", async () => {
     const judge = vi.fn();
 

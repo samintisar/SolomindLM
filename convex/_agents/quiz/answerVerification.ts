@@ -112,8 +112,12 @@ export async function verifyQuizQuestions(
     status: "unchecked",
     reason: "source passage too short to check against",
   }));
+  // Candidates are parsed back from stored map results without schema checks, so the
+  // snippet may be missing or not a string at runtime.
   const checkable = items.flatMap((item, index) =>
-    item.snippet.trim().length >= MIN_SNIPPET_CHARS ? [index] : []
+    typeof item.snippet === "string" && item.snippet.trim().length >= MIN_SNIPPET_CHARS
+      ? [index]
+      : []
   );
   const batches: number[][] = [];
   for (let start = 0; start < checkable.length; start += batchSize) {
