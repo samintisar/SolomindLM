@@ -46,13 +46,12 @@ export function openAccessUserAgent(): string {
   return `SolomindLM/1.0 (mailto:${env.OPEN_ACCESS_CONTACT_EMAIL})`;
 }
 
-/** https URL with the fragment removed, or null for anything that isn't http(s). */
+/** URL with the fragment removed (scheme kept: some repositories serve http only), or null for non-http(s). */
 function cleanUrl(raw: string | null | undefined): string | null {
   if (!raw?.trim()) return null;
   try {
     const u = new URL(raw.trim());
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    u.protocol = "https:";
     u.hash = "";
     return u.toString();
   } catch {
@@ -62,12 +61,16 @@ function cleanUrl(raw: string | null | undefined): string | null {
 
 /** Comparison key: scheme, host case, trailing slash and fragment don't make a different copy. */
 export function candidateKey(raw: string): string {
-  const cleaned = cleanUrl(raw) ?? raw.trim();
-  return cleaned.replace(/\/+$/, "").toLowerCase();
+  try {
+    const u = new URL(raw.trim());
+    return `${u.host}${u.pathname.replace(/\/+$/, "")}${u.search}`;
+  } catch {
+    return raw.trim().replace(/\/+$/, "");
+  }
 }
 
 function asVersion(v: string | null | undefined): FullTextVersion | undefined {
-  return v && v in VERSION_RANK ? (v as FullTextVersion) : undefined;
+  return v && Object.hasOwn(VERSION_RANK, v) ? (v as FullTextVersion) : undefined;
 }
 
 function arxivIdFromUrl(url: string | null | undefined): string | undefined {
@@ -81,7 +84,7 @@ function arxivIdFromPmh(pmhId: string | null | undefined): string | undefined {
 
 function pmcNumberFromUrl(url: string | null | undefined): string | undefined {
   return url?.match(
-    /(?:\/pmc\/articles\/|pmc\.ncbi\.nlm\.nih\.gov\/articles\/)(?:PMC)?(\d+)/i
+    /(?:\/pmc\/articles\/|pmc\.ncbi\.nlm\.nih\.gov\/articles\/|europepmc\.org\/articles\/)(?:PMC)?(\d+)/i
   )?.[1];
 }
 
@@ -107,6 +110,7 @@ export function candidatesFromLocations(
     const license = loc?.license?.trim() || undefined;
     const existing = byKey.get(key);
     if (existing) {
+      if (url.startsWith("https:") && existing.url.startsWith("http:")) existing.url = url;
       existing.version ??= version;
       existing.license ??= license;
       return;

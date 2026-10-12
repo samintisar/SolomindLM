@@ -15,6 +15,19 @@ export type FetchedCandidate =
   | { type: "html"; finalUrl: string }
   | { type: "unusable"; reason: string };
 
+/** UTF-8 byte order mark as latin1 decodes it. */
+const BOM = String.fromCharCode(0xef, 0xbb, 0xbf);
+
+function concat(parts: Uint8Array[], total: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    bytes.set(part, offset);
+    offset += part.byteLength;
+  }
+  return bytes;
+}
+
 function head(bytes: Uint8Array): string {
   return new TextDecoder("latin1").decode(bytes.subarray(0, SNIFF_BYTES));
 }
@@ -25,6 +38,7 @@ export async function fetchOaCandidate(
 ): Promise<FetchedCandidate> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     const res = await fetch(url, {
       redirect: "follow",
@@ -46,22 +60,33 @@ export async function fetchOaCandidate(
     }
     if (!res.body) return { type: "unusable", reason: "empty body" };
 
-    const reader = res.body.getReader();
-    const first = await reader.read();
-    if (first.done || !first.value?.byteLength) return { type: "unusable", reason: "empty body" };
+    reader = res.body.getReader();
+    const parts: Uint8Array[] = [];
+    let total = 0;
+    let streamEnded = false;
+    // Sniff the first SNIFF_BYTES, however the network happens to chunk them.
+    while (total < SNIFF_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) {
+        streamEnded = true;
+        break;
+      }
+      if (!value?.byteLength) continue;
+      parts.push(value);
+      total += value.byteLength;
+    }
+    if (total === 0) return { type: "unusable", reason: "empty body" };
 
-    const start = head(first.value);
+    const start = head(concat(parts, total));
     if (!start.includes("%PDF-")) {
       await reader.cancel();
       const contentType = res.headers.get("content-type") ?? "";
-      return contentType.includes("html") || start.trimStart().startsWith("<")
+      return contentType.includes("html") || start.replace(BOM, "").trimStart().startsWith("<")
         ? { type: "html", finalUrl }
         : { type: "unusable", reason: `not a PDF (${contentType || "unknown type"})` };
     }
 
-    const parts: Uint8Array[] = [first.value];
-    let total = first.value.byteLength;
-    for (;;) {
+    while (!streamEnded) {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
@@ -71,14 +96,10 @@ export async function fetchOaCandidate(
       }
       parts.push(value);
     }
-    const bytes = new Uint8Array(total);
-    let offset = 0;
-    for (const part of parts) {
-      bytes.set(part, offset);
-      offset += part.byteLength;
-    }
-    return { type: "pdf", bytes, finalUrl };
+    if (total > MAX_PDF_BYTES) return { type: "unusable", reason: "too_large" };
+    return { type: "pdf", bytes: concat(parts, total), finalUrl };
   } catch (error) {
+    await reader?.cancel().catch(() => undefined);
     return { type: "unusable", reason: error instanceof Error ? error.message : String(error) };
   } finally {
     clearTimeout(timer);

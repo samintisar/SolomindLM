@@ -106,4 +106,49 @@ describe("fetchOaCandidate", () => {
       reason: "ECONNRESET",
     });
   });
+
+  it("finds the PDF magic bytes when they are split across chunks", async () => {
+    const chunks = [enc.encode("%PD"), enc.encode("F-1.7\nbody")];
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = chunks.shift();
+        if (next) controller.enqueue(next);
+        else controller.close();
+      },
+    });
+    mockFetch.mockResolvedValue(new Response(body, { status: 200 }));
+    const out = await fetchOaCandidate("https://x.example/a.pdf");
+    expect(out.type).toBe("pdf");
+    if (out.type === "pdf") expect(new TextDecoder().decode(out.bytes)).toBe("%PDF-1.7\nbody");
+  });
+
+  it("finds a PDF after a leading whitespace chunk, and ignores empty chunks", async () => {
+    const chunks = [new Uint8Array(0), enc.encode("\n\n"), enc.encode("%PDF-1.4 rest")];
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = chunks.shift();
+        if (next) controller.enqueue(next);
+        else controller.close();
+      },
+    });
+    mockFetch.mockResolvedValue(new Response(body, { status: 200 }));
+    expect((await fetchOaCandidate("https://x.example/a.pdf")).type).toBe("pdf");
+  });
+
+  it("sniffs HTML behind a UTF-8 byte order mark", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(new Uint8Array([0xef, 0xbb, 0xbf, ...enc.encode("<html></html>")]), {
+        status: 200,
+      })
+    );
+    expect((await fetchOaCandidate("https://x.example/a")).type).toBe("html");
+  });
+
+  it("reports an empty body as unusable", async () => {
+    mockFetch.mockResolvedValue(new Response(new Uint8Array(0), { status: 200 }));
+    expect(await fetchOaCandidate("https://x.example/a")).toEqual({
+      type: "unusable",
+      reason: "empty body",
+    });
+  });
 });

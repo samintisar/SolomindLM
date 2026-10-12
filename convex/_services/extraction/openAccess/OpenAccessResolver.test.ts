@@ -95,6 +95,53 @@ describe("candidatesFromLocations", () => {
     expect(out[0].version).toBe("publishedVersion");
   });
 
+  it("keeps the original scheme of an http-only location, and prefers https when both exist", () => {
+    const out = candidatesFromLocations([{ pdfUrl: "http://old.example.org/paper.pdf" }], []);
+    expect(out.map((c) => c.url)).toEqual(["http://old.example.org/paper.pdf"]);
+
+    const both = candidatesFromLocations(
+      [
+        { pdfUrl: "http://old.example.org/paper.pdf" },
+        { pdfUrl: "https://old.example.org/paper.pdf", version: "publishedVersion" },
+      ],
+      []
+    );
+    expect(both.map((c) => c.url)).toEqual(["https://old.example.org/paper.pdf"]);
+  });
+
+  it("treats URLs differing only in path case as different copies", () => {
+    const out = candidatesFromLocations(
+      [
+        { pdfUrl: "https://repo.example.org/Paper.pdf" },
+        { pdfUrl: "https://repo.example.org/paper.pdf" },
+      ],
+      []
+    );
+    expect(out).toHaveLength(2);
+  });
+
+  it("turns Europe PMC article URLs into the PMC article page", () => {
+    const out = candidatesFromLocations(
+      [
+        { pdfUrl: "https://europepmc.org/articles/pmc4221854?pdf=render" },
+        { landingUrl: "https://europepmc.org/pmc/articles/PMC999" },
+      ],
+      []
+    );
+    expect(out.map((c) => [c.url, c.kind])).toEqual([
+      ["https://pmc.ncbi.nlm.nih.gov/articles/PMC4221854/", "html"],
+      ["https://pmc.ncbi.nlm.nih.gov/articles/PMC999/", "html"],
+    ]);
+  });
+
+  it("ignores version strings that are not real versions", () => {
+    const out = candidatesFromLocations(
+      [{ pdfUrl: "https://repo.example.org/a.pdf", version: "toString" }],
+      []
+    );
+    expect(out[0].version).toBeUndefined();
+  });
+
   it("ignores non-http URLs", () => {
     expect(candidatesFromLocations([{ pdfUrl: "ftp://x.example/a.pdf" }], [])).toEqual([]);
   });
@@ -104,6 +151,12 @@ describe("candidateKey", () => {
   it("ignores scheme, case of host, trailing slash and fragment", () => {
     expect(candidateKey("http://PMC.ncbi.nlm.nih.gov/articles/PMC1/#x")).toBe(
       candidateKey("https://pmc.ncbi.nlm.nih.gov/articles/PMC1")
+    );
+  });
+
+  it("keeps the case of the path and query", () => {
+    expect(candidateKey("https://x.example/Paper.pdf")).not.toBe(
+      candidateKey("https://x.example/paper.pdf")
     );
   });
 });
