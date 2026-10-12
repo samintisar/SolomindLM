@@ -1,7 +1,6 @@
 # Citation pages and click-through — design
 
-Part of #356 (cited extraction table), slice 1 of 4. Also delivers growth-plan feature #3, "citations that open the
-PDF at the exact page and passage".
+Part of #489 (cited extraction table), slice 1 of 4.
 
 ## Goal
 
@@ -89,5 +88,5 @@ cells reuse it in slice 2.
 ## Out of scope
 
 - Highlighting inside the rendered PDF page (its text layer differs from OCR text).
-- The extraction table, column templates and XLSX export (slices 2–4 of #356).
+- The extraction table, column templates and XLSX export (slices 2–4 of #489).
 - Pages for sources that don't go through Mistral OCR.

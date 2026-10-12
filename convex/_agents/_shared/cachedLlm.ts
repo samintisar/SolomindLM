@@ -6,6 +6,7 @@
 
 import { env } from "../../_lib/env";
 import { mergeModelKwargs } from "./llm_factory.js";
+import { MissingStructuredJsonError } from "./llmErrors.js";
 
 // ============================================================
 // Types
@@ -303,25 +304,6 @@ async function executeTogetherLlmRequest(
 
       const hasStructuredJson = Boolean(structuredJson?.trim());
 
-      if (wantsStructuredJson && !hasStructuredJson) {
-        if (!content.trim()) {
-          logEmptyTogetherAssistant(options.model, choice);
-        }
-        const msg = choice?.message;
-        console.warn("[Together LLM] structured response missing JSON payload", {
-          model: options.model,
-          finishReason: choice?.finish_reason,
-          contentPreview: messageContentToString(msg).slice(0, 120),
-          reasoningPreview:
-            typeof msg?.reasoning === "string" ? msg.reasoning.slice(0, 120) : undefined,
-        });
-        throw new Error("LLM API returned no JSON payload for structured response");
-      }
-
-      if (!content.trim() && !hasStructuredJson) {
-        logEmptyTogetherAssistant(options.model, choice);
-      }
-
       const usageRaw = data.usage;
       const usage =
         usageRaw &&
@@ -334,6 +316,29 @@ async function executeTogetherLlmRequest(
               totalTokens: usageRaw.total_tokens,
             }
           : undefined;
+
+      if (wantsStructuredJson && !hasStructuredJson) {
+        if (!content.trim()) {
+          logEmptyTogetherAssistant(options.model, choice);
+        }
+        const msg = choice?.message;
+        console.warn("[Together LLM] structured response missing JSON payload", {
+          model: options.model,
+          finishReason: choice?.finish_reason,
+          contentPreview: messageContentToString(msg).slice(0, 120),
+          reasoningPreview:
+            typeof msg?.reasoning === "string" ? msg.reasoning.slice(0, 120) : undefined,
+        });
+        throw new MissingStructuredJsonError({
+          model: options.model,
+          finishReason: choice?.finish_reason,
+          usage,
+        });
+      }
+
+      if (!content.trim() && !hasStructuredJson) {
+        logEmptyTogetherAssistant(options.model, choice);
+      }
 
       return {
         content,

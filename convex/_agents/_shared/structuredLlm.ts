@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { env } from "../../_lib/env";
 import { extractJsonObjectString, uncachedLlmCall } from "./cachedLlm.js";
+import { MissingStructuredJsonError } from "./llmErrors.js";
 import { fromProviderUsage, type TokenUsage } from "./usageAggregate.js";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
@@ -23,6 +24,8 @@ export type InvokeStructuredOutputOptions<T> = {
   /** Prefix for retry / fallback log lines (e.g. `WrittenQuestionsMap`). */
   logPrefix?: string;
   onUsage?: (usage: TokenUsage) => void;
+  /** Called when reasoning is switched off after a `finish_reason: "length"` failure. */
+  onReasoningDisabled?: () => void;
 };
 
 function parseStructuredContent<T>(raw: string, schema: z.ZodType<T>): T {
@@ -63,6 +66,9 @@ function isRetriableStructuredError(error: unknown): boolean {
  * Handles GPT-OSS models that return JSON in `reasoning` when `content` is empty.
  * Retries parse/validation failures up to `maxAttempts` (default 3) with backoff;
  * the final attempt falls back to `json_object`. Other errors fail immediately.
+ * If a reasoning-on attempt stops at `max_tokens` (`finish_reason: "length"`) without valid JSON,
+ * the remaining attempts run with reasoning off: repeating the same settings fails the same way.
+ * Every attempt's token usage is reported, including failed ones.
  */
 export async function invokeStructuredOutput<T>(
   options: InvokeStructuredOutputOptions<T>
@@ -70,7 +76,7 @@ export async function invokeStructuredOutput<T>(
   const model = options.model ?? env.FAST_LLM;
   const maxTokens = options.maxTokens ?? 16_384;
   const temperature = options.temperature ?? 0.3;
-  const reasoningEnabled = options.reasoningEnabled ?? false;
+  let reasoningEnabled = options.reasoningEnabled ?? false;
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const logPrefix = options.logPrefix ?? "StructuredOutput";
   const jsonSchema = z.toJSONSchema(options.schema) as Record<string, unknown>;
@@ -78,6 +84,7 @@ export async function invokeStructuredOutput<T>(
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    let finishReason: string | undefined;
     try {
       const isLastAttempt = attempt === maxAttempts - 1;
       if (isLastAttempt && attempt > 0) {
@@ -109,16 +116,30 @@ export async function invokeStructuredOutput<T>(
             },
       });
 
-      const jsonPayload =
-        response.structuredJson?.trim() || extractJsonObjectString(response.content) || "";
-      const parsed = parseStructuredContent(jsonPayload, options.schema);
+      finishReason = response.finishReason;
       const usage = fromProviderUsage(response.usage);
       if (usage) {
         options.onUsage?.(usage);
       }
-      return parsed;
+      const jsonPayload =
+        response.structuredJson?.trim() || extractJsonObjectString(response.content) || "";
+      return parseStructuredContent(jsonPayload, options.schema);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      if (error instanceof MissingStructuredJsonError) {
+        finishReason = error.finishReason;
+        const usage = fromProviderUsage(error.usage);
+        if (usage) {
+          options.onUsage?.(usage);
+        }
+      }
+      if (reasoningEnabled && finishReason === "length") {
+        reasoningEnabled = false;
+        options.onReasoningDisabled?.();
+        console.warn(
+          `[${logPrefix}] Reasoning used the whole ${maxTokens}-token budget before valid JSON; retrying with reasoning off`
+        );
+      }
       if (attempt < maxAttempts - 1 && isRetriableStructuredError(error)) {
         const delayMs = 1000 * 2 ** attempt;
         console.warn(

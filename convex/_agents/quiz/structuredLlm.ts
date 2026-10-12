@@ -40,6 +40,9 @@ export function createStructuredLLM<T>(
   }
 ): StructuredOutputInvoker<T> {
   const model = options?.model ?? env.FAST_LLM;
+  // Once a call switches reasoning off after a length failure, later invokes (e.g. an outer
+  // retry) start with it off instead of repeating the failing setting.
+  let reasoningEnabled = options?.reasoningEnabled;
 
   return {
     invoke: async (messages) => {
@@ -52,9 +55,12 @@ export function createStructuredLLM<T>(
         model,
         maxTokens: options?.maxTokens,
         temperature: options?.temperature,
-        reasoningEnabled: options?.reasoningEnabled,
+        reasoningEnabled,
         logPrefix: options?.logPrefix ?? "QuizStructured",
         onUsage: options?.onUsage,
+        onReasoningDisabled: () => {
+          reasoningEnabled = false;
+        },
       }) as Promise<T>;
     },
   };

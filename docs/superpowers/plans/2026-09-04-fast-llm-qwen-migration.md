@@ -397,5 +397,4 @@ git status --short
 git log -3 --oneline
 ```
 
-Expected: only the intended migration commits are present; do not add or
-modify the pre-existing `archive/SolomindLM_Creator_Brief.pdf`.
+Expected: only the intended migration commits are present.
