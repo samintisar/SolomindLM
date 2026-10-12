@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
@@ -54,6 +54,10 @@ async function seedPaper(
 }
 
 describe("documents.paperFullText internal", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("recordPaperIngest sets the outcome and clears an old source when none is given", async () => {
     const t = makeT();
     const { documentId } = await seedPaper(t, {
@@ -101,6 +105,8 @@ describe("documents.paperFullText internal", () => {
   });
 
   test("prepareDocumentReembed keeps fullTextSource unless a new PDF replaces the old one", async () => {
+    // Fake timers keep the scheduled docEmbedding job from running (it would call real APIs).
+    vi.useFakeTimers();
     const t = makeT();
     const { documentId } = await seedPaper(t, {
       ingestionStatus: "ingested",
@@ -113,6 +119,8 @@ describe("documents.paperFullText internal", () => {
     });
     let doc = await t.run((ctx) => ctx.db.get(documentId));
     expect(doc).toMatchObject({ status: "pending", ingestionStatus: "pending" });
+    const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(scheduled.some((f) => f.name.includes("docEmbedding"))).toBe(true);
     expect(doc?.fullTextSource).toEqual({ method: "oa_pdf", host: "arxiv.org" });
 
     const storageId = await t.run((ctx) => ctx.storage.store(new Blob(["%PDF-1.7"])));

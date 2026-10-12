@@ -272,13 +272,25 @@ export const docEmbedding = internalAction({
                 new Blob([bytes], { type: "application/pdf" })
               );
               const previous = currentStorageId;
-              await ctx.runMutation(internal.documents.paperFullText.setPaperStorage, {
-                documentId,
-                storageId,
-              });
+              try {
+                await ctx.runMutation(internal.documents.paperFullText.setPaperStorage, {
+                  documentId,
+                  storageId,
+                });
+              } catch (e) {
+                await ctx.storage.delete(storageId as Id<"_storage">).catch(() => {});
+                throw e;
+              }
               currentStorageId = storageId;
               if (previous && previous !== storageId) {
-                await ctx.storage.delete(previous as Id<"_storage">);
+                try {
+                  await ctx.storage.delete(previous as Id<"_storage">);
+                } catch (e) {
+                  logger.warn("Could not delete the replaced PDF", {
+                    storageId: previous,
+                    error: e instanceof Error ? e.message : String(e),
+                  });
+                }
               }
               return storageId;
             },
