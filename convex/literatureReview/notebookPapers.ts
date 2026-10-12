@@ -110,7 +110,7 @@ export function notebookPaperText(
     fileType?: string;
   }
 ): string {
-  if (doc.fileType === "paper_record" && doc.ingestionStatus !== "ingested") return "";
+  if (doc.fileType === "paper_record" && doc.ingestionStatus === "metadata_only") return "";
   const text = startOfText(doc.extractedMarkdown, NOTEBOOK_PAPER_TEXT_MAX_CHARS);
   return text || (doc.paperRecord?.abstract ?? "").trim();
 }

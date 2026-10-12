@@ -120,6 +120,15 @@ describe("notebookPaperText", () => {
       })
     ).toBe("Full article text");
   });
+
+  it("keeps the full text of a paper record with no ingestion status (e.g. a forked notebook)", () => {
+    expect(
+      notebookPaperText({
+        fileType: "paper_record",
+        extractedMarkdown: "Full article text",
+      })
+    ).toBe("Full article text");
+  });
 });
 
 describe("dropSearchCopiesOfNotebookPapers", () => {
