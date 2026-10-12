@@ -40,8 +40,8 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
   const localIdsRef = useRef(new Set<string>());
   /** Rows removed locally whose delete has not finished yet. */
   const deletingIdsRef = useRef(new Set<string>());
-  const updateDocument = useUpdateDocument();
-  const deleteDocumentMutation = useDeleteDocument();
+  const updateDocument = useUpdateDocument(notebookId);
+  const deleteDocumentMutation = useDeleteDocument(notebookId);
   const removeManyDocuments = useRemoveManyDocuments(notebookId);
   const { error: showError } = useToast();
 
