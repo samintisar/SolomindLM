@@ -159,6 +159,9 @@ import type * as _services_extraction_BibliographyParserService from "../_servic
 import type * as _services_extraction_DoiResolverService from "../_services/extraction/DoiResolverService.js";
 import type * as _services_extraction_MistralOCRService from "../_services/extraction/MistralOCRService.js";
 import type * as _services_extraction_WebLoaderService from "../_services/extraction/WebLoaderService.js";
+import type * as _services_extraction_openAccess_OpenAccessResolver from "../_services/extraction/openAccess/OpenAccessResolver.js";
+import type * as _services_extraction_openAccess_fetchOaCandidate from "../_services/extraction/openAccess/fetchOaCandidate.js";
+import type * as _services_extraction_openAccess_fullTextTest from "../_services/extraction/openAccess/fullTextTest.js";
 import type * as _services_extraction_urlSource from "../_services/extraction/urlSource.js";
 import type * as _services_extractors from "../_services/extractors.js";
 import type * as _services_grading_WrittenQuestionsGradingService from "../_services/grading/WrittenQuestionsGradingService.js";
@@ -199,6 +202,8 @@ import type * as documents_getExistingPapers from "../documents/getExistingPaper
 import type * as documents_index from "../documents/index.js";
 import type * as documents_internal from "../documents/internal.js";
 import type * as documents_listSummary from "../documents/listSummary.js";
+import type * as documents_paperFullText from "../documents/paperFullText.js";
+import type * as documents_paperIngest from "../documents/paperIngest.js";
 import type * as documents_paperRecord from "../documents/paperRecord.js";
 import type * as documents_parseBibliography from "../documents/parseBibliography.js";
 import type * as documents_refreshRemote from "../documents/refreshRemote.js";
@@ -475,6 +480,9 @@ declare const fullApi: ApiFromModules<{
   "_services/extraction/DoiResolverService": typeof _services_extraction_DoiResolverService;
   "_services/extraction/MistralOCRService": typeof _services_extraction_MistralOCRService;
   "_services/extraction/WebLoaderService": typeof _services_extraction_WebLoaderService;
+  "_services/extraction/openAccess/OpenAccessResolver": typeof _services_extraction_openAccess_OpenAccessResolver;
+  "_services/extraction/openAccess/fetchOaCandidate": typeof _services_extraction_openAccess_fetchOaCandidate;
+  "_services/extraction/openAccess/fullTextTest": typeof _services_extraction_openAccess_fullTextTest;
   "_services/extraction/urlSource": typeof _services_extraction_urlSource;
   "_services/extractors": typeof _services_extractors;
   "_services/grading/WrittenQuestionsGradingService": typeof _services_grading_WrittenQuestionsGradingService;
@@ -515,6 +523,8 @@ declare const fullApi: ApiFromModules<{
   "documents/index": typeof documents_index;
   "documents/internal": typeof documents_internal;
   "documents/listSummary": typeof documents_listSummary;
+  "documents/paperFullText": typeof documents_paperFullText;
+  "documents/paperIngest": typeof documents_paperIngest;
   "documents/paperRecord": typeof documents_paperRecord;
   "documents/parseBibliography": typeof documents_parseBibliography;
   "documents/refreshRemote": typeof documents_refreshRemote;
