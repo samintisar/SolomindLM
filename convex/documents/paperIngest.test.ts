@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OaCandidate } from "../_services/extraction/openAccess/OpenAccessResolver";
 import {
-  CANDIDATE_BUDGET_MS,
   fulltextStatusAfterIngest,
+  HTML_ATTEMPT_RESERVE_MS,
+  INGEST_DEADLINE_MS,
   ingestPaper,
   MAX_CANDIDATE_ATTEMPTS,
   type PaperIngestDeps,
   type PaperIngestInput,
+  PDF_ATTEMPT_RESERVE_MS,
 } from "./paperIngest";
 
 const longText = Array.from({ length: 2_000 }, (_, i) => `w${i}`).join(" ");
@@ -164,7 +166,7 @@ describe("ingestPaper", () => {
         .fn()
         .mockResolvedValue([candidate(), candidate({ url: "https://b.example/2.pdf" })]),
       fetchCandidate: vi.fn().mockImplementation(async () => {
-        t += CANDIDATE_BUDGET_MS;
+        t += INGEST_DEADLINE_MS;
         return { type: "unusable", reason: "slow" };
       }),
       now: () => t,
@@ -216,6 +218,333 @@ describe("ingestPaper", () => {
     expect(out.content).toContain("## Abstract");
     expect(out.content).toContain("Short abstract.");
     expect(out.content).toContain("Full text was not ingested");
+  });
+
+  describe("a stored PDF is never lost", () => {
+    it("rethrows when OCR of the stored PDF fails, without touching storage", async () => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockRejectedValue(new Error("Mistral 503")),
+        resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+      });
+      await expect(ingestPaper(input({ storageId: "storage_1" }), deps, logger)).rejects.toThrow(
+        "Mistral 503"
+      );
+      expect(deps.attachPdf).not.toHaveBeenCalled();
+      expect(deps.detachPdf).not.toHaveBeenCalled();
+    });
+
+    it("skips PDF candidates when the stored PDF has no text, but still uses HTML ones", async () => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockResolvedValue("  "),
+        resolveCandidates: vi.fn().mockResolvedValue([
+          candidate({ url: "https://a.example/1.pdf", host: "a.example" }),
+          candidate({
+            url: "https://pmc.example/articles/PMC1/",
+            kind: "html",
+            host: "pmc.example",
+          }),
+        ]),
+        fetchCandidate: vi
+          .fn()
+          .mockResolvedValue({ type: "html", finalUrl: "https://pmc.example/articles/PMC1/" }),
+        scrape: vi.fn().mockResolvedValue({ title: "PMC", content: longText }),
+      });
+      const out = await ingestPaper(input({ storageId: "storage_1" }), deps, logger);
+      expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
+      expect(deps.fetchCandidate).toHaveBeenCalledWith("https://pmc.example/articles/PMC1/");
+      expect(deps.attachPdf).not.toHaveBeenCalled();
+      expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "oa_html" } });
+    });
+
+    it("doesn't replace the stored PDF when an HTML candidate actually serves a PDF", async () => {
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockResolvedValue(""),
+        resolveCandidates: vi
+          .fn()
+          .mockResolvedValue([candidate({ url: "https://a.example/view", kind: "html" })]),
+        fetchCandidate: vi
+          .fn()
+          .mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "https://a.example/x.pdf" }),
+      });
+      const out = await ingestPaper(
+        input({ storageId: "storage_1", fileUrl: undefined }),
+        deps,
+        logger
+      );
+      expect(deps.attachPdf).not.toHaveBeenCalled();
+      expect(out.outcome).toBe("abstract_only");
+    });
+
+    it("records a stored PDF with a stale non-PDF source as uploaded", async () => {
+      const out = await ingestPaper(
+        input({
+          storageId: "storage_1",
+          fullTextSource: { method: "oa_html", url: "https://pmc.example/a" },
+        }),
+        makeDeps(),
+        logger
+      );
+      expect(out).toMatchObject({
+        outcome: "full_text",
+        fullTextSource: { method: "uploaded_pdf" },
+      });
+    });
+  });
+
+  describe("deadline", () => {
+    it("skips a PDF candidate that no longer fits but still tries an HTML one", async () => {
+      let t = 0;
+      const deps = makeDeps({
+        // Candidate lookup eats most of the deadline: HTML still fits, PDF no longer does.
+        resolveCandidates: vi.fn().mockImplementation(async () => {
+          t += INGEST_DEADLINE_MS - PDF_ATTEMPT_RESERVE_MS + 1;
+          return [
+            candidate({ url: "https://a.example/1.pdf", host: "a.example" }),
+            candidate({ url: "https://pmc.example/a/", kind: "html", host: "pmc.example" }),
+          ];
+        }),
+        fetchCandidate: vi
+          .fn()
+          .mockResolvedValue({ type: "html", finalUrl: "https://pmc.example/a/" }),
+        scrape: vi.fn().mockResolvedValue({ title: "A", content: longText }),
+        now: () => t,
+      });
+      expect(PDF_ATTEMPT_RESERVE_MS).toBeGreaterThan(HTML_ATTEMPT_RESERVE_MS);
+      const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+      expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
+      expect(deps.fetchCandidate).toHaveBeenCalledWith("https://pmc.example/a/");
+      expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "oa_html" } });
+    });
+
+    it("doesn't count skipped candidates as attempts", async () => {
+      let t = 0;
+      const pdfs = Array.from({ length: MAX_CANDIDATE_ATTEMPTS + 2 }, (_, i) =>
+        candidate({ url: `https://m.example/${i}.pdf`, host: "m.example" })
+      );
+      const html = candidate({ url: "https://pmc.example/a/", kind: "html", host: "pmc.example" });
+      const deps = makeDeps({
+        resolveCandidates: vi.fn().mockImplementation(async () => {
+          t += INGEST_DEADLINE_MS - PDF_ATTEMPT_RESERVE_MS + 1;
+          return [...pdfs, html];
+        }),
+        fetchCandidate: vi
+          .fn()
+          .mockResolvedValue({ type: "html", finalUrl: "https://pmc.example/a/" }),
+        scrape: vi.fn().mockResolvedValue({ title: "A", content: longText }),
+        now: () => t,
+      });
+      const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+      expect(out.outcome).toBe("full_text");
+    });
+
+    it("doesn't store a fetched PDF when there's no time left to OCR it", async () => {
+      let t = 0;
+      const deps = makeDeps({
+        resolveCandidates: vi
+          .fn()
+          .mockResolvedValue([candidate({ url: "https://a.example/view", kind: "html" })]),
+        fetchCandidate: vi.fn().mockImplementation(async () => {
+          t += 250_000;
+          return { type: "pdf", bytes: pdfBytes, finalUrl: "https://a.example/x.pdf" };
+        }),
+        now: () => t,
+      });
+      const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+      expect(deps.attachPdf).not.toHaveBeenCalled();
+      expect(out.outcome).toBe("abstract_only");
+    });
+
+    it("skips the landing page when too little time is left", async () => {
+      let t = 0;
+      const deps = makeDeps({
+        resolveCandidates: vi.fn().mockImplementation(async () => {
+          t += INGEST_DEADLINE_MS - 59_999;
+          return [];
+        }),
+        scrape: vi.fn().mockResolvedValue({ title: "Article", content: longText }),
+        now: () => t,
+      });
+      const out = await ingestPaper(input(), deps, logger);
+      expect(deps.scrape).not.toHaveBeenCalled();
+      expect(out.outcome).toBe("abstract_only");
+    });
+
+    it("counts a time-consuming stored-PDF step against the deadline", async () => {
+      let t = 0;
+      const deps = makeDeps({
+        ocrStoredPdf: vi.fn().mockImplementation(async () => {
+          t += INGEST_DEADLINE_MS - 59_999;
+          return "";
+        }),
+        scrape: vi.fn().mockResolvedValue({ title: "Article", content: longText }),
+        now: () => t,
+      });
+      const out = await ingestPaper(input({ storageId: "storage_1" }), deps, logger);
+      expect(deps.scrape).not.toHaveBeenCalled();
+      expect(out.outcome).toBe("abstract_only");
+    });
+
+    it("measures the deadline from the start of the ingest", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+        fetchCandidate: vi.fn().mockResolvedValue({ type: "unusable", reason: "x" }),
+        now: () => 1_000_000,
+      });
+      await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+      expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("resilience", () => {
+    it("falls through to the landing page when candidate lookup throws", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi.fn().mockRejectedValue(new Error("Unpaywall down")),
+        scrape: vi.fn().mockResolvedValue({ title: "Article", content: longText }),
+      });
+      const out = await ingestPaper(input(), deps, logger);
+      expect(out).toMatchObject({
+        outcome: "full_text",
+        fullTextSource: { method: "landing_page" },
+      });
+    });
+
+    it("treats a throwing fetch as unusable and carries on", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi
+          .fn()
+          .mockResolvedValue([
+            candidate({ url: "https://a.example/1.pdf", host: "a.example" }),
+            candidate({ url: "https://b.example/2.pdf", host: "b.example" }),
+          ]),
+        fetchCandidate: vi
+          .fn()
+          .mockRejectedValueOnce(new Error("socket hang up"))
+          .mockResolvedValueOnce({
+            type: "pdf",
+            bytes: pdfBytes,
+            finalUrl: "https://b.example/2.pdf",
+          }),
+      });
+      const out = await ingestPaper(input(), deps, logger);
+      expect(deps.fetchCandidate).toHaveBeenCalledTimes(2);
+      expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "oa_pdf" } });
+    });
+
+    it("continues to the next candidate when storing a PDF fails", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi
+          .fn()
+          .mockResolvedValue([
+            candidate({ url: "https://a.example/1.pdf", host: "a.example" }),
+            candidate({ url: "https://b.example/2.pdf", host: "b.example" }),
+          ]),
+        fetchCandidate: vi.fn().mockImplementation(async (url: string) => ({
+          type: "pdf",
+          bytes: pdfBytes,
+          finalUrl: url,
+        })),
+        attachPdf: vi
+          .fn()
+          .mockRejectedValueOnce(new Error("storage 500"))
+          .mockResolvedValueOnce("storage_ok"),
+      });
+      const out = await ingestPaper(input(), deps, logger);
+      expect(deps.attachPdf).toHaveBeenCalledTimes(2);
+      expect(deps.ocrStoredPdf).toHaveBeenCalledWith("storage_ok");
+      expect(out).toMatchObject({
+        outcome: "full_text",
+        fullTextSource: { url: "https://b.example/2.pdf" },
+      });
+    });
+
+    it("swallows a failed delete of an unreadable PDF", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+        fetchCandidate: vi.fn().mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "x" }),
+        ocrStoredPdf: vi.fn().mockResolvedValue(""),
+        detachPdf: vi.fn().mockRejectedValue(new Error("delete failed")),
+      });
+      const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+      expect(deps.detachPdf).toHaveBeenCalledWith("storage_new");
+      expect(out.outcome).toBe("abstract_only");
+    });
+  });
+
+  describe("landing page", () => {
+    it("uses the record's landing page when there is no file URL", async () => {
+      const deps = makeDeps({
+        scrape: vi.fn().mockResolvedValue({ title: "Article", content: longText }),
+      });
+      const out = await ingestPaper(
+        input({
+          fileUrl: undefined,
+          paperRecord: {
+            abstract: "Short abstract.",
+            landingPageUrl: "https://journal.example/article/1",
+          },
+        }),
+        deps,
+        logger
+      );
+      expect(deps.scrape).toHaveBeenCalledWith("https://journal.example/article/1");
+      expect(out).toMatchObject({
+        fullTextSource: { method: "landing_page", host: "journal.example" },
+      });
+    });
+
+    it("doesn't re-scrape a landing page an earlier candidate redirected to", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi
+          .fn()
+          .mockResolvedValue([candidate({ url: "https://link.example/go/1", kind: "html" })]),
+        fetchCandidate: vi
+          .fn()
+          .mockResolvedValue({ type: "html", finalUrl: "https://doi.org/10.1038/nature12373" }),
+        scrape: vi.fn().mockResolvedValue({ title: "Paywall", content: "Buy this article" }),
+      });
+      await ingestPaper(input(), deps, logger);
+      expect(deps.scrape).toHaveBeenCalledTimes(1);
+    });
+
+    it("treats scheme and trailing-slash variants of a tried URL as the same page", async () => {
+      const deps = makeDeps({
+        resolveCandidates: vi.fn().mockResolvedValue([
+          candidate({
+            url: "http://pmc.example/articles/PMC1",
+            kind: "html",
+            host: "pmc.example",
+          }),
+        ]),
+        fetchCandidate: vi
+          .fn()
+          .mockResolvedValue({ type: "html", finalUrl: "http://pmc.example/articles/PMC1" }),
+        scrape: vi.fn().mockResolvedValue({ title: "Short", content: "nope" }),
+      });
+      await ingestPaper(input({ fileUrl: "https://pmc.example/articles/PMC1/" }), deps, logger);
+      expect(deps.scrape).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("takes an HTML result's host from the page it ended up on", async () => {
+    const deps = makeDeps({
+      resolveCandidates: vi
+        .fn()
+        .mockResolvedValue([
+          candidate({ url: "https://doi.org/10.1/x", kind: "html", host: "doi.org" }),
+        ]),
+      fetchCandidate: vi
+        .fn()
+        .mockResolvedValue({ type: "html", finalUrl: "https://publisher.example/article/x" }),
+      scrape: vi.fn().mockResolvedValue({ title: "Article", content: longText }),
+    });
+    const out = await ingestPaper(input(), deps, logger);
+    expect(out).toMatchObject({
+      fullTextSource: {
+        method: "oa_html",
+        url: "https://publisher.example/article/x",
+        host: "publisher.example",
+      },
+    });
   });
 });
 

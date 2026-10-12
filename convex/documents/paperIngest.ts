@@ -6,19 +6,33 @@
  *   4. otherwise the title + abstract stub, marked abstract only.
  * Scraped text must pass `isFullTextLength`. All I/O comes in through `deps`, so this is unit-tested
  * without Convex; `embeddingJob` supplies the real storage, OCR and scraper.
+ *
+ * A PDF that is already stored is never replaced: if its OCR throws the error propagates (the
+ * caller marks the source failed and the user can retry), and if it yields no text the ladder only
+ * tries non-PDF routes. Steps 1-3 share one deadline (`INGEST_DEADLINE_MS`) so the caller keeps
+ * enough of Convex's 600 s action limit to chunk and embed the result.
  */
 
 import type { FetchedCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
 import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTest";
-import type {
-  OaCandidate,
-  OaResolverInput,
+import {
+  candidateKey,
+  type OaCandidate,
+  type OaResolverInput,
 } from "../_services/extraction/openAccess/OpenAccessResolver";
 import { buildPaperMetadataMarkdown, type FullTextSource, type PaperRecord } from "./paperRecord";
 
 export const MAX_CANDIDATE_ATTEMPTS = 6;
-/** Keeps the whole embedding job well inside Convex's 600 s action limit. */
-export const CANDIDATE_BUDGET_MS = 180_000;
+/** Steps 1-3 must finish this long after `ingestPaper` starts; chunking and embedding get the rest of 600 s. */
+export const INGEST_DEADLINE_MS = 420_000;
+/** Worst case for a PDF candidate: 30 s fetch + Mistral OCR with retries (about 3 x 60 s + backoff). */
+export const PDF_ATTEMPT_RESERVE_MS = 220_000;
+/** Worst case for an HTML candidate: 30 s fetch + a Supadata scrape. */
+export const HTML_ATTEMPT_RESERVE_MS = 90_000;
+/** Time needed to store and OCR a PDF once it has been downloaded (the fetch is already spent). */
+const PDF_OCR_RESERVE_MS = 190_000;
+/** Time needed for the landing-page scrape. */
+const LANDING_RESERVE_MS = 60_000;
 
 export interface PaperIngestInput {
   title: string;
@@ -102,21 +116,43 @@ async function fullTextPage(
   return null;
 }
 
+interface AttemptContext {
+  abstract: string;
+  deps: PaperIngestDeps;
+  logger: IngestLogger;
+  /** `candidateKey`s of every page already looked at, including where redirects ended up. */
+  tried: Set<string>;
+  deadline: number;
+  /** A PDF is stored on the source and must not be replaced. */
+  keepStoredPdf: boolean;
+}
+
 async function tryCandidate(
   candidate: OaCandidate,
-  abstract: string,
-  deps: PaperIngestDeps,
-  logger: IngestLogger
+  ctx: AttemptContext
 ): Promise<FullTextResult | null> {
-  const fetched = await deps.fetchCandidate(candidate.url);
-  const provenance = {
-    url: candidate.url,
-    version: candidate.version,
-    license: candidate.license,
-    host: candidate.host,
-  };
+  const { abstract, deps, logger, tried } = ctx;
+  let fetched: FetchedCandidate;
+  try {
+    fetched = await deps.fetchCandidate(candidate.url);
+  } catch (e) {
+    logger.warn("Fetching open-access candidate failed", {
+      url: candidate.url,
+      error: errorMessage(e),
+    });
+    return null;
+  }
+  if (fetched.type !== "unusable") tried.add(candidateKey(fetched.finalUrl));
 
   if (fetched.type === "pdf") {
+    if (ctx.keepStoredPdf) {
+      logger.info("Skipping a PDF; the source already has one stored", { url: candidate.url });
+      return null;
+    }
+    if (deps.now() + PDF_OCR_RESERVE_MS > ctx.deadline) {
+      logger.info("Skipping a fetched PDF; too little time left to OCR it", { url: candidate.url });
+      return null;
+    }
     let storageId: string;
     try {
       storageId = await deps.attachPdf(fetched.bytes);
@@ -129,7 +165,13 @@ async function tryCandidate(
       return {
         outcome: "full_text",
         content: text,
-        fullTextSource: compactSource({ method: "oa_pdf", ...provenance }),
+        fullTextSource: compactSource({
+          method: "oa_pdf",
+          url: candidate.url,
+          version: candidate.version,
+          license: candidate.license,
+          host: candidate.host,
+        }),
       };
     }
     await deps
@@ -147,12 +189,35 @@ async function tryCandidate(
       outcome: "full_text",
       content: page.content,
       title: page.title,
-      fullTextSource: compactSource({ method: "oa_html", ...provenance, url: fetched.finalUrl }),
+      fullTextSource: compactSource({
+        method: "oa_html",
+        url: fetched.finalUrl,
+        version: candidate.version,
+        license: candidate.license,
+        host: hostOf(fetched.finalUrl) ?? candidate.host,
+      }),
     };
   }
 
   logger.info("Open-access candidate unusable", { url: candidate.url, reason: fetched.reason });
   return null;
+}
+
+async function resolveCandidatesSafely(
+  pr: PaperRecord,
+  deps: PaperIngestDeps,
+  logger: IngestLogger
+): Promise<OaCandidate[]> {
+  try {
+    return await deps.resolveCandidates({
+      doi: pr.doi,
+      openAlexId: pr.openAlexId,
+      pdfUrl: pr.pdfUrl,
+    });
+  } catch (e) {
+    logger.warn("Open-access lookup failed", { error: errorMessage(e) });
+    return [];
+  }
 }
 
 export async function ingestPaper(
@@ -162,39 +227,47 @@ export async function ingestPaper(
 ): Promise<PaperIngestResult> {
   const pr = input.paperRecord;
   const abstract = pr.abstract ?? "";
+  const deadline = deps.now() + INGEST_DEADLINE_MS;
 
-  // 1. A PDF already on the source.
+  // 1. A PDF already on the source. A failed OCR throws: the file must not be replaced by a
+  // download, and the caller's failure path lets the user retry.
+  let keepStoredPdf = false;
   if (input.storageId) {
-    const text = await ocrText(deps, input.storageId, logger);
+    const text = (await deps.ocrStoredPdf(input.storageId)).trim();
     if (text) {
+      const recorded = input.fullTextSource;
       return {
         outcome: "full_text",
         content: text,
-        fullTextSource: input.fullTextSource ?? { method: "uploaded_pdf" },
+        fullTextSource:
+          recorded && (recorded.method === "oa_pdf" || recorded.method === "uploaded_pdf")
+            ? recorded
+            : { method: "uploaded_pdf" },
       };
     }
+    logger.warn("Stored PDF OCR returned no text; keeping the file and trying other routes", {
+      storageId: input.storageId,
+    });
+    keepStoredPdf = true;
   }
 
   // 2. Open-access candidates.
-  const tried = new Set<string>();
-  const started = deps.now();
-  const candidates = await deps.resolveCandidates({
-    doi: pr.doi,
-    openAlexId: pr.openAlexId,
-    pdfUrl: pr.pdfUrl,
-  });
+  const ctx: AttemptContext = { abstract, deps, logger, tried: new Set(), deadline, keepStoredPdf };
+  const candidates = await resolveCandidatesSafely(pr, deps, logger);
   let attempts = 0;
   for (const candidate of candidates) {
-    if (attempts >= MAX_CANDIDATE_ATTEMPTS || deps.now() - started >= CANDIDATE_BUDGET_MS) {
-      logger.info("Stopped trying open-access candidates", {
-        attempts,
-        candidates: candidates.length,
-      });
+    if (attempts >= MAX_CANDIDATE_ATTEMPTS) break;
+    const remaining = deadline - deps.now();
+    if (remaining < HTML_ATTEMPT_RESERVE_MS) {
+      logger.info("Out of time for open-access candidates", { attempts });
       break;
     }
+    if (candidate.kind === "pdf" && (keepStoredPdf || remaining < PDF_ATTEMPT_RESERVE_MS)) {
+      continue;
+    }
     attempts++;
-    tried.add(candidate.url);
-    const result = await tryCandidate(candidate, abstract, deps, logger);
+    ctx.tried.add(candidateKey(candidate.url));
+    const result = await tryCandidate(candidate, ctx);
     if (result) {
       logger.info("Paper full text found", {
         method: result.fullTextSource.method,
@@ -207,19 +280,23 @@ export async function ingestPaper(
 
   // 3. The landing page.
   const landing = input.fileUrl?.trim() || pr.landingPageUrl?.trim();
-  if (landing && !tried.has(landing)) {
-    const page = await fullTextPage(deps, landing, abstract, logger);
-    if (page) {
-      return {
-        outcome: "full_text",
-        content: page.content,
-        title: page.title,
-        fullTextSource: compactSource({
-          method: "landing_page",
-          url: landing,
-          host: hostOf(landing),
-        }),
-      };
+  if (landing && !ctx.tried.has(candidateKey(landing))) {
+    if (deadline - deps.now() < LANDING_RESERVE_MS) {
+      logger.info("Out of time for the landing page", { landing });
+    } else {
+      const page = await fullTextPage(deps, landing, abstract, logger);
+      if (page) {
+        return {
+          outcome: "full_text",
+          content: page.content,
+          title: page.title,
+          fullTextSource: compactSource({
+            method: "landing_page",
+            url: landing,
+            host: hostOf(landing),
+          }),
+        };
+      }
     }
   }
 
