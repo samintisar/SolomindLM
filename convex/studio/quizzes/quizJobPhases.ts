@@ -17,7 +17,6 @@ import {
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
-  pickSpread,
   type QuestionVerification,
   type QuizVerificationResponse,
   QuizVerificationSchema,
@@ -48,8 +47,17 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { invokeStudioLlm } from "../_job/invokeStudioLlm";
-import { createJobDeadline } from "../_job/jobDeadline";
+import { pickSpread } from "../_job/collapsePlan";
+import {
+  generateTitleWithinDeadline,
+  invokeStudioLlm,
+  invokeWithinBudget,
+} from "../_job/invokeStudioLlm";
+import {
+  createJobDeadline,
+  STUDIO_FINALIZE_BUDGET_MS,
+  STUDIO_SAVE_RESERVE_MS,
+} from "../_job/jobDeadline";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("QuizGraph");
@@ -71,10 +79,13 @@ export const QUIZ_EXPAND_LLM_OPTIONS = {
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 400_000, // ~6.7 minutes
-  // Per question expansion attempt. Timeouts are not retried, so a slow provider
-  // gives up after 60s; the backfill reserve below assumes this bound.
+  REDUCE_TIMEOUT_MS: 400_000, // all selection attempts together
+  // Per question expansion, all attempts together. Timeouts are not retried, so a
+  // slow provider gives up after 60s; the reserves below assume this bound.
   EXPAND_TIMEOUT_MS: 60_000,
+  // Most held back from selection for expansion waves + save: covers the largest quiz
+  // the app offers (30 questions = 6 waves of 60s + 30s save), leaving selection 150s.
+  MAX_EXPAND_RESERVE_MS: 390_000,
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 20,
   BUFFER_MULTIPLIER: 1.2,
@@ -83,11 +94,9 @@ const CONFIG = {
   MAP_MAX_ROUNDS: 3,
   // Answer-key verification (#219). Finalization must end before Convex's 600s
   // action limit, so verification and backfill only run while time is left.
-  FINALIZE_BUDGET_MS: 540_000,
   VERIFY_TIMEOUT_MS: 120_000, // per verification batch
   VERIFY_MAX_TOKENS: 16_000, // DeepSeek reasoning shares this budget
   MIN_VERIFY_CALL_MS: 20_000, // below this, questions stay unchecked
-  SAVE_RESERVE_MS: 30_000, // held back for title generation + saving
   BACKFILL_MIN_REMAINING_MS: 210_000, // expand (60s) + verify (120s) + save (30s)
   BACKFILL_EXPAND_RESERVE_MS: 150_000, // held back from refill expansions: verify + save
   MIN_EXPAND_CALL_MS: 15_000, // refill expansions below this per-call budget are skipped
@@ -604,7 +613,7 @@ export async function runFinalizeQuizPhase(
 
   logger.info("Starting finalization phase");
 
-  const deadline = createJobDeadline(CONFIG.FINALIZE_BUDGET_MS);
+  const deadline = createJobDeadline(STUDIO_FINALIZE_BUDGET_MS);
 
   try {
     // Get quiz with map results
@@ -699,25 +708,49 @@ export async function runFinalizeQuizPhase(
     });
 
     const startTime = Date.now();
-    const selectionResponse = await invokeStudioLlm({
-      invoke: () =>
-        (structuredSelectLLM as any).invoke([
-          new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
-          new HumanMessage(selectionPrompt),
-        ]),
-      timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-      phaseLabel: "QuizSelect",
-      retry: { maxAttempts: 2, baseDelayMs: 1000 },
-    });
+    let selectedIndices: number[] = [];
+    try {
+      const selectionResponse = await invokeWithinBudget({
+        invoke: () =>
+          (structuredSelectLLM as any).invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+            new HumanMessage(selectionPrompt),
+          ]),
+        // Expansion runs in waves of EXPAND_CONCURRENCY, each up to EXPAND_TIMEOUT_MS; hold
+        // that back (plus the save reserve) so a slow selection cannot starve later waves.
+        timeoutMs: deadline.stepTimeoutMs(
+          CONFIG.REDUCE_TIMEOUT_MS,
+          Math.min(
+            CONFIG.MAX_EXPAND_RESERVE_MS,
+            Math.ceil(questionCount / CONFIG.EXPAND_CONCURRENCY) * CONFIG.EXPAND_TIMEOUT_MS +
+              STUDIO_SAVE_RESERVE_MS
+          )
+        ),
+        phaseLabel: "QuizSelect",
+        retry: { maxAttempts: 2, baseDelayMs: 1000 },
+      });
+      selectedIndices = (selectionResponse as QuizCandidateIndexSelection).selectedIndices ?? [];
+    } catch (error) {
+      // Selection may get little time on the largest quizzes; a spread pick of the
+      // candidates still yields a full quiz.
+      logger.phaseError("selection", error, {
+        fallback: "spread_candidates",
+        candidateCount: allCandidates.length,
+        targetCount: questionCount,
+      });
+    }
 
-    const indexPayload = selectionResponse as QuizCandidateIndexSelection;
-    let selectedCandidates = applySelectedCandidateIndices(
-      allCandidates,
-      indexPayload.selectedIndices ?? [],
-      questionCount
-    );
+    // applySelectedCandidateIndices fills gaps from the front of the list, so when no
+    // returned index resolves, spread the pick across all candidates instead.
+    const anyIndexResolves = selectedIndices.some((raw) => {
+      const oneBased = Math.round(raw);
+      return oneBased >= 1 && oneBased <= allCandidates.length;
+    });
+    let selectedCandidates = anyIndexResolves
+      ? applySelectedCandidateIndices(allCandidates, selectedIndices, questionCount)
+      : pickSpread(allCandidates, questionCount);
     console.log(
-      `[QuizJob] Selection completed in ${Date.now() - startTime}ms, resolved ${selectedCandidates.length} candidates (raw indices: ${(indexPayload.selectedIndices ?? []).length})`
+      `[QuizJob] Selection completed in ${Date.now() - startTime}ms, resolved ${selectedCandidates.length} candidates (raw indices: ${selectedIndices.length})`
     );
 
     // DIAGNOSTIC: Log selected candidates
@@ -764,24 +797,26 @@ export async function runFinalizeQuizPhase(
     );
 
     /**
-     * Expands candidates into full questions. With `withinDeadline`, each call gets
-     * one attempt bounded by the time left after the verify + save reserve, and calls
-     * that would start with too little time are skipped (later waves of a refill).
+     * Expands candidates into full questions. Every call is bounded by what is left of
+     * the deadline after the save reserve, so later waves cannot push past it; refill
+     * calls (`isRefill`) also keep the verify + save reserve and get one attempt. Calls
+     * that would start with too little time are skipped.
      */
-    const expandCandidates = (candidates: QuizCandidate[], withinDeadline = false) =>
+    const expandCandidates = (candidates: QuizCandidate[], isRefill = false) =>
       allWithConcurrency(
         candidates.map((candidate, index) => {
           return async (): Promise<QuizQuestion | null> => {
-            const timeoutMs = withinDeadline
-              ? deadline.stepTimeoutMs(CONFIG.EXPAND_TIMEOUT_MS, CONFIG.BACKFILL_EXPAND_RESERVE_MS)
-              : CONFIG.EXPAND_TIMEOUT_MS;
+            const timeoutMs = deadline.stepTimeoutMs(
+              CONFIG.EXPAND_TIMEOUT_MS,
+              isRefill ? CONFIG.BACKFILL_EXPAND_RESERVE_MS : STUDIO_SAVE_RESERVE_MS
+            );
             if (timeoutMs < CONFIG.MIN_EXPAND_CALL_MS) {
               console.log(`[QuizJob] Skipped expanding candidate ${index}: out of time budget`);
               return null;
             }
             try {
               const prompt = getExpandPrompt(candidate);
-              return await invokeStudioLlm({
+              return await invokeWithinBudget({
                 invoke: () =>
                   (structuredExpandLLM as any).invoke([
                     new SystemMessage(
@@ -791,7 +826,7 @@ export async function runFinalizeQuizPhase(
                   ]),
                 timeoutMs,
                 phaseLabel: "QuizExpand",
-                retry: { maxAttempts: withinDeadline ? 1 : 2, baseDelayMs: 1000 },
+                retry: { maxAttempts: isRefill ? 1 : 2, baseDelayMs: 1000 },
               });
             } catch (error) {
               console.log(`[QuizJob] Failed to expand candidate ${index}: ${error}`);
@@ -858,7 +893,7 @@ export async function runFinalizeQuizPhase(
         judge: async (prompt) => {
           const timeoutMs = deadline.stepTimeoutMs(
             CONFIG.VERIFY_TIMEOUT_MS,
-            CONFIG.SAVE_RESERVE_MS
+            STUDIO_SAVE_RESERVE_MS
           );
           if (timeoutMs < CONFIG.MIN_VERIFY_CALL_MS) {
             throw new Error("No time left in the finalize budget to verify answers");
@@ -963,9 +998,7 @@ export async function runFinalizeQuizPhase(
         .map((q) => q.question)
         .join(" ")
         .substring(0, 2000);
-      title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: titleContent,
-      });
+      title = await generateTitleWithinDeadline(deadline, titleContent, "QuizTitle");
     } catch (_e) {
       console.log("[QuizJob] Title generation failed, using default");
     }

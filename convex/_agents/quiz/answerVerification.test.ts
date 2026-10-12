@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getVerificationPrompt,
-  pickSpread,
   type QuizVerificationResponse,
   type VerifiableQuestion,
   verifyQuizQuestions,
@@ -155,21 +154,5 @@ describe("verifyQuizQuestions", () => {
 
     await expect(verifyQuizQuestions([], { judge })).resolves.toEqual([]);
     expect(judge).not.toHaveBeenCalled();
-  });
-});
-
-describe("pickSpread", () => {
-  it("returns the whole pool when asked for at least its size", () => {
-    expect(pickSpread([1, 2, 3], 5)).toEqual([1, 2, 3]);
-  });
-
-  it("spreads picks across the pool instead of taking the front", () => {
-    const pool = Array.from({ length: 10 }, (_, i) => i);
-    expect(pickSpread(pool, 2)).toEqual([0, 5]);
-    expect(pickSpread(pool, 3)).toEqual([0, 3, 6]);
-  });
-
-  it("returns nothing for a non-positive count", () => {
-    expect(pickSpread([1, 2, 3], 0)).toEqual([]);
   });
 });

@@ -152,15 +152,3 @@ export async function verifyQuizQuestions(
   });
   return results;
 }
-
-/** Up to `count` items spread evenly across `pool`, so a refill does not favour the first sources. */
-export function pickSpread<T>(pool: T[], count: number): T[] {
-  if (count <= 0) {
-    return [];
-  }
-  if (count >= pool.length) {
-    return [...pool];
-  }
-  const step = pool.length / count;
-  return Array.from({ length: count }, (_, i) => pool[Math.floor(i * step)]);
-}
