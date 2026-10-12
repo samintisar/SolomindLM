@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { createErrorMetadata, createJobLogger } from "../_agents/_shared/logging";
 import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import {
   EMBEDDING_BATCH_SIZE,
@@ -11,9 +12,10 @@ import {
 } from "../_lib/embeddingConfig";
 import { sourceFailureMessage } from "../_lib/sourceFailure";
 import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
-import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
 import { MistralOCRService } from "../_services/extraction/MistralOCRService";
+import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
+import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
 import { extractUrlSource } from "../_services/extraction/urlSource";
 import {
   extractDocumentMetadata,
@@ -21,7 +23,7 @@ import {
 } from "../_services/processing/DocumentMetadataExtractor";
 import { maxPageLabel } from "../_services/processing/pageLabels";
 import { StructuralChunker } from "../_services/processing/StructuralChunker";
-import { buildPaperMetadataMarkdown } from "./paperRecord";
+import { fulltextStatusAfterIngest, ingestPaper } from "./paperIngest";
 import { toStoredMarkdown } from "./storedMarkdown.helpers";
 
 // File extensions that require OCR processing
@@ -137,9 +139,6 @@ export const docEmbedding = internalAction({
       currentPhase = "extraction";
 
       const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
-      const academicLoader = new AcademicLoaderService(async (url: string) =>
-        ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url })
-      );
 
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
@@ -249,55 +248,73 @@ export const docEmbedding = internalAction({
         });
       } else if (docDetails.fileType === "paper_record") {
         logger.info(
-          "Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)"
+          "Processing paper_record (stored PDF → open-access copies → landing page → abstract)"
         );
         const pr = docDetails.paperRecord;
         if (!pr) {
           throw new Error("paper_record document missing paperRecord");
         }
-        let paperIngestion: "ingested" | "metadata_only" = "metadata_only";
 
-        const paper = {
-          title: docDetails.fileName || "Research paper",
-          authors: pr.authors || [],
-          year: pr.publicationYear,
-          abstract: pr.abstract || "",
-          url: docDetails.fileUrl || pr.landingPageUrl || "",
-          pdfUrl: pr.pdfUrl,
-          source: "semantic_scholar" as const,
-          doi: pr.doi,
-        };
+        let currentStorageId = docDetails.storageId;
+        const result = await ingestPaper(
+          {
+            title: docDetails.fileName || "Research paper",
+            paperRecord: pr,
+            fileUrl: docDetails.fileUrl,
+            storageId: docDetails.storageId,
+            fullTextSource: docDetails.fullTextSource,
+          },
+          {
+            resolveCandidates: resolveOpenAccessCandidates,
+            fetchCandidate: (url) => fetchOaCandidate(url),
+            attachPdf: async (bytes) => {
+              const storageId = await ctx.storage.store(
+                new Blob([bytes], { type: "application/pdf" })
+              );
+              const previous = currentStorageId;
+              await ctx.runMutation(internal.documents.paperFullText.setPaperStorage, {
+                documentId,
+                storageId,
+              });
+              currentStorageId = storageId;
+              if (previous && previous !== storageId) {
+                await ctx.storage.delete(previous as Id<"_storage">);
+              }
+              return storageId;
+            },
+            detachPdf: async (storageId) => {
+              await ctx.runMutation(internal.documents.paperFullText.setPaperStorage, {
+                documentId,
+              });
+              currentStorageId = undefined;
+              await ctx.storage.delete(storageId as Id<"_storage">);
+            },
+            ocrStoredPdf: async (storageId) => {
+              const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
+              if (!url) throw new Error("Stored PDF not found");
+              return mistralOCR.processDocument(url);
+            },
+            scrape: (url) =>
+              ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url }),
+            now: () => Date.now(),
+          },
+          logger
+        );
 
-        try {
-          const result = await academicLoader.loadPaper(paper);
-          extractedText = result.content;
-          if (result.title?.trim()) extractedTitle = result.title.trim();
-          if (extractedText?.trim()) {
-            paperIngestion = "ingested";
-            logger.phaseComplete("extraction", {
-              contentLength: extractedText.length,
-              title: extractedTitle,
-              method: "academic_loader",
-            });
-          }
-        } catch (e) {
-          logger.warn("AcademicLoaderService failed", {
-            message: e instanceof Error ? e.message : String(e),
-          });
+        extractedText = result.content;
+        if (result.outcome === "full_text" && result.title?.trim()) {
+          extractedTitle = result.title.trim();
         }
-
-        if (!extractedText?.trim()) {
-          extractedText = buildPaperMetadataMarkdown(pr, docDetails.fileName || "Research paper");
-          paperIngestion = "metadata_only";
-          logger.phaseComplete("extraction", {
-            contentLength: extractedText.length,
-            method: "metadata_stub",
-          });
-        }
-
-        await ctx.runMutation(internal.documents.internal.patch, {
+        await ctx.runMutation(internal.documents.paperFullText.recordPaperIngest, {
           documentId,
-          patch: { ingestionStatus: paperIngestion },
+          ingestionStatus: result.outcome === "full_text" ? "ingested" : "metadata_only",
+          fulltextStatus: fulltextStatusAfterIngest(result.outcome, docDetails.fulltextStatus),
+          ...(result.outcome === "full_text" ? { fullTextSource: result.fullTextSource } : {}),
+        });
+        logger.phaseComplete("extraction", {
+          contentLength: extractedText.length,
+          outcome: result.outcome,
+          method: result.outcome === "full_text" ? result.fullTextSource.method : "abstract",
         });
       }
 
