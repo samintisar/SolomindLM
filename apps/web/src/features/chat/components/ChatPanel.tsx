@@ -55,6 +55,7 @@ import { useLiteratureReviewSession } from "../services/literatureReviewApi";
 import { useApproveResearchPlan, useRejectResearchPlan } from "../services/researchApi";
 import { useSaveChat } from "../services/userNotesApi";
 import { useChatStreamingContext } from "../useChatStreaming";
+import { isAbstractOnlyReference } from "../utils/abstractOnlyReference";
 import { exportAsMarkdown } from "../utils/exportChat";
 import { selectedNotebookPaperIds } from "../utils/literatureReviewPapers";
 import { stripReferencesSection } from "../utils/messageRendering.utils";
@@ -462,10 +463,16 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     [notebookId, addExternalSourcesMutation, success, toastError]
   );
 
+  const isReferenceAbstractOnly = useCallback(
+    (reference: ReferenceChunk) => isAbstractOnlyReference(reference, sources),
+    [sources]
+  );
+
   const citation = useCitationPopover({
     resolveReference,
     onOpenInSources: getOpenReferenceInSources,
     onAddToNotebook: getAddReferenceToNotebook,
+    isAbstractOnly: isReferenceAbstractOnly,
   });
   const closeCitation = citation.close;
 

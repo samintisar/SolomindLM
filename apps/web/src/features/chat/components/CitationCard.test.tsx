@@ -47,4 +47,9 @@ describe("CitationCard", () => {
 
     expect(await screen.findByText(/Reference 20 • p\. 7/)).toBeInTheDocument();
   });
+
+  test("marks a citation from an abstract-only paper", () => {
+    render(<CitationCard refId={3} reference={reference()} abstractOnly />);
+    expect(screen.getByText(/Reference 3 • Abstract only/)).toBeInTheDocument();
+  });
 });

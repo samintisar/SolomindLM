@@ -29,6 +29,8 @@ interface Options {
   onOpenInSources?: (ref: ReferenceChunk) => (() => void) | undefined;
   /** Returns the "add to notebook" action for this reference, or undefined to hide it. */
   onAddToNotebook?: (ref: ReferenceChunk) => (() => void | Promise<unknown>) | undefined;
+  /** Whether this reference's source holds only its abstract. */
+  isAbstractOnly?: (ref: ReferenceChunk) => boolean;
 }
 
 function chipsFor(root: Element, messageId: string, refId: number): HTMLElement[] {
@@ -75,6 +77,7 @@ export function useCitationPopover({
   resolveReference,
   onOpenInSources,
   onAddToNotebook,
+  isAbstractOnly,
 }: Options) {
   const [target, setTarget] = useState<Target | null>(null);
   // The last opened target stays rendered while the popover animates closed.
@@ -286,6 +289,7 @@ export function useCitationPopover({
               })
             }
             onAddToNotebook={addToNotebook}
+            abstractOnly={isAbstractOnly?.(reference) ?? false}
           />
         </PopoverContent>
       )}
