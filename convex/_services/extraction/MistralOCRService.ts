@@ -3,6 +3,7 @@
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { PAGE_LABEL_LINE } from "../processing/pageLabels";
 
 type MistralOcrTable = { id?: string; content?: string; format?: string };
 
@@ -188,6 +189,18 @@ function stripMistralOcrMedia(text: string): string {
       .replace(/\n\s*\n\s*\n+/g, "\n\n")
       .replace(/^\s+|\s+$/g, "")
       .trim()
+  );
+}
+
+const PAGE_LABEL_LINES = new RegExp(PAGE_LABEL_LINE.source, "gm");
+
+/** Whether stitched OCR markdown holds anything beyond page labels and separators. */
+export function hasOcrContent(markdown: string): boolean {
+  return (
+    markdown
+      .replace(PAGE_LABEL_LINES, "")
+      .replace(/^-{3,}[ \t]*$/gm, "")
+      .trim().length > 0
   );
 }
 

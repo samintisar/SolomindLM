@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   figureBlock,
+  hasOcrContent,
   inlineOcrFigures,
   markdownFromMistralOcrResponse,
   parseFigureAnnotation,
@@ -203,5 +204,21 @@ describe("inlineOcrFigures", () => {
       { id: "img-(1).png", image_annotation: CHART },
     ]);
     expect(md).toBe(BLOCK);
+  });
+});
+
+describe("hasOcrContent", () => {
+  it("is false for page labels, separators and whitespace only", () => {
+    expect(hasOcrContent("")).toBe(false);
+    expect(hasOcrContent("**Page 1**")).toBe(false);
+    expect(hasOcrContent("**Page 1**\n\n   \n\n---\n\n**Page 2**\n\n")).toBe(false);
+  });
+
+  it("is true when a page has text", () => {
+    expect(hasOcrContent("**Page 1**\n\nHello")).toBe(true);
+  });
+
+  it("is true when a page has only a figure description", () => {
+    expect(hasOcrContent(`**Page 1**\n\n${figureBlock(CHART)}`)).toBe(true);
   });
 });
