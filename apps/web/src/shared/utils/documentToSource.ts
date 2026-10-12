@@ -32,10 +32,12 @@ export function documentToSource(doc: any): Source {
             openAlexId: pr.openAlexId,
             fulltextStatus: doc.fulltextStatus,
             ingestionStatus: doc.ingestionStatus,
+            fullTextSource: doc.fullTextSource,
           }
         : {
             fulltextStatus: doc.fulltextStatus,
             ingestionStatus: doc.ingestionStatus,
+            fullTextSource: doc.fullTextSource,
           },
       sourceGuide: doc.sourceGuide,
       wordCount: doc.wordCount,

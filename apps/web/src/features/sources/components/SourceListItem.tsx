@@ -32,6 +32,7 @@ import {
 } from "@/shared/components/ui/item";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Source } from "@/shared/types";
+import { fullTextSourceLabel } from "../utils/fullTextSourceLabel";
 
 interface SourceListItemProps {
   source: Source;
@@ -138,12 +139,8 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
     if (source.type !== "PAPER" || !source.paper) return null;
     if (status === "processing" || source.paper.ingestionStatus === "pending") return null;
     if (status === "failed" || source.paper.ingestionStatus === "failed") return null;
-    if (source.paper.ingestionStatus === "metadata_only") {
-      return source.paper.fulltextStatus === "external_only" ? "External" : "Abstract";
-    }
-    if (source.paper.ingestionStatus === "ingested") {
-      return source.paper.fulltextStatus === "available" ? "Full text" : "Indexed";
-    }
+    if (source.paper.ingestionStatus === "metadata_only") return "Abstract only";
+    if (source.paper.ingestionStatus === "ingested") return "Full text";
     return null;
   };
 
@@ -194,7 +191,17 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                 </span>{" "}
                 <span>• {source.date}</span>
                 {paperHint && status === "completed" && (
-                  <span className="font-normal normal-case tracking-normal"> · {paperHint}</span>
+                  <span
+                    className="font-normal normal-case tracking-normal"
+                    title={
+                      paperHint === "Full text"
+                        ? fullTextSourceLabel(source.paper?.fullTextSource)
+                        : undefined
+                    }
+                  >
+                    {" "}
+                    · {paperHint}
+                  </span>
                 )}
               </span>
             </ItemDescription>

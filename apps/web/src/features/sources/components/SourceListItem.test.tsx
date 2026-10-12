@@ -119,4 +119,24 @@ describe("SourceListItem", () => {
     await userEvent.type(input, "{Escape}");
     expect(p.onRenameCancel).toHaveBeenCalled();
   });
+
+  const paper = (over: Partial<NonNullable<Source["paper"]>>): Partial<Source> => ({
+    type: "PAPER",
+    title: "A paper",
+    paper: { ingestionStatus: "ingested", fulltextStatus: "available", ...over },
+  });
+
+  it("labels a paper with full text, with its version and licence as a tooltip", () => {
+    setup(
+      {},
+      paper({ fullTextSource: { method: "oa_pdf", version: "acceptedVersion", license: "cc-by" } })
+    );
+    const hint = screen.getByText(/Full text/);
+    expect(hint).toHaveAttribute("title", "Accepted manuscript · CC BY");
+  });
+
+  it("labels an abstract-only paper, whatever was guessed when it was added", () => {
+    setup({}, paper({ ingestionStatus: "metadata_only", fulltextStatus: "external_only" }));
+    expect(screen.getByText(/Abstract only/)).toBeInTheDocument();
+  });
 });
