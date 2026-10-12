@@ -156,6 +156,10 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   const fullTextLabel =
     paperHint === "Full text" ? fullTextSourceLabel(source.paper?.fullTextSource) : undefined;
   const isAbstractOnlyPaper = paperHint === "Abstract only" && status === "completed";
+  // A paper whose (re-)ingest failed has to be able to retry, or the user is stuck with Rename/Delete.
+  const isFailedPaper =
+    source.type === "PAPER" && (status === "failed" || source.paper?.ingestionStatus === "failed");
+  const canGetFullText = isAbstractOnlyPaper || isFailedPaper;
 
   return (
     <Item role="listitem" data-source-id={source.id} size="sm">
@@ -245,13 +249,13 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               }
             }}
           >
-            {isAbstractOnlyPaper && onFindFullText && (
+            {canGetFullText && onFindFullText && (
               <DropdownMenuItem onSelect={() => onFindFullText(source.id)}>
                 <Search />
-                Find full text
+                {isFailedPaper ? "Try again" : "Find full text"}
               </DropdownMenuItem>
             )}
-            {isAbstractOnlyPaper && onUploadPdf && (
+            {canGetFullText && onUploadPdf && (
               <DropdownMenuItem onSelect={() => onUploadPdf(source.id)}>
                 <FileUp />
                 Upload PDF

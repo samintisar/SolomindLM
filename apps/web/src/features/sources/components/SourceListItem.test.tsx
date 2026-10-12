@@ -185,4 +185,39 @@ describe("SourceListItem", () => {
     const hint = screen.getByText(/Full text/);
     expect(hint.querySelector(".sr-only")).toBeNull();
   });
+
+  it("lets a failed paper try again or take a PDF", async () => {
+    const onFindFullText = vi.fn();
+    const onUploadPdf = vi.fn();
+    setup(
+      { isMenuOpen: true, onFindFullText, onUploadPdf },
+      { ...paper({ ingestionStatus: "failed" }), status: "failed" }
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Try again" }));
+    expect(onFindFullText).toHaveBeenCalledWith("s1");
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Upload PDF" }));
+    expect(onUploadPdf).toHaveBeenCalledWith("s1");
+    expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer them while a paper is processing", async () => {
+    setup(
+      { isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf: vi.fn() },
+      { ...paper({ ingestionStatus: "pending" }), status: "processing" }
+    );
+    await screen.findByRole("menuitem", { name: "Rename" });
+    expect(screen.queryByRole("menuitem", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Find full text" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't offer them for a failed source that isn't a paper", async () => {
+    setup(
+      { isMenuOpen: true, onFindFullText: vi.fn(), onUploadPdf: vi.fn() },
+      { status: "failed" }
+    );
+    await screen.findByRole("menuitem", { name: "Rename" });
+    expect(screen.queryByRole("menuitem", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Upload PDF" })).not.toBeInTheDocument();
+  });
 });
