@@ -278,7 +278,7 @@ export const docEmbedding = internalAction({
                   storageId,
                 });
               } catch (e) {
-                await ctx.storage.delete(storageId as Id<"_storage">).catch(() => {});
+                await ctx.storage.delete(storageId as Id<"_storage">).catch(() => undefined);
                 throw e;
               }
               currentStorageId = storageId;
