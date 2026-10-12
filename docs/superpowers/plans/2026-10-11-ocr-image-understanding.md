@@ -742,6 +742,23 @@ describe("MistralOCRService.processDocument", () => {
     expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
   });
 
+  it("falls back to the pre-annotation request for images: document_url, no annotations", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(400))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").processDocument("https://x/storage/abc", { kind: "image" });
+
+    expect(sentBody(fetchMock, 0).document).toEqual({ type: "image_url", image_url: "https://x/storage/abc" });
+    expect(sentBody(fetchMock, 1).document).toEqual({
+      type: "document_url",
+      document_url: "https://x/storage/abc",
+    });
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+  });
+
   it("retries once without annotations when the annotated request times out", async () => {
     const fetchMock = vi
       .fn()
@@ -788,9 +805,15 @@ import { PAGE_LABEL_LINE } from "../processing/pageLabels";
 Add before the class:
 
 ```ts
-/** Annotations add a vision pass per figure; the plain fallback is the request that worked before them. */
-const ANNOTATED_TIMEOUT_MS = 180_000;
-const PLAIN_TIMEOUT_MS = 120_000;
+/**
+ * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
+ * request that worked before them, with its old 60s timeout and 3 attempts. Capping the annotated call at 2
+ * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 120s + 3 × 60s = 420s, which leaves the
+ * embedding job time to chunk and embed inside the 600s action limit.
+ */
+const ANNOTATED_TIMEOUT_MS = 120_000;
+const ANNOTATED_MAX_ATTEMPTS = 2;
+const PLAIN_TIMEOUT_MS = 60_000;
 
 export const NOTHING_READABLE_MESSAGE =
   "We couldn't find any text or images to read in this file. If it's a photo, try a clearer or higher-resolution version.";
@@ -826,7 +849,8 @@ export class MistralOCRService {
 
   private async callOcrEndpoint(
     body: Record<string, unknown>,
-    timeoutMs: number
+    timeoutMs: number,
+    maxAttempts?: number
   ): Promise<MistralOcrResponse> {
     const logger = createServiceLogger("mistral", "ocr");
 
@@ -874,7 +898,7 @@ export class MistralOCRService {
         }
         throw new Error("Failed to process document with Mistral OCR", { cause: error });
       }
-    }, "mistral_ocr");
+    }, "mistral_ocr", maxAttempts ? { maxAttempts } : undefined);
   }
 
   /**
@@ -888,14 +912,22 @@ export class MistralOCRService {
 
     let data: MistralOcrResponse;
     try {
-      data = await this.callOcrEndpoint(buildOcrRequestBody(url, kind, true), ANNOTATED_TIMEOUT_MS);
+      data = await this.callOcrEndpoint(
+        buildOcrRequestBody(url, kind, true),
+        ANNOTATED_TIMEOUT_MS,
+        ANNOTATED_MAX_ATTEMPTS
+      );
     } catch (error) {
       if (!shouldRetryWithoutAnnotations(error)) throw error;
       logger.warn("OCR with figure annotations failed; retrying without annotations", {
         kind,
         error: error instanceof Error ? error.message : String(error),
       });
-      data = await this.callOcrEndpoint(buildOcrRequestBody(url, kind, false), PLAIN_TIMEOUT_MS);
+      // Exactly the request that worked before annotations, images included (they were sent as documents).
+      data = await this.callOcrEndpoint(
+        buildOcrRequestBody(url, "document", false),
+        PLAIN_TIMEOUT_MS
+      );
     }
 
     const markdown = stripMistralOcrMedia(
