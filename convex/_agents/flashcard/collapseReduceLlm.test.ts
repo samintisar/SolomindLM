@@ -115,5 +115,26 @@ describe("recursiveCollapse", () => {
     const result = await recursiveCollapse(outputs, makeDeps(540_000));
 
     expect(result[0]).toHaveLength(40);
+    expect(result[0][0].front).toContain("z0");
+  });
+
+  it("keeps a group's cards when the collapse returns no cards", async () => {
+    invokeCollapse.mockResolvedValue({ flashcards: [] });
+    const outputs = ["a", "b", "c"].map((tag) => cards(tag));
+
+    const result = await recursiveCollapse(outputs, makeDeps(540_000));
+
+    expect(result).toEqual([[...outputs[0], ...outputs[1]], outputs[2]]);
+  });
+
+  it("keeps a group's cards when the collapse returns only unusable cards", async () => {
+    invokeCollapse.mockResolvedValue({
+      flashcards: cards("z", 25).map((card) => ({ ...card, back: "" })),
+    });
+    const outputs = ["a", "b", "c"].map((tag) => cards(tag));
+
+    const result = await recursiveCollapse(outputs, makeDeps(540_000));
+
+    expect(result).toEqual([[...outputs[0], ...outputs[1]], outputs[2]]);
   });
 });

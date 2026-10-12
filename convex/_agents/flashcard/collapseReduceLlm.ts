@@ -171,8 +171,19 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
     retry: { maxAttempts: 2 },
   })) as FlashcardResponse;
 
-  // A collapse may only shrink a group; an LLM that pads the set is cut back.
-  return response.flashcards.slice(0, allCards.length);
+  // A collapse may only shrink a group; an LLM that pads the set is cut back, and
+  // one that returns nothing usable leaves the group's cards as they were.
+  const usable = response.flashcards.filter(isUsableFlashcard).slice(0, allCards.length);
+  if (usable.length === 0) {
+    deps.logger.warn("Collapse returned no usable cards, keeping the group uncollapsed", {
+      agent: "FlashcardGraph",
+      phase: "collapse_group_empty",
+      inputCount: allCards.length,
+      returnedCount: response.flashcards.length,
+    });
+    return allCards;
+  }
+  return usable;
 }
 
 export async function refineFlashcardSelection(
