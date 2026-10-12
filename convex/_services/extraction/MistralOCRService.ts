@@ -63,7 +63,8 @@ export function figureBlock(annotation: FigureAnnotation): string {
 function figureInline(annotation: FigureAnnotation): string {
   const head = `**Figure (${annotation.kind}):** ${annotation.description}`;
   const text = annotation.details ? `${head} Details: ${annotation.details}` : head;
-  return text.replace(/\|/g, "\\|");
+  // Escape backslashes too, so a "\|" in the description can't turn into an unescaped cell delimiter.
+  return text.replace(/[\\|]/g, "\\$&");
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

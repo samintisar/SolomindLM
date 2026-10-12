@@ -223,6 +223,16 @@ describe("inlineOcrFigures", () => {
     );
   });
 
+  it("escapes backslashes before pipes, so a table cell can't be split", () => {
+    const md = inlineOcrFigures("| ![img-0.jpeg](img-0.jpeg) |", [
+      {
+        id: "img-0.jpeg",
+        image_annotation: { kind: "chart", description: "a \\| b", details: "" },
+      },
+    ]);
+    expect(md).toBe("| **Figure (chart):** a \\\\\\| b |");
+  });
+
   it("describes a figure in the middle of a sentence on one line", () => {
     const md = inlineOcrFigures("See ![img-0.jpeg](img-0.jpeg) below.", [
       { id: "img-0.jpeg", image_annotation: { ...CHART, details: "" } },
