@@ -731,15 +731,18 @@ export async function runFinalizeWrittenQuestionsPhase(
           retry: { maxAttempts: 2, baseDelayMs: 1000 },
         });
 
+        // applySelectedQuestionIds fills gaps from the front of the pool, so check
+        // that at least one returned id is real before trusting it.
+        const knownIds = new Set(dedupedQuestions.map((q) => q.id));
+        if (!selectionResponse.selectedIds.some((id) => knownIds.has(id))) {
+          throw new Error("LLM returned zero valid selected question IDs");
+        }
+
         finalQuestions = applySelectedQuestionIds(
           dedupedQuestions,
           selectionResponse.selectedIds,
           questionCount
         );
-
-        if (finalQuestions.length === 0) {
-          throw new Error("LLM returned zero valid selected question IDs");
-        }
       } catch (error) {
         // The deduped pool already holds more questions than requested, so a failed
         // or timed-out selection still yields a full set.

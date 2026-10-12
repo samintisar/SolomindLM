@@ -39,6 +39,7 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { pickSpread } from "../_job/collapsePlan";
 import {
   generateTitleWithinDeadline,
   invokeStudioLlm,
@@ -64,7 +65,9 @@ const CONFIG = {
   // Per question expansion. Timeouts are not retried, so a slow provider gives up
   // here; a retryable error retries within the same 60s.
   EXPAND_TIMEOUT_MS: 60_000,
-  MAX_EXPAND_RESERVE_MS: 300_000, // most held back from selection for expansion waves + save
+  // Most held back from selection for expansion waves + save: covers the largest quiz
+  // the app offers (30 questions = 6 waves of 60s + 30s save), leaving selection 150s.
+  MAX_EXPAND_RESERVE_MS: 390_000,
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 20,
   BUFFER_MULTIPLIER: 1.2,
@@ -670,34 +673,49 @@ export async function runFinalizeQuizPhase(
     });
 
     const startTime = Date.now();
-    const selectionResponse = await invokeWithinBudget({
-      invoke: () =>
-        (structuredSelectLLM as any).invoke([
-          new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
-          new HumanMessage(selectionPrompt),
-        ]),
-      // Expansion runs in waves of EXPAND_CONCURRENCY, each up to EXPAND_TIMEOUT_MS; hold
-      // that back (plus the save reserve) so a slow selection cannot starve later waves.
-      timeoutMs: deadline.stepTimeoutMs(
-        CONFIG.REDUCE_TIMEOUT_MS,
-        Math.min(
-          CONFIG.MAX_EXPAND_RESERVE_MS,
-          Math.ceil(questionCount / CONFIG.EXPAND_CONCURRENCY) * CONFIG.EXPAND_TIMEOUT_MS +
-            STUDIO_SAVE_RESERVE_MS
-        )
-      ),
-      phaseLabel: "QuizSelect",
-      retry: { maxAttempts: 2, baseDelayMs: 1000 },
-    });
+    let selectedIndices: number[] = [];
+    try {
+      const selectionResponse = await invokeWithinBudget({
+        invoke: () =>
+          (structuredSelectLLM as any).invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+            new HumanMessage(selectionPrompt),
+          ]),
+        // Expansion runs in waves of EXPAND_CONCURRENCY, each up to EXPAND_TIMEOUT_MS; hold
+        // that back (plus the save reserve) so a slow selection cannot starve later waves.
+        timeoutMs: deadline.stepTimeoutMs(
+          CONFIG.REDUCE_TIMEOUT_MS,
+          Math.min(
+            CONFIG.MAX_EXPAND_RESERVE_MS,
+            Math.ceil(questionCount / CONFIG.EXPAND_CONCURRENCY) * CONFIG.EXPAND_TIMEOUT_MS +
+              STUDIO_SAVE_RESERVE_MS
+          )
+        ),
+        phaseLabel: "QuizSelect",
+        retry: { maxAttempts: 2, baseDelayMs: 1000 },
+      });
+      selectedIndices = (selectionResponse as QuizCandidateIndexSelection).selectedIndices ?? [];
+    } catch (error) {
+      // Selection may get little time on the largest quizzes; a spread pick of the
+      // candidates still yields a full quiz.
+      logger.phaseError("selection", error, {
+        fallback: "spread_candidates",
+        candidateCount: allCandidates.length,
+        targetCount: questionCount,
+      });
+    }
 
-    const indexPayload = selectionResponse as QuizCandidateIndexSelection;
-    let selectedCandidates = applySelectedCandidateIndices(
-      allCandidates,
-      indexPayload.selectedIndices ?? [],
-      questionCount
-    );
+    // applySelectedCandidateIndices fills gaps from the front of the list, so when no
+    // returned index resolves, spread the pick across all candidates instead.
+    const anyIndexResolves = selectedIndices.some((raw) => {
+      const oneBased = Math.round(raw);
+      return oneBased >= 1 && oneBased <= allCandidates.length;
+    });
+    let selectedCandidates = anyIndexResolves
+      ? applySelectedCandidateIndices(allCandidates, selectedIndices, questionCount)
+      : pickSpread(allCandidates, questionCount);
     console.log(
-      `[QuizJob] Selection completed in ${Date.now() - startTime}ms, resolved ${selectedCandidates.length} candidates (raw indices: ${(indexPayload.selectedIndices ?? []).length})`
+      `[QuizJob] Selection completed in ${Date.now() - startTime}ms, resolved ${selectedCandidates.length} candidates (raw indices: ${selectedIndices.length})`
     );
 
     // DIAGNOSTIC: Log selected candidates
