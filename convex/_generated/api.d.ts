@@ -129,6 +129,7 @@ import type * as _lib_srsScheduling from "../_lib/srsScheduling.js";
 import type * as _lib_textTitle from "../_lib/textTitle.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
 import type * as _migration_backfillChunkPages from "../_migration/backfillChunkPages.js";
+import type * as _migration_backfillPaperFullText from "../_migration/backfillPaperFullText.js";
 import type * as _migration_removeSlidePrompts from "../_migration/removeSlidePrompts.js";
 import type * as _model_audioOverviews from "../_model/audioOverviews.js";
 import type * as _model_conversations from "../_model/conversations.js";
@@ -450,6 +451,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/textTitle": typeof _lib_textTitle;
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;
   "_migration/backfillChunkPages": typeof _migration_backfillChunkPages;
+  "_migration/backfillPaperFullText": typeof _migration_backfillPaperFullText;
   "_migration/removeSlidePrompts": typeof _migration_removeSlidePrompts;
   "_model/audioOverviews": typeof _model_audioOverviews;
   "_model/conversations": typeof _model_conversations;
