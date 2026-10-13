@@ -260,6 +260,70 @@ describe("decideScreening", () => {
     expect(decision.reason).toContain("Original evidence");
   });
 
+  it("leaves the screener's verdict alone when exactly half the criteria are unclear", () => {
+    const fourCriteria = [
+      ...CRITERIA,
+      { label: "Measured outcome", description: "Reports a measured outcome." },
+    ];
+    const checks = [
+      { criterion: 1, status: "met", explanation: "On topic." },
+      { criterion: 2, status: "unclear", explanation: "Not stated." },
+      { criterion: 3, status: "unclear", explanation: "No baseline mentioned." },
+      { criterion: 4, status: "met", explanation: "Reports accuracy." },
+    ];
+
+    const excluded = decideScreening(
+      { isIncluded: false, reason: "Too little detail.", criteria: checks },
+      fourCriteria
+    );
+    const included = decideScreening(
+      { isIncluded: true, reason: "Relevant.", criteria: checks },
+      fourCriteria
+    );
+
+    expect(excluded.isIncluded).toBe(false);
+    expect(excluded.reason).toBe("Too little detail.");
+    expect(included.isIncluded).toBe(true);
+  });
+
+  it("keeps an exclusion for a reason outside the criteria", () => {
+    const decision = decideScreening(
+      {
+        isIncluded: false,
+        outsideCriteria: true,
+        reason: "An editorial, not a research paper.",
+        criteria: [
+          { criterion: 1, status: "met", explanation: "On topic." },
+          { criterion: 2, status: "met", explanation: "Discusses results." },
+          { criterion: 3, status: "unclear", explanation: "No baseline mentioned." },
+        ],
+      },
+      CRITERIA
+    );
+
+    expect(decision.isIncluded).toBe(false);
+    expect(decision.reason).toBe("An editorial, not a research paper.");
+  });
+
+  it("names the unclear criteria when the screener included the paper", () => {
+    const decision = decideScreening(
+      {
+        isIncluded: true,
+        reason: "Relevant.",
+        criteria: [
+          { criterion: 1, status: "met", explanation: "On topic." },
+          { criterion: 2, status: "met", explanation: "Has experiments." },
+          { criterion: 3, status: "unclear", explanation: "No baseline mentioned." },
+        ],
+      },
+      CRITERIA
+    );
+
+    expect(decision.isIncluded).toBe(true);
+    expect(decision.reason).toContain("Relevant.");
+    expect(decision.reason).toContain("Comparison");
+  });
+
   it("keeps an exclusion that came without per-criterion checks", () => {
     const excluded = decideScreening(
       { isIncluded: false, reason: "Off topic.", criteria: [] },

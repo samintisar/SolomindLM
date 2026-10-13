@@ -29,6 +29,8 @@ export const ScreenSinglePaperOutputSchema = z.object({
   ),
   reason: z.string(),
   isIncluded: z.boolean(),
+  /** Set when the paper is excluded for a reason no criterion covers; such exclusions stand. */
+  outsideCriteria: z.boolean(),
 });
 
 export type ScreenSinglePaperOutput = z.infer<typeof ScreenSinglePaperOutputSchema>;
@@ -215,11 +217,11 @@ For each criterion, by its number, give a status:
 - "unclear": the title and abstract do not say either way.
 Sharing the question's general topic is not enough to meet a criterion; judge what each criterion actually asks for.
 
-Then give a one-sentence reason for the overall decision. Set isIncluded to false when a criterion is not_met, or when the paper should be excluded for a reason the criteria don't cover (for example, it is not a research paper). A criterion the title and abstract leave unclear is not a reason to exclude: the full text will settle it.
+Then give a one-sentence reason for the overall decision. Set isIncluded to false when a criterion is not_met, or when the paper should be excluded for a reason the criteria don't cover (for example, it is not a research paper). A criterion the title and abstract leave unclear is not a reason to exclude: the full text will settle it. Set outsideCriteria to true only when you exclude the paper for a reason none of the criteria covers; otherwise false.
 
 Respond in the following JSON format exactly (shape only; replace every value):
 
-{\n  "criteria": [\n    { "criterion": 1, "status": "met | not_met | unclear", "explanation": "One short sentence grounded in the title or abstract." }\n  ],\n  "reason": "One sentence explaining the decision.",\n  "isIncluded": true\n}
+{\n  "criteria": [\n    { "criterion": 1, "status": "met | not_met | unclear", "explanation": "One short sentence grounded in the title or abstract." }\n  ],\n  "reason": "One sentence explaining the decision.",\n  "isIncluded": true,\n  "outsideCriteria": false\n}
 
 JSON OUTPUT:`;
 
