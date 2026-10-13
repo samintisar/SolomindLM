@@ -189,6 +189,10 @@ export async function invokeWithRetry<T>(
 
       // Wait before retrying
       await new Promise((resolve) => setTimeout(resolve, delay));
+      // A timer can fire late; don't start an attempt the deadline has already passed.
+      if (deadline !== undefined && Date.now() >= deadline) {
+        break;
+      }
     }
   }
 

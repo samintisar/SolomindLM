@@ -145,6 +145,26 @@ describe("invokeWithRetry", () => {
     expect(Date.now() - start).toBeLessThan(500);
   });
 
+  it("skips the retry when the backoff timer fires after the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const fn = vi.fn().mockRejectedValue(new Error("rate limit"));
+      const start = Date.now();
+      const settled = invokeWithRetry(
+        fn,
+        { maxAttempts: 3, baseDelayMs: 100, deadline: start + 1_000 },
+        "test"
+      ).catch((error: Error) => error);
+      // The 100 ms backoff timer runs 1 s late, as on a busy event loop.
+      vi.setSystemTime(start + 1_100);
+      await vi.advanceTimersByTimeAsync(100);
+      expect((await settled).message).toBe("rate limit");
+      expect(fn).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps retrying while the next attempt starts before the deadline", async () => {
     const fn = vi.fn().mockRejectedValueOnce(new Error("rate limit")).mockResolvedValue("ok");
     const result = await invokeWithRetry(
