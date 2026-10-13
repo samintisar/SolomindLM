@@ -4,8 +4,9 @@
  * Planning derives criteria from the question; the screener checks each paper against every
  * criterion; this module turns those checks into an include/exclude decision. The decision is
  * made here, not by the model's verdict alone: a paper that fails any criterion, or whose
- * abstract leaves most criteria unclear, is excluded. A paper that could not be screened is
- * excluded with that reason rather than waved through.
+ * abstract leaves most criteria unclear, is excluded; one that fails none and leaves only a
+ * minority unclear is kept for the full text. A paper that could not be screened is excluded with
+ * that reason rather than waved through.
  */
 import { v } from "convex/values";
 
@@ -108,6 +109,8 @@ const STATUS_STRICTNESS: Record<CriterionStatus, number> = { met: 0, unclear: 1,
 
 type ScreenerResponse = {
   isIncluded: boolean;
+  /** True when the screener excluded the paper for a reason none of the criteria covers. */
+  outsideCriteria?: boolean;
   reason: string;
   criteria?: Array<{ criterion?: number; status: string; explanation?: string }>;
 };
@@ -156,7 +159,8 @@ export function decideScreening(
   });
 
   const failed = assessments.find((a) => a.status === "not_met");
-  const unclearCount = assessments.filter((a) => a.status === "unclear").length;
+  const unclear = assessments.filter((a) => a.status === "unclear");
+  const unclearCount = unclear.length;
 
   if (failed) {
     return {
@@ -170,6 +174,21 @@ export function decideScreening(
       isIncluded: false,
       reason:
         "The title and abstract give not enough information to confirm most eligibility criteria.",
+      criteria: assessments,
+    };
+  }
+  // Nothing fails and only a minority is unclear: the full text decides, as in title/abstract
+  // screening. The screener's exclusion is overruled here, since an abstract that doesn't mention
+  // something is not evidence the paper lacks it (#518); an exclusion for a reason outside the
+  // criteria still stands.
+  const excludedOutsideCriteria = !response.isIncluded && response.outsideCriteria === true;
+  if (unclearCount > 0 && unclearCount * 2 < assessments.length && !excludedOutsideCriteria) {
+    const unclearLabels = unclear.map((a) => `"${a.label}"`).join(" and ");
+    return {
+      isIncluded: true,
+      reason: response.isIncluded
+        ? `${modelReason || "Meets the eligibility criteria the abstract addresses."} Unclear from the title and abstract: ${unclearLabels}.`
+        : `Kept for full-text review: nothing in the title or abstract rules it out, and it leaves ${unclearLabels} unclear.`,
       criteria: assessments,
     };
   }
