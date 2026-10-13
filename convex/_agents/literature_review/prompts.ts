@@ -215,7 +215,7 @@ For each criterion, by its number, give a status:
 - "unclear": the title and abstract do not say either way.
 Sharing the question's general topic is not enough to meet a criterion; judge what each criterion actually asks for.
 
-Then give a one-sentence reason for the overall decision, and set isIncluded to true only if the paper meets the criteria.
+Then give a one-sentence reason for the overall decision. Set isIncluded to false when a criterion is not_met, or when the paper should be excluded for a reason the criteria don't cover (for example, it is not a research paper). A criterion the title and abstract leave unclear is not a reason to exclude: the full text will settle it.
 
 Respond in the following JSON format exactly (shape only; replace every value):
 

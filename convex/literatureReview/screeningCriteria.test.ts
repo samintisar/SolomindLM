@@ -215,6 +215,51 @@ describe("decideScreening", () => {
     expect(decision.isIncluded).toBe(true);
   });
 
+  it("keeps a paper the screener excluded only because a criterion was unclear", () => {
+    const decision = decideScreening(
+      {
+        isIncluded: false,
+        reason: "The abstract does not confirm a comparison, which is a strict requirement.",
+        criteria: [
+          { criterion: 1, status: "met", explanation: "On topic." },
+          { criterion: 2, status: "met", explanation: "Has experiments." },
+          { criterion: 3, status: "unclear", explanation: "No baseline mentioned." },
+        ],
+      },
+      CRITERIA
+    );
+
+    expect(decision.isIncluded).toBe(true);
+    expect(decision.reason).toContain("Comparison");
+    expect(decision.reason).not.toContain("strict requirement");
+  });
+
+  it("names every unclear criterion when it keeps a paper for the full text", () => {
+    const fiveCriteria = [
+      ...CRITERIA,
+      { label: "Measured outcome", description: "Reports a measured outcome." },
+      { label: "Original evidence", description: "Reports original results or a review." },
+    ];
+    const decision = decideScreening(
+      {
+        isIncluded: false,
+        reason: "Lacks explicit confirmation of a baseline.",
+        criteria: [
+          { criterion: 1, status: "met", explanation: "On topic." },
+          { criterion: 2, status: "met", explanation: "Has experiments." },
+          { criterion: 3, status: "unclear", explanation: "No baseline mentioned." },
+          { criterion: 4, status: "met", explanation: "Reports accuracy." },
+          { criterion: 5, status: "unclear", explanation: "Study type not stated." },
+        ],
+      },
+      fiveCriteria
+    );
+
+    expect(decision.isIncluded).toBe(true);
+    expect(decision.reason).toContain("Comparison");
+    expect(decision.reason).toContain("Original evidence");
+  });
+
   it("keeps an exclusion that came without per-criterion checks", () => {
     const excluded = decideScreening(
       { isIncluded: false, reason: "Off topic.", criteria: [] },
