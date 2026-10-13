@@ -23,6 +23,8 @@ export interface RetryConfig {
   onRetry?: (attempt: number, error: Error, delayMs: number) => void;
   /** Optional jitter to prevent thundering herd (default: false) */
   jitter?: boolean;
+  /** Epoch ms: no retry starts at or after this time; the last error is thrown instead of waiting. */
+  deadline?: number;
 }
 
 /**
@@ -153,6 +155,7 @@ export async function invokeWithRetry<T>(
     retryableErrors = isRetryableError,
     onRetry,
     jitter = false,
+    deadline,
   } = config;
 
   let lastError: Error | undefined;
@@ -175,6 +178,9 @@ export async function invokeWithRetry<T>(
 
       // Calculate delay for next attempt
       const delay = calculateDelay(attempt, baseDelayMs, jitter);
+      if (deadline !== undefined && Date.now() + delay >= deadline) {
+        break;
+      }
 
       // Call onRetry callback if provided
       if (onRetry) {
@@ -183,6 +189,10 @@ export async function invokeWithRetry<T>(
 
       // Wait before retrying
       await new Promise((resolve) => setTimeout(resolve, delay));
+      // A timer can fire late; don't start an attempt the deadline has already passed.
+      if (deadline !== undefined && Date.now() >= deadline) {
+        break;
+      }
     }
   }
 
