@@ -48,6 +48,14 @@ function toNotebookDTO(
   };
 }
 
+function withoutCustomInstructions(
+  settings: Doc<"notebooks">["chatSettings"]
+): Doc<"notebooks">["chatSettings"] {
+  if (!settings) return settings;
+  const { customInstructions: _customInstructions, ...rest } = settings;
+  return rest;
+}
+
 /**
  * Get all notebooks for the authenticated user with source counts
  */
@@ -129,11 +137,24 @@ export const get = query({
     if (!access) return null;
 
     const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
-    const owner = access === "owner" ? null : await ctx.db.get(notebook.userId);
-    return toNotebookDTO(notebook, sourceCount, {
-      access,
-      ownerName: owner ? (owner.name ?? "SolomindLM user") : undefined,
-    });
+    if (access === "owner") return toNotebookDTO(notebook, sourceCount, { access });
+
+    const owner = await ctx.db.get(notebook.userId);
+    return toNotebookDTO(
+      {
+        ...notebook,
+        // The owner's folder means nothing to anyone else.
+        folderId: undefined,
+        // Viewers chat with the notebook's settings (conversations snapshot them server-side) but
+        // don't get to read the owner's custom prompt.
+        chatSettings:
+          access === "viewer"
+            ? withoutCustomInstructions(notebook.chatSettings)
+            : notebook.chatSettings,
+      },
+      sourceCount,
+      { access, ownerName: owner?.name ?? "SolomindLM user" }
+    );
   },
 });
 
