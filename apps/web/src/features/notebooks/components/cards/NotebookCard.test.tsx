@@ -56,6 +56,20 @@ describe("NotebookCard", () => {
     expect(screen.queryByRole("button", { name: "Notebook actions" })).not.toBeInTheDocument();
   });
 
+  test("public cards show author and date but no source count", () => {
+    const { sourceCount: _omit, ...listing } = nb;
+    render(
+      <NotebookCard
+        notebook={{ ...listing, isPublic: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        variant="public"
+      />
+    );
+    expect(screen.getByText(/^by Ada · Sep 12/)).toBeInTheDocument();
+    expect(screen.queryByText(/sources?/)).not.toBeInTheDocument();
+  });
+
   test("featured public cards say Featured", () => {
     render(
       <NotebookCard

@@ -114,9 +114,15 @@ export function NotebookCard(props: NotebookCardProps) {
   const menu = cardMenu(props, actions);
   const Icon = notebookIcon(notebook.icon);
   const fill = coverFillClass(notebook.coverColor);
+  // Public cards: author and created date; public listings don't count sources.
   const meta =
-    props.variant === "public" && notebook.ownerName
-      ? `by ${notebook.ownerName} · ${notebookMeta(notebook)}`
+    props.variant === "public"
+      ? [
+          notebook.ownerName && `by ${notebook.ownerName}`,
+          notebookMeta({ created_at: notebook.created_at }),
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : notebookMeta(notebook);
   const open = () => onSelectNotebook(notebook);
 

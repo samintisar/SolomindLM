@@ -462,7 +462,8 @@ export interface NotebookItem {
   id: string;
   title: string;
   date: string;
-  sourceCount: number;
+  /** Missing on public listings (too costly to count per card). */
+  sourceCount?: number;
   author?: string;
   coverColor?: string; // e.g. 'bg-amber-200'
   icon?: string;
