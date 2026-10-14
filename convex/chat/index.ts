@@ -20,30 +20,33 @@ export const ensureConversation = internalMutation({
     if (!access) {
       throw new Error("Access denied");
     }
+    const viewer = { userId: args.userId, access };
 
     if (args.conversationId) {
       const existing = await ctx.db.get(args.conversationId);
-      if (existing && existing.notebookId === args.notebookId) {
+      if (
+        existing &&
+        existing.notebookId === args.notebookId &&
+        ConvModel.isConversationVisible(existing, viewer)
+      ) {
         await ctx.db.patch(existing._id, { updatedAt: Date.now() });
         return existing._id;
       }
     }
 
-    const inNotebook = await ConvModel.listConversationsInNotebook(ctx, args.notebookId);
-    const sorted = inNotebook.sort((a, b) => b.updatedAt - a.updatedAt);
-    if (sorted[0]) {
-      await ctx.db.patch(sorted[0]._id, { updatedAt: Date.now() });
-      return sorted[0]._id;
+    const primary = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, viewer);
+    if (primary) {
+      await ctx.db.patch(primary._id, { updatedAt: Date.now() });
+      return primary._id;
     }
 
-    const conversationId = await ctx.db.insert("conversations", {
+    return await ctx.db.insert("conversations", {
       userId: args.userId,
       notebookId: args.notebookId,
+      ...ConvModel.conversationPrivacy(access),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
-
-    return conversationId;
   },
 });
 
