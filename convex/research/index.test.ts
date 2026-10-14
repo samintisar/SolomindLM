@@ -326,3 +326,154 @@ Should not appear in stored sections.`,
     expect(table!.papers[0]!.rowData["year"]).toBe("");
   });
 });
+
+describe("research queries on a public notebook", () => {
+  async function setup() {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const ids = await t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Owner" });
+      const viewer = await ctx.db.insert("users", { name: "Viewer" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Public",
+        isPublic: true,
+        publishedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const conversationId = await ctx.db.insert("conversations", {
+        userId: owner,
+        notebookId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const messageId = await ctx.db.insert("messages", {
+        conversationId,
+        role: "assistant",
+        content: "plan",
+        createdAt: now,
+      });
+      const planId = await ctx.db.insert("researchPlans", {
+        userId: owner,
+        notebookId,
+        conversationId,
+        messageId,
+        query: "q",
+        subQuestions: [],
+        sourcePolicy: { channels: ["web"] },
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const runId = await ctx.db.insert("researchRuns", {
+        planId,
+        userId: owner,
+        notebookId,
+        conversationId,
+        status: "completed",
+        currentIteration: 1,
+        maxIterations: 2,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("researchEvidence", {
+        runId,
+        subQuestionId: "sq1",
+        sourceType: "web",
+        sourceTitle: "Source",
+        content: "evidence",
+        iteration: 1,
+        createdAt: now,
+      });
+      await ctx.db.insert("researchSteps", {
+        researchId: String(runId),
+        agentType: "research",
+        stepType: "searching",
+        status: "completed",
+        order: 1,
+      });
+      const sessionId = await ctx.db.insert("literatureReviewSessions", {
+        query: "q",
+        notebookId,
+        userId: owner,
+        workflowId: "wf_1",
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("researchSteps", {
+        researchId: String(sessionId),
+        agentType: "literature_review",
+        stepType: "searching",
+        status: "completed",
+        order: 1,
+      });
+      return { owner, viewer, notebookId, planId, runId, sessionId };
+    });
+    return { t, ...ids };
+  }
+
+  const as = (t: ReturnType<typeof convexTest>, userId: Id<"users">) =>
+    t.withIdentity({ subject: `${userId}|session1` });
+
+  test("the owner reads plan, run, evidence and steps from their thread", async () => {
+    const { t, owner, notebookId, planId, runId, sessionId } = await setup();
+    expect(await as(t, owner).query(api.research.index.getPlan, { planId })).not.toBeNull();
+    expect(
+      await as(t, owner).query(api.research.index.getLatestRunForPlan, { planId })
+    ).not.toBeNull();
+    expect(await as(t, owner).query(api.research.index.getRunEvidence, { runId })).toHaveLength(1);
+    expect(
+      await as(t, owner).query(api.research.index.getResearchSteps, {
+        researchId: String(runId),
+        notebookId,
+      })
+    ).toHaveLength(1);
+    expect(
+      await as(t, owner).query(api.research.index.getResearchSteps, {
+        researchId: String(sessionId),
+        notebookId,
+      })
+    ).toHaveLength(1);
+  });
+
+  test("a viewer cannot read research from the owner's thread", async () => {
+    const { t, viewer, notebookId, planId, runId, sessionId } = await setup();
+    expect(await as(t, viewer).query(api.research.index.getPlan, { planId })).toBeNull();
+    expect(
+      await as(t, viewer).query(api.research.index.getLatestRunForPlan, { planId })
+    ).toBeNull();
+    expect(await as(t, viewer).query(api.research.index.getRunEvidence, { runId })).toEqual([]);
+    expect(
+      await as(t, viewer).query(api.research.index.getResearchSteps, {
+        researchId: String(runId),
+        notebookId,
+      })
+    ).toEqual([]);
+    expect(
+      await as(t, viewer).query(api.research.index.getResearchSteps, {
+        researchId: String(sessionId),
+        notebookId,
+      })
+    ).toEqual([]);
+  });
+
+  test("getResearchSteps refuses a research id from another notebook", async () => {
+    const { t, owner, runId } = await setup();
+    const otherNotebook = await t.run((ctx) =>
+      ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Other",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+    expect(
+      await as(t, owner).query(api.research.index.getResearchSteps, {
+        researchId: String(runId),
+        notebookId: otherNotebook,
+      })
+    ).toEqual([]);
+  });
+});

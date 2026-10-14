@@ -10,15 +10,18 @@ import {
   internalMutation,
   internalQuery,
   mutation,
+  type QueryCtx,
   query,
 } from "../_generated/server";
+import { getConversationIfReadable } from "../_lib/conversationAccess";
 import {
   assertConcurrentRunCapacity,
   assertRetryAllowed,
   isProUser,
   takeFeatureRun,
 } from "../_lib/limits";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
+import { assertCanEditNotebook, getNotebookAccess } from "../_lib/notebookAccess";
+import { isConversationVisible } from "../_model/conversations";
 import { getAuthUserId } from "../auth";
 import { scheduleResearchRunCompletionPush } from "../push/notify";
 import { normalizeResearchTitle } from "./titles";
@@ -29,6 +32,42 @@ export { createResearchArtifacts } from "./artifacts";
 // QUERIES
 // ============================================================
 
+/**
+ * A plan or run is readable when the user can see the conversation it belongs to, so a viewer of
+ * a public notebook never reads research from someone else's thread.
+ */
+async function canReadResearch(
+  ctx: QueryCtx,
+  row: { notebookId: Id<"notebooks">; conversationId: Id<"conversations"> },
+  userId: Id<"users">
+): Promise<boolean> {
+  const conversation = await getConversationIfReadable(ctx, row.conversationId, userId);
+  return conversation !== null && conversation.notebookId === row.notebookId;
+}
+
+/**
+ * Steps are keyed by a run, plan or literature review session id. Each must belong to
+ * `notebookId` and be visible to the user. Review sessions have no conversation; they are shared
+ * with owners and editors like a shared thread (only they can start one).
+ */
+async function canReadResearchSteps(
+  ctx: QueryCtx,
+  researchId: string,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">
+): Promise<boolean> {
+  const runId = ctx.db.normalizeId("researchRuns", researchId);
+  const planId = ctx.db.normalizeId("researchPlans", researchId);
+  const row = runId ? await ctx.db.get(runId) : planId ? await ctx.db.get(planId) : null;
+  if (row) return row.notebookId === notebookId && (await canReadResearch(ctx, row, userId));
+
+  const sessionId = ctx.db.normalizeId("literatureReviewSessions", researchId);
+  const session = sessionId ? await ctx.db.get(sessionId) : null;
+  if (!session || session.notebookId !== notebookId) return false;
+  const access = await getNotebookAccess(ctx, notebookId, userId);
+  return access !== null && isConversationVisible({ userId: session.userId }, { userId, access });
+}
+
 export const getPlan = query({
   args: { planId: v.id("researchPlans") },
   returns: v.union(v.null(), v.any()),
@@ -37,11 +76,7 @@ export const getPlan = query({
     if (!userId) return null;
     const plan = await ctx.db.get(args.planId);
     if (!plan) return null;
-    try {
-      await assertCanReadNotebook(ctx, plan.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!(await canReadResearch(ctx, plan, userId))) return null;
     return plan;
   },
 });
@@ -55,11 +90,7 @@ export const getLatestRunForPlan = query({
     if (!userId) return null;
     const plan = await ctx.db.get(args.planId);
     if (!plan) return null;
-    try {
-      await assertCanReadNotebook(ctx, plan.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!(await canReadResearch(ctx, plan, userId))) return null;
     const run = await ctx.db
       .query("researchRuns")
       .withIndex("by_planId_and_createdAt", (q) => q.eq("planId", args.planId))
@@ -78,11 +109,7 @@ export const getResearchSteps = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    try {
-      await assertCanReadNotebook(ctx, args.notebookId, userId);
-    } catch {
-      return [];
-    }
+    if (!(await canReadResearchSteps(ctx, args.researchId, args.notebookId, userId))) return [];
     return await ctx.db
       .query("researchSteps")
       .withIndex("by_research", (q) => q.eq("researchId", args.researchId))
@@ -99,11 +126,7 @@ export const getRunEvidence = query({
     if (!userId) return [];
     const run = await ctx.db.get(args.runId);
     if (!run) return [];
-    try {
-      await assertCanReadNotebook(ctx, run.notebookId, userId);
-    } catch {
-      return [];
-    }
+    if (!(await canReadResearch(ctx, run, userId))) return [];
     return await ctx.db
       .query("researchEvidence")
       .withIndex("by_run", (q) => q.eq("runId", args.runId))
