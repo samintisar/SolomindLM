@@ -44,6 +44,9 @@ function NotebookViewContent() {
 
   const { urlNotebookId, notebookTitle, activeNotebook } = useNotebookContext();
 
+  // A signed-in user opening someone else's public notebook: every panel hides its edit controls.
+  const readOnly = activeNotebook?.access === "viewer";
+
   const { sources } = useSourcesContext();
 
   const { notes } = useStudioContext();
@@ -206,6 +209,7 @@ function NotebookViewContent() {
           sessionId={activeLiteratureView.sessionId}
           notebookId={urlNotebookId as Id<"notebooks">}
           onClose={handleCloseLiteratureView}
+          readOnly={readOnly}
         />
       );
     }
@@ -227,6 +231,7 @@ function NotebookViewContent() {
           onClose={handleCloseLiteratureView}
           onOpenSavedReport={handleOpenSavedReport}
           onOpenSavedSpreadsheet={handleOpenSavedSpreadsheet}
+          readOnly={readOnly}
         />
       );
     }
@@ -239,6 +244,7 @@ function NotebookViewContent() {
         sources={sources}
         notebookId={urlNotebookId}
         onAskInChat={handleAskInChat}
+        readOnly={readOnly}
       />
     );
   };
@@ -396,6 +402,7 @@ function NotebookViewContent() {
                   focusSourceRequest={sourceFocusRequest}
                   onFocusSourceHandled={clearSourceFocusRequest}
                   onDiscussTopic={handleDiscussSourceTopic}
+                  readOnly={readOnly}
                 />
               </Panel>
 
@@ -421,6 +428,7 @@ function NotebookViewContent() {
                     onOpenLiteratureReport={handleOpenLiteratureReport}
                     onOpenRankedPapers={handleOpenRankedPapers}
                     onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                    readOnly={readOnly}
                   />
                 </div>
               </Panel>
@@ -496,6 +504,7 @@ function NotebookViewContent() {
                     focusSourceRequest={sourceFocusRequest}
                     onFocusSourceHandled={clearSourceFocusRequest}
                     onDiscussTopic={handleDiscussSourceTopic}
+                    readOnly={readOnly}
                   />
                 </div>
               )}
@@ -517,6 +526,7 @@ function NotebookViewContent() {
                     onOpenLiteratureReport={handleOpenLiteratureReport}
                     onOpenRankedPapers={handleOpenRankedPapers}
                     onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                    readOnly={readOnly}
                   />
                 </div>
               )}
