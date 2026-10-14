@@ -3,6 +3,9 @@
 const { chromium } = require("playwright-core");
 const path = require("path");
 
+const { BASE } = require("./lib.cjs");
+const APP_HOST = new URL(BASE).hostname;
+
 (async () => {
   const profile = path.join(__dirname, "profile");
   const ctx = await chromium.launchPersistentContext(profile, {
@@ -10,10 +13,11 @@ const path = require("path");
     viewport: { width: 1280, height: 860 },
   });
   const page = ctx.pages()[0] ?? (await ctx.newPage());
-  await page.goto("https://www.solomindlm.com/sign-in");
+  await page.goto(`${BASE}/sign-in`);
   console.log("Waiting for sign-in (up to 15 min)...");
+  // Exact host match: OAuth pages carry the app URL in their own query strings.
   await page.waitForURL(
-    (u) => u.hostname.endsWith("solomindlm.com") && u.pathname.startsWith("/home"),
+    (u) => u.hostname === APP_HOST && u.pathname.startsWith("/home"),
     { timeout: 15 * 60_000 }
   );
   await page.waitForTimeout(3000);
