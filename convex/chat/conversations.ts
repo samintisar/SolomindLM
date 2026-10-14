@@ -23,7 +23,9 @@ export const listForNotebook = query({
       userId,
       access,
     });
-    return conversations.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+    return conversations
+      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+      .map((c) => Conversations.conversationForRequester(c, access));
   },
 });
 

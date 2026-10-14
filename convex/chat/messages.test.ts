@@ -121,6 +121,41 @@ describe("viewer chat on a public notebook", () => {
     return { t, ...ids };
   }
 
+  test("a viewer's conversation keeps the owner's instructions server-side but never returns them", async () => {
+    const { t, owner, viewer, notebookId } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(notebookId, {
+        chatSettings: {
+          instructionMode: "custom",
+          customInstructions: "Secret prompt",
+          responseLength: "default",
+        },
+      })
+    );
+
+    const created = await withAuth(t, viewer).mutation(api.chat.messages.createConversation, {
+      notebookId,
+    });
+    expect(created).not.toHaveProperty("customInstructions");
+    expect(created?.instructionMode).toBe("custom");
+
+    const listed = await withAuth(t, viewer).query(api.chat.conversations.listForNotebook, {
+      notebookId,
+    });
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).not.toHaveProperty("customInstructions");
+
+    // Chat still runs with the snapshot.
+    const stored = await t.run((ctx) => ctx.db.get(created!._id));
+    expect(stored?.customInstructions).toBe("Secret prompt");
+
+    // The owner still sees their own instructions.
+    const ownerCreated = await withAuth(t, owner).mutation(api.chat.messages.createConversation, {
+      notebookId,
+    });
+    expect(ownerCreated?.customInstructions).toBe("Secret prompt");
+  });
+
   test("a viewer's first message starts a private thread, not the owner's", async () => {
     const { t, viewer, notebookId, ownerConv } = await setup();
     const { conversationId } = await withAuth(t, viewer).mutation(

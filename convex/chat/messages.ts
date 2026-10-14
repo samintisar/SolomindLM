@@ -110,7 +110,8 @@ export const createConversation = mutation({
       updatedAt: now,
     });
 
-    return await ctx.db.get(conversationId);
+    const conversation = await ctx.db.get(conversationId);
+    return conversation ? ConvModel.conversationForRequester(conversation, access) : null;
   },
 });
 

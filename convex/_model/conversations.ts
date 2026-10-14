@@ -128,6 +128,19 @@ export async function getPrimaryVisibleConversation(
   return visible.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
 }
 
+/**
+ * A conversation as returned to a client. A viewer's thread snapshots the owner's custom
+ * instructions so chat behaves the same, but the viewer doesn't get to read them.
+ */
+export function conversationForRequester(
+  conversation: Doc<"conversations">,
+  access: NotebookAccessRole
+): Doc<"conversations"> | Omit<Doc<"conversations">, "customInstructions"> {
+  if (access !== "viewer") return conversation;
+  const { customInstructions: _customInstructions, ...rest } = conversation;
+  return rest;
+}
+
 /** Fields for a conversation a user starts: viewers' threads are private to them. */
 export function conversationPrivacy(access: NotebookAccessRole): { isPrivate?: true } {
   return access === "viewer" ? { isPrivate: true } : {};
