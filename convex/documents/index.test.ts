@@ -747,6 +747,54 @@ describe("deleting a source whose file a fork shares", () => {
   });
 });
 
+describe("documents.getSignedUrl for a file a fork shares", () => {
+  async function seedPublicSourceForkedAway(t: ReturnType<typeof convexTest>) {
+    const owner = await seedUser(t);
+    const forker = await seedUser(t);
+    const stranger = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    const fileId = await t.run(async (ctx) => {
+      await ctx.db.patch(notebookId, { isPublic: true });
+      const fileId = await ctx.storage.store(new Blob(["%PDF-1.7"]));
+      await ctx.db.insert("documents", {
+        userId: owner,
+        notebookId,
+        fileName: "paper.pdf",
+        fileType: "pdf",
+        storageId: fileId,
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return fileId;
+    });
+    await t.run((ctx) => performNotebookFork(ctx, notebookId, forker));
+    // The owner takes the notebook off the Public tab; the forker keeps their copy.
+    await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
+    return { owner, forker, stranger, fileId };
+  }
+
+  test("the forker still gets a URL after the original is unpublished", async () => {
+    const t = convexTest(schema, modules);
+    const { forker, fileId } = await seedPublicSourceForkedAway(t);
+
+    const url = await withAuth(t, forker).mutation(api.documents.index.getSignedUrl, {
+      storageId: fileId,
+    });
+
+    expect(url).toEqual(expect.any(String));
+  });
+
+  test("a user who can read neither notebook is refused", async () => {
+    const t = convexTest(schema, modules);
+    const { stranger, fileId } = await seedPublicSourceForkedAway(t);
+
+    await expect(
+      withAuth(t, stranger).mutation(api.documents.index.getSignedUrl, { storageId: fileId })
+    ).rejects.toThrow("Notebook not found");
+  });
+});
+
 describe("documents.addExternalSources", () => {
   test("creates documents from discovered sources", async () => {
     const t = convexTest(schema, modules);

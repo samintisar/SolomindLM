@@ -3,11 +3,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  getNotebookAccess,
-} from "../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
 
 /**
@@ -63,25 +59,6 @@ export const deleteDocumentFileIfUnusedInternal = internalMutation({
   handler: async (ctx, args) => {
     await deleteDocumentFileIfUnused(ctx, args.storageId);
     return null;
-  },
-});
-
-/**
- * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
- */
-export const userCanAccessStorage = internalQuery({
-  args: {
-    userId: v.id("users"),
-    storageId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db
-      .query("documents")
-      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .first();
-    if (!doc) return false;
-    const access = await getNotebookAccess(ctx, doc.notebookId, args.userId);
-    return access !== null;
   },
 });
 

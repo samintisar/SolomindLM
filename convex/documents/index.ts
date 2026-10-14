@@ -16,7 +16,6 @@ import {
   assertCanEditNotebook,
   assertCanReadNotebook,
   canReadNotebook,
-  getNotebookAccess,
 } from "../_lib/notebookAccess";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
@@ -265,6 +264,9 @@ export const getContent = query({
   },
 });
 
+/** Bounds the rows read when looking for a notebook through which the caller may read a file. */
+const MAX_DOCUMENTS_SHARING_A_FILE_CHECKED = 20;
+
 /**
  * Get a signed URL for a document's storage file
  */
@@ -275,16 +277,30 @@ export const getSignedUrl = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const document = await ctx.db
+    // A fork shares its sources' files, so several notebooks can hold this file. The caller may
+    // read it through any of them (the original may since have been unpublished or deleted).
+    const documents = await ctx.db
       .query("documents")
       .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .first();
+      .take(MAX_DOCUMENTS_SHARING_A_FILE_CHECKED);
 
-    if (!document) {
+    if (documents.length === 0) {
       throw new Error("Document not found");
     }
 
-    await assertCanReadNotebook(ctx, document.notebookId, userId);
+    const checked = new Set<Id<"notebooks">>();
+    let readable = false;
+    for (const document of documents) {
+      if (checked.has(document.notebookId)) continue;
+      checked.add(document.notebookId);
+      if (await canReadNotebook(ctx, document.notebookId, userId)) {
+        readable = true;
+        break;
+      }
+    }
+    if (!readable) {
+      throw new Error("Notebook not found");
+    }
 
     return await ctx.storage.getUrl(args.storageId as Id<"_storage">);
   },
