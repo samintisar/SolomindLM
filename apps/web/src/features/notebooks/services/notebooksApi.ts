@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useCallback, useMemo } from "react";
 import type { ChatSettings } from "@/shared/types";
 
@@ -31,7 +31,6 @@ export function useCreateNotebook() {
       title: string;
       coverColor?: string;
       icon?: string;
-      isFeatured?: boolean;
       folderId?: string | null;
     }) => {
       // Convert folderId to proper type if provided
@@ -50,7 +49,7 @@ export function useUpdateNotebook() {
   const update = useMemo(
     () =>
       updateMutation.withOptimisticUpdate((localStore, args) => {
-        const { id, title, coverColor, icon, isFeatured, folderId, chatSettings } = args;
+        const { id, title, coverColor, icon, folderId, chatSettings } = args;
         const now = Date.now();
 
         // Update list view
@@ -66,7 +65,6 @@ export function useUpdateNotebook() {
                     ...(title !== undefined && { title }),
                     ...(coverColor !== undefined && { coverColor }),
                     ...(icon !== undefined && { icon }),
-                    ...(isFeatured !== undefined && { isFeatured }),
                     ...(folderId !== undefined && { folderId }),
                     ...(chatSettings !== undefined && { chatSettings }),
                     updated_at: now,
@@ -92,7 +90,6 @@ export function useUpdateNotebook() {
               ...(title !== undefined && { title }),
               ...(coverColor !== undefined && { coverColor }),
               ...(icon !== undefined && { icon }),
-              ...(isFeatured !== undefined && { isFeatured }),
               ...(folderId !== undefined && { folderId }),
               ...(chatSettings !== undefined && { chatSettings }),
               updated_at: now,
@@ -115,7 +112,6 @@ export function useUpdateNotebook() {
         title?: string;
         coverColor?: string;
         icon?: string;
-        isFeatured?: boolean;
         folderId?: string | null;
         chatSettings?: ChatSettings;
       }
@@ -202,4 +198,46 @@ export function useForkNotebookFromToken() {
 
 export function usePeekShareToken(token: string | null) {
   return useQuery(api.notebooks.sharing.peekShareToken, token ? { token } : "skip");
+}
+
+// ============================================================
+// Public notebooks
+// ============================================================
+
+const PUBLIC_PAGE_SIZE = 24;
+
+/** Community grid: public notebooks that aren't featured, newest published first. */
+export function usePublicNotebooks() {
+  const result = usePaginatedQuery(
+    api.notebooks.public.listPublic,
+    {},
+    { initialNumItems: PUBLIC_PAGE_SIZE }
+  );
+  const { loadMore } = result;
+  const loadNextPage = useCallback(() => loadMore(PUBLIC_PAGE_SIZE), [loadMore]);
+  return { ...result, loadNextPage };
+}
+
+export function useFeaturedNotebooks() {
+  return useQuery(api.notebooks.public.listFeatured, {});
+}
+
+export function useSetNotebookPublic() {
+  return useMutation(api.notebooks.public.setPublic);
+}
+
+export function useForkPublicNotebook() {
+  return useMutation(api.notebooks.public.forkPublic);
+}
+
+export function useSetNotebookFeatured() {
+  return useMutation(api.notebooks.public.setFeatured);
+}
+
+export function useAdminUnpublishNotebook() {
+  return useMutation(api.notebooks.public.adminUnpublish);
+}
+
+export function useIsAdmin() {
+  return useQuery(api.feedback.index.isAdmin, {}) ?? false;
 }
