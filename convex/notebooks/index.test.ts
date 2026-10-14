@@ -112,3 +112,45 @@ describe("notebooks.index", () => {
     );
   });
 });
+
+describe("notebooks.get access", () => {
+  test("a viewer gets the notebook with access=viewer and the owner's name", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { viewer, notebookId } = await t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Ada" });
+      const viewer = await ctx.db.insert("users", { name: "Viewer" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Public",
+        isPublic: true,
+        publishedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { viewer, notebookId };
+    });
+    const nb = await withAuth(t, viewer).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.access).toBe("viewer");
+    expect(nb?.isPublic).toBe(true);
+    expect(nb?.ownerName).toBe("Ada");
+  });
+
+  test("the owner gets access=owner", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { owner, notebookId } = await t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Ada" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Mine",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { owner, notebookId };
+    });
+    const nb = await withAuth(t, owner).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.access).toBe("owner");
+    expect(nb?.isPublic).toBe(false);
+  });
+});

@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import { internalQuery, mutation, query } from "../_generated/server";
 import { checkNotebookLimit } from "../_lib/limits";
-import { getNotebookAccess } from "../_lib/notebookAccess";
+import { getNotebookAccess, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
 
@@ -16,12 +16,13 @@ function toNotebookDTO(
     | "coverColor"
     | "icon"
     | "isFeatured"
+    | "isPublic"
     | "folderId"
     | "createdAt"
     | "chatSettings"
   >,
   sourceCount: number,
-  options?: { isSharedNotebook?: boolean }
+  options: { access: NotebookAccessRole; ownerName?: string }
 ) {
   return {
     id: notebook._id,
@@ -35,10 +36,14 @@ function toNotebookDTO(
     coverColor: notebook.coverColor ?? "bg-vintage-brown-300",
     icon: notebook.icon ?? "Book",
     isFeatured: notebook.isFeatured ?? false,
+    isPublic: notebook.isPublic ?? false,
     folderId: notebook.folderId,
     created_at: notebook.createdAt,
     updated_at: notebook.updatedAt,
-    isSharedNotebook: options?.isSharedNotebook ?? false,
+    access: options.access,
+    /** Someone else's notebook you can edit via a cowork link. */
+    isSharedNotebook: options.access === "editor",
+    ownerName: options.ownerName,
     chatSettings: notebook.chatSettings ?? undefined,
   };
 }
@@ -55,7 +60,7 @@ export const list = query({
     const ownedDtos = await Promise.all(
       owned.map(async (notebook) => {
         const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
-        return toNotebookDTO(notebook, sourceCount, { isSharedNotebook: false });
+        return toNotebookDTO(notebook, sourceCount, { access: "owner" });
       })
     );
 
@@ -69,7 +74,7 @@ export const list = query({
       const notebook = await ctx.db.get(m.notebookId);
       if (!notebook) continue;
       const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
-      sharedDtos.push(toNotebookDTO(notebook, sourceCount, { isSharedNotebook: true }));
+      sharedDtos.push(toNotebookDTO(notebook, sourceCount, { access: "editor" }));
     }
 
     const merged = [...ownedDtos, ...sharedDtos];
@@ -124,8 +129,10 @@ export const get = query({
     if (!access) return null;
 
     const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
+    const owner = access === "owner" ? null : await ctx.db.get(notebook.userId);
     return toNotebookDTO(notebook, sourceCount, {
-      isSharedNotebook: access === "editor",
+      access,
+      ownerName: owner ? (owner.name ?? "SolomindLM user") : undefined,
     });
   },
 });
@@ -138,7 +145,6 @@ export const create = mutation({
     title: v.string(),
     coverColor: v.optional(v.string()),
     icon: v.optional(v.string()),
-    isFeatured: v.optional(v.boolean()),
     folderId: v.optional(v.id("folders")),
   },
   handler: async (ctx, args) => {
@@ -152,7 +158,6 @@ export const create = mutation({
       title: args.title,
       coverColor: args.coverColor,
       icon: args.icon,
-      isFeatured: args.isFeatured,
       folderId: args.folderId,
     });
 
@@ -168,7 +173,9 @@ export const create = mutation({
       sourceCount: 0,
       coverColor: args.coverColor ?? "bg-vintage-brown-300",
       icon: args.icon ?? "Book",
-      isFeatured: args.isFeatured ?? false,
+      isFeatured: false,
+      isPublic: false,
+      access: "owner" as const,
       folderId: args.folderId,
       created_at: now,
       updated_at: now,
@@ -185,7 +192,6 @@ export const update = mutation({
     title: v.optional(v.string()),
     coverColor: v.optional(v.string()),
     icon: v.optional(v.string()),
-    isFeatured: v.optional(v.boolean()),
     folderId: v.optional(v.id("folders")),
     chatSettings: v.optional(
       v.object({
@@ -217,7 +223,7 @@ export const update = mutation({
     const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, id);
     if (!updated) throw new Error("Notebook not found");
 
-    return toNotebookDTO(updated, sourceCount);
+    return toNotebookDTO(updated, sourceCount, { access: "owner" });
   },
 });
 
