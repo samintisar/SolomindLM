@@ -255,6 +255,7 @@ import type * as literatureReview_workflowProvenance from "../literatureReview/w
 import type * as literatureReview_workflowSteps from "../literatureReview/workflowSteps.js";
 import type * as notebooks__forkNotebook from "../notebooks/_forkNotebook.js";
 import type * as notebooks_index from "../notebooks/index.js";
+import type * as notebooks_public from "../notebooks/public.js";
 import type * as notebooks_sharing from "../notebooks/sharing.js";
 import type * as notes_index from "../notes/index.js";
 import type * as notes_listSummary from "../notes/listSummary.js";
@@ -581,6 +582,7 @@ declare const fullApi: ApiFromModules<{
   "literatureReview/workflowSteps": typeof literatureReview_workflowSteps;
   "notebooks/_forkNotebook": typeof notebooks__forkNotebook;
   "notebooks/index": typeof notebooks_index;
+  "notebooks/public": typeof notebooks_public;
   "notebooks/sharing": typeof notebooks_sharing;
   "notes/index": typeof notes_index;
   "notes/listSummary": typeof notes_listSummary;
