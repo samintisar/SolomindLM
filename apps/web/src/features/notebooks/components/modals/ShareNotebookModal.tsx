@@ -1,5 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { Ban, Check, Copy, GitFork, Lock, Share2, Users } from "lucide-react";
+import { Ban, Check, Copy, GitFork, Globe, Lock, Share2, Users } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -10,16 +10,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
+import { Label } from "@/shared/components/ui/label";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { Switch } from "@/shared/components/ui/switch";
 import { useToast } from "@/shared/contexts/useToast";
 import {
   useCreateShareLink,
   useRevokeShareLinkWithOptimisticUpdate,
+  useSetNotebookPublic,
   useShareLinks,
 } from "../../services/notebooksApi";
 
 interface ShareNotebookModalProps {
   notebookId: string;
+  /** From the reactive notebook list, so the switch follows the mutation. */
+  isPublic: boolean;
   onClose: () => void;
 }
 
@@ -94,8 +99,27 @@ function LinkUrlRow({
   );
 }
 
-export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebookId, onClose }) => {
+export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({
+  notebookId,
+  isPublic,
+  onClose,
+}) => {
   const { success, error: showError } = useToast();
+
+  const setNotebookPublic = useSetNotebookPublic();
+  const [publicBusy, setPublicBusy] = useState(false);
+
+  const handlePublicChange = async (next: boolean) => {
+    setPublicBusy(true);
+    try {
+      await setNotebookPublic({ notebookId: notebookId as Id<"notebooks">, isPublic: next });
+      success(next ? "Notebook is now public" : "Notebook is private again");
+    } catch (e) {
+      showError(e instanceof Error ? e.message : "Could not change visibility");
+    } finally {
+      setPublicBusy(false);
+    }
+  };
 
   const links = useShareLinks(notebookId);
 
@@ -168,6 +192,26 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
               Create cowork or duplicate links for this notebook.
             </DialogDescription>
           </DialogHeader>
+        </div>
+
+        <div className="flex items-start gap-4 border-b border-border px-6 py-4">
+          <Globe aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1 space-y-1">
+            <Label htmlFor="notebook-public" className="font-sans text-sm font-semibold">
+              Make public
+            </Label>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Anyone signed in to SolomindLM can find this notebook on the Public tab, read its
+              sources and Studio items, chat with it privately, and fork a copy. Your name is shown
+              as the author. They can't change it.
+            </p>
+          </div>
+          <Switch
+            id="notebook-public"
+            checked={isPublic}
+            disabled={publicBusy}
+            onCheckedChange={(next) => void handlePublicChange(next)}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-card/50">

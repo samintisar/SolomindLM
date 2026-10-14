@@ -329,7 +329,11 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   return (
     <OnboardingProvider key={user?.id ?? "anon"} isAuthenticated={isAuthenticated}>
       {shareModalOpen && urlNotebookId && activeNotebook?.access === "owner" && (
-        <ShareNotebookModal notebookId={urlNotebookId} onClose={() => setShareModalOpen(false)} />
+        <ShareNotebookModal
+          notebookId={urlNotebookId}
+          isPublic={activeNotebook.isPublic ?? false}
+          onClose={() => setShareModalOpen(false)}
+        />
       )}
 
       <div className="w-full bg-background text-foreground font-serif flex flex-col h-screen overflow-hidden">
