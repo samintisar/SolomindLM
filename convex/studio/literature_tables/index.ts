@@ -3,7 +3,7 @@ import type { FunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { workflow } from "../../_agents/literature_review/LiteratureReviewGraph.js";
 import { components, internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { internalMutation, mutation, query } from "../../_generated/server";
 import { getConversationIfReadable } from "../../_lib/conversationAccess";
@@ -112,6 +112,33 @@ function isChatLiteratureReport(
     chatReportIds.has(report._id) ||
     isChatLiteratureReportTitle(report.title)
   );
+}
+
+/**
+ * Anyone who can read the notebook can open its Studio tables and reports. Chat review outputs
+ * belong to the creator's thread, so only the creator opens those.
+ */
+async function canReadLiteratureTable(
+  ctx: QueryCtx,
+  table: Doc<"literatureTables">,
+  userId: Id<"users">
+): Promise<boolean> {
+  if (!(await canReadNotebook(ctx, table.notebookId, userId))) return false;
+  if (table.userId === userId) return true;
+  const { tableIds } = await getChatLinkedLiteratureArtifactIds(ctx, table.notebookId);
+  return !isChatLiteratureTable(table, tableIds);
+}
+
+/** Same rule as `canReadLiteratureTable`. */
+async function canReadLiteratureReport(
+  ctx: QueryCtx,
+  report: Doc<"literatureReports">,
+  userId: Id<"users">
+): Promise<boolean> {
+  if (!(await canReadNotebook(ctx, report.notebookId, userId))) return false;
+  if (report.userId === userId) return true;
+  const { reportIds } = await getChatLinkedLiteratureArtifactIds(ctx, report.notebookId);
+  return !isChatLiteratureReport(report, reportIds);
 }
 
 /**
@@ -693,15 +720,7 @@ export const getLiteratureTable = query({
     if (!userId) return null;
 
     const table = await ctx.db.get(args.tableId);
-    if (!table) return null;
-
-    if (table.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, table.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!table || !(await canReadLiteratureTable(ctx, table, userId))) return null;
 
     const papers = await Promise.all(
       table.papers.map(async (paper) => {
@@ -766,15 +785,7 @@ export const getLiteratureReport = query({
     if (!userId) return null;
 
     const report = await ctx.db.get(args.reportId);
-    if (!report) return null;
-
-    if (report.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, report.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!report || !(await canReadLiteratureReport(ctx, report, userId))) return null;
 
     return report;
   },
@@ -945,13 +956,7 @@ export const getLiteratureReportDetail = query({
     if (!userId) return null;
 
     const report = await ctx.db.get(args.reportId);
-    if (!report || report.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, report.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!report || !(await canReadLiteratureReport(ctx, report, userId))) return null;
 
     const citations: Record<
       string,
