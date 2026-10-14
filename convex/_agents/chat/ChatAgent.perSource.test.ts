@@ -197,3 +197,35 @@ describe("ChatAgent per-source retrieval (#450)", () => {
     expect(searchDocument).not.toHaveBeenCalled();
   });
 });
+
+describe("ChatAgent opening passages (#477)", () => {
+  it("takes openings retrieval found and fetches only the rest", async () => {
+    const fetchOpeningPassagesFn = vi.fn(async () => [passage("react", 0)]);
+    const agent = new ChatAgent({ fetchOpeningPassagesFn });
+    const passages = [passage("rag", 7), passage("react", 4)];
+    const pool = [...passages, passage("rag", 0)];
+
+    const out: ReferenceChunk[] = await agent["withOpeningPassages"](passages, pool, logger);
+
+    expect(fetchOpeningPassagesFn).toHaveBeenCalledWith(["react"]);
+    expect(out.map((c) => c.id)).toEqual(["rag-0", "rag-7", "react-0", "react-4"]);
+  });
+
+  it("logs a failed fetch and keeps the passages it has", async () => {
+    const agent = new ChatAgent({
+      fetchOpeningPassagesFn: vi.fn(async () => {
+        throw new Error("query failed");
+      }),
+    });
+    const warn = vi.spyOn(logger, "warn");
+    const passages = [passage("rag", 7)];
+
+    await expect(agent["withOpeningPassages"](passages, passages, logger)).resolves.toEqual(
+      passages
+    );
+    expect(warn).toHaveBeenCalledWith(
+      "Opening passage lookup failed",
+      expect.objectContaining({ error: expect.stringContaining("query failed") })
+    );
+  });
+});

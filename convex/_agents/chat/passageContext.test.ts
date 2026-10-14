@@ -25,10 +25,39 @@ describe("passageTextForModel", () => {
     );
   });
 
-  it("strips citation markers from the source text so they cannot be mistaken for ours", () => {
+  it("rewrites the source's own reference markers so they cannot be mistaken for ours", () => {
     expect(passageTextForModel(passage("Validated measure [44] of activity [12]."))).toBe(
-      "Validated measure  of activity ."
+      "Validated measure (ref. 44) of activity (ref. 12)."
     );
+  });
+
+  it("keeps ranges and lists of references, which mark a claim as another study's (#477)", () => {
+    expect(
+      passageTextForModel(
+        passage(
+          "Effective in treating [6-8] and preventing [9] depression [2,3] and anxiety [4, 5–7]."
+        )
+      )
+    ).toBe(
+      "Effective in treating (refs. 6-8) and preventing (ref. 9) depression (refs. 2,3) and anxiety (refs. 4, 5–7)."
+    );
+  });
+
+  it("leaves bracketed numbers that are not references alone", () => {
+    expect(passageTextForModel(passage("Scores in [0, 1] and [0.5] and [2024a] stay."))).toBe(
+      "Scores in [0, 1] and [0.5] and [2024a] stay."
+    );
+  });
+
+  it("rewrites reference markers in the neighbours' previews too", () => {
+    expect(
+      passageTextForModel(
+        passage("Middle.", {
+          previousChunkPreview: "Earlier work [3]",
+          nextChunkPreview: "Later [4-5]",
+        })
+      )
+    ).toBe("...Earlier work (ref. 3)\n\nMiddle.\n\nLater (refs. 4-5)...");
   });
 
   it("returns the bare passage when there are no previews", () => {

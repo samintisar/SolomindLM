@@ -417,7 +417,17 @@ export function addNeighbourPassages(
     }
   }
 
-  return result.map((c) => {
+  return dropCoveredPreviews(result);
+}
+
+/** Drops each passage's neighbour previews whose whole passage is also in the context. */
+function dropCoveredPreviews(passages: ReferenceChunk[]): ReferenceChunk[] {
+  const inContext = new Set(
+    passages
+      .filter((c) => c.documentId && c.chunkIndex >= 0)
+      .map((c) => positionKey(c.documentId as string, c.chunkIndex))
+  );
+  return passages.map((c) => {
     if (!c.documentId || c.chunkIndex < 0 || !c.metadata) return c;
     const hasNext = inContext.has(positionKey(c.documentId, c.chunkIndex + 1));
     const hasPrevious = inContext.has(positionKey(c.documentId, c.chunkIndex - 1));
@@ -431,4 +441,76 @@ export function addNeighbourPassages(
       },
     };
   });
+}
+
+/**
+ * Documents with passages in the context but not their opening passage (chunk 0), in the order
+ * they first appear. Whole documents (chunkIndex -1) already include their opening.
+ */
+export function documentsNeedingOpening(passages: ReferenceChunk[]): string[] {
+  const withOpening = new Set(
+    passages.filter((c) => c.documentId && c.chunkIndex <= 0).map((c) => c.documentId as string)
+  );
+  const needing: string[] = [];
+  for (const c of passages) {
+    if (!c.documentId || c.chunkIndex < 0 || withOpening.has(c.documentId)) continue;
+    if (!needing.includes(c.documentId)) needing.push(c.documentId);
+  }
+  return needing;
+}
+
+export type OpeningPassageOptions = {
+  /** Tokens the added openings may use in total. */
+  tokenBudget: number;
+  /** Most openings to add. */
+  maxPassages: number;
+};
+
+/**
+ * Puts each document's opening passage (its title and, for a paper, usually the start of the
+ * abstract) before the document's first passage in the context. Retrieval picks passages by
+ * relevance to the question, so a result or discussion passage often arrives without anything
+ * saying what the source is: which study, of what design, whose findings these are (#477).
+ * Documents are served in the order they first appear, so the best-ranked sources get theirs
+ * first when the limits bind.
+ *
+ * @param passages - Context passages in rank order
+ * @param openings - Opening passages of documents, from the retrieval pool or fetched
+ */
+export function addOpeningPassages(
+  passages: ReferenceChunk[],
+  openings: ReferenceChunk[],
+  options: OpeningPassageOptions
+): ReferenceChunk[] {
+  const openingByDocument = new Map<string, ReferenceChunk>();
+  for (const o of openings) {
+    if (o.documentId && !openingByDocument.has(o.documentId))
+      openingByDocument.set(o.documentId, o);
+  }
+  const inContext = new Set(
+    passages
+      .filter((c) => c.documentId && c.chunkIndex >= 0)
+      .map((c) => positionKey(c.documentId as string, c.chunkIndex))
+  );
+
+  const result = [...passages];
+  let usedTokens = 0;
+  let added = 0;
+  for (const documentId of documentsNeedingOpening(passages)) {
+    if (added >= options.maxPassages) break;
+    const opening = openingByDocument.get(documentId);
+    if (!opening || inContext.has(positionKey(documentId, opening.chunkIndex))) continue;
+    const tokens = countTokens(opening.content);
+    if (usedTokens + tokens > options.tokenBudget) continue;
+    result.splice(
+      result.findIndex((c) => c.documentId === documentId),
+      0,
+      opening
+    );
+    inContext.add(positionKey(documentId, opening.chunkIndex));
+    usedTokens += tokens;
+    added++;
+  }
+
+  return added > 0 ? dropCoveredPreviews(result) : result;
 }

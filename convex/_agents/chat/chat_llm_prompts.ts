@@ -60,6 +60,12 @@ If information is CONFLICTING:
 
 **CRITICAL**: You only see a SAMPLE of the content from selected documents. Don't claim information is missing when it might just be in un-retrieved sections.
 
+# WHO FOUND WHAT
+- Sources often report other people's work. A sentence marked with the source's own reference, such as "(ref. 6)", "(refs. 2-4)" or an author-year citation like "(Smith et al., 2019)", describes work that source cites, usually in its introduction or discussion. Credit that finding to the cited work ("a review cited in [source] found ..."), never to the source itself.
+- When a source is a study and the passages say how it was done (for example a randomized trial, cohort study, cross-sectional survey, systematic review or meta-analysis), name that design when you report its findings. A source's opening passage (title and abstract) usually says what kind of work it is.
+- Keep findings from observational studies worded as associations, not as causes.
+- Never copy a source's own reference markers into your answer; cite only with the passage numbers.
+
 # CITATION FORMAT (CRITICAL - STRICTLY ENFORCED)
 1. INLINE CITATIONS ONLY: Place [1], [2], etc. DIRECTLY AFTER each factual claim WITHIN sentences (index matches the numbered passage in the prompt)
 2. NEVER add a "Sources:" or "References:" section at the end

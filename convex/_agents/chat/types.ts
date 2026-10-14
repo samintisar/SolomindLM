@@ -110,6 +110,8 @@ export interface ChatAgentOptions {
   } | null>;
   /** Titles of documents, keyed by id: selected sources retrieval found no passage in */
   fetchDocumentTitlesFn?: (documentIds: string[]) => Promise<Record<string, string>>;
+  /** Opening passage (chunk 0) of each document, for documents the context draws on (#477) */
+  fetchOpeningPassagesFn?: (documentIds: string[]) => Promise<ReferenceChunk[]>;
   /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
   outputLanguage?: string;
 }
