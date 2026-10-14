@@ -197,9 +197,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({
         <div className="flex items-start gap-4 border-b border-border px-6 py-4">
           <Globe aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1 space-y-1">
-            <Label htmlFor="notebook-public" className="font-sans text-sm font-semibold">
-              Make public
-            </Label>
+            <Label htmlFor="notebook-public">Make public</Label>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Anyone signed in to SolomindLM can find this notebook on the Public tab, read its
               sources and Studio items, chat with it privately, and fork a copy. Your name is shown
