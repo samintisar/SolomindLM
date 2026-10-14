@@ -113,6 +113,35 @@ describe("NotebookCard", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  test("admin Unpublish asks first", async () => {
+    const onUnpublish = vi.fn();
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isPublic: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        variant="public"
+        adminActions={{ onToggleFeatured: vi.fn(), onUnpublish }}
+      />
+    );
+    const unpublish = async () => {
+      await userEvent.click(screen.getByRole("button", { name: "Moderation actions" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Unpublish" }));
+      return screen.findByRole("alertdialog");
+    };
+
+    let dialog = await unpublish();
+    expect(
+      within(dialog).getByText(/Remove "Cell Biology" from the Public tab/)
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(onUnpublish).not.toHaveBeenCalled();
+
+    dialog = await unpublish();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Unpublish" }));
+    expect(onUnpublish).toHaveBeenCalledOnce();
+  });
+
   test("shared notebooks have no actions menu", () => {
     render(
       <NotebookCard

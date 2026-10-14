@@ -28,8 +28,33 @@ function useNotebookActions({
   onOpenCustomize,
   onOpenMoveToFolder,
   onDeleteNotebook,
+  adminActions,
 }: NotebookCardProps) {
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+
+  const moderation: CardAction[] = [];
+  if (adminActions)
+    moderation.push(
+      {
+        label: notebook.isFeatured ? "Unfeature" : "Feature",
+        icon: Star,
+        onSelect: adminActions.onToggleFeatured,
+      },
+      {
+        label: "Unpublish",
+        icon: EyeOff,
+        destructive: true,
+        onSelect: async () => {
+          const ok = await confirm(
+            "Unpublish notebook",
+            `Remove "${notebook.title}" from the Public tab? The owner can publish it again.`,
+            { confirmText: "Unpublish", cancelText: "Cancel", variant: "danger" }
+          );
+          if (ok) adminActions.onUnpublish();
+        },
+      }
+    );
+
   const actions: CardAction[] = [];
   if (onOpenCustomize)
     actions.push({ label: "Customize", icon: Settings2, onSelect: onOpenCustomize });
@@ -49,7 +74,7 @@ function useNotebookActions({
         if (ok) onDeleteNotebook(notebook.id);
       },
     });
-  return { actions, ConfirmDialogComponent };
+  return { actions, moderation, ConfirmDialogComponent };
 }
 
 function StatusBadge({ props }: { props: NotebookCardProps }) {
@@ -78,29 +103,12 @@ function StatusBadge({ props }: { props: NotebookCardProps }) {
   return null;
 }
 
-function moderationActions(props: NotebookCardProps): CardAction[] {
-  if (!props.adminActions) return [];
-  return [
-    {
-      label: props.notebook.isFeatured ? "Unfeature" : "Feature",
-      icon: Star,
-      onSelect: props.adminActions.onToggleFeatured,
-    },
-    {
-      label: "Unpublish",
-      icon: EyeOff,
-      destructive: true,
-      onSelect: props.adminActions.onUnpublish,
-    },
-  ];
-}
-
 /** The card's menu: admin moderation, else the owner's actions, else none. */
 function cardMenu(
   props: NotebookCardProps,
-  actions: CardAction[]
+  actions: CardAction[],
+  moderation: CardAction[]
 ): { label: string; actions: CardAction[] } | null {
-  const moderation = moderationActions(props);
   if (moderation.length > 0) return { label: "Moderation actions", actions: moderation };
   if (props.variant === "public" || props.notebook.isSharedNotebook || actions.length === 0)
     return null;
@@ -109,9 +117,9 @@ function cardMenu(
 
 export function NotebookCard(props: NotebookCardProps) {
   const { notebook, viewMode, onSelectNotebook } = props;
-  const { actions: ownerActions, ConfirmDialogComponent } = useNotebookActions(props);
+  const { actions: ownerActions, moderation, ConfirmDialogComponent } = useNotebookActions(props);
   const actions = props.variant === "public" ? [] : ownerActions;
-  const menu = cardMenu(props, actions);
+  const menu = cardMenu(props, actions, moderation);
   const Icon = notebookIcon(notebook.icon);
   const fill = coverFillClass(notebook.coverColor);
   // Public cards: author and created date; public listings don't count sources.
