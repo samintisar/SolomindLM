@@ -15,8 +15,8 @@ import {
 } from "../../_lib/limits";
 import {
   assertCanEditNotebook,
-  assertCanReadNotebook,
   canReadNotebook,
+  getNotebookAccess,
 } from "../../_lib/notebookAccess";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
 import { toConvexError } from "../../_lib/serviceErrors";
@@ -58,6 +58,21 @@ const literatureTablePaperValidator = v.object({
   offTopicReason: v.optional(v.string()),
   extractionFailed: v.optional(v.boolean()),
 });
+
+/**
+ * A review session belongs to its creator's chat thread. Only the creator reads it, and only
+ * while they own or edit the notebook: viewers of a public notebook never do (matching
+ * `canReadResearchSteps`), even one who started the session as a since-removed editor.
+ */
+async function canReadReviewSession(
+  ctx: QueryCtx,
+  session: Doc<"literatureReviewSessions">,
+  userId: Id<"users">
+): Promise<boolean> {
+  if (session.userId !== userId) return false;
+  const access = await getNotebookAccess(ctx, session.notebookId, userId);
+  return access === "owner" || access === "editor";
+}
 
 /**
  * Anyone who can read the notebook can open its Studio tables and reports. Chat review outputs
@@ -515,15 +530,7 @@ export const getLiteratureReviewSession = query({
     if (!userId) return null;
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session) return null;
-
-    if (session.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, session.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!session || !(await canReadReviewSession(ctx, session, userId))) return null;
 
     return session;
   },
@@ -587,13 +594,7 @@ export const getRankedPapersForSession = query({
     if (!userId) return null;
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, session.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!session || !(await canReadReviewSession(ctx, session, userId))) return null;
 
     const row = await ctx.db
       .query("literatureReviewRankedPapers")
@@ -975,13 +976,7 @@ export const getLiteratureReviewScreeningDecisions = query({
     if (!userId) return [];
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== userId) return [];
-
-    try {
-      await assertCanReadNotebook(ctx, session.notebookId, userId);
-    } catch {
-      return [];
-    }
+    if (!session || !(await canReadReviewSession(ctx, session, userId))) return [];
 
     const rows = await ctx.db
       .query("literatureReviewScreeningDecisions")

@@ -450,3 +450,85 @@ describe("literature outputs for other readers of the notebook", () => {
     });
   });
 });
+
+describe("literature review session reads", () => {
+  /** A session started by an editor of a public notebook, with ranked papers and a decision. */
+  async function seedSession(t: ReturnType<typeof convexTest>) {
+    const owner = await seedUser(t);
+    const creator = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    const now = Date.now();
+    const { sessionId, membershipId } = await t.run(async (ctx) => {
+      await ctx.db.patch(notebookId, { isPublic: true });
+      const membershipId = await ctx.db.insert("notebookMembers", {
+        notebookId,
+        userId: creator,
+        role: "editor",
+        joinedAt: now,
+      });
+      const sessionId = await ctx.db.insert("literatureReviewSessions", {
+        query: "sleep and memory",
+        notebookId,
+        userId: creator,
+        workflowId: "wf",
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+      } as never);
+      await ctx.db.insert("literatureReviewRankedPapers", {
+        sessionId,
+        papers: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("literatureReviewScreeningDecisions", {
+        sessionId,
+        paperIndex: 0,
+        title: "Paper",
+        authors: ["A"],
+        decision: "included",
+        reason: "Relevant",
+        createdAt: now,
+      });
+      return { sessionId, membershipId };
+    });
+    return { creator, sessionId, membershipId };
+  }
+
+  async function readSession(
+    t: ReturnType<typeof convexTest>,
+    userId: Id<"users">,
+    sessionId: Id<"literatureReviewSessions">
+  ) {
+    const as = withAuth(t, userId);
+    const index = api.studio.literature_tables.index;
+    return {
+      session: await as.query(index.getLiteratureReviewSession, { sessionId }),
+      ranked: await as.query(index.getRankedPapersForSession, { sessionId }),
+      decisions: await as.query(index.getLiteratureReviewScreeningDecisions, { sessionId }),
+    };
+  }
+
+  test("the creator reads their session while they can edit the notebook", async () => {
+    const t = convexTest(schema, modules);
+    const { creator, sessionId } = await seedSession(t);
+
+    const result = await readSession(t, creator, sessionId);
+
+    expect(result.session?._id).toBe(sessionId);
+    expect(result.ranked?.sessionId).toBe(sessionId);
+    expect(result.decisions).toHaveLength(1);
+  });
+
+  test("a creator who is now only a viewer of the public notebook reads nothing", async () => {
+    const t = convexTest(schema, modules);
+    const { creator, sessionId, membershipId } = await seedSession(t);
+    await t.run((ctx) => ctx.db.delete(membershipId));
+
+    expect(await readSession(t, creator, sessionId)).toEqual({
+      session: null,
+      ranked: null,
+      decisions: [],
+    });
+  });
+});
