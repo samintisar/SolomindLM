@@ -19,9 +19,7 @@ export function HomeHeader(props: HomeHeaderProps) {
   return (
     <header className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-xl font-bold text-foreground sm:text-3xl">
-          Your notebooks
-        </h1>
+        <h1 className="font-display text-xl font-bold text-foreground sm:text-3xl">Notebooks</h1>
         <CreateMenuButton
           onCreateNotebook={props.onCreateNotebook}
           onCreateFolder={props.onCreateFolder}

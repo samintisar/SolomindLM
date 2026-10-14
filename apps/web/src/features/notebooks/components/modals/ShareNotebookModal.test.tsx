@@ -26,6 +26,13 @@ describe("ShareNotebookModal: Make public", () => {
     expect(screen.getByRole("switch", { name: "Make public" })).toBeChecked();
   });
 
+  test("says who can see it and that your name is shown", () => {
+    render(<ShareNotebookModal notebookId="n1" isPublic={false} onClose={vi.fn()} />);
+    expect(
+      screen.getByText(/They can't change it, and your name is shown as the author\.$/)
+    ).toBeInTheDocument();
+  });
+
   test("turning it on publishes the notebook", async () => {
     setPublic.mockResolvedValue({ isPublic: true });
     render(<ShareNotebookModal notebookId="n1" isPublic={false} onClose={vi.fn()} />);

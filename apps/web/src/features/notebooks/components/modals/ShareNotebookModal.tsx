@@ -14,6 +14,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Switch } from "@/shared/components/ui/switch";
 import { useToast } from "@/shared/contexts/useToast";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import {
   useCreateShareLink,
   useRevokeShareLinkWithOptimisticUpdate,
@@ -105,6 +106,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({
   onClose,
 }) => {
   const { success, error: showError } = useToast();
+  const { showError: showServiceError } = useServiceErrorToast();
 
   const setNotebookPublic = useSetNotebookPublic();
   const [publicBusy, setPublicBusy] = useState(false);
@@ -115,7 +117,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({
       await setNotebookPublic({ notebookId: notebookId as Id<"notebooks">, isPublic: next });
       success(next ? "Notebook is now public" : "Notebook is private again");
     } catch (e) {
-      showError(e instanceof Error ? e.message : "Could not change visibility");
+      showServiceError(e);
     } finally {
       setPublicBusy(false);
     }
@@ -200,8 +202,8 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({
             <Label htmlFor="notebook-public">Make public</Label>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Anyone signed in to SolomindLM can find this notebook on the Public tab, read its
-              sources and Studio items, chat with it privately, and fork a copy. Your name is shown
-              as the author. They can't change it.
+              sources and Studio items, chat with it privately, and fork a copy. They can't change
+              it, and your name is shown as the author.
             </p>
           </div>
           <Switch
