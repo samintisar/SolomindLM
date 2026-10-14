@@ -37,6 +37,8 @@ interface LiteratureTablePaperCellProps {
   onToggleSelect: () => void;
   onCite: () => void;
   onAddToNotebook: () => void;
+  /** Viewer of a public notebook: no selecting or adding to the notebook. */
+  readOnly?: boolean;
 }
 
 function StudyTypePillIcon({ kind }: { kind: StudyTypePillIcon }) {
@@ -96,6 +98,7 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
   onToggleSelect,
   onCite,
   onAddToNotebook,
+  readOnly = false,
 }) => {
   const title = getPaperTitle(paper, columns);
   const citation = paper.citation;
@@ -114,12 +117,14 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
         >
           {rank}
         </span>
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={() => onToggleSelect()}
-          aria-label={`Select ${title}`}
-          className="mt-1.5"
-        />
+        {!readOnly && (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect()}
+            aria-label={`Select ${title}`}
+            className="mt-1.5"
+          />
+        )}
       </div>
 
       <div className="min-w-0 flex-1 space-y-2.5">
@@ -182,7 +187,7 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
             <Quote aria-hidden />
             Cite
           </Button>
-          {!isNotebookPaper && (
+          {!isNotebookPaper && !readOnly && (
             <Button
               variant="ghost"
               size="xs"

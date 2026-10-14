@@ -53,6 +53,25 @@ function renderTable(props: Partial<React.ComponentProps<typeof LiteratureTableV
 beforeEach(() => vi.clearAllMocks());
 
 describe("LiteratureTableView", () => {
+  it("read-only keeps export but drops selection, adding, columns and save", () => {
+    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);
+    try {
+      renderTable({ readOnly: true, onSave: vi.fn() });
+      expect(screen.getByRole("button", { name: "Export table" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add to notebook/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Manage columns" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("complementary", { name: "Manage Columns" })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Save table to Studio" })
+      ).not.toBeInTheDocument();
+    } finally {
+      clientWidth.mockRestore();
+    }
+  });
+
   it("renders the papers in a table with a column per data column", () => {
     renderTable();
     const table = screen.getByRole("table");
