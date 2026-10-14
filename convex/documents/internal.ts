@@ -272,12 +272,15 @@ export const patch = internalMutation({
 });
 
 /**
- * Internal: Keyword search using full-text search index
+ * Internal: Keyword search using full-text search index, scoped to one notebook. Callers check
+ * notebook access first; chunks carry the uploader's userId, so filtering by the caller's id would
+ * hide every source a Cowork editor or public-notebook viewer did not upload.
  */
 export const keywordSearch = internalQuery({
   args: {
     notebookId: v.id("notebooks"),
-    userId: v.id("users"), // Note: Using v.id("users") from Better Auth
+    /** For logs only. */
+    userId: v.id("users"),
     query: v.string(),
     limit: v.optional(v.number()),
     documentIds: v.optional(v.array(v.id("documents"))),
@@ -290,7 +293,7 @@ export const keywordSearch = internalQuery({
     const results = await ctx.db
       .query("documentChunks")
       .withSearchIndex("search_content", (q) =>
-        q.search("content", args.query).eq("userId", args.userId).eq("notebookId", args.notebookId)
+        q.search("content", args.query).eq("notebookId", args.notebookId)
       )
       .take(limit);
 
