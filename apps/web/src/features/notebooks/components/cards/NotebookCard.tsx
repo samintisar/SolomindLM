@@ -1,4 +1,4 @@
-import { FolderOpen, Settings2, Trash2, Users } from "lucide-react";
+import { EyeOff, FolderOpen, Globe, Settings2, Star, Trash2, Users } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Card } from "@/shared/components/ui/card";
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
@@ -17,8 +17,10 @@ interface NotebookCardProps {
   onOpenCustomize?: () => void;
   onOpenMoveToFolder?: () => void;
   onDeleteNotebook?: (id: string) => void;
-  /** Featured/demo notebooks: "Featured" badge, no actions. */
-  featured?: boolean;
+  /** "public": shown on the Public tab — author line, no owner actions. */
+  variant?: "default" | "public";
+  /** Admin moderation on Public-tab cards. */
+  adminActions?: { onToggleFeatured: () => void; onUnpublish: () => void };
 }
 
 function useNotebookActions({
@@ -51,35 +53,71 @@ function useNotebookActions({
 }
 
 function StatusBadge({ props }: { props: NotebookCardProps }) {
-  if (props.featured)
+  const { notebook } = props;
+  if (props.variant === "public" && notebook.isFeatured)
     return (
       <Badge variant="secondary" className="shrink-0">
+        <Star aria-hidden />
         Featured
       </Badge>
     );
-  if (props.notebook.isSharedNotebook)
+  if (notebook.isSharedNotebook)
     return (
       <Badge variant="secondary" className="shrink-0">
         <Users aria-hidden />
         Shared
       </Badge>
     );
+  if (props.variant !== "public" && notebook.isPublic)
+    return (
+      <Badge variant="secondary" className="shrink-0">
+        <Globe aria-hidden />
+        Public
+      </Badge>
+    );
   return null;
 }
 
-/** Grid corner: a status badge, or the actions menu when the card has actions. */
-function CornerSlot({ props, actions }: { props: NotebookCardProps; actions: CardAction[] }) {
-  if (props.featured || props.notebook.isSharedNotebook) return <StatusBadge props={props} />;
-  if (actions.length === 0) return null;
-  return <CardActionsMenu label="Notebook actions" actions={actions} />;
+function moderationActions(props: NotebookCardProps): CardAction[] {
+  if (!props.adminActions) return [];
+  return [
+    {
+      label: props.notebook.isFeatured ? "Unfeature" : "Feature",
+      icon: Star,
+      onSelect: props.adminActions.onToggleFeatured,
+    },
+    {
+      label: "Unpublish",
+      icon: EyeOff,
+      destructive: true,
+      onSelect: props.adminActions.onUnpublish,
+    },
+  ];
+}
+
+/** The card's menu: admin moderation, else the owner's actions, else none. */
+function cardMenu(
+  props: NotebookCardProps,
+  actions: CardAction[]
+): { label: string; actions: CardAction[] } | null {
+  const moderation = moderationActions(props);
+  if (moderation.length > 0) return { label: "Moderation actions", actions: moderation };
+  if (props.variant === "public" || props.notebook.isSharedNotebook || actions.length === 0)
+    return null;
+  return { label: "Notebook actions", actions };
 }
 
 export function NotebookCard(props: NotebookCardProps) {
   const { notebook, viewMode, onSelectNotebook } = props;
-  const { actions, ConfirmDialogComponent } = useNotebookActions(props);
+  const { actions: ownerActions, ConfirmDialogComponent } = useNotebookActions(props);
+  const actions = props.variant === "public" ? [] : ownerActions;
+  const menu = cardMenu(props, actions);
   const Icon = notebookIcon(notebook.icon);
   const fill = coverFillClass(notebook.coverColor);
-  const meta = notebookMeta(notebook);
+  const meta =
+    props.variant === "public" && notebook.ownerName
+      ? `by ${notebook.ownerName} · ${notebookMeta(notebook)}`
+      : notebookMeta(notebook);
   const open = () => onSelectNotebook(notebook);
 
   if (viewMode === "list") {
@@ -113,9 +151,7 @@ export function NotebookCard(props: NotebookCardProps) {
             </span>
           </button>
           <div className="mr-2 flex w-8 shrink-0 justify-center">
-            {actions.length > 0 && !props.featured && !notebook.isSharedNotebook && (
-              <CardActionsMenu label="Notebook actions" actions={actions} />
-            )}
+            {menu && <CardActionsMenu label={menu.label} actions={menu.actions} />}
           </div>
         </Card>
         <ConfirmDialogComponent />
@@ -138,11 +174,19 @@ export function NotebookCard(props: NotebookCardProps) {
             <span className="line-clamp-2 text-base font-semibold leading-snug text-card-foreground">
               {notebook.title}
             </span>
-            <span className="text-xs text-muted-foreground">{meta}</span>
+            <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {meta}
+              {/* The corner holds the menu, so the status badge sits beside the meta instead. */}
+              {menu && <StatusBadge props={props} />}
+            </span>
           </span>
         </button>
         <div className="absolute top-2 right-2">
-          <CornerSlot props={props} actions={actions} />
+          {menu ? (
+            <CardActionsMenu label={menu.label} actions={menu.actions} />
+          ) : (
+            <StatusBadge props={props} />
+          )}
         </div>
       </Card>
       <ConfirmDialogComponent />

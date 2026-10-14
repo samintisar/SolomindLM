@@ -35,7 +35,7 @@ export function FeaturedSection({
               notebook={nb}
               viewMode={viewMode}
               onSelectNotebook={onSelectNotebook}
-              featured
+              variant="public"
             />
           </CardGridItem>
         ))}
