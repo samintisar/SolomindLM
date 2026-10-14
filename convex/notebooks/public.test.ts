@@ -71,6 +71,80 @@ describe("notebooks.public", () => {
     expect(after.page[0].isOwnedByViewer).toBe(false);
   });
 
+  test("public cards carry no source count and no owner email", async () => {
+    const { t, owner, other, notebookId } = await setup();
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    const { page } = await withAuth(t, other).query(api.notebooks.public.listPublic, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(page[0]).not.toHaveProperty("sourceCount");
+    expect(JSON.stringify(page[0])).not.toContain("ada@example.com");
+  });
+
+  test("publishing an already public notebook keeps its publishedAt", async () => {
+    const { t, owner, notebookId } = await setup();
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    const first = (await t.run((ctx) => ctx.db.get(notebookId)))?.publishedAt;
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + 60_000);
+      await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+        notebookId,
+        isPublic: true,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((await t.run((ctx) => ctx.db.get(notebookId)))?.publishedAt).toBe(first);
+  });
+
+  test("an editor cannot unpublish the owner's notebook", async () => {
+    const { t, owner, other, notebookId } = await setup();
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    await t.run((ctx) =>
+      ctx.db.insert("notebookMembers", {
+        notebookId,
+        userId: other,
+        role: "editor",
+        joinedAt: Date.now(),
+      })
+    );
+    await expect(
+      withAuth(t, other).mutation(api.notebooks.public.setPublic, { notebookId, isPublic: false })
+    ).rejects.toThrow("Notebook not found");
+    expect((await t.run((ctx) => ctx.db.get(notebookId)))?.isPublic).toBe(true);
+  });
+
+  test("signed-out callers get empty public lists", async () => {
+    const { t, owner, notebookId } = await setup();
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    const community = await t.query(api.notebooks.public.listPublic, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(community.page).toEqual([]);
+    expect(await t.query(api.notebooks.public.listFeatured, {})).toEqual([]);
+  });
+
+  test("listFeatured skips a featured row that is no longer public", async () => {
+    const { t, other, notebookId } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(notebookId, { isFeatured: true, isPublic: false, publishedAt: Date.now() })
+    );
+    expect(await withAuth(t, other).query(api.notebooks.public.listFeatured, {})).toEqual([]);
+  });
+
   test("unpublishing clears featured", async () => {
     const { t, owner, admin, notebookId } = await setup();
     await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
@@ -132,6 +206,18 @@ describe("notebooks.public", () => {
     });
     await withAuth(t, admin).mutation(api.notebooks.public.adminUnpublish, { notebookId });
     expect((await t.run((ctx) => ctx.db.get(notebookId)))?.isPublic).toBe(false);
+  });
+
+  test("non-admins cannot use adminUnpublish", async () => {
+    const { t, owner, other, notebookId } = await setup();
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    await expect(
+      withAuth(t, other).mutation(api.notebooks.public.adminUnpublish, { notebookId })
+    ).rejects.toThrow("Not authorized");
+    expect((await t.run((ctx) => ctx.db.get(notebookId)))?.isPublic).toBe(true);
   });
 
   test("forkPublic copies a public notebook and refuses a private one", async () => {

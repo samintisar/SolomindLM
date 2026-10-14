@@ -6,7 +6,6 @@ import { assertFeedbackAdmin } from "../_lib/feedbackAdmin";
 import { checkNotebookLimit } from "../_lib/limits";
 import { assertNotebookOwner } from "../_lib/notebookAccess";
 import { rateLimiter } from "../_lib/rateLimits";
-import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
 import { performNotebookFork } from "./_forkNotebook";
 
@@ -18,8 +17,8 @@ async function toPublicNotebookDTO(
   notebook: Doc<"notebooks">,
   viewerId: Id<"users">
 ) {
+  // No source count: counting reads every document row, once per card.
   const owner = await ctx.db.get(notebook.userId);
-  const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
   return {
     id: notebook._id,
     title: notebook.title,
@@ -28,7 +27,6 @@ async function toPublicNotebookDTO(
       day: "numeric",
       year: "numeric",
     }),
-    sourceCount,
     coverColor: notebook.coverColor ?? "bg-vintage-brown-300",
     icon: notebook.icon ?? "Book",
     created_at: notebook.createdAt,
@@ -47,13 +45,19 @@ export const setPublic = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-    await assertNotebookOwner(ctx, args.notebookId, userId);
-    await ctx.db.patch(
-      args.notebookId,
-      args.isPublic
-        ? { isPublic: true, publishedAt: Date.now() }
-        : { isPublic: false, isFeatured: false, publishedAt: undefined }
-    );
+    const notebook = await assertNotebookOwner(ctx, args.notebookId, userId);
+    if (args.isPublic) {
+      // Re-publishing must not move the notebook to the top of the Community grid.
+      if (!notebook.isPublic) {
+        await ctx.db.patch(args.notebookId, { isPublic: true, publishedAt: Date.now() });
+      }
+    } else {
+      await ctx.db.patch(args.notebookId, {
+        isPublic: false,
+        isFeatured: false,
+        publishedAt: undefined,
+      });
+    }
     return { isPublic: args.isPublic };
   },
 });
