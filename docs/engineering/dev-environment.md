@@ -25,6 +25,11 @@ appends secrets to repo-root `.env`, runs `npx convex env set …` against dev).
 studio kinds); `eval:studio` is for cross-cutting work. Use-case packs (`evals/rag/usecases/`): `bun run eval:seed`
 then `bun run eval:usecases` (needs `RAG_EVAL_OWNER_EMAIL` on the dev deployment).
 
+Judges are most of an eval's token cost. Keep runs small: one run per affected case, `--rubric <id>` to judge only
+the rubric check a change targets, and `--judge-reasoning off` to skip the judge's reasoning (about 90% fewer judge
+output tokens). Rubric prompts put the check last so a case's checks share Together's prompt cache; the run ends
+with a `Judge tokens:` line showing how much was cached.
+
 ## Dev servers and worktrees
 
 - `dev:web` / `dev:mobile` go through `apps/web/scripts/dev-server.ts`. The main checkout gets :5173 /

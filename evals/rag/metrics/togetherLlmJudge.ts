@@ -23,6 +23,55 @@ export interface TogetherJudgeConfig {
   maxTokens?: number;
   /** Temperature for judge (default: 0.1 for consistent evaluation) */
   temperature?: number;
+  /**
+   * `false` turns the model's reasoning off (`--judge-reasoning off`). Reasoning tokens bill at
+   * the output rate; a verdict needs few. Unset leaves the model's default (DeepSeek: on).
+   */
+  reasoning?: boolean;
+}
+
+export interface JudgeTokenUsage {
+  calls: number;
+  promptTokens: number;
+  /** Prompt tokens served from Together's prompt cache, billed at the cached input rate */
+  cachedPromptTokens: number;
+  completionTokens: number;
+}
+
+const usageTotals: JudgeTokenUsage = {
+  calls: 0,
+  promptTokens: 0,
+  cachedPromptTokens: 0,
+  completionTokens: 0,
+};
+
+/** Judge tokens used by every Together judge invoker in this process since the last reset. */
+export function judgeTokenUsage(): JudgeTokenUsage {
+  return { ...usageTotals };
+}
+
+export function resetJudgeTokenUsage(): void {
+  usageTotals.calls = 0;
+  usageTotals.promptTokens = 0;
+  usageTotals.cachedPromptTokens = 0;
+  usageTotals.completionTokens = 0;
+}
+
+type UsageWithCache = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  cached_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+};
+
+function recordUsage(usage: UsageWithCache | undefined | null): void {
+  usageTotals.calls++;
+  if (!usage) return;
+  usageTotals.promptTokens += usage.prompt_tokens ?? 0;
+  // Models report cached tokens in either place.
+  usageTotals.cachedPromptTokens +=
+    usage.prompt_tokens_details?.cached_tokens ?? usage.cached_tokens ?? 0;
+  usageTotals.completionTokens += usage.completion_tokens ?? 0;
 }
 
 /** Default judge model for eval binary judges and pairwise compare */
@@ -128,6 +177,10 @@ export function createTogetherJudgeInvoker(
   const maxTokens = config.maxTokens ?? 32_768;
   const temperature = config.temperature ?? 0.1;
 
+  // Not in the SDK's request type yet; Together reads it from the body.
+  const reasoningParams: Record<string, unknown> =
+    config.reasoning === false ? { reasoning: { enabled: false } } : {};
+
   return async (prompt: string): Promise<string> => {
     try {
       const response = await client.chat.completions.create({
@@ -147,7 +200,9 @@ export function createTogetherJudgeInvoker(
         response_format: { type: "json_object" },
         max_tokens: maxTokens,
         temperature,
+        ...reasoningParams,
       });
+      recordUsage(response.usage as UsageWithCache | undefined);
 
       const choice = response.choices[0];
       const message = choice?.message as

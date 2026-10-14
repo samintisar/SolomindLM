@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
+import {
+  createTogetherJudgeInvoker,
+  judgeTokenUsage,
+  resetJudgeTokenUsage,
+} from "./togetherLlmJudge";
 
 const create = vi.fn();
 
@@ -115,5 +119,38 @@ describe("createTogetherJudgeInvoker", () => {
     await expect(createTogetherJudgeInvoker({ apiKey: "k" })("prompt")).resolves.toBe(
       '{"pass": false, "reason": "missing items"}'
     );
+  });
+
+  it("leaves reasoning to the model by default and turns it off when asked", async () => {
+    create.mockResolvedValue(choice({ content: '{"pass": true, "reason": "ok"}' }));
+
+    await createTogetherJudgeInvoker({ apiKey: "k" })("prompt");
+    await createTogetherJudgeInvoker({ apiKey: "k", reasoning: false })("prompt");
+
+    expect(create.mock.calls[0][0]).not.toHaveProperty("reasoning");
+    expect(create.mock.calls[1][0].reasoning).toEqual({ enabled: false });
+  });
+
+  it("adds up judge tokens, cached input included, across invokers", async () => {
+    resetJudgeTokenUsage();
+    const usage = (prompt: number, cached: number, completion: number) => ({
+      ...choice({ content: '{"pass": true, "reason": "ok"}' }),
+      usage: {
+        prompt_tokens: prompt,
+        completion_tokens: completion,
+        prompt_tokens_details: { cached_tokens: cached },
+      },
+    });
+    create.mockResolvedValueOnce(usage(1000, 0, 50)).mockResolvedValueOnce(usage(1000, 900, 40));
+
+    await createTogetherJudgeInvoker({ apiKey: "k" })("prompt");
+    await createTogetherJudgeInvoker({ apiKey: "k" })("prompt");
+
+    expect(judgeTokenUsage()).toEqual({
+      calls: 2,
+      promptTokens: 2000,
+      cachedPromptTokens: 900,
+      completionTokens: 90,
+    });
   });
 });
