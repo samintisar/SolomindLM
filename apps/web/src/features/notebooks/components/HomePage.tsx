@@ -2,8 +2,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import React, { useCallback, useMemo, useState } from "react";
 import { useClaimPendingDeck } from "@/features/tools/hooks/useClaimPendingDeck";
 import { Tabs, TabsContent } from "@/shared/components/ui/tabs";
-import { useToast } from "@/shared/contexts/useToast";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import type { NotebookItem } from "@/shared/types/index";
 import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
 import { useCreateFolder } from "../services/foldersApi";
@@ -163,24 +163,26 @@ export const HomePage: React.FC = () => {
     notebookHandlers.closeMoveToFolder();
   };
 
-  // Public notebooks: the curated Featured shelf and the paginated Community grid.
-  const featuredPublic = useFeaturedNotebooks();
-  const communityPublic = usePublicNotebooks();
+  // Public notebooks: the curated Featured shelf (All and Public tabs) and the paginated
+  // Community grid (Public tab only). Each query subscribes only where it's shown.
+  const featuredPublic = useFeaturedNotebooks(tab !== "mine");
+  const communityPublic = usePublicNotebooks(tab === "public");
   const isAdmin = useIsAdmin();
   const setFeatured = useSetNotebookFeatured();
   const adminUnpublish = useAdminUnpublishNotebook();
-  const { error: toastError } = useToast();
+  const { showError } = useServiceErrorToast();
 
   const runModeration = async (action: () => Promise<unknown>) => {
     try {
       await action();
     } catch (error) {
-      toastError(error instanceof Error ? error.message : "Could not update notebook");
+      showError(error);
     }
   };
 
   const publicSectionProps = {
     featured: featuredPublic ?? [],
+    featuredLoading: featuredPublic === undefined,
     community: communityPublic.results,
     communityStatus: communityPublic.status,
     onLoadMore: communityPublic.loadNextPage,

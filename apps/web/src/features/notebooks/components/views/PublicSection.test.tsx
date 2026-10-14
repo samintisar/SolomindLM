@@ -20,6 +20,7 @@ const base = {
   isAdmin: false,
   onToggleFeatured: vi.fn(),
   onUnpublish: vi.fn(),
+  featuredLoading: false,
 };
 
 describe("PublicSection", () => {
@@ -67,14 +68,45 @@ describe("PublicSection", () => {
     expect(screen.getByText("No public notebooks yet.")).toBeInTheDocument();
   });
 
-  test("no empty state while the first page loads", () => {
-    const { container } = render(
+  test("skeleton, not the empty state, while the first page loads", () => {
+    render(
       <PublicSection
         {...base}
         featured={[]}
         community={[]}
         communityStatus="LoadingFirstPage"
         onLoadMore={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("status", { name: "Loading notebooks" })).toBeInTheDocument();
+    expect(screen.queryByText("No public notebooks yet.")).not.toBeInTheDocument();
+  });
+
+  test("featured loading + community empty → no empty state", () => {
+    render(
+      <PublicSection
+        {...base}
+        featured={[]}
+        featuredLoading
+        community={[]}
+        communityStatus="Exhausted"
+        onLoadMore={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("status", { name: "Loading notebooks" })).toBeInTheDocument();
+    expect(screen.queryByText("No public notebooks yet.")).not.toBeInTheDocument();
+  });
+
+  test("featuredOnly renders nothing while the shelf loads", () => {
+    const { container } = render(
+      <PublicSection
+        {...base}
+        featured={[]}
+        featuredLoading
+        community={[]}
+        communityStatus="LoadingFirstPage"
+        onLoadMore={vi.fn()}
+        featuredOnly
       />
     );
     expect(container).toBeEmptyDOMElement();

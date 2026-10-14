@@ -3,6 +3,7 @@ import { Button } from "@/shared/components/ui/button";
 import type { NotebookItem } from "@/shared/types/index";
 import { NotebookCard } from "../cards/NotebookCard";
 import { CardGrid, CardGridItem, type ViewMode } from "../home/CardGrid";
+import { GridSkeleton } from "../home/GridSkeleton";
 import { ListHeader } from "../ListHeader";
 
 /** `usePaginatedQuery` status of the Community grid. */
@@ -10,6 +11,8 @@ type CommunityStatus = "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exh
 
 interface PublicSectionProps {
   featured: NotebookItem[];
+  /** The Featured shelf's query hasn't returned yet. */
+  featuredLoading: boolean;
   community: NotebookItem[];
   communityStatus: CommunityStatus;
   onLoadMore: () => void;
@@ -64,17 +67,19 @@ function Shelf({
 
 /** Public notebooks: the admin-curated Featured shelf, then the Community grid. */
 export function PublicSection(props: PublicSectionProps) {
-  const { featured, community, communityStatus, featuredOnly } = props;
+  const { featured, featuredLoading, community, communityStatus, featuredOnly } = props;
 
   if (featuredOnly) {
-    return featured.length > 0 ? (
+    return !featuredLoading && featured.length > 0 ? (
       <Shelf heading="Featured" notebooks={featured} props={props} />
     ) : null;
   }
 
+  // While loading, an empty list means "not loaded yet", not "none".
+  if (featuredLoading || communityStatus === "LoadingFirstPage") return <GridSkeleton />;
+
   if (featured.length === 0 && community.length === 0) {
-    // While loading, an empty list means "not loaded yet", not "none".
-    return communityStatus === "LoadingFirstPage" ? null : (
+    return (
       <p className="py-12 text-center font-sans text-sm text-muted-foreground">
         No public notebooks yet.
       </p>

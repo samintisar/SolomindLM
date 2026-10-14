@@ -206,20 +206,22 @@ export function usePeekShareToken(token: string | null) {
 
 const PUBLIC_PAGE_SIZE = 24;
 
-/** Community grid: public notebooks that aren't featured, newest published first. */
-export function usePublicNotebooks() {
-  const result = usePaginatedQuery(
-    api.notebooks.public.listPublic,
-    {},
-    { initialNumItems: PUBLIC_PAGE_SIZE }
-  );
+/**
+ * Community grid: public notebooks that aren't featured, newest published first.
+ * Subscribes only while `enabled` (the Public tab is open).
+ */
+export function usePublicNotebooks(enabled: boolean) {
+  const result = usePaginatedQuery(api.notebooks.public.listPublic, enabled ? {} : "skip", {
+    initialNumItems: PUBLIC_PAGE_SIZE,
+  });
   const { loadMore } = result;
   const loadNextPage = useCallback(() => loadMore(PUBLIC_PAGE_SIZE), [loadMore]);
   return { ...result, loadNextPage };
 }
 
-export function useFeaturedNotebooks() {
-  return useQuery(api.notebooks.public.listFeatured, {});
+/** Featured shelf; `undefined` while loading or not `enabled`. */
+export function useFeaturedNotebooks(enabled: boolean) {
+  return useQuery(api.notebooks.public.listFeatured, enabled ? {} : "skip");
 }
 
 export function useSetNotebookPublic() {
