@@ -34,6 +34,8 @@ export interface RubricJudgeOptions {
   model: string;
   /** Pack source text, used when the artifact has no retrieved chunks (studio runners) */
   sourceTexts?: SourceText[];
+  /** Check ids to run (`--rubric`); every applicable check when unset */
+  onlyChecks?: string[];
 }
 
 export function rubricMetricName(packId: string, checkId: string): string {
@@ -99,12 +101,12 @@ export function buildRubricPrompt(
   artifact: EvalRunArtifact,
   sourceTexts: SourceText[] = []
 ): string {
+  // The check goes last: everything before it is the same for every check of one output, so
+  // the judge's prompt cache serves that prefix (often the whole source text) after the first.
   const lines = [
     `You are checking an AI-generated ${artifact.runner} output made for ${pack.title}.`,
     "",
     `User request: ${fixture.question}`,
-    "",
-    `Check: ${check.question}`,
     "",
   ];
   if (check.evidence === "sources") {
@@ -121,6 +123,8 @@ export function buildRubricPrompt(
     "Output:",
     truncateOutput(artifact.answer),
     "",
+    `Check: ${check.question}`,
+    "",
     "Answer the check for the output as a whole. Pass only if the answer is yes.",
     'Respond JSON only: {"pass": boolean, "reason": string}'
   );
@@ -133,47 +137,37 @@ export async function scoreRubricMetrics(
   pack: UseCasePack,
   options: RubricJudgeOptions
 ): Promise<MetricResult[]> {
-  const checks = pack.rubric.filter((c) => c.appliesTo.includes(artifact.runner));
-  // Independent checks of one artifact run concurrently; results keep rubric order.
-  return Promise.all(
-    checks.map(async (check): Promise<MetricResult> => {
-      const metric = rubricMetricName(pack.id, check.id);
-      try {
-        const raw = await options.invoke(
-          buildRubricPrompt(pack, check, fixture, artifact, options.sourceTexts)
-        );
-        const { pass, reason } = parseBinaryResponse(raw);
-        return metricResult(
-          metric,
-          fixture,
-          artifact,
-          pass ? "pass" : "fail",
-          pass ? 1 : 0,
-          reason,
-          {
-            model: options.model,
-            pass,
-            check: check.question,
-          }
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        // No verdict: a warning, so a flaky judge does not fail the run (scorecard counts it apart).
-        return metricResult(
-          metric,
-          fixture,
-          artifact,
-          "warn",
-          0,
-          `Rubric judge failed: ${message}`,
-          {
-            model: options.model,
-            judgeError: true,
-            error: message,
-            check: check.question,
-          }
-        );
-      }
-    })
+  const checks = pack.rubric.filter(
+    (c) =>
+      c.appliesTo.includes(artifact.runner) &&
+      (!options.onlyChecks || options.onlyChecks.includes(c.id))
   );
+  const judge = async (check: RubricCheck): Promise<MetricResult> => {
+    const metric = rubricMetricName(pack.id, check.id);
+    try {
+      const raw = await options.invoke(
+        buildRubricPrompt(pack, check, fixture, artifact, options.sourceTexts)
+      );
+      const { pass, reason } = parseBinaryResponse(raw);
+      return metricResult(metric, fixture, artifact, pass ? "pass" : "fail", pass ? 1 : 0, reason, {
+        model: options.model,
+        pass,
+        check: check.question,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // No verdict: a warning, so a flaky judge does not fail the run (scorecard counts it apart).
+      return metricResult(metric, fixture, artifact, "warn", 0, `Rubric judge failed: ${message}`, {
+        model: options.model,
+        judgeError: true,
+        error: message,
+        check: check.question,
+      });
+    }
+  };
+  if (checks.length === 0) return [];
+  // The first check runs alone so its prompt is cached before the others, which share its
+  // prefix, run concurrently. Results keep rubric order.
+  const first = await judge(checks[0]);
+  return [first, ...(await Promise.all(checks.slice(1).map(judge)))];
 }

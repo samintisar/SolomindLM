@@ -15,7 +15,7 @@ import { dirname, join } from "path";
 import { caseFileStem } from "./caseFile";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
-import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
+import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
 import {
   buildJudgeCalibrationQueue,
   checkHoldoutPromotion,
@@ -92,6 +92,10 @@ interface CliOptions {
   likertJudges: boolean;
   /** Judge model for binary judges (default DeepSeek Flash) */
   judgeModel?: string;
+  /** Rubric check ids to judge; every applicable check when unset */
+  rubricChecks?: string[];
+  /** `false` turns judge reasoning off */
+  judgeReasoning?: boolean;
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
@@ -166,6 +170,8 @@ const CLI_OPTIONS = {
   "smart-llm": { type: "string" },
   "likert-judges": { type: "boolean" },
   "judge-model": { type: "string" },
+  rubric: { type: "string" },
+  "judge-reasoning": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
@@ -181,6 +187,21 @@ const TWO_VALUE_OPTIONS = new Set(["compare", "promotion-check"]);
  * Parse CLI args strictly: unknown flags and stray arguments are errors, and both
  * `--runner report` and `--runner=report` work.
  */
+function parseRubricChecks(value: string): string[] {
+  const ids = value
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (ids.length === 0) throw new Error("--rubric takes one or more check ids. See --help.");
+  return ids;
+}
+
+function parseOnOff(name: string, value: string): boolean {
+  if (value === "on") return true;
+  if (value === "off") return false;
+  throw new Error(`--${name} takes "on" or "off". See --help.`);
+}
+
 function parseArgs(args: string[]): CliOptions {
   const { values, tokens } = parseNodeArgs({
     args,
@@ -232,6 +253,11 @@ function parseArgs(args: string[]): CliOptions {
     smartLlm: values["smart-llm"],
     likertJudges: values["likert-judges"] ?? false,
     judgeModel: values["judge-model"],
+    rubricChecks: values.rubric !== undefined ? parseRubricChecks(values.rubric) : undefined,
+    judgeReasoning:
+      values["judge-reasoning"] !== undefined
+        ? parseOnOff("judge-reasoning", values["judge-reasoning"])
+        : undefined,
     compareA: values.compare,
     compareB: secondValues.get("compare"),
     scoreJudgeQueue: values["score-judge-queue"],
@@ -263,6 +289,8 @@ Options:
   --smart-llm <model>      Override smart LLM for studio agent reduce phases
   --likert-judges          Enable legacy Likert 0–1 LLM judges (default: binary only)
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
+  --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
+  --judge-reasoning <on|off>  Judge reasoning (default: the model's; off bills far fewer output tokens)
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
@@ -599,6 +627,8 @@ async function main(): Promise<void> {
         likertJudges: opts.likertJudges,
         dryRun: opts.dryRun,
         judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+        rubricChecks: opts.rubricChecks,
+        judgeReasoning: opts.judgeReasoning,
         packSourceTexts: fixture.useCase
           ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
           : undefined,
@@ -642,6 +672,17 @@ async function main(): Promise<void> {
   }
 
   if (!opts.dryRun) {
+    const usage = judgeTokenUsage();
+    if (usage.calls > 0) {
+      const cachedShare = usage.promptTokens
+        ? Math.round((usage.cachedPromptTokens / usage.promptTokens) * 100)
+        : 0;
+      console.log(
+        `
+Judge tokens: ${usage.calls} calls, ${usage.promptTokens} prompt ` +
+          `(${usage.cachedPromptTokens} cached, ${cachedShare}%), ${usage.completionTokens} completion`
+      );
+    }
     const queue = buildJudgeCalibrationQueue(allMetrics, { limit: 20 });
     if (queue.length > 0) {
       const queuePath = join("evals/rag/generated", "judge-queue.json");
