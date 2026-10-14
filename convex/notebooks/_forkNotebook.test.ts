@@ -152,3 +152,81 @@ describe("performNotebookFork infographics", () => {
     expect(draft?.metadata).toBeUndefined();
   });
 });
+
+describe("performNotebookFork literature outputs", () => {
+  test("copies completed studio tables and reports and relinks the report to the copied table", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { notebookId, citationId } = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Review",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const citationId = await ctx.db.insert("citations", {
+        paperId: "W1",
+        title: "Paper",
+        authors: ["A"],
+        url: "https://example.org/p",
+        sourceApi: "openalex",
+        citationKey: "a2020",
+      });
+      const tableId = await ctx.db.insert("literatureTables", {
+        title: "Table",
+        notebookId,
+        userId: ownerId,
+        status: "completed",
+        columns: [],
+        papers: [{ citationId, rowData: {}, isIncluded: true }],
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("literatureTables", {
+        title: "Still generating",
+        notebookId,
+        userId: ownerId,
+        status: "generating",
+        columns: [],
+        papers: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("literatureReports", {
+        title: "Report",
+        notebookId,
+        userId: ownerId,
+        status: "completed",
+        content: "# Review",
+        citationStyle: "apa7",
+        sections: [],
+        citationIds: [citationId],
+        tableId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { notebookId, citationId };
+    });
+
+    const forkerId = await t.run((ctx) => ctx.db.insert("users", { name: "Forker" }));
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const { tables, reports } = await t.run(async (ctx) => ({
+      tables: await ctx.db
+        .query("literatureTables")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect(),
+      reports: await ctx.db
+        .query("literatureReports")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect(),
+    }));
+    expect(tables.map((r) => r.title)).toEqual(["Table"]);
+    expect(tables[0].userId).toBe(forkerId);
+    expect(tables[0].papers[0].citationId).toBe(citationId);
+    expect(reports).toHaveLength(1);
+    expect(reports[0].tableId).toBe(tables[0]._id);
+    expect(reports[0].userId).toBe(forkerId);
+  });
+});

@@ -293,6 +293,50 @@ export async function performNotebookFork(
     });
   }
 
+  // Literature tables and reports shown in Studio. Ones tied to a chat review session stay behind
+  // with the chat thread, which a fork doesn't copy. Citation rows are global and reused as-is.
+  const tableIdMap = new Map<Id<"literatureTables">, Id<"literatureTables">>();
+  const literatureTables = await ctx.db
+    .query("literatureTables")
+    .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
+    .collect();
+  for (const r of literatureTables) {
+    if (r.status !== "completed" || r.literatureReviewSessionId !== undefined) continue;
+    const newTableId = await ctx.db.insert("literatureTables", {
+      title: r.title,
+      description: r.description,
+      notebookId: newNotebookId,
+      userId: forkUserId,
+      status: r.status,
+      columns: r.columns,
+      papers: r.papers,
+      createdAt: now,
+      updatedAt: now,
+    });
+    tableIdMap.set(r._id, newTableId);
+  }
+
+  const literatureReports = await ctx.db
+    .query("literatureReports")
+    .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
+    .collect();
+  for (const r of literatureReports) {
+    if (r.status !== "completed" || r.literatureReviewSessionId !== undefined) continue;
+    await ctx.db.insert("literatureReports", {
+      title: r.title,
+      notebookId: newNotebookId,
+      userId: forkUserId,
+      status: r.status,
+      content: r.content,
+      citationStyle: r.citationStyle,
+      sections: r.sections,
+      citationIds: r.citationIds,
+      tableId: r.tableId ? tableIdMap.get(r.tableId) : undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
   const manualNotes = await ctx.db
     .query("notes")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
