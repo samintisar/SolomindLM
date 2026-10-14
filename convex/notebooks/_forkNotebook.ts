@@ -304,8 +304,33 @@ export async function performNotebookFork(
     });
   }
 
+  // Citation rows are global and reused as-is, except a notebook-paper citation: it names the
+  // source it came from, so the fork gets a copy naming its own copy of that source (or none).
+  const citationIdMap = new Map<Id<"citations">, Id<"citations">>();
+  const forkCitationId = async (citationId: Id<"citations">): Promise<Id<"citations">> => {
+    const cached = citationIdMap.get(citationId);
+    if (cached) return cached;
+    let forkedId = citationId;
+    const citation = await ctx.db.get(citationId);
+    if (citation?.sourceApi === "notebook" && citation.documentId !== undefined) {
+      const { _id, _creationTime, documentId, ...fields } = citation;
+      forkedId = await ctx.db.insert("citations", {
+        ...fields,
+        documentId: docIdMap.get(documentId),
+      });
+    }
+    citationIdMap.set(citationId, forkedId);
+    return forkedId;
+  };
+  // Sequential, so a citation listed twice gets one copy.
+  const forkCitationIds = async (ids: Id<"citations">[]): Promise<Id<"citations">[]> => {
+    const forked: Id<"citations">[] = [];
+    for (const id of ids) forked.push(await forkCitationId(id));
+    return forked;
+  };
+
   // Literature tables and reports shown in Studio. Ones tied to a chat review session stay behind
-  // with the chat thread, which a fork doesn't copy. Citation rows are global and reused as-is.
+  // with the chat thread, which a fork doesn't copy.
   const tableIdMap = new Map<Id<"literatureTables">, Id<"literatureTables">>();
   const literatureTables = await ctx.db
     .query("literatureTables")
@@ -313,6 +338,7 @@ export async function performNotebookFork(
     .collect();
   for (const r of literatureTables) {
     if (r.status !== "completed" || r.literatureReviewSessionId !== undefined) continue;
+    const paperCitationIds = await forkCitationIds(r.papers.map((p) => p.citationId));
     const newTableId = await ctx.db.insert("literatureTables", {
       title: r.title,
       description: r.description,
@@ -320,7 +346,7 @@ export async function performNotebookFork(
       userId: forkUserId,
       status: r.status,
       columns: r.columns,
-      papers: r.papers,
+      papers: r.papers.map((p, i) => ({ ...p, citationId: paperCitationIds[i] })),
       createdAt: now,
       updatedAt: now,
     });
@@ -341,7 +367,7 @@ export async function performNotebookFork(
       content: r.content,
       citationStyle: r.citationStyle,
       sections: r.sections,
-      citationIds: r.citationIds,
+      citationIds: await forkCitationIds(r.citationIds),
       tableId: r.tableId ? tableIdMap.get(r.tableId) : undefined,
       createdAt: now,
       updatedAt: now,

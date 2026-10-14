@@ -276,4 +276,176 @@ describe("performNotebookFork literature outputs", () => {
     expect(reports[0].tableId).toBe(tables[0]._id);
     expect(reports[0].userId).toBe(forkerId);
   });
+
+  test("skips failed and chat-session tables and reports", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const notebookId = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Review",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const sessionId = await ctx.db.insert("literatureReviewSessions", {
+        query: "q",
+        notebookId,
+        userId: ownerId,
+        workflowId: "wf",
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+      } as never);
+      for (const [title, extra] of [
+        ["Failed", { status: "failed" as const }],
+        ["From chat", { status: "completed" as const, literatureReviewSessionId: sessionId }],
+      ] as const) {
+        await ctx.db.insert("literatureTables", {
+          title,
+          notebookId,
+          userId: ownerId,
+          columns: [],
+          papers: [],
+          createdAt: now,
+          updatedAt: now,
+          ...extra,
+        });
+        await ctx.db.insert("literatureReports", {
+          title,
+          notebookId,
+          userId: ownerId,
+          content: "",
+          citationStyle: "apa7",
+          sections: [],
+          citationIds: [],
+          createdAt: now,
+          updatedAt: now,
+          ...extra,
+        });
+      }
+      return notebookId;
+    });
+
+    const forkerId = await t.run((ctx) => ctx.db.insert("users", { name: "Forker" }));
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const counts = await t.run(async (ctx) => ({
+      tables: (
+        await ctx.db
+          .query("literatureTables")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+          .collect()
+      ).length,
+      reports: (
+        await ctx.db
+          .query("literatureReports")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+          .collect()
+      ).length,
+    }));
+    expect(counts).toEqual({ tables: 0, reports: 0 });
+  });
+
+  test("notebook-paper citations point at the fork's own sources", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const seeded = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Review",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const source = (fileName: string, status: "completed" | "failed") =>
+        ctx.db.insert("documents", {
+          userId: ownerId,
+          notebookId,
+          fileName,
+          fileType: "pdf",
+          status,
+          createdAt: now,
+          updatedAt: now,
+        });
+      const docId = await source("paper.pdf", "completed");
+      // Failed sources aren't forked, so a citation of one has no copy to point at.
+      const failedDocId = await source("broken.pdf", "failed");
+      const notebookCitation = (documentId: typeof docId, key: string) =>
+        ctx.db.insert("citations", {
+          paperId: `notebook:${documentId}`,
+          title: key,
+          authors: ["B"],
+          url: "https://example.org/n",
+          sourceApi: "notebook",
+          citationKey: key,
+          documentId,
+        });
+      const externalId = await ctx.db.insert("citations", {
+        paperId: "W1",
+        title: "Paper",
+        authors: ["A"],
+        url: "https://example.org/p",
+        sourceApi: "openalex",
+        citationKey: "a2020",
+      });
+      const notebookCitationId = await notebookCitation(docId, "b2021");
+      const orphanCitationId = await notebookCitation(failedDocId, "c2022");
+      const citationIds = [externalId, notebookCitationId, orphanCitationId];
+      await ctx.db.insert("literatureTables", {
+        title: "Table",
+        notebookId,
+        userId: ownerId,
+        status: "completed",
+        columns: [],
+        papers: citationIds.map((citationId) => ({ citationId, rowData: {}, isIncluded: true })),
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("literatureReports", {
+        title: "Report",
+        notebookId,
+        userId: ownerId,
+        status: "completed",
+        content: "# Review",
+        citationStyle: "apa7",
+        sections: [],
+        citationIds,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { notebookId, externalId, notebookCitationId, orphanCitationId };
+    });
+
+    const forkerId = await t.run((ctx) => ctx.db.insert("users", { name: "Forker" }));
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, seeded.notebookId, forkerId));
+
+    const result = await t.run(async (ctx) => {
+      const [table] = await ctx.db
+        .query("literatureTables")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect();
+      const [report] = await ctx.db
+        .query("literatureReports")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect();
+      const [forkDoc] = await ctx.db
+        .query("documents")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect();
+      const tableCitationIds = table.papers.map((p) => p.citationId);
+      const citations = await Promise.all(tableCitationIds.map((id) => ctx.db.get(id)));
+      return { tableCitationIds, reportCitationIds: report.citationIds, citations, forkDoc };
+    });
+
+    const [external, notebookCopy, orphanCopy] = result.citations;
+    expect(result.tableCitationIds[0]).toBe(seeded.externalId);
+    expect(result.tableCitationIds[1]).not.toBe(seeded.notebookCitationId);
+    expect(notebookCopy).toMatchObject({ citationKey: "b2021", documentId: result.forkDoc._id });
+    expect(result.tableCitationIds[2]).not.toBe(seeded.orphanCitationId);
+    expect(orphanCopy?.citationKey).toBe("c2022");
+    expect(orphanCopy?.documentId).toBeUndefined();
+    expect(external?.sourceApi).toBe("openalex");
+    expect(result.reportCitationIds).toEqual(result.tableCitationIds);
+  });
 });
