@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
+import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
@@ -218,6 +219,45 @@ describe("notebooks.public", () => {
       withAuth(t, other).mutation(api.notebooks.public.adminUnpublish, { notebookId })
     ).rejects.toThrow("Not authorized");
     expect((await t.run((ctx) => ctx.db.get(notebookId)))?.isPublic).toBe(true);
+  });
+
+  test("forkPublic refuses a caller at the notebook limit", async () => {
+    const { t, owner, other, notebookId } = await setup();
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    const ownedByOther = async () =>
+      (
+        await t.run((ctx) =>
+          ctx.db
+            .query("notebooks")
+            .withIndex("by_user", (q) => q.eq("userId", other))
+            .collect()
+        )
+      ).length;
+    await t.run(async (ctx) => {
+      // The free plan allows five notebooks.
+      for (let i = 0; i < 5; i++) {
+        await ctx.db.insert("notebooks", {
+          userId: other,
+          title: `Notebook ${i}`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+    });
+
+    const error = await withAuth(t, other)
+      .mutation(api.notebooks.public.forkPublic, { notebookId })
+      .then(
+        () => null,
+        (e: unknown) => e
+      );
+
+    expect(error).toBeInstanceOf(ConvexError);
+    expect((error as ConvexError<{ code: string }>).data.code).toBe("NOTEBOOK_LIMIT_REACHED");
+    expect(await ownedByOther()).toBe(5);
   });
 
   test("forkPublic copies a public notebook and refuses a private one", async () => {
