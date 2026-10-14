@@ -25,59 +25,6 @@ export async function getConversationByUserAndNotebook(
     .first();
 }
 
-/** All threads in a notebook (for Cowork: shared across owner + editors). */
-export async function listConversationsInNotebook(
-  ctx: QueryCtx,
-  notebookId: Id<"notebooks">
-): Promise<Doc<"conversations">[]> {
-  return await ctx.db
-    .query("conversations")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-    .collect();
-}
-
-/** Most recently updated thread in a notebook, or null. */
-export async function getPrimaryConversationForNotebook(
-  ctx: QueryCtx,
-  notebookId: Id<"notebooks">
-): Promise<Doc<"conversations"> | null> {
-  const all = await listConversationsInNotebook(ctx, notebookId);
-  if (all.length === 0) {
-    return null;
-  }
-  return all.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
-}
-
-/**
- * Conversations in every notebook the user can access (owned + Cowork memberships).
- */
-export async function getUserConversations(
-  ctx: QueryCtx,
-  userId: Id<"users">
-): Promise<Doc<"conversations">[]> {
-  const owned = await ctx.db
-    .query("notebooks")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
-  const memberships = await ctx.db
-    .query("notebookMembers")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
-  const notebookIds = new Set<Id<"notebooks">>();
-  for (const n of owned) {
-    notebookIds.add(n._id);
-  }
-  for (const m of memberships) {
-    notebookIds.add(m.notebookId);
-  }
-  const all: Doc<"conversations">[] = [];
-  for (const notebookId of notebookIds) {
-    const convs = await listConversationsInNotebook(ctx, notebookId);
-    all.push(...convs);
-  }
-  return all.sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
 export type ConversationCreate = {
   userId: Id<"users">;
   notebookId: Id<"notebooks">;
@@ -124,33 +71,60 @@ export async function deleteConversation(
   await ctx.db.delete("conversations", conversationId);
 }
 
-export type ConversationViewer = { userId: Id<"users">; access: NotebookAccessRole };
+/** The user asking for conversations, with their access role on the notebook. */
+export type ConversationRequester = { userId: Id<"users">; access: NotebookAccessRole };
 
-/** Viewers see only their own threads; owners and editors see all but viewers' private ones. */
+/**
+ * The single visibility rule. Viewers see only their own threads; owners and editors see every
+ * shared thread plus their own private ones, never another user's private thread.
+ */
 export function isConversationVisible(
   conversation: Pick<Doc<"conversations">, "userId" | "isPrivate">,
-  viewer: ConversationViewer
+  requester: ConversationRequester
 ): boolean {
-  if (viewer.access === "viewer") return conversation.userId === viewer.userId;
-  return !conversation.isPrivate || conversation.userId === viewer.userId;
+  if (requester.access === "viewer") return conversation.userId === requester.userId;
+  return !conversation.isPrivate || conversation.userId === requester.userId;
 }
 
+/**
+ * Threads `isConversationVisible` allows, read through indexes so a public notebook's chat never
+ * reads (or subscribes to) other viewers' private threads.
+ */
 export async function listVisibleConversations(
   ctx: QueryCtx,
   notebookId: Id<"notebooks">,
-  viewer: ConversationViewer
+  requester: ConversationRequester
 ): Promise<Doc<"conversations">[]> {
-  const all = await listConversationsInNotebook(ctx, notebookId);
-  return all.filter((c) => isConversationVisible(c, viewer));
+  const own = await ctx.db
+    .query("conversations")
+    .withIndex("by_user_notebook", (q) =>
+      q.eq("userId", requester.userId).eq("notebookId", notebookId)
+    )
+    .collect();
+  if (requester.access === "viewer") return own;
+
+  const sharedRange = (isPrivate: false | undefined) =>
+    ctx.db
+      .query("conversations")
+      .withIndex("by_notebook_and_isPrivate", (q) =>
+        q.eq("notebookId", notebookId).eq("isPrivate", isPrivate)
+      )
+      .collect();
+  // Shared threads have no `isPrivate`; an explicit `false` is treated the same way.
+  const [unset, explicitFalse] = await Promise.all([sharedRange(undefined), sharedRange(false)]);
+
+  const byId = new Map<Id<"conversations">, Doc<"conversations">>();
+  for (const c of [...unset, ...explicitFalse, ...own]) byId.set(c._id, c);
+  return [...byId.values()];
 }
 
 /** Most recently updated thread this user can see, or null. */
 export async function getPrimaryVisibleConversation(
   ctx: QueryCtx,
   notebookId: Id<"notebooks">,
-  viewer: ConversationViewer
+  requester: ConversationRequester
 ): Promise<Doc<"conversations"> | null> {
-  const visible = await listVisibleConversations(ctx, notebookId, viewer);
+  const visible = await listVisibleConversations(ctx, notebookId, requester);
   return visible.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
 }
 

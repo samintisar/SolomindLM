@@ -396,7 +396,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_notebook", ["userId", "notebookId"])
-    .index("by_notebook", ["notebookId"]),
+    .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_isPrivate", ["notebookId", "isPrivate"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),

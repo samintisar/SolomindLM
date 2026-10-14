@@ -20,21 +20,21 @@ export const ensureConversation = internalMutation({
     if (!access) {
       throw new Error("Access denied");
     }
-    const viewer = { userId: args.userId, access };
+    const requester = { userId: args.userId, access };
 
     if (args.conversationId) {
       const existing = await ctx.db.get(args.conversationId);
       if (
         existing &&
         existing.notebookId === args.notebookId &&
-        ConvModel.isConversationVisible(existing, viewer)
+        ConvModel.isConversationVisible(existing, requester)
       ) {
         await ctx.db.patch(existing._id, { updatedAt: Date.now() });
         return existing._id;
       }
     }
 
-    const primary = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, viewer);
+    const primary = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, requester);
     if (primary) {
       await ctx.db.patch(primary._id, { updatedAt: Date.now() });
       return primary._id;
