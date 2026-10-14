@@ -73,7 +73,7 @@ leads with a curated shelf. Seed a set of showcase notebooks that demonstrate wh
 
 - `setPublic({ notebookId, isPublic })` — owner only; sets/clears `publishedAt`.
 - `listPublic({ paginationOpts })` — public notebooks newest-published first, with author display
-  name, source count and studio item count. Signed-in only.
+  name and source count. Signed-in only.
 - `listFeatured()` — public + featured, small bounded list.
 - `setFeatured({ notebookId, isFeatured })`, `adminUnpublish({ notebookId })` — admin only.
 - `forkPublic({ notebookId })` — notebook must be public; applies `checkNotebookLimit` and the
@@ -127,7 +127,9 @@ leads with a curated shelf. Seed a set of showcase notebooks that demonstrate wh
 - File sources (e.g. Project Gutenberg text, PDFs) are fetched by the action and stored with
   `ctx.storage.store`.
 - Literature review and deep research run through their durable workflows; the seed approves the
-  workflow's plan/screening pause itself (as the owner would in the UI).
+  workflow's plan/screening pause itself (as the owner would in the UI). Their outputs are tied to
+  the owner's chat thread, which viewers can't see, so the seed also saves the final table/report
+  as Studio items (no `literatureReviewSessionId`) so viewers and forks get them.
 - **Sources are publicly readable by viewers, so publishing a notebook republishes its sources.**
   The showcase only uses openly licensed or public-domain material: OpenStax (CC BY), arXiv papers
   with a CC BY licence, U.S. government reports and SEC filings, MIT OpenCourseWare videos. Papers
