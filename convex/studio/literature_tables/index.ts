@@ -6,6 +6,7 @@ import { components, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { internalMutation, mutation, query } from "../../_generated/server";
+import { getConversationIfReadable } from "../../_lib/conversationAccess";
 import {
   assertConcurrentRunCapacity,
   assertRetryAllowed,
@@ -272,7 +273,7 @@ export const startLiteratureReview = mutation({
     // Use the requested thread or start a fresh conversation (never reuse another thread).
     let conversationId: Id<"conversations">;
     if (args.conversationId) {
-      const existing = await ctx.db.get(args.conversationId);
+      const existing = await getConversationIfReadable(ctx, args.conversationId, userId);
       if (!existing || existing.notebookId !== args.notebookId) {
         throw new Error("Invalid conversation for this notebook");
       }
