@@ -144,14 +144,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
 
   const notebookList = useMemo(() => notebooks ?? [], [notebooks]);
   const folderList = useMemo(() => folders ?? [], [folders]);
-  const featuredNotebooks = useMemo(
-    () => notebookList.filter((nb: NotebookItem) => nb.isFeatured),
-    [notebookList]
-  );
-  const recentNotebooks = useMemo(
-    () => notebookList.filter((nb: NotebookItem) => !nb.isFeatured),
-    [notebookList]
-  );
+  const recentNotebooks = notebookList;
   const activeNotebook = useMemo(() => {
     if (!urlNotebookId || notebookList.length === 0) return undefined;
     return notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
@@ -208,7 +201,6 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   const notebookContextValue = useMemo(
     () => ({
       notebookList,
-      featuredNotebooks,
       recentNotebooks,
       activeNotebook,
       notebooksLoading: notebooks === undefined || folders === undefined,
@@ -238,7 +230,6 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     }),
     [
       notebookList,
-      featuredNotebooks,
       recentNotebooks,
       activeNotebook,
       notebooks,
