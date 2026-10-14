@@ -7,9 +7,11 @@
  *
  *   bun run test:deployed-headers https://<deployment>.vercel.app
  *
- * Preview deployments sit behind Vercel Authentication: set VERCEL_AUTOMATION_BYPASS_SECRET
- * (Project Settings → Deployment Protection → Protection Bypass for Automation). The secret is
- * only ever sent over HTTPS to this project's own hosts (DEPLOYMENT_HOSTS).
+ * Deployment URLs, production ones included, sit behind Vercel Authentication: set
+ * VERCEL_AUTOMATION_BYPASS_SECRET (Project Settings → Deployment Protection → Protection Bypass
+ * for Automation). The secret is only ever sent over HTTPS to this project's own hosts
+ * (DEPLOYMENT_HOSTS). www.solomindlm.com is behind Cloudflare, which may challenge scripted
+ * requests or serve a cached static file, so CI checks the deployment URL instead.
  *
  * VERCEL_JSON points at the vercel.json to compare against (default: this checkout's). CI runs
  * this script from main and passes the deployed commit's vercel.json, which is only parsed.

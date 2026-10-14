@@ -4,18 +4,22 @@
 # can't see Vercel silently ignoring them; this job can.
 #
 # Vercel's GitHub integration posts a deployment_status for every Production and Preview
-# deployment.
+# deployment. Both are checked on the deployment's own URL (environment_url), not on
+# www.solomindlm.com: Cloudflare sits in front of the custom domain, answers GitHub's runners
+# with a 403 challenge, and can serve a cached copy of a static file from before a headers
+# change. Neither says anything about what Vercel sends. The deployment URL is also the exact
+# commit that was deployed, not whatever is live by the time the job runs.
 #
-# - Production: checks https://www.solomindlm.com, which is public, so no secret is involved.
-# - Preview: previews are behind Deployment Protection, so the job needs
-#   VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Project Settings → Deployment Protection →
-#   Protection Bypass for Automation). Store it as a secret of the `vercel-preview-bypass`
-#   GitHub Environment, not as a repo secret. deployment_status runs the workflow file from the
-#   deployed commit, so a branch could edit this file; an environment secret is only released
-#   to jobs that pass the environment's protection rules (add required reviewers there if fork
-#   deployments are ever authorized in Vercel). Without the secret the job warns and skips.
-#   The checker runs from main and only parses the deployed commit's vercel.json, and the
-#   script refuses to send the secret anywhere but HTTPS on this project's hosts.
+# Deployment URLs (production ones too) are behind Deployment Protection, so the job needs
+# VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Project Settings → Deployment Protection →
+# Protection Bypass for Automation). It is a secret of the `vercel-preview-bypass` GitHub
+# Environment, not a repo secret; the name predates production using it too (indexnow.yml
+# shares it). deployment_status runs the workflow file from the deployed commit, so a branch
+# could edit this file; an environment secret is only released to jobs that pass the
+# environment's protection rules (add required reviewers there if fork deployments are ever
+# authorized in Vercel). Without the secret the job warns and skips. The checker runs from
+# main and only parses the deployed commit's vercel.json, and the script refuses to send the
+# secret anywhere but HTTPS on this project's hosts.
 #
 # Advisory: a deployment_status run is not attached to the PR's required checks.
 
@@ -28,31 +32,11 @@ permissions:
   contents: read
 
 jobs:
-  production:
-    name: Deployed security headers (production)
-    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      # No secret in this job, so the deployed commit's own checker is safe to run.
-      - name: Checkout deployed commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event.deployment.sha }}
-          persist-credentials: false
-
-      # The check only uses node: built-ins, so no dependency install.
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version-file: package.json
-
-      - name: Check headers and routing
-        run: bun e2e/csp/check-deployed-headers.ts https://www.solomindlm.com
-
-  preview:
-    name: Deployed security headers (preview)
-    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Preview'
+  deployment:
+    name: Deployed security headers (${{ github.event.deployment.environment }})
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      (github.event.deployment.environment == 'Production' || github.event.deployment.environment == 'Preview')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: vercel-preview-bypass
@@ -63,7 +47,7 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET}" ]; then
-            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set on the vercel-preview-bypass environment; protected previews can't be checked. Skipping."
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set on the vercel-preview-bypass environment; protected deployments can't be checked. Skipping."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
