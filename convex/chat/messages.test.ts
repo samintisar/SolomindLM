@@ -178,4 +178,100 @@ describe("viewer chat on a public notebook", () => {
     expect(id).not.toBe(ownerConv);
     expect((await t.run((ctx) => ctx.db.get(id)))?.isPrivate).toBe(true);
   });
+
+  test("a viewer's clearHistory without a conversationId leaves the owner's thread intact", async () => {
+    const { t, viewer, notebookId, ownerConv } = await setup();
+    await withAuth(t, viewer).mutation(api.chat.messages.sendMessageOptimistic, {
+      notebookId,
+      message: "viewer question",
+    });
+    await withAuth(t, viewer).mutation(api.chat.messages.clearHistory, { notebookId });
+    const ownerMessages = await t.run((ctx) =>
+      ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q) => q.eq("conversationId", ownerConv))
+        .collect()
+    );
+    expect(ownerMessages.map((m) => m.content)).toEqual(["owner's question"]);
+  });
+
+  test("createConversation by a viewer is private", async () => {
+    const { t, viewer, notebookId } = await setup();
+    const conv = await withAuth(t, viewer).mutation(api.chat.messages.createConversation, {
+      notebookId,
+      title: "Mine",
+    });
+    expect(conv?.isPrivate).toBe(true);
+    expect(conv?.userId).toBe(viewer);
+  });
+
+  test("listByNotebook with the owner's conversationId is empty for a viewer", async () => {
+    const { t, viewer, notebookId, ownerConv } = await setup();
+    const result = await withAuth(t, viewer).query(api.chat.messages.listByNotebook, {
+      notebookId,
+      conversationId: ownerConv,
+    });
+    expect(result.messages).toEqual([]);
+  });
+
+  test("an editor sees another editor's shared thread but not a viewer's private one", async () => {
+    const { t, viewer, notebookId, ownerConv } = await setup();
+    const [editorA, editorB] = await t.run(async (ctx) => {
+      const a = await ctx.db.insert("users", { name: "Editor A" });
+      const b = await ctx.db.insert("users", { name: "Editor B" });
+      for (const userId of [a, b]) {
+        await ctx.db.insert("notebookMembers", {
+          notebookId,
+          userId,
+          role: "editor",
+          joinedAt: Date.now(),
+        });
+      }
+      return [a, b];
+    });
+    const editorAConv = await withAuth(t, editorA).mutation(api.chat.messages.createConversation, {
+      notebookId,
+      title: "Editor A thread",
+    });
+    await withAuth(t, viewer).mutation(api.chat.messages.sendMessageOptimistic, {
+      notebookId,
+      message: "viewer question",
+    });
+    const list = await withAuth(t, editorB).query(api.chat.conversations.listForNotebook, {
+      notebookId,
+    });
+    expect(list.map((c) => c._id).sort()).toEqual([ownerConv, editorAConv?._id].sort());
+  });
+
+  test("after unpublishing, a viewer can no longer read their own thread", async () => {
+    const { t, viewer, notebookId } = await setup();
+    const { conversationId } = await withAuth(t, viewer).mutation(
+      api.chat.messages.sendMessageOptimistic,
+      { notebookId, message: "viewer question" }
+    );
+    await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
+    const result = await withAuth(t, viewer).query(api.chat.messages.listByNotebook, {
+      notebookId,
+      conversationId,
+    });
+    expect(result.messages).toEqual([]);
+    const list = await withAuth(t, viewer).query(api.chat.conversations.listForNotebook, {
+      notebookId,
+    });
+    expect(list).toEqual([]);
+  });
+
+  test("releaseChatGeneration ignores a conversation from another notebook", async () => {
+    const { t, owner, ownerConv } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(ownerConv, { chatGenerationInFlight: 1, chatGenerationStartedAt: Date.now() })
+    );
+    const otherNotebook = await seedNotebook(t, owner);
+    await withAuth(t, owner).mutation(api.chat.messages.releaseChatGeneration, {
+      notebookId: otherNotebook,
+      conversationId: ownerConv,
+    });
+    const conv = await t.run((ctx) => ctx.db.get(ownerConv));
+    expect(conv?.chatGenerationInFlight).toBe(1);
+  });
 });

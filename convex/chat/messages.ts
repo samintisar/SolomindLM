@@ -283,7 +283,7 @@ export const releaseChatGeneration = mutation({
     let conversation;
     if (args.conversationId) {
       conversation = await getConversationIfReadable(ctx, args.conversationId, userId);
-      if (!conversation) return;
+      if (!conversation || conversation.notebookId !== args.notebookId) return;
     } else {
       conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
         userId,
