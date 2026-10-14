@@ -48,6 +48,10 @@ export interface ScoreAllMetricsOptions {
   judgeInvoke?: LlmJudgeOptions["invoke"];
   /** Extracted pack source text for rubric judges (use-case pack fixtures) */
   packSourceTexts?: SourceText[];
+  /** Rubric check ids to judge (`--rubric`); every applicable check when unset. */
+  rubricChecks?: string[];
+  /** `false` turns judge reasoning off (`--judge-reasoning off`). */
+  judgeReasoning?: boolean;
 }
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
@@ -67,6 +71,7 @@ function judgeInvoker(options: ScoreAllMetricsOptions): LlmJudgeOptions["invoke"
   }
   return createTogetherJudgeInvoker({
     model: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+    reasoning: options.judgeReasoning,
   });
 }
 
@@ -132,6 +137,7 @@ export async function scoreAllMetrics(
         invoke,
         model: judgeModel,
         sourceTexts: options.packSourceTexts,
+        onlyChecks: options.rubricChecks,
       })
     );
   }

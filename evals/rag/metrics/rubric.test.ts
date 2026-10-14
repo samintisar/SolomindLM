@@ -258,3 +258,71 @@ describe("scoreRubricMetrics", () => {
     expect(result.breakdown).toMatchObject({ judgeError: true });
   });
 });
+
+describe("rubric judge cost", () => {
+  const twoSourceChecks: UseCasePack = {
+    ...pack,
+    rubric: [
+      { id: "a", question: "Check A?", appliesTo: ["report"], evidence: "sources" },
+      { id: "b", question: "Check B?", appliesTo: ["report"], evidence: "sources" },
+    ],
+  };
+  const sourceTexts = [{ fileName: "q3.pdf", text: "Q3 revenue grew 12% on strong demand." }];
+
+  it("puts the check last, so every check of one output shares the evidence prefix", () => {
+    const [a, b] = twoSourceChecks.rubric.map((check) =>
+      buildRubricPrompt(twoSourceChecks, check, fixture, artifact(), sourceTexts)
+    );
+    let shared = 0;
+    while (shared < a.length && a[shared] === b[shared]) shared++;
+
+    expect(a.slice(0, shared)).toContain("Q3 revenue grew 12% on strong demand.");
+    expect(a.slice(0, shared)).toContain("Revenue grew 12%.");
+    expect(a.indexOf("Check: Check A?")).toBeGreaterThan(a.indexOf("Revenue grew 12%."));
+  });
+
+  it("judges the first check alone, then the rest together, so they can reuse its cache", async () => {
+    let releaseFirst: (verdict: string) => void = () => {};
+    const started: string[] = [];
+    const invoke = (prompt: string) => {
+      started.push(prompt.includes("Check A?") ? "a" : "b");
+      return started.length === 1
+        ? new Promise<string>((resolve) => {
+            releaseFirst = resolve;
+          })
+        : Promise.resolve('{"pass": true, "reason": "ok"}');
+    };
+
+    const scoring = scoreRubricMetrics(fixture, artifact(), twoSourceChecks, {
+      invoke,
+      model: "m",
+      sourceTexts,
+    });
+    await Promise.resolve();
+    expect(started).toEqual(["a"]);
+
+    releaseFirst('{"pass": true, "reason": "ok"}');
+    const results = await scoring;
+    expect(started).toEqual(["a", "b"]);
+    expect(results.map((r) => r.metric)).toEqual([
+      "rubric:professionals:a",
+      "rubric:professionals:b",
+    ]);
+  });
+
+  it("runs only the named checks when asked", async () => {
+    const prompts: string[] = [];
+    const results = await scoreRubricMetrics(fixture, artifact(), twoSourceChecks, {
+      invoke: async (prompt) => {
+        prompts.push(prompt);
+        return '{"pass": true, "reason": "ok"}';
+      },
+      model: "m",
+      sourceTexts,
+      onlyChecks: ["b"],
+    });
+
+    expect(results.map((r) => r.metric)).toEqual(["rubric:professionals:b"]);
+    expect(prompts).toHaveLength(1);
+  });
+});
