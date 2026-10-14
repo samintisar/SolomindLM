@@ -69,7 +69,6 @@ export const runResearchEval = action({
       );
     }
     const evalUserId = notebook.userId as Id<"users">;
-    const keywordSearchChunkUserId = evalUserId;
 
     // In-memory cache for discoverSources to avoid duplicate API calls within one eval run
     const searchCache = new Map<string, any[]>();
@@ -134,7 +133,7 @@ export const runResearchEval = action({
     const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
       return ctx.runQuery(internal.documents.internal.keywordSearch, {
         notebookId: notebookIdTyped,
-        userId: keywordSearchChunkUserId,
+        userId: evalUserId,
         query,
         limit,
         documentIds: docIds as Id<"documents">[] | undefined,
