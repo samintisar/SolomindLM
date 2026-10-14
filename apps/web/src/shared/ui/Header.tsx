@@ -7,6 +7,7 @@ import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 import { useAuth } from "../../features/auth/useAuth";
 import { canOfferPurchases } from "../../utils/platformDetection";
 import { Button } from "../components/ui/button";
+import { Spinner } from "../components/ui/spinner";
 import { useTheme } from "../contexts/useTheme";
 import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
 
@@ -25,6 +26,8 @@ interface HeaderProps {
   byline?: string;
   /** Viewing a public notebook: copy it into your account. */
   onFork?: () => void;
+  /** A fork is in flight: Fork shows a spinner and can't be pressed again. */
+  forkPending?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   onShare,
   byline,
   onFork,
+  forkPending = false,
 }) => {
   const navigate = useNavigate();
   const authLocation = useLocation();
@@ -201,10 +205,12 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             size="sm"
             onClick={onFork}
+            disabled={forkPending}
+            aria-label="Fork notebook"
             title="Copy this notebook to your account"
             className="shrink-0"
           >
-            <GitFork aria-hidden />
+            {forkPending ? <Spinner aria-hidden /> : <GitFork aria-hidden />}
             <span className="hidden sm:inline">Fork</span>
           </Button>
         )}
@@ -214,6 +220,7 @@ export const Header: React.FC<HeaderProps> = ({
             variant="outline"
             size="sm"
             onClick={onShare}
+            aria-label="Share notebook"
             title="Share notebook"
             className="shrink-0"
           >

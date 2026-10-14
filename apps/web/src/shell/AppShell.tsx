@@ -2,7 +2,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import type { DocumentSummary } from "@convex/documents/listSummary";
 import { useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/useAuth";
 import { BillingPage } from "@/features/billing/components/BillingPage";
@@ -34,11 +34,13 @@ import { useNoteCRUD } from "@/features/studio/hooks/useNoteCRUD";
 import { StudioProvider } from "@/features/studio/StudioContext";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { RouteTransition } from "@/shared/components/RouteTransition";
+import { useToast } from "@/shared/contexts/useToast";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { NotebookItem } from "@/shared/types/index";
 import { Header } from "@/shared/ui/Header";
 import { isNativeShell } from "@/utils/platformDetection";
+import { isVisitedNotebookGone, notebookHeaderProps } from "./notebookHeaderProps";
 
 /** Stable fallback while the documents query is skipped or loading, so consumers' effects don't re-run each render. */
 const EMPTY_DOCUMENTS: readonly DocumentSummary[] = Object.freeze([]);
@@ -161,7 +163,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
       : "skip"
   );
   const activeNotebook: NotebookItem | undefined = listedNotebook ?? visitedNotebook ?? undefined;
-  const isViewingPublic = activeNotebook?.access === "viewer";
+  const headerProps = notebookHeaderProps(activeNotebook, isNotebookRoute);
 
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
@@ -186,19 +188,52 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     }
   }, [shareModalOpen, urlNotebookId, activeNotebook]);
 
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  // An unlisted (public) notebook that was unpublished or deleted: say so and go home, once per id.
+  const goneNotebookRef = useRef<string | null>(null);
+  const visitedGone = isVisitedNotebookGone({
+    urlNotebookId,
+    hasShareToken: new URLSearchParams(location.search).has("share"),
+    listLoaded: notebooks !== undefined,
+    listed: listedNotebook !== undefined,
+    visited: visitedNotebook,
+  });
+  useEffect(() => {
+    // Leaving the notebook re-arms it, so a later visit to a still-missing one says so again.
+    if (urlNotebookId !== goneNotebookRef.current) goneNotebookRef.current = null;
+    if (!visitedGone || !urlNotebookId || goneNotebookRef.current === urlNotebookId) return;
+    goneNotebookRef.current = urlNotebookId;
+    toastError("This notebook is no longer available");
+    navigate("/home", { replace: true });
+  }, [visitedGone, urlNotebookId, toastError, navigate]);
+
   const forkPublic = useForkPublicNotebook();
   const { handleLimitError } = useLimitErrorToast();
   const { showError: showServiceError } = useServiceErrorToast();
+  const [forking, setForking] = useState(false);
   const handleFork = useCallback(async () => {
-    if (!urlNotebookId) return;
+    if (!urlNotebookId || forking) return;
+    setForking(true);
     try {
       const { newNotebookId } = await forkPublic({ notebookId: urlNotebookId as Id<"notebooks"> });
+      toastSuccess("Copied to your notebooks");
       navigate(`/notebook/${newNotebookId}`);
     } catch (error) {
       const handled = await handleLimitError(error);
       if (!handled.isLimitError) showServiceError(error);
+    } finally {
+      setForking(false);
     }
-  }, [forkPublic, navigate, handleLimitError, showServiceError, urlNotebookId]);
+  }, [
+    forkPublic,
+    forking,
+    navigate,
+    handleLimitError,
+    showServiceError,
+    toastSuccess,
+    urlNotebookId,
+  ]);
 
   // Signed in, / only bounces back to /home (useAuthGuard), and crossing to the public shell would
   // unmount this whole shell on the way. Signed-out visitors still get the landing page.
@@ -349,19 +384,11 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
           onLogoClick={handleLogoClick}
           onBillingClick={() => navigate("/billing")}
           hasSubscription={subscriptionStatus.hasSubscription}
-          // Editors (cowork link) and viewers (public notebook) can't rename or share.
-          notebookRenamable={isNotebookRoute && activeNotebook?.access === "owner"}
-          onShare={
-            isNotebookRoute && activeNotebook?.access === "owner"
-              ? () => setShareModalOpen(true)
-              : undefined
-          }
-          byline={
-            isNotebookRoute && isViewingPublic
-              ? `Public · by ${activeNotebook?.ownerName ?? "SolomindLM user"}`
-              : undefined
-          }
-          onFork={isNotebookRoute && isViewingPublic ? () => void handleFork() : undefined}
+          notebookRenamable={headerProps.renamable}
+          onShare={headerProps.canShare ? () => setShareModalOpen(true) : undefined}
+          byline={headerProps.byline}
+          onFork={headerProps.canFork ? () => void handleFork() : undefined}
+          forkPending={forking}
         />
 
         <NotebookProvider value={notebookContextValue}>
