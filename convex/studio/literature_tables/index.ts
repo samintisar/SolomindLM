@@ -20,6 +20,11 @@ import {
 } from "../../_lib/notebookAccess";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
 import { toConvexError } from "../../_lib/serviceErrors";
+import {
+  getChatLinkedLiteratureArtifactIds,
+  isChatLiteratureReport,
+  isChatLiteratureTable,
+} from "../../_model/literatureArtifacts";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
 import { loadNotebookPaperDocuments } from "../../literatureReview/db";
@@ -53,66 +58,6 @@ const literatureTablePaperValidator = v.object({
   offTopicReason: v.optional(v.string()),
   extractionFailed: v.optional(v.boolean()),
 });
-
-/** Chat workflow tables/reports — never listed in the studio sidebar. */
-async function getChatLinkedLiteratureArtifactIds(
-  ctx: QueryCtx,
-  notebookId: Id<"notebooks">
-): Promise<{
-  tableIds: Set<Id<"literatureTables">>;
-  reportIds: Set<Id<"literatureReports">>;
-}> {
-  const sessions = await ctx.db
-    .query("literatureReviewSessions")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-    .collect();
-
-  const tableIds = new Set<Id<"literatureTables">>();
-  const reportIds = new Set<Id<"literatureReports">>();
-  for (const session of sessions) {
-    if (session.tableId) tableIds.add(session.tableId);
-    if (session.reportId) reportIds.add(session.reportId);
-  }
-  return { tableIds, reportIds };
-}
-
-function isChatLiteratureTableTitle(title: string): boolean {
-  return title.startsWith("Literature table —") || title.startsWith("Literature table - ");
-}
-
-function isChatLiteratureReportTitle(title: string): boolean {
-  return title.startsWith("Report —") || title.startsWith("Report - ");
-}
-
-function isChatLiteratureTable(
-  table: {
-    _id: Id<"literatureTables">;
-    title: string;
-    literatureReviewSessionId?: Id<"literatureReviewSessions">;
-  },
-  chatTableIds: Set<Id<"literatureTables">>
-): boolean {
-  return (
-    table.literatureReviewSessionId !== undefined ||
-    chatTableIds.has(table._id) ||
-    isChatLiteratureTableTitle(table.title)
-  );
-}
-
-function isChatLiteratureReport(
-  report: {
-    _id: Id<"literatureReports">;
-    title: string;
-    literatureReviewSessionId?: Id<"literatureReviewSessions">;
-  },
-  chatReportIds: Set<Id<"literatureReports">>
-): boolean {
-  return (
-    report.literatureReviewSessionId !== undefined ||
-    chatReportIds.has(report._id) ||
-    isChatLiteratureReportTitle(report.title)
-  );
-}
 
 /**
  * Anyone who can read the notebook can open its Studio tables and reports. Chat review outputs

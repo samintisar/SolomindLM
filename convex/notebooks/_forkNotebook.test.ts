@@ -347,6 +347,80 @@ describe("performNotebookFork literature outputs", () => {
     expect(counts).toEqual({ tables: 0, reports: 0 });
   });
 
+  test("skips older chat outputs linked only from a session or named like one", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const notebookId = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Review",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const table = (title: string) =>
+        ctx.db.insert("literatureTables", {
+          title,
+          notebookId,
+          userId: ownerId,
+          status: "completed",
+          columns: [],
+          papers: [],
+          createdAt: now,
+          updatedAt: now,
+        });
+      const report = (title: string) =>
+        ctx.db.insert("literatureReports", {
+          title,
+          notebookId,
+          userId: ownerId,
+          status: "completed",
+          content: "",
+          citationStyle: "apa7",
+          sections: [],
+          citationIds: [],
+          createdAt: now,
+          updatedAt: now,
+        });
+      const linkedTableId = await table("Linked table");
+      const linkedReportId = await report("Linked report");
+      await table("Literature table — sleep");
+      await report("Report — sleep");
+      await table("Studio table");
+      await ctx.db.insert("literatureReviewSessions", {
+        query: "q",
+        notebookId,
+        userId: ownerId,
+        workflowId: "wf",
+        status: "completed",
+        tableId: linkedTableId,
+        reportId: linkedReportId,
+        createdAt: now,
+        updatedAt: now,
+      } as never);
+      return notebookId;
+    });
+
+    const forkerId = await t.run((ctx) => ctx.db.insert("users", { name: "Forker" }));
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const titles = await t.run(async (ctx) => ({
+      tables: (
+        await ctx.db
+          .query("literatureTables")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+          .collect()
+      ).map((r) => r.title),
+      reports: (
+        await ctx.db
+          .query("literatureReports")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+          .collect()
+      ).map((r) => r.title),
+    }));
+    expect(titles).toEqual({ tables: ["Studio table"], reports: [] });
+  });
+
   test("notebook-paper citations point at the fork's own sources", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();

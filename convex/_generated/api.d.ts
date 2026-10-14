@@ -137,6 +137,7 @@ import type * as _model_feedback from "../_model/feedback.js";
 import type * as _model_flashcards from "../_model/flashcards.js";
 import type * as _model_folders from "../_model/folders.js";
 import type * as _model_infographics from "../_model/infographics.js";
+import type * as _model_literatureArtifacts from "../_model/literatureArtifacts.js";
 import type * as _model_literatureReviewSearchOptions from "../_model/literatureReviewSearchOptions.js";
 import type * as _model_mindmaps from "../_model/mindmaps.js";
 import type * as _model_notebooks from "../_model/notebooks.js";
@@ -464,6 +465,7 @@ declare const fullApi: ApiFromModules<{
   "_model/flashcards": typeof _model_flashcards;
   "_model/folders": typeof _model_folders;
   "_model/infographics": typeof _model_infographics;
+  "_model/literatureArtifacts": typeof _model_literatureArtifacts;
   "_model/literatureReviewSearchOptions": typeof _model_literatureReviewSearchOptions;
   "_model/mindmaps": typeof _model_mindmaps;
   "_model/notebooks": typeof _model_notebooks;

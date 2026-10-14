@@ -1,5 +1,10 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import {
+  getChatLinkedLiteratureArtifactIds,
+  isChatLiteratureReport,
+  isChatLiteratureTable,
+} from "../_model/literatureArtifacts";
 
 const MAX_FORK_DOCUMENTS = 200;
 const MAX_FORK_CHUNKS = 10_000;
@@ -329,15 +334,16 @@ export async function performNotebookFork(
     return forked;
   };
 
-  // Literature tables and reports shown in Studio. Ones tied to a chat review session stay behind
-  // with the chat thread, which a fork doesn't copy.
+  // Literature tables and reports shown in Studio. Chat review outputs stay behind with the chat
+  // thread, which a fork doesn't copy.
+  const chatOutputs = await getChatLinkedLiteratureArtifactIds(ctx, sourceNotebookId);
   const tableIdMap = new Map<Id<"literatureTables">, Id<"literatureTables">>();
   const literatureTables = await ctx.db
     .query("literatureTables")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
   for (const r of literatureTables) {
-    if (r.status !== "completed" || r.literatureReviewSessionId !== undefined) continue;
+    if (r.status !== "completed" || isChatLiteratureTable(r, chatOutputs.tableIds)) continue;
     const paperCitationIds = await forkCitationIds(r.papers.map((p) => p.citationId));
     const newTableId = await ctx.db.insert("literatureTables", {
       title: r.title,
@@ -358,7 +364,7 @@ export async function performNotebookFork(
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
   for (const r of literatureReports) {
-    if (r.status !== "completed" || r.literatureReviewSessionId !== undefined) continue;
+    if (r.status !== "completed" || isChatLiteratureReport(r, chatOutputs.reportIds)) continue;
     await ctx.db.insert("literatureReports", {
       title: r.title,
       notebookId: newNotebookId,
