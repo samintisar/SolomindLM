@@ -20,7 +20,12 @@ export default defineSchema({
     title: v.string(),
     coverColor: v.optional(v.string()),
     icon: v.optional(v.string()),
+    /** Admin-curated: shows on the Public tab's Featured shelf. Only honoured while `isPublic`. */
     isFeatured: v.optional(v.boolean()),
+    /** Visible to every signed-in user (read, private chat, fork). */
+    isPublic: v.optional(v.boolean()),
+    /** When `isPublic` was last turned on; orders the Public tab. */
+    publishedAt: v.optional(v.number()),
     folderId: v.optional(v.id("folders")),
     /** Overrides env CHAT_GROUNDING_MODE when set: async | sync | off */
     chatGroundingMode: v.optional(v.union(v.literal("async"), v.literal("sync"), v.literal("off"))),
@@ -42,6 +47,8 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_createdAt", ["userId", "createdAt"])
     .index("by_folder", ["folderId"])
+    .index("by_isPublic_and_publishedAt", ["isPublic", "publishedAt"])
+    .index("by_isFeatured_and_publishedAt", ["isFeatured", "publishedAt"])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["userId", "folderId"],
@@ -361,6 +368,8 @@ export default defineSchema({
     chatGenerationInFlight: v.optional(v.number()),
     /** Last time a generation was started (UX / stale detection). */
     chatGenerationStartedAt: v.optional(v.number()),
+    /** Started by a viewer of a public notebook: only that user sees it. */
+    isPrivate: v.optional(v.boolean()),
     // Deprecated/unused fields (kept for schema compatibility)
     activeModes: v.optional(
       v.object({
