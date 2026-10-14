@@ -1,5 +1,6 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { NotebookAccessRole } from "../_lib/notebookAccess";
 
 /**
  * Database operations for conversations.
@@ -121,4 +122,39 @@ export async function deleteConversation(
   conversationId: Id<"conversations">
 ): Promise<void> {
   await ctx.db.delete("conversations", conversationId);
+}
+
+export type ConversationViewer = { userId: Id<"users">; access: NotebookAccessRole };
+
+/** Viewers see only their own threads; owners and editors see all but viewers' private ones. */
+export function isConversationVisible(
+  conversation: Pick<Doc<"conversations">, "userId" | "isPrivate">,
+  viewer: ConversationViewer
+): boolean {
+  if (viewer.access === "viewer") return conversation.userId === viewer.userId;
+  return !conversation.isPrivate || conversation.userId === viewer.userId;
+}
+
+export async function listVisibleConversations(
+  ctx: QueryCtx,
+  notebookId: Id<"notebooks">,
+  viewer: ConversationViewer
+): Promise<Doc<"conversations">[]> {
+  const all = await listConversationsInNotebook(ctx, notebookId);
+  return all.filter((c) => isConversationVisible(c, viewer));
+}
+
+/** Most recently updated thread this user can see, or null. */
+export async function getPrimaryVisibleConversation(
+  ctx: QueryCtx,
+  notebookId: Id<"notebooks">,
+  viewer: ConversationViewer
+): Promise<Doc<"conversations"> | null> {
+  const visible = await listVisibleConversations(ctx, notebookId, viewer);
+  return visible.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+}
+
+/** Fields for a conversation a user starts: viewers' threads are private to them. */
+export function conversationPrivacy(access: NotebookAccessRole): { isPrivate?: true } {
+  return access === "viewer" ? { isPrivate: true } : {};
 }
