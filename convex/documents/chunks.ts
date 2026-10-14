@@ -34,6 +34,30 @@ export const listChunksByDocument = internalQuery({
 });
 
 /**
+ * Internal: Each document's opening chunk, without its embedding. Chunks are stored in order,
+ * so the first by creation is chunk 0. Chat shows it so the model knows what a source is (#477).
+ */
+export const listOpeningChunks = internalQuery({
+  args: {
+    documentIds: v.array(v.id("documents")),
+  },
+  handler: async (ctx, args) => {
+    const chunks = await Promise.all(
+      [...new Set(args.documentIds)].map((documentId) =>
+        ctx.db
+          .query("documentChunks")
+          .withIndex("by_document", (q) => q.eq("documentId", documentId))
+          .order("asc")
+          .first()
+      )
+    );
+    return chunks
+      .filter((c): c is Doc<"documentChunks"> => c !== null)
+      .map(({ embedding: _embedding, ...chunk }) => chunk);
+  },
+});
+
+/**
  * Internal: Get chunks by IDs
  */
 export const getChunks = internalQuery({

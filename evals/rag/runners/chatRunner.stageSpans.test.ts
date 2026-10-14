@@ -75,7 +75,7 @@ describe("runChatEval stageSpans", () => {
 
     expect(artifact.selectedChunks[0]?.content).toBe("Thresholds were applied [43].");
     expect(artifact.selectedChunks[0]?.contextText).toBe(
-      "Thresholds were applied .\n\nMVPA was self-reported with the IPAQ..."
+      "Thresholds were applied (ref. 43).\n\nMVPA was self-reported with the IPAQ..."
     );
   });
 });

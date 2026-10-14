@@ -1,5 +1,5 @@
 import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
-import { passageTextForModel } from "./passageContext.js";
+import { markSourceReferences, passageTextForModel } from "./passageContext.js";
 import type { ReferenceChunk } from "./types";
 
 /** The sources the user selected (#450), and whether the question asks about each of them. */
@@ -61,7 +61,7 @@ export function buildGroundingPrompt(
         contextHeader += `\n[${characteristics.join(", ")}]`;
       }
 
-      const sanitizedContent = chunk.content.replace(/\[\d+\]/g, "");
+      const sanitizedContent = markSourceReferences(chunk.content);
       const formatted = `${contextHeader}:\n${passageTextForModel(chunk)}`;
 
       console.log(`[ChatLLMWrapper] Chunk [${index + 1}] (db chunkIndex=${chunk.chunkIndex}):`, {

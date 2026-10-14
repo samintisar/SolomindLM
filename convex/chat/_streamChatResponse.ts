@@ -13,6 +13,7 @@ import {
   createChatVectorSearchRunner,
   createFetchDocumentFn,
   createFetchDocumentTitlesFn,
+  createFetchOpeningPassagesFn,
   createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
@@ -169,6 +170,7 @@ export async function streamChatResponse(
     outputLanguage: userPrefs?.outputLanguage,
     fetchDocumentFn: createFetchDocumentFn(ctx),
     fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx, notebookIdTyped),
+    fetchOpeningPassagesFn: createFetchOpeningPassagesFn(ctx, notebookIdTyped),
   });
 
   // External search

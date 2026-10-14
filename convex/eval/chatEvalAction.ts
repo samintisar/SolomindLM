@@ -29,6 +29,7 @@ import {
   createChatVectorSearchRunner,
   createFetchDocumentFn,
   createFetchDocumentTitlesFn,
+  createFetchOpeningPassagesFn,
   createRerankFn,
 } from "../chat/_streamSearch";
 import { assertRagEvalGate } from "./_gate";
@@ -210,6 +211,7 @@ export const runChatEval = action({
       globalRerankFn: spyGlobalRerankFn,
       fetchDocumentFn: createFetchDocumentFn(ctx),
       fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx, notebookIdTyped),
+      fetchOpeningPassagesFn: createFetchOpeningPassagesFn(ctx, notebookIdTyped),
     });
 
     // ── Consume the full generator stream ──

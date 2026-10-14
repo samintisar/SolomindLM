@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { LIST_QUERY_MAX_SELECTED_CHUNKS } from "./chatConfig.js";
 import {
   addNeighbourPassages,
+  addOpeningPassages,
   chunkDedupKey,
   chunkRankingScore,
+  documentsNeedingOpening,
   mergeChunkScores,
   selectChunksByTokenBudget,
   selectChunksByTokenBudgetWithReservation,
@@ -272,5 +274,72 @@ describe("addNeighbourPassages", () => {
     expect(
       positions(addNeighbourPassages(selected, pool, { tokenBudget: 2000, maxPassages: 8 }))
     ).toEqual(["A5", "A3", "A4"]);
+  });
+});
+
+describe("opening passages (#477)", () => {
+  // ~100 tokens each; positions are (document, chunkIndex).
+  const at = (documentId: string, chunkIndex: number, metadata?: ReferenceChunk["metadata"]) =>
+    chunk({
+      sourceId: `src-${documentId}${chunkIndex}`,
+      documentId,
+      chunkIndex,
+      content: `${documentId}${chunkIndex} `.repeat(200).slice(0, 400),
+      metadata,
+    });
+  const positions = (chunks: ReferenceChunk[]) =>
+    chunks.map((c) => `${c.documentId}${c.chunkIndex}`);
+  const options = { tokenBudget: 2000, maxPassages: 10 };
+
+  it("names the documents whose opening passage is not in the context, in order", () => {
+    const passages = [at("B", 7), at("A", 3), at("B", 2), at("C", 0)];
+
+    expect(documentsNeedingOpening(passages)).toEqual(["B", "A"]);
+  });
+
+  it("leaves out whole documents and passages without a document", () => {
+    const whole = chunk({ sourceId: "D", documentId: "D", chunkIndex: -1, content: "all of D" });
+    const loose = chunk({ sourceId: "web", documentId: undefined, chunkIndex: 4, content: "web" });
+
+    expect(documentsNeedingOpening([whole, loose, at("A", 3)])).toEqual(["A"]);
+  });
+
+  it("puts each document's opening passage before its first passage", () => {
+    const passages = [at("B", 7), at("A", 3), at("B", 2)];
+
+    const out = addOpeningPassages(passages, [at("A", 0), at("B", 0)], options);
+
+    expect(positions(out)).toEqual(["B0", "B7", "A0", "A3", "B2"]);
+  });
+
+  it("skips an opening already in the context and one for a document with no passages", () => {
+    const passages = [at("A", 0), at("A", 3)];
+
+    const out = addOpeningPassages(passages, [at("A", 0), at("Z", 0)], options);
+
+    expect(positions(out)).toEqual(["A0", "A3"]);
+  });
+
+  it("stops at the passage and token limits, earliest documents first", () => {
+    const passages = [at("A", 3), at("B", 3), at("C", 3)];
+    const openings = [at("A", 0), at("B", 0), at("C", 0)];
+
+    expect(
+      positions(addOpeningPassages(passages, openings, { ...options, maxPassages: 2 }))
+    ).toEqual(["A0", "A3", "B0", "B3", "C3"]);
+    expect(
+      positions(addOpeningPassages(passages, openings, { ...options, tokenBudget: 150 }))
+    ).toEqual(["A0", "A3", "B3", "C3"]);
+  });
+
+  it("drops the previews an added opening passage makes redundant", () => {
+    const passages = [at("A", 1, { previousChunkPreview: "end of A0", nextChunkPreview: "A2" })];
+    const opening = at("A", 0, { nextChunkPreview: "start of A1" });
+
+    const out = addOpeningPassages(passages, [opening], options);
+
+    expect(out[0].metadata?.nextChunkPreview).toBeUndefined();
+    expect(out[1].metadata?.previousChunkPreview).toBeUndefined();
+    expect(out[1].metadata?.nextChunkPreview).toBe("A2");
   });
 });

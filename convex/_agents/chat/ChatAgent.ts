@@ -21,7 +21,9 @@ import {
   LIST_QUERY_MAX_SELECTED_CHUNKS,
   MAX_CHUNKS_HARD_LIMIT,
   MAX_NEIGHBOUR_PASSAGES,
+  MAX_OPENING_PASSAGES,
   NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+  OPENING_PASSAGE_TOKEN_BUDGET,
   PER_SOURCE_PASSAGES_PER_SEARCH,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
@@ -30,8 +32,10 @@ import { budgetConversationHistory } from "./chatHistoryBudget.js";
 import { routeChatMessage } from "./chatRouter.js";
 import {
   addNeighbourPassages,
+  addOpeningPassages,
   chunkDedupKey,
   chunkRankingScore,
+  documentsNeedingOpening,
   documentsWithRerankedPassages,
   mergeChunkScores,
   selectChunksByTokenBudgetWithReservation,
@@ -73,6 +77,7 @@ export class ChatAgent {
   private globalRerankFn?: GlobalRerankFn;
   private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
   private fetchDocumentTitlesFn?: ChatAgentOptions["fetchDocumentTitlesFn"];
+  private fetchOpeningPassagesFn?: ChatAgentOptions["fetchOpeningPassagesFn"];
 
   constructor(options?: ChatAgentOptions) {
     const smartModel = resolveSmartModel(options?.smartModel);
@@ -99,6 +104,7 @@ export class ChatAgent {
     this.globalRerankFn = options?.globalRerankFn;
     this.fetchDocumentFn = options?.fetchDocumentFn;
     this.fetchDocumentTitlesFn = options?.fetchDocumentTitlesFn;
+    this.fetchOpeningPassagesFn = options?.fetchOpeningPassagesFn;
   }
 
   /**
@@ -118,6 +124,48 @@ export class ChatAgent {
       });
       return {};
     }
+  }
+
+  /**
+   * Adds the opening passage of each document the context draws on (#477), taken from the
+   * retrieval pool when retrieval found it, otherwise fetched. A failed fetch is logged and the
+   * answer goes ahead with the passages it has.
+   */
+  private async withOpeningPassages(
+    passages: ReferenceChunk[],
+    pool: ReferenceChunk[],
+    logger: ServiceLogger
+  ): Promise<ReferenceChunk[]> {
+    const needing = documentsNeedingOpening(passages).slice(0, MAX_OPENING_PASSAGES);
+    if (needing.length === 0) return passages;
+    const fromPool = pool.filter(
+      (c) => c.chunkIndex === 0 && c.documentId && needing.includes(c.documentId)
+    );
+    const found = new Set(fromPool.map((c) => c.documentId));
+    const missing = needing.filter((id) => !found.has(id));
+    let fetched: ReferenceChunk[] = [];
+    if (missing.length > 0 && this.fetchOpeningPassagesFn) {
+      try {
+        fetched = await this.fetchOpeningPassagesFn(missing);
+      } catch (e) {
+        logger.warn("Opening passage lookup failed", {
+          documentIds: missing.length,
+          error: String(e),
+        });
+      }
+    }
+    const withOpenings = addOpeningPassages(passages, [...fromPool, ...fetched], {
+      tokenBudget: OPENING_PASSAGE_TOKEN_BUDGET,
+      maxPassages: MAX_OPENING_PASSAGES,
+    });
+    if (withOpenings.length > passages.length) {
+      logger.info("Added opening passages", {
+        added: withOpenings.length - passages.length,
+        fromPool: fromPool.length,
+        fetched: fetched.length,
+      });
+    }
+    return withOpenings;
   }
 
   /**
@@ -796,16 +844,20 @@ export class ChatAgent {
     // of the selection cap (at most MAX_NEIGHBOUR_PASSAGES within NEIGHBOUR_PASSAGE_TOKEN_BUDGET):
     // selection usually fills the cap, and evals showed neighbours sharing it were almost never
     // added.
-    const rankedChunks = addNeighbourPassages(selectedChunks, restNotebook, {
+    const withNeighbours = addNeighbourPassages(selectedChunks, restNotebook, {
       tokenBudget: NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
       maxPassages: MAX_NEIGHBOUR_PASSAGES,
     });
-    if (rankedChunks.length > selectedChunks.length) {
+    if (withNeighbours.length > selectedChunks.length) {
       logger.info("Added neighbouring passages", {
-        added: rankedChunks.length - selectedChunks.length,
-        total: rankedChunks.length,
+        added: withNeighbours.length - selectedChunks.length,
+        total: withNeighbours.length,
       });
     }
+    // Each source's opening passage, so the model knows what the source is and how a study was
+    // done when the selected passages are results or discussion (#477). Own allowance, like the
+    // neighbours'.
+    const rankedChunks = await this.withOpeningPassages(withNeighbours, restNotebook, logger);
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");

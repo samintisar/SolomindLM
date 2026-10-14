@@ -3,7 +3,7 @@
 import type { HybridSearchConfig, KeywordSearchRunner } from "../_agents/chat/hybrid_search.js";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
-import type { ChunkMetadata } from "../_agents/chat/types";
+import type { ChunkMetadata, ReferenceChunk } from "../_agents/chat/types";
 import type { ChatAgentOptions } from "../_agents/chat/types.js";
 import type { RerankFunction, VectorSearchRunner } from "../_agents/chat/vector_search.js";
 import { internal } from "../_generated/api";
@@ -106,6 +106,63 @@ export async function documentIdsInNotebook(
   });
   const inNotebook = new Set<string>(docs.map((d) => d._id));
   return documentIds.filter((id) => inNotebook.has(id));
+}
+
+/** A stored chunk's position, section and content flags, as chat passages carry them. */
+function chunkMetadata(chunk: Omit<DocumentChunkDoc, "embedding">): ChunkMetadata {
+  return {
+    totalChunks: chunk.totalChunks ?? undefined,
+    relativePosition: chunk.relativePosition ?? undefined,
+    chunkLengthChars: chunk.chunkLengthChars ?? undefined,
+    wordCount: chunk.wordCount ?? undefined,
+    sentenceCount: chunk.sentenceCount ?? undefined,
+    pageNumber: chunk.pageNumber ?? undefined,
+    sectionTitle: chunk.sectionTitle ?? undefined,
+    sectionLevel: chunk.sectionLevel ?? undefined,
+    headingPath: chunk.headingPath ?? undefined,
+    previousChunkPreview: chunk.previousChunkPreview ?? undefined,
+    nextChunkPreview: chunk.nextChunkPreview ?? undefined,
+    hasCodeBlock: chunk.hasCodeBlock ?? undefined,
+    hasMathNotation: chunk.hasMathNotation ?? undefined,
+    hasTable: chunk.hasTable ?? undefined,
+    hasBulletList: chunk.hasBulletList ?? undefined,
+    hasNumberedList: chunk.hasNumberedList ?? undefined,
+  };
+}
+
+/**
+ * Each document's opening passage (chunk 0) as a chat passage, titled like retrieved ones (#477).
+ * A document outside the notebook, or with no chunks, gets none.
+ */
+export function createFetchOpeningPassagesFn(
+  ctx: ActionCtx,
+  notebookId: Id<"notebooks">
+): NonNullable<ChatAgentOptions["fetchOpeningPassagesFn"]> {
+  return async (documentIds: string[]) => {
+    const ids = documentIds as Id<"documents">[];
+    const [chunks, docs] = await Promise.all([
+      ctx.runQuery(internal.documents.chunks.listOpeningChunks, { documentIds: ids }),
+      ctx.runQuery(internal.documents.internal.getDocumentsByIds, { documentIds: ids }),
+    ]);
+    const docById = new Map(docs.map((d) => [d._id, d]));
+    return chunks
+      .filter((c) => c.notebookId === notebookId)
+      .map((c): ReferenceChunk => {
+        const doc = docById.get(c.documentId);
+        const url = doc?.fileUrl?.trim();
+        return {
+          id: String(c._id),
+          sourceId: String(c._id),
+          documentId: String(c.documentId),
+          sourceTitle: doc?.fileName ?? "Document",
+          sourceUrl:
+            url && (doc?.fileType === "url" || doc?.fileType === "youtube") ? url : undefined,
+          content: c.content,
+          chunkIndex: c.chunkIndex,
+          metadata: chunkMetadata(c),
+        };
+      });
+  };
 }
 
 /**
@@ -225,24 +282,7 @@ export function createChatVectorSearchRunner(
         chunkIndex: chunk.chunkIndex,
         content: chunk.content,
         embedding: chunk.embedding ?? [],
-        metadata: {
-          totalChunks: chunk.totalChunks ?? undefined,
-          relativePosition: chunk.relativePosition ?? undefined,
-          chunkLengthChars: chunk.chunkLengthChars ?? undefined,
-          wordCount: chunk.wordCount ?? undefined,
-          sentenceCount: chunk.sentenceCount ?? undefined,
-          pageNumber: chunk.pageNumber ?? undefined,
-          sectionTitle: chunk.sectionTitle ?? undefined,
-          sectionLevel: chunk.sectionLevel ?? undefined,
-          headingPath: chunk.headingPath ?? undefined,
-          previousChunkPreview: chunk.previousChunkPreview ?? undefined,
-          nextChunkPreview: chunk.nextChunkPreview ?? undefined,
-          hasCodeBlock: chunk.hasCodeBlock ?? undefined,
-          hasMathNotation: chunk.hasMathNotation ?? undefined,
-          hasTable: chunk.hasTable ?? undefined,
-          hasBulletList: chunk.hasBulletList ?? undefined,
-          hasNumberedList: chunk.hasNumberedList ?? undefined,
-        },
+        metadata: chunkMetadata(chunk),
       });
     }
 
