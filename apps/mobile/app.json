@@ -8,11 +8,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "solomindlm",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
@@ -27,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F5F1E6"
       },
       "package": "com.solomindlm.app",
       "predictiveBackGestureEnabled": false,
@@ -61,6 +56,18 @@
         }
       ],
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "backgroundColor": "#F5F1E6",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#161311"
+          }
+        }
+      ],
       [
         "expo-notifications",
         {
