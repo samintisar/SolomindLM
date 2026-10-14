@@ -1,4 +1,5 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { Header } from "./Header";
 
@@ -95,5 +96,33 @@ describe("Header onboarding action wiring", () => {
     await capturedAvatarProps?.onShowChecklist?.();
 
     expect(mockShowChecklist).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Header on someone's public notebook", () => {
+  test("shows the byline and a Fork button", async () => {
+    mockUseQuery.mockReturnValue(undefined);
+    const onFork = vi.fn();
+    render(
+      <Header
+        title="ECON 101"
+        onRename={vi.fn()}
+        isHome={false}
+        onLogoClick={vi.fn()}
+        notebookRenamable={false}
+        byline="Public · by Ada"
+        onFork={onFork}
+      />
+    );
+    expect(screen.getByText("Public · by Ada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Share/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Fork/ }));
+    expect(onFork).toHaveBeenCalledOnce();
+  });
+
+  test("no byline or Fork by default", () => {
+    mockUseQuery.mockReturnValue(undefined);
+    render(<Header title="Mine" onRename={vi.fn()} isHome={false} onLogoClick={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /Fork/ })).not.toBeInTheDocument();
   });
 });

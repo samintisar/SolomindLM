@@ -21,7 +21,7 @@ import { useFolderCRUD } from "@/features/notebooks/hooks/useFolderCRUD";
 import { useNotebookCRUD } from "@/features/notebooks/hooks/useNotebookCRUD";
 import { NotebookProvider } from "@/features/notebooks/NotebookContext";
 import { useFolders } from "@/features/notebooks/services/foldersApi";
-import { useNotebooks } from "@/features/notebooks/services/notebooksApi";
+import { useForkPublicNotebook, useNotebooks } from "@/features/notebooks/services/notebooksApi";
 import { ChecklistCard } from "@/features/onboarding/components/ChecklistCard";
 import { TourTooltip } from "@/features/onboarding/components/TourTooltip";
 import { OnboardingProvider } from "@/features/onboarding/OnboardingProvider";
@@ -34,6 +34,8 @@ import { useNoteCRUD } from "@/features/studio/hooks/useNoteCRUD";
 import { StudioProvider } from "@/features/studio/StudioContext";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { RouteTransition } from "@/shared/components/RouteTransition";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { NotebookItem } from "@/shared/types/index";
 import { Header } from "@/shared/ui/Header";
 import { isNativeShell } from "@/utils/platformDetection";
@@ -137,6 +139,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     return null;
   }, [location.pathname]);
 
+  const isNotebookRoute = location.pathname.startsWith("/notebook/");
   const isHomePage =
     location.pathname === "/home" ||
     location.pathname === "/billing" ||
@@ -145,10 +148,20 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   const notebookList = useMemo(() => notebooks ?? [], [notebooks]);
   const folderList = useMemo(() => folders ?? [], [folders]);
   const recentNotebooks = notebookList;
-  const activeNotebook = useMemo(() => {
-    if (!urlNotebookId || notebookList.length === 0) return undefined;
-    return notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
-  }, [urlNotebookId, notebookList]);
+  const listedNotebook = useMemo(
+    () =>
+      urlNotebookId ? notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId) : undefined,
+    [urlNotebookId, notebookList]
+  );
+  // A public notebook you don't own or cowork on isn't in your list; fetch it directly.
+  const visitedNotebook = useQuery(
+    api.notebooks.index.get,
+    urlNotebookId && urlNotebookId !== "new" && notebooks !== undefined && !listedNotebook
+      ? { id: urlNotebookId as Id<"notebooks"> }
+      : "skip"
+  );
+  const activeNotebook: NotebookItem | undefined = listedNotebook ?? visitedNotebook ?? undefined;
+  const isViewingPublic = activeNotebook?.access === "viewer";
 
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
@@ -161,21 +174,31 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     }
   }, [urlNotebookId, currentView, activeNotebookId]);
 
+  const activeNotebookTitle = activeNotebook?.title;
   useEffect(() => {
-    if (urlNotebookId && notebookList.length > 0) {
-      const notebook = notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
-      if (notebook) {
-        setNotebookTitle(notebook.title);
-      }
-    }
-  }, [urlNotebookId, notebookList]);
+    if (urlNotebookId && activeNotebookTitle !== undefined) setNotebookTitle(activeNotebookTitle);
+  }, [urlNotebookId, activeNotebookTitle]);
 
   useEffect(() => {
     if (!shareModalOpen) return;
-    if (!urlNotebookId || !activeNotebook || activeNotebook.isSharedNotebook) {
+    if (!urlNotebookId || !activeNotebook || activeNotebook.access !== "owner") {
       setShareModalOpen(false);
     }
   }, [shareModalOpen, urlNotebookId, activeNotebook]);
+
+  const forkPublic = useForkPublicNotebook();
+  const { handleLimitError } = useLimitErrorToast();
+  const { showError: showServiceError } = useServiceErrorToast();
+  const handleFork = useCallback(async () => {
+    if (!urlNotebookId) return;
+    try {
+      const { newNotebookId } = await forkPublic({ notebookId: urlNotebookId as Id<"notebooks"> });
+      navigate(`/notebook/${newNotebookId}`);
+    } catch (error) {
+      const handled = await handleLimitError(error);
+      if (!handled.isLimitError) showServiceError(error);
+    }
+  }, [forkPublic, navigate, handleLimitError, showServiceError, urlNotebookId]);
 
   // Signed in, / only bounces back to /home (useAuthGuard), and crossing to the public shell would
   // unmount this whole shell on the way. Signed-out visitors still get the landing page.
@@ -305,7 +328,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
 
   return (
     <OnboardingProvider key={user?.id ?? "anon"} isAuthenticated={isAuthenticated}>
-      {shareModalOpen && urlNotebookId && activeNotebook && !activeNotebook.isSharedNotebook && (
+      {shareModalOpen && urlNotebookId && activeNotebook?.access === "owner" && (
         <ShareNotebookModal notebookId={urlNotebookId} onClose={() => setShareModalOpen(false)} />
       )}
 
@@ -322,19 +345,19 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
           onLogoClick={handleLogoClick}
           onBillingClick={() => navigate("/billing")}
           hasSubscription={subscriptionStatus.hasSubscription}
-          notebookRenamable={
-            location.pathname.startsWith("/notebook/") &&
-            activeNotebook !== undefined &&
-            !activeNotebook?.isSharedNotebook
-          }
+          // Editors (cowork link) and viewers (public notebook) can't rename or share.
+          notebookRenamable={isNotebookRoute && activeNotebook?.access === "owner"}
           onShare={
-            location.pathname.startsWith("/notebook/") &&
-            urlNotebookId &&
-            activeNotebook &&
-            !activeNotebook.isSharedNotebook
+            isNotebookRoute && activeNotebook?.access === "owner"
               ? () => setShareModalOpen(true)
               : undefined
           }
+          byline={
+            isNotebookRoute && isViewingPublic
+              ? `Public · by ${activeNotebook?.ownerName ?? "SolomindLM user"}`
+              : undefined
+          }
+          onFork={isNotebookRoute && isViewingPublic ? () => void handleFork() : undefined}
         />
 
         <NotebookProvider value={notebookContextValue}>

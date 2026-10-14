@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
-import { Share2 } from "lucide-react";
+import { GitFork, Share2 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
@@ -21,6 +21,10 @@ interface HeaderProps {
   notebookRenamable?: boolean;
   /** Owner-only: opens share UI for the active notebook. */
   onShare?: () => void;
+  /** Shown under the title, e.g. "Public · by Ada" when viewing someone's public notebook. */
+  byline?: string;
+  /** Viewing a public notebook: copy it into your account. */
+  onFork?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,6 +36,8 @@ export const Header: React.FC<HeaderProps> = ({
   hasSubscription = false,
   notebookRenamable = true,
   onShare,
+  byline,
+  onFork,
 }) => {
   const navigate = useNavigate();
   const authLocation = useLocation();
@@ -172,12 +178,17 @@ export const Header: React.FC<HeaderProps> = ({
                 {title}
               </h1>
             ) : (
-              <h1
-                className="text-lg font-display font-bold text-foreground tracking-tight truncate min-w-0"
-                title={title}
-              >
-                {title}
-              </h1>
+              <div className="flex min-w-0 flex-col">
+                <h1
+                  className="text-lg font-display font-bold text-foreground tracking-tight truncate min-w-0"
+                  title={title}
+                >
+                  {title}
+                </h1>
+                {byline && (
+                  <span className="truncate font-sans text-xs text-muted-foreground">{byline}</span>
+                )}
+              </div>
             )}
           </>
         )}
@@ -185,6 +196,18 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-4">
+        {onFork && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onFork}
+            title="Copy this notebook to your account"
+            className="shrink-0"
+          >
+            <GitFork aria-hidden />
+            <span className="hidden sm:inline">Fork</span>
+          </Button>
+        )}
         {onShare && (
           <Button
             type="button"
