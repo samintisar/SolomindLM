@@ -3,7 +3,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 type DbCtx = QueryCtx | MutationCtx;
 
-export type NotebookAccessRole = "owner" | "editor";
+export type NotebookAccessRole = "owner" | "editor" | "viewer";
 
 export async function getNotebookMember(
   ctx: DbCtx,
@@ -17,7 +17,8 @@ export async function getNotebookMember(
 }
 
 /**
- * Returns owner if user owns the notebook, editor if they are a member, else null.
+ * Returns owner if user owns the notebook, editor if they are a member, viewer if the notebook is
+ * public, else null. Viewers may read and chat privately; `assertCanEditNotebook` rejects them.
  */
 export async function getNotebookAccess(
   ctx: DbCtx,
@@ -29,6 +30,7 @@ export async function getNotebookAccess(
   if (notebook.userId === userId) return "owner";
   const member = await getNotebookMember(ctx, notebookId, userId);
   if (member) return "editor";
+  if (notebook.isPublic) return "viewer";
   return null;
 }
 
