@@ -2,6 +2,7 @@ import { PersistentTextStreaming, type StreamId } from "@convex-dev/persistent-t
 import { components } from "../_generated/api";
 import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { isDocumentFileUsedElsewhere } from "../documents/internal";
 import { deleteSynthesisChunkFiles } from "../studio/jobMutations/audio";
 
 /**
@@ -154,7 +155,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
           },
         ],
         async (doc) => {
-          if (doc.storageId) await deleteStoredFile(ctx, doc.storageId);
+          // Forks share the source's file; keep it while another document still uses it.
+          if (
+            doc.storageId &&
+            !(await isDocumentFileUsedElsewhere(ctx, doc.storageId, [doc._id]))
+          ) {
+            await deleteStoredFile(ctx, doc.storageId);
+          }
         }
       ),
   },

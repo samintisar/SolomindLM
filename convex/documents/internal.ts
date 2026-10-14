@@ -27,6 +27,46 @@ export async function deleteAllChunksForDocument(
 }
 
 /**
+ * True when a document other than `exceptDocumentIds` points at this stored file. Forks reuse
+ * the original's file, so deleting one copy must leave the others readable.
+ */
+export async function isDocumentFileUsedElsewhere(
+  ctx: MutationCtx,
+  storageId: string,
+  exceptDocumentIds: readonly Id<"documents">[] = []
+): Promise<boolean> {
+  const users = await ctx.db
+    .query("documents")
+    .withIndex("by_storage", (q) => q.eq("storageId", storageId))
+    .take(exceptDocumentIds.length + 1);
+  return users.some((doc) => !exceptDocumentIds.includes(doc._id));
+}
+
+/**
+ * Deletes a source's stored file unless another document still uses it (see
+ * `isDocumentFileUsedElsewhere`). Call before deleting the document row, passing its id, or
+ * after the row stopped referencing the file.
+ */
+export async function deleteDocumentFileIfUnused(
+  ctx: MutationCtx,
+  storageId: string,
+  exceptDocumentIds: readonly Id<"documents">[] = []
+): Promise<void> {
+  if (await isDocumentFileUsedElsewhere(ctx, storageId, exceptDocumentIds)) return;
+  await ctx.storage.delete(storageId as Id<"_storage">);
+}
+
+/** For actions that swapped a document's file: delete the old one if nothing else uses it. */
+export const deleteDocumentFileIfUnusedInternal = internalMutation({
+  args: { storageId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await deleteDocumentFileIfUnused(ctx, args.storageId);
+    return null;
+  },
+});
+
+/**
  * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
  */
 export const userCanAccessStorage = internalQuery({
@@ -59,7 +99,7 @@ export async function resetDocumentForReembed(
 
   if (args.newStorageId !== undefined) {
     if (doc.storageId) {
-      await ctx.storage.delete(doc.storageId as Id<"_storage">);
+      await deleteDocumentFileIfUnused(ctx, doc.storageId, [doc._id]);
     }
     await ctx.db.patch(args.documentId, {
       storageId: args.newStorageId,

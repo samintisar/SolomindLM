@@ -21,7 +21,7 @@ import {
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
-import { deleteAllChunksForDocument } from "./internal";
+import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
 /**
@@ -384,7 +384,7 @@ export const remove = mutation({
     await deleteAllChunksForDocument(ctx, args.id);
 
     if (document.storageId) {
-      await ctx.storage.delete(document.storageId as Id<"_storage">);
+      await deleteDocumentFileIfUnused(ctx, document.storageId, [args.id]);
     }
 
     await ctx.db.delete(args.id);
@@ -416,7 +416,7 @@ export const removeMany = mutation({
       await deleteAllChunksForDocument(ctx, id);
 
       if (document.storageId) {
-        await ctx.storage.delete(document.storageId as Id<"_storage">);
+        await deleteDocumentFileIfUnused(ctx, document.storageId, [id]);
       }
 
       await ctx.db.delete(id);

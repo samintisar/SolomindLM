@@ -6,6 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { preloadModules } from "../_testing/preloadModules.helpers";
+import { performNotebookFork } from "../notebooks/_forkNotebook";
 import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -682,6 +683,67 @@ describe("documents.removeMany", () => {
     });
 
     expect(result.deleted).toBe(0);
+  });
+});
+
+describe("deleting a source whose file a fork shares", () => {
+  /** Owner's notebook with one stored source, forked into another user's account. */
+  async function seedForkedSource(t: ReturnType<typeof convexTest>) {
+    const owner = await seedUser(t);
+    const forker = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    const { fileId, docId } = await t.run(async (ctx) => {
+      const fileId = await ctx.storage.store(new Blob(["%PDF-1.7"]));
+      const docId = await ctx.db.insert("documents", {
+        userId: owner,
+        notebookId,
+        fileName: "paper.pdf",
+        fileType: "pdf",
+        storageId: fileId,
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return { fileId, docId };
+    });
+    const forkNotebookId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forker));
+    const forkDocId = await t.run(async (ctx) => {
+      const [forkDoc] = await ctx.db
+        .query("documents")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkNotebookId))
+        .collect();
+      return forkDoc._id;
+    });
+    return { owner, forker, fileId, docId, forkDocId };
+  }
+
+  test("deleting the fork's copy keeps the owner's file", async () => {
+    const t = convexTest(schema, modules);
+    const { forker, fileId, forkDocId } = await seedForkedSource(t);
+
+    await withAuth(t, forker).mutation(api.documents.index.remove, { id: forkDocId });
+
+    expect(await t.run((ctx) => ctx.db.system.get(fileId))).not.toBeNull();
+  });
+
+  test("deleting the original keeps the file while a fork still uses it", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, fileId, docId } = await seedForkedSource(t);
+
+    await withAuth(t, owner).mutation(api.documents.index.removeMany, { ids: [docId] });
+
+    expect(await t.run((ctx) => ctx.db.system.get(fileId))).not.toBeNull();
+  });
+
+  test("deleting the last document that uses the file deletes it", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, forker, fileId, docId, forkDocId } = await seedForkedSource(t);
+
+    await withAuth(t, forker).mutation(api.documents.index.removeMany, { ids: [forkDocId] });
+    expect(await t.run((ctx) => ctx.db.system.get(fileId))).not.toBeNull();
+    await withAuth(t, owner).mutation(api.documents.index.remove, { id: docId });
+
+    expect(await t.run((ctx) => ctx.db.system.get(fileId))).toBeNull();
   });
 });
 

@@ -182,6 +182,26 @@ describe("account deletion", () => {
     });
   });
 
+  test("keeps a source file that another user's forked document still uses", async () => {
+    const t = setup();
+    const doomed = await seedUser(t, "doomed@example.com");
+    const forker = await seedUser(t, "forker@example.com");
+    const [sharedFileId] = doomed.fileIds;
+    await t.run(async (ctx) => {
+      // A fork copies the source's storageId.
+      await ctx.db.insert("documents", {
+        userId: forker.userId,
+        storageId: sharedFileId,
+      } as never);
+    });
+
+    await deleteAndDrain(t, doomed.userId);
+
+    await t.run(async (ctx) => {
+      expect(await ctx.storage.get(sharedFileId)).not.toBeNull();
+    });
+  });
+
   test("keeps an audio file a legacy URL-only overview shares with an id-only fork", async () => {
     const t = setup();
     const doomed = await seedUser(t, "doomed@example.com");

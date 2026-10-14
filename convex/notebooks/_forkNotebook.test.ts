@@ -153,6 +153,53 @@ describe("performNotebookFork infographics", () => {
   });
 });
 
+describe("performNotebookFork audio overviews", () => {
+  test("a forked overview drops the source's synthesis chunk files", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { notebookId, chunkFileId } = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Original",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const chunkFileId = await ctx.storage.store(new Blob(["mp3"]));
+      await ctx.db.insert("audioOverviews", {
+        userId: ownerId,
+        notebookId,
+        title: "Overview",
+        status: "generating",
+        metadata: {
+          audioType: "deep_dive",
+          synthesis: {
+            chunks: [{ start: 0, end: 1 }],
+            done: { "0": { storageId: chunkFileId, synthesizedLines: 1, failedLines: 0 } },
+            startedAt: now,
+          },
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { notebookId, chunkFileId };
+    });
+
+    const forkerId = await t.run((ctx) => ctx.db.insert("users", { name: "Forker" }));
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const [forked] = await t.run((ctx) =>
+      ctx.db
+        .query("audioOverviews")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect()
+    );
+    // Deleting or failing the fork's row deletes the chunk files its metadata names.
+    expect(forked.metadata).toEqual({ audioType: "deep_dive" });
+    expect(await t.run((ctx) => ctx.db.system.get(chunkFileId))).not.toBeNull();
+  });
+});
+
 describe("performNotebookFork literature outputs", () => {
   test("copies completed studio tables and reports and relinks the report to the copied table", async () => {
     const t = convexTest(schema, modules);

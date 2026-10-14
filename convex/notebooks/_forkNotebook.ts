@@ -39,6 +39,17 @@ function remapInfographicData(
 }
 
 /**
+ * An unfinished overview lists its chunk MP3s in `metadata.synthesis`, and failing or finishing a
+ * row deletes those files. The fork's row has no job of its own, so it must not name the source's.
+ */
+function withoutSynthesisChunks(metadata: unknown): unknown {
+  const stored = metadata as Record<string, unknown> | undefined;
+  if (stored?.synthesis === undefined) return metadata;
+  const { synthesis: _synthesis, ...rest } = stored;
+  return rest;
+}
+
+/**
  * Deep-copies a notebook into forkUserId's account. Single-transaction helper (not an API).
  */
 export async function performNotebookFork(
@@ -235,7 +246,7 @@ export async function performNotebookFork(
       audioUrl: r.audioUrl,
       // Same file as the source row, so access checks can find the fork by storage id.
       audioStorageId: r.audioStorageId,
-      metadata: r.metadata,
+      metadata: withoutSynthesisChunks(r.metadata),
       createdAt: now,
       updatedAt: now,
     });
