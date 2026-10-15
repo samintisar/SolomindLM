@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { toConvexError } from "../../_lib/serviceErrors";
 import { withQuizAnswer } from "../../_model/practiceProgress";
 import * as Quizzes from "../../_model/quizzes";
 import {
@@ -247,6 +249,16 @@ export const submitAnswer = mutation({
     }
 
     const target = await getPracticeTarget(ctx, quiz.notebookId, userId);
+    const questionCount = Array.isArray(quiz.questionsData) ? quiz.questionsData.length : 0;
+    if (
+      !Number.isInteger(args.questionIndex) ||
+      args.questionIndex < 0 ||
+      args.questionIndex >= questionCount
+    ) {
+      throw toConvexError(
+        new InputValidationError("Invalid question index", { field: "questionIndex" })
+      );
+    }
     if (target === "viewer") {
       // A viewer's answer goes to their own progress; the shared quiz is the owner's.
       await saveViewerProgress(

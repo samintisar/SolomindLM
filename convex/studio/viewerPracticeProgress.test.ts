@@ -564,6 +564,29 @@ describe("cleaning up viewers' progress", () => {
   });
 });
 
+describe("quizzes.submitAnswer question index", () => {
+  test("an index outside the quiz is refused for viewers and the owner alike", async () => {
+    const { t, owner, viewer, quizId } = await setup();
+    for (const user of [viewer, owner]) {
+      for (const questionIndex of [-1, 1, 0.5, 9999]) {
+        await expect(
+          withAuth(t, user).mutation(api.studio.quizzes.index.submitAnswer, {
+            id: quizId,
+            questionIndex,
+            selectedOption: 0,
+          })
+        ).rejects.toThrow(/Invalid question index/);
+      }
+    }
+    expect(await allProgress(t)).toEqual([]);
+    expect((await t.run((ctx) => ctx.db.get(quizId)))?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: { 0: 1 },
+      lastViewedIndex: 0,
+    });
+  });
+});
+
 describe("forking a public notebook", () => {
   test("leaves the viewer's progress behind", async () => {
     const { t, viewer, notebookId, flashcardId } = await setup();
