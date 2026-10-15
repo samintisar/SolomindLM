@@ -355,3 +355,45 @@ describe("a viewer practising flashcards", () => {
     expect(await allProgress(t)).toEqual([]);
   });
 });
+
+describe("a viewer answering quizzes and written questions", () => {
+  test("a quiz answer is saved for the viewer only", async () => {
+    const { t, viewer, quizId } = await setup();
+    const answered = await withAuth(t, viewer).mutation(api.studio.quizzes.index.submitAnswer, {
+      id: quizId,
+      questionIndex: 0,
+      selectedOption: 0,
+    });
+    expect(answered?.metadata).toEqual({ difficulty: "easy", userAnswers: { 0: 0 } });
+    const shared = await t.run((ctx) => ctx.db.get(quizId));
+    expect(shared?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: { 0: 1 },
+      lastViewedIndex: 0,
+    });
+  });
+
+  test("a written draft is saved for the viewer only", async () => {
+    const { t, viewer, writtenId } = await setup();
+    const asViewer = withAuth(t, viewer);
+    await asViewer.mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: writtenId,
+      questionId: "q1",
+      answer: "Mine",
+    });
+
+    const mine = await asViewer.query(api.studio.writtenQuestions.index.get, { id: writtenId });
+    expect(mine?.metadata?.userAnswers).toEqual({ q1: { graded: false, answer: "Mine" } });
+    const shared = await t.run((ctx) => ctx.db.get(writtenId));
+    expect(shared?.metadata?.userAnswers).toEqual({
+      q1: { answer: "Because", graded: true, score: 4, feedback: "Good" },
+    });
+    await expect(
+      asViewer.mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+        id: writtenId,
+        questionId: "nope",
+        answer: "x",
+      })
+    ).rejects.toThrow("Question not found");
+  });
+});

@@ -1,8 +1,14 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { withQuizAnswer } from "../../_model/practiceProgress";
 import * as Quizzes from "../../_model/quizzes";
-import { viewerPracticeRow, viewerPracticeRows } from "../../_model/studioProgress";
+import {
+  getPracticeTarget,
+  saveViewerProgress,
+  viewerPracticeRow,
+  viewerPracticeRows,
+} from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
 
 /**
@@ -238,7 +244,16 @@ export const submitAnswer = mutation({
       throw new Error("Quiz not found");
     }
 
-    await assertCanEditNotebook(ctx, quiz.notebookId, userId);
+    const target = await getPracticeTarget(ctx, quiz.notebookId, userId);
+    if (target === "viewer") {
+      // A viewer's answer goes to their own progress; the shared quiz is the owner's.
+      await saveViewerProgress(
+        ctx,
+        { userId, itemType: "quizzes", itemId: quiz._id, notebookId: quiz.notebookId },
+        (current) => withQuizAnswer(current, args.questionIndex, args.selectedOption)
+      );
+      return await viewerPracticeRow(ctx, "quizzes", quiz, userId);
+    }
 
     await Quizzes.patchQuizUserAnswer(ctx, args.id, args.questionIndex, args.selectedOption);
 

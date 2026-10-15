@@ -2,7 +2,13 @@ import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
-import { viewerPracticeRow, viewerPracticeRows } from "../../_model/studioProgress";
+import { withWrittenDraft } from "../../_model/practiceProgress";
+import {
+  getPracticeTarget,
+  saveViewerProgress,
+  viewerPracticeRow,
+  viewerPracticeRows,
+} from "../../_model/studioProgress";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 
@@ -141,13 +147,26 @@ export const saveUserAnswerDraft = mutation({
     if (!userId) throw new Error("Unauthenticated");
     const existing = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!existing) throw new Error("Written question set not found or access denied");
-    await assertCanEditNotebook(ctx, existing.notebookId, userId);
+    const target = await getPracticeTarget(ctx, existing.notebookId, userId);
     const known = (existing.questionsData ?? []).some(
       (q: { id?: string }) => q?.id === args.questionId
     );
     if (!known) throw new Error("Question not found");
     if (args.answer.length > MAX_DRAFT_ANSWER_LENGTH) {
       throw new Error("Answer is too long to save");
+    }
+    if (target === "viewer") {
+      await saveViewerProgress(
+        ctx,
+        {
+          userId,
+          itemType: "writtenQuestions",
+          itemId: existing._id,
+          notebookId: existing.notebookId,
+        },
+        (current) => withWrittenDraft(current, args.questionId, args.answer)
+      );
+      return;
     }
     await WrittenQuestions.saveWrittenQuestionUserAnswerDraft(
       ctx,
