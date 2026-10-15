@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ExternalServiceError } from "../../_lib/errors";
 import { uncachedLlmCall } from "./cachedLlm.js";
 
 vi.mock("../../_lib/env.js", () => ({
@@ -38,9 +39,11 @@ describe("uncachedLlmCall timeoutMs", () => {
   it("aborts a stalled request at the deadline instead of waiting it out", async () => {
     fetchMock.mockImplementation(hangingFetch);
 
-    await expect(uncachedLlmCall({ ...request, timeoutMs: 50 })).rejects.toThrow(
-      /timed out after 50ms/
-    );
+    const call = uncachedLlmCall({ ...request, timeoutMs: 50 });
+
+    await expect(call).rejects.toThrow(/timed out after 50ms/);
+    // A provider timeout, so toConvexError reports a retryable service error.
+    await expect(call).rejects.toBeInstanceOf(ExternalServiceError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

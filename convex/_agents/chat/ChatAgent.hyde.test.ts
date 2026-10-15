@@ -8,7 +8,7 @@ vi.hoisted(() => {
 
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { ChatAgent } from "./ChatAgent";
-import { HYDE_TIMEOUT_MS } from "./chatConfig";
+import { EMBEDDING_TIMEOUT_MS } from "./chatConfig";
 import type { ReferenceChunk } from "./types";
 
 const passage: ReferenceChunk = {
@@ -24,9 +24,11 @@ const passage: ReferenceChunk = {
 const logger = createServiceLogger("ChatAgent", "test");
 const context = { userId: "u", noteId: "n", conversationHistory: [] };
 
-function agentWithHyde(generateHypotheticalDocument: () => Promise<string>) {
+function agentWithHyde(
+  generateHypotheticalDocument: () => Promise<string>,
+  embedText = vi.fn(async (_text: string) => [0.1, 0.2])
+) {
   const search = vi.fn(async () => [passage]);
-  const embedText = vi.fn(async () => [0.1, 0.2]);
   const agent = new ChatAgent({
     vectorSearchHandler: { search } as unknown as NonNullable<
       ConstructorParameters<typeof ChatAgent>[0]
@@ -44,16 +46,29 @@ describe("ChatAgent sub-query retrieval when HyDE stalls", () => {
     vi.useRealTimers();
   });
 
-  it("searches with the query alone once HyDE passes its deadline", async () => {
-    vi.useFakeTimers();
-    const { agent, search, embedText } = agentWithHyde(() => new Promise<string>(() => {}));
+  it("searches with the query alone when HyDE wrote nothing (its call passed its deadline)", async () => {
+    const { agent, search, embedText } = agentWithHyde(async () => "");
 
-    const found = agent["runSubqueryRetrieval"]("tensor shape", context, logger);
-    await vi.advanceTimersByTimeAsync(HYDE_TIMEOUT_MS);
-
-    await expect(found).resolves.toEqual([passage]);
+    await expect(agent["runSubqueryRetrieval"]("tensor shape", context, logger)).resolves.toEqual([
+      passage,
+    ]);
     expect(embedText).toHaveBeenCalledWith("tensor shape");
     expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails the sub-query at the embedding deadline instead of using the whole budget", async () => {
+    vi.useFakeTimers();
+    const { agent, search } = agentWithHyde(
+      async () => "",
+      vi.fn(() => new Promise<number[]>(() => {}))
+    );
+
+    const found = agent["runSubqueryRetrieval"]("tensor shape", context, logger);
+    const failed = expect(found).rejects.toThrow(/hyde_embedding timed out/);
+    await vi.advanceTimersByTimeAsync(EMBEDDING_TIMEOUT_MS);
+
+    await failed;
+    expect(search).not.toHaveBeenCalled();
   });
 
   it("searches with the query alone when HyDE fails", async () => {

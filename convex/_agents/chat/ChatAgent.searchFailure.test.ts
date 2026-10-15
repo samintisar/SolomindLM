@@ -9,7 +9,9 @@ vi.hoisted(() => {
 import { ChatAgent, SEARCH_FAILED_MESSAGE } from "./ChatAgent";
 import type { StreamChunk } from "./types";
 
-function agentWhoseSearch(search: () => Promise<unknown[]>) {
+function agentWhoseSearch(
+  search: (userId: string, noteId: string, query: string) => Promise<unknown[]>
+) {
   const generateDirectResponse = vi.fn(async () => "a general answer from no sources");
   const agent = new ChatAgent({
     vectorSearchHandler: { search: vi.fn(search) } as unknown as NonNullable<
@@ -51,6 +53,9 @@ const answerText = (chunks: StreamChunk[]) =>
     .join("")
     .trim();
 
+const errors = (chunks: StreamChunk[]) =>
+  chunks.filter((c) => c.type === "error").map((c) => c.data);
+
 // A search that threw was reported as finding nothing, and chat then answered from general
 // knowledge as if the sources had nothing on the question.
 describe("ChatAgent when sub-query searches fail", () => {
@@ -74,7 +79,21 @@ describe("ChatAgent when sub-query searches fail", () => {
 
     const chunks = await collect(agent);
 
-    expect(answerText(chunks)).toBe(SEARCH_FAILED_MESSAGE);
+    // An error, so the turn is saved as a failed one rather than as an answer.
+    expect(errors(chunks)).toEqual([{ message: SEARCH_FAILED_MESSAGE, type: "search_failed" }]);
+    expect(answerText(chunks)).toBe("");
+    expect(generateDirectResponse).not.toHaveBeenCalled();
+  });
+
+  it("does not answer without sources when some searches failed and the rest found nothing", async () => {
+    const { agent, generateDirectResponse } = agentWhoseSearch(async (_userId, _noteId, query) => {
+      if (query === "Tensor shape definition") throw new Error("hyde_embedding timed out");
+      return [];
+    });
+
+    const chunks = await collect(agent);
+
+    expect(errors(chunks)).toEqual([{ message: SEARCH_FAILED_MESSAGE, type: "search_failed" }]);
     expect(generateDirectResponse).not.toHaveBeenCalled();
   });
 

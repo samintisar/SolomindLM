@@ -44,6 +44,7 @@ import {
   DIRECT_RESPONSE_TIMEOUT_MS,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
   HYDE_TIMEOUT_MS,
+  PLANNER_FALLBACK_TIMEOUT_MS,
   PLANNER_TIMEOUT_MS,
 } from "./chatConfig.js";
 import type { ReferenceChunk } from "./types";
@@ -300,7 +301,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       { role: "user", content: prompt },
     ];
 
-    const callModel = async (modelId: string) => {
+    const callModel = async (modelId: string, timeoutMs: number) => {
       const response = await uncachedLlmCall({
         model: modelId,
         messages,
@@ -308,14 +309,14 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         maxTokens: 500,
         reasoningEnabled: false,
         toolChoice: "none",
-        timeoutMs: PLANNER_TIMEOUT_MS,
+        timeoutMs,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
 
     try {
-      const fromFast = await callModel(this.fastLlmModelId);
+      const fromFast = await callModel(this.fastLlmModelId, PLANNER_TIMEOUT_MS);
       if (fromFast) {
         // Expand subqueries for list queries when the LLM returned too few
         if (isListEnumerationQuery(trimmed) && fromFast.subqueries.length < 4) {
@@ -333,7 +334,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       if (this.smartLlmModelId !== this.fastLlmModelId) {
         try {
           console.log("[ChatLLMWrapper] Retrying subquery decomposition with smart model");
-          const fromSmart = await callModel(this.smartLlmModelId);
+          const fromSmart = await callModel(this.smartLlmModelId, PLANNER_FALLBACK_TIMEOUT_MS);
           if (fromSmart) return fromSmart;
         } catch (e2) {
           console.warn(

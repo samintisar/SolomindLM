@@ -6,6 +6,7 @@ vi.mock("../_shared/cachedLlm.js", () => ({ uncachedLlmCall }));
 import {
   DIRECT_RESPONSE_TIMEOUT_MS,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
+  PLANNER_FALLBACK_TIMEOUT_MS,
   PLANNER_TIMEOUT_MS,
 } from "./chatConfig";
 import { ChatLLMWrapper } from "./llm_wrapper";
@@ -56,13 +57,14 @@ describe("generateRetrievalSubqueries deadline", () => {
     const plan = wrapper().generateRetrievalSubqueries(message, [], {
       severalSourcesSelected: true,
     });
-    await vi.advanceTimersByTimeAsync(2 * PLANNER_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(PLANNER_TIMEOUT_MS + PLANNER_FALLBACK_TIMEOUT_MS);
 
     await expect(plan).resolves.toEqual({ subqueries: [message] });
-    expect(uncachedLlmCall).toHaveBeenCalledTimes(2);
-    for (const [options] of uncachedLlmCall.mock.calls) {
-      expect(options.timeoutMs).toBe(PLANNER_TIMEOUT_MS);
-    }
+    // The smart model is slower, so its retry gets a longer deadline.
+    expect(uncachedLlmCall.mock.calls.map(([o]) => [o.model, o.timeoutMs])).toEqual([
+      ["fast-model", PLANNER_TIMEOUT_MS],
+      ["smart-model", PLANNER_FALLBACK_TIMEOUT_MS],
+    ]);
   });
 });
 

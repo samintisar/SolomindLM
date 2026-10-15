@@ -11,12 +11,18 @@ export const SEARCH_PIPELINE_TIMEOUT_MS = 70000;
  */
 export const HYDE_TIMEOUT_MS = 8000;
 
+/** One sub-query's embedding; past this its search fails instead of using the whole budget. */
+export const EMBEDDING_TIMEOUT_MS = 15000;
+
 /**
  * Each search-planner attempt (fast model, then smart model) runs before any source is searched;
  * past this deadline it falls back to searching the user's message. Eval runs take 1.1s at p50
  * and 2.4s at most.
  */
 export const PLANNER_TIMEOUT_MS = 8000;
+
+/** The smart-model planner retry: a slower model, with no eval timings yet (it never ran). */
+export const PLANNER_FALLBACK_TIMEOUT_MS = 15000;
 
 /** A reply without sources (greetings, app questions); past this it sends a fixed reply. */
 export const DIRECT_RESPONSE_TIMEOUT_MS = 30000;
