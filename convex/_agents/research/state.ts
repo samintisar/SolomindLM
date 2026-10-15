@@ -1,8 +1,10 @@
 import type { EvidenceEntry, Gap, SourcePolicy, SubQuestion } from "./types";
 
 // Working memory for one research run. The database is the source of truth.
-// Nodes return a Partial<ResearchStateType>; graph.ts merges it into the running state
-// (evidence is appended, every other field is replaced).
+// Nodes return a Partial<ResearchStateType>; graph.ts applies it by hand. runPlanGraph reads the
+// planner's subQuestions directly. runExecuteGraph appends the retriever's evidence (and takes its
+// subQuestions), then spreads the writer's result over the state — so a node must omit a field it
+// does not set, because an explicit `undefined` would overwrite it.
 export interface ResearchStateType {
   // From plan (set once at start)
   query: string;
