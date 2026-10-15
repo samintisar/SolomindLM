@@ -146,6 +146,7 @@ import type * as _model_practiceProgress from "../_model/practiceProgress.js";
 import type * as _model_quizzes from "../_model/quizzes.js";
 import type * as _model_reports from "../_model/reports.js";
 import type * as _model_spreadsheets from "../_model/spreadsheets.js";
+import type * as _model_studioProgress from "../_model/studioProgress.js";
 import type * as _model_writtenQuestions from "../_model/writtenQuestions.js";
 import type * as _services_ai_embeddingClient from "../_services/ai/embeddingClient.js";
 import type * as _services_ai_mp3 from "../_services/ai/mp3.js";
@@ -475,6 +476,7 @@ declare const fullApi: ApiFromModules<{
   "_model/quizzes": typeof _model_quizzes;
   "_model/reports": typeof _model_reports;
   "_model/spreadsheets": typeof _model_spreadsheets;
+  "_model/studioProgress": typeof _model_studioProgress;
   "_model/writtenQuestions": typeof _model_writtenQuestions;
   "_services/ai/embeddingClient": typeof _services_ai_embeddingClient;
   "_services/ai/mp3": typeof _services_ai_mp3;
