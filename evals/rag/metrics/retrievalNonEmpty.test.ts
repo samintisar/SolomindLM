@@ -64,6 +64,12 @@ describe("retrievalNonEmpty", () => {
     expect(result.detail).toContain("tensor shape properties");
   });
 
+  it("does not apply when the turn searched nothing (a clarifying question or direct reply)", () => {
+    const result = retrievalNonEmpty(fixture, artifact({ selectedChunks: [], subQueries: [] }));
+
+    expect(result.status).toBe("info");
+  });
+
   it("does not apply when the case does not search the notebook", () => {
     const result = retrievalNonEmpty(
       { ...fixture, sourcePolicy: { channels: ["web"] } },

@@ -5,6 +5,7 @@
  */
 
 import { env } from "../../_lib/env";
+import { ExternalServiceError } from "../../_lib/errors";
 import { mergeModelKwargs } from "./llm_factory.js";
 import { MissingStructuredJsonError } from "./llmErrors.js";
 
@@ -278,7 +279,11 @@ async function executeTogetherLlmRequest(
 
   const { timeoutMs } = options;
   const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
-  const deadlineError = () => new Error(`LLM request timed out after ${timeoutMs}ms`);
+  const deadlineError = () =>
+    new ExternalServiceError("Together", `LLM request timed out after ${timeoutMs}ms`, {
+      retryable: true,
+      endpoint: url,
+    });
   /** Backs off before a retry, or returns false when the backoff would end past the deadline. */
   const backOff = async (attempt: number): Promise<boolean> => {
     const delay = retryDelayMs(attempt, TOGETHER_LLM_RETRY_BASE_MS);

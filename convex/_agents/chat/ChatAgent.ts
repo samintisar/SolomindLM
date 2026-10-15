@@ -15,9 +15,9 @@ import type { SelectedSources } from "./chat_llm_grounding.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
+  EMBEDDING_TIMEOUT_MS,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
   GLOBAL_RERANK_TIMEOUT_MS,
-  HYDE_TIMEOUT_MS,
   LIST_QUERY_CONTEXT_TOKEN_BUDGET,
   LIST_QUERY_MAX_SELECTED_CHUNKS,
   MAX_CHUNKS_HARD_LIMIT,
@@ -392,9 +392,10 @@ export class ChatAgent {
 
     logger.apiCall("ChatLLMWrapper", "generateHypotheticalDocument", { query });
     // HyDE only sharpens the embedding: when it stalls or fails, search with the query alone.
+    // Its own deadline (HYDE_TIMEOUT_MS) is applied to the LLM call; this only keeps the budget.
     const hydeText = await withTimeout(
       this.llmWrapper.generateHypotheticalDocument(query),
-      Math.min(HYDE_TIMEOUT_MS, remainingMs()),
+      remainingMs(),
       "hyde_generation"
     ).catch((error) => {
       logger.warn("HyDE skipped, searching with the query alone", {
@@ -407,7 +408,7 @@ export class ChatAgent {
     const textForVectorEmbedding = [query.trim(), hydeText.trim()].filter(Boolean).join("\n\n");
     const hydeEmbedding = await withTimeout(
       this.embeddingService.embedText(textForVectorEmbedding),
-      remainingMs(),
+      Math.min(EMBEDDING_TIMEOUT_MS, remainingMs()),
       "hyde_embedding"
     );
 
@@ -711,7 +712,6 @@ export class ChatAgent {
     const selectedSources = enableNotebookSearch ? selectedSourceIds(context.documentIds) : [];
     let coverEachSource = false;
     let failedSearches = 0;
-    let everySearchFailed = false;
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
@@ -790,7 +790,6 @@ export class ChatAgent {
           };
         }
       }
-      everySearchFailed = settled.length > 0 && failedSearches === settled.length;
     } else {
       logger.info("Notebook source search disabled — skipping hybrid retrieval");
     }
@@ -882,16 +881,16 @@ export class ChatAgent {
     // neighbours'.
     const rankedChunks = await this.withOpeningPassages(withNeighbours, restNotebook, logger);
 
-    if (rankedChunks.length === 0 && everySearchFailed) {
-      // The sources were never searched, so an answer without them would read as if they had
-      // nothing on the question.
-      logger.warn("Every source search failed — not answering without sources", {
-        searches: failedSearches,
-      });
-      for await (const piece of sliceParagraphForStream(SEARCH_FAILED_MESSAGE)) {
-        yield { type: "token", data: piece };
-      }
-      yield this.doneChunk();
+    if (rankedChunks.length === 0 && failedSearches > 0) {
+      // Some sources were never searched, so an answer without them would read as if they had
+      // nothing on the question. Sent as an error so the turn is saved as one, not as an answer.
+      logger.warn(
+        "Source searches failed and none found passages — not answering without sources",
+        {
+          failedSearches,
+        }
+      );
+      yield { type: "error", data: { message: SEARCH_FAILED_MESSAGE, type: "search_failed" } };
       return;
     }
 

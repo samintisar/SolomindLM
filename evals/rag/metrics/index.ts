@@ -332,6 +332,10 @@ export function retrievalNonEmpty(
       { failedSubQueries: failed, selectedChunks: artifact.selectedChunks.length }
     );
   }
+  if (artifact.subQueries.length === 0) {
+    // Clarifying questions and direct replies (greetings, app questions) search nothing by design.
+    return metricResult(metric, fixture, artifact, "info", 1, "No source search ran this turn.");
+  }
   if (artifact.selectedChunks.length === 0) {
     return metricResult(
       metric,
