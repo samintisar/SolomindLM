@@ -84,7 +84,9 @@ table and delivered by reactive queries (chat and deep research also stream toke
 - _Chat_ — `ChatAgent` (`_agents/chat/ChatAgent.ts`), driven and streamed by `chat/_streamChatResponse.ts`.
 - _LangChain_ — used for the `ChatTogetherAI` client (`_agents/_shared/llm_factory.ts`), message types and
   `RecursiveCharacterTextSplitter`. `@langchain/langgraph` is not a dependency; agent state types are plain
-  TypeScript (e.g. `_agents/research/state.ts`).
+  TypeScript (e.g. `_agents/research/state.ts`). `@langchain/openai` has no importers but must stay:
+  `ChatTogetherAI` (`@langchain/community`) loads it at runtime, it is listed in `convex.json`
+  `node.externalPackages`, and `knip.json` ignores it on purpose (#237). Removing it breaks the Convex deploy.
 
 ## Gotchas
 
