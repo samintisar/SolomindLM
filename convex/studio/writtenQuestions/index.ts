@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
-import { withWrittenDraft } from "../../_model/practiceProgress";
+import { withWrittenAnswer, withWrittenDraft } from "../../_model/practiceProgress";
 import {
   getPracticeTarget,
   saveViewerProgress,
@@ -55,14 +55,15 @@ export const getInternal = internalQuery({
 });
 
 /**
- * Internal: Load written-question set when the user can edit the notebook (actions without query auth).
+ * Internal: Load a written-question set for someone who may practise on it: the owner, an editor
+ * or a public notebook's viewer (actions without query auth). Throws for anyone else.
  */
 export const getWrittenQuestionForUserInternal = internalQuery({
   args: { id: v.id("writtenQuestions"), userId: v.id("users") },
   handler: async (ctx, args) => {
     const wq = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!wq) return null;
-    await assertCanEditNotebook(ctx, wq.notebookId, args.userId);
+    await getPracticeTarget(ctx, wq.notebookId, args.userId);
     return wq;
   },
 });
@@ -214,13 +215,34 @@ export const patch = internalMutation({
   },
 });
 
+/**
+ * Internal: Record one answer's grading state for `userId`: on the shared set for the owner and
+ * editors, in their own progress for a public notebook's viewer.
+ */
 export const patchUserAnswer = internalMutation({
   args: {
     writtenQuestionId: v.id("writtenQuestions"),
+    userId: v.id("users"),
     questionId: v.string(),
     answerData: v.any(),
   },
   handler: async (ctx, args) => {
+    const set = await WrittenQuestions.getWrittenQuestion(ctx, args.writtenQuestionId);
+    if (!set) throw new Error("Written question set not found");
+    const target = await getPracticeTarget(ctx, set.notebookId, args.userId);
+    if (target === "viewer") {
+      await saveViewerProgress(
+        ctx,
+        {
+          userId: args.userId,
+          itemType: "writtenQuestions",
+          itemId: set._id,
+          notebookId: set.notebookId,
+        },
+        (current) => withWrittenAnswer(current, args.questionId, args.answerData)
+      );
+      return;
+    }
     await WrittenQuestions.patchWrittenQuestionUserAnswer(
       ctx,
       args.writtenQuestionId,

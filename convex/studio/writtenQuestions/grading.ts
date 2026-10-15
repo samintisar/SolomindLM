@@ -3,15 +3,21 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { action } from "../../_generated/server";
+import { InputValidationError } from "../../_lib/errors";
+import { rateLimiter } from "../../_lib/rateLimits";
+import { toConvexError } from "../../_lib/serviceErrors";
 import {
   type WrittenQuestion,
   WrittenQuestionsGradingService,
 } from "../../_services/grading/WrittenQuestionsGradingService";
 import { getAuthUserId } from "../../auth";
 
+const GRADING_RATE_LIMITED = "You've graded a lot of answers in the last hour. Try again later.";
+
 /**
- * Submit an answer and grade it
- * This action stores the answer, triggers grading, and returns the result
+ * Submit an answer and grade it. The answer and grade are saved where the caller practises (the
+ * shared set, or a viewer's own progress); each grade counts against the caller's hourly grading
+ * limit.
  */
 export const submitAndGrade = action({
   args: {
@@ -43,9 +49,14 @@ export const submitAndGrade = action({
       throw new Error("Question not found");
     }
 
+    // Each grade is an LLM call, charged to the caller (owner, editor or viewer alike).
+    const { ok } = await rateLimiter.limit(ctx, "writtenAnswerGrade", { key: userId });
+    if (!ok) throw toConvexError(new InputValidationError(GRADING_RATE_LIMITED));
+
     // Store "grading in progress" state
     await ctx.runMutation(internal.studio.writtenQuestions.index.patchUserAnswer, {
       writtenQuestionId: writtenQuestionsId,
+      userId,
       questionId: questionId,
       answerData: {
         answer,
@@ -64,6 +75,7 @@ export const submitAndGrade = action({
     // Update with the graded result
     await ctx.runMutation(internal.studio.writtenQuestions.index.patchUserAnswer, {
       writtenQuestionId: writtenQuestionsId,
+      userId,
       questionId: questionId,
       answerData: {
         answer,
