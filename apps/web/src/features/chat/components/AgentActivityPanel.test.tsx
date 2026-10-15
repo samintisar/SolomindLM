@@ -57,6 +57,17 @@ describe("AgentActivityPanel", () => {
     );
   });
 
+  test("a search that ran and found nothing says no sections matched", () => {
+    renderPanel({ toolCalls: [{ ...searchCall, resultCount: 0 }] });
+    expect(screen.getByText("No matching sections found in your sources.")).toBeInTheDocument();
+  });
+
+  test("a search that failed says the sources could not be searched", () => {
+    renderPanel({ toolCalls: [{ ...searchCall, resultCount: 0, failed: true }] });
+    expect(screen.getByText(/couldn't search your sources/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no matching sections/i)).not.toBeInTheDocument();
+  });
+
   test("a failed hard grounding check renders as a polite status note", () => {
     renderPanel({
       groundingChecks: [

@@ -88,6 +88,8 @@ export interface MessageToolCall {
   query: string;
   status: "searching" | "done";
   resultCount?: number;
+  /** The search threw or timed out, so its zero results mean it never ran. */
+  failed?: boolean;
 }
 
 /** Grounding / confidence signal streamed after the main answer chunks */

@@ -40,6 +40,11 @@ export interface LLMOptions {
    * OpenAI-style. `"none"` prevents spurious tool_calls when no tools are provided.
    */
   toolChoice?: "none" | "auto" | "required";
+  /**
+   * Deadline for the whole call, retries included: a request still open at the deadline is
+   * aborted, and no retry starts that would back off past it. Unset, a call can retry for minutes.
+   */
+  timeoutMs?: number;
 }
 
 export interface LLMResponse {
@@ -271,16 +276,34 @@ async function executeTogetherLlmRequest(
 
   let lastFailure: Error | undefined;
 
+  const { timeoutMs } = options;
+  const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+  const deadlineError = () => new Error(`LLM request timed out after ${timeoutMs}ms`);
+  /** Backs off before a retry, or returns false when the backoff would end past the deadline. */
+  const backOff = async (attempt: number): Promise<boolean> => {
+    const delay = retryDelayMs(attempt, TOGETHER_LLM_RETRY_BASE_MS);
+    if (deadline !== undefined && Date.now() + delay >= deadline) return false;
+    await sleepMs(delay);
+    return true;
+  };
+
   for (let attempt = 0; attempt < TOGETHER_LLM_MAX_ATTEMPTS; attempt++) {
     try {
-      const response = await fetch(url, init);
+      const signal =
+        deadline === undefined
+          ? undefined
+          : AbortSignal.timeout(Math.max(1, deadline - Date.now()));
+      const response = await fetch(url, signal ? { ...init, signal } : init);
       const bodyText = await response.text();
 
       if (!response.ok) {
         const err = new Error(`LLM API error: ${response.status} - ${bodyText}`);
         lastFailure = err;
-        if (isTransientLlmHttpStatus(response.status) && attempt < TOGETHER_LLM_MAX_ATTEMPTS - 1) {
-          await sleepMs(retryDelayMs(attempt, TOGETHER_LLM_RETRY_BASE_MS));
+        if (
+          isTransientLlmHttpStatus(response.status) &&
+          attempt < TOGETHER_LLM_MAX_ATTEMPTS - 1 &&
+          (await backOff(attempt))
+        ) {
           continue;
         }
         throw err;
@@ -358,9 +381,12 @@ async function executeTogetherLlmRequest(
       if (isOurApiError) {
         throw e;
       }
+      const aborted = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+      if (deadline !== undefined && (aborted || Date.now() >= deadline)) {
+        throw deadlineError();
+      }
       lastFailure = e instanceof Error ? e : new Error(String(e));
-      if (attempt < TOGETHER_LLM_MAX_ATTEMPTS - 1) {
-        await sleepMs(retryDelayMs(attempt, TOGETHER_LLM_RETRY_BASE_MS));
+      if (attempt < TOGETHER_LLM_MAX_ATTEMPTS - 1 && (await backOff(attempt))) {
         continue;
       }
       throw lastFailure;

@@ -36,6 +36,8 @@ type TraceToolCall = {
   query: string;
   status: "searching" | "done";
   resultCount?: number;
+  /** The search threw or timed out, so its zero results mean it never ran. */
+  failed?: boolean;
 };
 
 type TraceGrounding = {
@@ -283,6 +285,7 @@ export async function streamChatResponse(
             query: tc.query ?? "",
             status: tc.status,
             resultCount: tc.resultCount,
+            ...(tc.failed ? { failed: true } : {}),
           });
         }
         await chunkAppender(`\n__TOOL_CALL:${JSON.stringify(chunk.data)}\n`);
