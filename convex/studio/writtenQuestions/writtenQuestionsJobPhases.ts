@@ -74,7 +74,7 @@ const CONFIG = {
   REDUCE_TIMEOUT_MS: 480_000, // all selection attempts together
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 30,
-  // Match LangGraph routing.ts — 2.5× over-generation gives dedupe headroom to land at target
+  // 2.5× over-generation gives dedupe and selection headroom to still land at the target count
   BUFFER_MULTIPLIER: 2.5,
   /** Extra map rounds when the model returns empty or too few candidates */
   MAP_MAX_ROUNDS: 4,

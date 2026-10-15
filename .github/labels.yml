@@ -40,7 +40,7 @@
   description: "convex/ backend, schema, functions"
 - name: "area:agents"
   color: "1d76db"
-  description: "convex/_agents LangGraph agents"
+  description: "convex/_agents agent prompts, routing and pipelines"
 - name: "area:rag"
   color: "1d76db"
   description: "Retrieval, embeddings, reranking, RAG evals"

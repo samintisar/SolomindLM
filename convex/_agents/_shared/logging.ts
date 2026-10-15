@@ -514,8 +514,9 @@ export function createJobLogger(context: JobLogContext): JobLogger {
 }
 
 /**
- * Structured logger for LangGraph nodes when logs are not tied to a Convex job row.
- * `jobId` is set to `agentName` for searchability; pass a concrete `jobType` when the graph matches a studio artifact.
+ * Structured logger for agent helpers that log outside a Convex job row (e.g. the flashcard and
+ * written-question heuristics). `jobId` is set to `agentName` for searchability; pass a concrete
+ * `jobType` when the logs belong to a studio artifact.
  */
 export function createAgentGraphLogger(
   agentName: string,
