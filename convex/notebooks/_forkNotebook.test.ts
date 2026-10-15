@@ -206,6 +206,140 @@ describe("performNotebookFork sources", () => {
     expect(chunks).toHaveLength(0);
   });
 
+  test("stops when the fork's notebook has been deleted", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, forkerId } = await seedSource(t, 3);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await t.run((ctx) => ctx.db.delete(forkId));
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(chunks).toHaveLength(0);
+    expect(doc.extractedMarkdown).toBeUndefined();
+  });
+
+  /** Runs only the copy steps already due, so a test can change the original between batches. */
+  async function runOneStep(t: ReturnType<typeof convexTest>) {
+    vi.runOnlyPendingTimers();
+    await t.finishInProgressScheduledFunctions();
+  }
+
+  /** What reprocessing does to the original: new chunks, new text, a new `updatedAt`. */
+  async function reprocessOriginal(
+    t: ReturnType<typeof convexTest>,
+    docId: Id<"documents">,
+    chunkCount: number,
+    status: "processing" | "completed"
+  ) {
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(docId);
+      if (!doc) throw new Error("missing original");
+      for (const chunk of await ctx.db
+        .query("documentChunks")
+        .withIndex("by_document", (q) => q.eq("documentId", docId))
+        .collect()) {
+        await ctx.db.delete(chunk._id);
+      }
+      for (let i = 0; i < chunkCount; i++) {
+        await ctx.db.insert("documentChunks", {
+          documentId: docId,
+          userId: doc.userId,
+          notebookId: doc.notebookId,
+          content: `new chunk ${i}`,
+          chunkIndex: i,
+          createdAt: Date.now(),
+        });
+      }
+      await ctx.db.patch(docId, {
+        status,
+        extractedMarkdown: "# New text",
+        totalChunks: chunkCount,
+        updatedAt: doc.updatedAt + 1,
+      });
+    });
+  }
+
+  test("starts over when the original is reprocessed mid-copy", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, docId, forkerId } = await seedSource(t, FORK_CHUNK_BATCH_SIZE + 50);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await runOneStep(t);
+    expect((await forkedSource(t, forkId)).chunks).toHaveLength(FORK_CHUNK_BATCH_SIZE);
+    await reprocessOriginal(t, docId, 30, "completed");
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(doc.status).toBe("completed");
+    expect(doc.extractedMarkdown).toBe("# New text");
+    expect(doc.totalChunks).toBe(30);
+    expect(chunks.map((c) => c.content).sort()).toEqual(
+      Array.from({ length: 30 }, (_, i) => `new chunk ${i}`).sort()
+    );
+  });
+
+  test("follows a new file uploaded to the original mid-copy and drops the old one", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, docId, forkerId } = await seedSource(t, FORK_CHUNK_BATCH_SIZE + 50);
+    const oldFileId = await t.run(async (ctx) => {
+      const fileId = await ctx.storage.store(new Blob(["%PDF old"]));
+      await ctx.db.patch(docId, { storageId: fileId });
+      return fileId;
+    });
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await runOneStep(t);
+    // The owner's upload swaps the original's file; the original lets go of the old one.
+    const newFileId = await t.run(async (ctx) => {
+      const fileId = await ctx.storage.store(new Blob(["%PDF new"]));
+      await ctx.db.patch(docId, { storageId: fileId });
+      return fileId;
+    });
+    await reprocessOriginal(t, docId, 10, "completed");
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc } = await forkedSource(t, forkId);
+    expect(doc.storageId).toBe(newFileId);
+    expect(await t.run((ctx) => ctx.db.system.get(oldFileId))).toBeNull();
+  });
+
+  test("waits while the original is reprocessing, then copies the new version", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, docId, forkerId } = await seedSource(t, FORK_CHUNK_BATCH_SIZE + 50);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await runOneStep(t);
+    await reprocessOriginal(t, docId, 20, "processing");
+    await runOneStep(t);
+    expect((await forkedSource(t, forkId)).doc.status).toBe("processing");
+    // Reprocessing finishes without touching `updatedAt` again.
+    await t.run((ctx) => ctx.db.patch(docId, { status: "completed" }));
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(doc.status).toBe("completed");
+    expect(doc.extractedMarkdown).toBe("# New text");
+    expect(chunks.map((c) => c.content).sort()).toEqual(
+      Array.from({ length: 20 }, (_, i) => `new chunk ${i}`).sort()
+    );
+  });
+
+  test("gives up, without leftover chunks, when the original never finishes reprocessing", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, docId, forkerId } = await seedSource(t, FORK_CHUNK_BATCH_SIZE + 50);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await runOneStep(t);
+    await reprocessOriginal(t, docId, 20, "processing");
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(doc.status).toBe("failed");
+    expect(doc.error).toEqual(expect.any(String));
+    expect(chunks).toHaveLength(0);
+  });
+
   test("refuses a notebook with too many sources with a readable error", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();

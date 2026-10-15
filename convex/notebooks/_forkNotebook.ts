@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
 import { toConvexError } from "../_lib/serviceErrors";
@@ -14,6 +14,7 @@ import {
   withoutQuizProgress,
   withoutWrittenQuestionProgress,
 } from "../_model/practiceProgress";
+import { deleteDocumentFileIfUnused } from "../documents/internal";
 
 const MAX_FORK_DOCUMENTS = 200;
 
@@ -23,33 +24,155 @@ const MAX_FORK_DOCUMENTS = 200;
  */
 export const FORK_CHUNK_BATCH_SIZE = 100;
 
+/** How long the copy waits for an original that is being reprocessed, per check and in checks. */
+const SOURCE_REPROCESS_WAIT_MS = 60_000;
+const MAX_SOURCE_REPROCESS_WAITS = 30;
+
+/** The original's file and the fields its processing writes, as the copy takes them. */
+function processedContent(source: Doc<"documents">) {
+  return {
+    storageId: source.storageId,
+    fullTextSource: source.fullTextSource,
+    extractedMarkdown: source.extractedMarkdown,
+    metadata: source.metadata,
+    wordCount: source.wordCount,
+    estimatedReadingTimeMinutes: source.estimatedReadingTimeMinutes,
+    totalPages: source.totalPages,
+    totalChunks: source.totalChunks,
+    hasCodeBlocks: source.hasCodeBlocks,
+    hasMathNotation: source.hasMathNotation,
+    hasTables: source.hasTables,
+    hasImages: source.hasImages,
+    language: source.language,
+    documentStructure: source.documentStructure,
+    maxHeadingLevel: source.maxHeadingLevel,
+  };
+}
+
+/** Deletes one batch of the copy's chunks; true when more are left. */
+async function deleteCopiedChunksBatch(
+  ctx: MutationCtx,
+  forkDocumentId: Id<"documents">
+): Promise<boolean> {
+  const chunks = await ctx.db
+    .query("documentChunks")
+    .withIndex("by_document", (q) => q.eq("documentId", forkDocumentId))
+    .take(FORK_CHUNK_BATCH_SIZE + 1);
+  for (const chunk of chunks.slice(0, FORK_CHUNK_BATCH_SIZE)) {
+    await ctx.db.delete(chunk._id);
+  }
+  return chunks.length > FORK_CHUNK_BATCH_SIZE;
+}
+
+/** Marks the copy failed and removes whatever part of the original it had copied. */
+async function failCopy(ctx: MutationCtx, forkDocumentId: Id<"documents">, error: string) {
+  await ctx.db.patch(forkDocumentId, { status: "failed", error, updatedAt: Date.now() });
+  if (await deleteCopiedChunksBatch(ctx, forkDocumentId)) {
+    await ctx.scheduler.runAfter(0, internal.notebooks._forkNotebook.deleteForkedDocumentChunks, {
+      forkDocumentId,
+    });
+  }
+}
+
+/** Finishes removing a failed copy's chunks, a batch per run. */
+export const deleteForkedDocumentChunks = internalMutation({
+  args: { forkDocumentId: v.id("documents") },
+  returns: v.null(),
+  handler: async (ctx, { forkDocumentId }) => {
+    if (await deleteCopiedChunksBatch(ctx, forkDocumentId)) {
+      await ctx.scheduler.runAfter(0, internal.notebooks._forkNotebook.deleteForkedDocumentChunks, {
+        forkDocumentId,
+      });
+    }
+    return null;
+  },
+});
+
 /**
  * Copies one forked source's text and chunks from the original, a batch per run, rescheduling
- * itself until done; then marks the copy completed. Stops if the copy has been deleted meanwhile.
+ * itself until done; then marks the copy completed.
+ *
+ * `sourceUpdatedAt` is the version of the original being copied. If the original has changed
+ * since (it was reprocessed, so its chunks were rebuilt), the copy drops what it has and starts
+ * over; null means it must start over once the original is completed again. While the original
+ * is being reprocessed the copy waits, then fails after MAX_SOURCE_REPROCESS_WAITS checks.
+ * Stops quietly if the copy or its notebook has been deleted meanwhile.
  */
 export const copyForkedDocumentContent = internalMutation({
   args: {
     sourceDocumentId: v.id("documents"),
     forkDocumentId: v.id("documents"),
     cursor: v.union(v.string(), v.null()),
+    sourceUpdatedAt: v.union(v.number(), v.null()),
+    waits: v.optional(v.number()),
   },
   returns: v.null(),
-  handler: async (ctx, { sourceDocumentId, forkDocumentId, cursor }) => {
+  handler: async (ctx, args) => {
+    const { sourceDocumentId, forkDocumentId, cursor, sourceUpdatedAt } = args;
     const fork = await ctx.db.get(forkDocumentId);
     if (!fork) return null;
+    // Deleting a notebook can leave its document rows behind; nothing reads them, so stop.
+    if (!(await ctx.db.get(fork.notebookId))) return null;
+
     const source = await ctx.db.get(sourceDocumentId);
     if (!source) {
       // Without the original there is nothing left to copy; don't leave the copy spinning.
-      await ctx.db.patch(forkDocumentId, {
-        status: "failed",
-        error: "The original source was deleted before it finished copying.",
-        updatedAt: Date.now(),
+      await failCopy(
+        ctx,
+        forkDocumentId,
+        "The original source was deleted before it finished copying."
+      );
+      return null;
+    }
+
+    const continueWith = async (
+      delayMs: number,
+      next: Pick<typeof args, "cursor" | "sourceUpdatedAt" | "waits">
+    ) => {
+      await ctx.scheduler.runAfter(
+        delayMs,
+        internal.notebooks._forkNotebook.copyForkedDocumentContent,
+        { sourceDocumentId, forkDocumentId, ...next }
+      );
+    };
+
+    if (source.status !== "completed") {
+      const waits = args.waits ?? 0;
+      if (waits >= MAX_SOURCE_REPROCESS_WAITS) {
+        await failCopy(
+          ctx,
+          forkDocumentId,
+          "The original source was being reprocessed and didn't finish in time to copy."
+        );
+        return null;
+      }
+      await continueWith(SOURCE_REPROCESS_WAIT_MS, {
+        cursor: null,
+        sourceUpdatedAt: null,
+        waits: waits + 1,
       });
       return null;
     }
 
-    if (cursor === null && source.extractedMarkdown !== undefined) {
-      await ctx.db.patch(forkDocumentId, { extractedMarkdown: source.extractedMarkdown });
+    if (source.updatedAt !== sourceUpdatedAt) {
+      // The original changed under the copy: drop the chunks copied so far, then start over.
+      if (await deleteCopiedChunksBatch(ctx, forkDocumentId)) {
+        await continueWith(0, { cursor, sourceUpdatedAt, waits: 0 });
+      } else {
+        await continueWith(0, { cursor: null, sourceUpdatedAt: source.updatedAt, waits: 0 });
+      }
+      return null;
+    }
+
+    if (cursor === null) {
+      const content = processedContent(source);
+      const previousStorageId = fork.storageId;
+      await ctx.db.patch(forkDocumentId, content);
+      // A new upload on the original replaced its file; the copy follows it, so drop the old
+      // file unless something else still uses it.
+      if (previousStorageId && previousStorageId !== content.storageId) {
+        await deleteDocumentFileIfUnused(ctx, previousStorageId, [forkDocumentId]);
+      }
     }
 
     const batch = await ctx.db
@@ -70,11 +193,7 @@ export const copyForkedDocumentContent = internalMutation({
     }
 
     if (!batch.isDone) {
-      await ctx.scheduler.runAfter(0, internal.notebooks._forkNotebook.copyForkedDocumentContent, {
-        sourceDocumentId,
-        forkDocumentId,
-        cursor: batch.continueCursor,
-      });
+      await continueWith(0, { cursor: batch.continueCursor, sourceUpdatedAt, waits: 0 });
       return null;
     }
 
@@ -213,6 +332,7 @@ export async function performNotebookFork(
       sourceDocumentId: d._id,
       forkDocumentId: newDocId,
       cursor: null,
+      sourceUpdatedAt: d.updatedAt,
     });
   }
 
