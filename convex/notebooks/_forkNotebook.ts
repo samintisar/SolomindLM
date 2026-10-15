@@ -9,6 +9,11 @@ import {
   isChatLiteratureReport,
   isChatLiteratureTable,
 } from "../_model/literatureArtifacts";
+import {
+  withoutFlashcardProgress,
+  withoutQuizProgress,
+  withoutWrittenQuestionProgress,
+} from "../_model/practiceProgress";
 
 const MAX_FORK_DOCUMENTS = 200;
 
@@ -233,7 +238,8 @@ export async function performNotebookFork(
     .query("flashcards")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of flashcards) {
+  // Practice progress on the source rows is the owner's; the forker starts fresh.
+  for (const r of flashcards.map(withoutFlashcardProgress)) {
     await ctx.db.insert("flashcards", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -250,7 +256,7 @@ export async function performNotebookFork(
     .query("quizzes")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of quizzes) {
+  for (const r of quizzes.map(withoutQuizProgress)) {
     await ctx.db.insert("quizzes", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -339,7 +345,7 @@ export async function performNotebookFork(
     .query("writtenQuestions")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of writtenQuestions) {
+  for (const r of writtenQuestions.map(withoutWrittenQuestionProgress)) {
     await ctx.db.insert("writtenQuestions", {
       userId: forkUserId,
       notebookId: newNotebookId,

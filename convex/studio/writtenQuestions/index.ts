@@ -1,11 +1,8 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  canReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { withoutWrittenQuestionProgress } from "../../_model/practiceProgress";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 
@@ -16,8 +13,11 @@ export const list = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
-    return await WrittenQuestions.listByNotebook(ctx, args.notebookId);
+    const access = await getNotebookAccess(ctx, args.notebookId, userId);
+    if (!access) return [];
+    const sets = await WrittenQuestions.listByNotebook(ctx, args.notebookId);
+    // Answers and grades on the shared row are the owner's; a viewer starts fresh.
+    return access === "viewer" ? sets.map(withoutWrittenQuestionProgress) : sets;
   },
 });
 
@@ -28,12 +28,9 @@ export const get = query({
     if (!userId) return null;
     const writtenQuestion = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!writtenQuestion) return null;
-    try {
-      await assertCanReadNotebook(ctx, writtenQuestion.notebookId, userId);
-    } catch {
-      return null;
-    }
-    return writtenQuestion;
+    const access = await getNotebookAccess(ctx, writtenQuestion.notebookId, userId);
+    if (!access) return null;
+    return access === "viewer" ? withoutWrittenQuestionProgress(writtenQuestion) : writtenQuestion;
   },
 });
 

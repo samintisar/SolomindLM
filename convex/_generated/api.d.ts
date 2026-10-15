@@ -142,6 +142,7 @@ import type * as _model_literatureReviewSearchOptions from "../_model/literature
 import type * as _model_mindmaps from "../_model/mindmaps.js";
 import type * as _model_notebooks from "../_model/notebooks.js";
 import type * as _model_notes from "../_model/notes.js";
+import type * as _model_practiceProgress from "../_model/practiceProgress.js";
 import type * as _model_quizzes from "../_model/quizzes.js";
 import type * as _model_reports from "../_model/reports.js";
 import type * as _model_spreadsheets from "../_model/spreadsheets.js";
@@ -470,6 +471,7 @@ declare const fullApi: ApiFromModules<{
   "_model/mindmaps": typeof _model_mindmaps;
   "_model/notebooks": typeof _model_notebooks;
   "_model/notes": typeof _model_notes;
+  "_model/practiceProgress": typeof _model_practiceProgress;
   "_model/quizzes": typeof _model_quizzes;
   "_model/reports": typeof _model_reports;
   "_model/spreadsheets": typeof _model_spreadsheets;

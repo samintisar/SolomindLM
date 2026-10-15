@@ -243,6 +243,70 @@ describe("performNotebookFork sources", () => {
   });
 });
 
+describe("performNotebookFork practice items", () => {
+  test("the forker starts without the owner's answers, grades or review history", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { notebookId, forkerId } = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Original",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const base = {
+        userId: ownerId,
+        notebookId,
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+      };
+      await ctx.db.insert("flashcards", {
+        ...base,
+        title: "Deck",
+        cardsData: [{ front: "Q", back: "A", proficiency: { interval: 30, easeFactor: 2.6 } }],
+        metadata: { difficulty: "hard", showMastered: true, lastViewedIndex: 0 },
+      });
+      await ctx.db.insert("quizzes", {
+        ...base,
+        title: "Quiz",
+        questionsData: [{ question: "Q", options: ["a", "b"], correctAnswer: 1 }],
+        metadata: { difficulty: "easy", userAnswers: { 0: 1 }, lastViewedIndex: 0 },
+      });
+      await ctx.db.insert("writtenQuestions", {
+        ...base,
+        title: "Written",
+        questionType: "short",
+        questionsData: [{ id: "q1", question: "Why?" }],
+        metadata: { focus: "causes", userAnswers: { q1: { answer: "x", score: 4 } } },
+      });
+      const forkerId = await ctx.db.insert("users", { name: "Forker" });
+      return { notebookId, forkerId };
+    });
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const forked = await t.run(async (ctx) => {
+      const byNotebook = <T extends "flashcards" | "quizzes" | "writtenQuestions">(table: T) =>
+        ctx.db
+          .query(table)
+          .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+          .unique();
+      return {
+        deck: await byNotebook("flashcards"),
+        quiz: await byNotebook("quizzes"),
+        written: await byNotebook("writtenQuestions"),
+      };
+    });
+    expect(forked.deck?.cardsData).toEqual([{ front: "Q", back: "A" }]);
+    expect(forked.deck?.metadata).toEqual({ difficulty: "hard" });
+    expect(forked.quiz?.questionsData).toHaveLength(1);
+    expect(forked.quiz?.metadata).toEqual({ difficulty: "easy" });
+    expect(forked.written?.metadata).toEqual({ focus: "causes" });
+  });
+});
+
 describe("performNotebookFork mind maps", () => {
   test("a forked mind map points at the fork's own sources", async () => {
     const t = convexTest(schema, modules);
