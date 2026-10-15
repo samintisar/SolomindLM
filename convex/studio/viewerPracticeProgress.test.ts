@@ -563,3 +563,25 @@ describe("cleaning up viewers' progress", () => {
     }
   });
 });
+
+describe("forking a public notebook", () => {
+  test("leaves the viewer's progress behind", async () => {
+    const { t, viewer, notebookId, flashcardId } = await setup();
+    const asViewer = withAuth(t, viewer);
+    await asViewer.mutation(api.studio.flashcards.index.submitCardReview, {
+      id: flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+
+    const { newNotebookId } = await asViewer.mutation(api.notebooks.public.forkPublic, {
+      notebookId,
+    });
+
+    const [forkedDeck] = await asViewer.query(api.studio.flashcards.index.list, {
+      notebookId: newNotebookId,
+    });
+    expect(forkedDeck.cardsData).toEqual([{ front: "Q", back: "A" }]);
+    expect((await allProgress(t)).map((p) => p.itemId)).toEqual([flashcardId]);
+  });
+});
