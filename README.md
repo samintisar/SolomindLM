@@ -113,8 +113,8 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 │                           │                                  │
 │  ┌──────────────┐  ┌──────▼───────┐  ┌─────────────────┐   │
 │  │   Storage    │  │   Agents     │  │   Vector DB     │   │
-│  │ (Documents,  │  │ (LangGraph   │  │ (Document       │   │
-│  │  Notebooks)  │  │  Pipelines)  │  │  Chunks)        │   │
+│  │ (Documents,  │  │ (Phased jobs,│  │ (Document       │   │
+│  │  Notebooks)  │  │  Workflows)  │  │  Chunks)        │   │
 │  └──────────────┘  └──────────────┘  └─────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
           │
@@ -135,7 +135,12 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 
 1. **Ingestion** → Document upload → OCR/Extraction → Smart splitting → Embeddings → Vector store
 2. **Chat** → User query → Vector search → Reranking → LLM with context → Streaming response
-3. **Generation** → User request → Agent scheduling → LangGraph pipeline → Content generation → Streaming delivery
+3. **Studio generation** → User request → Job row → Phased Convex actions (single pass, or parallel map-chunk actions then a finalize phase) → Result table → Reactive query delivery
+4. **Deep research & literature review** → User request → `@convex-dev/workflow` durable workflow → User approval of the plan → Retrieval and writing → Result (deep research streams tokens)
+
+LangChain supplies the Together AI chat client, message types and text splitting. Earlier versions ran the
+studio agents as LangGraph `StateGraph`s; they were replaced by phased actions to stay inside Convex's action
+time limit, and `@langchain/langgraph` is no longer a dependency.
 
 ---
 
@@ -146,7 +151,7 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 | **Frontend**   | React 19, Vite 7, TypeScript 5.9, TailwindCSS 4, Streamdown + KaTeX |
 | **Mobile**     | Expo 55, React Native 0.83 (WebView shell + native auth/push) |
 | **Backend**    | Convex 1.36, TypeScript                                   |
-| **AI/ML**      | LangChain, LangGraph, Together AI                         |
+| **AI/ML**      | Together AI, LangChain, @convex-dev/workflow              |
 | **Auth**       | @convex-dev/auth (Google OAuth + Password/OTP)            |
 | **Payments**   | Stripe                                                    |
 | **Database**   | Convex (Document + Vector search)                         |
@@ -402,7 +407,7 @@ SolomindLM/
 │   └── mobile/                 # Expo WebView shell (native auth, push)
 │       └── app/                # File-based routing
 ├── convex/                     # Convex backend
-│   ├── _agents/                # LangGraph agents
+│   ├── _agents/                # Agent prompts, routing, heuristics
 │   │   ├── _shared/            # Shared agent utilities
 │   │   ├── chat/               # Chat agent
 │   │   ├── report/             # Report generation
@@ -439,7 +444,7 @@ SolomindLM/
 ├── docs/superpowers/           # Internal design specs (not user docs)
 ├── e2e/                        # Playwright E2E tests
 ├── evals/                      # RAG + studio eval suite (rag/, ragas/)
-├── flowcharts/                 # LangGraph flow diagrams
+├── flowcharts/                 # Diagrams of the original LangGraph agents (historical)
 └── PROMPT_LIBRARY.md           # Curated studio prompt seeds
 ```
 

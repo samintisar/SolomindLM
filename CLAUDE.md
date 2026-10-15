@@ -36,8 +36,7 @@ Invoke the skill at the start of the phase it covers:
 | Schema or table change | `convex-migration-helper` (widen-migrate-narrow) |
 | Read amplification, OCC conflicts, `npx convex insights` warnings | `convex-performance-audit` |
 | New isolated table-owning module | `convex-create-component` |
-| `convex/_agents/` or `studio/*/*JobPhases.ts` | `langchain-fundamentals`, `langchain-rag` (`langgraph-fundamentals` only for state types / legacy graphs) |
-| `convex/_services/ai/`, `convex/studio/audio/` | `together-*` (audio, chat-completions, embeddings, evaluations, images, video) |
+| `convex/_agents/`, `studio/*/*JobPhases.ts`, `convex/_services/ai/`, `convex/studio/audio/` | `together-*` (audio, chat-completions, embeddings, evaluations, images, video) |
 | React components, Vite config, types, new UI | `vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `shadcn` |
 
 ### Hooks

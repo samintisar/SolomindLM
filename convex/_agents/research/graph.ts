@@ -3,7 +3,7 @@
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import type { ResearchNodeDeps } from "./nodes";
 import { plannerNode, retrieverNode, writerNode } from "./nodes";
-import { ResearchStateType } from "./state";
+import type { ResearchStateType } from "./state";
 import type { EvidenceEntry, ResearchContext, SourcePolicy, SubQuestion } from "./types";
 
 const graphLog = createServiceLogger("research", "executeGraph");
