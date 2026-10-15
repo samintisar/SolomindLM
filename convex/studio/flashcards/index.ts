@@ -2,7 +2,17 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
 import * as Flashcards from "../../_model/flashcards";
-import { viewerPracticeRow, viewerPracticeRows } from "../../_model/studioProgress";
+import {
+  savedCardProficiency,
+  withCardReview,
+  withShowMastered,
+} from "../../_model/practiceProgress";
+import {
+  getPracticeTarget,
+  saveViewerProgress,
+  viewerPracticeRow,
+  viewerPracticeRows,
+} from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
 
 /**
@@ -225,7 +235,7 @@ export const submitCardReview = mutation({
       throw new Error("Flashcard set not found");
     }
 
-    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+    const target = await getPracticeTarget(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
     if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
@@ -233,6 +243,32 @@ export const submitCardReview = mutation({
     }
 
     const card = cardsData[args.cardIndex];
+
+    if (target === "viewer") {
+      // A viewer's review goes to their own progress; the shared deck is the owner's.
+      const front = String((card as { front?: unknown }).front ?? "");
+      await saveViewerProgress(
+        ctx,
+        {
+          userId,
+          itemType: "flashcards",
+          itemId: flashcard._id,
+          notebookId: flashcard.notebookId,
+        },
+        (current) =>
+          withCardReview(
+            current,
+            args.cardIndex,
+            front,
+            Flashcards.updateProficiencyAfterReview(
+              savedCardProficiency(current, args.cardIndex, front),
+              args.rating
+            )
+          )
+      );
+      return await viewerPracticeRow(ctx, "flashcards", flashcard, userId);
+    }
+
     const currentProficiency = card.proficiency;
 
     // Update proficiency
@@ -464,7 +500,23 @@ export const updatePreferences = mutation({
       throw new Error("Flashcard set not found");
     }
 
-    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+    const target = await getPracticeTarget(ctx, flashcard.notebookId, userId);
+    if (target === "viewer") {
+      const { showMastered } = args;
+      if (showMastered !== undefined) {
+        await saveViewerProgress(
+          ctx,
+          {
+            userId,
+            itemType: "flashcards",
+            itemId: flashcard._id,
+            notebookId: flashcard.notebookId,
+          },
+          (current) => withShowMastered(current, showMastered)
+        );
+      }
+      return await viewerPracticeRow(ctx, "flashcards", flashcard, userId);
+    }
 
     const metadata = {
       ...(flashcard.metadata as Record<string, unknown>),

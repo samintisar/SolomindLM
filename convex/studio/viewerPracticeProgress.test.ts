@@ -272,3 +272,86 @@ describe("a viewer's own practice progress", () => {
     });
   });
 });
+
+describe("a viewer practising flashcards", () => {
+  test("a review is saved for the viewer only", async () => {
+    const { t, owner, viewer, otherViewer, flashcardId } = await setup();
+    const asViewer = withAuth(t, viewer);
+
+    const reviewed = await asViewer.mutation(api.studio.flashcards.index.submitCardReview, {
+      id: flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+    // A fresh history of one review, not the owner's six.
+    expect(reviewed?.cardsData?.[0]).toMatchObject({
+      front: "Q",
+      proficiency: { totalReviews: 1 },
+    });
+    expect(reviewed?.metadata).toEqual({ difficulty: "hard" });
+    const again = await asViewer.mutation(api.studio.flashcards.index.submitCardReview, {
+      id: flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+    expect(again?.cardsData?.[0]).toMatchObject({ proficiency: { totalReviews: 2 } });
+
+    const shared = await t.run((ctx) => ctx.db.get(flashcardId));
+    expect(shared?.cardsData).toEqual([{ front: "Q", back: "A", proficiency: PROFICIENCY }]);
+    const theirs = await withAuth(t, otherViewer).query(api.studio.flashcards.index.get, {
+      id: flashcardId,
+    });
+    expect(theirs?.cardsData).toEqual([{ front: "Q", back: "A" }]);
+    const owners = await withAuth(t, owner).query(api.studio.flashcards.index.get, {
+      id: flashcardId,
+    });
+    expect(owners?.cardsData).toEqual([{ front: "Q", back: "A", proficiency: PROFICIENCY }]);
+  });
+
+  test("a card the owner edits starts fresh for the viewer", async () => {
+    const { t, owner, viewer, flashcardId } = await setup();
+    await withAuth(t, viewer).mutation(api.studio.flashcards.index.submitCardReview, {
+      id: flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+    await withAuth(t, owner).mutation(api.studio.flashcards.index.updateCard, {
+      id: flashcardId,
+      cardIndex: 0,
+      front: "New Q",
+    });
+
+    const deck = await withAuth(t, viewer).query(api.studio.flashcards.index.get, {
+      id: flashcardId,
+    });
+    expect(deck?.cardsData).toEqual([{ front: "New Q", back: "A" }]);
+  });
+
+  test("the Due/All choice is the viewer's own", async () => {
+    const { t, viewer, flashcardId } = await setup();
+    const updated = await withAuth(t, viewer).mutation(
+      api.studio.flashcards.index.updatePreferences,
+      { id: flashcardId, showMastered: false }
+    );
+    expect(updated?.metadata).toEqual({ difficulty: "hard", showMastered: false });
+    const shared = await t.run((ctx) => ctx.db.get(flashcardId));
+    expect(shared?.metadata).toEqual({
+      difficulty: "hard",
+      showMastered: true,
+      lastViewedIndex: 0,
+    });
+  });
+
+  test("nothing is saved once the notebook is unpublished", async () => {
+    const { t, viewer, notebookId, flashcardId } = await setup();
+    await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
+    await expect(
+      withAuth(t, viewer).mutation(api.studio.flashcards.index.submitCardReview, {
+        id: flashcardId,
+        cardIndex: 0,
+        rating: "good",
+      })
+    ).rejects.toThrow("Notebook not found");
+    expect(await allProgress(t)).toEqual([]);
+  });
+});
