@@ -164,9 +164,10 @@ export function useDeleteFlashcard() {
 /**
  * Persist flashcard progress (last viewed card index)
  * Note: Does NOT use optimistic updates to avoid interfering with flashcard state
+ * Viewers of a public notebook save to their own progress.
  */
 export function useUpdateFlashcardProgress(flashcardId: string | null, currentIndex: number) {
-  const update = useMutation(api.studio.flashcards.index.update);
+  const setLastViewedIndex = useMutation(api.studio.practice.setLastViewedIndex);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -175,10 +176,7 @@ export function useUpdateFlashcardProgress(flashcardId: string | null, currentIn
 
     // Debounce the update to avoid excessive API calls during navigation
     timeoutRef.current = setTimeout(() => {
-      update({
-        id: flashcardId as Id<"flashcards">,
-        metadata: { lastViewedIndex: currentIndex },
-      });
+      setLastViewedIndex({ itemType: "flashcards", itemId: flashcardId, index: currentIndex });
     }, 500);
 
     return () => {
@@ -186,7 +184,7 @@ export function useUpdateFlashcardProgress(flashcardId: string | null, currentIn
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [flashcardId, currentIndex, update]);
+  }, [flashcardId, currentIndex, setLastViewedIndex]);
 }
 
 /**

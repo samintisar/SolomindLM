@@ -205,19 +205,13 @@ export function useSaveWrittenAnswerDraft() {
 }
 
 /**
- * Reset all answers for a written questions set
+ * Reset all answers for a written questions set ("Try again")
  */
 export function useResetWrittenAnswers() {
-  const update = useMutation(api.studio.writtenQuestions.index.update);
+  const reset = useMutation(api.studio.practice.resetAnswers);
 
   return async (id: string) => {
-    return await update({
-      id: id as Id<"writtenQuestions">,
-      metadata: {
-        userAnswers: {},
-        lastViewedIndex: 0,
-      },
-    });
+    return await reset({ itemType: "writtenQuestions", itemId: id });
   };
 }
 
@@ -229,7 +223,7 @@ export function useUpdateWrittenQuestionsProgress(
   writtenQuestionsId: string | null,
   currentIndex: number
 ) {
-  const update = useMutation(api.studio.writtenQuestions.index.update);
+  const setLastViewedIndex = useMutation(api.studio.practice.setLastViewedIndex);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -238,9 +232,10 @@ export function useUpdateWrittenQuestionsProgress(
 
     // Debounce the update to avoid excessive API calls during navigation
     timeoutRef.current = setTimeout(() => {
-      update({
-        id: writtenQuestionsId as Id<"writtenQuestions">,
-        metadata: { lastViewedIndex: currentIndex },
+      setLastViewedIndex({
+        itemType: "writtenQuestions",
+        itemId: writtenQuestionsId,
+        index: currentIndex,
       });
     }, 500);
 
@@ -249,5 +244,5 @@ export function useUpdateWrittenQuestionsProgress(
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [writtenQuestionsId, currentIndex, update]);
+  }, [writtenQuestionsId, currentIndex, setLastViewedIndex]);
 }

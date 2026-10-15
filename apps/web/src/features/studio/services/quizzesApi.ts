@@ -200,19 +200,13 @@ export function useSubmitQuizAnswer() {
 }
 
 /**
- * Reset all answers for a quiz
+ * Reset all answers for a quiz ("Try again")
  */
 export function useResetQuizAnswers() {
-  const update = useMutation(api.studio.quizzes.index.update);
+  const reset = useMutation(api.studio.practice.resetAnswers);
 
   return async (quizId: string) => {
-    return await update({
-      id: quizId as Id<"quizzes">,
-      metadata: {
-        userAnswers: {},
-        lastViewedIndex: 0,
-      },
-    });
+    return await reset({ itemType: "quizzes", itemId: quizId });
   };
 }
 
@@ -221,7 +215,7 @@ export function useResetQuizAnswers() {
  * Note: Does NOT use optimistic updates to avoid interfering with quiz state
  */
 export function useUpdateQuizProgress(quizId: string | null, currentIndex: number) {
-  const update = useMutation(api.studio.quizzes.index.update);
+  const setLastViewedIndex = useMutation(api.studio.practice.setLastViewedIndex);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -230,10 +224,7 @@ export function useUpdateQuizProgress(quizId: string | null, currentIndex: numbe
 
     // Debounce the update to avoid excessive API calls during navigation
     timeoutRef.current = setTimeout(() => {
-      update({
-        id: quizId as Id<"quizzes">,
-        metadata: { lastViewedIndex: currentIndex },
-      });
+      setLastViewedIndex({ itemType: "quizzes", itemId: quizId, index: currentIndex });
     }, 500);
 
     return () => {
@@ -241,5 +232,5 @@ export function useUpdateQuizProgress(quizId: string | null, currentIndex: numbe
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [quizId, currentIndex, update]);
+  }, [quizId, currentIndex, setLastViewedIndex]);
 }
