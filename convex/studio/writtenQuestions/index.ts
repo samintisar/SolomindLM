@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
-import { withoutWrittenQuestionProgress } from "../../_model/practiceProgress";
+import { viewerPracticeRow, viewerPracticeRows } from "../../_model/studioProgress";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 
@@ -16,8 +16,10 @@ export const list = query({
     const access = await getNotebookAccess(ctx, args.notebookId, userId);
     if (!access) return [];
     const sets = await WrittenQuestions.listByNotebook(ctx, args.notebookId);
-    // Answers and grades on the shared row are the owner's; a viewer starts fresh.
-    return access === "viewer" ? sets.map(withoutWrittenQuestionProgress) : sets;
+    // Answers and grades on the shared row are the owner's; a viewer sees their own.
+    return access === "viewer"
+      ? await viewerPracticeRows(ctx, "writtenQuestions", sets, userId, args.notebookId)
+      : sets;
   },
 });
 
@@ -30,7 +32,9 @@ export const get = query({
     if (!writtenQuestion) return null;
     const access = await getNotebookAccess(ctx, writtenQuestion.notebookId, userId);
     if (!access) return null;
-    return access === "viewer" ? withoutWrittenQuestionProgress(writtenQuestion) : writtenQuestion;
+    return access === "viewer"
+      ? await viewerPracticeRow(ctx, "writtenQuestions", writtenQuestion, userId)
+      : writtenQuestion;
   },
 });
 

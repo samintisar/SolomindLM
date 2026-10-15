@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
@@ -10,7 +11,15 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
-preloadModules(modules, ["./notes/index.ts"]);
+preloadModules(modules, [
+  "./notes/index.ts",
+  "./studio/flashcards/index.ts",
+  "./studio/quizzes/index.ts",
+  "./studio/writtenQuestions/index.ts",
+  "./notebooks/index.ts",
+  "./notebooks/public.ts",
+]);
+preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId as string}|session1` });
@@ -21,10 +30,13 @@ const PROFICIENCY = { interval: 30, easeFactor: 2.6, streak: 4, totalReviews: 6 
 /** A public notebook whose owner has practised one deck, one quiz and one written set. */
 async function setup() {
   const t = convexTest(schema, modules);
+  // forkPublic calls the rate limiter.
+  registerRateLimiter(t);
   const now = Date.now();
   const ids = await t.run(async (ctx) => {
     const owner = await ctx.db.insert("users", { name: "Owner" });
     const viewer = await ctx.db.insert("users", { name: "Viewer" });
+    const otherViewer = await ctx.db.insert("users", { name: "Other viewer" });
     const notebookId = await ctx.db.insert("notebooks", {
       userId: owner,
       title: "Public",
@@ -56,10 +68,47 @@ async function setup() {
         lastViewedIndex: 0,
       },
     });
-    return { owner, viewer, notebookId, flashcardId, quizId, writtenId };
+    return { owner, viewer, otherViewer, notebookId, flashcardId, quizId, writtenId };
   });
   return { t, ...ids };
 }
+
+type PracticeTable = "flashcards" | "quizzes" | "writtenQuestions";
+
+async function seedProgress(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  notebookId: Id<"notebooks">,
+  itemType: PracticeTable,
+  itemId: string,
+  progress: unknown
+) {
+  await t.run((ctx) =>
+    ctx.db.insert("studioProgress", {
+      userId,
+      notebookId,
+      itemType,
+      itemId,
+      progress,
+      updatedAt: Date.now(),
+    })
+  );
+}
+
+async function allProgress(t: ReturnType<typeof convexTest>) {
+  return await t.run((ctx) => ctx.db.query("studioProgress").collect());
+}
+
+/** A review state due tomorrow. */
+const VIEWER_PROFICIENCY = {
+  interval: 1,
+  easeFactor: 2.5,
+  streak: 1,
+  totalReviews: 1,
+  correctCount: 1,
+  incorrectCount: 0,
+  nextReviewDate: Date.now() + 86_400_000,
+};
 
 describe("practice progress on a public notebook", () => {
   test("a viewer gets each practice item without the owner's progress", async () => {
@@ -131,6 +180,95 @@ describe("practice progress on a public notebook", () => {
     const rows = await asOwner.query(api.notes.index.list, { notebookId });
     expect(rows.find((r) => r._type === "quiz")?.metadata).toMatchObject({
       userAnswers: { 0: 1 },
+    });
+  });
+});
+
+describe("a viewer's own practice progress", () => {
+  test("every studio read shows the viewer's progress instead of the owner's", async () => {
+    const { t, viewer, notebookId, flashcardId, quizId, writtenId } = await setup();
+    await seedProgress(t, viewer, notebookId, "flashcards", flashcardId, {
+      cards: { "0": { front: "Q", proficiency: VIEWER_PROFICIENCY } },
+      lastViewedIndex: 0,
+    });
+    await seedProgress(t, viewer, notebookId, "quizzes", quizId, { userAnswers: { 0: 0 } });
+    await seedProgress(t, viewer, notebookId, "writtenQuestions", writtenId, {
+      userAnswers: { q1: { answer: "Mine", graded: false } },
+    });
+    const asViewer = withAuth(t, viewer);
+
+    const deck = await asViewer.query(api.studio.flashcards.index.get, { id: flashcardId });
+    expect(deck?.cardsData).toEqual([{ front: "Q", back: "A", proficiency: VIEWER_PROFICIENCY }]);
+    expect(deck?.metadata).toEqual({ difficulty: "hard", lastViewedIndex: 0 });
+    const [listedDeck] = await asViewer.query(api.studio.flashcards.index.list, { notebookId });
+    expect(listedDeck.cardsData).toEqual(deck?.cardsData);
+
+    const quiz = await asViewer.query(api.studio.quizzes.index.get, { id: quizId });
+    expect(quiz?.metadata).toEqual({ difficulty: "easy", userAnswers: { 0: 0 } });
+    const [listedQuiz] = await asViewer.query(api.studio.quizzes.index.list, { notebookId });
+    expect(listedQuiz.metadata).toEqual(quiz?.metadata);
+
+    const written = await asViewer.query(api.studio.writtenQuestions.index.get, { id: writtenId });
+    expect(written?.metadata).toEqual({
+      focus: "causes",
+      userAnswers: { q1: { answer: "Mine", graded: false } },
+    });
+    const [listedWritten] = await asViewer.query(api.studio.writtenQuestions.index.list, {
+      notebookId,
+    });
+    expect(listedWritten.metadata).toEqual(written?.metadata);
+
+    const rows = await asViewer.query(api.notes.index.list, { notebookId });
+    const metadataByType = Object.fromEntries(rows.map((r) => [r._type as string, r.metadata]));
+    expect(metadataByType).toEqual({
+      flashcard: { difficulty: "hard", lastViewedIndex: 0 },
+      quiz: { difficulty: "easy", userAnswers: { 0: 0 } },
+      writtenQuestions: {
+        focus: "causes",
+        userAnswers: { q1: { answer: "Mine", graded: false } },
+      },
+    });
+    const noteDeck = await asViewer.query(api.notes.index.get, {
+      type: "flashcard",
+      id: flashcardId,
+    });
+    expect((noteDeck as { cardsData: unknown[] }).cardsData).toEqual(deck?.cardsData);
+  });
+
+  test("due cards come from the viewer's own review state", async () => {
+    const { t, viewer, otherViewer, notebookId, flashcardId } = await setup();
+    await seedProgress(t, viewer, notebookId, "flashcards", flashcardId, {
+      cards: { "0": { front: "Q", proficiency: VIEWER_PROFICIENCY } },
+    });
+    const nowMs = Date.now();
+
+    expect(
+      await withAuth(t, viewer).query(api.studio.flashcards.index.getDueCards, {
+        id: flashcardId,
+        nowMs,
+      })
+    ).toEqual([]);
+    expect(
+      await withAuth(t, otherViewer).query(api.studio.flashcards.index.getDueCards, {
+        id: flashcardId,
+        nowMs,
+      })
+    ).toEqual([{ index: 0, card: { front: "Q", back: "A" } }]);
+  });
+
+  test("two viewers don't see each other's progress, and the owner sees neither", async () => {
+    const { t, owner, viewer, otherViewer, notebookId, quizId } = await setup();
+    await seedProgress(t, viewer, notebookId, "quizzes", quizId, { userAnswers: { 0: 0 } });
+
+    const theirs = await withAuth(t, otherViewer).query(api.studio.quizzes.index.get, {
+      id: quizId,
+    });
+    expect(theirs?.metadata).toEqual({ difficulty: "easy" });
+    const owners = await withAuth(t, owner).query(api.studio.quizzes.index.get, { id: quizId });
+    expect(owners?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: { 0: 1 },
+      lastViewedIndex: 0,
     });
   });
 });

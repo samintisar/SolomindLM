@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
-import { withoutQuizProgress } from "../../_model/practiceProgress";
 import * as Quizzes from "../../_model/quizzes";
+import { viewerPracticeRow, viewerPracticeRows } from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
 
 /**
@@ -17,8 +17,10 @@ export const list = query({
     const access = await getNotebookAccess(ctx, args.notebookId, userId);
     if (!access) return [];
     const quizzes = await Quizzes.listByNotebook(ctx, args.notebookId);
-    // Answers on the shared row are the owner's; a viewer starts fresh.
-    return access === "viewer" ? quizzes.map(withoutQuizProgress) : quizzes;
+    // Answers on the shared row are the owner's; a viewer sees their own.
+    return access === "viewer"
+      ? await viewerPracticeRows(ctx, "quizzes", quizzes, userId, args.notebookId)
+      : quizzes;
   },
 });
 
@@ -40,7 +42,7 @@ export const get = query({
     const access = await getNotebookAccess(ctx, quiz.notebookId, userId);
     if (!access) return null;
 
-    return access === "viewer" ? withoutQuizProgress(quiz) : quiz;
+    return access === "viewer" ? await viewerPracticeRow(ctx, "quizzes", quiz, userId) : quiz;
   },
 });
 

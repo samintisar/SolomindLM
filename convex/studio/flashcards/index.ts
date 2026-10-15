@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
 import * as Flashcards from "../../_model/flashcards";
-import { withoutFlashcardProgress } from "../../_model/practiceProgress";
+import { viewerPracticeRow, viewerPracticeRows } from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
 
 /**
@@ -27,8 +27,10 @@ export const list = query({
     const access = await getNotebookAccess(ctx, args.notebookId, userId);
     if (!access) return [];
     const flashcards = await Flashcards.listByNotebook(ctx, args.notebookId);
-    // Review history on the shared row is the owner's; a viewer starts fresh.
-    return access === "viewer" ? flashcards.map(withoutFlashcardProgress) : flashcards;
+    // Review history on the shared row is the owner's; a viewer sees their own.
+    return access === "viewer"
+      ? await viewerPracticeRows(ctx, "flashcards", flashcards, userId, args.notebookId)
+      : flashcards;
   },
 });
 
@@ -50,7 +52,9 @@ export const get = query({
     const access = await getNotebookAccess(ctx, flashcard.notebookId, userId);
     if (!access) return null;
 
-    return access === "viewer" ? withoutFlashcardProgress(flashcard) : flashcard;
+    return access === "viewer"
+      ? await viewerPracticeRow(ctx, "flashcards", flashcard, userId)
+      : flashcard;
   },
 });
 
@@ -428,7 +432,10 @@ export const getDueCards = query({
     const access = await getNotebookAccess(ctx, flashcard.notebookId, userId);
     if (!access) return [];
 
-    const visible = access === "viewer" ? withoutFlashcardProgress(flashcard) : flashcard;
+    const visible =
+      access === "viewer"
+        ? await viewerPracticeRow(ctx, "flashcards", flashcard, userId)
+        : flashcard;
     const cardsData = visible.cardsData as any[];
     const dueIndices = Flashcards.getDueCardIndices(cardsData, args.nowMs);
 
