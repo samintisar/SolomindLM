@@ -18,6 +18,7 @@ preloadModules(modules, [
   "./studio/writtenQuestions/index.ts",
   "./notebooks/index.ts",
   "./notebooks/public.ts",
+  "./studio/practice.ts",
 ]);
 preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 
@@ -395,5 +396,100 @@ describe("a viewer answering quizzes and written questions", () => {
         answer: "x",
       })
     ).rejects.toThrow("Question not found");
+  });
+});
+
+describe("practice.setLastViewedIndex and practice.resetAnswers", () => {
+  test("a viewer's position and Try again stay in their own progress", async () => {
+    const { t, viewer, flashcardId, quizId, writtenId } = await setup();
+    const asViewer = withAuth(t, viewer);
+    await asViewer.mutation(api.studio.quizzes.index.submitAnswer, {
+      id: quizId,
+      questionIndex: 0,
+      selectedOption: 0,
+    });
+    await asViewer.mutation(api.studio.practice.setLastViewedIndex, {
+      itemType: "quizzes",
+      itemId: quizId,
+      index: 3,
+    });
+    expect((await asViewer.query(api.studio.quizzes.index.get, { id: quizId }))?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: { 0: 0 },
+      lastViewedIndex: 3,
+    });
+
+    await asViewer.mutation(api.studio.practice.resetAnswers, {
+      itemType: "quizzes",
+      itemId: quizId,
+    });
+    expect((await asViewer.query(api.studio.quizzes.index.get, { id: quizId }))?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: {},
+      lastViewedIndex: 0,
+    });
+
+    await asViewer.mutation(api.studio.practice.setLastViewedIndex, {
+      itemType: "flashcards",
+      itemId: flashcardId,
+      index: 0,
+    });
+    await asViewer.mutation(api.studio.practice.resetAnswers, {
+      itemType: "writtenQuestions",
+      itemId: writtenId,
+    });
+
+    const shared = await t.run(async (ctx) => ({
+      deck: await ctx.db.get(flashcardId),
+      quiz: await ctx.db.get(quizId),
+      written: await ctx.db.get(writtenId),
+    }));
+    expect(shared.deck?.metadata).toEqual({
+      difficulty: "hard",
+      showMastered: true,
+      lastViewedIndex: 0,
+    });
+    expect(shared.quiz?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: { 0: 1 },
+      lastViewedIndex: 0,
+    });
+    expect(shared.written?.metadata).toMatchObject({ userAnswers: { q1: { answer: "Because" } } });
+  });
+
+  test("the owner's position and Try again still go on the shared row", async () => {
+    const { t, owner, quizId, writtenId } = await setup();
+    const asOwner = withAuth(t, owner);
+    await asOwner.mutation(api.studio.practice.setLastViewedIndex, {
+      itemType: "quizzes",
+      itemId: quizId,
+      index: 2,
+    });
+    expect((await t.run((ctx) => ctx.db.get(quizId)))?.metadata).toEqual({
+      difficulty: "easy",
+      userAnswers: { 0: 1 },
+      lastViewedIndex: 2,
+    });
+    await asOwner.mutation(api.studio.practice.resetAnswers, {
+      itemType: "writtenQuestions",
+      itemId: writtenId,
+    });
+    expect((await t.run((ctx) => ctx.db.get(writtenId)))?.metadata).toEqual({
+      focus: "causes",
+      userAnswers: {},
+      lastViewedIndex: 0,
+    });
+    expect(await allProgress(t)).toEqual([]);
+  });
+
+  test("an id from another table is refused", async () => {
+    const { t, owner, flashcardId } = await setup();
+    await expect(
+      withAuth(t, owner).mutation(api.studio.practice.setLastViewedIndex, {
+        itemType: "quizzes",
+        itemId: flashcardId,
+        index: 0,
+      })
+    ).rejects.toThrow("Studio item not found");
   });
 });

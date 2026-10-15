@@ -308,6 +308,7 @@ import type * as studio_mindmaps_index from "../studio/mindmaps/index.js";
 import type * as studio_mindmaps_job from "../studio/mindmaps/job.js";
 import type * as studio_mindmaps_mindmapFallback from "../studio/mindmaps/mindmapFallback.js";
 import type * as studio_mindmaps_mindmapJobPhases from "../studio/mindmaps/mindmapJobPhases.js";
+import type * as studio_practice from "../studio/practice.js";
 import type * as studio_prompts_config from "../studio/prompts/config.js";
 import type * as studio_prompts_index from "../studio/prompts/index.js";
 import type * as studio_quizzes_index from "../studio/quizzes/index.js";
@@ -638,6 +639,7 @@ declare const fullApi: ApiFromModules<{
   "studio/mindmaps/job": typeof studio_mindmaps_job;
   "studio/mindmaps/mindmapFallback": typeof studio_mindmaps_mindmapFallback;
   "studio/mindmaps/mindmapJobPhases": typeof studio_mindmaps_mindmapJobPhases;
+  "studio/practice": typeof studio_practice;
   "studio/prompts/config": typeof studio_prompts_config;
   "studio/prompts/index": typeof studio_prompts_index;
   "studio/quizzes/index": typeof studio_quizzes_index;
