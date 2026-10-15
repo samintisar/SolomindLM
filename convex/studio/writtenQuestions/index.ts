@@ -11,6 +11,7 @@ import {
 } from "../../_model/studioProgress";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
+import { deletePracticeProgress } from "../practice";
 
 const MAX_DRAFT_ANSWER_LENGTH = 50_000;
 
@@ -187,6 +188,7 @@ export const remove = mutation({
     if (!writtenQuestion) throw new Error("Written question set not found or access denied");
     await assertCanEditNotebook(ctx, writtenQuestion.notebookId, userId);
     await WrittenQuestions.deleteWrittenQuestion(ctx, args.writtenQuestionId);
+    await deletePracticeProgress(ctx, { itemId: args.writtenQuestionId });
   },
 });
 

@@ -14,6 +14,7 @@ import {
   viewerPracticeRows,
 } from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
+import { deletePracticeProgress } from "../practice";
 
 /**
  * Internal: Get a flashcard set by ID (for use by jobs)
@@ -172,6 +173,7 @@ export const remove = mutation({
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
     await Flashcards.deleteFlashcard(ctx, args.id);
+    await deletePracticeProgress(ctx, { itemId: args.id });
 
     return { message: "Flashcard set deleted successfully" };
   },

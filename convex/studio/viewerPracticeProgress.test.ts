@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
-import { api } from "../_generated/api";
+import { describe, expect, test, vi } from "vitest";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
@@ -491,5 +491,75 @@ describe("practice.setLastViewedIndex and practice.resetAnswers", () => {
         index: 0,
       })
     ).rejects.toThrow("Studio item not found");
+  });
+});
+
+describe("cleaning up viewers' progress", () => {
+  test("deleting a studio item deletes viewers' progress on it", async () => {
+    const { t, owner, viewer, flashcardId, quizId, writtenId } = await setup();
+    const asViewer = withAuth(t, viewer);
+    await asViewer.mutation(api.studio.flashcards.index.submitCardReview, {
+      id: flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+    await asViewer.mutation(api.studio.quizzes.index.submitAnswer, {
+      id: quizId,
+      questionIndex: 0,
+      selectedOption: 0,
+    });
+    await asViewer.mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: writtenId,
+      questionId: "q1",
+      answer: "Mine",
+    });
+    const asOwner = withAuth(t, owner);
+
+    await asOwner.mutation(api.studio.flashcards.index.remove, { id: flashcardId });
+    expect((await allProgress(t)).map((p) => p.itemId).sort()).toEqual(
+      [quizId as string, writtenId as string].sort()
+    );
+    await asOwner.mutation(api.studio.quizzes.index.remove, { id: quizId });
+    await asOwner.mutation(api.studio.writtenQuestions.index.remove, {
+      writtenQuestionId: writtenId,
+    });
+    expect(await allProgress(t)).toEqual([]);
+  });
+
+  test("deleting the notebook deletes every viewer's progress on it", async () => {
+    const { t, owner, viewer, otherViewer, notebookId, quizId } = await setup();
+    for (const user of [viewer, otherViewer]) {
+      await withAuth(t, user).mutation(api.studio.quizzes.index.submitAnswer, {
+        id: quizId,
+        questionIndex: 0,
+        selectedOption: 0,
+      });
+    }
+    await withAuth(t, owner).mutation(api.notebooks.index.remove, { id: notebookId });
+    expect(await allProgress(t)).toEqual([]);
+  });
+
+  test("a large clean-up finishes in scheduled batches", async () => {
+    vi.useFakeTimers();
+    try {
+      const { t, viewer, notebookId } = await setup();
+      await t.run(async (ctx) => {
+        for (let i = 0; i < 501; i++) {
+          await ctx.db.insert("studioProgress", {
+            userId: viewer,
+            notebookId,
+            itemType: "quizzes",
+            itemId: `item${i}`,
+            progress: {},
+            updatedAt: 0,
+          });
+        }
+      });
+      await t.mutation(internal.studio.practice.deleteProgressBatch, { scope: { notebookId } });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await allProgress(t)).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

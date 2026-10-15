@@ -10,6 +10,7 @@ import {
   viewerPracticeRows,
 } from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
+import { deletePracticeProgress } from "../practice";
 
 /**
  * List all quizzes for a notebook
@@ -166,6 +167,7 @@ export const remove = mutation({
     await assertCanEditNotebook(ctx, quiz.notebookId, userId);
 
     await Quizzes.deleteQuiz(ctx, args.id);
+    await deletePracticeProgress(ctx, { itemId: args.id });
 
     return { message: "Quiz deleted successfully" };
   },
