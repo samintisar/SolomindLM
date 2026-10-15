@@ -40,7 +40,12 @@ import {
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
 } from "./chat_retrieval_subqueries.js";
-import { HYDE_TIMEOUT_MS } from "./chatConfig.js";
+import {
+  DIRECT_RESPONSE_TIMEOUT_MS,
+  FOLLOWUP_GENERATION_TIMEOUT_MS,
+  HYDE_TIMEOUT_MS,
+  PLANNER_TIMEOUT_MS,
+} from "./chatConfig.js";
 import type { ReferenceChunk } from "./types";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
@@ -129,6 +134,7 @@ export class ChatLLMWrapper {
         maxTokens: 1024,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs: DIRECT_RESPONSE_TIMEOUT_MS,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       return response.content.trim();
@@ -204,6 +210,7 @@ Question: ${query}`;
         maxTokens: 320,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs: FOLLOWUP_GENERATION_TIMEOUT_MS,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       const text = response.content.trim();
@@ -301,6 +308,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         maxTokens: 500,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs: PLANNER_TIMEOUT_MS,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
