@@ -145,10 +145,10 @@ export const forkPublic = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    await rateLimiter.limit(ctx, "notebookFork", { key: userId, throws: true });
-
     const notebook = await ctx.db.get(args.notebookId);
     if (!notebook?.isPublic) throw new Error("Notebook not found");
+
+    await rateLimiter.limit(ctx, "notebookFork", { key: userId, throws: true });
 
     await checkNotebookLimit(ctx);
     const newNotebookId = await performNotebookFork(ctx, args.notebookId, userId);

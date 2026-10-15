@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { rateLimiter } from "../_lib/rateLimits";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 
@@ -258,6 +259,17 @@ describe("notebooks.public", () => {
     expect(error).toBeInstanceOf(ConvexError);
     expect((error as ConvexError<{ code: string }>).data.code).toBe("NOTEBOOK_LIMIT_REACHED");
     expect(await ownedByOther()).toBe(5);
+  });
+
+  test("forkPublic checks the notebook is public before the fork rate limit", async () => {
+    const { t, other, notebookId } = await setup();
+    await t.run(async (ctx) => {
+      await rateLimiter.limit(ctx, "notebookFork", { key: other, count: 20 });
+    });
+
+    await expect(
+      withAuth(t, other).mutation(api.notebooks.public.forkPublic, { notebookId })
+    ).rejects.toThrow("Notebook not found");
   });
 
   test("forkPublic copies a public notebook and refuses a private one", async () => {
