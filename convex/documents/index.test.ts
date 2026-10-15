@@ -793,6 +793,80 @@ describe("documents.getSignedUrl for a file a fork shares", () => {
       withAuth(t, stranger).mutation(api.documents.index.getSignedUrl, { storageId: fileId })
     ).rejects.toThrow("Notebook not found");
   });
+
+  /** A showcase notebook forked more times than the storage scan reads, then unpublished. */
+  async function seedManyForks(t: ReturnType<typeof convexTest>, forkCount: number) {
+    const owner = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    const { fileId, otherFileId } = await t.run(async (ctx) => {
+      await ctx.db.patch(notebookId, { isPublic: true });
+      const fileId = await ctx.storage.store(new Blob(["%PDF-1.7"]));
+      const otherFileId = await ctx.storage.store(new Blob(["%PDF-1.7 other"]));
+      await ctx.db.insert("documents", {
+        userId: owner,
+        notebookId,
+        fileName: "paper.pdf",
+        fileType: "pdf",
+        storageId: fileId,
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return { fileId, otherFileId };
+    });
+    let lastForker = owner;
+    for (let i = 0; i < forkCount; i++) {
+      lastForker = await seedUser(t);
+      const forker = lastForker;
+      await t.run((ctx) => performNotebookFork(ctx, notebookId, forker));
+    }
+    await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
+    const forkDocId = await t.run(async (ctx) => {
+      const [doc] = await ctx.db
+        .query("documents")
+        .withIndex("by_user", (q) => q.eq("userId", lastForker))
+        .collect();
+      return doc._id;
+    });
+    return { lastForker, forkDocId, fileId, otherFileId };
+  }
+
+  test("a later forker gets the URL through their own source", async () => {
+    const t = convexTest(schema, modules);
+    const { lastForker, forkDocId, fileId } = await seedManyForks(t, 21);
+
+    const url = await withAuth(t, lastForker).mutation(api.documents.index.getSignedUrl, {
+      storageId: fileId,
+      documentId: forkDocId,
+    });
+
+    expect(url).toEqual(expect.any(String));
+  });
+
+  test("a source that doesn't hold the file is refused", async () => {
+    const t = convexTest(schema, modules);
+    const { lastForker, forkDocId, otherFileId } = await seedManyForks(t, 1);
+
+    await expect(
+      withAuth(t, lastForker).mutation(api.documents.index.getSignedUrl, {
+        storageId: otherFileId,
+        documentId: forkDocId,
+      })
+    ).rejects.toThrow("Document not found");
+  });
+
+  test("a source in a notebook the caller can't read is refused", async () => {
+    const t = convexTest(schema, modules);
+    const { forkDocId, fileId } = await seedManyForks(t, 1);
+    const stranger = await seedUser(t);
+
+    await expect(
+      withAuth(t, stranger).mutation(api.documents.index.getSignedUrl, {
+        storageId: fileId,
+        documentId: forkDocId,
+      })
+    ).rejects.toThrow("Notebook not found");
+  });
 });
 
 describe("documents.addExternalSources", () => {
