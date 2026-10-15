@@ -1,5 +1,9 @@
+import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
+import { InputValidationError } from "../_lib/errors";
+import { toConvexError } from "../_lib/serviceErrors";
 import {
   getChatLinkedLiteratureArtifactIds,
   isChatLiteratureReport,
@@ -7,7 +11,72 @@ import {
 } from "../_model/literatureArtifacts";
 
 const MAX_FORK_DOCUMENTS = 200;
-const MAX_FORK_CHUNKS = 10_000;
+
+/**
+ * Chunks copied per transaction. A chunk carries a 1536-float embedding (~13 KB), so a batch
+ * reads and writes ~1.5 MB, well under the per-mutation limits even with the source's text.
+ */
+export const FORK_CHUNK_BATCH_SIZE = 100;
+
+/**
+ * Copies one forked source's text and chunks from the original, a batch per run, rescheduling
+ * itself until done; then marks the copy completed. Stops if the copy has been deleted meanwhile.
+ */
+export const copyForkedDocumentContent = internalMutation({
+  args: {
+    sourceDocumentId: v.id("documents"),
+    forkDocumentId: v.id("documents"),
+    cursor: v.union(v.string(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { sourceDocumentId, forkDocumentId, cursor }) => {
+    const fork = await ctx.db.get(forkDocumentId);
+    if (!fork) return null;
+    const source = await ctx.db.get(sourceDocumentId);
+    if (!source) {
+      // Without the original there is nothing left to copy; don't leave the copy spinning.
+      await ctx.db.patch(forkDocumentId, {
+        status: "failed",
+        error: "The original source was deleted before it finished copying.",
+        updatedAt: Date.now(),
+      });
+      return null;
+    }
+
+    if (cursor === null && source.extractedMarkdown !== undefined) {
+      await ctx.db.patch(forkDocumentId, { extractedMarkdown: source.extractedMarkdown });
+    }
+
+    const batch = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", sourceDocumentId))
+      .paginate({ cursor, numItems: FORK_CHUNK_BATCH_SIZE });
+
+    const now = Date.now();
+    for (const c of batch.page) {
+      const { _id, _creationTime, documentId, userId, notebookId, createdAt, ...fields } = c;
+      await ctx.db.insert("documentChunks", {
+        ...fields,
+        documentId: forkDocumentId,
+        userId: fork.userId,
+        notebookId: fork.notebookId,
+        createdAt: now,
+      });
+    }
+
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.notebooks._forkNotebook.copyForkedDocumentContent, {
+        sourceDocumentId,
+        forkDocumentId,
+        cursor: batch.continueCursor,
+      });
+      return null;
+    }
+
+    await ctx.db.patch(forkDocumentId, { status: "completed", updatedAt: now });
+    return null;
+  },
+});
 
 /**
  * A forked studio item must point at the fork's own copies of its sources, not the original's.
@@ -55,7 +124,9 @@ function withoutSynthesisChunks(metadata: unknown): unknown {
 }
 
 /**
- * Deep-copies a notebook into forkUserId's account. Single-transaction helper (not an API).
+ * Deep-copies a notebook into forkUserId's account (a helper for fork mutations, not an API).
+ * Copies everything but the sources' text and chunks in this transaction; those follow in one
+ * scheduled copyForkedDocumentContent run per source, each source showing as processing until then.
  */
 export async function performNotebookFork(
   ctx: MutationCtx,
@@ -87,14 +158,18 @@ export async function performNotebookFork(
     .collect();
 
   if (docs.length > MAX_FORK_DOCUMENTS) {
-    throw new Error(`Notebook has too many sources to fork at once (max ${MAX_FORK_DOCUMENTS}).`);
+    throw toConvexError(
+      new InputValidationError(
+        `This notebook has too many sources to copy (max ${MAX_FORK_DOCUMENTS}).`
+      )
+    );
   }
 
   const docIdMap = new Map<Id<"documents">, Id<"documents">>();
 
   for (const d of docs) {
-    const newStorageId = d.storageId;
-
+    // Text and chunks are copied by copyForkedDocumentContent, one transaction per batch: a large
+    // notebook's chunk embeddings don't fit in this one. Until then the copy shows as processing.
     const newDocId = await ctx.db.insert("documents", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -102,9 +177,11 @@ export async function performNotebookFork(
       fileType: d.fileType,
       fileSize: d.fileSize,
       fileUrl: d.fileUrl,
-      storageId: newStorageId,
+      // Shared with the original; deletes keep the file while any document still names it.
+      storageId: d.storageId,
+      // Drive ids are left behind: refreshing from the owner's Drive isn't the forker's to do.
       contentType: d.contentType,
-      status: d.status,
+      status: "processing",
       error: undefined,
       metadata: d.metadata,
       wordCount: d.wordCount,
@@ -118,52 +195,19 @@ export async function performNotebookFork(
       language: d.language,
       documentStructure: d.documentStructure,
       maxHeadingLevel: d.maxHeadingLevel,
-      extractedMarkdown: d.extractedMarkdown,
+      paperRecord: d.paperRecord,
+      fulltextStatus: d.fulltextStatus,
+      ingestionStatus: d.ingestionStatus,
+      fullTextSource: d.fullTextSource,
+      sourceGuide: d.sourceGuide,
       createdAt: now,
       updatedAt: now,
     });
     docIdMap.set(d._id, newDocId);
-  }
-
-  const chunks = await ctx.db
-    .query("documentChunks")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
-    .collect();
-
-  if (chunks.length > MAX_FORK_CHUNKS) {
-    throw new Error(`Notebook is too large to fork (max ${MAX_FORK_CHUNKS} text chunks).`);
-  }
-
-  for (const c of chunks) {
-    const newDocId = docIdMap.get(c.documentId);
-    if (!newDocId) continue;
-
-    await ctx.db.insert("documentChunks", {
-      documentId: newDocId,
-      userId: forkUserId,
-      notebookId: newNotebookId,
-      content: c.content,
-      chunkIndex: c.chunkIndex,
-      embedding: c.embedding,
-      embeddingModel: c.embeddingModel,
-      metadata: c.metadata,
-      totalChunks: c.totalChunks,
-      relativePosition: c.relativePosition,
-      chunkLengthChars: c.chunkLengthChars,
-      wordCount: c.wordCount,
-      sentenceCount: c.sentenceCount,
-      pageNumber: c.pageNumber,
-      sectionTitle: c.sectionTitle,
-      sectionLevel: c.sectionLevel,
-      headingPath: c.headingPath,
-      previousChunkPreview: c.previousChunkPreview,
-      nextChunkPreview: c.nextChunkPreview,
-      hasCodeBlock: c.hasCodeBlock,
-      hasMathNotation: c.hasMathNotation,
-      hasTable: c.hasTable,
-      hasBulletList: c.hasBulletList,
-      hasNumberedList: c.hasNumberedList,
-      createdAt: now,
+    await ctx.scheduler.runAfter(0, internal.notebooks._forkNotebook.copyForkedDocumentContent, {
+      sourceDocumentId: d._id,
+      forkDocumentId: newDocId,
+      cursor: null,
     });
   }
 

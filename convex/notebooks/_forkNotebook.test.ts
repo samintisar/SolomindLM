@@ -1,15 +1,247 @@
 /// <reference types="vite/client" />
+
+import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
-import { performNotebookFork } from "./_forkNotebook";
+import { FORK_CHUNK_BATCH_SIZE, performNotebookFork } from "./_forkNotebook";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 preloadModules(modules, ["./notebooks/index.ts"]);
+
+describe("performNotebookFork sources", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const MARKDOWN = "# Paper\n\nFull text.";
+  const EMBEDDING = Array.from({ length: 1536 }, (_, i) => i / 1536);
+
+  /** One completed source with `chunkCount` chunks; the notebook also has a mind map naming it. */
+  async function seedSource(t: ReturnType<typeof convexTest>, chunkCount: number) {
+    const now = Date.now();
+    return await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Original",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const docId = await ctx.db.insert("documents", {
+        userId: ownerId,
+        notebookId,
+        fileName: "paper.pdf",
+        fileType: "paper_record",
+        status: "completed",
+        totalChunks: chunkCount,
+        extractedMarkdown: MARKDOWN,
+        paperRecord: {
+          abstract: "An abstract.",
+          authors: ["A. Author"],
+          doi: "10.1000/x",
+          isOa: true,
+        },
+        fulltextStatus: "available",
+        ingestionStatus: "ingested",
+        fullTextSource: { method: "oa_pdf", url: "https://example.org/p.pdf" },
+        sourceGuide: { summary: "About things.", topics: ["things"], generatedAt: now },
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (let i = 0; i < chunkCount; i++) {
+        await ctx.db.insert("documentChunks", {
+          documentId: docId,
+          userId: ownerId,
+          notebookId,
+          content: `chunk ${i}`,
+          chunkIndex: i,
+          embedding: i === 0 ? EMBEDDING : undefined,
+          pageNumber: 1,
+          createdAt: now,
+        });
+      }
+      await ctx.db.insert("mindmaps", {
+        userId: ownerId,
+        notebookId,
+        title: "Map",
+        data: {},
+        status: "completed",
+        metadata: { documentIds: [docId] },
+        createdAt: now,
+        updatedAt: now,
+      });
+      const forkerId = await ctx.db.insert("users", { name: "Forker" });
+      return { notebookId, docId, forkerId };
+    });
+  }
+
+  async function forkedSource(t: ReturnType<typeof convexTest>, forkId: Id<"notebooks">) {
+    return await t.run(async (ctx) => {
+      const [doc] = await ctx.db
+        .query("documents")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect();
+      const chunks = doc
+        ? await ctx.db
+            .query("documentChunks")
+            .withIndex("by_document", (q) => q.eq("documentId", doc._id))
+            .collect()
+        : [];
+      return { doc, chunks };
+    });
+  }
+
+  test("the fork's source starts processing, without its text or chunks", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, forkerId } = await seedSource(t, 3);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(doc.status).toBe("processing");
+    expect(doc.extractedMarkdown).toBeUndefined();
+    expect(chunks).toHaveLength(0);
+  });
+
+  test("copies the text and every chunk across several batches, then completes", async () => {
+    const t = convexTest(schema, modules);
+    const chunkCount = FORK_CHUNK_BATCH_SIZE * 2 + 5;
+    const { notebookId, docId, forkerId } = await seedSource(t, chunkCount);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(doc._id).not.toBe(docId);
+    expect(doc.status).toBe("completed");
+    expect(doc.extractedMarkdown).toBe(MARKDOWN);
+    expect(chunks).toHaveLength(chunkCount);
+    expect(new Set(chunks.map((c) => c.chunkIndex)).size).toBe(chunkCount);
+    expect(chunks.every((c) => c.userId === forkerId && c.notebookId === forkId)).toBe(true);
+    const first = chunks.find((c) => c.chunkIndex === 0);
+    expect(first?.embedding).toEqual(EMBEDDING);
+    expect(first?.pageNumber).toBe(1);
+
+    // The original keeps its own chunks.
+    const originalChunks = await t.run((ctx) =>
+      ctx.db
+        .query("documentChunks")
+        .withIndex("by_document", (q) => q.eq("documentId", docId))
+        .collect()
+    );
+    expect(originalChunks).toHaveLength(chunkCount);
+
+    const [map] = await t.run((ctx) =>
+      ctx.db
+        .query("mindmaps")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect()
+    );
+    expect(map.metadata).toEqual({ documentIds: [doc._id] });
+  });
+
+  test("keeps the source's paper metadata and source guide", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, forkerId } = await seedSource(t, 1);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const { doc } = await forkedSource(t, forkId);
+    expect(doc).toMatchObject({
+      paperRecord: {
+        abstract: "An abstract.",
+        authors: ["A. Author"],
+        doi: "10.1000/x",
+        isOa: true,
+      },
+      fulltextStatus: "available",
+      ingestionStatus: "ingested",
+      fullTextSource: { method: "oa_pdf", url: "https://example.org/p.pdf" },
+      sourceGuide: { summary: "About things.", topics: ["things"] },
+    });
+  });
+
+  test("stops quietly when the fork's source is deleted mid-copy", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, forkerId } = await seedSource(t, FORK_CHUNK_BATCH_SIZE + 1);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    const { doc } = await forkedSource(t, forkId);
+    await t.run((ctx) => ctx.db.delete(doc._id));
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const chunks = await t.run((ctx) =>
+      ctx.db
+        .query("documentChunks")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect()
+    );
+    expect(chunks).toHaveLength(0);
+  });
+
+  test("marks the fork's source failed when the original is deleted mid-copy", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId, docId, forkerId } = await seedSource(t, 1);
+
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+    await t.run(async (ctx) => {
+      for (const chunk of await ctx.db
+        .query("documentChunks")
+        .withIndex("by_document", (q) => q.eq("documentId", docId))
+        .collect()) {
+        await ctx.db.delete(chunk._id);
+      }
+      await ctx.db.delete(docId);
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const { doc, chunks } = await forkedSource(t, forkId);
+    expect(doc.status).toBe("failed");
+    expect(doc.error).toEqual(expect.any(String));
+    expect(chunks).toHaveLength(0);
+  });
+
+  test("refuses a notebook with too many sources with a readable error", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { notebookId, forkerId } = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Huge",
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (let i = 0; i < 201; i++) {
+        await ctx.db.insert("documents", {
+          userId: ownerId,
+          notebookId,
+          fileName: `s${i}.txt`,
+          fileType: "text",
+          status: "completed",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      const forkerId = await ctx.db.insert("users", { name: "Forker" });
+      return { notebookId, forkerId };
+    });
+
+    const error = await t
+      .run((ctx) => performNotebookFork(ctx, notebookId, forkerId))
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConvexError);
+    expect((error as ConvexError<{ type: string; detail: string }>).data).toMatchObject({
+      type: "INPUT_VALIDATION_ERROR",
+      detail: expect.stringContaining("200"),
+    });
+  });
+});
 
 describe("performNotebookFork mind maps", () => {
   test("a forked mind map points at the fork's own sources", async () => {
