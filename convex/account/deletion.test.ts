@@ -50,6 +50,7 @@ const DIRECT_USER_TABLES = [
   "spreadsheets",
   "writtenQuestions",
   "notes",
+  "studioProgress",
   "stripeSubscriptions",
   "rateLimits",
   "mobilePushTokens",
@@ -265,6 +266,36 @@ describe("account deletion", () => {
     await t.run(async (ctx) => {
       for (const id of crossIds) expect(await ctx.db.get(id)).toBeNull();
       for (const id of other.ids) expect(await ctx.db.get(id)).not.toBeNull();
+    });
+  });
+
+  test("deletes other users' practice progress on the user's notebooks, and keeps the rest", async () => {
+    const t = setup();
+    const doomed = await seedUser(t, "doomed@example.com");
+    const viewer = await seedUser(t, "viewer@example.com");
+    const { onDoomed, onOwn } = await t.run(async (ctx) => {
+      const doomedNotebook = await ctx.db
+        .query("notebooks")
+        .withIndex("by_user", (q) => q.eq("userId", doomed.userId))
+        .first();
+      const viewerNotebook = await ctx.db
+        .query("notebooks")
+        .withIndex("by_user", (q) => q.eq("userId", viewer.userId))
+        .first();
+      if (!doomedNotebook || !viewerNotebook) throw new Error("seed is missing a notebook");
+      // biome-ignore lint/suspicious/noExplicitAny: validation is off; rows carry only links.
+      const row = (notebookId: Id<"notebooks">) => ({ userId: viewer.userId, notebookId }) as any;
+      return {
+        onDoomed: await ctx.db.insert("studioProgress", row(doomedNotebook._id)),
+        onOwn: await ctx.db.insert("studioProgress", row(viewerNotebook._id)),
+      };
+    });
+
+    await deleteAndDrain(t, doomed.userId);
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(onDoomed)).toBeNull();
+      expect(await ctx.db.get(onOwn)).not.toBeNull();
     });
   });
 

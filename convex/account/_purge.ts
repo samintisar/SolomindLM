@@ -335,7 +335,8 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       ),
   },
   {
-    tables: ["notebooks", "notebookShareLinks", "notebookMembers"],
+    // Viewers' practice progress on the user's public notebooks goes with the notebooks.
+    tables: ["notebooks", "notebookShareLinks", "notebookMembers", "studioProgress"],
     run: (ctx, userId, budget) =>
       drainWithChildren(
         ctx,
@@ -357,6 +358,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             take: (n) =>
               ctx.db
                 .query("notebookMembers")
+                .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
+                .take(n),
+          },
+          {
+            take: (n) =>
+              ctx.db
+                .query("studioProgress")
                 .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
                 .take(n),
           },
@@ -392,6 +400,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
     ctx.db
       .query("notebookMembers")
       .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(n)
+  ),
+  // Practice progress on other people's public notebooks.
+  direct("studioProgress", (ctx, userId, n) =>
+    ctx.db
+      .query("studioProgress")
+      .withIndex("by_user_and_notebook", (q) => q.eq("userId", userId))
       .take(n)
   ),
   // The user's saves, ratings and reports of other people's prompts.
