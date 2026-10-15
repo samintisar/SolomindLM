@@ -54,6 +54,8 @@ export function createConvexChatInvoker(
         answer: result.answer,
         citations: result.citations,
         subQueries: result.subQueries,
+        // Absent when the deployment predates the field.
+        failedSubQueries: result.failedSubQueries ?? [],
         preRerankChunks: result.preRerankChunks as ReferenceChunk[],
         postRerankChunks: result.postRerankChunks as ReferenceChunk[],
         selectedChunks: result.selectedChunks as ReferenceChunk[],

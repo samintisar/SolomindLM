@@ -64,6 +64,10 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       () => toolCalls.some((tc) => tc.tool === "search_documents"),
       [toolCalls]
     );
+    const searchFailed = useMemo(
+      () => toolCalls.some((tc) => tc.tool === "search_documents" && tc.failed === true),
+      [toolCalls]
+    );
     const useClaudeLayout = hasSearchDocuments || (references != null && references.length > 0);
 
     const aggregatedSources = useMemo(() => aggregateRetrievalSources(references), [references]);
@@ -246,7 +250,9 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                       <p className="m-0 min-w-0 leading-snug text-muted-foreground">
                         {isStreaming && !searchFullyDone
                           ? "Searching your materials…"
-                          : "No matching sections found in your sources."}
+                          : searchFailed
+                            ? "Couldn't search your sources. Try sending your message again."
+                            : "No matching sections found in your sources."}
                       </p>
                     ) : (
                       <ul className="m-0 min-w-0 list-none divide-y divide-border/50 p-0">

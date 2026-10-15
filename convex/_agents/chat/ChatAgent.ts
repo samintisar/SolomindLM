@@ -17,6 +17,7 @@ import {
   CONTEXT_TOKEN_BUDGET,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
   GLOBAL_RERANK_TIMEOUT_MS,
+  HYDE_TIMEOUT_MS,
   LIST_QUERY_CONTEXT_TOKEN_BUDGET,
   LIST_QUERY_MAX_SELECTED_CHUNKS,
   MAX_CHUNKS_HARD_LIMIT,
@@ -53,6 +54,10 @@ import type {
 } from "./types.js";
 import { VectorSearchHandler } from "./vector_search.js";
 import { withTimeout } from "./withTimeout.js";
+
+/** The reply when every search of the sources failed, instead of an answer made without them. */
+export const SEARCH_FAILED_MESSAGE =
+  "I couldn't search your sources just now, so I can't answer from them. Please send your message again in a moment.";
 
 /**
 
@@ -386,11 +391,18 @@ export class ChatAgent {
     const searchOpts = { skipRerank: true, allowEmpty: true, isListQuery } as const;
 
     logger.apiCall("ChatLLMWrapper", "generateHypotheticalDocument", { query });
+    // HyDE only sharpens the embedding: when it stalls or fails, search with the query alone.
     const hydeText = await withTimeout(
       this.llmWrapper.generateHypotheticalDocument(query),
-      remainingMs(),
+      Math.min(HYDE_TIMEOUT_MS, remainingMs()),
       "hyde_generation"
-    );
+    ).catch((error) => {
+      logger.warn("HyDE skipped, searching with the query alone", {
+        query,
+        error: String(error),
+      });
+      return "";
+    });
 
     const textForVectorEmbedding = [query.trim(), hydeText.trim()].filter(Boolean).join("\n\n");
     const hydeEmbedding = await withTimeout(
@@ -698,6 +710,8 @@ export class ChatAgent {
     // None when notebook search is off: sources that weren't searched aren't named.
     const selectedSources = enableNotebookSearch ? selectedSourceIds(context.documentIds) : [];
     let coverEachSource = false;
+    let failedSearches = 0;
+    let everySearchFailed = false;
 
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
@@ -761,13 +775,22 @@ export class ChatAgent {
             },
           };
         } else {
+          failedSearches++;
           logger.warn("Subquery search failed", { query: sq, error: String(r.reason) });
+          // Marked failed so the UI does not report a search that never ran as finding nothing.
           yield {
             type: "tool_call",
-            data: { tool: "search_documents", query: sq, status: "done", resultCount: 0 },
+            data: {
+              tool: "search_documents",
+              query: sq,
+              status: "done",
+              resultCount: 0,
+              failed: true,
+            },
           };
         }
       }
+      everySearchFailed = settled.length > 0 && failedSearches === settled.length;
     } else {
       logger.info("Notebook source search disabled — skipping hybrid retrieval");
     }
@@ -858,6 +881,19 @@ export class ChatAgent {
     // done when the selected passages are results or discussion (#477). Own allowance, like the
     // neighbours'.
     const rankedChunks = await this.withOpeningPassages(withNeighbours, restNotebook, logger);
+
+    if (rankedChunks.length === 0 && everySearchFailed) {
+      // The sources were never searched, so an answer without them would read as if they had
+      // nothing on the question.
+      logger.warn("Every source search failed — not answering without sources", {
+        searches: failedSearches,
+      });
+      for await (const piece of sliceParagraphForStream(SEARCH_FAILED_MESSAGE)) {
+        yield { type: "token", data: piece };
+      }
+      yield this.doneChunk();
+      return;
+    }
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");

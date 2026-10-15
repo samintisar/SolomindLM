@@ -5,6 +5,12 @@ import { env } from "../../_lib/env";
 /** HyDE + embed + hybrid search must finish before Convex action limits kill the stream (client saw only `searching` then disconnect). */
 export const SEARCH_PIPELINE_TIMEOUT_MS = 70000;
 
+/**
+ * HyDE is optional: past this deadline a sub-query searches with its own text alone. Without it a
+ * stalled Together call used the whole search budget and failed every sub-query.
+ */
+export const HYDE_TIMEOUT_MS = 8000;
+
 export const FOLLOWUP_GENERATION_TIMEOUT_MS = 15000;
 /** Global rerank is optional; past this budget chat keeps the merged hybrid order. */
 export { GLOBAL_RERANK_TIMEOUT_MS } from "../../_lib/rerankConfig";
