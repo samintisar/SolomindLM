@@ -67,6 +67,14 @@ describe("FlashcardView", () => {
     expect(updatePreferences).not.toHaveBeenCalled();
   });
 
+  it("read-only starts on All, since a viewer has no review history to be due from", () => {
+    // The owner's deck preference says Due, but a viewer's copy carries no progress.
+    render(<FlashcardView note={makeNote(false)} readOnly />);
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Due" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+  });
+
   it("shows the first card and flips it on click", async () => {
     const user = userEvent.setup();
     const { container } = render(<FlashcardView note={makeNote()} />);

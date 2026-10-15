@@ -60,7 +60,10 @@ type ViewMode = "browse" | "study" | "edit";
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, readOnly = false }) => {
   // State
   const [mode, setMode] = useState<ViewMode>("browse");
-  const [showMastered, setShowMastered] = useState((note.metadata as any)?.showMastered ?? false);
+  // A viewer's deck carries no review history (the server strips the owner's), so start on All.
+  const [showMastered, setShowMastered] = useState<boolean>(
+    readOnly || ((note.metadata as { showMastered?: boolean } | undefined)?.showMastered ?? false)
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
