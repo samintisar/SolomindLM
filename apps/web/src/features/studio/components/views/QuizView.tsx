@@ -20,7 +20,6 @@ import {
   toDisplayPick,
 } from "@/shared/utils/quizOptionLabels";
 import { useStreak } from "../../motion/useStreak";
-import { ForkToPractiseNote } from "../practice/ForkToPractiseNote";
 import { QuestionProgress } from "../practice/QuestionProgress";
 import { type OptionState, QuizOption } from "../practice/QuizOption";
 import { ResultsSummary } from "../practice/ResultsSummary";
@@ -66,16 +65,9 @@ export interface QuizViewProps {
   note: QuizNote;
   onNoteUpdate?: (note: QuizNote) => void;
   onBack?: () => void;
-  /** Viewer of a public notebook: answering writes to the shared quiz, so it is locked. */
-  readOnly?: boolean;
 }
 
-export const QuizView: React.FC<QuizViewProps> = ({
-  note,
-  onNoteUpdate,
-  onBack,
-  readOnly = false,
-}) => {
+export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }) => {
   // Initialize currentIndex from note.metadata.lastViewedIndex if available
   const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
   const [currentIndex, setCurrentIndex] = useState(
@@ -109,7 +101,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   // Persist progress - track last viewed index
   // Use useMemo to prevent re-initializing when other state changes
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateQuizProgress(readOnly ? null : note.id, stableCurrentIndex);
+  useUpdateQuizProgress(note.id, stableCurrentIndex);
 
   // Sync userAnswers with note.userAnswers
   // Using a serialized key prevents the effect from running on every render
@@ -167,7 +159,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const score = questionStates.filter((state) => state === "correct").length;
 
   const handleSelect = async (index: number) => {
-    if (isAnswered || reviewMode || readOnly) return;
+    if (isAnswered || reviewMode) return;
 
     // Update local state immediately for responsiveness
     setUserAnswers((prev) => ({ ...prev, [currentIndex]: index }));
@@ -286,12 +278,10 @@ export const QuizView: React.FC<QuizViewProps> = ({
               <Eye />
               Review
             </Button>
-            {!readOnly && (
-              <Button className="flex-1" onClick={resetQuiz} disabled={isResetting}>
-                {isResetting ? <Spinner /> : <RotateCcw />}
-                {isResetting ? "Resetting…" : "Try Again"}
-              </Button>
-            )}
+            <Button className="flex-1" onClick={resetQuiz} disabled={isResetting}>
+              {isResetting ? <Spinner /> : <RotateCcw />}
+              {isResetting ? "Resetting…" : "Try Again"}
+            </Button>
           </>
         }
       >
@@ -324,8 +314,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
             </Alert>
           )}
 
-          {readOnly && !reviewMode && <ForkToPractiseNote />}
-
           <QuestionProgress
             currentIndex={currentIndex}
             states={questionStates}
@@ -352,7 +340,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   key={idx}
                   position={idx}
                   state={optionState(idx)}
-                  disabled={isAnswered || reviewMode || readOnly}
+                  disabled={isAnswered || reviewMode}
                   celebrate={celebrated?.question === currentIndex && celebrated.option === idx}
                   onSelect={() => handleSelect(idx)}
                 >

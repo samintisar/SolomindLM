@@ -26,10 +26,10 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
+import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import { Burst } from "../../motion/Burst";
 import { useCountUp } from "../../motion/useCountUp";
 import { useStreak } from "../../motion/useStreak";
-import { ForkToPractiseNote } from "../practice/ForkToPractiseNote";
 import { QuestionProgress } from "../practice/QuestionProgress";
 import { ResultsSummary } from "../practice/ResultsSummary";
 import { StreakChip } from "../practice/StreakChip";
@@ -43,11 +43,6 @@ export interface WrittenQuestionsViewProps {
   note: WrittenQuestionsNote;
   onNoteUpdate?: (note: WrittenQuestionsNote) => void;
   onBack?: () => void;
-  /**
-   * Viewer of a public notebook: drafts and grades write to the shared set, so answering is
-   * locked and nothing is saved or graded.
-   */
-  readOnly?: boolean;
 }
 
 // Idle value for the grade-on-Finish progress state. Must be reset between runs
@@ -76,7 +71,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   note,
   onNoteUpdate,
   onBack,
-  readOnly = false,
 }) => {
   // Initialize currentIndex from note.metadata.lastViewedIndex if available
   const questions = note.questions || [];
@@ -153,7 +147,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   // Persist progress - track last viewed index
   // Use useMemo to prevent re-initializing when other state changes
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateWrittenQuestionsProgress(readOnly ? null : note.id, stableCurrentIndex);
+  useUpdateWrittenQuestionsProgress(note.id, stableCurrentIndex);
 
   // Sync userAnswers from server only when server data actually changes (e.g. after submit/reset).
   // Using a serialized key prevents the effect from running on every render (latestNote?.userAnswers
@@ -194,7 +188,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   // Persist whatever draft is currently pending immediately. Used on question
   // change and unmount instead of only cancelling the debounce timer.
   const flushDraft = useCallback(() => {
-    if (readOnly) return;
     const pending = pendingDraftRef.current;
     if (!pending) return;
     if (lastSavedDraftRef.current[pending.questionId] === pending.answer) {
@@ -209,10 +202,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       questionId: pending.questionId,
       answer: pending.answer,
     }).catch((err) => console.error("Failed to flush answer draft:", err));
-  }, [saveDraftMutation, note.id, readOnly]);
+  }, [saveDraftMutation, note.id]);
 
   useEffect(() => {
-    if (readOnly) return;
     // Keep the pending-flush snapshot in sync with the latest state so a flush
     // (on nav / unmount) can never persist text the user has since retracted or
     // a question that has since been graded. A question with no saved draft and
@@ -249,7 +241,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     return () => {
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     };
-  }, [currentQuestionId, currentDraft, currentDraftGraded, note.id, saveDraftMutation, readOnly]);
+  }, [currentQuestionId, currentDraft, currentDraftGraded, note.id, saveDraftMutation]);
 
   // Flush (not just cancel) the pending draft when the user navigates to another
   // question or the view unmounts within the debounce window. The cleanup fires
@@ -309,7 +301,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const gradePending = gradingId === currentQuestion.id || justGraded?.id === currentQuestion.id;
 
   const handleSubmitAnswer = async () => {
-    if (readOnly || !isAnswered || isSubmitting || gradePending) return;
+    if (!isAnswered || isSubmitting || gradePending) return;
 
     const submittedId = currentQuestion.id;
     setIsSubmitting(true);
@@ -344,7 +336,14 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       }
     } catch (error) {
       console.error("Failed to submit answer:", error);
-      alert(error instanceof Error ? error.message : "Failed to submit answer");
+      const parsed = parseServiceError(error);
+      alert(
+        parsed
+          ? getServiceErrorMessage(parsed)
+          : error instanceof Error
+            ? error.message
+            : "Failed to submit answer"
+      );
     } finally {
       setIsSubmitting(false);
       setGradingId(null);
@@ -429,8 +428,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     setAnnouncement("");
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
-    } else if (readOnly) {
-      setShowResults(true);
     } else {
       void runGradeAllThenShowResults();
     }
@@ -560,12 +557,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
               <Eye />
               Review
             </Button>
-            {!readOnly && (
-              <Button className="flex-1" onClick={resetQuestions} disabled={isResetting}>
-                {isResetting ? <Spinner /> : <RotateCcw />}
-                {isResetting ? "Resetting…" : "Try Again"}
-              </Button>
-            )}
+            <Button className="flex-1" onClick={resetQuestions} disabled={isResetting}>
+              {isResetting ? <Spinner /> : <RotateCcw />}
+              {isResetting ? "Resetting…" : "Try Again"}
+            </Button>
           </>
         }
       >
@@ -612,8 +607,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
               </AlertDescription>
             </Alert>
           )}
-
-          {readOnly && !reviewMode && <ForkToPractiseNote className="mb-6" />}
 
           {/* Progress Header */}
           <div className="mb-8">
@@ -697,7 +690,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
                         ? "Type your short answer here (1-3 sentences)..."
                         : "Type your detailed answer here..."
                     }
-                    disabled={reviewMode || readOnly}
+                    disabled={reviewMode}
                     data-answered={isAnswered ? "true" : undefined}
                     className="w-full flex-1 resize-none rounded-xl bg-background p-6 font-serif text-base leading-relaxed shadow-xs ring-1 ring-hairline outline-hidden transition-shadow placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/30 disabled:opacity-70 not-focus-visible:data-[answered=true]:ring-primary/40"
                   />
@@ -831,7 +824,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             </span>
           </div>
 
-          {!isGraded && !reviewMode && !readOnly && (
+          {!isGraded && !reviewMode && (
             <Button
               ref={submitButtonRef}
               size="sm"

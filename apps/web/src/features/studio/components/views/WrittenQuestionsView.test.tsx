@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WrittenQuestionsNote } from "@/shared/types/index";
@@ -51,37 +52,6 @@ function makeNote(overrides: Partial<WrittenQuestionsNote> = {}): WrittenQuestio
 beforeEach(() => {
   vi.clearAllMocks();
   latestNote = null;
-});
-
-// --- Read-only viewer --------------------------------------------------------
-describe("WrittenQuestionsView read-only", () => {
-  it("locks answering, never saves or grades, and offers no retry", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      // A draft the owner left behind must not be re-saved or graded on the viewer's behalf.
-      const note = makeNote({ userAnswers: { q1: { answer: "owner draft", graded: false } } });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<WrittenQuestionsView note={note} readOnly />);
-      expect(screen.getByText("Fork this notebook to practise.")).toBeInTheDocument();
-      expect(screen.getByRole("textbox")).toBeDisabled();
-      expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
-      expect(updateProgress).toHaveBeenCalledWith(null, 0);
-      expect(updateProgress).not.toHaveBeenCalledWith("wq1", expect.anything());
-
-      await user.click(screen.getByRole("button", { name: "Next" }));
-      await user.click(screen.getByRole("button", { name: "Finish" }));
-      expect(await screen.findByText("Assessment Complete!")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Try Again/ })).not.toBeInTheDocument();
-
-      await act(async () => {
-        vi.advanceTimersByTime(2000);
-      });
-      expect(saveDraft).not.toHaveBeenCalled();
-      expect(submitAnswer).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 });
 
 // --- Results coverage ------------------------------------------------------
@@ -685,5 +655,23 @@ describe("WrittenQuestionsView redesign", () => {
     await screen.findByText("Graded: 5 of 5 points.");
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(submitAnswer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("WrittenQuestionsView grading errors", () => {
+  it("shows the server's reason when grading is refused", async () => {
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    const reason = "You've graded a lot of answers in the last hour. Try again later.";
+    submitAnswer.mockRejectedValueOnce(
+      new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: reason })
+    );
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+
+    await user.type(screen.getByRole("textbox"), "My answer");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(reason));
+    alertSpy.mockRestore();
   });
 });
