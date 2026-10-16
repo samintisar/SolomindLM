@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import type { MessageToolCall } from "@/shared/types/index";
 import type { SendMessageCallbacks } from "../services/chatApi";
 import { consumePersistentTextStream } from "../services/chatApi";
 
@@ -136,6 +137,23 @@ describe("consumePersistentTextStream", () => {
     expect(lastToolCalls).toHaveLength(1);
     expect(lastToolCalls[0].status).toBe("done");
     expect(lastToolCalls[0].resultCount).toBe(3);
+  });
+
+  it("keeps a failed search's failed flag", async () => {
+    const failed = {
+      tool: "search_documents",
+      query: "tensor shape",
+      status: "done" as const,
+      resultCount: 0,
+      failed: true,
+    };
+    const response = createStreamResponse([`__TOOL_CALL:${JSON.stringify(failed)}`, "__DONE"]);
+    const callbacks = createMockCallbacks();
+
+    await consumePersistentTextStream(response, callbacks);
+
+    const lastToolCalls = callbacks.calls.onToolCalls.at(-1)?.[0] as MessageToolCall[];
+    expect(lastToolCalls[0]).toMatchObject({ resultCount: 0, failed: true });
   });
 
   it("calls onGroundingChecks with parsed checks", async () => {

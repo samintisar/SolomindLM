@@ -18,6 +18,7 @@ export interface ChatAgentInvoker {
     answer: string;
     citations: string[];
     subQueries: string[];
+    failedSubQueries?: string[];
     preRerankChunks: ReferenceChunk[];
     postRerankChunks: ReferenceChunk[];
     selectedChunks: ReferenceChunk[];
@@ -129,6 +130,7 @@ export async function runChatEval(
         postRerankChunks: result.postRerankChunks.map(toChunkSnapshot),
         selectedChunks: result.selectedChunks.map(toChunkSnapshot),
         subQueries: result.subQueries,
+        failedSubQueries: result.failedSubQueries,
         latencyMs: result.latencyMs,
         tokenUsage: result.tokenUsage,
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
