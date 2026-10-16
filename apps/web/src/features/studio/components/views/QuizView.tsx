@@ -11,9 +11,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/aler
 import { Button } from "@/shared/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import { QuizNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
+import { getServiceErrorMessage, parseServiceError } from "@/shared/utils/errorParser";
 import {
   normalizeStoredQuizQuestion,
   stripQuizOptionLabel,
@@ -82,6 +84,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   const submitAnswer = useSubmitQuizAnswer();
   const resetAnswers = useResetQuizAnswers();
   const latestNote = useQuiz(note.id);
+  const toast = useToast();
 
   // Track if we've initialized the index from saved progress
   const hasInitializedIndex = useRef(false);
@@ -235,7 +238,10 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
       }
     } catch (error) {
       console.error("Failed to reset answers:", error);
-      alert(error instanceof Error ? error.message : "Failed to reset answers");
+      const parsed = parseServiceError(error);
+      toast.error(
+        parsed ? getServiceErrorMessage(parsed) : "Couldn't reset your answers. Try again."
+      );
     } finally {
       setIsResetting(false);
     }

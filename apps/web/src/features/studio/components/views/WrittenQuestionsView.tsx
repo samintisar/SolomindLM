@@ -23,6 +23,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Progress } from "@/shared/components/ui/progress";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
@@ -48,6 +49,14 @@ export interface WrittenQuestionsViewProps {
 // Idle value for the grade-on-Finish progress state. Must be reset between runs
 // so a stale `failed` count can't leak the failure banner onto a later clean finish.
 const GRADING_ALL_IDLE = { active: false, done: 0, total: 0, failed: 0, stopping: false };
+
+/** The server's reason when grading was refused at the hourly limit, else null. */
+function gradingLimitReason(error: unknown): string | null {
+  const parsed = parseServiceError(error);
+  return parsed?.kind === "input_validation" && parsed.field === "rateLimit"
+    ? getServiceErrorMessage(parsed)
+    : null;
+}
 
 /** "7 / 10", counting up when a grade has just arrived (duration 0 shows it at once). */
 function GradedScore({
@@ -91,7 +100,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     total: number;
     failed: number;
     stopping: boolean;
+    /** Set when the run stopped at the hourly grading limit: the server's reason. */
+    limitReason?: string;
   }>(GRADING_ALL_IDLE);
+  const toast = useToast();
 
   // Hooks for mutations
   const submitAnswerMutation = useSubmitWrittenAnswer();
@@ -408,6 +420,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
         } catch (err) {
           console.error("Failed to grade answer on finish:", err);
           failed += 1;
+          // At the hourly limit every further answer would be refused too: stop here.
+          const limitReason = gradingLimitReason(err);
+          if (limitReason) {
+            setGradingAll((s) => ({ ...s, done: i + 1, failed, limitReason }));
+            break;
+          }
         }
         setGradingAll((s) => ({ ...s, done: i + 1, failed }));
       }
@@ -474,7 +492,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       }
     } catch (error) {
       console.error("Failed to reset answers:", error);
-      alert(error instanceof Error ? error.message : "Failed to reset answers");
+      const parsed = parseServiceError(error);
+      toast.error(
+        parsed ? getServiceErrorMessage(parsed) : "Couldn't reset your answers. Try again."
+      );
     } finally {
       setIsResetting(false);
     }
@@ -576,10 +597,14 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
         {gradedCount < totalCount && (
           <p className="text-xs text-muted-foreground">Ungraded questions count as 0.</p>
         )}
-        {gradingAll.failed > 0 && (
-          <p className="text-xs text-warning-muted-foreground">
-            {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
-          </p>
+        {gradingAll.limitReason ? (
+          <p className="text-xs text-warning-muted-foreground">{gradingAll.limitReason}</p>
+        ) : (
+          gradingAll.failed > 0 && (
+            <p className="text-xs text-warning-muted-foreground">
+              {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
+            </p>
+          )
         )}
       </ResultsSummary>
     );

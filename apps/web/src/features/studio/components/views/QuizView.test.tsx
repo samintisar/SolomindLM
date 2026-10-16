@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QuizNote } from "@/shared/types/index";
@@ -8,7 +9,12 @@ import { QuizView } from "./QuizView";
 const submitAnswer = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn().mockResolvedValue(undefined);
 const updateProgress = vi.fn();
+const toastError = vi.fn();
 let latestNote: QuizNote | null = null;
+
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: toastError }),
+}));
 
 vi.mock("@/features/studio/services/quizzesApi", () => ({
   useSubmitQuizAnswer: () => submitAnswer,
@@ -219,6 +225,18 @@ describe("QuizView", () => {
     expect(resetAnswers).toHaveBeenCalledWith("quiz1");
     expect(await screen.findByText("Score 0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Right one/ })).toHaveAttribute("data-state", "idle");
+  });
+
+  it("shows the server's reason in a toast when Try Again fails", async () => {
+    resetAnswers.mockRejectedValueOnce(
+      new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: "Studio item not found" })
+    );
+    const user = userEvent.setup();
+    render(<QuizView note={makeQuiz()} />);
+    await finishQuiz(user);
+    await user.click(screen.getByRole("button", { name: "Try Again" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Studio item not found"));
+    expect(screen.getByRole("heading", { name: "Quiz Complete!" })).toBeInTheDocument();
   });
 
   it("neither announces nor takes focus when an answered question is restored", async () => {
