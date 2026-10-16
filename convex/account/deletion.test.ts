@@ -299,6 +299,48 @@ describe("account deletion", () => {
     });
   });
 
+  test("deletes viewers' progress on the user's studio items in other people's notebooks", async () => {
+    const t = setup();
+    const doomed = await seedUser(t, "doomed@example.com");
+    const viewer = await seedUser(t, "viewer@example.com");
+    const { onDoomedItems, onOtherItem } = await t.run(async (ctx) => {
+      // The viewer's notebook stands in for someone else's notebook the user edited in.
+      const otherNotebook = await ctx.db
+        .query("notebooks")
+        .withIndex("by_user", (q) => q.eq("userId", viewer.userId))
+        .first();
+      if (!otherNotebook) throw new Error("seed is missing a notebook");
+      const progressOn = async (itemId: string) =>
+        await ctx.db.insert(
+          "studioProgress",
+          // biome-ignore lint/suspicious/noExplicitAny: validation is off; rows carry only links.
+          { userId: viewer.userId, notebookId: otherNotebook._id, itemId } as any
+        );
+      const onDoomedItems = [];
+      for (const table of ["flashcards", "quizzes", "writtenQuestions"] as const) {
+        const item = await ctx.db
+          .query(table)
+          .withIndex("by_user", (q) => q.eq("userId", doomed.userId))
+          .first();
+        if (!item) throw new Error(`seed is missing ${table}`);
+        onDoomedItems.push(await progressOn(item._id));
+      }
+      const viewerQuiz = await ctx.db
+        .query("quizzes")
+        .withIndex("by_user", (q) => q.eq("userId", viewer.userId))
+        .first();
+      if (!viewerQuiz) throw new Error("seed is missing quizzes");
+      return { onDoomedItems, onOtherItem: await progressOn(viewerQuiz._id) };
+    });
+
+    await deleteAndDrain(t, doomed.userId);
+
+    await t.run(async (ctx) => {
+      for (const id of onDoomedItems) expect(await ctx.db.get(id)).toBeNull();
+      expect(await ctx.db.get(onOtherItem)).not.toBeNull();
+    });
+  });
+
   test("drains accounts larger than one batch across scheduled transactions", async () => {
     const t = setup();
     const { userId } = await seedUser(t, "big@example.com");
