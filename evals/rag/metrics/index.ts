@@ -296,6 +296,66 @@ export function retrievalItemRecall(
   });
 }
 
+// ─── Retrieval ran and reached the answer ──────────────────────
+
+/**
+ * Fails a notebook-searching chat case whose answer drew on no passages, or where any sub-query
+ * search failed (threw or timed out). Without it a case with no expected items passed every
+ * deterministic metric even when its sources were never searched.
+ */
+export function retrievalNonEmpty(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  _baseline?: EvalBaseline
+): MetricResult {
+  const metric = "retrieval_nonempty";
+  if (fixture.sourcePolicy && !fixture.sourcePolicy.channels.includes("notebook")) {
+    return metricResult(
+      metric,
+      fixture,
+      artifact,
+      "info",
+      1,
+      "Notebook not searched in this case."
+    );
+  }
+  const failed = artifact.failedSubQueries ?? [];
+  if (failed.length > 0) {
+    const searches = Math.max(artifact.subQueries.length, failed.length);
+    return metricResult(
+      metric,
+      fixture,
+      artifact,
+      "fail",
+      0,
+      `${failed.length} of ${searches} sub-query searches failed: ${failed.join("; ")}`,
+      { failedSubQueries: failed, selectedChunks: artifact.selectedChunks.length }
+    );
+  }
+  if (artifact.subQueries.length === 0) {
+    // Clarifying questions and direct replies (greetings, app questions) search nothing by design.
+    return metricResult(metric, fixture, artifact, "info", 1, "No source search ran this turn.");
+  }
+  if (artifact.selectedChunks.length === 0) {
+    return metricResult(
+      metric,
+      fixture,
+      artifact,
+      "fail",
+      0,
+      "No passages reached the answer; it was written without the sources."
+    );
+  }
+  return metricResult(
+    metric,
+    fixture,
+    artifact,
+    "pass",
+    1,
+    `${artifact.selectedChunks.length} passages reached the answer.`
+  );
+}
+
 // ─── 3. Retrieval Precision @ K ────────────────────────────────
 
 /**

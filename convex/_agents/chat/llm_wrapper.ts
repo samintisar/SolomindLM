@@ -40,6 +40,13 @@ import {
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
 } from "./chat_retrieval_subqueries.js";
+import {
+  DIRECT_RESPONSE_TIMEOUT_MS,
+  FOLLOWUP_GENERATION_TIMEOUT_MS,
+  HYDE_TIMEOUT_MS,
+  PLANNER_FALLBACK_TIMEOUT_MS,
+  PLANNER_TIMEOUT_MS,
+} from "./chatConfig.js";
 import type { ReferenceChunk } from "./types";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
@@ -128,6 +135,7 @@ export class ChatLLMWrapper {
         maxTokens: 1024,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs: DIRECT_RESPONSE_TIMEOUT_MS,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       return response.content.trim();
@@ -138,9 +146,12 @@ export class ChatLLMWrapper {
   }
 
   /**
-   * Generates a hypothetical document paragraph for HyDE retrieval (uses the smart model).
-   * The caller typically embeds this together with the declarative search query so
-   * explicit keywords stay represented while HyDE improves semantic density.
+   * Generates a hypothetical document paragraph for HyDE retrieval. The caller embeds it together
+   * with the declarative search query so explicit keywords stay represented while HyDE improves
+   * semantic density.
+   *
+   * Every sub-query waits on it before searching, so it uses the fast model with thinking off and
+   * a deadline of its own. On failure it returns "" and the sub-query searches with its own text.
    *
    * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
@@ -156,20 +167,24 @@ Coverage rules (for retrieval — follow even if you are unsure of fine details)
 Question: ${query}`;
     try {
       const response = await uncachedLlmCall({
-        model: this.smartLlmModelId,
+        model: this.fastLlmModelId,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         maxTokens: 220,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs: HYDE_TIMEOUT_MS,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       const text = response.content.trim();
       console.log("[ChatLLMWrapper] HyDE document:", text.slice(0, 200));
-      return text || query;
+      return text;
     } catch (error) {
-      console.warn("[ChatLLMWrapper] HyDE generation failed, falling back to raw query:", error);
-      return query;
+      console.warn(
+        "[ChatLLMWrapper] HyDE generation failed, searching with the query alone:",
+        error
+      );
+      return "";
     }
   }
 
@@ -196,6 +211,7 @@ Question: ${query}`;
         maxTokens: 320,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs: FOLLOWUP_GENERATION_TIMEOUT_MS,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       const text = response.content.trim();
@@ -285,7 +301,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       { role: "user", content: prompt },
     ];
 
-    const callModel = async (modelId: string) => {
+    const callModel = async (modelId: string, timeoutMs: number) => {
       const response = await uncachedLlmCall({
         model: modelId,
         messages,
@@ -293,13 +309,14 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         maxTokens: 500,
         reasoningEnabled: false,
         toolChoice: "none",
+        timeoutMs,
       });
       this.tokenUsage.add(fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
 
     try {
-      const fromFast = await callModel(this.fastLlmModelId);
+      const fromFast = await callModel(this.fastLlmModelId, PLANNER_TIMEOUT_MS);
       if (fromFast) {
         // Expand subqueries for list queries when the LLM returned too few
         if (isListEnumerationQuery(trimmed) && fromFast.subqueries.length < 4) {
@@ -317,7 +334,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       if (this.smartLlmModelId !== this.fastLlmModelId) {
         try {
           console.log("[ChatLLMWrapper] Retrying subquery decomposition with smart model");
-          const fromSmart = await callModel(this.smartLlmModelId);
+          const fromSmart = await callModel(this.smartLlmModelId, PLANNER_FALLBACK_TIMEOUT_MS);
           if (fromSmart) return fromSmart;
         } catch (e2) {
           console.warn(

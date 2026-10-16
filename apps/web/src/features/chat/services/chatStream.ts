@@ -178,6 +178,7 @@ function applyToolCallLine(state: MarkerState, line: string): void {
     query,
     status: raw.status,
     resultCount: raw.resultCount,
+    ...(raw.failed === true ? { failed: true } : {}),
   };
   const { toolCalls } = state.data;
   const existing = state.toolCallIndex.get(key);

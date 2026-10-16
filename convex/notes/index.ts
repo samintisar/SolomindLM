@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { TableNames } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import { assertCanReadNotebook, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as NotesModel from "../_model/notes";
@@ -183,7 +184,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const tableMap: Record<string, string> = {
+    const tableMap: Record<string, TableNames> = {
       report: "reports",
       flashcard: "flashcards",
       quiz: "quizzes",
@@ -200,7 +201,11 @@ export const get = query({
       return null;
     }
 
-    const note = await ctx.db.get(args.id as any);
+    // The id must belong to the table `type` names: the progress strip below is chosen by type,
+    // so a mismatched pair would strip the wrong fields.
+    const id = ctx.db.normalizeId(tableName, args.id);
+    if (!id) return null;
+    const note = await ctx.db.get(id);
     if (!note) return null;
 
     if (!("notebookId" in note)) {

@@ -79,6 +79,8 @@ export interface ChatEvalResult {
   answer: string;
   citations: string[];
   subQueries: string[];
+  /** Sub-queries whose search threw or timed out (their zero results mean they never ran). */
+  failedSubQueries: string[];
   preRerankChunks: ReferenceChunk[];
   postRerankChunks: ReferenceChunk[];
   selectedChunks: ReferenceChunk[];
@@ -218,6 +220,7 @@ export const runChatEval = action({
     let answer = "";
     let references: ReferenceChunk[] = [];
     const subQueries: string[] = [];
+    const failedSubQueries: string[] = [];
 
     const userIdStr = evalUserId as string;
     const notebookIdStr = args.notebookId as string;
@@ -375,9 +378,17 @@ export const runChatEval = action({
           selectEndedAt = Date.now();
           break;
         case "tool_call": {
-          const tc = chunk.data as { tool?: string; query?: string; status?: string };
+          const tc = chunk.data as {
+            tool?: string;
+            query?: string;
+            status?: string;
+            failed?: boolean;
+          };
           if (tc?.query && tc?.status === "searching") {
             subQueries.push(tc.query);
+          }
+          if (tc?.query && tc?.status === "done" && tc.failed === true) {
+            failedSubQueries.push(tc.query);
           }
           break;
         }
@@ -469,6 +480,7 @@ export const runChatEval = action({
       answer,
       citations: Array.from(citationSet),
       subQueries,
+      failedSubQueries,
       preRerankChunks,
       postRerankChunks,
       selectedChunks,

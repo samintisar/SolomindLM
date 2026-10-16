@@ -14,11 +14,14 @@
 import { env } from "../../_lib/env";
 import { uncachedLlmCall } from "../_shared/cachedLlm";
 
+/** The web search waits on the refinement; past this it searches with the user's message. */
+const REFINE_TIMEOUT_MS = 8000;
+
 /**
  * Rewrite a user message into a concise, search-optimized query.
  *
- * Falls back to the original message on any error so the search pipeline
- * never blocks on a refinement failure.
+ * Falls back to the original message on any error (including its deadline) so the search
+ * pipeline never blocks on a refinement failure.
  */
 export async function refineWebSearchQuery(userMessage: string): Promise<string> {
   const trimmed = userMessage.trim();
@@ -55,6 +58,7 @@ export async function refineWebSearchQuery(userMessage: string): Promise<string>
       maxTokens: 120,
       reasoningEnabled: false,
       toolChoice: "none",
+      timeoutMs: REFINE_TIMEOUT_MS,
     });
 
     const refined = response.content.trim();

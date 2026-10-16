@@ -19,6 +19,7 @@ import {
   latencyCostBudget,
   retrievalItemRecall,
   retrievalNdcgAtK,
+  retrievalNonEmpty,
   retrievalPrecisionAtK,
 } from "./index";
 import {
@@ -92,6 +93,7 @@ export async function scoreAllMetrics(
   results.push(stageTokenShare(fixture, artifact, baseline));
 
   if (isChunkRetrievalRunner(artifact.runner)) {
+    results.push(retrievalNonEmpty(fixture, artifact, baseline));
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
     results.push(abstentionCorrectness(fixture, artifact, baseline));
