@@ -116,6 +116,18 @@ describe("practice progress on a public notebook", () => {
     expect((quiz as { metadata: unknown }).metadata).toEqual({ difficulty: "easy" });
   });
 
+  test("notes.get returns nothing when the type doesn't match the id's table", async () => {
+    const { t, viewer, flashcardId } = await setup();
+    const asViewer = withAuth(t, viewer);
+
+    // A quiz-shaped strip would leave the deck's card proficiency in place.
+    const mismatched = await asViewer.query(api.notes.index.get, {
+      type: "quiz",
+      id: flashcardId,
+    });
+    expect(mismatched).toBeNull();
+  });
+
   test("the owner still sees their progress", async () => {
     const { t, owner, notebookId, flashcardId, quizId, writtenId } = await setup();
     const asOwner = withAuth(t, owner);
