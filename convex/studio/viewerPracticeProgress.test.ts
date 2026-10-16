@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
+import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import { api, internal } from "../_generated/api";
@@ -586,6 +587,149 @@ describe("quizzes.submitAnswer question index", () => {
     });
   });
 });
+
+describe("flashcard card index", () => {
+  test("a fractional or out-of-range index is refused as invalid input", async () => {
+    const { t, owner, viewer, flashcardId } = await setup();
+    for (const cardIndex of [-1, 0.5, 1, 9999]) {
+      for (const user of [viewer, owner]) {
+        const refusal = await rejectionOf(
+          withAuth(t, user).mutation(api.studio.flashcards.index.submitCardReview, {
+            id: flashcardId,
+            cardIndex,
+            rating: "good",
+          })
+        );
+        expect(validationField(refusal)).toBe("cardIndex");
+      }
+      const asOwner = withAuth(t, owner);
+      expect(
+        validationField(
+          await rejectionOf(
+            asOwner.mutation(api.studio.flashcards.index.updateCard, {
+              id: flashcardId,
+              cardIndex,
+              front: "x",
+            })
+          )
+        )
+      ).toBe("cardIndex");
+      expect(
+        validationField(
+          await rejectionOf(
+            asOwner.mutation(api.studio.flashcards.index.deleteCard, { id: flashcardId, cardIndex })
+          )
+        )
+      ).toBe("cardIndex");
+    }
+    expect(await allProgress(t)).toEqual([]);
+    const shared = await t.run((ctx) => ctx.db.get(flashcardId));
+    expect(shared?.cardsData).toEqual([{ front: "Q", back: "A", proficiency: PROFICIENCY }]);
+  });
+});
+
+describe("who practice calls reach", () => {
+  test("an editor's practice calls go on the shared rows", async () => {
+    const { t, notebookId, flashcardId, quizId, writtenId } = await setup();
+    const editor = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("users", { name: "Editor" });
+      await ctx.db.insert("notebookMembers", {
+        notebookId,
+        userId: id,
+        role: "editor",
+        joinedAt: Date.now(),
+      });
+      return id;
+    });
+    const asEditor = withAuth(t, editor);
+
+    await asEditor.mutation(api.studio.flashcards.index.submitCardReview, {
+      id: flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+    await asEditor.mutation(api.studio.flashcards.index.updatePreferences, {
+      id: flashcardId,
+      showMastered: false,
+    });
+    await asEditor.mutation(api.studio.quizzes.index.submitAnswer, {
+      id: quizId,
+      questionIndex: 0,
+      selectedOption: 0,
+    });
+    await asEditor.mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: writtenId,
+      questionId: "q1",
+      answer: "Edited",
+    });
+    await asEditor.mutation(api.studio.practice.setLastViewedIndex, {
+      itemType: "quizzes",
+      itemId: quizId,
+      index: 0,
+    });
+
+    const shared = await t.run(async (ctx) => ({
+      deck: await ctx.db.get(flashcardId),
+      quiz: await ctx.db.get(quizId),
+      written: await ctx.db.get(writtenId),
+    }));
+    expect(shared.deck?.cardsData?.[0]).toMatchObject({ proficiency: { totalReviews: 7 } });
+    expect(shared.deck?.metadata).toMatchObject({ showMastered: false });
+    expect(shared.quiz?.metadata).toMatchObject({ userAnswers: { 0: 0 }, lastViewedIndex: 0 });
+    expect(shared.written?.metadata).toMatchObject({ userAnswers: { q1: { answer: "Edited" } } });
+    expect(await allProgress(t)).toEqual([]);
+  });
+
+  test("a stranger to a private notebook can't set a position or try again", async () => {
+    const { t, viewer, notebookId, quizId } = await setup();
+    await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
+    const asStranger = withAuth(t, viewer);
+    await expect(
+      asStranger.mutation(api.studio.practice.setLastViewedIndex, {
+        itemType: "quizzes",
+        itemId: quizId,
+        index: 0,
+      })
+    ).rejects.toThrow("Notebook not found");
+    await expect(
+      asStranger.mutation(api.studio.practice.resetAnswers, { itemType: "quizzes", itemId: quizId })
+    ).rejects.toThrow("Notebook not found");
+    expect(await allProgress(t)).toEqual([]);
+  });
+
+  test("setLastViewedIndex refuses a negative or fractional index", async () => {
+    const { t, viewer, owner, quizId } = await setup();
+    for (const user of [viewer, owner]) {
+      for (const index of [-1, 0.5]) {
+        const refusal = await rejectionOf(
+          withAuth(t, user).mutation(api.studio.practice.setLastViewedIndex, {
+            itemType: "quizzes",
+            itemId: quizId,
+            index,
+          })
+        );
+        expect(validationField(refusal)).toBe("index");
+      }
+    }
+    expect(await allProgress(t)).toEqual([]);
+  });
+});
+
+async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  throw new Error("expected the call to be refused");
+}
+
+/** The `field` of an InputValidationError sent to the client, else undefined. */
+function validationField(error: unknown): unknown {
+  if (!(error instanceof ConvexError)) return undefined;
+  const data = error.data as { type?: unknown; field?: unknown };
+  return data.type === "INPUT_VALIDATION_ERROR" ? data.field : undefined;
+}
 
 describe("forking a public notebook", () => {
   test("leaves the viewer's progress behind", async () => {

@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { toConvexError } from "../../_lib/serviceErrors";
 import * as Flashcards from "../../_model/flashcards";
 import {
   savedCardProficiency,
@@ -15,6 +17,18 @@ import {
 } from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
 import { deletePracticeProgress } from "../practice";
+
+/** Refuses a card index that isn't a whole number naming one of the deck's cards. */
+function assertCardIndex(cardsData: unknown[] | undefined, cardIndex: number): void {
+  if (
+    !Array.isArray(cardsData) ||
+    !Number.isInteger(cardIndex) ||
+    cardIndex < 0 ||
+    cardIndex >= cardsData.length
+  ) {
+    throw toConvexError(new InputValidationError("Invalid card index", { field: "cardIndex" }));
+  }
+}
 
 /**
  * Internal: Get a flashcard set by ID (for use by jobs)
@@ -240,9 +254,7 @@ export const submitCardReview = mutation({
     const target = await getPracticeTarget(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
-    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
-      throw new Error("Invalid card index");
-    }
+    assertCardIndex(cardsData, args.cardIndex);
 
     const card = cardsData[args.cardIndex];
 
@@ -318,9 +330,7 @@ export const updateCard = mutation({
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
-    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
-      throw new Error("Invalid card index");
-    }
+    assertCardIndex(cardsData, args.cardIndex);
 
     const card = cardsData[args.cardIndex];
 
@@ -417,9 +427,7 @@ export const deleteCard = mutation({
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
-    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
-      throw new Error("Invalid card index");
-    }
+    assertCardIndex(cardsData, args.cardIndex);
 
     cardsData.splice(args.cardIndex, 1);
 
