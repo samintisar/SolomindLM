@@ -147,6 +147,12 @@ describe("NoteItem", () => {
     expect(document.querySelector("[data-slot='finish-glow']")).not.toBeNull();
   });
 
+  it("read-only hides the rename/delete menu", () => {
+    renderItem(note(), { readOnly: true });
+    expect(screen.queryByRole("button", { name: "More options" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /SQL Joins/ })).toBeInTheDocument();
+  });
+
   it("offers inline play for a finished audio overview", async () => {
     const onPlayAudio = vi.fn();
     renderItem(note({ type: "audioOverview", audioUrl: "https://x/a.mp3" }), { onPlayAudio });

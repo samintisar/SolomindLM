@@ -41,13 +41,109 @@ describe("NotebookCard", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  test("featured and shared notebooks have no actions menu", () => {
-    const { rerender } = render(
-      <NotebookCard notebook={nb} viewMode="grid" onSelectNotebook={vi.fn()} featured />
+  test("public cards show the author and no owner actions", () => {
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isPublic: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        onOpenCustomize={vi.fn()}
+        onDeleteNotebook={vi.fn()}
+        variant="public"
+      />
     );
-    expect(screen.queryByRole("button", { name: "Notebook actions" })).toBeNull();
+    expect(screen.getByText(/by Ada/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notebook actions" })).not.toBeInTheDocument();
+  });
+
+  test("public cards show author and date but no source count", () => {
+    const { sourceCount: _omit, ...listing } = nb;
+    render(
+      <NotebookCard
+        notebook={{ ...listing, isPublic: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        variant="public"
+      />
+    );
+    expect(screen.getByText(/^by Ada · Sep 12/)).toBeInTheDocument();
+    expect(screen.queryByText(/sources?/)).not.toBeInTheDocument();
+  });
+
+  test("featured public cards say Featured", () => {
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isPublic: true, isFeatured: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        variant="public"
+      />
+    );
     expect(screen.getByText("Featured")).toBeInTheDocument();
-    rerender(
+  });
+
+  test("your own published notebook shows a Public badge in My notebooks", () => {
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isPublic: true }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        onDeleteNotebook={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Public")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Notebook actions" })).toBeInTheDocument();
+  });
+
+  test("admins get moderation actions on public cards", async () => {
+    const onToggleFeatured = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isPublic: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={onSelect}
+        variant="public"
+        adminActions={{ onToggleFeatured, onUnpublish: vi.fn() }}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Moderation actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Feature" }));
+    expect(onToggleFeatured).toHaveBeenCalledOnce();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  test("admin Unpublish asks first", async () => {
+    const onUnpublish = vi.fn();
+    render(
+      <NotebookCard
+        notebook={{ ...nb, isPublic: true, ownerName: "Ada" }}
+        viewMode="grid"
+        onSelectNotebook={vi.fn()}
+        variant="public"
+        adminActions={{ onToggleFeatured: vi.fn(), onUnpublish }}
+      />
+    );
+    const unpublish = async () => {
+      await userEvent.click(screen.getByRole("button", { name: "Moderation actions" }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Unpublish" }));
+      return screen.findByRole("alertdialog");
+    };
+
+    let dialog = await unpublish();
+    expect(
+      within(dialog).getByText(/Remove "Cell Biology" from the Public tab/)
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(onUnpublish).not.toHaveBeenCalled();
+
+    dialog = await unpublish();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Unpublish" }));
+    expect(onUnpublish).toHaveBeenCalledOnce();
+  });
+
+  test("shared notebooks have no actions menu", () => {
+    render(
       <NotebookCard
         notebook={{ ...nb, isSharedNotebook: true }}
         viewMode="list"

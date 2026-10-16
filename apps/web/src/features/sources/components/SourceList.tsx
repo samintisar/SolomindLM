@@ -45,6 +45,8 @@ interface SourceListProps {
   onRefreshAll: () => void;
   canRefreshAll: boolean;
   isRefreshing: boolean;
+  /** Viewer of a public notebook: only search and selection for chat are offered. */
+  readOnly?: boolean;
 }
 
 export const SourceList: React.FC<SourceListProps> = ({
@@ -75,6 +77,7 @@ export const SourceList: React.FC<SourceListProps> = ({
   onRefreshAll,
   canRefreshAll,
   isRefreshing,
+  readOnly = false,
 }) => {
   const handleRenameSubmit = (id: string, newTitle: string) => {
     if (newTitle.trim()) {
@@ -86,64 +89,66 @@ export const SourceList: React.FC<SourceListProps> = ({
     <div className="flex flex-col gap-3 p-3">
       {sources.length > 0 && (
         <>
-          <div className="flex items-center gap-2">
-            <Button
-              className="flex-1"
-              onClick={onAddSource}
-              title="Add Source"
-              data-onboarding="add-source-button"
-            >
-              <Plus />
-              Add source
-            </Button>
-            <ButtonGroup variant="tray" aria-label="Source actions">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Discover sources"
-                    onClick={onDiscoverClick}
-                  >
-                    <Search />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Discover sources</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
+          {!readOnly && (
+            <div className="flex items-center gap-2">
+              <Button
+                className="flex-1"
+                onClick={onAddSource}
+                title="Add Source"
+                data-onboarding="add-source-button"
+              >
+                <Plus />
+                Add source
+              </Button>
+              <ButtonGroup variant="tray" aria-label="Source actions">
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label="Refresh all"
-                      onClick={onRefreshAll}
-                      disabled={!canRefreshAll || isRefreshing}
+                      aria-label="Discover sources"
+                      onClick={onDiscoverClick}
                     >
-                      {isRefreshing ? <Spinner /> : <RefreshCw />}
+                      <Search />
                     </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>Re-fetch web pages and Google Drive imports</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Delete selected"
-                      onClick={onDeleteSelected}
-                      disabled={selectedCount === 0}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>Delete selected</TooltipContent>
-              </Tooltip>
-            </ButtonGroup>
-          </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Discover sources</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Refresh all"
+                        onClick={onRefreshAll}
+                        disabled={!canRefreshAll || isRefreshing}
+                      >
+                        {isRefreshing ? <Spinner /> : <RefreshCw />}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Re-fetch web pages and Google Drive imports</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Delete selected"
+                        onClick={onDeleteSelected}
+                        disabled={selectedCount === 0}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete selected</TooltipContent>
+                </Tooltip>
+              </ButtonGroup>
+            </div>
+          )}
 
           <InputGroup>
             <InputGroupAddon>
@@ -179,17 +184,21 @@ export const SourceList: React.FC<SourceListProps> = ({
             <EmptyMedia variant="icon">
               <FileText />
             </EmptyMedia>
-            <EmptyTitle>Add your first source</EmptyTitle>
+            <EmptyTitle>{readOnly ? "No sources" : "Add your first source"}</EmptyTitle>
             <EmptyDescription>
-              Upload files, paste links or import papers to ground your notebook.
+              {readOnly
+                ? "This notebook has no sources yet."
+                : "Upload files, paste links or import papers to ground your notebook."}
             </EmptyDescription>
           </EmptyHeader>
-          <EmptyContent>
-            <Button onClick={onAddSource} title="Add Source" data-onboarding="add-source-button">
-              <Plus />
-              Add source
-            </Button>
-          </EmptyContent>
+          {!readOnly && (
+            <EmptyContent>
+              <Button onClick={onAddSource} title="Add Source" data-onboarding="add-source-button">
+                <Plus />
+                Add source
+              </Button>
+            </EmptyContent>
+          )}
         </Empty>
       ) : filteredSources.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
@@ -215,6 +224,7 @@ export const SourceList: React.FC<SourceListProps> = ({
               onRefreshSource={onRefreshSource}
               onFindFullText={onFindFullText}
               onUploadPdf={onUploadPdf}
+              readOnly={readOnly}
             />
           ))}
         </ItemGroup>

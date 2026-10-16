@@ -16,12 +16,11 @@ import {
   assertCanEditNotebook,
   assertCanReadNotebook,
   canReadNotebook,
-  getNotebookAccess,
 } from "../_lib/notebookAccess";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
-import { deleteAllChunksForDocument } from "./internal";
+import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
 /**
@@ -265,26 +264,59 @@ export const getContent = query({
   },
 });
 
+/** Bounds the rows read when looking for a notebook through which the caller may read a file. */
+const MAX_DOCUMENTS_SHARING_A_FILE_CHECKED = 20;
+
 /**
  * Get a signed URL for a document's storage file
  */
 export const getSignedUrl = mutation({
-  args: { storageId: v.string() },
+  args: {
+    storageId: v.string(),
+    /** The source being viewed. Checked directly, so access never depends on how many forks share the file. */
+    documentId: v.optional(v.id("documents")),
+  },
   returns: v.union(v.null(), v.string()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const document = await ctx.db
+    if (args.documentId !== undefined) {
+      const document = await ctx.db.get(args.documentId);
+      if (!document || document.storageId !== args.storageId) {
+        throw new Error("Document not found");
+      }
+      if (!(await canReadNotebook(ctx, document.notebookId, userId))) {
+        throw new Error("Notebook not found");
+      }
+      return await ctx.storage.getUrl(args.storageId as Id<"_storage">);
+    }
+
+    // Callers without a source id: a fork shares its sources' files, so several notebooks can hold
+    // this file, and the caller may read it through any of them (the original may since have been
+    // unpublished or deleted). Only the first rows are checked.
+    const documents = await ctx.db
       .query("documents")
       .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .first();
+      .take(MAX_DOCUMENTS_SHARING_A_FILE_CHECKED);
 
-    if (!document) {
+    if (documents.length === 0) {
       throw new Error("Document not found");
     }
 
-    await assertCanReadNotebook(ctx, document.notebookId, userId);
+    const checked = new Set<Id<"notebooks">>();
+    let readable = false;
+    for (const document of documents) {
+      if (checked.has(document.notebookId)) continue;
+      checked.add(document.notebookId);
+      if (await canReadNotebook(ctx, document.notebookId, userId)) {
+        readable = true;
+        break;
+      }
+    }
+    if (!readable) {
+      throw new Error("Notebook not found");
+    }
 
     return await ctx.storage.getUrl(args.storageId as Id<"_storage">);
   },
@@ -384,7 +416,7 @@ export const remove = mutation({
     await deleteAllChunksForDocument(ctx, args.id);
 
     if (document.storageId) {
-      await ctx.storage.delete(document.storageId as Id<"_storage">);
+      await deleteDocumentFileIfUnused(ctx, document.storageId, [args.id]);
     }
 
     await ctx.db.delete(args.id);
@@ -416,7 +448,7 @@ export const removeMany = mutation({
       await deleteAllChunksForDocument(ctx, id);
 
       if (document.storageId) {
-        await ctx.storage.delete(document.storageId as Id<"_storage">);
+        await deleteDocumentFileIfUnused(ctx, document.storageId, [id]);
       }
 
       await ctx.db.delete(id);

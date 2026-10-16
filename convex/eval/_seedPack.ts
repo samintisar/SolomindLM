@@ -9,7 +9,7 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import * as Notebooks from "../_model/notebooks";
-import { deleteAllChunksForDocument } from "../documents/internal";
+import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "../documents/internal";
 import { EVAL_PACK_FOLDER_NAME } from "./_packFolder";
 
 export { EVAL_PACK_FOLDER_NAME };
@@ -227,7 +227,7 @@ export const deletePackDocument = internalMutation({
     }
     await deleteAllChunksForDocument(ctx, args.documentId);
     if (document.storageId) {
-      await ctx.storage.delete(document.storageId as Id<"_storage">);
+      await deleteDocumentFileIfUnused(ctx, document.storageId, [args.documentId]);
     }
     await ctx.db.delete(args.documentId);
     return null;

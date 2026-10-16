@@ -63,7 +63,6 @@ export async function streamChatResponse(
   const notebookDoc = await ctx.runQuery(internal.notebooks.index.getNotebookInternal, {
     notebookId: notebookIdTyped,
   });
-  const keywordSearchChunkUserId = (notebookDoc?.userId ?? userId) as Id<"users">;
 
   const chatStreamLog = createServiceLogger("chatStream", "streamChatResponse", {
     userId,
@@ -137,10 +136,11 @@ export async function streamChatResponse(
   const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
   const vectorSearchRunner = createChatVectorSearchRunner(ctx, notebookIdTyped, chatStreamLog);
+  // Keyword search is scoped by notebook; the user id only labels its logs.
   const keywordSearchRunner = createKeywordSearchRunner(
     ctx,
     notebookIdTyped,
-    keywordSearchChunkUserId
+    userId as Id<"users">
   );
   const rerankFn = createRerankFn(ctx);
   const globalRerankFn: GlobalRerankFn = rerankFn;

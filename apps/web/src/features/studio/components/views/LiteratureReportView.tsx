@@ -55,6 +55,8 @@ export interface LiteratureReportViewProps {
   onBack?: () => void;
   onExport?: () => void;
   onSaveAndEdit?: () => Promise<void>;
+  /** Viewer of a public notebook: no Save & Edit (it writes a Studio report). */
+  readOnly?: boolean;
   citations?: Record<string, { title: string; authors: string[]; year?: number; url: string }>;
   workflowProvenance?: PrismaFlowCounts;
 }
@@ -247,6 +249,7 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
   onSaveAndEdit,
   citations = {},
   workflowProvenance,
+  readOnly = false,
 }) => {
   const [currentStyle, setCurrentStyle] = useState<CitationStyle>(report.citationStyle);
   const [didCopyReport, setDidCopyReport] = useState(false);
@@ -349,19 +352,21 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="sm-adaptive"
-            onClick={handleSaveAndEdit}
-            disabled={!onSaveAndEdit || isSaving}
-            title="Save & Edit Document"
-            aria-label={isSaving ? "Saving document" : "Save and edit document"}
-          >
-            {isSaving ? <Spinner aria-hidden /> : <Save />}
-            <span className="hidden @2xl/report-toolbar:inline">
-              {isSaving ? "Saving..." : "Save & Edit Document"}
-            </span>
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="ghost"
+              size="sm-adaptive"
+              onClick={handleSaveAndEdit}
+              disabled={!onSaveAndEdit || isSaving}
+              title="Save & Edit Document"
+              aria-label={isSaving ? "Saving document" : "Save and edit document"}
+            >
+              {isSaving ? <Spinner aria-hidden /> : <Save />}
+              <span className="hidden @2xl/report-toolbar:inline">
+                {isSaving ? "Saving..." : "Save & Edit Document"}
+              </span>
+            </Button>
+          )}
           {onBack && (
             <Button
               variant="ghost"

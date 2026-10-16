@@ -1,7 +1,9 @@
 import { v } from "convex/values";
+import type { TableNames } from "../_generated/dataModel";
 import { query } from "../_generated/server";
-import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { assertCanReadNotebook, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as NotesModel from "../_model/notes";
+import { withoutPracticeProgress } from "../_model/practiceProgress";
 import { getAuthUserId } from "../auth";
 import { summarizeListRow } from "./listSummary";
 
@@ -22,8 +24,9 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    let access: NotebookAccessRole;
     try {
-      await assertCanReadNotebook(ctx, args.notebookId, userId);
+      ({ access } = await assertCanReadNotebook(ctx, args.notebookId, userId));
     } catch {
       return [];
     }
@@ -139,11 +142,12 @@ export const list = query({
     }
 
     const results = await Promise.all(queries);
-    const allNotes = results
-      .flat()
-      .map((item) =>
-        summarizeListRow(item as Record<string, unknown> & { _type: string })
-      ) as Array<Record<string, unknown> & { updatedAt: number }>;
+    const allNotes = results.flat().map((item: Record<string, unknown> & { _type: string }) =>
+      summarizeListRow(
+        // Practice progress on a shared row is the owner's; a viewer starts fresh.
+        access === "viewer" ? withoutPracticeProgress(item._type, item) : item
+      )
+    ) as Array<Record<string, unknown> & { updatedAt: number }>;
 
     allNotes.sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -173,7 +177,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const tableMap: Record<string, string> = {
+    const tableMap: Record<string, TableNames> = {
       report: "reports",
       flashcard: "flashcards",
       quiz: "quizzes",
@@ -190,16 +194,21 @@ export const get = query({
       return null;
     }
 
-    const note = await ctx.db.get(args.id as any);
+    // The id must belong to the table `type` names: the progress strip below is chosen by type,
+    // so a mismatched pair would strip the wrong fields.
+    const id = ctx.db.normalizeId(tableName, args.id);
+    if (!id) return null;
+    const note = await ctx.db.get(id);
     if (!note) return null;
 
     if (!("notebookId" in note)) {
       return null;
     }
 
+    let access: NotebookAccessRole;
     try {
       if (!note.notebookId) return null;
-      await assertCanReadNotebook(ctx, note.notebookId, userId);
+      ({ access } = await assertCanReadNotebook(ctx, note.notebookId, userId));
     } catch {
       return null;
     }
@@ -210,6 +219,7 @@ export const get = query({
       }
     }
 
-    return { ...note, _type: args.type };
+    const visible = access === "viewer" ? withoutPracticeProgress(tableName, note) : note;
+    return { ...visible, _type: args.type };
   },
 });

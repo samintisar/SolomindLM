@@ -67,6 +67,21 @@ describe("LiteraturePapersPanel", () => {
     expect(api.exportBibtex).toHaveBeenCalledWith([PAPER], "transformers.bib");
   });
 
+  it("read-only can cite and export but not select or add papers", () => {
+    render(
+      <LiteraturePapersPanel
+        sessionId={"s1" as never}
+        notebookId={"n1" as never}
+        onClose={vi.fn()}
+        readOnly
+      />
+    );
+    expect(screen.getByRole("button", { name: "Export papers" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cite" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add to notebook" })).not.toBeInTheDocument();
+  });
+
   it("selecting a paper shows the bulk bar", async () => {
     const user = userEvent.setup();
     render(panel());

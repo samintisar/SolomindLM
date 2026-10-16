@@ -7,12 +7,13 @@ import { QuizView } from "./QuizView";
 
 const submitAnswer = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn().mockResolvedValue(undefined);
+const updateProgress = vi.fn();
 let latestNote: QuizNote | null = null;
 
 vi.mock("@/features/studio/services/quizzesApi", () => ({
   useSubmitQuizAnswer: () => submitAnswer,
   useResetQuizAnswers: () => resetAnswers,
-  useUpdateQuizProgress: () => undefined,
+  useUpdateQuizProgress: (id: string | null, index: number) => updateProgress(id, index),
   useQuiz: () => latestNote,
 }));
 
@@ -65,6 +66,21 @@ beforeEach(() => {
 });
 
 describe("QuizView", () => {
+  it("read-only locks the options, saves no progress and offers no retry", async () => {
+    const user = userEvent.setup();
+    render(<QuizView note={makeQuiz()} readOnly />);
+    expect(await screen.findByText("Fork this notebook to practise.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Right one/ })).toBeDisabled();
+    expect(updateProgress).toHaveBeenCalledWith(null, 0);
+    expect(updateProgress).not.toHaveBeenCalledWith("quiz1", expect.anything());
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    await screen.findByRole("heading", { name: "Quiz Complete!" });
+    expect(screen.queryByRole("button", { name: /Try Again/ })).not.toBeInTheDocument();
+    expect(submitAnswer).not.toHaveBeenCalled();
+  });
+
   it("marks the right answer, counts the score and explains", async () => {
     const user = userEvent.setup();
     render(<QuizView note={makeQuiz()} />);
@@ -206,7 +222,7 @@ describe("QuizView", () => {
     await finishQuiz(user);
     await user.click(screen.getByRole("button", { name: /Question 1, correct/ }));
     expect(await screen.findByText("Review Mode")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Right one/ })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /Right one/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Wrong one/ })).toBeDisabled();
   });
 

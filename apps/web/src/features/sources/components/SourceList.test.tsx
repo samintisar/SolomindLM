@@ -220,6 +220,23 @@ describe("SourceList actions, search and empty states", () => {
     expect(screen.queryByText("Add your first source")).not.toBeInTheDocument();
   });
 
+  it("read-only hides add, delete and discover but keeps search and selection", () => {
+    render(<SourceList {...props({ readOnly: true })} />);
+    expect(screen.queryByRole("button", { name: /add source/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete selected" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Discover sources" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More options" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search sources" })).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+  });
+
+  it("read-only empty state has no add button", () => {
+    render(<SourceList {...props({ readOnly: true, sources: [], filteredSources: [] })} />);
+    expect(screen.getByText("No sources")).toBeInTheDocument();
+    expect(screen.getByText("This notebook has no sources yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add source/i })).not.toBeInTheDocument();
+  });
+
   it("reports search input changes", async () => {
     const p = props({ sources: three, filteredSources: three });
     render(<SourceList {...p} />);

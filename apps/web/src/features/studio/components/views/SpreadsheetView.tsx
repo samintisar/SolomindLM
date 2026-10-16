@@ -15,6 +15,8 @@ import { useSheetAutosave } from "../spreadsheet/useSheetAutosave";
 
 export interface SpreadsheetViewProps {
   note: SpreadsheetNote;
+  /** Viewer of a public notebook: the sheet can be read and downloaded, not edited. */
+  readOnly?: boolean;
 }
 
 /** A download name without the characters file systems reject. */
@@ -55,12 +57,12 @@ function hasTableContent(content: unknown): boolean {
  *
  * Keyed by note id, so a different spreadsheet never inherits this one's grid or pending save.
  */
-export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ note }) => (
-  <SpreadsheetSheet key={note.id} note={note} />
+export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ note, readOnly }) => (
+  <SpreadsheetSheet key={note.id} note={note} readOnly={readOnly} />
 );
 
-function SpreadsheetSheet({ note }: SpreadsheetViewProps) {
-  const readOnly = note.status !== "completed";
+function SpreadsheetSheet({ note, readOnly: viewerReadOnly = false }: SpreadsheetViewProps) {
+  const readOnly = viewerReadOnly || note.status !== "completed";
   const isFailed = note.status === "failed";
 
   const [grid, setGrid] = useState<Grid>(() => toGrid(note.content));

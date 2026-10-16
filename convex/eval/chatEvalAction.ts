@@ -117,7 +117,6 @@ export const runChatEval = action({
       );
     }
     const evalUserId = notebook.userId as Id<"users">;
-    const keywordSearchChunkUserId = evalUserId;
 
     const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
 
@@ -152,7 +151,7 @@ export const runChatEval = action({
       try {
         return await ctx.runQuery(internal.documents.internal.keywordSearch, {
           notebookId: notebookIdTyped,
-          userId: keywordSearchChunkUserId,
+          userId: evalUserId,
           query,
           limit,
           documentIds: docIds as Id<"documents">[] | undefined,

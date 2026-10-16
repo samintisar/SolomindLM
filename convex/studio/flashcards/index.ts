@@ -1,11 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  canReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
 import * as Flashcards from "../../_model/flashcards";
+import { withoutFlashcardProgress } from "../../_model/practiceProgress";
 import { getAuthUserId } from "../../auth";
 
 /**
@@ -27,8 +24,11 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
-    return await Flashcards.listByNotebook(ctx, args.notebookId);
+    const access = await getNotebookAccess(ctx, args.notebookId, userId);
+    if (!access) return [];
+    const flashcards = await Flashcards.listByNotebook(ctx, args.notebookId);
+    // Review history on the shared row is the owner's; a viewer starts fresh.
+    return access === "viewer" ? flashcards.map(withoutFlashcardProgress) : flashcards;
   },
 });
 
@@ -47,13 +47,10 @@ export const get = query({
       return null;
     }
 
-    try {
-      await assertCanReadNotebook(ctx, flashcard.notebookId, userId);
-    } catch {
-      return null;
-    }
+    const access = await getNotebookAccess(ctx, flashcard.notebookId, userId);
+    if (!access) return null;
 
-    return flashcard;
+    return access === "viewer" ? withoutFlashcardProgress(flashcard) : flashcard;
   },
 });
 
@@ -428,13 +425,11 @@ export const getDueCards = query({
       throw new Error("Flashcard set not found");
     }
 
-    try {
-      await assertCanReadNotebook(ctx, flashcard.notebookId, userId);
-    } catch {
-      return [];
-    }
+    const access = await getNotebookAccess(ctx, flashcard.notebookId, userId);
+    if (!access) return [];
 
-    const cardsData = flashcard.cardsData as any[];
+    const visible = access === "viewer" ? withoutFlashcardProgress(flashcard) : flashcard;
+    const cardsData = visible.cardsData as any[];
     const dueIndices = Flashcards.getDueCardIndices(cardsData, args.nowMs);
 
     // Return due cards with their indices

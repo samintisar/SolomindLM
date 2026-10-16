@@ -1,10 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  canReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { withoutQuizProgress } from "../../_model/practiceProgress";
 import * as Quizzes from "../../_model/quizzes";
 import { getAuthUserId } from "../../auth";
 
@@ -17,8 +14,11 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
-    return await Quizzes.listByNotebook(ctx, args.notebookId);
+    const access = await getNotebookAccess(ctx, args.notebookId, userId);
+    if (!access) return [];
+    const quizzes = await Quizzes.listByNotebook(ctx, args.notebookId);
+    // Answers on the shared row are the owner's; a viewer starts fresh.
+    return access === "viewer" ? quizzes.map(withoutQuizProgress) : quizzes;
   },
 });
 
@@ -37,13 +37,10 @@ export const get = query({
       return null;
     }
 
-    try {
-      await assertCanReadNotebook(ctx, quiz.notebookId, userId);
-    } catch {
-      return null;
-    }
+    const access = await getNotebookAccess(ctx, quiz.notebookId, userId);
+    if (!access) return null;
 
-    return quiz;
+    return access === "viewer" ? withoutQuizProgress(quiz) : quiz;
   },
 });
 

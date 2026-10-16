@@ -7,6 +7,8 @@ import { FlashcardView } from "./FlashcardView";
 
 const noop = vi.fn().mockResolvedValue(undefined);
 const updateCard = vi.fn().mockResolvedValue(undefined);
+const updatePreferences = vi.fn().mockResolvedValue(undefined);
+const updateProgress = vi.fn();
 
 vi.mock("@/features/studio/services/flashcardsApi", () => ({
   useFlashcard: () => null,
@@ -14,8 +16,8 @@ vi.mock("@/features/studio/services/flashcardsApi", () => ({
   useUpdateCard: () => updateCard,
   useDeleteCard: () => noop,
   useCardReview: () => noop,
-  useUpdateFlashcardPreferences: () => noop,
-  useUpdateFlashcardProgress: () => undefined,
+  useUpdateFlashcardPreferences: () => updatePreferences,
+  useUpdateFlashcardProgress: (id: string | null, index: number) => updateProgress(id, index),
 }));
 
 vi.mock("@/shared/contexts/useToast", () => ({
@@ -51,6 +53,28 @@ beforeEach(() => {
 });
 
 describe("FlashcardView", () => {
+  it("read-only browses only: no study or edit mode, no saved progress or preference", async () => {
+    const user = userEvent.setup();
+    render(<FlashcardView note={makeNote()} readOnly />);
+    expect(await screen.findByText("Front 1")).toBeInTheDocument();
+    expect(screen.getByText("Fork this notebook to practise.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Study Mode" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit Mode" })).not.toBeInTheDocument();
+    expect(updateProgress).toHaveBeenCalledWith(null, 0);
+    expect(updateProgress).not.toHaveBeenCalledWith("fc1", expect.anything());
+    await user.click(screen.getByRole("button", { name: "All" }));
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(updatePreferences).not.toHaveBeenCalled();
+  });
+
+  it("read-only starts on All, since a viewer has no review history to be due from", () => {
+    // The owner's deck preference says Due, but a viewer's copy carries no progress.
+    render(<FlashcardView note={makeNote(false)} readOnly />);
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Due" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+  });
+
   it("shows the first card and flips it on click", async () => {
     const user = userEvent.setup();
     const { container } = render(<FlashcardView note={makeNote()} />);

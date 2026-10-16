@@ -40,7 +40,6 @@ export type NotebookCreate = {
   title: string;
   coverColor?: string;
   icon?: string;
-  isFeatured?: boolean;
   folderId?: Id<"folders">;
 };
 
@@ -54,7 +53,6 @@ export async function createNotebook(
     title: data.title.trim(),
     coverColor: data.coverColor,
     icon: data.icon,
-    isFeatured: data.isFeatured ?? false,
     folderId: data.folderId,
     createdAt: now,
     updatedAt: now,
@@ -75,7 +73,6 @@ export type NotebookUpdate = {
   title?: string;
   coverColor?: string;
   icon?: string;
-  isFeatured?: boolean;
   folderId?: Id<"folders">;
   chatSettings?: ChatSettings;
 };

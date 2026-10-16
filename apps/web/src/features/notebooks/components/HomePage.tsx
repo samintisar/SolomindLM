@@ -1,15 +1,25 @@
+import type { Id } from "@convex/_generated/dataModel";
 import React, { useCallback, useMemo, useState } from "react";
 import { useClaimPendingDeck } from "@/features/tools/hooks/useClaimPendingDeck";
 import { Tabs, TabsContent } from "@/shared/components/ui/tabs";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import type { NotebookItem } from "@/shared/types/index";
 import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
 import { useCreateFolder } from "../services/foldersApi";
-import { useCreateNotebook } from "../services/notebooksApi";
+import {
+  useAdminUnpublishNotebook,
+  useCreateNotebook,
+  useFeaturedNotebooks,
+  useIsAdmin,
+  usePublicNotebooks,
+  useSetNotebookFeatured,
+} from "../services/notebooksApi";
 import { useNotebookContext } from "../useNotebookContext";
 import type { ViewMode } from "./home/CardGrid";
 import { HomeHeader, type HomeTab } from "./home/HomeHeader";
 import { CustomizeFolderModal, CustomizeNotebookModal, MoveToFolderModal } from "./modals";
-import { FeaturedSection, RecentSection } from "./views";
+import { PublicSection, RecentSection } from "./views";
 
 interface NotebookCreateData {
   title: string;
@@ -27,7 +37,6 @@ export const HomePage: React.FC = () => {
   // OAuth sign-in from the free flashcard tool lands here: save the deck the visitor made.
   useClaimPendingDeck();
   const ctx = useNotebookContext();
-  const featuredNotebooks = ctx.featuredNotebooks;
   const recentNotebooks = ctx.recentNotebooks;
   const onSelectNotebook = ctx.selectNotebook;
   const onSelectFolder = ctx.selectFolder;
@@ -148,25 +157,45 @@ export const HomePage: React.FC = () => {
     () => getSortedNotebooks(recentNotebooks),
     [getSortedNotebooks, recentNotebooks]
   );
-  const sortedFeaturedNotebooks = useMemo(
-    () => getSortedNotebooks(featuredNotebooks),
-    [getSortedNotebooks, featuredNotebooks]
-  );
 
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
     onMoveNotebookToFolder(notebookId, folderId);
     notebookHandlers.closeMoveToFolder();
   };
 
-  const featuredSection = (
-    <FeaturedSection
-      featuredNotebooks={sortedFeaturedNotebooks}
-      viewMode={viewMode}
-      onSelectNotebook={onSelectNotebook}
-      // Not while loading: an empty list then means "not loaded yet", not "none".
-      showEmpty={tab === "featured" && !ctx.notebooksLoading}
-    />
-  );
+  // Public notebooks: the curated Featured shelf (All and Public tabs) and the paginated
+  // Community grid (Public tab only). Each query subscribes only where it's shown.
+  const featuredPublic = useFeaturedNotebooks(tab !== "mine");
+  const communityPublic = usePublicNotebooks(tab === "public");
+  const isAdmin = useIsAdmin();
+  const setFeatured = useSetNotebookFeatured();
+  const adminUnpublish = useAdminUnpublishNotebook();
+  const { showError } = useServiceErrorToast();
+
+  const runModeration = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const publicSectionProps = {
+    featured: featuredPublic ?? [],
+    featuredLoading: featuredPublic === undefined,
+    community: communityPublic.results,
+    communityStatus: communityPublic.status,
+    onLoadMore: communityPublic.loadNextPage,
+    viewMode,
+    onSelectNotebook,
+    isAdmin,
+    onToggleFeatured: (nb: NotebookItem) =>
+      void runModeration(() =>
+        setFeatured({ notebookId: nb.id as Id<"notebooks">, isFeatured: !nb.isFeatured })
+      ),
+    onUnpublish: (nb: NotebookItem) =>
+      void runModeration(() => adminUnpublish({ notebookId: nb.id as Id<"notebooks"> })),
+  };
 
   const recentSection = (
     <RecentSection
@@ -200,12 +229,14 @@ export const HomePage: React.FC = () => {
             />
             <TabsContent value="all">
               <div className="flex flex-col gap-8">
-                {featuredSection}
+                <PublicSection {...publicSectionProps} featuredOnly />
                 {recentSection}
               </div>
             </TabsContent>
             <TabsContent value="mine">{recentSection}</TabsContent>
-            <TabsContent value="featured">{featuredSection}</TabsContent>
+            <TabsContent value="public">
+              <PublicSection {...publicSectionProps} />
+            </TabsContent>
           </div>
         </Tabs>
       </div>
@@ -216,9 +247,7 @@ export const HomePage: React.FC = () => {
           notebook={
             notebookHandlers.isCreatingNotebook
               ? undefined
-              : [...featuredNotebooks, ...recentNotebooks].find(
-                  (n) => n.id === notebookHandlers.customizingId
-                )
+              : recentNotebooks.find((n) => n.id === notebookHandlers.customizingId)
           }
           onClose={notebookHandlers.closeCustomize}
           onSave={async (data) => {
