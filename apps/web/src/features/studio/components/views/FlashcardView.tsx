@@ -40,7 +40,6 @@ import { Toggle } from "@/shared/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { cn } from "@/shared/utils/cn";
-import { ForkToPractiseNote } from "../practice/ForkToPractiseNote";
 import { EditCardModal } from "./EditCardModal";
 import { ProficiencyBadge } from "./ProficiencyBadge";
 import { type DueFlashcard, StudyMode } from "./StudyMode";
@@ -49,8 +48,8 @@ export interface FlashcardViewProps {
   note: FlashcardNote;
   onBack?: () => void;
   /**
-   * Viewer of a public notebook: browse only. Study reviews, card edits and the Due/All
-   * preference all write to the shared deck.
+   * Viewer of a public notebook: no Edit mode, since card edits change the shared deck. Study
+   * reviews, the Due/All choice and the last card viewed save to the viewer's own progress.
    */
   readOnly?: boolean;
 }
@@ -59,10 +58,11 @@ type ViewMode = "browse" | "study" | "edit";
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, readOnly = false }) => {
   // State
-  const [mode, setMode] = useState<ViewMode>("browse");
-  // A viewer's deck carries no review history (the server strips the owner's), so start on All.
+  const [selectedMode, setMode] = useState<ViewMode>("browse");
+  // The effective mode: a deck that turns read-only while in Edit mode falls back to Browse.
+  const mode: ViewMode = readOnly && selectedMode === "edit" ? "browse" : selectedMode;
   const [showMastered, setShowMastered] = useState<boolean>(
-    readOnly || ((note.metadata as { showMastered?: boolean } | undefined)?.showMastered ?? false)
+    (note.metadata as { showMastered?: boolean } | undefined)?.showMastered ?? false
   );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -117,16 +117,17 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, read
 
   // Persist progress
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateFlashcardProgress(readOnly ? null : note.id, stableCurrentIndex);
+  const savedIndex =
+    (displayNote.metadata as { lastViewedIndex?: number } | undefined)?.lastViewedIndex ?? 0;
+  useUpdateFlashcardProgress(note.id, stableCurrentIndex, savedIndex);
 
-  // Sync showMastered with server (a viewer's choice is local, so the server must not undo it)
+  // Sync showMastered with server
   useEffect(() => {
-    if (readOnly) return;
     const serverShowMastered = (latestNote?.metadata as any)?.showMastered;
     if (serverShowMastered !== undefined && serverShowMastered !== showMastered) {
       setShowMastered(serverShowMastered);
     }
-  }, [latestNote, showMastered, readOnly]);
+  }, [latestNote, showMastered]);
 
   // Handlers
   const handleNext = () => {
@@ -155,7 +156,6 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, read
   const setShowMasteredPreference = async (value: boolean) => {
     if (value === showMastered) return;
     setShowMastered(value);
-    if (readOnly) return;
     await updatePreferences(note.id, { showMastered: value });
   };
 
@@ -225,6 +225,11 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, read
     { value: "edit", name: "Edit Mode", tip: "Edit", icon: <Edit3 /> },
   ] as const;
 
+  // A viewer studies the shared deck but can't edit it.
+  const visibleModeToggles = readOnly
+    ? modeToggles.filter(({ value }) => value !== "edit")
+    : modeToggles;
+
   return (
     <div
       className={cn(
@@ -245,31 +250,27 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, read
       {/* Header Controls */}
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          {readOnly ? (
-            <ForkToPractiseNote className="w-auto" />
-          ) : (
-            <ButtonGroup variant="tray" aria-label="Mode">
-              {modeToggles.map(({ value, name, tip, icon }) => (
-                <Tooltip key={value}>
-                  {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
-                  <TooltipTrigger asChild>
-                    <Toggle
-                      size="sm"
-                      pressed={mode === value}
-                      onPressedChange={(pressed) => {
-                        if (pressed) handleModeChange(value);
-                      }}
-                      disabled={value === "study" && dueCards.length === 0}
-                      aria-label={name}
-                    >
-                      {icon}
-                    </Toggle>
-                  </TooltipTrigger>
-                  <TooltipContent>{tip}</TooltipContent>
-                </Tooltip>
-              ))}
-            </ButtonGroup>
-          )}
+          <ButtonGroup variant="tray" aria-label="Mode">
+            {visibleModeToggles.map(({ value, name, tip, icon }) => (
+              <Tooltip key={value}>
+                {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
+                <TooltipTrigger asChild>
+                  <Toggle
+                    size="sm"
+                    pressed={mode === value}
+                    onPressedChange={(pressed) => {
+                      if (pressed) handleModeChange(value);
+                    }}
+                    disabled={value === "study" && dueCards.length === 0}
+                    aria-label={name}
+                  >
+                    {icon}
+                  </Toggle>
+                </TooltipTrigger>
+                <TooltipContent>{tip}</TooltipContent>
+              </Tooltip>
+            ))}
+          </ButtonGroup>
 
           {mode === "browse" && currentCard && <ProficiencyBadge card={currentCard} />}
         </div>

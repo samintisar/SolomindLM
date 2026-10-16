@@ -1,9 +1,18 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
-import { withoutQuizProgress } from "../../_model/practiceProgress";
+import { toConvexError } from "../../_lib/serviceErrors";
+import { withQuizAnswer } from "../../_model/practiceProgress";
 import * as Quizzes from "../../_model/quizzes";
+import {
+  getPracticeTarget,
+  saveViewerProgress,
+  viewerPracticeRow,
+  viewerPracticeRows,
+} from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
+import { deletePracticeProgress } from "../practice";
 
 /**
  * List all quizzes for a notebook
@@ -17,8 +26,10 @@ export const list = query({
     const access = await getNotebookAccess(ctx, args.notebookId, userId);
     if (!access) return [];
     const quizzes = await Quizzes.listByNotebook(ctx, args.notebookId);
-    // Answers on the shared row are the owner's; a viewer starts fresh.
-    return access === "viewer" ? quizzes.map(withoutQuizProgress) : quizzes;
+    // Answers on the shared row are the owner's; a viewer sees their own.
+    return access === "viewer"
+      ? await viewerPracticeRows(ctx, "quizzes", quizzes, userId, args.notebookId)
+      : quizzes;
   },
 });
 
@@ -40,7 +51,7 @@ export const get = query({
     const access = await getNotebookAccess(ctx, quiz.notebookId, userId);
     if (!access) return null;
 
-    return access === "viewer" ? withoutQuizProgress(quiz) : quiz;
+    return access === "viewer" ? await viewerPracticeRow(ctx, "quizzes", quiz, userId) : quiz;
   },
 });
 
@@ -158,6 +169,7 @@ export const remove = mutation({
     await assertCanEditNotebook(ctx, quiz.notebookId, userId);
 
     await Quizzes.deleteQuiz(ctx, args.id);
+    await deletePracticeProgress(ctx, { itemId: args.id });
 
     return { message: "Quiz deleted successfully" };
   },
@@ -236,7 +248,26 @@ export const submitAnswer = mutation({
       throw new Error("Quiz not found");
     }
 
-    await assertCanEditNotebook(ctx, quiz.notebookId, userId);
+    const target = await getPracticeTarget(ctx, quiz.notebookId, userId);
+    const questionCount = Array.isArray(quiz.questionsData) ? quiz.questionsData.length : 0;
+    if (
+      !Number.isInteger(args.questionIndex) ||
+      args.questionIndex < 0 ||
+      args.questionIndex >= questionCount
+    ) {
+      throw toConvexError(
+        new InputValidationError("Invalid question index", { field: "questionIndex" })
+      );
+    }
+    if (target === "viewer") {
+      // A viewer's answer goes to their own progress; the shared quiz is the owner's.
+      await saveViewerProgress(
+        ctx,
+        { userId, itemType: "quizzes", itemId: quiz._id, notebookId: quiz.notebookId },
+        (current) => withQuizAnswer(current, args.questionIndex, args.selectedOption)
+      );
+      return await viewerPracticeRow(ctx, "quizzes", quiz, userId);
+    }
 
     await Quizzes.patchQuizUserAnswer(ctx, args.id, args.questionIndex, args.selectedOption);
 
