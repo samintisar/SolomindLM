@@ -6,13 +6,19 @@ import { action } from "../../_generated/server";
 import { InputValidationError } from "../../_lib/errors";
 import { rateLimiter } from "../../_lib/rateLimits";
 import { toConvexError } from "../../_lib/serviceErrors";
+import { MAX_WRITTEN_ANSWER_LENGTH } from "../../_model/writtenQuestions";
 import {
   type WrittenQuestion,
   WrittenQuestionsGradingService,
 } from "../../_services/grading/WrittenQuestionsGradingService";
 import { getAuthUserId } from "../../auth";
 
-const GRADING_RATE_LIMITED = "You've graded a lot of answers in the last hour. Try again later.";
+/** The hourly grading-limit refusal, saying when grading opens up again. */
+function gradingRateLimitedMessage(retryAfterMs: number | undefined): string {
+  const minutes = Math.max(1, Math.ceil((retryAfterMs ?? 0) / 60_000));
+  const when = `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  return `You've graded a lot of answers in the last hour. Try again in ${when}.`;
+}
 
 /**
  * Submit an answer and grade it. The answer and grade are saved where the caller practises (the
@@ -49,9 +55,23 @@ export const submitAndGrade = action({
       throw new Error("Question not found");
     }
 
+    if (answer.length > MAX_WRITTEN_ANSWER_LENGTH) {
+      throw toConvexError(
+        new InputValidationError(
+          `Answers can be at most ${MAX_WRITTEN_ANSWER_LENGTH.toLocaleString("en-US")} characters.`,
+          { field: "answer" }
+        )
+      );
+    }
+
     // Each grade is an LLM call, charged to the caller (owner, editor or viewer alike).
-    const { ok } = await rateLimiter.limit(ctx, "writtenAnswerGrade", { key: userId });
-    if (!ok) throw toConvexError(new InputValidationError(GRADING_RATE_LIMITED));
+    const { ok, retryAfter } = await rateLimiter.limit(ctx, "writtenAnswerGrade", { key: userId });
+    if (!ok) {
+      // `field: "rateLimit"` lets the web tell this refusal apart (parseServiceError).
+      throw toConvexError(
+        new InputValidationError(gradingRateLimitedMessage(retryAfter), { field: "rateLimit" })
+      );
+    }
 
     // Store "grading in progress" state
     await ctx.runMutation(internal.studio.writtenQuestions.index.patchUserAnswer, {

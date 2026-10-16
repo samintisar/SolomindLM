@@ -1,10 +1,12 @@
 /// <reference types="vite/client" />
 import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
+import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import { rateLimiter, WRITTEN_ANSWER_GRADES_PER_HOUR } from "../../_lib/rateLimits";
+import { MAX_WRITTEN_ANSWER_LENGTH } from "../../_model/writtenQuestions";
 import { preloadModules } from "../../_testing/preloadModules.helpers";
 import schema from "../../schema";
 
@@ -125,9 +127,16 @@ describe("writtenQuestions.grading.submitAndGrade", () => {
     );
     const args = { writtenQuestionsId: writtenId, questionId: "q1", answer: "Mine" };
 
-    await expect(
+    const refusal = await rejectionOf(
       withAuth(t, viewer).action(api.studio.writtenQuestions.grading.submitAndGrade, args)
-    ).rejects.toThrow(/graded a lot of answers/);
+    );
+    // The web tells a rate-limit refusal apart by its field (parseServiceError).
+    expect(refusal).toBeInstanceOf(ConvexError);
+    expect((refusal as ConvexError<Record<string, unknown>>).data).toMatchObject({
+      type: "INPUT_VALIDATION_ERROR",
+      field: "rateLimit",
+      detail: expect.stringMatching(/graded a lot of answers.*Try again in \d+ minutes?/),
+    });
     expect(gradeAnswer).not.toHaveBeenCalled();
     // The owner's allowance is their own.
     await expect(
@@ -147,4 +156,35 @@ describe("writtenQuestions.grading.submitAndGrade", () => {
     ).rejects.toThrow("Notebook not found");
     expect(gradeAnswer).not.toHaveBeenCalled();
   });
+
+  test("an answer over the length cap is refused before the limit and the grader", async () => {
+    const { t, viewer, writtenId } = await setup();
+    const refusal = await rejectionOf(
+      withAuth(t, viewer).action(api.studio.writtenQuestions.grading.submitAndGrade, {
+        writtenQuestionsId: writtenId,
+        questionId: "q1",
+        answer: "x".repeat(MAX_WRITTEN_ANSWER_LENGTH + 1),
+      })
+    );
+    expect((refusal as ConvexError<Record<string, unknown>>).data).toMatchObject({
+      type: "INPUT_VALIDATION_ERROR",
+      field: "answer",
+    });
+    expect(gradeAnswer).not.toHaveBeenCalled();
+    // Nothing was charged to the caller's hourly allowance.
+    const { value } = await t.run((ctx) =>
+      rateLimiter.getValue(ctx, "writtenAnswerGrade", { key: viewer })
+    );
+    expect(value).toBe(WRITTEN_ANSWER_GRADES_PER_HOUR);
+    expect(await t.run((ctx) => ctx.db.query("studioProgress").collect())).toEqual([]);
+  });
 });
+
+async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  throw new Error("expected the call to be refused");
+}

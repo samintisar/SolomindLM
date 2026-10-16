@@ -13,8 +13,6 @@ import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 import { deletePracticeProgress } from "../practice";
 
-const MAX_DRAFT_ANSWER_LENGTH = 50_000;
-
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
@@ -154,7 +152,7 @@ export const saveUserAnswerDraft = mutation({
       (q: { id?: string }) => q?.id === args.questionId
     );
     if (!known) throw new Error("Question not found");
-    if (args.answer.length > MAX_DRAFT_ANSWER_LENGTH) {
+    if (args.answer.length > WrittenQuestions.MAX_WRITTEN_ANSWER_LENGTH) {
       throw new Error("Answer is too long to save");
     }
     if (target === "viewer") {
