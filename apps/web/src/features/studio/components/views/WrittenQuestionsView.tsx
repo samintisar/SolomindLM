@@ -147,7 +147,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   // Persist progress - track last viewed index
   // Use useMemo to prevent re-initializing when other state changes
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateWrittenQuestionsProgress(note.id, stableCurrentIndex);
+  const savedIndex =
+    ((latestNote ?? note).metadata as { lastViewedIndex?: number } | undefined)?.lastViewedIndex ??
+    0;
+  useUpdateWrittenQuestionsProgress(note.id, stableCurrentIndex, savedIndex);
 
   // Sync userAnswers from server only when server data actually changes (e.g. after submit/reset).
   // Using a serialized key prevents the effect from running on every render (latestNote?.userAnswers

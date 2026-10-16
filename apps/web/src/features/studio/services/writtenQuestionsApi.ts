@@ -1,9 +1,10 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
+import { useSaveLastViewedIndex } from "./useSaveLastViewedIndex";
 
 export interface CreateWrittenQuestionsParams {
   notebookId: string;
@@ -216,33 +217,13 @@ export function useResetWrittenAnswers() {
 }
 
 /**
- * Persist written questions progress (last viewed question index)
- * Note: Does NOT use optimistic updates to avoid interfering with questions state
+ * Persist written questions progress (last viewed question index), skipping a write when it is
+ * unchanged. Viewers of a public notebook save to their own progress.
  */
 export function useUpdateWrittenQuestionsProgress(
-  writtenQuestionsId: string | null,
-  currentIndex: number
+  writtenQuestionsId: string,
+  currentIndex: number,
+  savedIndex: number
 ) {
-  const setLastViewedIndex = useMutation(api.studio.practice.setLastViewedIndex);
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (writtenQuestionsId == null) return;
-
-    // Debounce the update to avoid excessive API calls during navigation
-    timeoutRef.current = setTimeout(() => {
-      setLastViewedIndex({
-        itemType: "writtenQuestions",
-        itemId: writtenQuestionsId,
-        index: currentIndex,
-      });
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [writtenQuestionsId, currentIndex, setLastViewedIndex]);
+  useSaveLastViewedIndex("writtenQuestions", writtenQuestionsId, currentIndex, savedIndex);
 }

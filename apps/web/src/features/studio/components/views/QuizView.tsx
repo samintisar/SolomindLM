@@ -101,7 +101,10 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   // Persist progress - track last viewed index
   // Use useMemo to prevent re-initializing when other state changes
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateQuizProgress(note.id, stableCurrentIndex);
+  const savedIndex =
+    ((latestNote ?? note).metadata as { lastViewedIndex?: number } | undefined)?.lastViewedIndex ??
+    0;
+  useUpdateQuizProgress(note.id, stableCurrentIndex, savedIndex);
 
   // Sync userAnswers with note.userAnswers
   // Using a serialized key prevents the effect from running on every render

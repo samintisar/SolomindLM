@@ -1,9 +1,10 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { QuizNote, QuizQuestion } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
+import { useSaveLastViewedIndex } from "./useSaveLastViewedIndex";
 
 export interface CreateQuizParams {
   notebookId: string;
@@ -211,26 +212,9 @@ export function useResetQuizAnswers() {
 }
 
 /**
- * Persist quiz progress (last viewed question index)
- * Note: Does NOT use optimistic updates to avoid interfering with quiz state
+ * Persist quiz progress (last viewed question index), skipping a write when it is unchanged.
+ * Viewers of a public notebook save to their own progress.
  */
-export function useUpdateQuizProgress(quizId: string | null, currentIndex: number) {
-  const setLastViewedIndex = useMutation(api.studio.practice.setLastViewedIndex);
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (quizId == null) return;
-
-    // Debounce the update to avoid excessive API calls during navigation
-    timeoutRef.current = setTimeout(() => {
-      setLastViewedIndex({ itemType: "quizzes", itemId: quizId, index: currentIndex });
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [quizId, currentIndex, setLastViewedIndex]);
+export function useUpdateQuizProgress(quizId: string, currentIndex: number, savedIndex: number) {
+  useSaveLastViewedIndex("quizzes", quizId, currentIndex, savedIndex);
 }

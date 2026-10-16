@@ -58,7 +58,9 @@ type ViewMode = "browse" | "study" | "edit";
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, readOnly = false }) => {
   // State
-  const [mode, setMode] = useState<ViewMode>("browse");
+  const [selectedMode, setMode] = useState<ViewMode>("browse");
+  // The effective mode: a deck that turns read-only while in Edit mode falls back to Browse.
+  const mode: ViewMode = readOnly && selectedMode === "edit" ? "browse" : selectedMode;
   const [showMastered, setShowMastered] = useState<boolean>(
     (note.metadata as { showMastered?: boolean } | undefined)?.showMastered ?? false
   );
@@ -115,7 +117,9 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, read
 
   // Persist progress
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateFlashcardProgress(note.id, stableCurrentIndex);
+  const savedIndex =
+    (displayNote.metadata as { lastViewedIndex?: number } | undefined)?.lastViewedIndex ?? 0;
+  useUpdateFlashcardProgress(note.id, stableCurrentIndex, savedIndex);
 
   // Sync showMastered with server
   useEffect(() => {
