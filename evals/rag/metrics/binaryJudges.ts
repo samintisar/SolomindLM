@@ -8,6 +8,7 @@ import {
   type EvalRunArtifact,
   isStudioRunner,
   type MetricResult,
+  type StudioRunnerKind,
 } from "../types";
 import type { SourceText } from "../usecases/types";
 import { CUT_NOTE, formatSourceTexts, SOURCE_TEXTS_LIMIT } from "./evidence";
@@ -204,19 +205,80 @@ ${subs || "(none)"}
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
+const GENERIC_STRUCTURE_CRITERION =
+  "Pass only if the required structure is present: non-empty items, the required sections, and answer keys as applicable.";
+const GENERIC_GROUNDING_CRITERION =
+  "Pass only if substantive claims are supported by the evidence (minor phrasing ok).";
+
+/**
+ * Per-kind structure criteria. Infographics are not listed: the vision judge covers them, so they
+ * keep the generic line, as do literature reviews (not a studio kind).
+ */
+export const STUDIO_STRUCTURE_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
+  flashcards:
+    "Pass only if the output is a non-empty list of cards, and every card has a non-empty front and a non-empty back.",
+  quiz: "Pass only if the output is a non-empty list of questions, each with at least two options, an answer key that names one of its options, and an explanation.",
+  report:
+    "Pass only if the output is a markdown report with a non-empty body under every required section heading.",
+  audioScript:
+    "Pass only if the output is a non-empty script of turns, and every turn has a speaker and non-empty text.",
+  audioScriptOnly:
+    "Pass only if the output is a non-empty script of turns, and every turn has a speaker and non-empty text.",
+  mindmap:
+    "Pass only if the output is a tree with a root node and child nodes, and every node has a non-empty label.",
+  spreadsheet:
+    "Pass only if the output has a header row and data rows, every row has a value for each header column, and the category columns are filled.",
+  writtenQuestions:
+    "Pass only if the output is a non-empty list of questions, and every question has a model answer.",
+};
+
+/**
+ * Per-kind grounding criteria. Infographics keep the generic line (the vision judge handles them).
+ */
+export const STUDIO_GROUNDING_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
+  flashcards:
+    "Pass only if every card's front and back are supported by the sources, and no card contradicts them.",
+  quiz: "Pass only if each correct option is supported by the sources, no distractor is also correct according to the sources, and the explanations do not invent facts.",
+  report:
+    "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
+  audioScript:
+    "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
+  audioScriptOnly:
+    "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
+  mindmap: "Pass only if the node labels name concepts that are present in the sources.",
+  spreadsheet: "Pass only if cell values and categories are traceable to the sources.",
+  writtenQuestions: "Pass only if the questions and model answers are supported by the sources.",
+};
+
+function criterionFor(
+  table: Partial<Record<StudioRunnerKind, string>>,
+  runner: string,
+  generic: string
+): string {
+  return isStudioRunner(runner) ? (table[runner] ?? generic) : generic;
+}
+
 function studioStructurePrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
   const minItems = fixture.expectedStructure?.minItems;
   const sections = fixture.expectedStructure?.requiredSections?.join(", ") ?? "";
-  return `You are evaluating studio output structure for runner "${artifact.runner}".
+  const criterion = criterionFor(
+    STUDIO_STRUCTURE_CRITERIA,
+    artifact.runner,
+    GENERIC_STRUCTURE_CRITERION
+  );
+  return `You are a strict reviewer checking the structure of a studio ${artifact.runner} output. Check structure only; whether the content is true is judged separately.
 
+Question: ${fixture.question}
 Expected behavior: ${fixture.expectedBehavior}
 Min items: ${minItems ?? "n/a"}
 Required sections: ${sections || "n/a"}
 
+Pass criteria for ${artifact.runner}:
+${criterion}
+
 Output (truncated):
 ${excerptForJudge(artifact.answer, 10000)}
 
-Pass if required structure is present (non-empty items, sections, answer keys as applicable).
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
@@ -226,18 +288,25 @@ function studioGroundingPrompt(
   artifact: EvalRunArtifact,
   sourceTexts: SourceText[] = []
 ): string | null {
+  const criterion = criterionFor(
+    STUDIO_GROUNDING_CRITERIA,
+    artifact.runner,
+    GENERIC_GROUNDING_CRITERION
+  );
+  const pass = `Pass criteria for ${artifact.runner}:\n${criterion}`;
   const context = combineChunkContents(artifact.selectedChunks);
   if (context.trim()) {
-    return `Pass if studio output is grounded in notebook chunks.
+    return `You are a strict evaluator checking a studio ${artifact.runner} output against the notebook passages it was built from.
 
 Question: ${fixture.question}
 
-Chunks:
+Retrieved chunks:
 ${context}
 
 Output:
 ${excerptForJudge(artifact.answer, 8000)}
 
+${pass}
 Respond JSON only: {"pass": boolean, "reason": string}`;
   }
   if (sourceTexts.length === 0) return null;
@@ -245,7 +314,7 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
   const header = formatted.truncated
     ? "Source text (some documents cut off):"
     : "Source text (complete):";
-  return `Pass if studio output is grounded in the source text.
+  return `You are a strict evaluator checking a studio ${artifact.runner} output against the source text it was made from.
 
 Question: ${fixture.question}
 
@@ -255,6 +324,7 @@ ${formatted.truncated ? `${CUT_NOTE}\n` : ""}${formatted.text}
 Output:
 ${excerptForJudge(artifact.answer, 8000)}
 
+${pass}
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
