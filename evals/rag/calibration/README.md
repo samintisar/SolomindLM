@@ -22,7 +22,8 @@ Each line is one labelled verdict:
 - `humanAgree: true` means you agree with the model verdict; `false` means you disagree.
 - `labelKey` is `sha1(caseId|runner|metric|modelReason)`. A verdict already in the store is never
   added again, and the first label for a key wins. Do not edit rows in place; to change a label,
-  delete the row and re-append.
+  delete the row and re-append. A new label that disagrees with a stored one is not written; the
+  append reports it as a conflict ("N labels conflict with the store").
 - `commitSha` is the commit the eval ran at, when known.
 
 ## How to label

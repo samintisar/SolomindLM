@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cohensKappa, type JudgeLabel, scoreJudgeCalibration } from "./judgeCalibration";
+import {
+  cohensKappa,
+  formatJudgeCalibrationTable,
+  type JudgeLabel,
+  scoreJudgeCalibration,
+} from "./judgeCalibration";
 import type { JudgeCalibrationItem } from "./judgeQueue";
 
 function item(
@@ -82,8 +87,31 @@ describe("scoreJudgeCalibration", () => {
       agreed: 20,
       agreement: 1,
       kappa: 1,
+      singleClass: false,
       blockingReady: true,
     });
+  });
+
+  it("flags a family whose model verdicts are all one class, and says why in the table", () => {
+    const labels = labelsFor("binary_judge_chat_grounding", () => true).map((row) => ({
+      ...row,
+      modelStatus: "pass" as const,
+    }));
+    const score = scoreJudgeCalibration(labels);
+    const chat = score.byJudge.binary_judge_chat_grounding;
+    expect(chat?.singleClass).toBe(true);
+    expect(chat?.kappa).toBe(0);
+    expect(chat?.blockingReady).toBe(false);
+    const table = formatJudgeCalibrationTable(score).join("\n");
+    expect(table).toContain("single class — label at least one fail/pass");
+  });
+
+  it("gives no reason for a ready family in the table", () => {
+    const score = scoreJudgeCalibration(labelsFor("binary_judge_chat_grounding", () => true));
+    expect(score.byJudge.binary_judge_chat_grounding?.singleClass).toBe(false);
+    const row = formatJudgeCalibrationTable(score)[1] ?? "";
+    expect(row).toContain("ready");
+    expect(row).not.toContain("(");
   });
 
   it("keeps a family out of the blocking set below 20 labels", () => {

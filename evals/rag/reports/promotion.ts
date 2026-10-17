@@ -22,7 +22,7 @@ export interface PromotionDecision {
   regressions: PromotionRegression[];
 }
 
-export function isPromoteMetric(name: string): boolean {
+function isPromoteMetric(name: string): boolean {
   return PROMOTE_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
 

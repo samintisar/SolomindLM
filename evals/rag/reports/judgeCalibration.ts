@@ -4,12 +4,14 @@ import { PROMOTE_PREFIXES } from "./promotion";
 /** A judge verdict with the human's call on it. `humanAgree: null` means not yet labelled. */
 export type JudgeLabel = Pick<JudgeCalibrationItem, "metric" | "modelStatus" | "humanAgree">;
 
-export interface JudgeFamilyCalibration {
+interface JudgeFamilyCalibration {
   labeled: number;
   agreed: number;
   agreement: number;
   /** Cohen's kappa of model verdict vs human verdict (0 when verdicts are all one class). */
   kappa: number;
+  /** Every model verdict in the family is the same class, so kappa cannot be measured. */
+  singleClass: boolean;
   /** Enough labels, agreement and kappa to trust this judge. Per family, not global. */
   blockingReady: boolean;
 }
@@ -70,11 +72,13 @@ function familyStats(labels: JudgeLabel[]): JudgeFamilyCalibration {
   const model = labeled.map((row) => row.modelStatus === "pass");
   const human = labeled.map((row, i) => (row.humanAgree ? model[i] : !model[i]));
   const kappa = cohensKappa(model, human);
+  const singleClass = labeled.length > 0 && model.every((verdict) => verdict === model[0]);
   return {
     labeled: labeled.length,
     agreed,
     agreement,
     kappa,
+    singleClass,
     blockingReady:
       labeled.length >= MIN_LABELED && agreement >= MIN_AGREEMENT && kappa >= MIN_KAPPA,
   };
@@ -104,6 +108,17 @@ export function scoreJudgeCalibration(labels: JudgeLabel[]): JudgeCalibrationSco
 }
 
 /** One line per judge family: the per-judge table the CLI prints. */
+/** Why a family is not ready, for the table; empty when it is ready. */
+function calibrationReason(row: JudgeFamilyCalibration): string {
+  if (row.blockingReady) return "";
+  if (row.singleClass) return "  (single class — label at least one fail/pass)";
+  const reasons: string[] = [];
+  if (row.labeled < MIN_LABELED) reasons.push(`under ${MIN_LABELED} labels`);
+  if (row.agreement < MIN_AGREEMENT) reasons.push(`agreement below ${MIN_AGREEMENT}`);
+  if (row.kappa < MIN_KAPPA) reasons.push(`kappa below ${MIN_KAPPA}`);
+  return reasons.length > 0 ? `  (${reasons.join(", ")})` : "";
+}
+
 export function formatJudgeCalibrationTable(score: JudgeCalibrationScore): string[] {
   const lines = ["  Judge calibration (per family):"];
   const families = Object.keys(score.byJudge);
@@ -117,7 +132,7 @@ export function formatJudgeCalibrationTable(score: JudgeCalibrationScore): strin
     const pct = `${Math.round(row.agreement * 100)}%`;
     const status = row.blockingReady ? "ready" : "not ready";
     lines.push(
-      `    ${family.padEnd(44)} labeled ${String(row.labeled).padStart(3)}  agreement ${pct.padStart(4)}  kappa ${row.kappa.toFixed(2)}  ${status}`
+      `    ${family.padEnd(44)} labeled ${String(row.labeled).padStart(3)}  agreement ${pct.padStart(4)}  kappa ${row.kappa.toFixed(2)}  ${status}${calibrationReason(row)}`
     );
   }
   return lines;

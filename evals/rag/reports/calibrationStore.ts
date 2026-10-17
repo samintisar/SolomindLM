@@ -25,6 +25,13 @@ export interface CalibrationRow {
   labelKey: string;
 }
 
+const MODEL_STATUSES: ReadonlyArray<CalibrationRow["modelStatus"]> = [
+  "pass",
+  "fail",
+  "warn",
+  "info",
+];
+
 export function calibrationLabelKey(
   row: Pick<CalibrationRow, "caseId" | "runner" | "metric" | "modelReason">
 ): string {
@@ -47,29 +54,39 @@ function isCalibrationRow(value: unknown): value is CalibrationRow {
     typeof row.metric === "string" &&
     typeof row.modelReason === "string" &&
     typeof row.labelKey === "string" &&
-    typeof row.humanAgree === "boolean"
+    typeof row.humanAgree === "boolean" &&
+    MODEL_STATUSES.includes(row.modelStatus as CalibrationRow["modelStatus"])
   );
 }
 
 /**
- * Append the labelled rows (`humanAgree !== null`) of `items` to the store in `dir`, skipping any
- * whose labelKey is already stored. The first label for a key wins. Returns the rows written.
+ * Append the labelled rows (`humanAgree !== null`) of `items` to the store in `dir`. A row whose
+ * labelKey is already stored is skipped; if its `humanAgree` differs, it is counted as a conflict
+ * and the stored label stands (delete the old row to replace it). Within one call the first label
+ * for a key wins too.
  */
 export function appendCalibrationLabels(
   dir: string,
   items: JudgeCalibrationItem[],
   options: { commitSha?: string } = {}
-): number {
-  const known = new Set(
-    Object.values(loadCalibration(dir))
-      .flat()
-      .map((row) => row.labelKey)
-  );
+): { written: number; conflicts: number } {
+  const known = new Map<string, boolean>();
+  for (const row of Object.values(loadCalibration(dir)).flat()) {
+    known.set(row.labelKey, row.humanAgree);
+  }
   const labeledAt = new Date().toISOString();
   const byFile = new Map<string, string[]>();
   let written = 0;
+  let conflicts = 0;
   for (const item of items) {
     if (item.humanAgree === null) continue;
+    const labelKey = calibrationLabelKey(item);
+    const existing = known.get(labelKey);
+    if (existing !== undefined) {
+      if (existing !== item.humanAgree) conflicts++;
+      continue;
+    }
+    known.set(labelKey, item.humanAgree);
     const row: CalibrationRow = {
       caseId: item.caseId,
       runner: item.runner,
@@ -80,31 +97,32 @@ export function appendCalibrationLabels(
       humanAgree: item.humanAgree,
       labeledAt,
       ...(options.commitSha ? { commitSha: options.commitSha } : {}),
-      labelKey: calibrationLabelKey(item),
+      labelKey,
     };
-    if (known.has(row.labelKey)) continue;
-    known.add(row.labelKey);
     const file = judgeFamilyFileName(item.metric);
     const lines = byFile.get(file) ?? [];
     lines.push(JSON.stringify(row));
     byFile.set(file, lines);
     written++;
   }
-  if (written === 0) return 0;
-  mkdirSync(dir, { recursive: true });
-  for (const [file, lines] of byFile) {
-    appendFileSync(join(dir, file), `${lines.join("\n")}\n`);
+  if (written > 0) {
+    mkdirSync(dir, { recursive: true });
+    for (const [file, lines] of byFile) {
+      appendFileSync(join(dir, file), `${lines.join("\n")}\n`);
+    }
   }
-  return written;
+  return { written, conflicts };
 }
 
 /**
- * Every stored row in `dir`, grouped by judge family (metric). A missing directory is empty; a
- * corrupt row throws with its file and line, since a silently dropped label would move the score.
+ * Every stored row in `dir`, grouped by judge family (metric). A repeated labelKey is dropped (the
+ * first row wins). A missing directory is empty; a corrupt row throws with its file and line, since
+ * a silently dropped label would move the score.
  */
 export function loadCalibration(dir: string): Record<string, CalibrationRow[]> {
   const grouped: Record<string, CalibrationRow[]> = {};
   if (!existsSync(dir)) return grouped;
+  const seen = new Set<string>();
   for (const name of readdirSync(dir).toSorted()) {
     if (!name.endsWith(".jsonl")) continue;
     const path = join(dir, name);
@@ -121,6 +139,8 @@ export function loadCalibration(dir: string): Record<string, CalibrationRow[]> {
       if (!isCalibrationRow(value)) {
         throw new Error(`${path}:${index + 1} is not a calibration row`);
       }
+      if (seen.has(value.labelKey)) return;
+      seen.add(value.labelKey);
       (grouped[value.metric] ??= []).push(value);
     });
   }

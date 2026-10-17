@@ -318,7 +318,8 @@ Options:
   --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
   --judge-reasoning <on|off>  Judge reasoning (default: off on smoke, the model's on train/holdout;
                            off bills far fewer output tokens)
-  --judge-consistency <0-1>  Share of judge calls re-run to measure self-consistency
+  --judge-consistency <0-1>  Share of binary judge calls re-run to measure self-consistency
+                           (rubric judges are not sampled)
                            (default: 0.1 on live runs, 0 on dry runs; a flipped verdict is marked)
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json (plus evals/rag/calibration/) and exit
@@ -428,10 +429,15 @@ async function main(): Promise<void> {
     }
     try {
       if (opts.appendCalibration) {
-        const added = appendCalibrationLabels(CALIBRATION_DIR, items, {
+        const appended = appendCalibrationLabels(CALIBRATION_DIR, items, {
           commitSha: await getCommitSha(),
         });
-        console.log(`Appended ${added} labelled row(s) to ${CALIBRATION_DIR}`);
+        console.log(`Appended ${appended.written} labelled row(s) to ${CALIBRATION_DIR}`);
+        if (appended.conflicts > 0) {
+          console.log(
+            `${appended.conflicts} labels conflict with the store; delete the old row to replace (not overwritten).`
+          );
+        }
       }
       stored = loadCalibration(CALIBRATION_DIR);
     } catch (err) {

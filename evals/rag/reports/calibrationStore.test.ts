@@ -63,7 +63,7 @@ describe("appendCalibrationLabels", () => {
       ],
       { commitSha: "abc123" }
     );
-    expect(written).toBe(2);
+    expect(written).toEqual({ written: 2, conflicts: 0 });
     const chat = readFileSync(join(dir, "binary_judge_chat_grounding.jsonl"), "utf8")
       .trim()
       .split("\n");
@@ -90,11 +90,34 @@ describe("appendCalibrationLabels", () => {
 
   it("dedupes by labelKey across calls and within one call", () => {
     const labels = [item({ id: 1, humanAgree: true }), item({ id: 2, humanAgree: true })];
-    expect(appendCalibrationLabels(dir, labels, { commitSha: "a" })).toBe(1);
-    expect(appendCalibrationLabels(dir, labels, { commitSha: "b" })).toBe(0);
+    expect(appendCalibrationLabels(dir, labels, { commitSha: "a" })).toEqual({
+      written: 1,
+      conflicts: 0,
+    });
+    expect(appendCalibrationLabels(dir, labels, { commitSha: "b" })).toEqual({
+      written: 0,
+      conflicts: 0,
+    });
     const stored = loadCalibration(dir)["binary_judge_chat_grounding"] ?? [];
     expect(stored).toHaveLength(1);
     expect(stored[0]?.commitSha).toBe("a");
+  });
+
+  it("counts a conflicting re-label and keeps the stored label", () => {
+    appendCalibrationLabels(dir, [item({ humanAgree: true })]);
+    const result = appendCalibrationLabels(dir, [item({ humanAgree: false })]);
+    expect(result).toEqual({ written: 0, conflicts: 1 });
+    const stored = loadCalibration(dir)["binary_judge_chat_grounding"] ?? [];
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.humanAgree).toBe(true);
+  });
+
+  it("does not count a repeat with the same verdict as a conflict", () => {
+    appendCalibrationLabels(dir, [item({ humanAgree: true })]);
+    expect(appendCalibrationLabels(dir, [item({ humanAgree: true })])).toEqual({
+      written: 0,
+      conflicts: 0,
+    });
   });
 
   it("keeps the same case under a different reason as a separate label", () => {
@@ -131,6 +154,35 @@ describe("loadCalibration", () => {
   it("fails loudly on a corrupt row instead of silently dropping it", () => {
     writeFileSync(join(dir, "binary_judge_chat_grounding.jsonl"), "{not json}\n");
     expect(() => loadCalibration(dir)).toThrow(/binary_judge_chat_grounding\.jsonl:1/);
+  });
+
+  it("rejects a row whose modelStatus is not a known status", () => {
+    const row = {
+      caseId: "c",
+      runner: "chat",
+      metric: "binary_judge_chat_grounding",
+      modelStatus: "maybe",
+      score: 0,
+      modelReason: "x",
+      humanAgree: true,
+      labeledAt: "2026-10-17T00:00:00.000Z",
+      labelKey: "k",
+    };
+    writeFileSync(join(dir, "binary_judge_chat_grounding.jsonl"), `${JSON.stringify(row)}\n`);
+    expect(() => loadCalibration(dir)).toThrow(/is not a calibration row/);
+  });
+
+  it("keeps the first of two identical labelKeys within a file", () => {
+    const first = appendCalibrationLabels(dir, [item({ humanAgree: true })]);
+    expect(first.written).toBe(1);
+    const line = readFileSync(join(dir, "binary_judge_chat_grounding.jsonl"), "utf8").trim();
+    writeFileSync(
+      join(dir, "binary_judge_chat_grounding.jsonl"),
+      `${line}\n${line.replace('"humanAgree":true', '"humanAgree":false')}\n`
+    );
+    const stored = loadCalibration(dir)["binary_judge_chat_grounding"] ?? [];
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.humanAgree).toBe(true);
   });
 });
 
