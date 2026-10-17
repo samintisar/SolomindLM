@@ -733,16 +733,28 @@ export function latencyCostBudget(
 ): MetricResult {
   const latencyMs = artifact.latencyMs;
   const totalTokens = artifact.tokenUsage?.total ?? 0;
+  // Estimated usage (chars/4) is not a provider count, so tokens are reported but never gated.
+  const providerTokens = artifact.tokenUsageSource === "provider";
 
   if (baseline) {
     const latencyRatio = latencyMs / baseline.latencyMs;
-    const tokenRatio = baseline.tokenUsage.total > 0 ? totalTokens / baseline.tokenUsage.total : 0;
-    const worstRatio = Math.max(latencyRatio, tokenRatio);
+    const baselineTokens = baseline.tokenUsage.total;
+    // A baseline with no recorded usage has no ratio to compare against.
+    const tokensGated = providerTokens && baselineTokens > 0;
+    const tokenRatio = baselineTokens > 0 ? totalTokens / baselineTokens : 0;
+    const worstRatio = tokensGated ? Math.max(latencyRatio, tokenRatio) : latencyRatio;
 
     let status: MetricStatus;
     if (worstRatio <= 1.2) status = "pass";
     else if (worstRatio <= 2.0) status = "warn";
     else status = "fail";
+
+    const latencyPart = `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x), `;
+    const tokenPart = !providerTokens
+      ? `tokens ${totalTokens} (estimated, not gated)`
+      : tokensGated
+        ? `tokens ${totalTokens} (baseline ${baselineTokens}, ${tokenRatio.toFixed(2)}x).`
+        : `tokens ${totalTokens} (baseline has no token usage)`;
 
     return metricResult(
       "latency_cost_budget",
@@ -750,14 +762,15 @@ export function latencyCostBudget(
       artifact,
       status,
       worstRatio,
-      `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x), tokens ${totalTokens} (baseline ${baseline.tokenUsage.total}, ${tokenRatio.toFixed(2)}x).`,
+      `${latencyPart}${tokenPart}`,
       {
         latencyMs,
         totalTokens,
         latencyRatio: Math.round(latencyRatio * 100) / 100,
         tokenRatio: Math.round(tokenRatio * 100) / 100,
         baselineLatencyMs: baseline.latencyMs,
-        baselineTotalTokens: baseline.tokenUsage.total,
+        baselineTotalTokens: baselineTokens,
+        tokensGated,
       }
     );
   }
@@ -766,37 +779,31 @@ export function latencyCostBudget(
   const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
   const tokenGate = PER_RUNNER_TOKEN_GATE[artifact.runner] ?? 8000;
   const latencyOk = latencyMs <= latencyGate;
-  const tokensOk = totalTokens <= tokenGate;
+  const tokensOk = !providerTokens || totalTokens <= tokenGate;
+  const withinWarnBand =
+    latencyMs <= latencyGate * 2 && (!providerTokens || totalTokens <= tokenGate * 2);
 
   let status: MetricStatus;
   if (latencyOk && tokensOk) status = "pass";
-  else if (latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2) status = "warn";
+  else if (withinWarnBand) status = "warn";
   else status = "fail";
 
-  const score =
-    latencyOk && tokensOk
-      ? 1
-      : latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2
-        ? 0.5
-        : 0;
+  const score = latencyOk && tokensOk ? 1 : withinWarnBand ? 0.5 : 0;
 
-  return metricResult(
-    "latency_cost_budget",
-    fixture,
-    artifact,
-    status,
-    score,
-    `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`,
-    {
-      latencyMs,
-      totalTokens,
-      latencyGate,
-      tokenGate,
-      latencyOk,
-      tokensOk,
-      hasBaseline: false,
-    }
-  );
+  const detail = providerTokens
+    ? `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`
+    : `Latency ${latencyMs}ms (gate ${latencyGate}ms), no baseline, tokens ${totalTokens} (estimated, not gated)`;
+
+  return metricResult("latency_cost_budget", fixture, artifact, status, score, detail, {
+    latencyMs,
+    totalTokens,
+    latencyGate,
+    tokenGate,
+    latencyOk,
+    tokensOk,
+    hasBaseline: false,
+    tokensGated: providerTokens,
+  });
 }
 
 // Re-export types for convenience
