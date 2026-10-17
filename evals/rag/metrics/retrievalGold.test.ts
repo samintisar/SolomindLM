@@ -148,20 +148,25 @@ describe("passageRecallByStage", () => {
     expect(selected.score).toBe(1);
   });
 
-  it("finds a quote split across two adjacent selected chunks, but not across unordered pre-rerank chunks", () => {
+  it("does not match a quote split across two chunks at any stage (each chunk is checked alone)", () => {
     const quote = P.a;
     const cut = quote.indexOf("specialist");
     const left = quote.slice(0, cut);
     const right = quote.slice(cut);
-    const [pre, , selected] = passageRecallByStage(
+    const rows = passageRecallByStage(
       fixture({ expectedPassages: [quote] }),
       artifact({
         preRerankChunks: [chunk("2", right), chunk("1", left)],
+        postRerankChunks: [chunk("1", left), chunk("2", right)],
         selectedChunks: [chunk("1", left), chunk("2", right)],
       })
     );
-    expect(selected.score).toBe(1);
-    expect(pre.score).toBe(0);
+    expect(rows.map((r) => r.score)).toEqual([0, 0, 0]);
+  });
+
+  it("holds the decimal point and thousands comma sentinels as real characters", () => {
+    expect(normalisePassageText("rate 3.5 and 1,000 units.")).toBe("rate 3.5 and 1,000 units");
+    expect(normalisePassageText("3.5.")).toBe("3.5");
   });
 
   it("lists the passages a stage missed and the upstream recalls on the selected row", () => {

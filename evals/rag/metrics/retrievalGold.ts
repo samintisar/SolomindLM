@@ -4,6 +4,10 @@
  * A fixture's `expectedPassages` are verbatim source quotes that a correct answer needs. A chunk
  * holds a passage when the normalised quote appears in its text. These metrics score retrieval
  * for fixtures that have no `expectedItems`, where the item-based metrics are blind.
+ *
+ * Each chunk is checked on its own. A quote is never matched across two chunks: selected and
+ * post-rerank chunks are ordered by score, not by position in the document, and a quote of at most
+ * 30 words fits inside one ~220-token chunk (55-token overlap), so a cross-chunk match cannot arise.
  */
 import type {
   ChunkSnapshot,
@@ -14,8 +18,12 @@ import type {
 } from "../types";
 import { metricResult } from "./metricResult";
 
-const DECIMAL_POINT = "";
-const THOUSANDS_COMMA = "";
+// Sentinels that keep a decimal point or thousands comma inside a number through the punctuation
+// step. Built from char codes: a private-use character written in source is invisible, and
+// formatters rewrite escapes of it into the raw character.
+const DECIMAL_POINT = String.fromCharCode(0xe000);
+const THOUSANDS_COMMA = String.fromCharCode(0xe001);
+const NON_WORD = new RegExp(`[^\\p{L}\\p{M}\\p{N}\\s${DECIMAL_POINT}${THOUSANDS_COMMA}]`, "gu");
 const NO_PASSAGES_DETAIL = "No expectedPassages on this fixture; passage metrics not scored.";
 
 /**
@@ -31,9 +39,11 @@ export function normalisePassageText(text: string): string {
     .replace(/(\p{N})\.(?=\p{N})/gu, `$1${DECIMAL_POINT}`)
     .replace(/(\p{N}),(?=\p{N})/gu, `$1${THOUSANDS_COMMA}`)
     .replace(/['‘’ʼ`´]/g, "")
-    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ")
-    .replace(//g, ".")
-    .replace(//g, ",")
+    .replace(NON_WORD, " ")
+    .split(DECIMAL_POINT)
+    .join(".")
+    .split(THOUSANDS_COMMA)
+    .join(",")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -45,26 +55,18 @@ export function passageFound(chunkText: string, quote: string): boolean {
   return ` ${normalisePassageText(chunkText)} `.includes(` ${needle} `);
 }
 
-/** The text a judge and a metric see for a chunk: what the model was shown when it exists. */
+/** The text a metric sees for a chunk: what the model was shown when it exists. */
 const chunkText = (chunk: ChunkSnapshot): string => chunk.contextText ?? chunk.content;
 
 interface StageCoverage {
-  /** Per passage: found in the stage. */
+  /** Per passage: found in some chunk of the stage. */
   found: boolean[];
   /** Per chunk (same order as the stage): the passage indices it holds. */
   chunkPassages: Set<number>[];
 }
 
-/**
- * Which passages a stage holds. With `adjacent`, a quote may span two consecutive chunks (checked
- * on their text joined by a space) and then both chunks hold it. Pre-rerank chunks are in
- * retrieval order, not document order, so they are checked one at a time.
- */
-function stageCoverage(
-  chunks: ChunkSnapshot[],
-  passages: string[],
-  adjacent: boolean
-): StageCoverage {
+/** Which passages each chunk of a stage holds, one chunk at a time. */
+function stageCoverage(chunks: ChunkSnapshot[], passages: string[]): StageCoverage {
   const texts = chunks.map(chunkText);
   const found = passages.map(() => false);
   const chunkPassages = chunks.map(() => new Set<number>());
@@ -75,17 +77,6 @@ function stageCoverage(
         chunkPassages[i].add(p);
       }
     });
-    if (adjacent) {
-      for (let i = 0; i + 1 < texts.length; i++) {
-        // A quote held whole by one chunk is not spanning: its neighbour gets no credit for it.
-        if (passageFound(texts[i], quote) || passageFound(texts[i + 1], quote)) continue;
-        if (passageFound(`${texts[i]} ${texts[i + 1]}`, quote)) {
-          found[p] = true;
-          chunkPassages[i].add(p);
-          chunkPassages[i + 1].add(p);
-        }
-      }
-    }
   });
   return { found, chunkPassages };
 }
@@ -124,24 +115,13 @@ export function passageRecallByStage(
 ): MetricResult[] {
   const passages = fixture.expectedPassages ?? [];
   const stages = [
-    {
-      metric: "passage_recall_pre_rerank",
-      label: "pre-rerank",
-      chunks: artifact.preRerankChunks,
-      adjacent: false,
-    },
+    { metric: "passage_recall_pre_rerank", label: "pre-rerank", chunks: artifact.preRerankChunks },
     {
       metric: "passage_recall_post_rerank",
       label: "post-rerank",
       chunks: artifact.postRerankChunks,
-      adjacent: true,
     },
-    {
-      metric: "passage_recall_selected",
-      label: "selected",
-      chunks: artifact.selectedChunks,
-      adjacent: true,
-    },
+    { metric: "passage_recall_selected", label: "selected", chunks: artifact.selectedChunks },
   ];
 
   if (passages.length === 0) {
@@ -151,7 +131,7 @@ export function passageRecallByStage(
   }
 
   const scored = stages.map((stage) => {
-    const coverage = stageCoverage(stage.chunks, passages, stage.adjacent);
+    const coverage = stageCoverage(stage.chunks, passages);
     return { ...stage, coverage, score: recallOf(coverage.found) };
   });
   const [pre, post] = scored;
@@ -187,12 +167,12 @@ export function passageRecallByStage(
 
 // ─── Selected-context precision and nDCG ─────────────────────
 
-/** Per selected chunk, whether it holds at least one expected passage (spanning counts). */
+/** Per selected chunk, whether it holds at least one expected passage. */
 function selectedRelevance(
   artifact: EvalRunArtifact,
   passages: string[]
 ): { relevance: number[]; chunkPassages: Set<number>[] } {
-  const { chunkPassages } = stageCoverage(artifact.selectedChunks, passages, true);
+  const { chunkPassages } = stageCoverage(artifact.selectedChunks, passages);
   return { relevance: chunkPassages.map((s) => (s.size > 0 ? 1 : 0)), chunkPassages };
 }
 
@@ -294,9 +274,9 @@ export function passageAbstentionRecalls(
 } {
   const passages = fixture.expectedPassages ?? [];
   return {
-    selectedRecall: recallOf(stageCoverage(artifact.selectedChunks, passages, true).found),
-    preRerankRecall: recallOf(stageCoverage(artifact.preRerankChunks, passages, false).found),
-    postRerankRecall: recallOf(stageCoverage(artifact.postRerankChunks, passages, true).found),
+    selectedRecall: recallOf(stageCoverage(artifact.selectedChunks, passages).found),
+    preRerankRecall: recallOf(stageCoverage(artifact.preRerankChunks, passages).found),
+    postRerankRecall: recallOf(stageCoverage(artifact.postRerankChunks, passages).found),
     answerRecall: recallOf(passages.map((p) => passageFound(artifact.answer, p))),
   };
 }
