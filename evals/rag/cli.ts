@@ -23,6 +23,7 @@ import {
   buildJudgeCalibrationQueue,
   checkHoldoutPromotion,
   formatReport,
+  formatWorkOrder,
   generateReport,
 } from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
@@ -114,6 +115,8 @@ interface CliOptions {
   promotionCheckAfter?: string;
   /** Append the live run's report to evals/rag/history/<split>.jsonl (never on dry runs) */
   appendHistory: boolean;
+  /** Write the agent work order (markdown) after the report; live and dry runs */
+  outputWorkOrder?: string;
 }
 
 /**
@@ -198,6 +201,7 @@ const CLI_OPTIONS = {
   /** Takes two paths: `--promotion-check <before.json> <after.json>`. */
   "promotion-check": { type: "string" },
   "append-history": { type: "boolean" },
+  "output-workorder": { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const satisfies NonNullable<ParseArgsConfig["options"]>;
 
@@ -290,6 +294,7 @@ function parseArgs(args: string[]): CliOptions {
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
     appendHistory: values["append-history"] ?? false,
+    outputWorkOrder: values["output-workorder"],
   };
 }
 
@@ -329,6 +334,8 @@ Options:
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
   --append-history         After a live run, append the report to evals/rag/history/<split>.jsonl
                            (off by default; never on dry runs; skipped when invocation errors occur)
+  --output-workorder <path>  Write a markdown task list for a coding agent (failure groups, target
+                           files, re-run commands, rules). Written for live and dry runs
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -689,6 +696,12 @@ async function main(): Promise<void> {
     mkdirSync(dirname(opts.output), { recursive: true });
     writeFileSync(opts.output, JSON.stringify(report, null, 2));
     console.log(`\nReport written to ${opts.output}`);
+  }
+
+  if (opts.outputWorkOrder) {
+    mkdirSync(dirname(opts.outputWorkOrder), { recursive: true });
+    writeFileSync(opts.outputWorkOrder, formatWorkOrder(report, { repeats, split: opts.split }));
+    console.log(`Work order written to ${opts.outputWorkOrder}`);
   }
 
   // History: live runs only. A run with invocation errors would record stub scores as metric
