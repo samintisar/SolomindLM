@@ -896,6 +896,11 @@ export class ChatAgent {
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");
+      // Eval only: no passages to answer from, and retrieval-only runs generate nothing.
+      if (context.evalRetrievalOnly) {
+        yield this.doneChunk();
+        return;
+      }
       yield { type: "status", status: "thinking", message: "Generating response..." };
       const directAnswer = await this.llmWrapper.generateDirectResponse(
         userMessage,
@@ -952,6 +957,11 @@ export class ChatAgent {
       message: `Reading ${citationChunks.length} passages...`,
     };
     yield { type: "references", data: citationChunks };
+    // Eval only: the passages are chosen, so stop before any generation (see ChatAgentContext).
+    if (context.evalRetrievalOnly) {
+      yield this.doneChunk();
+      return;
+    }
 
     logger.info("Generating grounded response", {
       chunkCount: citationChunks.length,

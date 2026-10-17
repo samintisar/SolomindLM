@@ -155,6 +155,30 @@ export const FIXTURES: Record<string, EvalFixture> = {
 | `explanation`      | -                     | correctness, faithfulness, completeness ✓ |
 | `summarization`    | -                     | completeness, faithfulness ✓              |
 
+## Gold passages (`expectedPassages`)
+
+Most prose fixtures have no `expectedItems`, so item-based retrieval metrics cannot score them. `expectedPassages` gives them retrieval gold: verbatim quotes from the fixture's sources that a correct answer needs.
+
+**Authoring.** Copy each quote verbatim from a markdown or text source, 8 to 30 words, with its punctuation. Matching ignores case, punctuation, dash and quote style, and markdown marks, but it keeps decimal points and thousands commas inside numbers. Use one to three quotes per fixture. Studio fixtures take none.
+
+**Checks.** `validatePack` checks that every quote is 8 to 30 words and, for a pack whose sources are all markdown or text, that it appears in those sources. A pack that also has PDFs skips the text check. Before a live run starts, every pack quote is checked against the extracted text of its pack, and the run exits 2 listing any that are missing. That catches OCR drift in PDFs.
+
+**Matching.** Each chunk is checked on its own. A quote never spans two chunks, because chunks are ordered by score, not by position in the document. All three retrieval stages match on the same text: `contextText` when it is set (the passage as the model saw it, with neighbouring previews), otherwise `content`.
+
+**Metrics** (chat artifacts with `expectedPassages`):
+
+| Metric | Stage | Status |
+| --- | --- | --- |
+| `passage_recall_pre_rerank` | share of quotes held | info |
+| `passage_recall_post_rerank` | share of quotes held | info |
+| `passage_recall_selected` | share of quotes held | pass ≥ 0.8, warn ≥ 0.5, else fail |
+| `passage_precision_selected` | share of selected chunks holding a quote | pass ≥ 0.4, warn ≥ 0.2 (lenient, because selection pads with neighbours) |
+| `passage_ndcg_selected` | binary-relevance nDCG over selected chunks | pass ≥ 0.7, warn ≥ 0.4 |
+
+A selected-stage recall miss is routed to `context_selection` when an earlier stage held more quotes, and to `retrieval` otherwise. Abstention correctness applies the same four rules to passage recall. Passage mode uses 0.6 as "sufficient" and warns on a context-selection miss at 0.5 or above. Item mode keeps 0.7.
+
+**Reference-free context judge** (`llm_context_precision`, `llm_context_waste_tokens`). Chat fixtures with neither `expectedItems` nor `expectedPassages` get one judge call per artifact. The judge sees each selected chunk's first 1200 characters of `content` and names the chunks the answer needs. Both metrics are info-only and never fail a run. A judge error shows as warn with `judgeError: true`. Results are cached in process by judge model, question and chunk text. The context judge does not run on dry runs or retrieval-only runs.
+
 ## Running Evaluations
 
 Non-dry runs invoke the gated Convex eval action against a **dev** deployment only.
@@ -188,6 +212,14 @@ bun run eval:rag -- --case agentic-patterns-20
 
 # Run only literature review fixtures
 bun run eval:literature-review
+```
+
+### Retrieval-only runs
+
+`--retrieval-only` runs chat fixtures through plan, search, rerank and context selection, then stops before any answer is generated. No answer metrics and no judges run, so a run costs roughly a tenth of a full one. Use it when you are sweeping a retrieval knob (budgets, thresholds, neighbour or opening passages) and only need to know what was found and selected, and how fast. Scores come from the passage metrics (`passage_recall_*`, `passage_precision_selected`, `passage_ndcg_selected`), the item metrics and the latency and token budgets. Use a full run before you judge an answer change. Other runners are skipped with a note. The report is labelled `RETRIEVAL-ONLY RUN`, and latency is not compared to a full-run baseline. A retrieval-only run also stops when retrieval finds no passages. Greetings and clarifying questions still get a direct reply, because they never search, so their artifacts can carry an answer.
+
+```bash
+bun run eval:rag -- --retrieval-only --runner chat --split train
 ```
 
 ## Suggested Fixtures for Machine Learning Notebook
