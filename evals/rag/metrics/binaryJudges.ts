@@ -48,10 +48,16 @@ export function resetJudgeConsistencyTally(): void {
  * Whether this case and metric are in the self-consistency sample. Deterministic (a hash of
  * `caseId|metric`), so the same judge calls are re-run on every run and their results compare.
  */
-export function isConsistencySampled(caseId: string, metric: string, sample: number): boolean {
+export function isConsistencySampled(
+  caseId: string,
+  runner: string,
+  metric: string,
+  sample: number
+): boolean {
   if (sample <= 0) return false;
   if (sample >= 1) return true;
-  const bucket = createHash("sha1").update(`${caseId}|${metric}`).digest().readUInt32BE(0) % 100;
+  const key = `${caseId}|${runner}|${metric}`;
+  const bucket = createHash("sha1").update(key).digest().readUInt32BE(0) % 100;
   return bucket < sample * 100;
 }
 
@@ -107,7 +113,7 @@ export function formatChunks(
 }
 
 /** Chunk context for grounding judges, with a note when passages were cut for judging. */
-export function combineChunkContents(
+function combineChunkContents(
   chunks: EvalRunArtifact["selectedChunks"],
   limit = CHUNK_CONTEXT_LIMIT
 ): string {
@@ -159,7 +165,7 @@ async function runBinaryJudge(
     const raw = await invoke(prompt);
     const { pass, reason } = parseBinaryResponse(raw);
     const breakdown: Record<string, unknown> = { model, pass };
-    if (isConsistencySampled(artifact.caseId, metric, consistencySample)) {
+    if (isConsistencySampled(artifact.caseId, artifact.runner, metric, consistencySample)) {
       const second = await repeatVerdict(prompt, invoke);
       if (second !== null) {
         consistencyTotals.sampled++;
@@ -273,10 +279,10 @@ const GENERIC_GROUNDING_CRITERION =
  * Per-kind structure criteria. Infographics are not listed: the vision judge covers them, so they
  * keep the generic line, as do literature reviews (not a studio kind).
  */
-export const STUDIO_STRUCTURE_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
+const STUDIO_STRUCTURE_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
   flashcards:
     "Pass only if the output is a non-empty list of cards, and every card has a non-empty front and a non-empty back.",
-  quiz: "Pass only if the output is a non-empty list of questions, each with at least two options, an answer key that names one of its options, and an explanation.",
+  quiz: "Pass only if the output is a non-empty list of questions, and each question has a stem, at least two options and exactly one answer key. Explanations, when present, are non-empty and consistent with the key.",
   report:
     "Pass only if the output is a markdown report with a non-empty body under every required section heading.",
   audioScript:
@@ -294,10 +300,10 @@ export const STUDIO_STRUCTURE_CRITERIA: Partial<Record<StudioRunnerKind, string>
 /**
  * Per-kind grounding criteria. Infographics keep the generic line (the vision judge handles them).
  */
-export const STUDIO_GROUNDING_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
+const STUDIO_GROUNDING_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
   flashcards:
     "Pass only if every card's front and back are supported by the sources, and no card contradicts them.",
-  quiz: "Pass only if each correct option is supported by the sources, no distractor is also correct according to the sources, and the explanations do not invent facts.",
+  quiz: "Pass only if each correct option is supported by the sources, no distractor is also correct according to the sources, and any explanations given do not invent facts.",
   report:
     "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
   audioScript:

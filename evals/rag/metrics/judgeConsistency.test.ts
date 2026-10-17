@@ -114,22 +114,34 @@ describe("judge self-consistency", () => {
 
 describe("isConsistencySampled", () => {
   it("is deterministic for a case and metric", () => {
-    const first = isConsistencySampled("chat-case", "binary_judge_chat_grounding", 0.5);
+    const first = isConsistencySampled("chat-case", "chat", "binary_judge_chat_grounding", 0.5);
     for (let i = 0; i < 5; i++) {
-      expect(isConsistencySampled("chat-case", "binary_judge_chat_grounding", 0.5)).toBe(first);
+      expect(isConsistencySampled("chat-case", "chat", "binary_judge_chat_grounding", 0.5)).toBe(
+        first
+      );
     }
+  });
+
+  it("keys the sample on the runner, so one case under two runners is sampled independently", () => {
+    const cases = Array.from({ length: 300 }, (_, i) => `case-${i}`);
+    const differs = cases.filter(
+      (id) =>
+        isConsistencySampled(id, "chat", "binary_judge_chat_grounding", 0.5) !==
+        isConsistencySampled(id, "quiz", "binary_judge_chat_grounding", 0.5)
+    );
+    expect(differs.length).toBeGreaterThan(0);
   });
 
   it("samples about the requested fraction across many cases", () => {
     const hits = Array.from({ length: 1000 }, (_, i) =>
-      isConsistencySampled(`case-${i}`, "binary_judge_chat_grounding", 0.1)
+      isConsistencySampled(`case-${i}`, "chat", "binary_judge_chat_grounding", 0.1)
     ).filter(Boolean).length;
     expect(hits).toBeGreaterThan(50);
     expect(hits).toBeLessThan(150);
   });
 
   it("samples nothing at 0 and everything at 1", () => {
-    expect(isConsistencySampled("case-1", "m", 0)).toBe(false);
-    expect(isConsistencySampled("case-1", "m", 1)).toBe(true);
+    expect(isConsistencySampled("case-1", "chat", "m", 0)).toBe(false);
+    expect(isConsistencySampled("case-1", "chat", "m", 1)).toBe(true);
   });
 });

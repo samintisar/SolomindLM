@@ -66,7 +66,7 @@ describe("studio grounding criteria by kind", () => {
     ["flashcards", "no card contradicts them"],
     ["quiz", "each correct option is supported by the sources"],
     ["quiz", "no distractor is also correct according to the sources"],
-    ["quiz", "the explanations do not invent facts"],
+    ["quiz", "any explanations given do not invent facts"],
     ["report", "substantive claims and figures are supported by the sources (minor phrasing ok)"],
     [
       "audioScript",
@@ -108,7 +108,8 @@ describe("studio grounding criteria by kind", () => {
 describe("studio structure criteria by kind", () => {
   const expected: Array<[StudioRunnerKind, string]> = [
     ["flashcards", "non-empty list of cards"],
-    ["quiz", "an answer key that names one of its options"],
+    ["quiz", "exactly one answer key"],
+    ["quiz", "Explanations, when present, are non-empty and consistent with the key"],
     ["report", "required section heading"],
     ["audioScript", "every turn has a speaker"],
     ["audioScriptOnly", "every turn has a speaker"],
