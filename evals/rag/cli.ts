@@ -14,6 +14,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { caseFileStem } from "./caseFile";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
+import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
 import {
@@ -106,6 +108,8 @@ interface CliOptions {
   rubricChecks?: string[];
   /** `false` turns judge reasoning off */
   judgeReasoning?: boolean;
+  /** Fraction (0–1) of judge calls re-run for self-consistency; default by run kind */
+  judgeConsistency?: number;
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
@@ -184,6 +188,7 @@ const CLI_OPTIONS = {
   "judge-model": { type: "string" },
   rubric: { type: "string" },
   "judge-reasoning": { type: "string" },
+  "judge-consistency": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
@@ -274,6 +279,10 @@ function parseArgs(args: string[]): CliOptions {
       values["judge-reasoning"] !== undefined
         ? parseOnOff("judge-reasoning", values["judge-reasoning"])
         : undefined,
+    judgeConsistency:
+      values["judge-consistency"] !== undefined
+        ? parseConsistencyFraction(values["judge-consistency"])
+        : undefined,
     compareA: values.compare,
     compareB: secondValues.get("compare"),
     scoreJudgeQueue: values["score-judge-queue"],
@@ -307,7 +316,10 @@ Options:
   --likert-judges          Enable legacy Likert 0–1 LLM judges (default: binary only)
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
   --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
-  --judge-reasoning <on|off>  Judge reasoning (default: the model's; off bills far fewer output tokens)
+  --judge-reasoning <on|off>  Judge reasoning (default: off on smoke, the model's on train/holdout;
+                           off bills far fewer output tokens)
+  --judge-consistency <0-1>  Share of judge calls re-run to measure self-consistency
+                           (default: 0.1 on live runs, 0 on dry runs; a flipped verdict is marked)
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json (plus evals/rag/calibration/) and exit
                            0 ready / 1 not ready / 2 under-labelled (or not a queue file)
@@ -462,6 +474,13 @@ async function main(): Promise<void> {
   if (!opts.dryRun && !opts.caseId && !opts.split) {
     opts.split = "smoke";
   }
+  const judge = resolveJudgeSettings({
+    split: opts.split,
+    dryRun: opts.dryRun,
+    judgeReasoning: opts.judgeReasoning,
+    judgeConsistency: opts.judgeConsistency,
+  });
+  resetJudgeConsistencyTally();
 
   let fixtureIds: string[];
   if (opts.caseId) {
@@ -670,7 +689,8 @@ async function main(): Promise<void> {
         dryRun: opts.dryRun,
         judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
         rubricChecks: opts.rubricChecks,
-        judgeReasoning: opts.judgeReasoning,
+        judgeReasoning: judge.judgeReasoning,
+        judgeConsistencySample: judge.judgeConsistencySample,
         packSourceTexts: fixture.useCase
           ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
           : undefined,
@@ -694,6 +714,7 @@ async function main(): Promise<void> {
 
   // Generate report
   const commitSha = await getCommitSha();
+  const consistency = judgeConsistencyTally();
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
@@ -702,6 +723,10 @@ async function main(): Promise<void> {
     useCaseByCase: new Map(
       fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
     ),
+    judgeConsistency:
+      consistency.sampled > 0
+        ? { ...consistency, rate: consistency.agreed / consistency.sampled }
+        : undefined,
   });
 
   console.log(formatReport(report));
@@ -723,6 +748,12 @@ async function main(): Promise<void> {
         `
 Judge tokens: ${usage.calls} calls, ${usage.promptTokens} prompt ` +
           `(${usage.cachedPromptTokens} cached, ${cachedShare}%), ${usage.completionTokens} completion`
+      );
+    }
+    if (consistency.sampled > 0) {
+      const rate = Math.round((consistency.agreed / consistency.sampled) * 100);
+      console.log(
+        `Judge self-consistency: ${consistency.agreed}/${consistency.sampled} (${rate}%)`
       );
     }
     const queue = buildJudgeCalibrationQueue(allMetrics, { limit: 20 });

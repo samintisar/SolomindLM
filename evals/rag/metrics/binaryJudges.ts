@@ -2,6 +2,8 @@
  * Binary pass/fail LLM judges per failure mode.
  * Default model: deepseek-ai/DeepSeek-V4.1-Flash via Together JSON mode.
  */
+
+import { createHash } from "crypto";
 import {
   type EvalBaseline,
   type EvalFixture,
@@ -26,6 +28,31 @@ export interface BinaryJudgeOptions extends LlmJudgeOptions {
   enabled?: boolean;
   /** Pack source text, the grounding evidence for studio artifacts that have no chunks */
   sourceTexts?: SourceText[];
+  /** Fraction (0–1) of judge calls to run a second time for self-consistency */
+  judgeConsistencySample?: number;
+}
+
+const consistencyTotals = { sampled: 0, agreed: 0 };
+
+/** Self-consistency since the last reset: repeated judge calls, and how many repeated the verdict. */
+export function judgeConsistencyTally(): { sampled: number; agreed: number } {
+  return { ...consistencyTotals };
+}
+
+export function resetJudgeConsistencyTally(): void {
+  consistencyTotals.sampled = 0;
+  consistencyTotals.agreed = 0;
+}
+
+/**
+ * Whether this case and metric are in the self-consistency sample. Deterministic (a hash of
+ * `caseId|metric`), so the same judge calls are re-run on every run and their results compare.
+ */
+export function isConsistencySampled(caseId: string, metric: string, sample: number): boolean {
+  if (sample <= 0) return false;
+  if (sample >= 1) return true;
+  const bucket = createHash("sha1").update(`${caseId}|${metric}`).digest().readUInt32BE(0) % 100;
+  return bucket < sample * 100;
 }
 
 /**
@@ -107,21 +134,53 @@ function parseBinaryResponse(raw: string): BinaryJudgeResult {
   return { pass: parsed.pass, reason };
 }
 
+/** Verdict from a repeat call, or null when the repeat fails (it is then not counted). */
+async function repeatVerdict(
+  prompt: string,
+  invoke: NonNullable<LlmJudgeOptions["invoke"]>
+): Promise<boolean | null> {
+  try {
+    return parseBinaryResponse(await invoke(prompt)).pass;
+  } catch {
+    return null;
+  }
+}
+
 async function runBinaryJudge(
   metric: string,
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   prompt: string,
   invoke: NonNullable<LlmJudgeOptions["invoke"]>,
-  model: string
+  model: string,
+  consistencySample = 0
 ): Promise<MetricResult> {
   try {
     const raw = await invoke(prompt);
     const { pass, reason } = parseBinaryResponse(raw);
-    return metricResult(metric, fixture, artifact, pass ? "pass" : "fail", pass ? 1 : 0, reason, {
-      model,
-      pass,
-    });
+    const breakdown: Record<string, unknown> = { model, pass };
+    if (isConsistencySampled(artifact.caseId, metric, consistencySample)) {
+      const second = await repeatVerdict(prompt, invoke);
+      if (second !== null) {
+        consistencyTotals.sampled++;
+        if (second === pass) {
+          consistencyTotals.agreed++;
+        } else {
+          // The first verdict stands; the flip is visible in the row.
+          breakdown.judgeUnstable = true;
+          breakdown.secondVerdict = second ? "pass" : "fail";
+        }
+      }
+    }
+    return metricResult(
+      metric,
+      fixture,
+      artifact,
+      pass ? "pass" : "fail",
+      pass ? 1 : 0,
+      reason,
+      breakdown
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return metricResult(metric, fixture, artifact, "fail", 0, `Binary judge failed: ${message}`, {
@@ -400,11 +459,12 @@ export async function scoreBinaryJudgeMetrics(
   }
 
   // Independent judges of one artifact run concurrently; results keep the order above.
+  const consistencySample = options.judgeConsistencySample ?? 0;
   return Promise.all(
     judges.map(([metric, prompt]) =>
       prompt === null
         ? Promise.resolve(noGroundingEvidence(fixture, artifact, model))
-        : runBinaryJudge(metric, fixture, artifact, prompt, invoke, model)
+        : runBinaryJudge(metric, fixture, artifact, prompt, invoke, model, consistencySample)
     )
   );
 }

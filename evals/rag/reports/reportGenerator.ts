@@ -13,6 +13,8 @@ export interface GenerateReportOptions {
   groupBySourcePolicy?: boolean;
   /** caseId → use-case pack id, for the scorecard */
   useCaseByCase?: Map<string, string>;
+  /** Judge self-consistency for this run, when any judge call was re-run */
+  judgeConsistency?: EvalReport["judgeConsistency"];
 }
 
 /**
@@ -48,6 +50,7 @@ export function generateReport(
     metrics,
     failureGroups,
     ...(scorecard && scorecard.cells.length > 0 ? { scorecard } : {}),
+    ...(options.judgeConsistency ? { judgeConsistency: options.judgeConsistency } : {}),
   };
 }
 

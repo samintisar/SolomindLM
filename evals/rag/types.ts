@@ -320,6 +320,8 @@ export interface EvalReport {
   failureGroups: FailureGroup[];
   /** Per use-case pack × runner pass rates (only when pack fixtures ran) */
   scorecard?: Scorecard;
+  /** Judge self-consistency: repeated judge calls, and how many repeated the verdict (sampled runs) */
+  judgeConsistency?: { sampled: number; agreed: number; rate: number };
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
