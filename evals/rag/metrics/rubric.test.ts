@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EvalFixture, EvalRunArtifact } from "../types";
 import type { UseCasePack } from "../usecases/types";
-import {
-  buildRubricPrompt,
-  formatSourceTexts,
-  rubricMetricName,
-  scoreRubricMetrics,
-} from "./rubric";
+import { formatSourceTexts } from "./evidence";
+import { buildRubricPrompt, rubricMetricName, scoreRubricMetrics } from "./rubric";
 
 const pack: UseCasePack = {
   id: "professionals",
