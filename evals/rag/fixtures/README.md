@@ -192,6 +192,37 @@ bun run eval:rag -- --case agentic-patterns-20
 bun run eval:literature-review
 ```
 
+## Sweeps
+
+`bun run eval:sweep` runs the chat fixtures once per cell of a grid of chat config overrides (the same
+knobs as `--chat-config` in the eval CLI). The empty override set always runs as the baseline. Each cell
+writes its artifacts to `<artifacts-dir>/<cellId>/`; the run writes `sweep.json` and `sweep.md`, and
+prints a table sorted by quality, with the Pareto front (quality up, tokens down, p95 latency down) marked `*`.
+
+```bash
+# Shape check, no agents or judges (stub artifacts; the table only shows the pipeline ran)
+bun run eval:sweep -- --dry-run --grid "hydeEnabled=true,false;contextTokenBudget=4000,8000" --prefix ml-factoid
+
+# Ranked experiments (run on the train split; add --compare-best to judge the best cell against the baseline)
+# 1. Cap full-document expansion: off, or only whole documents under 4000 or 8000 tokens
+bun run eval:sweep -- --grid "fullDocumentExpansion=off,4000,8000" --split train --compare-best
+# 2. Few-shot examples only for complex questions, or never
+bun run eval:sweep -- --grid "fewShotPolicy=complex-only,never" --split train --compare-best
+# 3. Keyword variants per sub-query (0 = one search per sub-query; the closest knob to reusing one vector search)
+bun run eval:sweep -- --grid "keywordVariants=0,1,2" --split train --compare-best
+# 4. HyDE gating
+bun run eval:sweep -- --grid "hydeEnabled=true,false" --split train --compare-best
+# Not ranked: the context budget axis
+bun run eval:sweep -- --grid "contextTokenBudget=4000,6000,8000" --split train --compare-best
+```
+
+Ranked items 5–7 (prompt-cache layout, chunk size, skipping follow-ups) are not chat overrides: the
+first needs a prompt change, the second a re-embed of the packs, the third an eval flag.
+
+Quality is the mean pass rate of `binary_judge_chat_grounding` and `expected_item_recall`.
+`expected_item_recall` passes by definition for fixtures with no `expectedItems`, so quality
+is closer to grounding alone on those fixtures.
+
 ## Suggested Fixtures for Machine Learning Notebook
 
 Based on the ML notebook, consider these scenarios:

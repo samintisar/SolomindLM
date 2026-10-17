@@ -20,6 +20,7 @@ import { caseFileStem } from "./caseFile";
 import { parseChatConfigFlag } from "./chatConfigFlag";
 import { mapWithConcurrency } from "./concurrency";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { createLiveInvokers } from "./liveInvokers";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
 import {
@@ -30,13 +31,7 @@ import {
 } from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
-import {
-  createConvexChatInvoker,
-  createConvexLiteratureReviewInvoker,
-  createConvexResearchInvoker,
-  createConvexStudioInvokers,
-  runEval,
-} from "./runners";
+import { runEval } from "./runners";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { LiteratureReviewInvoker } from "./runners/literatureReviewRunner";
@@ -57,7 +52,6 @@ import {
   type StudioRunnerKind,
 } from "./types";
 import { USE_CASE_PACKS } from "./usecases";
-import { createConvexSeedApi } from "./usecases/convexSeedApi";
 import { resolveUseCaseIds } from "./usecases/ids";
 import { requireEvalConvexEnv } from "./usecases/prodGuard";
 import {
@@ -576,11 +570,12 @@ async function main(): Promise<void> {
       process.exit(2);
     }
     console.log(`Using Convex at ${convexUrl} (eval mode)`);
-    chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
-    researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
-    literatureReviewInvoker = createConvexLiteratureReviewInvoker(convexUrl, { evalSecret });
-    studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
-    seedApi = createConvexSeedApi(convexUrl, evalSecret);
+    const live = createLiveInvokers(convexUrl, evalSecret);
+    chatInvoker = live.chatInvoker;
+    researchInvoker = live.researchInvoker;
+    literatureReviewInvoker = live.literatureReviewInvoker;
+    studioInvokers = live.studioInvokers;
+    seedApi = live.seedApi;
   }
 
   const allMetrics: MetricResult[] = [];
