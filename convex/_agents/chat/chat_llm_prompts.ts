@@ -1,5 +1,8 @@
 import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
 
+/** Bump when the chat prompts change so eval configHash changes with them. */
+export const CHAT_PROMPT_VERSION = "2026-10-17";
+
 /**
  * Streamlined core system prompt (optimized from ~2500 to ~800 tokens).
  */
