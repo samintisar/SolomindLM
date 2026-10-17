@@ -12,6 +12,7 @@ import type {
   MetricStatus,
 } from "../types";
 import { metricResult } from "./metricResult";
+import { passageAbstentionRecalls } from "./retrievalGold";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -544,7 +545,10 @@ export function abstentionCorrectness(
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
-  if (fixture.expectedItems.length === 0) {
+  // Without expectedItems, the same rules run on gold passages when the fixture has them (D1).
+  const passageMode =
+    fixture.expectedItems.length === 0 && (fixture.expectedPassages?.length ?? 0) > 0;
+  if (fixture.expectedItems.length === 0 && !passageMode) {
     return metricResult(
       "abstention_correctness",
       fixture,
@@ -555,15 +559,20 @@ export function abstentionCorrectness(
       { category: "none" }
     );
   }
-  const selectedRecall = chunkRecall(artifact.selectedChunks, fixture.expectedItems).score;
-  const preRerankRecall = chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score;
-  const postRerankRecall = chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score;
+  const unit = passageMode ? "passages" : "items";
+  const { selectedRecall, preRerankRecall, postRerankRecall, answerRecall } = passageMode
+    ? passageAbstentionRecalls(fixture, artifact)
+    : {
+        selectedRecall: chunkRecall(artifact.selectedChunks, fixture.expectedItems).score,
+        preRerankRecall: chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score,
+        postRerankRecall: chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score,
+        answerRecall: recallScore(
+          countMatches(artifact.answer, fixture.expectedItems).matched.length,
+          fixture.expectedItems.length
+        ),
+      };
 
   const abstains = answerAbstains(artifact.answer);
-  const answerRecall = recallScore(
-    countMatches(artifact.answer, fixture.expectedItems).matched.length,
-    fixture.expectedItems.length
-  );
 
   // Rule 1: Sufficient context was selected but answer still abstained.
   if (selectedRecall >= 0.7 && abstains) {
@@ -593,7 +602,7 @@ export function abstentionCorrectness(
       artifact,
       "fail",
       selectedRecall,
-      "Relevant items existed pre-selection but were dropped. Context selection miss.",
+      `Relevant ${unit} existed pre-selection but were dropped. Context selection miss.`,
       {
         category: "context_selection",
         selectedRecall,
@@ -613,7 +622,7 @@ export function abstentionCorrectness(
       artifact,
       "warn",
       Math.max(selectedRecall, preRerankRecall, postRerankRecall),
-      "Retrieval could not find expected items across any stage. Retrieval coverage miss.",
+      `Retrieval could not find expected ${unit} across any stage. Retrieval coverage miss.`,
       {
         category: "retrieval_coverage",
         selectedRecall,
@@ -632,7 +641,7 @@ export function abstentionCorrectness(
     artifact,
     "pass",
     selectedRecall,
-    "Answer provides expected items with sufficient recall.",
+    `Answer provides expected ${unit} with sufficient recall.`,
     {
       category: "none",
       selectedRecall,

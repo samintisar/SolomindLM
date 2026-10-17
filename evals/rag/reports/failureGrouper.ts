@@ -34,6 +34,21 @@ function classifyFailure(metric: MetricResult): FailureCategory {
     return "retrieval";
   }
 
+  if (metric.metric === "passage_recall_selected") {
+    // Passages an earlier stage held but selection dropped are a selection miss, not a retrieval one.
+    const upstream = Math.max(
+      Number(metric.breakdown?.preRerankRecall ?? 0),
+      Number(metric.breakdown?.postRerankRecall ?? 0)
+    );
+    return upstream > metric.score ? "context_selection" : "retrieval";
+  }
+  if (metric.metric.startsWith("passage_recall_")) {
+    return "retrieval";
+  }
+  if (metric.metric === "passage_precision_selected" || metric.metric === "passage_ndcg_selected") {
+    return "context_selection";
+  }
+
   if (metric.metric === "retrieval_precision_at_k" || metric.metric === "retrieval_ndcg_at_k") {
     return "context_selection";
   }

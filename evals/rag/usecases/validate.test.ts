@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EvalFixture } from "../types";
 import { readPackSources } from "./sources";
 import type { RegisteredPack, UseCasePack } from "./types";
-import { formatPackProblems, packsToValidate, validatePack } from "./validate";
+import {
+  formatPackProblems,
+  missingExpectedPassages,
+  packsToValidate,
+  validatePack,
+} from "./validate";
 
 let dir: string;
 
@@ -190,6 +195,99 @@ describe("validatePack", () => {
     expect(problems).toContain("language-learners/flashcards-vocab-01: duplicate fixture id");
     expect(problems).toContain('language-learners: rubric check "a" applies to no listed feature');
     expect(problems).toContain('language-learners: duplicate rubric check "a"');
+  });
+});
+
+describe("validatePack: gold passages", () => {
+  const QUOTE = "The past participle agrees in gender and number with a preceding direct object.";
+
+  it("accepts a quote that appears verbatim in a markdown source", () => {
+    writeFileSync(join(dir, "sources", "unit-1.md"), `# Unit 1\n\n${QUOTE}\n`);
+    const problems = validatePack(registered(pack(), [fixture({ expectedPassages: [QUOTE] })]));
+    expect(problems).toEqual([]);
+  });
+
+  it("flags a quote that is not in the markdown sources", () => {
+    const missing = "Gender and number agreement is taught in the second unit of this course.";
+    const problems = validatePack(
+      registered(pack(), [fixture({ id: "language-learners/p", expectedPassages: [missing] })])
+    );
+    expect(problems).toEqual([
+      `language-learners/p: expectedPassages quote not found in language-learners sources: "${missing}"`,
+    ]);
+  });
+
+  it("matches quotes despite case, punctuation and typographic apostrophes", () => {
+    writeFileSync(
+      join(dir, "sources", "unit-1.md"),
+      "# Unit 1\n\nIt’s the Past Participle, agrees in gender and number."
+    );
+    const problems = validatePack(
+      registered(pack(), [
+        fixture({ expectedPassages: ["it's the past participle: agrees in gender and number"] }),
+      ])
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it("flags quotes outside the 8 to 30 word range", () => {
+    const tooShort = "Too short here.";
+    const tooLong = Array.from({ length: 31 }, (_, i) => `word${i}`).join(" ");
+    const problems = validatePack(
+      registered(pack(), [
+        fixture({ id: "language-learners/short", expectedPassages: [tooShort] }),
+        fixture({ id: "language-learners/long", expectedPassages: [tooLong] }),
+      ])
+    );
+    expect(problems).toContain(
+      `language-learners/short: expectedPassages quote has 3 words (8-30 required): "${tooShort}"`
+    );
+    expect(
+      problems.some((p) =>
+        p.startsWith("language-learners/long: expectedPassages quote has 31 words")
+      )
+    ).toBe(true);
+  });
+
+  it("skips the text check for a pack whose sources are PDFs only", () => {
+    writeFileSync(join(dir, "sources", "doc.pdf"), "%PDF-1.4");
+    writeFileSync(join(dir, "sources", "LICENSES.md"), "- doc.pdf: CC BY 4.0, Example Author");
+    const problems = validatePack(
+      registered(pack({ sources: ["doc.pdf"] }), [
+        fixture({ expectedPassages: ["A quote the OCR text may or may not reproduce exactly."] }),
+      ])
+    );
+    expect(problems).toEqual([]);
+  });
+});
+
+describe("missingExpectedPassages", () => {
+  const QUOTE = "The past participle agrees in gender and number with a preceding direct object.";
+  const texts = new Map([
+    ["language-learners", [{ fileName: "unit-1.md", text: `Notes. ${QUOTE} More notes.` }]],
+  ]);
+
+  it("returns nothing when every quote is in the extracted pack text", () => {
+    expect(missingExpectedPassages([fixture({ expectedPassages: [QUOTE] })], texts)).toEqual([]);
+  });
+
+  it("lists each missing quote with its fixture id", () => {
+    const missing = "A quote that OCR dropped from the scanned unit entirely here.";
+    expect(
+      missingExpectedPassages(
+        [fixture({ id: "language-learners/ocr", expectedPassages: [QUOTE, missing] })],
+        texts
+      )
+    ).toEqual([`language-learners/ocr: ${missing}`]);
+  });
+
+  it("does not check fixtures whose pack has no extracted text", () => {
+    expect(
+      missingExpectedPassages(
+        [fixture({ expectedPassages: ["Not checked at all in this run."] })],
+        new Map()
+      )
+    ).toEqual([]);
   });
 });
 

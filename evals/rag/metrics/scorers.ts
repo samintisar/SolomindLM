@@ -27,6 +27,11 @@ import {
   scoreLiteratureReviewMetrics,
 } from "./literatureReview";
 import { type LlmJudgeOptions, scoreAllLlmJudgeMetrics } from "./llmJudge";
+import {
+  passageNdcgSelected,
+  passagePrecisionSelected,
+  passageRecallByStage,
+} from "./retrievalGold";
 import { scoreRubricMetrics } from "./rubric";
 import {
   externalSourceUtilization,
@@ -98,6 +103,9 @@ export async function scoreAllMetrics(
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
     results.push(abstentionCorrectness(fixture, artifact, baseline));
     results.push(...retrievalItemRecall(fixture, artifact, baseline));
+    results.push(...passageRecallByStage(fixture, artifact));
+    results.push(passagePrecisionSelected(fixture, artifact));
+    results.push(passageNdcgSelected(fixture, artifact));
   }
 
   if (isRagRunner(artifact.runner)) {

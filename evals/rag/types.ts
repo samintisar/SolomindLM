@@ -111,6 +111,14 @@ export interface EvalFixture {
   /** Items that must appear in the answer (for deterministic metrics) */
   expectedItems: string[];
   /**
+   * Gold passages for retrieval scoring: verbatim quotes from the fixture's sources (8 to 30
+   * words each) that a correct answer needs. A chunk holds a passage when its normalised text
+   * contains the normalised quote (metrics/retrievalGold.ts). Scores retrieval for prose fixtures
+   * that have no expectedItems. Use-case pack quotes are checked against the pack sources by
+   * validatePack and again against the extracted text before a live run.
+   */
+  expectedPassages?: string[];
+  /**
    * Expected answer text for LLM-judge evaluation.
    * Used when expectedItems is insufficient (e.g., prose explanations).
    */

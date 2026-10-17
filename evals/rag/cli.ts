@@ -63,7 +63,7 @@ import {
 } from "./usecases/resolve";
 import type { PackSeedApi } from "./usecases/seedClient";
 import type { SourceText } from "./usecases/types";
-import { formatPackProblems, packsToValidate } from "./usecases/validate";
+import { formatPackProblems, missingExpectedPassages, packsToValidate } from "./usecases/validate";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -556,6 +556,17 @@ async function main(): Promise<void> {
           process.exit(2);
         }
         throw err;
+      }
+      // Gold passages must still be in the extracted text, or a drifted PDF would score as misses.
+      const missingPassages = missingExpectedPassages(fixturesToRun, packSourceTexts);
+      if (missingPassages.length > 0) {
+        console.error(
+          [
+            "Expected passages not found in the pack's extracted source text (quote drift or OCR):",
+            ...missingPassages.map((m) => `  - ${m}`),
+          ].join("\n")
+        );
+        process.exit(2);
       }
     }
   }
