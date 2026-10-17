@@ -193,7 +193,7 @@ function recallScore(matched: number, total: number): number {
  */
 const DECLINE_PATTERNS: RegExp[] = [
   /\bdo(?:es)?(?:n't|\s+not)\s+provide\s+(?:any\s+)?information\b/,
-  /\bnot\s+covered\s+in\s+(?:your|the|these|the\s+selected)\s+(?:documents|sources|notes|papers)\b/,
+  /\b(?:is(?:n't|\s+not)\s+|not\s+)covered\s+in\s+(?:your|the|these|the\s+selected)\s+(?:documents|sources|notes|papers)\b/,
   /\b(?:sources|notes|papers|documents|report|passages)\s+(?:do|does)(?:n't|\s+not)\s+(?:cover|mention|discuss|contain|address|include)\b/,
   /\b(?:there\s+is\s+)?no\s+mention\s+of\b/,
   /\bi\s+don't\s+see\s+any\s+information\b/,
@@ -230,7 +230,7 @@ function answerAbstains(answer: string): boolean {
     "based on what's available, i cannot",
   ];
   if (phraseSignals.some((s) => text.includes(s))) return true;
-  if (/\bi'?(?:m|am) not able to\b/.test(text)) return true;
+  if (/\bi(?:'m|\s+am)\s+not\s+able\s+to\b/.test(text)) return true;
   return DECLINE_PATTERNS.some((pattern) => pattern.test(text));
 }
 

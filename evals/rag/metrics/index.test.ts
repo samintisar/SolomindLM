@@ -311,4 +311,13 @@ describe("decline forms on unanswerable fixtures", () => {
       expect(declines(reference)).toBe(true);
     }
   });
+
+  it("matches the spaced 'I am not able to' and the 'isn't covered in' contraction", () => {
+    expect(declines("I am not able to answer that.")).toBe(true);
+    expect(declines("I’m not able to answer that.")).toBe(true);
+    expect(declines("This isn't covered in the selected documents.")).toBe(true);
+    expect(declines("This isn’t covered in your notes.")).toBe(true);
+    // Technical negations about the subject still do not count as a decline.
+    expect(declines("The model does not include a bias term.")).toBe(false);
+  });
 });
