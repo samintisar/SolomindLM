@@ -28,9 +28,14 @@ export function generateReport(
     summary[m.status]++;
   }
 
-  const failureGroups = groupFailures(metrics, {
-    includeWarnings: options.includeWarnings,
-  });
+  // A flaky warning is listed in `flaky`, not grouped as a failure. A majority-fail flaky row
+  // is status fail and stays in the groups.
+  const failureGroups = groupFailures(
+    metrics.filter((m) => !(isFlakyMetric(m) && m.status === "warn")),
+    {
+      includeWarnings: options.includeWarnings,
+    }
+  );
 
   // Deduplicate case count
   const uniqueCases = new Set(metrics.map((m) => `${m.caseId}::${m.runner}`));

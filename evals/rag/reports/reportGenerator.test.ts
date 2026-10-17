@@ -34,6 +34,25 @@ describe("generateReport flaky rows", () => {
     expect(report.summary).toMatchObject({ pass: 1, fail: 0, warn: 1 });
   });
 
+  it("keeps flaky warnings out of failureGroups", () => {
+    const report = generateReport([flakyRow()], { commitSha: "abc" });
+    expect(report.failureGroups).toEqual([]);
+  });
+
+  it("keeps a majority-fail flaky row in failureGroups", () => {
+    const failing: MetricResult = {
+      ...flakyRow(),
+      status: "fail",
+      score: 0,
+      breakdown: { flaky: true, statuses: ["fail", "fail", "pass"], repeats: 3 },
+    };
+    const report = generateReport([failing], { commitSha: "abc" });
+
+    expect(report.failureGroups.length).toBeGreaterThan(0);
+    expect(report.failureGroups[0]?.cases[0]?.failures).toEqual([failing]);
+    expect(report.flaky).toHaveLength(1);
+  });
+
   it("omits the flaky field when no row is flaky", () => {
     const report = generateReport([passRow()], { commitSha: "abc" });
     expect(report).not.toHaveProperty("flaky");
