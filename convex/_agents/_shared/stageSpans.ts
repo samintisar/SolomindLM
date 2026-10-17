@@ -1,6 +1,18 @@
 import type { TokenUsage } from "./usageAggregate";
 
-export type AgentStageName = "retrieve" | "rerank" | "select" | "map" | "reduce" | "parse" | "tts";
+export type AgentStageName =
+  | "retrieve"
+  | "plan"
+  | "hyde"
+  | "rerank"
+  | "select"
+  | "generate"
+  | "grounding"
+  | "followup"
+  | "map"
+  | "reduce"
+  | "parse"
+  | "tts";
 
 export interface AgentStageSpan {
   stage: AgentStageName;

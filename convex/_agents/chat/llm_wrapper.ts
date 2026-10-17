@@ -9,13 +9,17 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 
 import Together from "together-ai";
-import { uncachedLlmCall } from "../_shared/cachedLlm.js";
+import { type LLMResponse, uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { invokeStructuredOutput } from "../_shared/structuredLlm.js";
-import { createTokenUsageAccumulator } from "../_shared/tokenUsageAccumulator.js";
-import { fromProviderUsage, fromTogetherUsage } from "../_shared/usageAggregate.js";
+import { createTurnTelemetry, type TurnTelemetry } from "../_shared/tokenUsageAccumulator.js";
+import {
+  fromProviderUsage,
+  fromTogetherUsage,
+  type TogetherUsage,
+} from "../_shared/usageAggregate.js";
 import {
   buildGroundingPrompt,
   estimateTokens,
@@ -66,9 +70,11 @@ export class ChatLLMWrapper {
   /** Together AI SDK client for streaming with structured output */
   private togetherClient: Together;
   private readonly outputLanguage?: string;
-  private readonly tokenUsage = createTokenUsageAccumulator();
+  /** Per-turn usage and call counters; the owning ChatAgent reads them on the `done` chunk. */
+  private readonly telemetry: TurnTelemetry;
 
   constructor(config: LLMWrapperConfig) {
+    this.telemetry = config.telemetry ?? createTurnTelemetry();
     // Smart vs fast: `mergeModelKwargs` — GPT-OSS uses reasoning_effort; Qwen-style uses chat_template thinking.
     this.llm = new ChatTogetherAI({
       apiKey: config.apiKey,
@@ -91,10 +97,6 @@ export class ChatLLMWrapper {
       apiKey: config.apiKey,
     });
     this.outputLanguage = config.outputLanguage;
-  }
-
-  consumeTokenUsage() {
-    return this.tokenUsage.consume();
   }
 
   /**
@@ -121,6 +123,7 @@ export class ChatLLMWrapper {
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
     try {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [
@@ -137,7 +140,7 @@ export class ChatLLMWrapper {
         toolChoice: "none",
         timeoutMs: DIRECT_RESPONSE_TIMEOUT_MS,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("generate", startedAt, fromProviderUsage(response.usage));
       return response.content.trim();
     } catch (error) {
       console.warn("[ChatLLMWrapper] Direct response failed:", error);
@@ -166,6 +169,7 @@ Coverage rules (for retrieval — follow even if you are unsure of fine details)
 
 Question: ${query}`;
     try {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [{ role: "user", content: prompt }],
@@ -175,7 +179,7 @@ Question: ${query}`;
         toolChoice: "none",
         timeoutMs: HYDE_TIMEOUT_MS,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("hyde", startedAt, fromProviderUsage(response.usage));
       const text = response.content.trim();
       console.log("[ChatLLMWrapper] HyDE document:", text.slice(0, 200));
       return text;
@@ -197,6 +201,7 @@ Question: ${query}`;
     const truncatedAnswer = answer.length > 600 ? answer.slice(0, 600) + "..." : answer;
     const prompt = `You are helping a student study. Based on this Q&A, suggest 2-3 short follow-up questions the student might naturally ask next.\n\nQuestion: ${userMessage}\nAnswer: ${truncatedAnswer}\n\nReturn ONLY a JSON array of strings, e.g. ["Question 1?", "Question 2?", "Question 3?"]`;
     try {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [
@@ -213,7 +218,7 @@ Question: ${query}`;
         toolChoice: "none",
         timeoutMs: FOLLOWUP_GENERATION_TIMEOUT_MS,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("followup", startedAt, fromProviderUsage(response.usage));
       const text = response.content.trim();
       // Strip Qwen-style <redacted_thinking>...</redacted_thinking> reasoning blocks before parsing
       const stripped = text
@@ -302,16 +307,24 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
     ];
 
     const callModel = async (modelId: string, timeoutMs: number) => {
-      const response = await uncachedLlmCall({
-        model: modelId,
-        messages,
-        temperature: 0.1,
-        maxTokens: 500,
-        reasoningEnabled: false,
-        toolChoice: "none",
-        timeoutMs,
-      });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      const startedAt = Date.now();
+      let response: LLMResponse;
+      try {
+        response = await uncachedLlmCall({
+          model: modelId,
+          messages,
+          temperature: 0.1,
+          maxTokens: 500,
+          reasoningEnabled: false,
+          toolChoice: "none",
+          timeoutMs,
+        });
+      } catch (error) {
+        // A failed attempt reports no usage, but it is still a planner attempt that took time.
+        this.telemetry.recordStage("plan", startedAt);
+        throw error;
+      }
+      this.telemetry.recordLlmCall("plan", startedAt, fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
 
@@ -472,6 +485,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       console.log("[ChatLLMWrapper] Starting streaming request to Together AI...");
 
       // Create streaming request
+      const generateStartedAt = Date.now();
       const stream = await this.togetherClient.chat.completions.create({
         model: this.smartLlmModelId,
         messages,
@@ -495,17 +509,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       const chunks: string[] = [];
       let providerUsage: ReturnType<typeof fromTogetherUsage>;
       for await (const chunk of stream) {
-        const mapped = fromTogetherUsage(
-          (
-            chunk as {
-              usage?: {
-                prompt_tokens?: number;
-                completion_tokens?: number;
-                total_tokens?: number;
-              } | null;
-            }
-          ).usage
-        );
+        const mapped = fromTogetherUsage((chunk as { usage?: TogetherUsage | null }).usage);
         if (mapped) {
           providerUsage = mapped;
         }
@@ -516,7 +520,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       }
 
       const fullResponse = chunks.join("");
-      this.tokenUsage.add(providerUsage);
+      this.telemetry.recordLlmCall("generate", generateStartedAt, providerUsage);
       console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
 
       // Parse the accumulated JSON
@@ -626,6 +630,10 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
     );
     try {
       let fallbackUsage: ReturnType<typeof fromProviderUsage>;
+      // One span per attempt that reports usage: each attempt starts when the previous one reported.
+      // Accepted imprecision: a span may include the retry backoff of an earlier attempt that
+      // reported no usage.
+      let attemptStartedAt = Date.now();
       const parsed = await invokeStructuredOutput({
         systemPrompt,
         userPrompt: groundedPrompt,
@@ -637,7 +645,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         logPrefix: "ChatStructuredFallback",
         onUsage: (usage) => {
           fallbackUsage = usage;
-          this.tokenUsage.add(usage);
+          this.telemetry.recordLlmCall("generate", attemptStartedAt, usage);
+          attemptStartedAt = Date.now();
         },
       });
       const validated = ChatResponseSchema.safeParse(parsed);

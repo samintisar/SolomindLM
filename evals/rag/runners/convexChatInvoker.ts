@@ -63,6 +63,8 @@ export function createConvexChatInvoker(
         tokenUsage: result.tokenUsage,
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
         stageSpans: result.stageSpans,
+        callCounters: result.callCounters,
+        contextTokenBudget: result.contextTokenBudget,
         sourcePolicy: toEvalSourcePolicy(result.sourcePolicy),
       };
     },
