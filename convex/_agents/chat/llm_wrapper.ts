@@ -123,6 +123,7 @@ export class ChatLLMWrapper {
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
     try {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [
@@ -139,7 +140,7 @@ export class ChatLLMWrapper {
         toolChoice: "none",
         timeoutMs: DIRECT_RESPONSE_TIMEOUT_MS,
       });
-      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("generate", startedAt, fromProviderUsage(response.usage));
       return response.content.trim();
     } catch (error) {
       console.warn("[ChatLLMWrapper] Direct response failed:", error);
@@ -168,6 +169,7 @@ Coverage rules (for retrieval — follow even if you are unsure of fine details)
 
 Question: ${query}`;
     try {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [{ role: "user", content: prompt }],
@@ -177,7 +179,7 @@ Question: ${query}`;
         toolChoice: "none",
         timeoutMs: HYDE_TIMEOUT_MS,
       });
-      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("hyde", startedAt, fromProviderUsage(response.usage));
       const text = response.content.trim();
       console.log("[ChatLLMWrapper] HyDE document:", text.slice(0, 200));
       return text;
@@ -199,6 +201,7 @@ Question: ${query}`;
     const truncatedAnswer = answer.length > 600 ? answer.slice(0, 600) + "..." : answer;
     const prompt = `You are helping a student study. Based on this Q&A, suggest 2-3 short follow-up questions the student might naturally ask next.\n\nQuestion: ${userMessage}\nAnswer: ${truncatedAnswer}\n\nReturn ONLY a JSON array of strings, e.g. ["Question 1?", "Question 2?", "Question 3?"]`;
     try {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [
@@ -215,7 +218,7 @@ Question: ${query}`;
         toolChoice: "none",
         timeoutMs: FOLLOWUP_GENERATION_TIMEOUT_MS,
       });
-      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("followup", startedAt, fromProviderUsage(response.usage));
       const text = response.content.trim();
       // Strip Qwen-style <redacted_thinking>...</redacted_thinking> reasoning blocks before parsing
       const stripped = text
@@ -304,6 +307,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
     ];
 
     const callModel = async (modelId: string, timeoutMs: number) => {
+      const startedAt = Date.now();
       const response = await uncachedLlmCall({
         model: modelId,
         messages,
@@ -313,7 +317,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         toolChoice: "none",
         timeoutMs,
       });
-      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall("plan", startedAt, fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
 
@@ -474,6 +478,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       console.log("[ChatLLMWrapper] Starting streaming request to Together AI...");
 
       // Create streaming request
+      const generateStartedAt = Date.now();
       const stream = await this.togetherClient.chat.completions.create({
         model: this.smartLlmModelId,
         messages,
@@ -508,7 +513,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       }
 
       const fullResponse = chunks.join("");
-      this.telemetry.recordLlmCall(providerUsage);
+      this.telemetry.recordLlmCall("generate", generateStartedAt, providerUsage);
       console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
 
       // Parse the accumulated JSON
@@ -618,6 +623,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
     );
     try {
       let fallbackUsage: ReturnType<typeof fromProviderUsage>;
+      // One span per attempt that reports usage: each attempt starts when the previous one reported.
+      let attemptStartedAt = Date.now();
       const parsed = await invokeStructuredOutput({
         systemPrompt,
         userPrompt: groundedPrompt,
@@ -629,7 +636,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         logPrefix: "ChatStructuredFallback",
         onUsage: (usage) => {
           fallbackUsage = usage;
-          this.telemetry.recordLlmCall(usage);
+          this.telemetry.recordLlmCall("generate", attemptStartedAt, usage);
+          attemptStartedAt = Date.now();
         },
       });
       const validated = ChatResponseSchema.safeParse(parsed);

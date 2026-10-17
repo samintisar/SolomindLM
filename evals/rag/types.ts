@@ -187,7 +187,19 @@ export interface StudioOutput {
   raw: unknown;
 }
 
-export type AgentStageName = "retrieve" | "rerank" | "select" | "map" | "reduce" | "parse" | "tts";
+export type AgentStageName =
+  | "retrieve"
+  | "plan"
+  | "hyde"
+  | "rerank"
+  | "select"
+  | "generate"
+  | "grounding"
+  | "followup"
+  | "map"
+  | "reduce"
+  | "parse"
+  | "tts";
 
 export interface AgentStageSpan {
   stage: AgentStageName;
@@ -258,6 +270,8 @@ export interface EvalRunArtifact {
   stageSpans?: AgentStageSpan[];
   /** Chat: provider calls the agent made this turn */
   callCounters?: CallCounters;
+  /** Chat: context token budget the agent applied to this question (list budget for list queries) */
+  contextTokenBudget?: number;
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
   /** Timestamp */

@@ -44,7 +44,11 @@ import {
   selectedSourceIds,
   titlesOfSources,
 } from "./chunkContext.js";
-import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
+import {
+  type GroundingValidationResult,
+  validateGrounding,
+  validateSemanticGrounding,
+} from "./grounding_validator.js";
 import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
 import type {
   ChatAgentContext,
@@ -495,15 +499,26 @@ export class ChatAgent {
     return results;
   }
 
-  /** Semantic grounding check; its embedding requests are counted in the turn telemetry. */
-  private semanticGrounding(answer: string, chunks: ReferenceChunk[]) {
+  /**
+   * Semantic grounding check. Its embedding requests are counted, and its latency is recorded as a
+   * `grounding` span, in the turn telemetry.
+   */
+  private async semanticGrounding(
+    answer: string,
+    chunks: ReferenceChunk[]
+  ): Promise<GroundingValidationResult> {
+    const startedAt = Date.now();
     const embeddings = {
       embedText: (text: string) => {
         this.telemetry.recordEmbeddingCall();
         return this.embeddingService.embedText(text);
       },
     };
-    return validateSemanticGrounding(answer, chunks, embeddings);
+    try {
+      return await validateSemanticGrounding(answer, chunks, embeddings);
+    } finally {
+      this.telemetry.recordStage("grounding", startedAt);
+    }
   }
 
   private async applyGlobalRerank(

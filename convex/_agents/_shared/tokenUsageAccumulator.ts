@@ -1,3 +1,4 @@
+import { type AgentStageName, type AgentStageSpan, createStageSpan } from "./stageSpans";
 import { addTokenUsage, type TokenUsage } from "./usageAggregate";
 
 export function createTokenUsageAccumulator() {
@@ -69,21 +70,32 @@ export function countRerankCall(counters: CallCounters, documents: number): void
 export interface TurnTelemetrySnapshot {
   tokenUsage?: TokenUsage;
   callCounters: CallCounters;
+  stageSpans: AgentStageSpan[];
 }
 
 /**
- * Per-turn collector for provider usage and call counters. The chat agent owns one per turn and
- * hands it to the LLM wrapper, so every call site records into the same place.
+ * Per-turn collector for provider usage, call counters and stage spans. The chat agent owns one per
+ * turn and hands it to the LLM wrapper, so every call site records into the same place.
  */
-export function createTurnTelemetry() {
+export function createTurnTelemetry(options?: { now?: () => number }) {
+  const now = options?.now ?? Date.now;
   const usage = createTokenUsageAccumulator();
   const counters = createCallCounters();
+  let spans: AgentStageSpan[] = [];
 
   return {
-    /** Counts one completed LLM call and adds its provider usage, when reported. */
-    recordLlmCall(tokenUsage?: TokenUsage): void {
+    /**
+     * Records one completed LLM call: counts it, adds its provider usage, and adds a span for the
+     * stage it served. `startedAtMs` is when the call began.
+     */
+    recordLlmCall(stage: AgentStageName, startedAtMs: number, tokenUsage?: TokenUsage): void {
       countLlmCall(counters);
       usage.add(tokenUsage);
+      spans.push(createStageSpan(stage, startedAtMs, { tokenUsage, now }));
+    },
+    /** Records a latency-only span for a stage that made no LLM call (e.g. grounding embeddings). */
+    recordStage(stage: AgentStageName, startedAtMs: number): void {
+      spans.push(createStageSpan(stage, startedAtMs, { now }));
     },
     /** Counts one embedding request covering `texts` inputs. */
     recordEmbeddingCall(texts: number = 1): void {
@@ -98,7 +110,9 @@ export function createTurnTelemetry() {
       const tokenUsage = usage.consume();
       const callCounters = { ...counters };
       Object.assign(counters, createCallCounters());
-      return { tokenUsage, callCounters };
+      const stageSpans = spans;
+      spans = [];
+      return { tokenUsage, callCounters, stageSpans };
     },
   };
 }

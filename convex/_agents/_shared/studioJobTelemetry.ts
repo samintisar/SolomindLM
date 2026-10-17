@@ -1,10 +1,21 @@
-import type { AgentStageSpan } from "./stageSpans";
+import type { AgentStageName, AgentStageSpan } from "./stageSpans";
 import { addTokenUsage, type TokenUsage, type TokenUsageSource } from "./usageAggregate";
+
+/**
+ * Stages studio jobs record. The chat-only stages (plan, hyde, ...) never appear here, and the job
+ * telemetry validators stored on rows accept exactly these.
+ */
+type StudioStageName = Extract<
+  AgentStageName,
+  "retrieve" | "rerank" | "select" | "map" | "reduce" | "parse" | "tts"
+>;
+
+export type StudioStageSpan = AgentStageSpan & { stage: StudioStageName };
 
 export type StudioJobTelemetrySnapshot = {
   tokenUsage?: TokenUsage;
   tokenUsageSource?: TokenUsageSource;
-  stageSpans?: AgentStageSpan[];
+  stageSpans?: StudioStageSpan[];
 };
 
 type MapResultLike = {
@@ -54,16 +65,16 @@ function parseMapResult(raw: unknown): MapResultLike {
 }
 
 function withOptionalUsage(
-  span: { stage: AgentStageSpan["stage"]; latencyMs: number },
+  span: { stage: StudioStageName; latencyMs: number },
   usage?: TokenUsage
-): AgentStageSpan {
+): StudioStageSpan {
   return usage !== undefined ? { ...span, tokenUsage: usage } : span;
 }
 
 export function aggregateStudioJobTelemetry(input: {
   mapResults?: unknown[];
   reduce?: { latencyMs: number; tokenUsage?: TokenUsage };
-  extraSpans?: AgentStageSpan[];
+  extraSpans?: StudioStageSpan[];
 }): StudioJobTelemetrySnapshot {
   const mapResults = (input.mapResults ?? []).map(parseMapResult);
   const mapLatencyMs = mapResults.reduce((sum, result) => sum + (result.processingTimeMs ?? 0), 0);
@@ -78,7 +89,7 @@ export function aggregateStudioJobTelemetry(input: {
       ? input.reduce.tokenUsage
       : undefined;
 
-  const stageSpans: AgentStageSpan[] = [];
+  const stageSpans: StudioStageSpan[] = [];
   if (mapResults.length > 0 || mapLatencyMs > 0 || mapUsageOrUndefined !== undefined) {
     stageSpans.push(
       withOptionalUsage({ stage: "map", latencyMs: mapLatencyMs }, mapUsageOrUndefined)
