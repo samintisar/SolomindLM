@@ -21,6 +21,18 @@ export function paraphraseBaseId(caseId: string): string {
   return caseId.replace(VARIANT_SEGMENT, "");
 }
 
+/**
+ * Two verdicts agree when both are fail, or both are not fail: a warn is a near pass, so pass and
+ * warn agree. A missing row (no verdict) never agrees with anything.
+ */
+function sameVerdict(
+  actual: MetricStatus | undefined,
+  expected: MetricStatus | undefined
+): boolean {
+  if (actual === undefined || expected === undefined) return false;
+  return (actual === "fail") === (expected === "fail");
+}
+
 interface VariantRow {
   caseId: string;
   statuses: Record<string, MetricStatus | undefined>;
@@ -67,7 +79,7 @@ export function paraphraseConsistency(metrics: MetricResult[]): MetricResult[] {
         const expected = statusOf.get(`${baseId}::${runner}::${metric}`);
         const actual = statusOf.get(`${caseId}::${runner}::${metric}`);
         statuses[metric] = actual;
-        if (actual !== expected) matches = false;
+        if (!sameVerdict(actual, expected)) matches = false;
       }
       return { caseId, statuses, matches };
     });

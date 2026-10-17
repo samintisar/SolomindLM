@@ -123,6 +123,29 @@ describe("paraphraseConsistency", () => {
     ]);
   });
 
+  it("treats a pass and a warn as agreeing verdicts", () => {
+    const result = paraphraseConsistency([
+      row("a/x", "expected_item_recall", "pass"),
+      row("a/x--p1", "expected_item_recall", "warn"),
+    ])[0];
+    expect(result?.score).toBe(1);
+    expect(result?.status).toBe("pass");
+  });
+
+  it("counts a warn against a fail, and a fail against a pass, as disagreeing", () => {
+    const warnVsFail = paraphraseConsistency([
+      row("a/x", "expected_item_recall", "fail"),
+      row("a/x--p1", "expected_item_recall", "warn"),
+    ])[0];
+    expect(warnVsFail?.score).toBe(0);
+
+    const failVsPass = paraphraseConsistency([
+      row("a/x", "expected_item_recall", "pass"),
+      row("a/x--p1", "expected_item_recall", "fail"),
+    ])[0];
+    expect(failVsPass?.score).toBe(0);
+  });
+
   it("emits nothing for a case with no paraphrases", () => {
     expect(paraphraseConsistency(caseRows("a/x", 0, ["pass"]))).toEqual([]);
   });

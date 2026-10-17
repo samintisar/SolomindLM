@@ -1,4 +1,5 @@
 import type { ConcreteRunnerKind, MetricResult } from "../types";
+import { isParaphraseVariant } from "./paraphrase";
 
 interface ScorecardCell {
   useCase: string;
@@ -37,6 +38,9 @@ export function buildScorecard(
 ): Scorecard {
   const cells = new Map<string, ScorecardCell>();
   for (const metric of metrics) {
+    // A paraphrase shares its base's evidence and is judged through paraphrase_consistency, so
+    // counting it would weight the base case more than once.
+    if (isParaphraseVariant(metric.caseId)) continue;
     const useCase = useCaseByCase.get(metric.caseId);
     if (!useCase) continue;
     // Rubric judge errors are "warn"; binary-judge errors are "fail". No-evidence rows are "warn".
