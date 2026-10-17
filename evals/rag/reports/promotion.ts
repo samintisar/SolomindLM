@@ -1,4 +1,5 @@
 import type { EvalReport, MetricResult } from "../types";
+import { isParaphraseVariant } from "./paraphrase";
 
 const PROMOTE_PREFIXES = [
   "binary_judge_chat_grounding",
@@ -40,7 +41,9 @@ export function checkHoldoutPromotion(before: EvalReport, after: EvalReport): Pr
   );
   const regressions: PromotionRegression[] = [];
   for (const row of after.metrics) {
+    // Paraphrases are compared through the base's paraphrase_consistency row, not on their own.
     if (!isPromoteMetric(row.metric) || row.status !== "fail") continue;
+    if (isParaphraseVariant(row.caseId)) continue;
     const prev = beforeByKey.get(key(row));
     if (!prev || prev.status !== "fail") {
       regressions.push({

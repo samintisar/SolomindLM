@@ -149,6 +149,38 @@ export interface EvalFixture {
    * notebookId/documentIds unset; the CLI fills them from the seeded notebook.
    */
   useCase?: string;
+  /**
+   * Unanswerable case: the sources do not contain the answer, so a correct response declines or
+   * says the sources do not cover it. `abstentionCorrectness` scores these first (answering is
+   * `hallucination_under_pressure`). `binary_judge_abstention` also runs on them with the sources
+   * as evidence. That judge is not in PROMOTE_PREFIXES, so it never blocks `--promotion-check`.
+   */
+  expectAbstain?: boolean;
+  /**
+   * Prior conversation before `question`, oldest first. The agent receives it as production does
+   * (`_streamChatResponse.ts`); `question` stays the final user turn. Only learning guide mode uses it.
+   */
+  turns?: Array<{ role: "user" | "assistant"; content: string }>;
+  /**
+   * Alternative phrasings of `question`, the same question as a user would type it. Each runs as its
+   * own artifact (`<id>--p1`, ...) and `paraphrase_consistency` checks the verdicts agree with the base.
+   * Variants are not judge calibration items: they share evidence with the base.
+   */
+  variants?: string[];
+  /** Chat settings the agent runs with (production `chatSettings`); default when unset. */
+  chatSettings?: {
+    instructionMode?: "default" | "learningGuide";
+  };
+  /**
+   * Production settings the chat eval passes the agent (chat only). `smartModel` must be a listed
+   * model id, `outputLanguage` a supported code (`convex/_agents/_shared/languageInstruction.ts`).
+   * `instructions` are the notebook's custom instructions (custom mode); they cannot be combined with learning guide mode.
+   */
+  chat?: {
+    smartModel?: string;
+    outputLanguage?: string;
+    instructions?: string;
+  };
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -272,6 +304,8 @@ export interface EvalRunArtifact {
   callCounters?: CallCounters;
   /** Chat: context token budget the agent applied to this question (list budget for list queries) */
   contextTokenBudget?: number;
+  /** Chat: instruction mode the agent ran this question in */
+  instructionMode?: "default" | "learningGuide" | "custom";
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
   /** Timestamp */
