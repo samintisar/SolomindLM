@@ -257,6 +257,11 @@ export interface EvalRunArtifact {
   stageSpans?: AgentStageSpan[];
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
+  /**
+   * Retrieval-only run (`--retrieval-only`): the agent stopped after context selection, so there
+   * is no answer. Only retrieval-side metrics apply; judges are skipped.
+   */
+  retrievalOnly?: boolean;
   /** Timestamp */
   timestamp: string;
 }

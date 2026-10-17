@@ -952,6 +952,11 @@ export class ChatAgent {
       message: `Reading ${citationChunks.length} passages...`,
     };
     yield { type: "references", data: citationChunks };
+    // Eval only: the passages are chosen, so stop before any generation (see ChatAgentContext).
+    if (context.evalRetrievalOnly) {
+      yield this.doneChunk();
+      return;
+    }
 
     logger.info("Generating grounded response", {
       chunkCount: citationChunks.length,

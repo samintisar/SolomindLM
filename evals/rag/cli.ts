@@ -104,6 +104,8 @@ interface CliOptions {
   /** Holdout promotion check: before/after EvalReport JSON paths */
   promotionCheckBefore?: string;
   promotionCheckAfter?: string;
+  /** Chat fixtures only: retrieval and selection, no answer, no judges (cheap knob sweeps) */
+  retrievalOnly?: boolean;
 }
 
 /**
@@ -172,6 +174,7 @@ const CLI_OPTIONS = {
   "judge-model": { type: "string" },
   rubric: { type: "string" },
   "judge-reasoning": { type: "string" },
+  "retrieval-only": { type: "boolean" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
@@ -263,6 +266,7 @@ function parseArgs(args: string[]): CliOptions {
     scoreJudgeQueue: values["score-judge-queue"],
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
+    retrievalOnly: values["retrieval-only"] ?? false,
   };
 }
 
@@ -294,6 +298,8 @@ Options:
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
+  --retrieval-only         Chat fixtures only: run retrieval and context selection, generate no
+                           answer, run no judges. Use for retrieval-knob sweeps (~10x cheaper)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -444,6 +450,16 @@ async function main(): Promise<void> {
       });
     }
   }
+  if (opts.retrievalOnly) {
+    // Only chat has a retrieval stage to stop at; other runners would have to generate.
+    const skipped = fixtureIds.filter((id) => getFixture(id).runner !== "chat");
+    if (skipped.length > 0) {
+      console.log(
+        `--retrieval-only runs chat fixtures only; skipping ${skipped.length} other fixture(s).`
+      );
+    }
+    fixtureIds = fixtureIds.filter((id) => getFixture(id).runner === "chat");
+  }
   if (opts.useCases && !opts.caseId) {
     if (USE_CASE_PACKS.length === 0) {
       console.log("No use-case packs registered (evals/rag/usecases/index.ts).");
@@ -583,6 +599,7 @@ async function main(): Promise<void> {
     try {
       results = await runEval(fixture, {
         dryRun: opts.dryRun,
+        retrievalOnly: opts.retrievalOnly,
         chatInvoker,
         researchInvoker,
         literatureReviewInvoker,

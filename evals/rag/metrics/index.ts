@@ -241,6 +241,16 @@ export function expectedItemRecall(
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
+  if (artifact.retrievalOnly) {
+    return metricResult(
+      "expected_item_recall",
+      fixture,
+      artifact,
+      "info",
+      0,
+      "retrieval-only run: no answer was generated, so answer recall is not scored."
+    );
+  }
   if (fixture.expectedItems.length === 0) {
     return metricResult(
       "expected_item_recall",

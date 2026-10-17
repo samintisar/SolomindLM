@@ -48,6 +48,7 @@ export function createConvexChatInvoker(
         notebookId: context.noteId as Id<"notebooks">,
         documentIds: context.documentIds as Id<"documents">[] | undefined,
         sourcePolicy: context.sourcePolicy,
+        ...(context.evalRetrievalOnly ? { retrievalOnly: true } : {}),
       });
 
       return {
@@ -64,6 +65,7 @@ export function createConvexChatInvoker(
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
         stageSpans: result.stageSpans,
         sourcePolicy: toEvalSourcePolicy(result.sourcePolicy),
+        ...(result.retrievalOnly ? { retrievalOnly: true } : {}),
       };
     },
   };

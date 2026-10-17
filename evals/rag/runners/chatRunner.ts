@@ -27,6 +27,8 @@ export interface ChatAgentInvoker {
     tokenUsageSource?: "provider" | "estimated";
     stageSpans?: import("../types").AgentStageSpan[];
     sourcePolicy?: import("../types").SourcePolicyConfig;
+    /** True when the deployment stopped after context selection (no answer). */
+    retrievalOnly?: boolean;
   }>;
 }
 
@@ -71,7 +73,7 @@ export async function runChatEval(
   invoker?: ChatAgentInvoker
 ): Promise<EvalRunnerResult> {
   const { fixture } = options;
-  return runWithHarness(options, invoker, {
+  const outcome = await runWithHarness(options, invoker, {
     runner: "chat",
     validate: validateFixture,
     missingInvokerMessage:
@@ -91,6 +93,7 @@ export async function runChatEval(
         conversationHistory: [{ role: "user", content: fixture.question }],
         documentIds: fixture.documentIds,
         sourcePolicy: fixture.sourcePolicy,
+        ...(options.retrievalOnly ? { evalRetrievalOnly: true } : {}),
       });
 
       // Build source evidence summary from selected chunks
@@ -137,8 +140,14 @@ export async function runChatEval(
         stageSpans: result.stageSpans,
         sourcePolicy: result.sourcePolicy,
         sourceEvidence,
+        ...(result.retrievalOnly ? { retrievalOnly: true } : {}),
         timestamp: new Date().toISOString(),
       };
     },
   });
+  // Dry runs never reach the invoker: mark their stub so the retrieval-only metric set applies.
+  if (options.dryRun && options.retrievalOnly) {
+    return { ...outcome, artifact: { ...outcome.artifact, retrievalOnly: true } };
+  }
+  return outcome;
 }

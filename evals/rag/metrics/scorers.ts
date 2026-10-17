@@ -83,6 +83,30 @@ function judgeInvoker(options: ScoreAllMetricsOptions): LlmJudgeOptions["invoke"
 }
 
 /**
+ * Retrieval-only runs (`--retrieval-only`) generate no answer, so answer metrics and every judge
+ * are skipped. What was found, selected and how fast is still scored.
+ */
+function scoreRetrievalOnlyMetrics(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  baseline?: EvalBaseline
+): MetricResult[] {
+  return [
+    expectedItemRecall(fixture, artifact, baseline),
+    latencyCostBudget(fixture, artifact, baseline),
+    contextTokenBudgetRatio(fixture, artifact, baseline),
+    stageTokenShare(fixture, artifact, baseline),
+    retrievalNonEmpty(fixture, artifact, baseline),
+    ...retrievalItemRecall(fixture, artifact, baseline),
+    retrievalPrecisionAtK(fixture, artifact, baseline),
+    retrievalNdcgAtK(fixture, artifact, baseline),
+    ...passageRecallByStage(fixture, artifact),
+    passagePrecisionSelected(fixture, artifact),
+    passageNdcgSelected(fixture, artifact),
+  ];
+}
+
+/**
  * Run every metric for a single eval case.
  */
 export async function scoreAllMetrics(
@@ -91,6 +115,10 @@ export async function scoreAllMetrics(
   baseline?: EvalBaseline,
   options: ScoreAllMetricsOptions = {}
 ): Promise<MetricResult[]> {
+  if (artifact.retrievalOnly) {
+    return scoreRetrievalOnlyMetrics(fixture, artifact, baseline);
+  }
+
   const results: MetricResult[] = [];
 
   results.push(expectedItemRecall(fixture, artifact, baseline));
