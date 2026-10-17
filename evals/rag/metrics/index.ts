@@ -580,7 +580,9 @@ function unanswerableAbstention(fixture: EvalFixture, artifact: EvalRunArtifact)
 
 /**
  * Deterministic routing rule:
- * - If selected-context item recall >= 0.7 and answer abstains: "answer_generation" error, fail.
+ * - If selected-context item recall >= 0.7 and the answer abstains with answer item recall < 0.5:
+ *   "answer_generation" error, fail. An answer with item recall >= 0.5 has answered, so a decline
+ *   fragment about its missing items falls through to the rules below.
  * - If raw or post-rerank recall >= 0.7 but selected-context recall < 0.7: "context_selection" miss, fail.
  * - If all snapshots < 0.7: "retrieval_coverage" miss, warn.
  * - If answer provides items and recall >= 0.7: pass.
@@ -614,8 +616,10 @@ export function abstentionCorrectness(
     fixture.expectedItems.length
   );
 
-  // Rule 1: Sufficient context was selected but answer still abstained.
-  if (selectedRecall >= 0.7 && abstains) {
+  // Rule 1: Sufficient context was selected but the answer abstained without giving the items.
+  // An answer that lists at least half of them has answered; a decline fragment about the rest
+  // ("the notes do not mention the fifth") does not make it a wrongful abstention.
+  if (selectedRecall >= 0.7 && abstains && answerRecall < 0.5) {
     return metricResult(
       "abstention_correctness",
       fixture,
