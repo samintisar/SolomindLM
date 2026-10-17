@@ -172,9 +172,6 @@ async function prepareFixtures(
     return { fixtures: opts.dryRun ? pinForDryRun(expanded) : expanded, sourceTexts: new Map() };
   }
   if (!live) throw new Error("A real sweep needs live invokers.");
-  if (!process.env.TOGETHER_AI_API_KEY?.trim()) {
-    throw new Error("Use-case packs are scored by rubric judges: set TOGETHER_AI_API_KEY.");
-  }
   const prepared = await prepareUseCaseRun(expanded, live.seedApi);
   return { fixtures: prepared.fixtures, sourceTexts: prepared.sourceTexts };
 }
@@ -251,6 +248,16 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  // Grounding is the quality signal, and its judge runs on Together: without the key a real sweep
+  // would report n/a for quality in every cell, so it is refused up front.
+  if (!opts.dryRun && !process.env.TOGETHER_AI_API_KEY?.trim()) {
+    console.error(
+      "FATAL: a sweep needs TOGETHER_AI_API_KEY: the grounding judge is its quality signal."
+    );
+    console.error("  Use --dry-run to validate the sweep without judges.");
+    process.exit(2);
+  }
+
   let live: LiveInvokers | undefined;
   if (!opts.dryRun) {
     let convexEnv: { convexUrl: string; evalSecret: string };
@@ -309,7 +316,11 @@ async function compareBestWithBaseline(
     console.log("--compare-best skipped: a dry run makes no judge calls.");
     return;
   }
-  const front = summaries.filter((s) => s.pareto);
+  // Only front cells have quality and tokens (markPareto), so the comparison is defined.
+  const front = summaries.filter(
+    (s): s is CellSummary & { quality: number; tokensMean: number } =>
+      s.pareto && s.quality !== null && s.tokensMean !== null
+  );
   const best = [...front].sort((a, b) => b.quality - a.quality || a.tokensMean - b.tokensMean)[0];
   const baseline = summaries.find((s) => Object.keys(s.overrides).length === 0);
   if (!best || !baseline || best.id === baseline.id) {

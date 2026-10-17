@@ -8,6 +8,7 @@ import {
   CHAT_CONFIG_OVERRIDE_KEYS,
   type ChatConfigOverrideKey,
   type ChatConfigOverrides,
+  PRODUCTION_CHAT_CONFIG,
   validateChatConfigOverrides,
 } from "../../../convex/_agents/chat/chatConfigOverrides";
 import { parseChatConfigValue } from "../chatConfigFlag";
@@ -68,23 +69,42 @@ export function cartesian(axes: GridAxis[]): ChatConfigOverrides[] {
   return cells;
 }
 
-/** Stable id for an override set: a short hash of its defined keys in sorted order. */
+/**
+ * The overrides that differ from production. A value equal to the production default is the same
+ * run as leaving it out, so it is dropped: `hydeEnabled=true` is the baseline.
+ */
+export function nonDefaultOverrides(overrides: ChatConfigOverrides): ChatConfigOverrides {
+  const defaults = new Map<string, unknown>(Object.entries(PRODUCTION_CHAT_CONFIG));
+  return Object.entries(overrides).reduce<ChatConfigOverrides>(
+    (kept, [key, value]) =>
+      value === undefined || defaults.get(key) === value
+        ? kept
+        : Object.assign(kept, { [key]: value }),
+    {}
+  );
+}
+
+/** Stable id for an override set: a short hash of its non-default keys in sorted order. */
 export function cellId(overrides: ChatConfigOverrides): string {
-  const sorted = Object.entries(overrides)
-    .filter(([, value]) => value !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const sorted = Object.entries(nonDefaultOverrides(overrides)).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
   return createHash("sha256").update(JSON.stringify(sorted)).digest("hex").slice(0, 8);
 }
 
-/** The cells to run: the empty override set first (the baseline), then the grid product. */
+/**
+ * The cells to run: the empty override set first (the baseline), then the grid product with
+ * default-valued overrides dropped, so two grid points that mean the same run are run once.
+ */
 export function buildSweepCells(axes: GridAxis[]): SweepCell[] {
   const seen = new Set<string>();
   const cells: SweepCell[] = [];
   for (const overrides of [{}, ...cartesian(axes)]) {
-    const id = cellId(overrides);
+    const normalized = nonDefaultOverrides(overrides);
+    const id = cellId(normalized);
     if (seen.has(id)) continue;
     seen.add(id);
-    cells.push({ id, overrides });
+    cells.push({ id, overrides: normalized });
   }
   return cells;
 }

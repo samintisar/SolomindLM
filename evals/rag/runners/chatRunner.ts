@@ -79,7 +79,7 @@ export async function runChatEval(
   invoker?: ChatAgentInvoker
 ): Promise<EvalRunnerResult> {
   const { fixture } = options;
-  return runWithHarness(options, invoker, {
+  const result = await runWithHarness(options, invoker, {
     runner: "chat",
     validate: validateFixture,
     missingInvokerMessage:
@@ -153,4 +153,9 @@ export async function runChatEval(
       };
     },
   });
+  // Stub artifacts (dry runs, failed invocations) still record the overrides that were requested.
+  if (options.config.overrides) {
+    result.artifact.configOverrides ??= options.config.overrides;
+  }
+  return result;
 }
