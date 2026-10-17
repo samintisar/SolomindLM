@@ -14,6 +14,7 @@ import type { SourceText } from "../usecases/types";
 import { scoreAbstentionJudgeMetrics } from "./abstentionJudge";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
 import { scoreContextRelevance } from "./contextRelevance";
+import { historyMode, historyTokenShare } from "./conversation";
 import {
   abstentionCorrectness,
   citationValidity,
@@ -130,6 +131,8 @@ export async function scoreAllMetrics(
   results.push(stageTokenShare(fixture, artifact, baseline));
 
   if (isChunkRetrievalRunner(artifact.runner)) {
+    results.push(historyTokenShare(fixture, artifact, baseline));
+    results.push(historyMode(fixture, artifact, baseline));
     results.push(retrievalNonEmpty(fixture, artifact, baseline));
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));

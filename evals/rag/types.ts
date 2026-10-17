@@ -164,6 +164,15 @@ export interface EvalFixture {
    * as evidence. That judge is not in PROMOTE_PREFIXES, so it never blocks `--promotion-check`.
    */
   expectAbstain?: boolean;
+  /**
+   * Prior conversation before `question`, oldest first. The agent receives it as production does
+   * (`_streamChatResponse.ts`); `question` stays the final user turn. Only learning guide mode uses it.
+   */
+  turns?: Array<{ role: "user" | "assistant"; content: string }>;
+  /** Chat settings the agent runs with (production `chatSettings`); default when unset. */
+  chatSettings?: {
+    instructionMode?: "default" | "learningGuide";
+  };
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -287,6 +296,8 @@ export interface EvalRunArtifact {
   callCounters?: CallCounters;
   /** Chat: context token budget the agent applied to this question (list budget for list queries) */
   contextTokenBudget?: number;
+  /** Chat: instruction mode the agent ran this question in */
+  instructionMode?: "default" | "learningGuide" | "custom";
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
   /**
