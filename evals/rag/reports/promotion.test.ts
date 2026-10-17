@@ -27,13 +27,49 @@ function report(metrics: MetricResult[]): EvalReport {
   };
 }
 
+const GROUNDING = "binary_judge_chat_grounding";
+const flakyWarn = () =>
+  metric({
+    metric: GROUNDING,
+    status: "warn",
+    breakdown: { flaky: true, statuses: ["pass", "fail", "pass"] },
+  });
+const flakyMajorityFail = () =>
+  metric({
+    metric: GROUNDING,
+    status: "fail",
+    breakdown: { flaky: true, statuses: ["fail", "fail", "pass"] },
+  });
+
 describe("checkHoldoutPromotion", () => {
   it("rejects a new grounding fail", () => {
-    const before = report([metric({ metric: "binary_judge_chat_grounding", status: "pass" })]);
-    const after = report([metric({ metric: "binary_judge_chat_grounding", status: "fail" })]);
+    const before = report([metric({ metric: GROUNDING, status: "pass" })]);
+    const after = report([metric({ metric: GROUNDING, status: "fail" })]);
     const decision = checkHoldoutPromotion(before, after);
     expect(decision.ok).toBe(false);
-    expect(decision.regressions[0]?.metric).toBe("binary_judge_chat_grounding");
+    expect(decision.regressions[0]?.metric).toBe(GROUNDING);
+  });
+
+  it("never blocks on a flaky minority warning on the after side", () => {
+    const before = report([metric({ metric: GROUNDING, status: "pass" })]);
+    const after = report([flakyWarn()]);
+    expect(checkHoldoutPromotion(before, after).ok).toBe(true);
+  });
+
+  it("a majority-fail flaky row on the after side is a regression against a pass", () => {
+    const before = report([metric({ metric: GROUNDING, status: "pass" })]);
+    const after = report([flakyMajorityFail()]);
+    const decision = checkHoldoutPromotion(before, after);
+    expect(decision.ok).toBe(false);
+    expect(decision.regressions[0]).toMatchObject({ before: "pass", after: "fail" });
+  });
+
+  it("a fail against a flaky warn before is a regression, reported as before warn", () => {
+    const before = report([flakyWarn()]);
+    const after = report([metric({ metric: GROUNDING, status: "fail" })]);
+    const decision = checkHoldoutPromotion(before, after);
+    expect(decision.ok).toBe(false);
+    expect(decision.regressions[0]).toMatchObject({ before: "warn", after: "fail" });
   });
 
   it("ignores expected_item_recall regressions", () => {

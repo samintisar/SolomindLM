@@ -1,5 +1,6 @@
 import type { EvalReport, MetricResult } from "../types";
 import { groupFailures } from "./failureGrouper";
+import { isFlakyMetric } from "./repeats";
 import { buildScorecard, formatScorecard } from "./scorecard";
 
 export interface GenerateReportOptions {
@@ -27,9 +28,14 @@ export function generateReport(
     summary[m.status]++;
   }
 
-  const failureGroups = groupFailures(metrics, {
-    includeWarnings: options.includeWarnings,
-  });
+  // A flaky warning is listed in `flaky`, not grouped as a failure. A majority-fail flaky row
+  // is status fail and stays in the groups.
+  const failureGroups = groupFailures(
+    metrics.filter((m) => !(isFlakyMetric(m) && m.status === "warn")),
+    {
+      includeWarnings: options.includeWarnings,
+    }
+  );
 
   // Deduplicate case count
   const uniqueCases = new Set(metrics.map((m) => `${m.caseId}::${m.runner}`));
@@ -38,6 +44,13 @@ export function generateReport(
     options.useCaseByCase && options.useCaseByCase.size > 0
       ? buildScorecard(metrics, options.useCaseByCase)
       : undefined;
+
+  const flaky = metrics.filter(isFlakyMetric).map((m) => ({
+    caseId: m.caseId,
+    runner: m.runner,
+    metric: m.metric,
+    statuses: (m.breakdown?.statuses as string[] | undefined) ?? [],
+  }));
 
   return {
     timestamp: new Date().toISOString(),
@@ -48,6 +61,7 @@ export function generateReport(
     metrics,
     failureGroups,
     ...(scorecard && scorecard.cells.length > 0 ? { scorecard } : {}),
+    ...(flaky.length > 0 ? { flaky } : {}),
   };
 }
 
@@ -101,6 +115,14 @@ export function formatReport(report: EvalReport): string {
 
   if (report.scorecard) {
     lines.push(...formatScorecard(report.scorecard));
+  }
+
+  if (report.flaky && report.flaky.length > 0) {
+    lines.push("  Flaky (repeats disagree):");
+    for (const f of report.flaky) {
+      lines.push(`    ${f.caseId} (${f.runner}) ${f.metric}: ${f.statuses.join(", ")}`);
+    }
+    lines.push("");
   }
 
   if (report.failureGroups.length > 0) {
