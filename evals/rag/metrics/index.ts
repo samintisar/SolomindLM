@@ -777,7 +777,7 @@ export function latencyCostBudget(
         latencyMs,
         totalTokens,
         latencyRatio: Math.round(latencyRatio * 100) / 100,
-        tokenRatio: Math.round(tokenRatio * 100) / 100,
+        ...(tokensGated ? { tokenRatio: Math.round(tokenRatio * 100) / 100 } : {}),
         baselineLatencyMs: baseline.latencyMs,
         baselineTotalTokens: baselineTokens,
         tokensGated,

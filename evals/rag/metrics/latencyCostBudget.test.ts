@@ -115,5 +115,32 @@ describe("latencyCostBudget", () => {
     expect(result.status).toBe("pass");
     expect(result.detail).toMatch(/tokens 10000 \(baseline has no token usage\)$/);
     expect(result.breakdown).toMatchObject({ tokensGated: false });
+    expect(result.breakdown).not.toHaveProperty("tokenRatio");
+  });
+
+  it("reports tokenRatio only when tokens are gated", () => {
+    const gated = latencyCostBudget(
+      chatFixture,
+      artifact({
+        runner: "chat",
+        latencyMs: 1000,
+        tokenUsage: { prompt: 500, completion: 500, total: 1000 },
+        tokenUsageSource: "provider",
+      }),
+      baseline
+    );
+    expect(gated.breakdown).toMatchObject({ tokensGated: true, tokenRatio: 1 });
+
+    const estimated = latencyCostBudget(
+      chatFixture,
+      artifact({
+        runner: "chat",
+        latencyMs: 1000,
+        tokenUsage: { prompt: 500, completion: 500, total: 1000 },
+        tokenUsageSource: "estimated",
+      }),
+      baseline
+    );
+    expect(estimated.breakdown).not.toHaveProperty("tokenRatio");
   });
 });
