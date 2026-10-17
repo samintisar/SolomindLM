@@ -6,6 +6,8 @@ interface ScorecardCell {
   pass: number;
   fail: number;
   judgeErrors: number;
+  /** Rows where no judge ran for lack of evidence (not scored as pass or fail) */
+  noEvidence: number;
   /** pass / (pass + fail); null when nothing was scored */
   passRate: number | null;
   /** Metric names that failed (judge errors excluded) */
@@ -23,6 +25,11 @@ export function isJudgeError(m: MetricResult): boolean {
   return m.breakdown?.judgeError === true || typeof m.breakdown?.error === "string";
 }
 
+/** A judge row that did not run because the artifact had no evidence to judge against. */
+function isNoEvidence(m: MetricResult): boolean {
+  return m.breakdown?.noEvidence === true;
+}
+
 /** Pass rates per use-case pack × runner (pass/fail metrics, plus judge errors of any status). */
 export function buildScorecard(
   metrics: MetricResult[],
@@ -32,8 +39,15 @@ export function buildScorecard(
   for (const metric of metrics) {
     const useCase = useCaseByCase.get(metric.caseId);
     if (!useCase) continue;
-    // Rubric judge errors are "warn"; binary-judge errors are "fail".
-    if (!isJudgeError(metric) && metric.status !== "pass" && metric.status !== "fail") continue;
+    // Rubric judge errors are "warn"; binary-judge errors are "fail". No-evidence rows are "warn".
+    const noEvidence = isNoEvidence(metric);
+    if (
+      !noEvidence &&
+      !isJudgeError(metric) &&
+      metric.status !== "pass" &&
+      metric.status !== "fail"
+    )
+      continue;
     const key = `${useCase}::${metric.runner}`;
     const cell = cells.get(key) ?? {
       useCase,
@@ -41,10 +55,13 @@ export function buildScorecard(
       pass: 0,
       fail: 0,
       judgeErrors: 0,
+      noEvidence: 0,
       passRate: null,
       failedChecks: [],
     };
-    if (isJudgeError(metric)) {
+    if (noEvidence) {
+      cell.noEvidence++;
+    } else if (isJudgeError(metric)) {
       cell.judgeErrors++;
     } else if (metric.status === "pass") {
       cell.pass++;
@@ -75,6 +92,7 @@ export function formatScorecard(scorecard: Scorecard): string[] {
     const rate = cell.passRate === null ? "n/a" : `${Math.round(cell.passRate * 100)}%`;
     const parts = [`      ${cell.runner}  ${rate} (${cell.pass}/${cell.pass + cell.fail})`];
     if (cell.judgeErrors > 0) parts.push(`judge errors: ${cell.judgeErrors}`);
+    if (cell.noEvidence > 0) parts.push(`no evidence: ${cell.noEvidence}`);
     if (cell.failedChecks.length > 0) parts.push(`failing: ${cell.failedChecks.join(", ")}`);
     lines.push(parts.join("  "));
   }
