@@ -1,3 +1,4 @@
+import type { ChatConfigOverrides } from "../../../convex/_agents/chat/chatConfigOverrides";
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
 import { inferSourceChannel } from "../metrics/sourceAware";
@@ -13,7 +14,11 @@ import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 export interface ChatAgentInvoker {
   invoke(
-    context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }
+    context: ChatAgentContext & {
+      sourcePolicy?: import("../types").SourcePolicyConfig;
+      /** Chat knobs to override for this question; absent for production values. */
+      configOverrides?: ChatConfigOverrides;
+    }
   ): Promise<{
     answer: string;
     citations: string[];
@@ -29,6 +34,7 @@ export interface ChatAgentInvoker {
     callCounters?: CallCounters;
     contextTokenBudget?: number;
     sourcePolicy?: import("../types").SourcePolicyConfig;
+    configOverrides?: ChatConfigOverrides;
   }>;
 }
 
@@ -73,7 +79,7 @@ export async function runChatEval(
   invoker?: ChatAgentInvoker
 ): Promise<EvalRunnerResult> {
   const { fixture } = options;
-  return runWithHarness(options, invoker, {
+  const result = await runWithHarness(options, invoker, {
     runner: "chat",
     validate: validateFixture,
     missingInvokerMessage:
@@ -93,6 +99,7 @@ export async function runChatEval(
         conversationHistory: [{ role: "user", content: fixture.question }],
         documentIds: fixture.documentIds,
         sourcePolicy: fixture.sourcePolicy,
+        configOverrides: options.config.overrides,
       });
 
       // Build source evidence summary from selected chunks
@@ -140,9 +147,15 @@ export async function runChatEval(
         callCounters: result.callCounters,
         contextTokenBudget: result.contextTokenBudget,
         sourcePolicy: result.sourcePolicy,
+        configOverrides: result.configOverrides ?? options.config.overrides,
         sourceEvidence,
         timestamp: new Date().toISOString(),
       };
     },
   });
+  // Stub artifacts (dry runs, failed invocations) still record the overrides that were requested.
+  if (options.config.overrides) {
+    result.artifact.configOverrides ??= options.config.overrides;
+  }
+  return result;
 }

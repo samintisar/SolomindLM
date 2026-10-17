@@ -1,5 +1,6 @@
 "use node";
 
+import type { ChatConfigOverrides } from "./chatConfigOverrides.js";
 import type { VectorSearchHandler } from "./vector_search.js";
 
 /**
@@ -114,4 +115,6 @@ export interface ChatAgentOptions {
   fetchOpeningPassagesFn?: (documentIds: string[]) => Promise<ReferenceChunk[]>;
   /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
   outputLanguage?: string;
+  /** Chat knobs to change from production for this agent (eval experiments). Omitted in production. */
+  configOverrides?: ChatConfigOverrides;
 }

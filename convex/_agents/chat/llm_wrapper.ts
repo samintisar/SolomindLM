@@ -48,13 +48,36 @@ import {
   DIRECT_RESPONSE_TIMEOUT_MS,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
   HYDE_TIMEOUT_MS,
+  MAX_RETRIEVAL_SUBQUERIES,
   PLANNER_FALLBACK_TIMEOUT_MS,
   PLANNER_TIMEOUT_MS,
 } from "./chatConfig.js";
+import type { FewShotPolicy } from "./chatConfigOverrides.js";
 import type { ReferenceChunk } from "./types";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
 export { ChatResponseSchema } from "./chat_llm_types.js";
+
+/**
+ * Whether the system prompt carries the few-shot block. "history-or-complex" is production:
+ * with no conversation history, or for a complex question.
+ */
+export function usesFewShotExamples(
+  policy: FewShotPolicy,
+  historyLength: number,
+  userMessage: string
+): boolean {
+  switch (policy) {
+    case "always":
+      return true;
+    case "never":
+      return false;
+    case "complex-only":
+      return isComplexQuery(userMessage);
+    case "history-or-complex":
+      return historyLength === 0 || isComplexQuery(userMessage);
+  }
+}
 
 /**
  * Handles LLM response generation with structured output and citations.
@@ -72,6 +95,7 @@ export class ChatLLMWrapper {
   private readonly outputLanguage?: string;
   /** Per-turn usage and call counters; the owning ChatAgent reads them on the `done` chunk. */
   private readonly telemetry: TurnTelemetry;
+  private readonly fewShotPolicy: FewShotPolicy;
 
   constructor(config: LLMWrapperConfig) {
     this.telemetry = config.telemetry ?? createTurnTelemetry();
@@ -97,6 +121,7 @@ export class ChatLLMWrapper {
       apiKey: config.apiKey,
     });
     this.outputLanguage = config.outputLanguage;
+    this.fewShotPolicy = config.fewShotPolicy ?? "history-or-complex";
   }
 
   /**
@@ -246,8 +271,9 @@ Question: ${query}`;
   async generateRetrievalSubqueries(
     userMessage: string,
     conversationHistory: Array<{ role: string; content: string }> = [],
-    options: { severalSourcesSelected?: boolean } = {}
+    options: { severalSourcesSelected?: boolean; maxSubqueries?: number } = {}
   ): Promise<{ subqueries: string[]; rerankQuery?: string; aboutEachSource?: boolean }> {
+    const maxSubqueries = options.maxSubqueries ?? MAX_RETRIEVAL_SUBQUERIES;
     const fallback = { subqueries: [userMessage.trim() || "study material"] };
     const trimmed = userMessage.trim();
     if (!trimmed) return fallback;
@@ -325,7 +351,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         throw error;
       }
       this.telemetry.recordLlmCall("plan", startedAt, fromProviderUsage(response.usage));
-      return parseRetrievalSubqueriesFromLlmContent(response.content);
+      return parseRetrievalSubqueriesFromLlmContent(response.content, maxSubqueries);
     };
 
     try {
@@ -333,7 +359,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       if (fromFast) {
         // Expand subqueries for list queries when the LLM returned too few
         if (isListEnumerationQuery(trimmed) && fromFast.subqueries.length < 4) {
-          fromFast.subqueries = expandListSubqueries(trimmed, fromFast.subqueries);
+          fromFast.subqueries = expandListSubqueries(trimmed, fromFast.subqueries, maxSubqueries);
           console.log(
             `[ChatLLMWrapper] Expanded list subqueries: ${fromFast.subqueries.length} total`,
             fromFast.subqueries
@@ -428,7 +454,11 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Generating structured response with citations (streaming)");
 
-    const needsExamples = conversationHistory.length === 0 || isComplexQuery(userMessage);
+    const needsExamples = usesFewShotExamples(
+      this.fewShotPolicy,
+      conversationHistory.length,
+      userMessage
+    );
 
     const today = new Date().toISOString().split("T")[0];
     const dateContext = `\nCurrent Date: ${today}`;
@@ -608,7 +638,11 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Using LangChain fallback (non-streaming)");
 
-    const needsExamples = conversationHistory.length === 0 || isComplexQuery(userMessage);
+    const needsExamples = usesFewShotExamples(
+      this.fewShotPolicy,
+      conversationHistory.length,
+      userMessage
+    );
     const today = new Date().toISOString().split("T")[0];
     const dateContext = `\nCurrent Date: ${today}`;
 
