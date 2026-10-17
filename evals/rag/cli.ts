@@ -25,6 +25,7 @@ import {
 } from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import { aggregateRepeatMetrics } from "./reports/repeats";
+import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
 import {
   createConvexChatInvoker,
   createConvexLiteratureReviewInvoker,
@@ -398,31 +399,29 @@ function exportRagasArtifacts(
   return outPath;
 }
 
+/** Write one studio artifact's output for manual inspection; returns the file path. */
+function saveStudioOutput(artifact: EvalRunArtifact, smartLlm: string | undefined): string {
+  const outputFile = `evals/rag/generated/${caseFileStem(artifact.caseId)}-${artifact.runner}-${Date.now()}.json`;
+  mkdirSync("evals/rag/generated", { recursive: true });
+  writeFileSync(
+    outputFile,
+    JSON.stringify(
+      {
+        caseId: artifact.caseId,
+        runner: artifact.runner,
+        smartLlm,
+        answer: artifact.answer,
+        raw: artifact.studioOutput?.raw,
+        latencyMs: artifact.latencyMs,
+      },
+      null,
+      2
+    )
+  );
+  return outputFile;
+}
+
 // ─── Main ────────────────────────────────────────────────────
-
-/** A console line held until its fixture finishes, so concurrent fixtures do not interleave. */
-interface BufferedLine {
-  stream: "stdout" | "stderr";
-  text: string;
-}
-
-function flushLines(lines: BufferedLine[]): void {
-  for (const line of lines) {
-    if (line.stream === "stdout") console.log(line.text);
-    else console.error(line.text);
-  }
-}
-
-interface FixtureOutcome {
-  lines: BufferedLine[];
-  /** Artifacts of the first repeat */
-  artifacts: EvalRunArtifact[];
-  /** Metrics of the first repeat (judge queue input) */
-  firstRepeatMetrics: MetricResult[];
-  /** Metrics aggregated over all repeats (report input) */
-  metrics: MetricResult[];
-  runtimeErrors: number;
-}
 
 async function main(): Promise<void> {
   let opts: CliOptions;
@@ -531,6 +530,9 @@ async function main(): Promise<void> {
   }
   // Repeats: the smoke split defaults to 3 so flaky verdicts show up; dry runs stay at 1.
   const repeats = opts.dryRun ? 1 : (opts.repeats ?? (opts.split === "smoke" ? 3 : 1));
+  if (opts.dryRun && (opts.repeats ?? 1) > 1) {
+    console.warn("Dry runs always use 1 repeat; --repeats is ignored.");
+  }
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}${repeats > 1 ? ` [repeats=${repeats}]` : ""}\n`
   );
@@ -617,132 +619,41 @@ async function main(): Promise<void> {
   // is not a calibration label); the report uses the aggregated rows of all repeats.
   const firstRepeatMetrics: MetricResult[] = [];
 
-  const runFixture = async (fixture: EvalFixture): Promise<FixtureOutcome> => {
-    const lines: BufferedLine[] = [];
-    const out = (text = "") => lines.push({ stream: "stdout", text });
-    const err = (text: string) => lines.push({ stream: "stderr", text });
-    fixtureMeta.set(fixture.id, {
-      question: fixture.question,
-      expectedItems: fixture.expectedItems,
-    });
-    out(`[${fixture.id}] ${fixture.question}`);
-
-    const artifacts: EvalRunArtifact[] = [];
-    const repeatRuns: MetricResult[][] = [];
-    let runtimeErrors = 0;
-    for (let repeat = 1; repeat <= repeats; repeat++) {
-      // Run the eval — throws in real mode if no invoker registered
-      let results;
-      try {
-        results = await runEval(fixture, {
-          dryRun: opts.dryRun,
-          chatInvoker,
-          researchInvoker,
-          literatureReviewInvoker,
-          studioInvokers,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        err(`  FATAL: ${message}`);
-        err("  Use --dry-run to validate fixtures without invokers.");
-        flushLines(lines);
-        process.exit(2);
-      }
-
-      const runMetrics: MetricResult[] = [];
-      for (const { artifact, errors } of results) {
-        artifact.useCase = fixture.useCase;
-        if (errors.length > 0) {
-          out(`  Errors: ${errors.join("; ")}`);
-          runtimeErrors += errors.length;
-        }
-
-        if (repeat === 1) artifacts.push(artifact);
-
-        // Save studio output for manual inspection
-        if (artifact.studioOutput) {
-          const outputFile = `evals/rag/generated/${caseFileStem(artifact.caseId)}-${artifact.runner}-${Date.now()}.json`;
-          mkdirSync("evals/rag/generated", { recursive: true });
-          writeFileSync(
-            outputFile,
-            JSON.stringify(
-              {
-                caseId: artifact.caseId,
-                runner: artifact.runner,
-                smartLlm: opts.smartLlm,
-                answer: artifact.answer,
-                raw: artifact.studioOutput.raw,
-                latencyMs: artifact.latencyMs,
-              },
-              null,
-              2
-            )
-          );
-          out(`  Output saved to: ${outputFile}`);
-        }
-
-        // Load baseline for this case+runner if available
-        const baseline = loadBaseline(fixture.id, artifact.runner);
-        if (repeat === 1 && baseline) {
-          out(`  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`);
-        }
-
-        const metrics = await scoreAllMetrics(fixture, artifact, baseline, {
-          likertJudges: opts.likertJudges,
-          dryRun: opts.dryRun,
-          judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
-          rubricChecks: opts.rubricChecks,
-          judgeReasoning: opts.judgeReasoning,
-          packSourceTexts: fixture.useCase
-            ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
-            : undefined,
-        });
-        runMetrics.push(...metrics);
-      }
-      repeatRuns.push(runMetrics);
-
-      if (repeats > 1 && !opts.verbose) {
-        const pass = runMetrics.filter((m) => m.status === "pass").length;
-        const fail = runMetrics.filter((m) => m.status === "fail").length;
-        out(`  repeat ${repeat}/${repeats}: ${pass} pass, ${fail} fail`);
-      }
-    }
-
-    const aggregated = aggregateRepeatMetrics(repeatRuns);
-    for (const artifact of artifacts) {
-      const rows = aggregated.filter(
-        (m) => m.caseId === artifact.caseId && m.runner === artifact.runner
-      );
-      if (opts.verbose) {
-        for (const m of rows) {
-          const icon =
-            m.status === "pass" ? "+" : m.status === "fail" ? "x" : m.status === "warn" ? "!" : "i";
-          out(`  [${icon}] ${m.metric}: ${m.score.toFixed(2)} — ${m.detail}`);
-        }
-      } else {
-        const pass = rows.filter((m) => m.status === "pass").length;
-        const fail = rows.filter((m) => m.status === "fail").length;
-        out(`  ${pass} pass, ${fail} fail (${artifact.runner}, ${artifact.latencyMs}ms)`);
-      }
-    }
-    out();
-
-    return {
-      lines,
-      artifacts,
-      firstRepeatMetrics: repeatRuns[0] ?? [],
-      metrics: aggregated,
-      runtimeErrors,
-    };
+  const fixtureDeps = {
+    repeats,
+    verbose: opts.verbose,
+    runEval,
+    runEvalOptions: {
+      dryRun: opts.dryRun,
+      chatInvoker,
+      researchInvoker,
+      literatureReviewInvoker,
+      studioInvokers,
+    },
+    scoreAllMetrics,
+    scoreOptionsFor: (fixture: EvalFixture) => ({
+      likertJudges: opts.likertJudges,
+      dryRun: opts.dryRun,
+      judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      rubricChecks: opts.rubricChecks,
+      judgeReasoning: opts.judgeReasoning,
+      packSourceTexts: fixture.useCase
+        ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
+        : undefined,
+    }),
+    loadBaseline,
+    saveStudioOutput: (artifact: EvalRunArtifact) => saveStudioOutput(artifact, opts.smartLlm),
   };
 
   // Fixtures run through a bounded pool; outcomes are merged in fixture order, so the report
   // and exports do not depend on which fixture finished first.
   const concurrency = opts.concurrency ?? (opts.dryRun ? 1 : 3);
   const outcomes = await mapWithConcurrency(fixturesToRun, concurrency, async (fixture) => {
-    const outcome = await runFixture(fixture);
-    flushLines(outcome.lines);
-    return outcome;
+    fixtureMeta.set(fixture.id, {
+      question: fixture.question,
+      expectedItems: fixture.expectedItems,
+    });
+    return runFixtureAndFlush(fixture, fixtureDeps);
   });
   for (const outcome of outcomes) {
     allMetrics.push(...outcome.metrics);
@@ -848,6 +759,7 @@ async function getCommitSha(): Promise<string> {
 }
 
 main().catch((err) => {
+  if (err instanceof FixtureFatalError) process.exit(2);
   console.error("Fatal error:", err);
   process.exit(2);
 });

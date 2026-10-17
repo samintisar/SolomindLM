@@ -57,4 +57,31 @@ describe("mapWithConcurrency", () => {
 
     expect(started).toEqual([1, 2]);
   });
+
+  it("rejects without waiting for an in-flight item, which still completes", async () => {
+    const finished: string[] = [];
+    const started: string[] = [];
+
+    const pool = mapWithConcurrency(["slow", "fail", "late"], 2, async (item) => {
+      started.push(item);
+      if (item === "slow") {
+        await sleep(80);
+        finished.push(item);
+        return item;
+      }
+      await sleep(5);
+      if (item === "fail") throw new Error("fail boom");
+      finished.push(item);
+      return item;
+    });
+
+    await expect(pool).rejects.toThrow("fail boom");
+    // The pool rejected while "slow" was still running, and "late" never started.
+    expect(finished).not.toContain("slow");
+    expect(started).toEqual(["slow", "fail"]);
+
+    await sleep(120);
+    expect(finished).toContain("slow");
+    expect(started).toEqual(["slow", "fail"]);
+  });
 });
