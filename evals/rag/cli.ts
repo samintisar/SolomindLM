@@ -301,8 +301,9 @@ Options:
                            "studio" = every studio kind except audioScriptOnly
   --split <smoke|train|holdout>  Filter fixtures by dataset split (live default: smoke)
   --repeats <n>            Run each fixture n times; pass^k and mean per metric. Verdicts that
-                           disagree are "flaky": reported separately, never regressions
-                           (default: 3 for the smoke split, else 1; dry runs use 1)
+                           disagree are flaky: a majority of fails (>= half) merges to fail,
+                           a minority of fails to a flaky warning (default: 3 for the smoke
+                           split, else 1; dry runs use 1)
   --concurrency <n>        Fixtures run in parallel (default: 3 live, 1 dry). Each fixture's
                            output is printed when it finishes; the report is unchanged
   --use-case <ids|all>     Use-case pack fixtures only (seed first: bun run eval:seed)

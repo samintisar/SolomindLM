@@ -44,12 +44,12 @@ describe("formatReport flaky block", () => {
   it("prints the flaky block with its statuses", () => {
     const text = formatReport(generateReport([flakyRow()], { commitSha: "abc" }));
 
-    expect(text).toContain("Flaky (not counted as regressions):");
+    expect(text).toContain("Flaky (repeats disagree):");
     expect(text).toContain("case-1 (chat) binary_judge_chat_grounding: pass, fail");
   });
 
   it("prints no flaky block when there are no flaky rows", () => {
     const text = formatReport(generateReport([passRow()], { commitSha: "abc" }));
-    expect(text).not.toContain("Flaky (not counted as regressions):");
+    expect(text).not.toContain("Flaky (repeats disagree):");
   });
 });

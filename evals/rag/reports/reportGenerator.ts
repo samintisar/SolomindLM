@@ -113,7 +113,7 @@ export function formatReport(report: EvalReport): string {
   }
 
   if (report.flaky && report.flaky.length > 0) {
-    lines.push("  Flaky (not counted as regressions):");
+    lines.push("  Flaky (repeats disagree):");
     for (const f of report.flaky) {
       lines.push(`    ${f.caseId} (${f.runner}) ${f.metric}: ${f.statuses.join(", ")}`);
     }
