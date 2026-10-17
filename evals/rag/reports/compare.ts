@@ -5,7 +5,6 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "f
 import { join } from "path";
 import { caseFileStem } from "../caseFile";
 import { getFixture } from "../fixtures";
-import { combineChunkContents } from "../metrics/binaryJudges";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "../metrics/togetherLlmJudge";
 import type {
   ChunkSnapshot,
@@ -56,39 +55,143 @@ export function loadArtifactsFromDir(dir: string): EvalRunArtifact[] {
   return artifacts;
 }
 
-/** Evidence budget for the pairwise judge: both answers' passages, deduplicated. */
+/** Evidence budget for the pairwise judge: half to each run's passages. */
 const COMPARE_EVIDENCE_LIMIT = 24_000;
 const NO_EVIDENCE_NOTE = "(no retrieved passages recorded for these outputs)";
+const SIDE_SEPARATOR = "\n\n---\n\n";
+const CUT_EVIDENCE_NOTE =
+  "Some retrieved passages were cut off for judging; do not fail a claim only because its support would be in a passage that is not shown.";
 
 type Verdict = "a" | "b" | "tie";
+/** Which artifact a passage came from: run A or run B. */
+type Side = "A" | "B";
 
-/**
- * The passages both answers were built from: one copy of each (whitespace-normalised content),
- * formatted like the binary judges' chunks. Chunk ids are local to each answer, so the judge is
- * told to read the passages as evidence, not to look ids up.
- */
-export function comparisonEvidence(artA: EvalRunArtifact, artB: EvalRunArtifact): string {
-  if (artA.selectedChunks.length === 0 || artB.selectedChunks.length === 0) {
-    return NO_EVIDENCE_NOTE;
-  }
-  const seen = new Set<string>();
-  const unique: ChunkSnapshot[] = [];
-  for (const chunk of [...artA.selectedChunks, ...artB.selectedChunks]) {
-    const key = (chunk.contextText ?? chunk.content).replace(/\s+/g, " ").trim();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(chunk);
-  }
-  return combineChunkContents(unique, COMPARE_EVIDENCE_LIMIT);
+interface SidePassage {
+  label: string;
+  key: string;
+  text: string;
 }
 
-/** One presentation of the pair: `answerA` is shown in slot A, `answerB` in slot B. */
+interface SideFill {
+  kept: SidePassage[];
+  skipped: string[];
+  cut: boolean;
+}
+
+/** One copy of each passage of one run (whitespace-normalised content), labelled `[A-3]` etc. */
+function sidePassages(side: Side, chunks: ChunkSnapshot[]): SidePassage[] {
+  const seen = new Set<string>();
+  const passages: SidePassage[] = [];
+  for (const chunk of chunks) {
+    const body = chunk.contextText ?? chunk.content;
+    const key = body.replace(/\s+/g, " ").trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const label = `${side}-${chunk.id}`;
+    const title = chunk.sourceTitle ? ` ${chunk.sourceTitle}` : "";
+    passages.push({ label, key, text: `[${label}]${title}\n${body}` });
+  }
+  return passages;
+}
+
+/**
+ * Whole passages in order while they fit `budget`. A first passage longer than the budget is cut
+ * and marked; a passage that does not fit is skipped and its label listed.
+ */
+function fillSide(passages: SidePassage[], budget: number): SideFill {
+  const kept: SidePassage[] = [];
+  const skipped: string[] = [];
+  let used = 0;
+  let cut = false;
+  for (const passage of passages) {
+    if (kept.length === 0 && passage.text.length > budget) {
+      cut = true;
+      kept.push({ ...passage, text: `${passage.text.slice(0, budget)}\n[… passage cut off here]` });
+      used = budget;
+      continue;
+    }
+    const separator = kept.length > 0 ? SIDE_SEPARATOR.length : 0;
+    if (used + separator + passage.text.length > budget) {
+      skipped.push(passage.label);
+      continue;
+    }
+    kept.push(passage);
+    used += separator + passage.text.length;
+  }
+  return { kept, skipped, cut };
+}
+
+/**
+ * The passages both runs were built from. Shared by both prompt directions, so the evidence text is
+ * identical whichever answer is shown first. Each run gets half the budget (all of it when the
+ * other run recorded none), and the runs are interleaved A, B, A, B so one verbose run cannot crowd
+ * the other out. A passage both runs used is shown once, under A, with an alias line for B's label.
+ */
+export function comparisonEvidence(artA: EvalRunArtifact, artB: EvalRunArtifact): string {
+  const passagesA = sidePassages("A", artA.selectedChunks);
+  const passagesB = sidePassages("B", artB.selectedChunks);
+  if (passagesA.length === 0 && passagesB.length === 0) return NO_EVIDENCE_NOTE;
+
+  if (passagesA.length === 0 || passagesB.length === 0) {
+    const onlySide: Side = passagesA.length > 0 ? "A" : "B";
+    const missing: Side = onlySide === "A" ? "B" : "A";
+    const only = fillSide(onlySide === "A" ? passagesA : passagesB, COMPARE_EVIDENCE_LIMIT);
+    const notes = [`(run ${missing} recorded no passages)`];
+    if (only.skipped.length > 0) notes.push(`[… passages not shown: ${only.skipped.join(", ")}]`);
+    if (only.cut || only.skipped.length > 0) notes.push(CUT_EVIDENCE_NOTE);
+    return [...notes, ...only.kept.map((p) => p.text)].join("\n\n");
+  }
+
+  const aliasLines: string[] = [];
+  const labelsA = new Map(passagesA.map((p) => [p.key, p.label]));
+  const ownB = passagesB.filter((p) => {
+    const sameAs = labelsA.get(p.key);
+    if (sameAs === undefined) return true;
+    aliasLines.push(`[${p.label}] is the same passage as [${sameAs}].`);
+    return false;
+  });
+
+  const half = Math.floor(COMPARE_EVIDENCE_LIMIT / 2);
+  const fillA = fillSide(passagesA, half);
+  const fillB = fillSide(ownB, half);
+  const interleaved: string[] = [];
+  for (let i = 0; i < Math.max(fillA.kept.length, fillB.kept.length); i++) {
+    const a = fillA.kept[i];
+    const b = fillB.kept[i];
+    if (a) interleaved.push(a.text);
+    if (b) interleaved.push(b.text);
+  }
+
+  const notes: string[] = [];
+  if (fillA.skipped.length > 0) {
+    notes.push(`[… passages not shown from run A: ${fillA.skipped.join(", ")}]`);
+  }
+  if (fillB.skipped.length > 0) {
+    notes.push(`[… passages not shown from run B: ${fillB.skipped.join(", ")}]`);
+  }
+  if (fillA.cut || fillB.cut || notes.length > 0) notes.unshift(CUT_EVIDENCE_NOTE);
+
+  const parts = [...notes, interleaved.join(SIDE_SEPARATOR)];
+  if (aliasLines.length > 0) parts.push(aliasLines.join("\n"));
+  return parts.join("\n\n");
+}
+
+/**
+ * One presentation of the pair. `sideOfA` is the run whose answer is shown in slot A, so the
+ * citation mapping names the passage labels each answer's [n] markers refer to.
+ */
 export function comparePrompt(
   question: string,
   answerA: string,
   answerB: string,
-  evidence: string
+  evidence: string,
+  sideOfA: Side = "A"
 ): string {
+  const sideOfB: Side = sideOfA === "A" ? "B" : "A";
+  const citationMap =
+    evidence === NO_EVIDENCE_NOTE
+      ? ""
+      : `Citation markers: in Answer A, [n] refers to [${sideOfA}-n] in the evidence; in Answer B, [n] refers to [${sideOfB}-n].\n\n`;
   return `You are comparing two AI answers to the same question. Pick the better answer.
 
 Judge in this order:
@@ -100,10 +203,10 @@ Do not prefer an answer because it is longer. Say "tie" when neither is clearly 
 
 Question: ${question}
 
-Evidence (passages retrieved for these answers; chunk ids are local to each answer):
+Evidence (passages retrieved for these answers; a label such as [A-3] names the run that retrieved the passage):
 ${evidence}
 
-Answer A:
+${citationMap}Answer A:
 ${answerA.slice(0, 6000)}
 
 Answer B:
@@ -126,7 +229,7 @@ function parseWinner(raw: string): { winner: "A" | "B" | "tie"; reason: string }
 }
 
 export interface PairJudgement {
-  /** Agreed verdict; "tie" when the two orders disagree */
+  /** Agreed verdict; "tie" when the two orders disagree or either says tie */
   winner: Verdict;
   /** Verdict with A in slot A, mapped back to artifact A / B */
   forward: Verdict;
@@ -145,10 +248,10 @@ export async function judgeArtifactPair(
 ): Promise<PairJudgement> {
   const evidence = comparisonEvidence(artA, artB);
   const forward = parseWinner(
-    await invoke(comparePrompt(question, artA.answer, artB.answer, evidence))
+    await invoke(comparePrompt(question, artA.answer, artB.answer, evidence, "A"))
   );
   const backward = parseWinner(
-    await invoke(comparePrompt(question, artB.answer, artA.answer, evidence))
+    await invoke(comparePrompt(question, artB.answer, artA.answer, evidence, "B"))
   );
 
   const forwardVerdict: Verdict =
@@ -168,7 +271,10 @@ function summarise(judgement: PairJudgement): string {
   if (judgement.forward === judgement.backward) {
     return `${judgement.winner} in both orders`;
   }
-  return `position disagreement (forward ${judgement.forward}, swapped ${judgement.backward}): tie`;
+  if (judgement.forward !== "tie" && judgement.backward !== "tie") {
+    return `position disagreement (forward ${judgement.forward}, swapped ${judgement.backward}): tie`;
+  }
+  return `tie (forward ${judgement.forward}, swapped ${judgement.backward})`;
 }
 
 type WinTally = { winsA: number; winsB: number; ties: number; winRateB: number };
@@ -253,7 +359,10 @@ export async function compareArtifactDirs(
 
   const total = winsA + winsB + ties;
   const winRateB = total > 0 ? (winsB + ties / 2) / total : 0;
-  const positionDisagreements = cases.filter((c) => c.forward !== c.backward).length;
+  // Only both-orders-picked-a-winner splits count; a tie in one order is not a position split.
+  const positionDisagreements = cases.filter(
+    (c) => c.forward !== "tie" && c.backward !== "tie" && c.forward !== c.backward
+  ).length;
 
   return {
     timestamp: new Date().toISOString(),

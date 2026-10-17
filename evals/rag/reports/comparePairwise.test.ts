@@ -67,16 +67,97 @@ describe("comparisonEvidence", () => {
     expect(evidence.split("fell to 3%.")).toHaveLength(2);
   });
 
-  it("says no passages were recorded when either side has none (studio output)", () => {
+  it("says no passages were recorded when neither side has any", () => {
+    const studio = artifact({ caseId: "c", runner: "report", answer: "b" });
+    expect(comparisonEvidence(studio, studio)).toBe(
+      "(no retrieved passages recorded for these outputs)"
+    );
+  });
+
+  it("shows the side that has passages, noting that the other run recorded none", () => {
     const chat = artifact({
       caseId: "c",
       answer: "a",
-      selectedChunks: [chunk("1", "A passage.")],
+      selectedChunks: [chunk("1", "Only A has a passage.")],
     });
     const studio = artifact({ caseId: "c", runner: "report", answer: "b" });
-    const expected = "(no retrieved passages recorded for these outputs)";
-    expect(comparisonEvidence(chat, studio)).toBe(expected);
-    expect(comparisonEvidence(studio, chat)).toBe(expected);
+    const forwardEvidence = comparisonEvidence(chat, studio);
+    expect(forwardEvidence).toContain("(run B recorded no passages)");
+    expect(forwardEvidence).toContain("[A-1]");
+    expect(forwardEvidence).toContain("Only A has a passage.");
+    const reversedEvidence = comparisonEvidence(studio, chat);
+    expect(reversedEvidence).toContain("(run A recorded no passages)");
+    expect(reversedEvidence).toContain("[B-1]");
+  });
+
+  it("gives each run half the budget, so a verbose run cannot crowd the other out", () => {
+    const verbose = Array.from({ length: 3 }, (_, i) =>
+      chunk(String(i + 1), `A-body-${i} ${"x".repeat(9_000)}`)
+    );
+    const short = [chunk("1", `B-only ${"y".repeat(2_000)}`)];
+    const evidence = comparisonEvidence(
+      artifact({ caseId: "c", answer: "a", selectedChunks: verbose }),
+      artifact({ caseId: "c", answer: "b", selectedChunks: short })
+    );
+    expect(evidence).toContain("[B-1]");
+    expect(evidence).toContain("B-only");
+    expect(evidence).toContain("[A-1]");
+    expect(evidence).not.toContain("[A-2]");
+    expect(evidence).toContain("passages not shown from run A: A-2, A-3");
+    // Interleaved: A's first passage comes before B's, and both appear in that order.
+    expect(evidence.indexOf("[A-1]")).toBeLessThan(evidence.indexOf("[B-1]"));
+  });
+
+  it("labels passages by run and tells the judge what each answer's citations mean", async () => {
+    const a = artifact({
+      caseId: "c",
+      answer: "GOOD",
+      citations: ["3"],
+      selectedChunks: [chunk("3", "PASSAGE-FROM-A")],
+    });
+    const b = artifact({
+      caseId: "c",
+      answer: "BAD",
+      citations: ["1"],
+      selectedChunks: [chunk("1", "PASSAGE-FROM-B")],
+    });
+    const prompts: string[] = [];
+    await judgeArtifactPair(
+      async (prompt) => {
+        prompts.push(prompt);
+        return JSON.stringify({ winner: "tie", reason: "same" });
+      },
+      "Q?",
+      a,
+      b
+    );
+    const [forward, backward] = prompts;
+    expect(forward).toContain("[A-3]");
+    expect(forward).toContain("[B-1]");
+    expect(forward).toContain("in Answer A, [n] refers to [A-n]");
+    expect(forward).toContain("in Answer B, [n] refers to [B-n]");
+    // Swapped: the run-B answer now sits in slot A, so its [n] refers to [B-n].
+    expect(backward).toContain("in Answer A, [n] refers to [B-n]");
+    expect(backward).toContain("in Answer B, [n] refers to [A-n]");
+    // The evidence block itself is identical in both directions.
+    const evidence = comparisonEvidence(a, b);
+    expect(forward).toContain(evidence);
+    expect(backward).toContain(evidence);
+  });
+
+  it("shows a passage both runs used once, with an alias for the other run's label", () => {
+    const shared = "The shared passage  text.";
+    const evidence = comparisonEvidence(
+      artifact({ caseId: "c", answer: "a", selectedChunks: [chunk("3", shared)] }),
+      artifact({
+        caseId: "c",
+        answer: "b",
+        selectedChunks: [chunk("2", "The shared passage text."), chunk("4", "B's own.")],
+      })
+    );
+    expect(evidence.split("The shared passage").length - 1).toBe(1);
+    expect(evidence).toContain("[B-2] is the same passage as [A-3].");
+    expect(evidence).toContain("[B-4]");
   });
 
   it("truncates the union at 24 000 characters with the cut note", () => {
@@ -186,6 +267,25 @@ describe("compareArtifactDirs with a stub judge", () => {
     expect(only).toMatchObject({ winner: "tie", forward: "a", backward: "b" });
     expect(only?.reasonForward).toBe("slot A");
     expect(only?.reason).toMatch(/position disagreement/);
+  });
+
+  it("does not count a tie in one order against a winner in the other as a position split", async () => {
+    exportEvalRunArtifacts(dirA, [artifact({ caseId: "x-case", answer: "GOOD" })]);
+    exportEvalRunArtifacts(dirB, [artifact({ caseId: "x-case", answer: "BAD" })]);
+    // Forward (run A in slot A): tie. Swapped (run B in slot A): picks slot A, which is run B.
+    const report = await compareArtifactDirs({
+      pathA: dirA,
+      pathB: dirB,
+      invoke: async (prompt) => {
+        const slotA = prompt.split("Answer A:\n")[1]?.split("\n")[0] ?? "";
+        return slotA.includes("GOOD")
+          ? JSON.stringify({ winner: "tie", reason: "close" })
+          : JSON.stringify({ winner: "A", reason: "slot A" });
+      },
+    });
+    const [only] = report.cases;
+    expect(only).toMatchObject({ winner: "tie", forward: "tie", backward: "b" });
+    expect(report.positionDisagreements).toBe(0);
   });
 
   it("reports no disagreements when the judge is consistent", async () => {

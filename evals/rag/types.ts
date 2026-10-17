@@ -348,7 +348,11 @@ export interface CompareReport {
   pathA: string;
   pathB: string;
   casesCompared: number;
-  /** Cases where the judge's verdict flipped with position (counted as ties) */
+  /**
+   * Cases where both position orders picked a winner and the winners differ (a flip, counted as a
+   * tie). Splits where one order says tie and the other picks a winner are NOT counted: they are
+   * ties with a lean, not position bias.
+   */
   positionDisagreements: number;
   winsA: number;
   winsB: number;
