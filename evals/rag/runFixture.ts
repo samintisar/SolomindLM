@@ -32,7 +32,7 @@ export function createLineBuffer(): { log: FixtureLog; lines: BufferedLine[] } {
   };
 }
 
-export function flushLines(lines: BufferedLine[]): void {
+function flushLines(lines: BufferedLine[]): void {
   for (const line of lines) {
     if (line.stream === "stdout") console.log(line.text);
     else console.error(line.text);
