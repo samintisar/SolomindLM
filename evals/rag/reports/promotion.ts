@@ -1,5 +1,4 @@
 import type { EvalReport, MetricResult } from "../types";
-import { isFlakyMetric } from "./repeats";
 
 const PROMOTE_PREFIXES = [
   "binary_judge_chat_grounding",
@@ -30,6 +29,11 @@ function key(row: MetricResult): string {
   return `${row.caseId}::${row.runner}::${row.metric}`;
 }
 
+/**
+ * A regression is an `after` row with status `fail` whose `before` row was not `fail`.
+ * Flaky warnings are `warn` and never block; a majority-fail flaky row is `fail` and does
+ * (see reports/repeats.ts). Status only, no flaky special case.
+ */
 export function checkHoldoutPromotion(before: EvalReport, after: EvalReport): PromotionDecision {
   const beforeByKey = new Map(
     before.metrics.filter((row) => isPromoteMetric(row.metric)).map((row) => [key(row), row])
@@ -38,8 +42,6 @@ export function checkHoldoutPromotion(before: EvalReport, after: EvalReport): Pr
   for (const row of after.metrics) {
     if (!isPromoteMetric(row.metric) || row.status !== "fail") continue;
     const prev = beforeByKey.get(key(row));
-    // A flaky verdict on either side is noise, not a regression (see reports/repeats.ts).
-    if (isFlakyMetric(row) || (prev && isFlakyMetric(prev))) continue;
     if (!prev || prev.status !== "fail") {
       regressions.push({
         caseId: row.caseId,
