@@ -268,7 +268,7 @@ export const professionalsFixtures: EvalFixture[] = [
     expectAbstain: true,
     studioParams: { documentTitleHint: BEIGE_BOOK },
     expectedAnswer:
-      "The Beige Book is a US report and does not mention the European Central Bank, so the correct reply says it does not cover it and gives no rate decisions.",
+      "The Beige Book is a US report and does not mention the European Central Bank, so the correct reply says the report does not cover it and gives no rate decisions.",
     expectedBehavior:
       "Declines, saying the sources do not cover European Central Bank decisions. It must not invent rate levels, dates or statements, " +
       "and must not present general macroeconomic knowledge as if it came from the sources.",

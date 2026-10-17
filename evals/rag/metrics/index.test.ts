@@ -3,6 +3,7 @@ import { AGENTIC_20_ITEMS } from "../fixtures/agentic-patterns-20";
 import type { ChunkSnapshot, EvalFixture, EvalRunArtifact } from "../types";
 import {
   abstentionCorrectness,
+  citationValidity,
   expectedItemRecall,
   retrievalNdcgAtK,
   retrievalPrecisionAtK,
@@ -208,5 +209,74 @@ describe("abstentionCorrectness on unanswerable fixtures", () => {
       artifact({ answer: "I cannot find it.", selectedChunks: [] })
     );
     expect(result.breakdown?.category).toBe("none");
+  });
+});
+
+describe("decline forms on unanswerable fixtures", () => {
+  const unanswerable: EvalFixture = {
+    ...fixture,
+    id: "wiring/unanswerable-forms",
+    expectedItems: [],
+    expectAbstain: true,
+  };
+  const declines = (answer: string) =>
+    abstentionCorrectness(unanswerable, artifact({ answer })).breakdown?.category ===
+    "correct_abstention";
+
+  it.each([
+    "The documents do not provide information about vaccine schedules.",
+    "This is not covered in the selected documents.",
+    "This is not covered in your notes.",
+    "The sources do not cover that topic.",
+    "The notes don't mention a dose.",
+    "The papers do not discuss dementia.",
+    "The report doesn't address exchange rates.",
+    "The passages do not include anything on the question.",
+    "There is no mention of pneumonia in the sources.",
+    "No mention of statins appears in these papers.",
+    "I don't see any information about the subjunctive.",
+    "The answer is not mentioned in these documents.",
+    "The dosing is not discussed in the notes.",
+    "It is not addressed in the report.",
+  ])("counts %j as a decline", (answer) => {
+    expect(declines(answer)).toBe(true);
+  });
+
+  it("accepts curly apostrophes and quotes", () => {
+    expect(declines("I don’t see any information about that.")).toBe(true);
+    expect(declines("The sources don’t cover that, so I can’t say.")).toBe(true);
+    expect(declines("The notes say “not covered in your documents”.")).toBe(true);
+  });
+
+  it("does not count a technical negation about the subject as a decline", () => {
+    expect(declines("The study did not include children under 12.")).toBe(false);
+    expect(declines("The sources do not agree on the dose.")).toBe(false);
+    expect(declines("Points do not have enough neighbours to form a cluster.")).toBe(false);
+    expect(declines("The drug is dosed at 5 mg twice daily.")).toBe(false);
+  });
+
+  it("does not require citations from a decline whose expectedBehavior names the sources", () => {
+    const result = citationValidity(
+      { ...unanswerable, expectedBehavior: "Pass if it says the sources do not cover it." },
+      artifact({ answer: "The sources do not cover that.", citations: [] })
+    );
+    expect(result.status).toBe("pass");
+    expect(result.breakdown?.expectsCitation).toBe(false);
+  });
+
+  it("accepts the reference answer of each unanswerable fixture", () => {
+    const references = [
+      "The notes do not cover the subjunctive, so the correct reply says the sources do not cover it and gives no subjunctive forms or rules.",
+      "The notes do not cover the imperfect, so the correct reply says the sources do not cover it and gives no imperfect forms.",
+      "The sources cover the heart, nerves and kidney, not immunisation, so the correct reply says the sources do not cover vaccine schedules and gives no doses or ages.",
+      "The sources do not cover pneumonia or its treatment, so the correct reply says so and names no antibiotic or dose.",
+      "The Beige Book covers regional economic conditions and does not mention Bitcoin or crypto mining, so the correct reply says the sources do not cover it and gives no prices or figures.",
+      "The Beige Book is a US report and does not mention the European Central Bank, so the correct reply says the report does not cover it and gives no rate decisions.",
+      "The four papers study depression and do not report dementia outcomes, so the correct reply says the sources do not cover dementia and gives no risk estimates.",
+      "The papers do not mention vaccination, so the correct reply says the sources do not report it as a covariate and gives no adjustment details.",
+    ];
+    for (const reference of references) {
+      expect(declines(reference)).toBe(true);
+    }
   });
 });
