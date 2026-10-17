@@ -253,7 +253,9 @@ bun run eval:trend -- --split smoke --branch eval-history
 ## Sweeps
 
 `bun run eval:sweep` runs the chat fixtures once per cell of a grid of chat config overrides (the same
-knobs as `--chat-config` in the eval CLI). The empty override set always runs as the baseline. Each cell
+knobs as `--chat-config` in the eval CLI). The empty override set always runs as the baseline. A value equal to
+the production default is the same run as the baseline, so it is not run again: `hydeEnabled=true` is the
+baseline, and a grid's default-valued points collapse into it. Each cell
 writes its artifacts to `<artifacts-dir>/<cellId>/`; the run writes `sweep.json` and `sweep.md`, and
 prints a table sorted by quality, with the Pareto front (quality up, tokens down, p95 latency down) marked `*`.
 
@@ -277,9 +279,16 @@ bun run eval:sweep -- --grid "contextTokenBudget=4000,6000,8000" --split train -
 Ranked items 5–7 (prompt-cache layout, chunk size, skipping follow-ups) are not chat overrides: the
 first needs a prompt change, the second a re-embed of the packs, the third an eval flag.
 
-Quality is the mean pass rate of `binary_judge_chat_grounding` and `expected_item_recall`.
-`expected_item_recall` passes by definition for fixtures with no `expectedItems`, so quality
-is closer to grounding alone on those fixtures.
+Quality is the mean pass rate of `binary_judge_chat_grounding` and `expected_item_recall`, over the
+components that have cases. `n/a` means no case had that component, and it is left out of quality
+rather than counted as 0. Recall counts only fixtures with `expectedItems`, since the metric passes by
+definition for the others. A real sweep needs `TOGETHER_AI_API_KEY`, because grounding is the judged
+signal, and it exits 2 without the key. A cell with no quality or no token figure is never on the
+Pareto front. Tokens averaged over only some cases are marked `(partial)`.
+
+With `rerankEnabled=false` the pre-rerank and post-rerank snapshots are empty, so
+`retrieval_item_recall_pre_rerank` and `retrieval_item_recall_post_rerank` read as failures in that
+cell. Only the selected-stage metrics are meaningful there.
 
 ## Suggested Fixtures for Machine Learning Notebook
 

@@ -9,11 +9,14 @@ const cell = (
 ): CellSummary => ({
   id,
   overrides,
-  quality: 0,
-  grounding: 0,
-  recall: 0,
+  quality: 0.5,
+  grounding: 0.5,
+  groundingCases: 1,
+  recall: null,
+  recallCases: 0,
   cases: 1,
   tokensMean: 0,
+  tokensPartial: false,
   tokensEstimated: false,
   latencyP95: 0,
   selectedTokensMean: 0,
@@ -34,6 +37,16 @@ const cells = [
 describe("sortForReport", () => {
   it("sorts by quality, highest first, then by tokens, lowest first", () => {
     expect(sortForReport(cells).map((c) => c.id)).toEqual(["best", "cheap", "base"]);
+  });
+
+  it("sorts cells with no quality, or no tokens at equal quality, after the others", () => {
+    const sorted = sortForReport([
+      cell("none", {}, { quality: null, tokensMean: 1 }),
+      cell("untokened", {}, { quality: 0.5, tokensMean: null }),
+      cell("tokened", {}, { quality: 0.5, tokensMean: 1 }),
+      cell("low", {}, { quality: 0.1, tokensMean: 1 }),
+    ]);
+    expect(sorted.map((c) => c.id)).toEqual(["tokened", "untokened", "low", "none"]);
   });
 });
 
@@ -79,6 +92,33 @@ describe("renderSweepMarkdown", () => {
 
   it("marks tokens that were estimated", () => {
     expect(markdown).toMatch(/200 \(est\.\)/);
+  });
+
+  it("shows n/a, not zero, for a component nothing judged", () => {
+    const row = renderSweepMarkdown(
+      [
+        cell(
+          "dry",
+          {},
+          { quality: null, grounding: null, groundingCases: 0, recall: null, tokensMean: null }
+        ),
+      ],
+      { split: "train", repeats: 1, dryRun: true }
+    )
+      .split("\n")
+      .find((line) => line.includes("| dry |"));
+    expect(row).toContain("| n/a | n/a (0) | n/a (0) | n/a |");
+  });
+
+  it("marks a token mean that covers only some cases as partial", () => {
+    const row = renderSweepMarkdown([cell("p", {}, { tokensPartial: true })], {
+      split: "train",
+      repeats: 1,
+      dryRun: false,
+    })
+      .split("\n")
+      .find((line) => line.includes("| p |"));
+    expect(row).toContain("(partial)");
   });
 });
 

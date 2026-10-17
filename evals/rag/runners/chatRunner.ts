@@ -157,6 +157,10 @@ export async function runChatEval(
       };
     },
   });
+  // Stub artifacts (dry runs, failed invocations) still record the overrides that were requested.
+  if (options.config.overrides) {
+    outcome.artifact.configOverrides ??= options.config.overrides;
+  }
   // Dry runs never reach the invoker: mark their stub so the retrieval-only metric set applies.
   if (options.dryRun && options.retrievalOnly) {
     return { ...outcome, artifact: { ...outcome.artifact, retrievalOnly: true } };
