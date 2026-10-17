@@ -10,11 +10,13 @@
  */
 
 import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
+import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { caseFileStem } from "./caseFile";
 import { mapWithConcurrency } from "./concurrency";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { appendHistory, HISTORY_DIR, historyFilePath } from "./history";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
 import {
@@ -110,6 +112,8 @@ interface CliOptions {
   /** Holdout promotion check: before/after EvalReport JSON paths */
   promotionCheckBefore?: string;
   promotionCheckAfter?: string;
+  /** Append the live run's report to evals/rag/history/<split>.jsonl (never on dry runs) */
+  appendHistory: boolean;
 }
 
 /**
@@ -193,6 +197,7 @@ const CLI_OPTIONS = {
   "score-judge-queue": { type: "string" },
   /** Takes two paths: `--promotion-check <before.json> <after.json>`. */
   "promotion-check": { type: "string" },
+  "append-history": { type: "boolean" },
   help: { type: "boolean", short: "h" },
 } as const satisfies NonNullable<ParseArgsConfig["options"]>;
 
@@ -284,6 +289,7 @@ function parseArgs(args: string[]): CliOptions {
     scoreJudgeQueue: values["score-judge-queue"],
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
+    appendHistory: values["append-history"] ?? false,
   };
 }
 
@@ -321,6 +327,8 @@ Options:
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
+  --append-history         After a live run, append the report to evals/rag/history/<split>.jsonl
+                           (off by default; never on dry runs; skipped when invocation errors occur)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -663,14 +671,15 @@ async function main(): Promise<void> {
 
   // Generate report
   const commitSha = await getCommitSha();
+  const useCaseByCase = new Map(
+    fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
+  );
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
-    useCaseByCase: new Map(
-      fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
-    ),
+    useCaseByCase,
   });
 
   console.log(formatReport(report));
@@ -680,6 +689,23 @@ async function main(): Promise<void> {
     mkdirSync(dirname(opts.output), { recursive: true });
     writeFileSync(opts.output, JSON.stringify(report, null, 2));
     console.log(`\nReport written to ${opts.output}`);
+  }
+
+  // History: live runs only. A run with invocation errors would record stub scores as metric
+  // failures, so it is not appended.
+  if (opts.appendHistory && !opts.dryRun) {
+    if (runtimeErrorCount === 0) {
+      const rows = appendHistory(HISTORY_DIR, report, {
+        split: opts.split,
+        runId: randomUUID(),
+        useCaseByCase,
+      });
+      console.log(
+        `History: ${rows} row(s) appended to ${historyFilePath(HISTORY_DIR, opts.split ?? report.split)}`
+      );
+    } else {
+      console.warn("History not appended: the run had invocation-layer errors.");
+    }
   }
 
   if (!opts.dryRun) {
