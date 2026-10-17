@@ -81,18 +81,47 @@ function normalizeForMatch(text: string): string {
     .trim();
 }
 
-/** Whole-phrase variations of a term: the term itself plus its explicit synonyms. */
+/**
+ * Whole-phrase variations of a term: the term itself, its explicit synonyms, and each of them with
+ * one adjacent pair of words joined ("feedforward network" for "feed forward network").
+ */
 function generateVariations(term: string): string[] {
-  return [...new Set(getAllVariations(term))];
+  const variations = [...new Set(getAllVariations(term))];
+  const joined: string[] = [];
+  for (const variation of variations) {
+    const words = variation.split(" ");
+    for (let i = 0; i < words.length - 1; i++) {
+      joined.push([...words.slice(0, i), words[i] + words[i + 1], ...words.slice(i + 2)].join(" "));
+    }
+  }
+  return [...new Set([...variations, ...joined])];
 }
 
 /**
- * Whether `phrase` (normalised) appears in the padded haystack as whole words. The last word may
- * take a plural ending ("routings" from "Routing's", "reflections"); nothing else is stemmed.
- * Apostrophes are already removed by normalizeForMatch.
+ * Singular forms of a needle's last word, for the "a neural network" / "neural networks" case.
+ * Words of four letters or fewer, and words ending in ss, us, is or os ("rectus", "analysis"),
+ * keep their s: it belongs to the stem.
+ */
+function singularForms(word: string): string[] {
+  if (word.length < 5 || /(?:ss|us|is|os)$/.test(word)) return [];
+  const forms: string[] = [];
+  if (word.endsWith("es")) forms.push(word.slice(0, -2));
+  if (word.endsWith("s")) forms.push(word.slice(0, -1));
+  return forms;
+}
+
+/**
+ * Whether `phrase` (normalised) appears in the padded haystack as whole words. The last word
+ * matches in either number: the needle's plural or singular form, with an optional "s" or "es" in
+ * the haystack. Apostrophes are already removed by normalizeForMatch ("Routing's" is "routings").
  */
 function hasWholePhrase(paddedHaystack: string, phrase: string): boolean {
-  return new RegExp(` ${phrase}(?:es|s)? `).test(paddedHaystack);
+  const words = phrase.split(" ");
+  const last = words.pop() ?? "";
+  if (last === "") return false;
+  const lastForms = [last, ...singularForms(last)].join("|");
+  const head = words.map((w) => `${w} `).join("");
+  return new RegExp(` ${head}(?:${lastForms})(?:es|s)? `).test(paddedHaystack);
 }
 
 /**

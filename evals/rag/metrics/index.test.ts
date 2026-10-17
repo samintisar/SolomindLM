@@ -115,6 +115,29 @@ describe("expectedItemRecall", () => {
   });
 });
 
+describe("plural and compound matching", () => {
+  const score = (items: string[], answer: string) =>
+    expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;
+
+  it("matches a singular answer to a plural item, and a plural answer to a singular item", () => {
+    expect(score(["neural networks"], "a neural network")).toBe(1);
+    expect(score(["neural network"], "neural networks")).toBe(1);
+    expect(score(["clinical trials"], "one clinical trial")).toBe(1);
+  });
+
+  it("does not strip the s from words whose s belongs to the stem", () => {
+    expect(score(["lateral rectus"], "lateral rectus muscle")).toBe(1);
+    // "analysis" keeps its s (it ends in "is"), so the plural "analyses" is not matched. This is
+    // a known gap, recorded here rather than stemmed around.
+    expect(score(["analysis"], "analyses were run")).toBe(0);
+  });
+
+  it("matches a hyphenated item written as one word in the answer", () => {
+    expect(score(["feed-forward network"], "feedforward network")).toBe(1);
+    expect(score(["multi-head attention"], "multihead attention")).toBe(1);
+  });
+});
+
 describe("retrieval metrics on the word 'agent'", () => {
   const agentOnly = [chunk("c1", "Each agent runs one step at a time.")];
 
