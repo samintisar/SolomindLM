@@ -84,7 +84,15 @@ jobs:
       # lets `eval:trend --check` compare tonight's run with earlier runs.
       - name: Restore eval history
         if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Read-only use of the token, env-scoped like the publish step: it is never written to
+          # .git/config or a remote URL.
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}"
           git fetch origin eval-history:refs/remotes/origin/eval-history 2>/dev/null && git checkout origin/eval-history -- evals/rag/history || echo "no eval-history branch yet"
 
       # The smoke split runs each fixture `repeats` times; a red run still appends its history rows.
