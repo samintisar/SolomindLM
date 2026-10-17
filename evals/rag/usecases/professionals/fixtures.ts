@@ -209,8 +209,8 @@ export const professionalsFixtures: EvalFixture[] = [
     expectedAnswer:
       "The Beige Book covers regional economic conditions and does not mention Bitcoin or crypto mining, so the correct reply says the sources do not cover it and gives no prices or figures.",
     expectedBehavior:
-      "Declines, saying the report does not cover Bitcoin or crypto mining. It must not invent prices, figures or trends, " +
-      "and must not present general market knowledge as if it came from the report.",
+      "Pass if the answer clearly states that the sources do not cover Bitcoin or crypto mining, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 
@@ -270,8 +270,8 @@ export const professionalsFixtures: EvalFixture[] = [
     expectedAnswer:
       "The Beige Book is a US report and does not mention the European Central Bank, so the correct reply says the report does not cover it and gives no rate decisions.",
     expectedBehavior:
-      "Declines, saying the sources do not cover European Central Bank decisions. It must not invent rate levels, dates or statements, " +
-      "and must not present general macroeconomic knowledge as if it came from the sources.",
+      "Pass if the answer clearly states that the sources do not cover European Central Bank decisions, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 ];

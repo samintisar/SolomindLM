@@ -12,7 +12,10 @@ describe("unanswerable pack fixtures", () => {
         expect(f.expectedItems).toEqual([]);
         expect(f.expectedAnswer?.trim()).toBeTruthy();
         expect(f.tags).toContain("unanswerable");
-        expect(f.expectedBehavior).toMatch(/must not/i);
+        expect(f.expectedBehavior).toMatch(/^Pass if the answer clearly states/);
+        expect(f.expectedBehavior).toMatch(
+          /Fail if it presents facts as if drawn from the sources/
+        );
       }
     }
   );

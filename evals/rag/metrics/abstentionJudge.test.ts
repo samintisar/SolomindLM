@@ -140,6 +140,46 @@ describe("scoreAbstentionJudgeMetrics", () => {
       sourceTexts: [{ fileName: "big.md", text: long }],
     });
     expect(prompts[0]).toContain("Source text (some documents cut off):");
-    expect(prompts[0]).toContain("Do not fail the check only because a value is missing");
+    expect(prompts[0]).toContain(
+      "Absence cannot be proven from a cut document; judge only what is shown."
+    );
+    expect(prompts[0]).not.toContain("Do not fail the check only because");
+  });
+
+  it("states the production standard for declines in the prompt", async () => {
+    const prompts: string[] = [];
+    await scoreAbstentionJudgeMetrics(unanswerable, artifact, {
+      invoke: async (prompt) => {
+        prompts.push(prompt);
+        return PASS;
+      },
+      model: "m",
+    });
+    expect(prompts[0]).toContain(
+      "Pass if the answer clearly states that the sources do not cover the question, and any additional content is explicitly labelled as general knowledge not from the sources."
+    );
+    expect(prompts[0]).toContain(
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap."
+    );
+  });
+
+  it("uses the abstention cut note for cut retrieved passages too", async () => {
+    const prompts: string[] = [];
+    const longChunk = { id: "c1", sourceTitle: "Long", content: "y".repeat(60_000) };
+    await scoreAbstentionJudgeMetrics(
+      unanswerable,
+      { ...artifact, selectedChunks: [longChunk] },
+      {
+        invoke: async (prompt) => {
+          prompts.push(prompt);
+          return PASS;
+        },
+        model: "m",
+      }
+    );
+    expect(prompts[0]).toContain(
+      "Absence cannot be proven from a cut document; judge only what is shown."
+    );
+    expect(prompts[0]).not.toContain("Do not fail the check only because");
   });
 });

@@ -217,8 +217,8 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     expectedAnswer:
       "The sources cover the heart, nerves and kidney, not immunisation, so the correct reply says the sources do not cover vaccine schedules and gives no doses or ages.",
     expectedBehavior:
-      "Declines, saying the sources do not cover vaccine schedules. It must not invent doses, ages or schedules, " +
-      "and must not present general medical knowledge as if it came from the sources.",
+      "Pass if the answer clearly states that the sources do not cover vaccine schedules, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 
@@ -273,8 +273,8 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     expectedAnswer:
       "The sources do not cover pneumonia or its treatment, so the correct reply says so and names no antibiotic or dose.",
     expectedBehavior:
-      "Declines, saying the sources do not cover pneumonia treatment. It must not name an antibiotic, dose or guideline, " +
-      "and must not present general medical knowledge as if it came from the sources.",
+      "Pass if the answer clearly states that the sources do not cover pneumonia treatment, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 ];
