@@ -73,6 +73,7 @@
     "eval:seed": "bun --env-file=.env run evals/rag/seed.ts",
     "eval:usecases": "bun --env-file=.env run evals/rag/cli.ts --use-case all --split smoke",
     "eval:usecases:dry": "bun run evals/rag/cli.ts --dry-run --use-case all",
+    "eval:sweep": "bun --env-file=.env run evals/rag/sweep.ts",
     "eval:rag:bootstrap-env": "node scripts/bootstrap-rag-eval-env.js",
     "eval:ragas": "conda run -n solomindlm-rag-evals python evals/ragas/run_ragas.py"
   },

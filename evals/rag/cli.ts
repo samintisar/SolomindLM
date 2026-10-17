@@ -41,6 +41,7 @@ import {
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { appendHistory, HISTORY_DIR, historyFilePath } from "./history";
 import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
+import { createLiveInvokers } from "./liveInvokers";
 import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
 import { scoreAllMetrics } from "./metrics/scorers";
 import {
@@ -64,13 +65,7 @@ import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import { formatJudgeCalibrationTable, scoreJudgeCalibration } from "./reports/judgeCalibration";
 import type { JudgeCalibrationItem } from "./reports/judgeQueue";
 import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
-import {
-  createConvexChatInvoker,
-  createConvexLiteratureReviewInvoker,
-  createConvexResearchInvoker,
-  createConvexStudioInvokers,
-  runEval,
-} from "./runners";
+import { runEval } from "./runners";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { LiteratureReviewInvoker } from "./runners/literatureReviewRunner";
@@ -91,7 +86,6 @@ import {
   type StudioRunnerKind,
 } from "./types";
 import { USE_CASE_PACKS } from "./usecases";
-import { createConvexSeedApi } from "./usecases/convexSeedApi";
 import { resolveUseCaseIds } from "./usecases/ids";
 import { requireEvalConvexEnv } from "./usecases/prodGuard";
 import {
@@ -722,11 +716,12 @@ async function main(): Promise<void> {
       process.exit(2);
     }
     console.log(`Using Convex at ${convexUrl} (eval mode)`);
-    chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
-    researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
-    literatureReviewInvoker = createConvexLiteratureReviewInvoker(convexUrl, { evalSecret });
-    studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
-    seedApi = createConvexSeedApi(convexUrl, evalSecret);
+    const live = createLiveInvokers(convexUrl, evalSecret);
+    chatInvoker = live.chatInvoker;
+    researchInvoker = live.researchInvoker;
+    literatureReviewInvoker = live.literatureReviewInvoker;
+    studioInvokers = live.studioInvokers;
+    seedApi = live.seedApi;
   }
 
   const allMetrics: MetricResult[] = [];
