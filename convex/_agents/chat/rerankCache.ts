@@ -88,6 +88,15 @@ function normalizeQuery(query: string): string {
   return query.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
+export interface CachedRerankOptions {
+  /**
+   * Call the uncached `rerankInternal` action instead of the cache. Same request, timeout and
+   * result mapping; the cache is neither read nor written. Evals use it so repeat runs are not
+   * served cached scores and do not warm the production cache.
+   */
+  bypassCache?: boolean;
+}
+
 /**
  * Cached reranking function with ID-based cache keys
  *
@@ -95,13 +104,15 @@ function normalizeQuery(query: string): string {
  * @param query - Search query
  * @param documents - Documents to rerank (with id and content)
  * @param topN - Number of top results to return
+ * @param options - See `CachedRerankOptions`
  * @returns Reranked results with original document IDs preserved
  */
 export async function cachedRerank(
   ctx: any,
   query: string,
   documents: RerankDocument[],
-  topN: number = 15
+  topN: number = 15,
+  options: CachedRerankOptions = {}
 ): Promise<RerankResult[]> {
   if (documents.length === 0) {
     return [];
@@ -125,15 +136,15 @@ export async function cachedRerank(
 
   // Call cached action with NORMALIZED query and documents content. The extra second lets the
   // action's own client timeout surface its error first; this is the backstop for a stalled action.
-  const results = await withTimeout(
-    rerankCache.fetch(ctx, {
-      query: normalizedQuery,
-      documents: sortedDocs.map((d) => d.content),
-      topN,
-    }),
-    RERANK_ACTION_BACKSTOP_MS,
-    "rerank"
-  );
+  const args = {
+    query: normalizedQuery,
+    documents: sortedDocs.map((d) => d.content),
+    topN,
+  };
+  const scores = options.bypassCache
+    ? ctx.runAction(internal._agents.chat.rerankCache.rerankInternal, args)
+    : rerankCache.fetch(ctx, args);
+  const results = await withTimeout(scores, RERANK_ACTION_BACKSTOP_MS, "rerank");
 
   // Handle null/undefined results
   if (!results || !Array.isArray(results)) {
