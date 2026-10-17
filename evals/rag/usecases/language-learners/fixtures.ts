@@ -272,6 +272,22 @@ export const languageLearnersFixtures: EvalFixture[] = [
     tags: tags("chat", "multi-turn", "follow-up"),
   },
 
+  {
+    ...base,
+    id: "language-learners/chat-answer-in-french",
+    split: "train",
+    runner: "chat",
+    question: "How do I form the passé composé with avoir? Give me one example.",
+    expectedItems: [],
+    expectedAnswer:
+      "Subject plus avoir in the present plus the past participle, for example « J'ai mangé » (I ate / I have eaten), explained in French.",
+    expectedBehavior:
+      "The whole answer is written in French, although the question is in English, because the notebook output language is French. " +
+      "The grammar is grounded in the notes and includes an example. An English answer fails this case; French grammar terms and example sentences are fine.",
+    chat: { outputLanguage: "fr" },
+    tags: tags("chat", "output-language", "grammar"),
+  },
+
   // ─── holdout (never tune against these) ───────────────────
   {
     ...base,

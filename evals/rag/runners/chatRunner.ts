@@ -1,5 +1,7 @@
+import { VALID_LANGUAGE_CODES } from "../../../convex/_agents/_shared/languageInstruction";
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
+import { AVAILABLE_SMART_MODEL_IDS } from "../../../convex/_lib/resolveSmartModel";
 import { inferSourceChannel } from "../metrics/sourceAware";
 import type { CallCounters, ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
 import { runWithHarness } from "./harness";
@@ -11,10 +13,19 @@ import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 // or CLI harness) provides an invoker that wraps the real agent
 // call and returns a structured result.
 
+/** Settings production passes the agent outside ChatAgentContext (ChatAgentOptions). */
+export interface EvalChatOptions {
+  smartModel?: string;
+  outputLanguage?: string;
+}
+
+export type ChatInvokeInput = ChatAgentContext & {
+  sourcePolicy?: import("../types").SourcePolicyConfig;
+  chatOptions?: EvalChatOptions;
+};
+
 export interface ChatAgentInvoker {
-  invoke(
-    context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }
-  ): Promise<{
+  invoke(context: ChatInvokeInput): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -51,6 +62,22 @@ function toChunkSnapshot(chunk: ReferenceChunk): ChunkSnapshot {
   };
 }
 
+/** Chat settings for a fixture. Notebook instructions make the mode custom, as in production. */
+function fixtureChatSettings(fixture: EvalFixture): NonNullable<ChatAgentContext["chatSettings"]> {
+  const instructions = fixture.chat?.instructions?.trim();
+  if (instructions) {
+    return {
+      instructionMode: "custom",
+      customInstructions: instructions,
+      responseLength: "default",
+    };
+  }
+  return {
+    instructionMode: fixture.chatSettings?.instructionMode ?? "default",
+    responseLength: "default",
+  };
+}
+
 function validateFixture(fixture: EvalFixture): string[] {
   const errors: string[] = [];
 
@@ -73,6 +100,22 @@ function validateFixture(fixture: EvalFixture): string[] {
     if (!turn.content?.trim()) {
       errors.push("turns must have non-empty content");
     }
+  }
+
+  const chat = fixture.chat;
+  if (chat?.instructions?.trim() && fixture.chatSettings?.instructionMode === "learningGuide") {
+    errors.push(
+      "chat.instructions cannot be combined with chatSettings.instructionMode learningGuide"
+    );
+  }
+  if (
+    chat?.smartModel &&
+    !(AVAILABLE_SMART_MODEL_IDS as readonly string[]).includes(chat.smartModel)
+  ) {
+    errors.push(`chat.smartModel "${chat.smartModel}" is not a listed model`);
+  }
+  if (chat?.outputLanguage && !VALID_LANGUAGE_CODES.includes(chat.outputLanguage)) {
+    errors.push(`chat.outputLanguage "${chat.outputLanguage}" is not a supported language code`);
   }
 
   return errors;
@@ -111,9 +154,10 @@ export async function runChatEval(
         documentIds: fixture.documentIds,
         sourcePolicy: fixture.sourcePolicy,
         ...(options.retrievalOnly ? { evalRetrievalOnly: true } : {}),
-        chatSettings: {
-          instructionMode: fixture.chatSettings?.instructionMode ?? "default",
-          responseLength: "default",
+        chatSettings: fixtureChatSettings(fixture),
+        chatOptions: {
+          smartModel: fixture.chat?.smartModel,
+          outputLanguage: fixture.chat?.outputLanguage,
         },
       });
 

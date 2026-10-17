@@ -52,6 +52,32 @@ describe("chatEvalArgsFor", () => {
     ).toEqual({ instructionMode: "default" });
   });
 
+  it("sends custom instructions as notebookInstructions, not as a chat mode", () => {
+    const args = chatEvalArgsFor(
+      context({
+        chatSettings: {
+          instructionMode: "custom",
+          customInstructions: "Answer as a tutor.",
+          responseLength: "default",
+        },
+      }),
+      "s"
+    );
+    expect(args.notebookInstructions).toBe("Answer as a tutor.");
+    expect(args.chatSettings).toEqual({ instructionMode: "default" });
+  });
+
+  it("sends the smart model and output language from the chat options", () => {
+    const args = chatEvalArgsFor(
+      {
+        ...context({}),
+        chatOptions: { smartModel: "zai-org/GLM-5.3-Flash", outputLanguage: "fr" },
+      },
+      "s"
+    );
+    expect(args).toMatchObject({ smartModel: "zai-org/GLM-5.3-Flash", outputLanguage: "fr" });
+  });
+
   it("rejects a history turn whose role is not user or assistant", () => {
     expect(() =>
       chatEvalArgsFor(

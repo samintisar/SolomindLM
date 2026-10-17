@@ -13,9 +13,9 @@ describe("language-learners pack", () => {
     expect(validatePack(registered)).toEqual([]);
   });
 
-  it("has 2 smoke, 10 train and 4 holdout fixtures", () => {
+  it("has 2 smoke, 11 train and 4 holdout fixtures", () => {
     const count = (split: EvalSplit) => fixtures.filter((f) => f.split === split).length;
-    expect([count("smoke"), count("train"), count("holdout")]).toEqual([2, 10, 4]);
+    expect([count("smoke"), count("train"), count("holdout")]).toEqual([2, 11, 4]);
   });
 
   it("has four multi-turn chat fixtures, two per instruction mode", () => {
@@ -25,6 +25,11 @@ describe("language-learners pack", () => {
     expect(multiTurn).toHaveLength(4);
     expect(modes.filter((m) => m === "learningGuide")).toHaveLength(2);
     expect(modes.filter((m) => m === "default")).toHaveLength(2);
+  });
+
+  it("has one train chat fixture that requires French output", () => {
+    const french = fixtures.filter((f) => f.chat?.outputLanguage === "fr");
+    expect(french.map((f) => [f.split, f.runner])).toEqual([["train", "chat"]]);
   });
 
   it("exercises every feature (written questions at least once, the rest at least twice)", () => {
