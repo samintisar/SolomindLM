@@ -161,6 +161,12 @@ export interface EvalFixture {
    * (`_streamChatResponse.ts`); `question` stays the final user turn. Only learning guide mode uses it.
    */
   turns?: Array<{ role: "user" | "assistant"; content: string }>;
+  /**
+   * Alternative phrasings of `question`, the same question as a user would type it. Each runs as its
+   * own artifact (`<id>--p1`, ...) and `paraphrase_consistency` checks the verdicts agree with the base.
+   * Variants are not judge calibration items: they share evidence with the base.
+   */
+  variants?: string[];
   /** Chat settings the agent runs with (production `chatSettings`); default when unset. */
   chatSettings?: {
     instructionMode?: "default" | "learningGuide";

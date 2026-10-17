@@ -14,7 +14,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { caseFileStem } from "./caseFile";
 import { mapWithConcurrency } from "./concurrency";
-import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { getFixture, listFixtureIds, withParaphrases, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
 import {
@@ -575,14 +575,17 @@ async function main(): Promise<void> {
     if (opts.smartLlm) {
       fixture.studioParams = { ...fixture.studioParams, smartLlm: opts.smartLlm };
     }
-    if (opts.sourceMatrix) {
-      const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
-      const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
-        channels: parseEvalSourceChannels(combo.split("+").map((channel) => channel.trim())),
-      }));
-      expandedFixtures.push(...withSourceMatrix(fixture, matrix));
-    } else {
-      expandedFixtures.push(fixture);
+    // Paraphrases: the base question and each `variants` phrasing run as their own artifacts.
+    for (const phrased of withParaphrases(fixture)) {
+      if (opts.sourceMatrix) {
+        const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
+        const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
+          channels: parseEvalSourceChannels(combo.split("+").map((channel) => channel.trim())),
+        }));
+        expandedFixtures.push(...withSourceMatrix(phrased, matrix));
+      } else {
+        expandedFixtures.push(phrased);
+      }
     }
   }
 

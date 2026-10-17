@@ -85,6 +85,8 @@ function classifyFailure(metric: MetricResult): FailureCategory {
   if (metric.metric === "citation_validity") return "citation";
   if (metric.metric === "latency_cost_budget") return "latency_cost";
   if (metric.metric === "expected_item_recall") return "retrieval";
+  // The same question answered differently in other words: the answer prompt or its grounding.
+  if (metric.metric === "paraphrase_consistency") return "prompt_answering";
 
   return "prompt_answering";
 }
