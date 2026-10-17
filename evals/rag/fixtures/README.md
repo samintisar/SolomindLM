@@ -192,6 +192,15 @@ bun run eval:rag -- --case agentic-patterns-20
 bun run eval:literature-review
 ```
 
+## Nightly
+
+[`.github/workflows/eval-nightly.yml`](../../../.github/workflows/eval-nightly.yml) runs the smoke split
+(3 repeats by default, `workflow_dispatch` takes `repeats`), the use-case packs, and `eval:trend --check`
+every night at 03:17 UTC. It needs three repo secrets: `RAG_EVAL_CONVEX_URL`, `RAG_EVAL_SECRET` and
+`TOGETHER_AI_API_KEY`. Without them the job logs a notice and does nothing. Reports and artifacts are
+uploaded for 30 days, and the rows it appends to [`history/`](history/README.md) are committed back to
+`main`. PR CI stays dry-run only.
+
 ## Suggested Fixtures for Machine Learning Notebook
 
 Based on the ML notebook, consider these scenarios:
