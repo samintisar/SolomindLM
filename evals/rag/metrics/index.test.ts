@@ -65,16 +65,51 @@ describe("expectedItemRecall", () => {
     expect(result.score).toBe(1);
   });
 
-  it("keeps the explicit 'tool calling' synonym for 'tool use'", () => {
-    const answer = ALL_VERBATIM.replace("- tool use", "- tool calling");
-    const result = expectedItemRecall(fixture, artifact({ answer }));
-    expect(result.score).toBe(1);
+  it("matches 'tool use' through its own synonyms", () => {
+    const score = (items: string[], answer: string) =>
+      expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;
+    expect(score(["tool use"], "The agent uses tool calling.")).toBe(1);
+    expect(score(["tool use"], "It relies on function calling.")).toBe(1);
+    expect(score(["tool use"], "A router picks the route.")).toBe(0);
+    expect(score(["routing"], "Agents use tool use to act.")).toBe(0);
+  });
+
+  it("does not let one item's synonyms credit another item", () => {
+    const pairs: string[] = [];
+    for (const i of AGENTIC_20_ITEMS) {
+      for (const j of AGENTIC_20_ITEMS) {
+        if (i === j) continue;
+        const result = expectedItemRecall(
+          { ...fixture, expectedItems: [i] },
+          artifact({ answer: j })
+        );
+        if (result.score !== 0) pairs.push(`${i} <- ${j}`);
+      }
+    }
+    expect(pairs).toEqual([]);
+  });
+
+  it("matches a plural or possessive of the item's last word", () => {
+    const score = (items: string[], answer: string) =>
+      expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;
+    expect(score(["routing"], "Routing's role is to pick the path.")).toBe(1);
+    expect(score(["reflection"], "Several reflections improve the output.")).toBe(1);
+    expect(score(["guardrails and safety patterns"], "Add a guardrail before the tool.")).toBe(1);
+  });
+
+  it("does not credit a multi-word item on generic pattern prose", () => {
+    const score = (items: string[], answer: string) =>
+      expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;
+    expect(score(["reasoning techniques"], "Various techniques; reasoning is hard")).toBe(0);
+    expect(
+      score(["guardrails and safety patterns"], "These design patterns matter for safety")
+    ).toBe(0);
   });
 
   it("does not match a multi-word item on a substring of a word", () => {
     const result = expectedItemRecall(
       fixture,
-      artifact({ answer: "Multi-agents collaborate through inter-agents communications." })
+      artifact({ answer: "Multi-agentic systems use interagentic messaging." })
     );
     expect(result.score).toBe(0);
   });

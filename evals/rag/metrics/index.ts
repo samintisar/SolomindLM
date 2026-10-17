@@ -20,60 +20,55 @@ import { metricResult } from "./metricResult";
  * Maps canonical names to alternative names the LLM might use.
  */
 const SYNONYM_MAPPINGS: Record<string, string[]> = {
-  routing: ["tool selection", "tool use", "router", "routing", "intelligent routing"],
-  parallelization: ["parallel workers", "parallel", "parallelization", "multi-worker"],
-  "learning and adaptation": ["feedback loop", "adaptation", "continuous improvement"],
+  routing: ["tool selection", "router", "routing", "intelligent routing"],
+  parallelization: ["parallel workers", "parallelization", "multi-worker"],
+  "learning and adaptation": ["adaptation", "continuous improvement"],
   "resource-aware optimization": [
     "resource aware",
     "resource optimization",
     "routing by complexity",
   ],
   prioritization: ["task scoring", "triage", "task prioritization"],
-  "multi-agent collaboration": [
-    "multi agent",
-    "multi-agent",
-    "agent collaboration",
-    "orchestration",
-  ],
-  "memory management": ["long-term memory", "memory systems"],
+  "multi-agent collaboration": ["multi agent", "multi-agent", "agent collaboration"],
+  "memory management": ["memory systems"],
   "human in the loop": ["human in the loop", "human-in-the-loop", "human intervention", "hitl"],
-  "guardrails and safety patterns": ["guardrails", "safety patterns"],
+  "guardrails and safety patterns": ["guardrails", "guardrail", "safety patterns"],
   "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals"],
   "exception handling and recovery": ["exception handling", "error handling"],
-  "knowledge retrieval": ["rag", "context retrieval"],
-  "inter-agent communication": ["agent communication", "messaging"],
+  "knowledge retrieval": ["retrieval augmented generation", "context retrieval"],
+  "inter-agent communication": ["agent communication"],
   "reasoning techniques": ["tree of thought"],
   "tool use": ["tool calling", "function calling"],
-  planning: ["step-by-step"],
   reflection: ["critique", "self-reflection"],
-  "prompt chaining": ["prompt chaining", "chaining"],
 };
 
-/** Words that never count toward the "two significant words" rule for multi-word items. */
+/** Words that never count toward the "significant words" rule for multi-word items. */
 const STOPWORDS = new Set(["and", "the", "with", "for", "from", "into"]);
 
 /**
- * Get all possible names for a canonical term (including the term itself).
+ * Words too common in pattern prose to count as evidence for an item: every answer about "the
+ * 20 patterns" says "patterns", so "reasoning techniques" must not be credited by it.
+ */
+const COMMON_ITEM_WORDS = new Set([
+  "patterns",
+  "techniques",
+  "agent",
+  "agents",
+  "management",
+  "systems",
+  "based",
+]);
+
+/**
+ * The canonical name's variations: the term itself plus the synonyms listed under that exact
+ * canonical key. Another item's synonym list is never consulted.
  */
 function getAllVariations(term: string): string[] {
   const normalized = normalizeForMatch(term);
-  const variations = [normalized];
-
-  // Check if term has synonym mappings
-  for (const [canonical, synonyms] of Object.entries(SYNONYM_MAPPINGS)) {
-    if (
-      normalized === normalizeForMatch(canonical) ||
-      synonyms.some((s) => normalizeForMatch(s) === normalized)
-    ) {
-      // Add all synonyms
-      for (const synonym of synonyms) {
-        variations.push(normalizeForMatch(synonym));
-      }
-      break;
-    }
-  }
-
-  return variations;
+  const entry = Object.entries(SYNONYM_MAPPINGS).find(
+    ([canonical]) => normalizeForMatch(canonical) === normalized
+  );
+  return [normalized, ...(entry ? entry[1].map(normalizeForMatch) : [])];
 }
 
 /** Normalize text for matching: lowercase, remove special chars, normalize spaces */
@@ -92,15 +87,25 @@ function generateVariations(term: string): string[] {
 }
 
 /**
+ * Whether `phrase` (normalised) appears in the padded haystack as whole words. The last word may
+ * take a plural ending ("routings" from "Routing's", "reflections"); nothing else is stemmed.
+ * Apostrophes are already removed by normalizeForMatch.
+ */
+function hasWholePhrase(paddedHaystack: string, phrase: string): boolean {
+  return new RegExp(` ${phrase}(?:es|s)? `).test(paddedHaystack);
+}
+
+/**
  * Whether `needle` is found in `haystack` on word boundaries. A multi-word needle matches when
- * its whole phrase or an explicit synonym appears, or when at least two of its significant words
- * (4+ chars, not stopwords) each appear as whole words. A single-word needle matches only as itself.
+ * its whole phrase or an explicit synonym appears, or on its significant words (4+ chars, not
+ * stopwords or COMMON_ITEM_WORDS): all of them when there are two, at least two when there are
+ * three or more. An item with fewer than two significant words matches only by phrase or synonym.
+ * A single-word needle matches only as itself or a synonym.
  */
 function containsFuzzy(haystack: string, needle: string): boolean {
   const paddedHaystack = ` ${normalizeForMatch(haystack)} `;
-  const hasWord = (phrase: string): boolean => paddedHaystack.includes(` ${phrase} `);
 
-  if (generateVariations(needle).some(hasWord)) {
+  if (generateVariations(needle).some((v) => hasWholePhrase(paddedHaystack, v))) {
     return true;
   }
 
@@ -108,11 +113,16 @@ function containsFuzzy(haystack: string, needle: string): boolean {
   if (words.length < 2) {
     return false;
   }
-  const significant = new Set(words.filter((w) => w.length >= 4 && !STOPWORDS.has(w)));
-  let found = 0;
-  for (const word of significant) {
-    if (hasWord(word)) found++;
+  const significant = [
+    ...new Set(
+      words.filter((w) => w.length >= 4 && !STOPWORDS.has(w) && !COMMON_ITEM_WORDS.has(w))
+    ),
+  ];
+  if (significant.length < 2) {
+    return false;
   }
+  // Two significant words: both must appear. Three or more: at least two.
+  const found = significant.filter((w) => hasWholePhrase(paddedHaystack, w)).length;
   return found >= 2;
 }
 
