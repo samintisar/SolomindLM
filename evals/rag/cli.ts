@@ -554,7 +554,8 @@ async function main(): Promise<void> {
   let packSourceTexts = new Map<string, SourceText[]>();
   if (expandedFixtures.some((f) => f.useCase)) {
     console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
-    if (!opts.dryRun && !process.env.TOGETHER_AI_API_KEY?.trim()) {
+    // Retrieval-only runs run no judges, so they need no key.
+    if (!opts.dryRun && !opts.retrievalOnly && !process.env.TOGETHER_AI_API_KEY?.trim()) {
       console.error(
         "Use-case packs are scored by rubric judges: set TOGETHER_AI_API_KEY (repo-root .env)."
       );
@@ -683,6 +684,7 @@ async function main(): Promise<void> {
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
+    retrievalOnly: allArtifacts.some((a) => a.retrievalOnly === true),
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
     useCaseByCase: new Map(
@@ -711,7 +713,8 @@ Judge tokens: ${usage.calls} calls, ${usage.promptTokens} prompt ` +
           `(${usage.cachedPromptTokens} cached, ${cachedShare}%), ${usage.completionTokens} completion`
       );
     }
-    const queue = buildJudgeCalibrationQueue(allMetrics, { limit: 20 });
+    // Retrieval-only runs have no judge verdicts to calibrate, so they write no queue.
+    const queue = opts.retrievalOnly ? [] : buildJudgeCalibrationQueue(allMetrics, { limit: 20 });
     if (queue.length > 0) {
       const queuePath = join("evals/rag/generated", "judge-queue.json");
       mkdirSync(dirname(queuePath), { recursive: true });

@@ -333,6 +333,8 @@ export interface EvalReport {
   failureGroups: FailureGroup[];
   /** Per use-case pack × runner pass rates (only when pack fixtures ran) */
   scorecard?: Scorecard;
+  /** Set when any artifact was a retrieval-only run: no answers were generated, so answer metrics are absent */
+  retrievalOnly?: boolean;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */

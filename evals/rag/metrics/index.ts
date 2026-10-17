@@ -817,6 +817,19 @@ export function latencyCostBudget(
   // Estimated usage (chars/4) is not a provider count, so tokens are reported but never gated.
   const providerTokens = artifact.tokenUsageSource === "provider";
 
+  if (baseline && artifact.retrievalOnly) {
+    // A retrieval-only run times retrieval alone; a full-run baseline would always look like a fail.
+    return metricResult(
+      "latency_cost_budget",
+      fixture,
+      artifact,
+      "info",
+      1,
+      "retrieval-only: not compared to a full-run baseline",
+      { latencyMs, totalTokens, retrievalOnly: true }
+    );
+  }
+
   if (baseline) {
     const latencyRatio = latencyMs / baseline.latencyMs;
     const baselineTokens = baseline.tokenUsage.total;
