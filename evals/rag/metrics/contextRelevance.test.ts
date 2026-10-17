@@ -92,27 +92,53 @@ describe("scoreContextRelevance", () => {
     expect(invoke).toHaveBeenCalledTimes(1);
   });
 
-  it("lists each selected chunk as [id] followed by its first 600 characters", async () => {
+  it("lists each selected chunk as [id] followed by the first 1200 characters of its content", async () => {
     clearContextRelevanceCache();
-    const long = "x".repeat(CONTEXT_RELEVANCE_CHUNK_CHARS + 50);
+    const long = `${"x".repeat(CONTEXT_RELEVANCE_CHUNK_CHARS)}TAIL`;
     const invoke = stub(reply([]));
-    await scoreContextRelevance(fixture(), artifact({ selectedChunks: [chunk("9", long)] }), {
-      invoke,
-      model: "judge",
-    });
+    await scoreContextRelevance(
+      fixture(),
+      artifact({
+        selectedChunks: [{ id: "9", sourceTitle: "s", content: long, contextText: "PREVIEW ..." }],
+      }),
+      { invoke, model: "judge" }
+    );
     const prompt = invoke.mock.calls[0][0];
     expect(prompt).toContain(`[9] ${"x".repeat(CONTEXT_RELEVANCE_CHUNK_CHARS)}`);
-    expect(prompt).not.toContain("x".repeat(CONTEXT_RELEVANCE_CHUNK_CHARS + 1));
+    expect(prompt).not.toContain("TAIL");
+    expect(prompt).not.toContain("PREVIEW");
     expect(prompt).toContain(fixture().question);
   });
 
-  it("caches by question and chunk ids, so a repeat does not pay for the judge again", async () => {
+  it("caches so a repeat with the same chunks does not pay for the judge again", async () => {
     clearContextRelevanceCache();
     const invoke = stub(reply(["2"]));
     const first = await scoreContextRelevance(fixture(), artifact(), { invoke, model: "judge" });
     const second = await scoreContextRelevance(fixture(), artifact(), { invoke, model: "judge" });
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(second).toEqual(first);
+  });
+
+  it("does not reuse a verdict when the same ids hold different content", async () => {
+    clearContextRelevanceCache();
+    const invoke = stub(reply(["1"]));
+    await scoreContextRelevance(fixture(), artifact(), { invoke, model: "judge" });
+    const otherContent = FOUR.map((c, i) =>
+      i === 0 ? { ...c, content: "A different passage that happens to sit at id 1." } : c
+    );
+    await scoreContextRelevance(fixture(), artifact({ selectedChunks: otherContent }), {
+      invoke,
+      model: "judge",
+    });
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reuse a verdict across judge models", async () => {
+    clearContextRelevanceCache();
+    const invoke = stub(reply(["1"]));
+    await scoreContextRelevance(fixture(), artifact(), { invoke, model: "judge-a" });
+    await scoreContextRelevance(fixture(), artifact(), { invoke, model: "judge-b" });
+    expect(invoke).toHaveBeenCalledTimes(2);
   });
 
   it("does not reuse a verdict for a different question", async () => {

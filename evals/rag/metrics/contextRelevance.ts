@@ -10,8 +10,11 @@ import type { ChunkSnapshot, EvalFixture, EvalRunArtifact, MetricResult } from "
 import type { LlmJudgeOptions } from "./llmJudge";
 import { metricResult } from "./metricResult";
 
-/** Characters of each passage the judge reads: enough to tell what a passage is about. */
-export const CONTEXT_RELEVANCE_CHUNK_CHARS = 600;
+/**
+ * Characters of each chunk's own `content` the judge reads. `content` (not `contextText`, whose
+ * start is the previous neighbour's preview) so the judge sees the passage it is judging.
+ */
+export const CONTEXT_RELEVANCE_CHUNK_CHARS = 1200;
 
 export interface ContextRelevanceOptions {
   invoke: NonNullable<LlmJudgeOptions["invoke"]>;
@@ -34,15 +37,19 @@ export function clearContextRelevanceCache(): void {
 /** The text a judge reads for a chunk: the passage as the model was shown it. */
 const passageText = (chunk: ChunkSnapshot): string => chunk.contextText ?? chunk.content;
 
-function cacheKey(question: string, chunkIds: string[]): string {
-  return createHash("sha1")
-    .update(`${question}\n${chunkIds.join("\n")}`)
-    .digest("hex");
+/**
+ * Chunk ids are positional ("1".."N") and mean nothing across questions, so the key covers the
+ * judge model, the question, and each chunk's id and text. A verdict is only reused when all of
+ * them match.
+ */
+function cacheKey(model: string, question: string, chunks: ChunkSnapshot[]): string {
+  const body = chunks.map((c) => `${c.id}\u001f${passageText(c)}`).join("\u001e");
+  return createHash("sha1").update(`${model}\u001d${question}\u001d${body}`).digest("hex");
 }
 
 function contextRelevancePrompt(question: string, chunks: ChunkSnapshot[]): string {
   const passages = chunks
-    .map((c) => `[${c.id}] ${passageText(c).slice(0, CONTEXT_RELEVANCE_CHUNK_CHARS)}`)
+    .map((c) => `[${c.id}] ${c.content.slice(0, CONTEXT_RELEVANCE_CHUNK_CHARS)}`)
     .join("\n\n");
   return `You are checking which retrieved passages a question needs.
 
@@ -129,7 +136,7 @@ export async function scoreContextRelevance(
 
   const chunks = artifact.selectedChunks;
   const chunkIds = chunks.map((c) => c.id);
-  const key = cacheKey(fixture.question, chunkIds);
+  const key = cacheKey(options.model, fixture.question, chunks);
 
   let verdict = verdictCache.get(key);
   if (!verdict) {
