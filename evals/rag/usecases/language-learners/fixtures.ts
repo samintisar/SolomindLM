@@ -200,14 +200,14 @@ export const languageLearnersFixtures: EvalFixture[] = [
     id: "language-learners/chat-followup-etre-examples",
     split: "train",
     runner: "chat",
-    question: "Give me two more examples of that.",
+    question: "What are two more examples of that from my notes?",
     turns: [
       { role: "user", content: "Which verbs take être in the passé composé?" },
       {
         role: "assistant",
         content:
           "Many intransitive verbs of coming and going take être, for example aller (to go): je suis allé(e). " +
-          "Can you think of another verb of movement that might take être?",
+          "Other verbs of movement follow the same pattern.",
       },
     ],
     chatSettings: { instructionMode: "learningGuide" },
@@ -226,14 +226,14 @@ export const languageLearnersFixtures: EvalFixture[] = [
     id: "language-learners/chat-followup-possessive-examples",
     split: "train",
     runner: "chat",
-    question: "Give me two more examples of that rule.",
+    question: "What are two more examples of that rule from my notes?",
     turns: [
       { role: "user", content: "How do ma, ta and sa change before a vowel?" },
       {
         role: "assistant",
         content:
           "Before a feminine noun that starts with a vowel sound, ma, ta and sa become mon, ton and son, as in 'mon amie'. " +
-          "Can you think of another feminine noun that starts with a vowel?",
+          "This is the liaison rule for possessive determiners.",
       },
     ],
     chatSettings: { instructionMode: "learningGuide" },
