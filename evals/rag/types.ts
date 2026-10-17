@@ -171,6 +171,16 @@ export interface EvalFixture {
   chatSettings?: {
     instructionMode?: "default" | "learningGuide";
   };
+  /**
+   * Production settings the chat eval passes the agent (chat only). `smartModel` must be a listed
+   * model id, `outputLanguage` a supported code (`convex/_agents/_shared/languageInstruction.ts`).
+   * `instructions` are the notebook's custom instructions (custom mode); they cannot be combined with learning guide mode.
+   */
+  chat?: {
+    smartModel?: string;
+    outputLanguage?: string;
+    instructions?: string;
+  };
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────

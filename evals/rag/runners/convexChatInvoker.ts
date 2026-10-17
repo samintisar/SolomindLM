@@ -11,7 +11,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { EvalHistoryTurn } from "../../../convex/eval/chatEvalAction";
 import { toEvalSourcePolicy } from "../sourceChannels";
-import type { ChatAgentInvoker } from "./chatRunner";
+import type { ChatAgentInvoker, EvalChatOptions } from "./chatRunner";
 
 export interface ConvexChatInvokerOptions {
   evalSecret: string;
@@ -28,16 +28,19 @@ function toEvalTurn(turn: { role: string; content: string }): EvalHistoryTurn {
  * Arguments for `api.eval.chatEvalAction.runChatEval`. The last context message is the question;
  * the messages before it are the prior conversation.
  */
-export function chatEvalArgsFor(context: ChatAgentContext, evalSecret: string) {
+export function chatEvalArgsFor(
+  context: ChatAgentContext & { chatOptions?: EvalChatOptions },
+  evalSecret: string
+) {
   const turns = context.conversationHistory;
   const lastMessage = turns[turns.length - 1];
   if (!lastMessage?.content) {
     throw new Error("No user message in conversation history");
   }
   const mode = context.chatSettings?.instructionMode ?? "default";
-  if (mode === "custom") {
-    throw new Error("The chat eval action does not support custom instructions yet.");
-  }
+  // Custom mode is the notebook's custom instructions; the action takes them as notebookInstructions.
+  const notebookInstructions =
+    mode === "custom" ? context.chatSettings?.customInstructions : undefined;
   return {
     evalSecret,
     question: lastMessage.content,
@@ -45,6 +48,9 @@ export function chatEvalArgsFor(context: ChatAgentContext, evalSecret: string) {
     chatSettings: {
       instructionMode: mode === "learningGuide" ? ("learningGuide" as const) : ("default" as const),
     },
+    notebookInstructions,
+    smartModel: context.chatOptions?.smartModel,
+    outputLanguage: context.chatOptions?.outputLanguage,
   };
 }
 
