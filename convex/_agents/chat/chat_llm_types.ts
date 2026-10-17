@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { TurnTelemetry } from "../_shared/tokenUsageAccumulator.js";
+import type { FewShotPolicy } from "./chatConfigOverrides.js";
 
 /**
  * Structured chat response with citations.
@@ -60,6 +61,8 @@ export interface LLMWrapperConfig {
   outputLanguage?: string;
   /** Turn telemetry this wrapper records into. Omitted: the wrapper keeps its own. */
   telemetry?: TurnTelemetry;
+  /** When the system prompt carries the few-shot block. Omitted: "history-or-complex" (production). */
+  fewShotPolicy?: FewShotPolicy;
 }
 
 /**
