@@ -23,6 +23,19 @@ type MapResultLike = {
   tokenUsage?: TokenUsage;
 };
 
+/**
+ * The usage shape the stored job telemetry validators accept: the cache count is carried only when
+ * the provider reported it, so a stored row never gets a field its validator does not list.
+ */
+function toStoredUsage(usage: TokenUsage): TokenUsage {
+  return {
+    prompt: usage.prompt,
+    completion: usage.completion,
+    total: usage.total,
+    ...(usage.cachedPrompt !== undefined ? { cachedPrompt: usage.cachedPrompt } : {}),
+  };
+}
+
 function parseTokenUsage(value: unknown): TokenUsage | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -39,7 +52,13 @@ function parseTokenUsage(value: unknown): TokenUsage | undefined {
   ) {
     return undefined;
   }
-  return { prompt, completion, total };
+  const cachedPrompt = record.cachedPrompt;
+  return toStoredUsage({
+    prompt,
+    completion,
+    total,
+    ...(typeof cachedPrompt === "number" ? { cachedPrompt } : {}),
+  });
 }
 
 function parseMapResult(raw: unknown): MapResultLike {
@@ -86,7 +105,7 @@ export function aggregateStudioJobTelemetry(input: {
 
   const reduceUsage =
     input.reduce?.tokenUsage !== undefined && input.reduce.tokenUsage.total > 0
-      ? input.reduce.tokenUsage
+      ? toStoredUsage(input.reduce.tokenUsage)
       : undefined;
 
   const stageSpans: StudioStageSpan[] = [];
@@ -101,7 +120,13 @@ export function aggregateStudioJobTelemetry(input: {
     );
   }
   if (input.extraSpans) {
-    stageSpans.push(...input.extraSpans);
+    stageSpans.push(
+      ...input.extraSpans.map((span) =>
+        span.tokenUsage !== undefined
+          ? { ...span, tokenUsage: toStoredUsage(span.tokenUsage) }
+          : span
+      )
+    );
   }
 
   const tokenUsage = addTokenUsage(mapUsageOrUndefined, reduceUsage);
