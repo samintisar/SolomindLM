@@ -22,39 +22,35 @@ import { metricResult } from "./metricResult";
 const SYNONYM_MAPPINGS: Record<string, string[]> = {
   routing: ["tool selection", "tool use", "router", "routing", "intelligent routing"],
   parallelization: ["parallel workers", "parallel", "parallelization", "multi-worker"],
-  "learning and adaptation": ["feedback loop", "adaptation", "learning", "continuous improvement"],
+  "learning and adaptation": ["feedback loop", "adaptation", "continuous improvement"],
   "resource-aware optimization": [
     "resource aware",
     "resource optimization",
     "routing by complexity",
   ],
-  prioritization: ["task scoring", "triage", "priority", "task prioritization", "scoring"],
+  prioritization: ["task scoring", "triage", "task prioritization"],
   "multi-agent collaboration": [
     "multi agent",
     "multi-agent",
     "agent collaboration",
     "orchestration",
   ],
-  "memory management": ["memory", "long-term memory", "memory systems"],
+  "memory management": ["long-term memory", "memory systems"],
   "human in the loop": ["human in the loop", "human-in-the-loop", "human intervention", "hitl"],
-  "guardrails and safety patterns": ["guardrails", "safety", "safety patterns", "security"],
-  "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals", "planning"],
-  "exception handling and recovery": [
-    "exception handling",
-    "error handling",
-    "recovery",
-    "fallback",
-  ],
-  "knowledge retrieval": ["retrieval", "knowledge", "rag", "context retrieval"],
-  "inter-agent communication": ["communication", "agent communication", "messaging"],
-  "reasoning techniques": ["reasoning", "tree of thought", "branching", "to"],
-  "evaluation and monitoring": ["evaluation", "monitoring", "testing", "metrics"],
-  "exploration and discovery": ["exploration", "discovery", "research"],
-  "tool use": ["tool", "tools", "tool calling", "function calling"],
-  planning: ["planning", "plan", "step-by-step", "sequential"],
-  reflection: ["reflection", "critique", "self-reflection", "review"],
-  "prompt chaining": ["prompt chaining", "chaining", "chain"],
+  "guardrails and safety patterns": ["guardrails", "safety patterns"],
+  "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals"],
+  "exception handling and recovery": ["exception handling", "error handling"],
+  "knowledge retrieval": ["rag", "context retrieval"],
+  "inter-agent communication": ["agent communication", "messaging"],
+  "reasoning techniques": ["tree of thought"],
+  "tool use": ["tool calling", "function calling"],
+  planning: ["step-by-step"],
+  reflection: ["critique", "self-reflection"],
+  "prompt chaining": ["prompt chaining", "chaining"],
 };
+
+/** Words that never count toward the "two significant words" rule for multi-word items. */
+const STOPWORDS = new Set(["and", "the", "with", "for", "from", "into"]);
 
 /**
  * Get all possible names for a canonical term (including the term itself).
@@ -90,42 +86,34 @@ function normalizeForMatch(text: string): string {
     .trim();
 }
 
-/** Generate variations of a term for fuzzy matching */
+/** Whole-phrase variations of a term: the term itself plus its explicit synonyms. */
 function generateVariations(term: string): string[] {
-  const normalized = normalizeForMatch(term);
-  const variations = getAllVariations(normalized);
-
-  // Split by space and generate word-level variations
-  const words = normalized.split(" ").filter((w) => w.length > 2);
-
-  // Add individual significant words as variations
-  for (const word of words) {
-    if (word.length >= 4) {
-      // Only meaningful words
-      variations.push(word);
-    }
-  }
-
-  // Add compound variation (no spaces)
-  if (words.length > 1) {
-    variations.push(words.join(""));
-  }
-
-  return [...new Set(variations)]; // Deduplicate
+  return [...new Set(getAllVariations(term))];
 }
 
-/** Check if any variation of the needle is found in the haystack */
+/**
+ * Whether `needle` is found in `haystack` on word boundaries. A multi-word needle matches when
+ * its whole phrase or an explicit synonym appears, or when at least two of its significant words
+ * (4+ chars, not stopwords) each appear as whole words. A single-word needle matches only as itself.
+ */
 function containsFuzzy(haystack: string, needle: string): boolean {
-  const normalizedHaystack = normalizeForMatch(haystack);
-  const variations = generateVariations(needle);
+  const paddedHaystack = ` ${normalizeForMatch(haystack)} `;
+  const hasWord = (phrase: string): boolean => paddedHaystack.includes(` ${phrase} `);
 
-  for (const variation of variations) {
-    if (normalizedHaystack.includes(variation)) {
-      return true;
-    }
+  if (generateVariations(needle).some(hasWord)) {
+    return true;
   }
 
-  return false;
+  const words = normalizeForMatch(needle).split(" ");
+  if (words.length < 2) {
+    return false;
+  }
+  const significant = new Set(words.filter((w) => w.length >= 4 && !STOPWORDS.has(w)));
+  let found = 0;
+  for (const word of significant) {
+    if (hasWord(word)) found++;
+  }
+  return found >= 2;
 }
 
 /** Case-insensitive substring check (kept for backward compatibility). */
