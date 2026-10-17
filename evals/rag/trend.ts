@@ -33,24 +33,20 @@ export function exitCodeFor(summary: { newFailCount: number }, opts: { check: bo
   return opts.check && summary.newFailCount > 0 ? 1 : 0;
 }
 
-/** Dedupe key: one metric row of one run. */
+/** Identity of one metric row of one run: run, case, runner, metric, use case and config. */
 export function historyRowKey(row: HistoryRow): string {
-  return [row.runId, row.caseId, row.runner, row.metric].join("\u0000");
+  return [row.runId, row.caseId, row.runner, row.metric, row.useCase ?? "", row.configHash].join(
+    "\u0000"
+  );
 }
 
-/** Union of row lists. A row whose key was already seen is dropped; the first occurrence wins. */
-export function mergeHistoryRows(...lists: HistoryRow[][]): HistoryRow[] {
-  const seen = new Set<string>();
-  const merged: HistoryRow[] = [];
-  for (const list of lists) {
-    for (const row of list) {
-      const key = historyRowKey(row);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(row);
-    }
-  }
-  return merged;
+/**
+ * Remote rows, then the local rows whose key is not already among the remote rows. Dedupe only
+ * happens across the two lists: rows within one list are never dropped.
+ */
+export function mergeHistoryRows(remote: HistoryRow[], local: HistoryRow[]): HistoryRow[] {
+  const remoteKeys = new Set(remote.map(historyRowKey));
+  return [...remote, ...local.filter((row) => !remoteKeys.has(historyRowKey(row)))];
 }
 
 /** Git path of a split's history file, as stored on the history branch. */

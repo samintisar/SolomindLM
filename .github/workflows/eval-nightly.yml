@@ -82,18 +82,40 @@ jobs:
 
       # Previous nights' history lives on the eval-history branch (not on main). Restoring it
       # lets `eval:trend --check` compare tonight's run with earlier runs.
+      # Only the *.jsonl history is restored; the README stays the one on main. A missing branch is
+      # a note. A branch that exists must restore, or the step fails: publish must never overwrite
+      # the cumulative history with one night's rows (publish is gated on this step's outcome).
       - name: Restore eval history
+        id: restore
         if: steps.gate.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           # Read-only use of the token, env-scoped like the publish step: it is never written to
           # .git/config or a remote URL.
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
           export GIT_CONFIG_COUNT=1
           export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
           export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}"
-          git fetch origin eval-history:refs/remotes/origin/eval-history 2>/dev/null && git checkout origin/eval-history -- evals/rag/history || echo "no eval-history branch yet"
+          rc=0
+          git ls-remote --exit-code --heads origin eval-history >/dev/null || rc=$?
+          if [ "$rc" -eq 2 ]; then
+            echo "no eval-history branch yet"
+            exit 0
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::ls-remote for eval-history failed (exit $rc)"
+            exit "$rc"
+          fi
+          git fetch origin eval-history:refs/remotes/origin/eval-history
+          mapfile -t files < <(git ls-tree --name-only origin/eval-history -- evals/rag/history/ | grep '\.jsonl$' || true)
+          if [ "${#files[@]}" -gt 0 ]; then
+            git checkout origin/eval-history -- "${files[@]}"
+          else
+            echo "eval-history has no history files yet"
+          fi
 
       # The smoke split runs each fixture `repeats` times; a red run still appends its history rows.
       - name: Smoke (live, repeats)
@@ -150,7 +172,7 @@ jobs:
       # worktree so the checked-out main tree stays untouched. Only main runs publish: a manual
       # run from a feature branch must not write history.
       - name: Publish eval history
-        if: always() && steps.gate.outputs.run == 'true' && github.ref == 'refs/heads/main'
+        if: always() && steps.gate.outputs.run == 'true' && steps.restore.outcome == 'success' && github.ref == 'refs/heads/main'
         env:
           EVALUATED_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -159,6 +181,7 @@ jobs:
           # Auth for this step's fetch and push only: an env-scoped extra header, so the token is
           # never written to .git/config or a remote URL.
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
           export GIT_CONFIG_COUNT=1
           export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
           export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}"

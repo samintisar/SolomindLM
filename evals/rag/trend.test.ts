@@ -58,7 +58,7 @@ function fakeReader(opts: {
 }
 
 describe("mergeHistoryRows", () => {
-  it("dedupes by runId, caseId, runner and metric, keeping the first occurrence", () => {
+  it("drops a local row whose key is already in the remote list; remote wins", () => {
     const remote = [histRow("r1", { status: "pass" }), histRow("r2")];
     const local = [histRow("r1", { status: "fail" }), histRow("r3")];
 
@@ -68,16 +68,35 @@ describe("mergeHistoryRows", () => {
     expect(merged[0]?.status).toBe("pass");
   });
 
-  it("treats rows that differ in caseId, runner or metric as distinct", () => {
+  it("never dedupes within one list", () => {
+    const twiceRemote = [histRow("r1"), histRow("r1")];
+    const twiceLocal = [histRow("r2"), histRow("r2")];
+
+    expect(mergeHistoryRows(twiceRemote, [])).toHaveLength(2);
+    expect(mergeHistoryRows([], twiceLocal)).toHaveLength(2);
+  });
+
+  it("treats rows that differ in caseId, runner, metric, useCase or configHash as distinct", () => {
     const rows = [
       histRow("r1"),
       histRow("r1", { caseId: "case-2" }),
       histRow("r1", { runner: "research" }),
       histRow("r1", { metric: "citation_validity" }),
+      histRow("r1", { useCase: "medical-students" }),
+      histRow("r1", { configHash: "other-cfg" }),
     ];
 
-    expect(mergeHistoryRows(rows)).toHaveLength(4);
+    expect(mergeHistoryRows([], rows)).toHaveLength(6);
     expect(historyRowKey(rows[0] as HistoryRow)).not.toBe(historyRowKey(rows[1] as HistoryRow));
+  });
+
+  it("treats a row that differs only in configHash as a different row across lists", () => {
+    const merged = mergeHistoryRows(
+      [histRow("r1", { configHash: "a" })],
+      [histRow("r1", { configHash: "b" })]
+    );
+
+    expect(merged).toHaveLength(2);
   });
 });
 
