@@ -187,9 +187,27 @@ function recallScore(matched: number, total: number): number {
   return matched / total;
 }
 
+/**
+ * Decline forms that are not plain phrases. Each names a source (documents, notes, papers, the
+ * report) or a stated absence, so a technical negation about the subject ("the study did not
+ * include children") does not match.
+ */
+const DECLINE_PATTERNS: RegExp[] = [
+  /\bdo(?:es)?(?:n't|\s+not)\s+provide\s+(?:any\s+)?information\b/,
+  /\bnot\s+covered\s+in\s+(?:your|the|these|the\s+selected)\s+(?:documents|sources|notes|papers)\b/,
+  /\b(?:sources|notes|papers|documents|report|passages)\s+(?:do|does)(?:n't|\s+not)\s+(?:cover|mention|discuss|contain|address|include)\b/,
+  /\b(?:there\s+is\s+)?no\s+mention\s+of\b/,
+  /\bi\s+don't\s+see\s+any\s+information\b/,
+  /\bnot\s+(?:mentioned|discussed|addressed)\s+in\b/,
+];
+
 /** Check whether the answer text exhibits abstention language. */
 function answerAbstains(answer: string): boolean {
-  const lower = answer.toLowerCase();
+  // Models write curly apostrophes and quotes; match them as straight ones.
+  const text = answer
+    .replace(/[‘’‛′]/g, "'")
+    .replace(/[“”„]/g, '"')
+    .toLowerCase();
   // Phrases must be specific enough not to fire on legitimate negations in source-backed
   // technical prose (e.g. "points do not have enough neighbours").
   const phraseSignals = [
@@ -212,9 +230,9 @@ function answerAbstains(answer: string): boolean {
     "based on the retrieved passages, i cannot",
     "based on what's available, i cannot",
   ];
-  if (phraseSignals.some((s) => lower.includes(s))) return true;
-  if (/\bi ['']?(?:m|am) not able to\b/i.test(answer)) return true;
-  return false;
+  if (phraseSignals.some((s) => text.includes(s))) return true;
+  if (/\bi'?(?:m|am) not able to\b/.test(text)) return true;
+  return DECLINE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /** Recall of expected items within a set of chunks (checks all chunk content). */
@@ -551,19 +569,6 @@ const PASSAGE_SUFFICIENT_RECALL = 0.6;
 const PASSAGE_PARTIAL_SELECTED_RECALL = 0.5;
 
 /**
- * Thresholds. Item mode: "sufficient" is 0.7. Passage mode is looser: with 2 or 3 passages, 0.7
- * would mean every passage, so losing one of three would fail. Passage mode uses 0.6 for
- * sufficient, and 0.5 as the floor below which a context-selection miss is a fail rather than a
- * warn.
- *
- * Deterministic routing rule (sufficient = the mode's sufficient threshold):
- * - If selected-context recall >= sufficient and answer abstains: "answer_generation" error, fail.
- * - If raw or post-rerank recall >= sufficient but selected-context recall < sufficient:
- *   "context_selection" miss. Fail; in passage mode, warn when selected recall is >= 0.5.
- * - If all snapshots < sufficient: "retrieval_coverage" miss, warn.
- * - If answer provides items and recall >= sufficient: pass.
- */
-/**
  * Unanswerable fixtures (`expectAbstain`): the sources lack the answer, so declining is correct and
  * any answer that does not abstain is hallucination under pressure. Item and passage rules do not
  * apply, since there are no expected items to recall.
@@ -591,6 +596,19 @@ function unanswerableAbstention(fixture: EvalFixture, artifact: EvalRunArtifact)
   );
 }
 
+/**
+ * Thresholds. Item mode: "sufficient" is 0.7. Passage mode is looser: with 2 or 3 passages, 0.7
+ * would mean every passage, so losing one of three would fail. Passage mode uses 0.6 for
+ * sufficient, and 0.5 as the floor below which a context-selection miss is a fail rather than a
+ * warn.
+ *
+ * Deterministic routing rule (sufficient = the mode's sufficient threshold):
+ * - If selected-context recall >= sufficient and answer abstains: "answer_generation" error, fail.
+ * - If raw or post-rerank recall >= sufficient but selected-context recall < sufficient:
+ *   "context_selection" miss. Fail; in passage mode, warn when selected recall is >= 0.5.
+ * - If all snapshots < sufficient: "retrieval_coverage" miss, warn.
+ * - If answer provides items and recall >= sufficient: pass.
+ */
 export function abstentionCorrectness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
@@ -735,9 +753,10 @@ export function citationValidity(
   const selectedChunkIds = new Set(artifact.selectedChunks.map((c) => c.id));
   const citations = artifact.citations;
   // Word-boundary cues only — avoid false positives (e.g. "resources" contains "source").
-  const expectsCitation = /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(
-    fixture.expectedBehavior
-  );
+  // A decline has nothing to cite, even when its expectedBehavior names the sources.
+  const expectsCitation =
+    fixture.expectAbstain !== true &&
+    /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(fixture.expectedBehavior);
 
   // No citations found in the answer.
   if (citations.length === 0) {
