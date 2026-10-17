@@ -22,7 +22,14 @@ import {
   formatReport,
   generateReport,
 } from "./reports";
+import {
+  appendCalibrationLabels,
+  combineLabels,
+  loadCalibration,
+} from "./reports/calibrationStore";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
+import { formatJudgeCalibrationTable, scoreJudgeCalibration } from "./reports/judgeCalibration";
+import type { JudgeCalibrationItem } from "./reports/judgeQueue";
 import {
   createConvexChatInvoker,
   createConvexLiteratureReviewInvoker,
@@ -65,6 +72,9 @@ import type { PackSeedApi } from "./usecases/seedClient";
 import type { SourceText } from "./usecases/types";
 import { formatPackProblems, packsToValidate } from "./usecases/validate";
 
+/** Versioned judge calibration labels (committed); see evals/rag/calibration/README.md */
+const CALIBRATION_DIR = "evals/rag/calibration";
+
 // ─── CLI Options ─────────────────────────────────────────────
 
 interface CliOptions {
@@ -101,6 +111,8 @@ interface CliOptions {
   compareB?: string;
   /** Score a labeled judge-queue.json and exit */
   scoreJudgeQueue?: string;
+  /** With --score-judge-queue: also append the queue's labelled rows to the calibration store */
+  appendCalibration: boolean;
   /** Holdout promotion check: before/after EvalReport JSON paths */
   promotionCheckBefore?: string;
   promotionCheckAfter?: string;
@@ -175,6 +187,7 @@ const CLI_OPTIONS = {
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
+  "append-calibration": { type: "boolean" },
   /** Takes two paths: `--promotion-check <before.json> <after.json>`. */
   "promotion-check": { type: "string" },
   help: { type: "boolean", short: "h" },
@@ -232,6 +245,9 @@ function parseArgs(args: string[]): CliOptions {
       throw new Error(`--${name} takes two paths. See --help.`);
     }
   }
+  if (values["append-calibration"] && values["score-judge-queue"] === undefined) {
+    throw new Error("--append-calibration needs --score-judge-queue <path>. See --help.");
+  }
 
   if (values.help) {
     printHelp();
@@ -261,6 +277,7 @@ function parseArgs(args: string[]): CliOptions {
     compareA: values.compare,
     compareB: secondValues.get("compare"),
     scoreJudgeQueue: values["score-judge-queue"],
+    appendCalibration: values["append-calibration"] ?? false,
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
   };
@@ -292,7 +309,10 @@ Options:
   --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
   --judge-reasoning <on|off>  Judge reasoning (default: the model's; off bills far fewer output tokens)
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
-  --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
+  --score-judge-queue <path>  Score labeled judge-queue.json (plus evals/rag/calibration/) and exit
+                           0 ready / 1 not ready / 2 under-labelled (or not a queue file)
+  --append-calibration     With --score-judge-queue: append the queue's labelled rows to
+                           evals/rag/calibration/ (versioned; deduped by labelKey)
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
   --help, -h               Show this help
 
@@ -384,9 +404,31 @@ async function main(): Promise<void> {
 
   if (opts.scoreJudgeQueue) {
     const { loadJudgeQueueFile } = await import("./reports/judgeQueueFile");
-    const { scoreJudgeCalibration } = await import("./reports/judgeCalibration");
-    const items = loadJudgeQueueFile(opts.scoreJudgeQueue);
-    const score = scoreJudgeCalibration(items);
+    let stored: ReturnType<typeof loadCalibration>;
+    let items: JudgeCalibrationItem[];
+    try {
+      items = loadJudgeQueueFile(opts.scoreJudgeQueue);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`FATAL: ${opts.scoreJudgeQueue} is not a judge queue file: ${message}`);
+      console.error('  Expected the judge-queue.json an eval run writes: {"items": [...]}.');
+      process.exit(2);
+    }
+    try {
+      if (opts.appendCalibration) {
+        const added = appendCalibrationLabels(CALIBRATION_DIR, items, {
+          commitSha: await getCommitSha(),
+        });
+        console.log(`Appended ${added} labelled row(s) to ${CALIBRATION_DIR}`);
+      }
+      stored = loadCalibration(CALIBRATION_DIR);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`FATAL: calibration store ${CALIBRATION_DIR} is unreadable: ${message}`);
+      process.exit(2);
+    }
+    const score = scoreJudgeCalibration(combineLabels(stored, items));
+    for (const line of formatJudgeCalibrationTable(score)) console.log(line);
     console.log(JSON.stringify(score, null, 2));
     if (score.readyForPromptCompile) process.exit(0);
     if (score.labeled < 20) process.exit(2);

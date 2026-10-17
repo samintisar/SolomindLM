@@ -1,6 +1,7 @@
 import type { EvalReport, MetricResult } from "../types";
 
-const PROMOTE_PREFIXES = [
+/** Judge families that gate holdout promotion (and must be calibrated before prompt compile). */
+export const PROMOTE_PREFIXES = [
   "binary_judge_chat_grounding",
   "binary_judge_research_grounding",
   "binary_judge_studio_grounding",
@@ -21,7 +22,7 @@ export interface PromotionDecision {
   regressions: PromotionRegression[];
 }
 
-function isPromoteMetric(name: string): boolean {
+export function isPromoteMetric(name: string): boolean {
   return PROMOTE_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
 
