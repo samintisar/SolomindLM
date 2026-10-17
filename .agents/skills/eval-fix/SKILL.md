@@ -24,12 +24,15 @@ Turn an eval work order into one pipeline fix, verified by re-runs, a train comp
 3. **Fix in the group's target files** or other pipeline files (`convex/_agents/chat/`, `convex/_services/`,
    `convex/studio/`, chunking, selection, retrieval scope, timeouts). Never edit prompt text, and never add
    fixture, notebook or rubric wording to a prompt. One exception: prompt files may change only when the
-   category is `prompt_answering` AND the retrieval snapshots already contain the facts.
+   category is `prompt_answering` AND the retrieval snapshots already contain the facts. Even then the edit
+   must stay generalized and never eval-targeted (AGENTS.md "Prompt authoring").
 4. **Re-run the group's `--case` commands** until the verdicts are stable across repeats:
    `bun run eval:rag -- --case <caseId> --repeats <n> --verbose`
-5. **Compare on train.** Snapshot the train split before and after the fix:
-   `bun run eval:rag:train:snapshot` (before the fix), then again (after), then
-   `bun run eval:compare -- <before-dir> <after-dir>`.
+5. **Compare on train.** The snapshot command always writes to its `--artifacts-dir` (default
+   `evals/rag/generated/train-snapshot`), so give before and after distinct directories:
+   `bun run eval:rag:train:snapshot -- --artifacts-dir evals/rag/generated/train-before` (before the fix), then
+   `bun run eval:rag:train:snapshot -- --artifacts-dir evals/rag/generated/train-after` (after), then
+   `bun run eval:compare -- evals/rag/generated/train-before evals/rag/generated/train-after`.
 6. **Confirm on holdout.** Run `bun run eval:holdout -- --output <before.json>` on the pre-fix code and
    `bun run eval:holdout -- --output <after.json>` on the post-fix code, then
    `bun run eval:rag -- --promotion-check <before.json> <after.json>`. Exit 0 is required.

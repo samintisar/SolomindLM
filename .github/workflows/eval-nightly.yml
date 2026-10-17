@@ -2,7 +2,12 @@
 # the stored history. Needs three repo secrets; without them the job logs a notice and does nothing.
 # PR CI stays dry-run only (ci.yml runs eval:rag:dry and eval:usecases:dry).
 #
-# Results are appended to evals/rag/history/*.jsonl and committed back to main by the last steps.
+# Prerequisite: the four use-case packs must be seeded on the target deployment first
+# (`bun run eval:seed -- --use-case all`). Otherwise the usecases step exits 2 with PackNotReadyError.
+#
+# Results are appended to evals/rag/history/*.jsonl. The "Publish eval history" step pushes them to the
+# unprotected eval-history branch. Nothing is pushed to main: main is protected (enforce_admins), so a
+# bot push to it is rejected.
 
 name: Eval nightly
 
@@ -30,15 +35,16 @@ jobs:
     name: Live smoke and trend
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    # Writes the history commit back to main (see the commit step).
+    # Pushes history to the eval-history branch (see the publish step).
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # Full history so the rebase before the history push has main to rebase onto.
           fetch-depth: 0
+          # The token is not left in .git/config; only the publish step gets it, via its env.
+          persist-credentials: false
 
       # Same secrets gate as the e2e job in ci.yml: skip the job's work, not the job.
       - name: Check for eval secrets
@@ -73,6 +79,13 @@ jobs:
       - name: Install dependencies
         if: steps.gate.outputs.run == 'true'
         run: bun install --frozen-lockfile
+
+      # Previous nights' history lives on the eval-history branch (not on main). Restoring it
+      # lets `eval:trend --check` compare tonight's run with earlier runs.
+      - name: Restore eval history
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          git fetch origin eval-history:refs/remotes/origin/eval-history 2>/dev/null && git checkout origin/eval-history -- evals/rag/history || echo "no eval-history branch yet"
 
       # The smoke split runs each fixture `repeats` times; a red run still appends its history rows.
       - name: Smoke (live, repeats)
@@ -125,20 +138,47 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      # Only pushes from main: a manual run on a feature branch must not write history to main.
-      - name: Commit history to main
+      # History goes to the unprotected eval-history branch, never main. Built in a temporary
+      # worktree so the checked-out main tree stays untouched. Only main runs publish: a manual
+      # run from a feature branch must not write history.
+      - name: Publish eval history
         if: always() && steps.gate.outputs.run == 'true' && github.ref == 'refs/heads/main'
+        env:
+          EVALUATED_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          # Auth for this step's fetch and push only: an env-scoped extra header, so the token is
+          # never written to .git/config or a remote URL.
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add evals/rag/history
-          if git diff --cached --quiet; then
-            echo "No history changes to commit."
-            exit 0
+          short_sha="$(git rev-parse --short "$EVALUATED_SHA")"
+          work="$RUNNER_TEMP/eval-history"
+          rm -rf "$work"
+          git fetch origin eval-history:refs/remotes/origin/eval-history 2>/dev/null || true
+          if git rev-parse --verify --quiet refs/remotes/origin/eval-history >/dev/null; then
+            git worktree add -B eval-history "$work" origin/eval-history
+          else
+            git worktree add --orphan -b eval-history "$work"
           fi
-          git commit -m "chore(evals): nightly history $(date -u +%Y-%m-%d)"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          mkdir -p "$work/evals/rag/history"
+          shopt -s nullglob
+          cp evals/rag/history/*.jsonl evals/rag/history/README.md "$work/evals/rag/history/"
+          shopt -u nullglob
+          cd "$work"
+          git add -f evals/rag/history
+          if git diff --cached --quiet; then
+            echo "No history changes to publish."
+          else
+            git commit -m "chore(evals): nightly history $(date -u +%Y-%m-%d) (${short_sha})"
+            git push origin HEAD:eval-history
+          fi
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force "$work"
 
       - name: Summary and result
         if: always() && steps.gate.outputs.run == 'true'
