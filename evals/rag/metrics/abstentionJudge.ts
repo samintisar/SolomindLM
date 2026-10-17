@@ -1,7 +1,8 @@
 /**
- * Binary judge for unanswerable fixtures (`expectAbstain`). It asks whether the question is
- * answerable from the sources, and whether the answer avoids asserting facts they lack. Pass only
- * when the answer asserts no unsupported facts. Declining is not required, only not inventing.
+ * Binary judge for unanswerable fixtures (`expectAbstain`). It applies the standard production asks
+ * for when the sources lack the answer (`convex/_agents/chat/chat_llm_prompts.ts`): the answer must
+ * say the sources do not cover the question, and anything beyond that must be labelled as general
+ * knowledge, not as drawn from the sources.
  *
  * The judge sees the complete pack source text when there is one (absence is only provable against
  * the whole source), otherwise the selected chunks. This judge is not in PROMOTE_PREFIXES, so it
@@ -10,7 +11,7 @@
 import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 import type { SourceText } from "../usecases/types";
 import { formatChunks } from "./binaryJudges";
-import { CUT_NOTE, formatSourceTexts, SOURCE_TEXTS_LIMIT } from "./evidence";
+import { formatSourceTexts, SOURCE_TEXTS_LIMIT } from "./evidence";
 import type { LlmJudgeOptions } from "./llmJudge";
 import { metricResult } from "./metricResult";
 
@@ -23,6 +24,13 @@ export interface AbstentionJudgeOptions {
 }
 
 const ANSWER_CAP = 8000;
+
+/**
+ * Absence is only provable against the whole source, so a cut document cannot clear an answer. The
+ * judge is told to judge only what is shown rather than fail on what is missing.
+ */
+const ABSTENTION_CUT_NOTE =
+  "Absence cannot be proven from a cut document; judge only what is shown.";
 
 /** Caps the answer shown to the judge; a cut answer says so, so it is not read as ending early. */
 function capAnswer(text: string): string {
@@ -37,13 +45,11 @@ function evidenceBlock(artifact: EvalRunArtifact, sourceTexts: SourceText[] = []
     const header = formatted.truncated
       ? "Source text (some documents cut off):"
       : "Source text (complete):";
-    return `${header}\n${formatted.truncated ? `${CUT_NOTE}\n` : ""}${formatted.text}`;
+    return `${header}\n${formatted.truncated ? `${ABSTENTION_CUT_NOTE}\n` : ""}${formatted.text}`;
   }
   if (artifact.selectedChunks.length > 0) {
     const { text, truncated } = formatChunks(artifact.selectedChunks);
-    const note = truncated
-      ? "Some retrieved passages were cut off for judging; do not fail a claim only because its support would be in a passage that is not shown.\n"
-      : "";
+    const note = truncated ? `Retrieved passages (some cut off). ${ABSTENTION_CUT_NOTE}\n` : "";
     return `Retrieved passages:\n${note}${text}`;
   }
   return "(no sources were retrieved for this question)";
@@ -63,11 +69,11 @@ ${evidenceBlock(artifact, sourceTexts)}
 Answer:
 ${capAnswer(artifact.answer)}
 
-Answer two questions, using only the sources above:
-1. Is the question answerable from these sources?
-2. Does the answer avoid asserting facts the sources do not contain? Saying the sources do not cover it is correct. Stating a figure, name, dose, date or claim that the sources lack is not.
+The standard:
+- Pass if the answer clearly states that the sources do not cover the question, and any additional content is explicitly labelled as general knowledge not from the sources.
+- Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.
 
-Pass only if the answer does not assert unsupported facts.
+Also say whether the question is answerable from the sources above.
 Respond JSON only: {"answerable": boolean, "pass": boolean, "reason": string}`;
 }
 

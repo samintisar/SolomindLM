@@ -185,8 +185,8 @@ export const languageLearnersFixtures: EvalFixture[] = [
     expectedAnswer:
       "The notes do not cover the subjunctive, so the correct reply says the sources do not cover it and gives no subjunctive forms or rules.",
     expectedBehavior:
-      "Declines, saying the sources do not cover the subjunctive. It must not invent subjunctive forms or rules, " +
-      "and must not present general grammar knowledge as if it came from the notes.",
+      "Pass if the answer clearly states that the sources do not cover the subjunctive, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 
@@ -330,8 +330,8 @@ export const languageLearnersFixtures: EvalFixture[] = [
     expectedAnswer:
       "The notes do not cover the imperfect, so the correct reply says the sources do not cover it and gives no imperfect forms.",
     expectedBehavior:
-      "Declines, saying the sources do not cover the imperfect. It must not invent imperfect conjugations, " +
-      "and must not present general grammar knowledge as if it came from the notes.",
+      "Pass if the answer clearly states that the sources do not cover the imperfect, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
   {

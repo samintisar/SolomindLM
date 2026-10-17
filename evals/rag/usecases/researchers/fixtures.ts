@@ -239,8 +239,8 @@ export const researchersFixtures: EvalFixture[] = [
     expectedAnswer:
       "The four papers study depression and do not report dementia outcomes, so the correct reply says the sources do not cover dementia and gives no risk estimates.",
     expectedBehavior:
-      "Declines, saying the papers do not report dementia outcomes. It must not invent risk estimates, hazard ratios or findings, " +
-      "and must not present general research knowledge as if it came from the papers.",
+      "Pass if the answer clearly states that the sources do not cover dementia outcomes, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 
@@ -302,8 +302,8 @@ export const researchersFixtures: EvalFixture[] = [
     expectedAnswer:
       "The papers do not mention vaccination, so the correct reply says the sources do not report it as a covariate and gives no adjustment details.",
     expectedBehavior:
-      "Declines, saying the papers do not report vaccination status or adjustment for it. It must not invent covariates, models or results, " +
-      "and must not present general methods knowledge as if it came from the papers.",
+      "Pass if the answer clearly states that the sources do not cover vaccination status or adjustment for it, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
     tags: tags("chat", "unanswerable"),
   },
 ];
