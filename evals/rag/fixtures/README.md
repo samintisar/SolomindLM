@@ -192,7 +192,7 @@ bun run eval:literature-review
 
 ### Retrieval-only runs
 
-`--retrieval-only` runs chat fixtures through plan, search, rerank and context selection, then stops before any answer is generated. No answer metrics and no judges run, so a run costs roughly a tenth of a full one. Use it when you are sweeping a retrieval knob (budgets, thresholds, neighbour or opening passages) and only need to know what was found and selected, and how fast. Scores come from the passage metrics (`passage_recall_*`, `passage_precision_selected`, `passage_ndcg_selected`), the item metrics and the latency and token budgets. Use a full run before you judge an answer change. Other runners are skipped with a note.
+`--retrieval-only` runs chat fixtures through plan, search, rerank and context selection, then stops before any answer is generated. No answer metrics and no judges run, so a run costs roughly a tenth of a full one. Use it when you are sweeping a retrieval knob (budgets, thresholds, neighbour or opening passages) and only need to know what was found and selected, and how fast. Scores come from the passage metrics (`passage_recall_*`, `passage_precision_selected`, `passage_ndcg_selected`), the item metrics and the latency and token budgets. Use a full run before you judge an answer change. Other runners are skipped with a note. A retrieval-only run also stops when retrieval finds no passages. Greetings and clarifying questions still get a direct reply, because they never search, so their artifacts can carry an answer.
 
 ```bash
 bun run eval:rag -- --retrieval-only --runner chat --split train

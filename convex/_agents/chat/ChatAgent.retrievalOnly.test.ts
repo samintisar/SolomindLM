@@ -18,7 +18,7 @@ const passage = (i: number): ReferenceChunk => ({
   similarity: 0.9,
 });
 
-function agentWithGeneration() {
+function agentWithGeneration(hits: ReferenceChunk[] = [passage(1), passage(2)]) {
   const generation = {
     generateStructuredResponse: vi.fn(async () => ({
       answer_markdown: "Routing sends requests to specialists [1].",
@@ -31,7 +31,7 @@ function agentWithGeneration() {
   };
   const agent = new ChatAgent({
     vectorSearchHandler: {
-      search: vi.fn(async () => [passage(1), passage(2)]),
+      search: vi.fn(async () => hits),
     } as unknown as NonNullable<ConstructorParameters<typeof ChatAgent>[0]>["vectorSearchHandler"],
   });
   agent["llmWrapper"] = {
@@ -86,5 +86,29 @@ describe("ChatAgent with evalRetrievalOnly", () => {
     expect(generation.generateStructuredResponse).toHaveBeenCalledTimes(1);
     expect(chunks.some((c) => c.type === "token")).toBe(true);
     expect(chunks.at(-1)?.type).toBe("done");
+  });
+
+  it("ends with done and no generation when retrieval finds nothing", async () => {
+    const { agent, generation } = agentWithGeneration([]);
+
+    const chunks = await collect(agent, { evalRetrievalOnly: true });
+
+    expect(chunks.filter((c) => c.type === "references")).toEqual([]);
+    expect(chunks.filter((c) => c.type === "token")).toEqual([]);
+    expect(chunks.at(-1)).toEqual({
+      type: "done",
+      data: { tokenUsage: { prompt: 120, completion: 0, total: 120 } },
+    });
+    expect(generation.generateDirectResponse).not.toHaveBeenCalled();
+    expect(generation.generateStructuredResponse).not.toHaveBeenCalled();
+  });
+
+  it("still answers directly when retrieval finds nothing and the flag is not set (control)", async () => {
+    const { agent, generation } = agentWithGeneration([]);
+
+    const chunks = await collect(agent);
+
+    expect(generation.generateDirectResponse).toHaveBeenCalledTimes(1);
+    expect(chunks.some((c) => c.type === "token")).toBe(true);
   });
 });

@@ -94,7 +94,7 @@ const recallOf = (found: boolean[]): number =>
   found.length === 0 ? 1 : found.filter(Boolean).length / found.length;
 
 /** Binary-relevance nDCG: DCG = sum(rel_i / log2(i + 1)), normalised by the ideal ordering. */
-export function binaryNdcg(relevance: number[]): number {
+function binaryNdcg(relevance: number[]): number {
   let dcg = 0;
   relevance.forEach((rel, i) => {
     dcg += rel / Math.log2(i + 2);
