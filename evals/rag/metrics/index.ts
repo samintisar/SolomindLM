@@ -563,11 +563,42 @@ const PASSAGE_PARTIAL_SELECTED_RECALL = 0.5;
  * - If all snapshots < sufficient: "retrieval_coverage" miss, warn.
  * - If answer provides items and recall >= sufficient: pass.
  */
+/**
+ * Unanswerable fixtures (`expectAbstain`): the sources lack the answer, so declining is correct and
+ * any answer that does not abstain is hallucination under pressure. Item and passage rules do not
+ * apply, since there are no expected items to recall.
+ */
+function unanswerableAbstention(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
+  if (answerAbstains(artifact.answer)) {
+    return metricResult(
+      "abstention_correctness",
+      fixture,
+      artifact,
+      "pass",
+      1,
+      "Answer declines: the sources do not contain the answer.",
+      { category: "correct_abstention", abstains: true }
+    );
+  }
+  return metricResult(
+    "abstention_correctness",
+    fixture,
+    artifact,
+    "fail",
+    0,
+    "Answer does not decline although the sources do not contain the answer.",
+    { category: "hallucination_under_pressure", abstains: false }
+  );
+}
+
 export function abstentionCorrectness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
+  if (fixture.expectAbstain === true) {
+    return unanswerableAbstention(fixture, artifact);
+  }
   // Without expectedItems, the same rules run on gold passages when the fixture has them (D1).
   const passageMode =
     fixture.expectedItems.length === 0 && (fixture.expectedPassages?.length ?? 0) > 0;

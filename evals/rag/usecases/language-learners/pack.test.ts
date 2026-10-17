@@ -13,9 +13,9 @@ describe("language-learners pack", () => {
     expect(validatePack(registered)).toEqual([]);
   });
 
-  it("has 2 smoke, 6 train and 2 holdout fixtures", () => {
+  it("has 2 smoke, 7 train and 3 holdout fixtures", () => {
     const count = (split: EvalSplit) => fixtures.filter((f) => f.split === split).length;
-    expect([count("smoke"), count("train"), count("holdout")]).toEqual([2, 6, 2]);
+    expect([count("smoke"), count("train"), count("holdout")]).toEqual([2, 7, 3]);
   });
 
   it("exercises every feature (written questions at least once, the rest at least twice)", () => {

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AGENTIC_20_ITEMS } from "../fixtures/agentic-patterns-20";
 import type { ChunkSnapshot, EvalFixture, EvalRunArtifact } from "../types";
-import { expectedItemRecall, retrievalNdcgAtK, retrievalPrecisionAtK } from "./index";
+import {
+  abstentionCorrectness,
+  expectedItemRecall,
+  retrievalNdcgAtK,
+  retrievalPrecisionAtK,
+} from "./index";
 
 const fixture: EvalFixture = {
   schemaVersion: 1,
@@ -149,5 +154,59 @@ describe("retrieval metrics on the word 'agent'", () => {
   it("does not treat a chunk containing only the word 'agent' as relevant to nDCG@K", () => {
     const result = retrievalNdcgAtK(fixture, artifact({ selectedChunks: agentOnly }));
     expect(result.score).toBe(0);
+  });
+});
+
+describe("abstentionCorrectness on unanswerable fixtures", () => {
+  const unanswerable: EvalFixture = {
+    ...fixture,
+    id: "wiring/unanswerable-01",
+    expectedItems: [],
+    expectAbstain: true,
+  };
+
+  it("passes with correct_abstention when the answer declines", () => {
+    const result = abstentionCorrectness(
+      unanswerable,
+      artifact({
+        answer: "I cannot find this in your sources, which do not cover it.",
+        selectedChunks: [chunk("c1", "Unrelated text about something else.")],
+      })
+    );
+    expect(result.status).toBe("pass");
+    expect(result.breakdown?.category).toBe("correct_abstention");
+  });
+
+  it("fails with hallucination_under_pressure when the answer asserts facts", () => {
+    const result = abstentionCorrectness(
+      unanswerable,
+      artifact({
+        answer: "The drug is dosed at 5 mg twice daily for adults.",
+        selectedChunks: [chunk("c1", "Unrelated text about something else.")],
+      })
+    );
+    expect(result.status).toBe("fail");
+    expect(result.score).toBe(0);
+    expect(result.breakdown?.category).toBe("hallucination_under_pressure");
+  });
+
+  it("applies the unanswerable rule even when retrieved passages match the question", () => {
+    const result = abstentionCorrectness(
+      unanswerable,
+      artifact({
+        answer: "Here is the answer from the sources.",
+        selectedChunks: [chunk("c1", "The answer appears in this passage.")],
+        preRerankChunks: [chunk("c1", "The answer appears in this passage.")],
+      })
+    );
+    expect(result.breakdown?.category).toBe("hallucination_under_pressure");
+  });
+
+  it("leaves a fixture without expectAbstain on the existing rules", () => {
+    const result = abstentionCorrectness(
+      { ...unanswerable, expectAbstain: false },
+      artifact({ answer: "I cannot find it.", selectedChunks: [] })
+    );
+    expect(result.breakdown?.category).toBe("none");
   });
 });

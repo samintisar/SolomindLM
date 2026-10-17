@@ -27,6 +27,8 @@ function classifyFailure(metric: MetricResult): FailureCategory {
     const category = (metric.breakdown?.category as string) ?? "prompt_answering";
     if (category === "retrieval_coverage") return "retrieval";
     if (category === "context_selection") return "context_selection";
+    // Answered an unanswerable question from non-existent evidence: fix the answer prompt.
+    if (category === "hallucination_under_pressure") return "prompt_answering";
     return "prompt_answering";
   }
 
