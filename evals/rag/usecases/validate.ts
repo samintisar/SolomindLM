@@ -72,11 +72,16 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
     }
   }
 
-  // Gold passages must be verbatim source text. Markdown and text sources are read here; a pack
-  // with none (PDF only) skips the text check, and its quotes are checked before the live run.
-  const textOfSources = pack.sources
-    .filter((file) => TEXT_EXTENSIONS.has(sourceExtension(file)) && onDisk?.has(file))
-    .map((file) => readFileSync(join(sourcesDir, file), "utf-8"));
+  // Gold passages must be verbatim source text. The text check runs only when every source is
+  // readable text (md/txt). A mixed pack could hold a quote only in its PDF, which this check
+  // cannot read, so it is skipped there and the quotes are checked before the live run instead.
+  // The word-count check always applies.
+  const allSourcesText = pack.sources.every((file) => TEXT_EXTENSIONS.has(sourceExtension(file)));
+  const textOfSources = allSourcesText
+    ? pack.sources
+        .filter((file) => onDisk?.has(file))
+        .map((file) => readFileSync(join(sourcesDir, file), "utf-8"))
+    : [];
   for (const f of fixtures) {
     for (const quote of f.expectedPassages ?? []) {
       const words = quote.trim().split(/\s+/).length;

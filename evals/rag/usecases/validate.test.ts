@@ -261,6 +261,34 @@ describe("validatePack: gold passages", () => {
   });
 });
 
+describe("validatePack: gold passages in a mixed pack", () => {
+  beforeEach(() => {
+    writeFileSync(join(dir, "sources", "doc.pdf"), "%PDF-1.4");
+    writeFileSync(join(dir, "sources", "LICENSES.md"), "- unit-1.md: x\n- doc.pdf: x");
+  });
+
+  it("skips the text check when a PDF sits alongside markdown, so a PDF-only quote is not flagged", () => {
+    const pdfOnly = "This quote only exists in the scanned PDF and not in the text notes.";
+    const problems = validatePack(
+      registered(pack({ sources: ["unit-1.md", "doc.pdf"] }), [
+        fixture({ expectedPassages: [pdfOnly] }),
+      ])
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it("still checks the word count in a mixed pack", () => {
+    const problems = validatePack(
+      registered(pack({ sources: ["unit-1.md", "doc.pdf"] }), [
+        fixture({ id: "language-learners/short", expectedPassages: ["Too short here."] }),
+      ])
+    );
+    expect(problems).toEqual([
+      'language-learners/short: expectedPassages quote has 3 words (8-30 required): "Too short here."',
+    ]);
+  });
+});
+
 describe("missingExpectedPassages", () => {
   const QUOTE = "The past participle agrees in gender and number with a preceding direct object.";
   const texts = new Map([
