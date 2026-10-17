@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NEIGHBOUR_PASSAGE_TOKEN_BUDGET } from "../../convex/_agents/chat/chatConfig";
+import { DEFAULT_FAST_MODEL_ID, DEFAULT_SMART_MODEL_ID } from "../../convex/_lib/defaultSmartModel";
 import { computeConfigHash } from "./configHash";
 import { snapshotRetrievalConfig } from "./runners/config";
 
@@ -25,6 +26,12 @@ describe("computeConfigHash", () => {
 });
 
 describe("snapshotRetrievalConfig", () => {
+  it("takes the model IDs from the shared defaults", () => {
+    const config = snapshotRetrievalConfig();
+    expect(config.fastModel).toBe(DEFAULT_FAST_MODEL_ID);
+    expect(config.smartModel).toBe(DEFAULT_SMART_MODEL_ID);
+  });
+
   it("reads the neighbour budget from the production chat config", () => {
     expect(snapshotRetrievalConfig().neighbourPassageTokenBudget).toBe(
       NEIGHBOUR_PASSAGE_TOKEN_BUDGET

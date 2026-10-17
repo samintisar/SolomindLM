@@ -11,19 +11,16 @@ import {
   OPENING_PASSAGE_TOKEN_BUDGET,
   PER_SOURCE_PASSAGES_PER_SEARCH,
 } from "../../../convex/_agents/chat/chatConfig";
-import { DEFAULT_SMART_MODEL_ID } from "../../../convex/_lib/defaultSmartModel";
+import {
+  DEFAULT_FAST_MODEL_ID,
+  DEFAULT_SMART_MODEL_ID,
+} from "../../../convex/_lib/defaultSmartModel";
 import {
   RAG_CHUNK_OVERLAP_TOKENS,
   RAG_CHUNK_SIZE_TOKENS,
 } from "../../../convex/_lib/embeddingConfig";
 import { env } from "../../../convex/_lib/env";
 import type { RetrievalConfigSnapshot } from "../types";
-
-/**
- * Fast model default. convex/_lib/env.ts reads FAST_LLM from process.env with this value as the
- * fallback, and that env read is not the deployment's, so the default is repeated here.
- */
-const DEFAULT_FAST_MODEL_ID = "Qwen/Qwen3.5-9B";
 
 /**
  * Snapshot the current retrieval config so every runner in a batch
