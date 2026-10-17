@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { TurnTelemetry } from "../_shared/tokenUsageAccumulator.js";
 
 /**
  * Structured chat response with citations.
@@ -57,6 +58,8 @@ export interface LLMWrapperConfig {
   fastApiKey?: string;
   /** BCP-47 language code for output language instruction. undefined = English (no prompt overhead). */
   outputLanguage?: string;
+  /** Turn telemetry this wrapper records into. Omitted: the wrapper keeps its own. */
+  telemetry?: TurnTelemetry;
 }
 
 /**

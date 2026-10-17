@@ -41,4 +41,21 @@ describe("latencyCostBudget", () => {
     );
     expect(result.status).toBe("pass");
   });
+
+  it("adds callCounters to the breakdown when the artifact has them", () => {
+    const callCounters = {
+      llmCalls: 4,
+      embeddingCalls: 2,
+      embeddingTexts: 2,
+      rerankCalls: 1,
+      rerankDocs: 8,
+    };
+    const result = latencyCostBudget(literatureReviewFixture, artifact({ callCounters }));
+    expect(result.breakdown?.callCounters).toEqual(callCounters);
+  });
+
+  it("leaves callCounters out of the breakdown when the artifact lacks them", () => {
+    const result = latencyCostBudget(literatureReviewFixture, artifact());
+    expect(result.breakdown).not.toHaveProperty("callCounters");
+  });
 });

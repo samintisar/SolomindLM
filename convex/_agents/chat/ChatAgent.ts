@@ -11,6 +11,7 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel";
 import { EmbeddingService } from "../../_services/ai/embeddingClient";
 import { countTokens } from "../_shared/tokenizer";
+import { createTurnTelemetry, type TurnTelemetry } from "../_shared/tokenUsageAccumulator";
 import type { SelectedSources } from "./chat_llm_grounding.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
@@ -72,10 +73,11 @@ import { sliceParagraphForStream } from "./streamSlice.js";
 
 export class ChatAgent {
   private llmWrapper: ChatLLMWrapper;
+  /** Usage and call counters for the turn in progress; reported on its `done` chunk. */
+  private readonly telemetry: TurnTelemetry = createTurnTelemetry();
 
   private doneChunk(): StreamChunk {
-    const tokenUsage = this.llmWrapper.consumeTokenUsage();
-    return tokenUsage !== undefined ? { type: "done", data: { tokenUsage } } : { type: "done" };
+    return { type: "done", data: this.telemetry.snapshot() };
   }
   private vectorSearch: VectorSearchHandler;
   private embeddingService: EmbeddingService;
@@ -93,6 +95,7 @@ export class ChatAgent {
       fastModel: env.FAST_LLM,
       fastApiKey: env.TOGETHER_AI_API_KEY,
       outputLanguage: options?.outputLanguage,
+      telemetry: this.telemetry,
     });
 
     this.vectorSearch =
@@ -406,6 +409,7 @@ export class ChatAgent {
     });
 
     const textForVectorEmbedding = [query.trim(), hydeText.trim()].filter(Boolean).join("\n\n");
+    this.telemetry.recordEmbeddingCall();
     const hydeEmbedding = await withTimeout(
       this.embeddingService.embedText(textForVectorEmbedding),
       Math.min(EMBEDDING_TIMEOUT_MS, remainingMs()),
@@ -491,6 +495,17 @@ export class ChatAgent {
     return results;
   }
 
+  /** Semantic grounding check; its embedding requests are counted in the turn telemetry. */
+  private semanticGrounding(answer: string, chunks: ReferenceChunk[]) {
+    const embeddings = {
+      embedText: (text: string) => {
+        this.telemetry.recordEmbeddingCall();
+        return this.embeddingService.embedText(text);
+      },
+    };
+    return validateSemanticGrounding(answer, chunks, embeddings);
+  }
+
   private async applyGlobalRerank(
     merged: ReferenceChunk[],
     rerankQueryFromDecomposer: string | undefined,
@@ -509,6 +524,7 @@ export class ChatAgent {
     }));
 
     const rerankStart = Date.now();
+    this.telemetry.recordRerankCall(docs.length);
     try {
       const reranked = await withTimeout(
         this.globalRerankFn(rerankQueryForCache, docs),
@@ -995,11 +1011,7 @@ export class ChatAgent {
         citationChunks
       );
       semanticValidation = syntacticValidation.isGrounded
-        ? await validateSemanticGrounding(
-            structuredResponse.answer_markdown,
-            citationChunks,
-            this.embeddingService
-          )
+        ? await this.semanticGrounding(structuredResponse.answer_markdown, citationChunks)
         : { isGrounded: false, issues: [], missingCitations: false };
 
       isGrounded = syntacticValidation.isGrounded && semanticValidation.isGrounded;
@@ -1026,11 +1038,7 @@ export class ChatAgent {
             citationChunks
           );
           const retrySemantic = retrySyntactic.isGrounded
-            ? await validateSemanticGrounding(
-                structuredResponse.answer_markdown,
-                citationChunks,
-                this.embeddingService
-              )
+            ? await this.semanticGrounding(structuredResponse.answer_markdown, citationChunks)
             : { isGrounded: false, issues: [], missingCitations: false };
           isGrounded = retrySyntactic.isGrounded && retrySemantic.isGrounded;
           semanticValidation = retrySemantic;
@@ -1046,11 +1054,7 @@ export class ChatAgent {
       const groundingPromise = (async () => {
         const syn = validateGrounding(structuredResponse.answer_markdown, citationChunks);
         const sem = syn.isGrounded
-          ? await validateSemanticGrounding(
-              structuredResponse.answer_markdown,
-              citationChunks,
-              this.embeddingService
-            )
+          ? await this.semanticGrounding(structuredResponse.answer_markdown, citationChunks)
           : { isGrounded: false, issues: [] as string[], missingCitations: false };
         const g = syn.isGrounded && sem.isGrounded;
         const semOnly = syn.isGrounded && !sem.isGrounded;

@@ -1,5 +1,6 @@
 import type { AgentStageSpan } from "../_agents/_shared/stageSpans";
 import { createStageSpan } from "../_agents/_shared/stageSpans";
+import type { CallCounters } from "../_agents/_shared/tokenUsageAccumulator";
 import {
   resolveEvalTokenUsage,
   type TokenUsage,
@@ -12,10 +13,12 @@ export function buildChatEvalTelemetry(input: {
   selectMs?: number;
   provider?: TokenUsage;
   estimated: TokenUsage;
+  callCounters?: CallCounters;
 }): {
   stageSpans: AgentStageSpan[];
   tokenUsage: TokenUsage;
   tokenUsageSource: TokenUsageSource;
+  callCounters?: CallCounters;
 } {
   const stageSpans: AgentStageSpan[] = [];
   if (input.retrieveMs !== undefined) {
@@ -37,5 +40,6 @@ export function buildChatEvalTelemetry(input: {
     stageSpans,
     tokenUsage: resolved.tokenUsage,
     tokenUsageSource: resolved.tokenUsageSource,
+    ...(input.callCounters !== undefined ? { callCounters: input.callCounters } : {}),
   };
 }

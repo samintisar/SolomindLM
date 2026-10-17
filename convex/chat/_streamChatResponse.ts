@@ -1,5 +1,6 @@
 "use node";
 
+import type { TurnTelemetrySnapshot } from "../_agents/_shared/tokenUsageAccumulator";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
 import { internal } from "../_generated/api";
@@ -186,6 +187,8 @@ export async function streamChatResponse(
   let fullResponse = "";
   let references: unknown[] = [];
   let hasError = false;
+  /** The turn's provider usage and call counters, from the `done` chunk. */
+  let turnTelemetry: Partial<TurnTelemetrySnapshot> | undefined;
 
   const agentTrace: {
     toolCalls: TraceToolCall[];
@@ -300,6 +303,7 @@ export async function streamChatResponse(
         await chunkAppender(`\n__ERROR:${JSON.stringify(chunk.data)}\n`);
         break;
       } else if (chunk.type === "done") {
+        turnTelemetry = chunk.data as Partial<TurnTelemetrySnapshot> | undefined;
         if (externalSources.length > 0) {
           await chunkAppender(`\n__EXTERNAL_SOURCES:${JSON.stringify(externalSources)}\n`);
         }
@@ -360,6 +364,9 @@ export async function streamChatResponse(
     },
     hadStreamError: hasError || undefined,
     externalSources: externalSources.length > 0 ? externalSources : undefined,
+    tokenUsage: turnTelemetry?.tokenUsage,
+    tokenUsageSource: turnTelemetry?.tokenUsage ? "provider" : undefined,
+    callCounters: turnTelemetry?.callCounters,
   };
 
   if (existingMessages.length === 0) {

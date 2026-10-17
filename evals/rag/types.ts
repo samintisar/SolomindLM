@@ -195,6 +195,15 @@ export interface AgentStageSpan {
   tokenUsage?: { prompt: number; completion: number; total: number };
 }
 
+/** Provider calls one chat turn made; mirrors `convex/_agents/_shared/callCounters.ts`. */
+export interface CallCounters {
+  llmCalls: number;
+  embeddingCalls: number;
+  embeddingTexts: number;
+  rerankCalls: number;
+  rerankDocs: number;
+}
+
 type TokenUsageSource = "provider" | "estimated";
 
 /** Artifact captured by an eval runner for a single case */
@@ -247,6 +256,8 @@ export interface EvalRunArtifact {
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: TokenUsageSource;
   stageSpans?: AgentStageSpan[];
+  /** Chat: provider calls the agent made this turn */
+  callCounters?: CallCounters;
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
   /** Timestamp */

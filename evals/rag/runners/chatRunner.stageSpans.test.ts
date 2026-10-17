@@ -50,6 +50,32 @@ describe("runChatEval stageSpans", () => {
     ]);
   });
 
+  it("copies callCounters from the invoker onto the artifact", async () => {
+    const callCounters = {
+      llmCalls: 5,
+      embeddingCalls: 2,
+      embeddingTexts: 2,
+      rerankCalls: 1,
+      rerankDocs: 9,
+    };
+    const invoker: ChatAgentInvoker = {
+      invoke: async () => ({
+        answer: "a",
+        citations: [],
+        subQueries: [],
+        preRerankChunks: [],
+        postRerankChunks: [],
+        selectedChunks: [],
+        latencyMs: 90,
+        callCounters,
+      }),
+    };
+
+    const { artifact } = await runChatEval({ fixture, config: snapshotRetrievalConfig() }, invoker);
+
+    expect(artifact.callCounters).toEqual(callCounters);
+  });
+
   it("records each selected passage as the model saw it, previews included", async () => {
     const passage: ReferenceChunk = {
       id: "1",

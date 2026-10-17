@@ -32,4 +32,21 @@ describe("buildChatEvalTelemetry", () => {
     expect(result.tokenUsageSource).toBe("estimated");
     expect(result.stageSpans).toEqual([{ stage: "retrieve", latencyMs: 12 }]);
   });
+
+  it("passes call counters through unchanged", () => {
+    const callCounters = {
+      llmCalls: 4,
+      embeddingCalls: 3,
+      embeddingTexts: 3,
+      rerankCalls: 1,
+      rerankDocs: 20,
+    };
+    const result = buildChatEvalTelemetry({ estimated, callCounters });
+    expect(result.callCounters).toEqual(callCounters);
+  });
+
+  it("omits callCounters when the agent did not report them", () => {
+    const result = buildChatEvalTelemetry({ estimated });
+    expect(result.callCounters).toBeUndefined();
+  });
 });

@@ -26,6 +26,7 @@ export interface ChatAgentInvoker {
     tokenUsage?: { prompt: number; completion: number; total: number };
     tokenUsageSource?: "provider" | "estimated";
     stageSpans?: import("../types").AgentStageSpan[];
+    callCounters?: import("../types").CallCounters;
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
 }
@@ -135,6 +136,7 @@ export async function runChatEval(
         tokenUsage: result.tokenUsage,
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
         stageSpans: result.stageSpans,
+        callCounters: result.callCounters,
         sourcePolicy: result.sourcePolicy,
         sourceEvidence,
         timestamp: new Date().toISOString(),

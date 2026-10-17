@@ -14,6 +14,7 @@
 "use node";
 
 import { v } from "convex/values";
+import type { CallCounters } from "../_agents/_shared/tokenUsageAccumulator";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
@@ -88,6 +89,8 @@ export interface ChatEvalResult {
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: "provider" | "estimated";
   stageSpans?: import("../_agents/_shared/stageSpans").AgentStageSpan[];
+  /** Provider calls the agent made this turn (LLM, embedding, rerank). */
+  callCounters?: CallCounters;
   sourcePolicy?: {
     channels: string[];
     maxResultsPerChannel?: number;
@@ -127,6 +130,7 @@ export const runChatEval = action({
     let selectStartedAt: number | undefined;
     let selectEndedAt: number | undefined;
     let providerUsage: { prompt: number; completion: number; total: number } | undefined;
+    let agentCallCounters: CallCounters | undefined;
 
     // ── Vector search runner: production's, so chunk metadata (totalChunks, titles) and
     // thresholds match what chat sees ──
@@ -403,14 +407,17 @@ export const runChatEval = action({
           throw new Error(`Agent stream error: ${msg}`);
         }
         case "done": {
-          const usage = (
-            chunk.data as
-              | { tokenUsage?: { prompt: number; completion: number; total: number } }
-              | undefined
-          )?.tokenUsage;
+          const doneData = chunk.data as
+            | {
+                tokenUsage?: { prompt: number; completion: number; total: number };
+                callCounters?: CallCounters;
+              }
+            | undefined;
+          const usage = doneData?.tokenUsage;
           if (usage && typeof usage.total === "number" && usage.total > 0) {
             providerUsage = usage;
           }
+          agentCallCounters = doneData?.callCounters;
           break;
         }
         case "warning":
@@ -475,6 +482,7 @@ export const runChatEval = action({
           : undefined,
       provider: providerUsage,
       estimated: estimateChatTokenUsage(args.question, answer, selectedChunks),
+      callCounters: agentCallCounters,
     });
 
     return {
@@ -489,6 +497,7 @@ export const runChatEval = action({
       tokenUsage: telemetry.tokenUsage,
       tokenUsageSource: telemetry.tokenUsageSource,
       stageSpans: telemetry.stageSpans,
+      callCounters: telemetry.callCounters,
       sourcePolicy: args.sourcePolicy,
     };
   },

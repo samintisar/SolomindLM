@@ -770,6 +770,7 @@ export function latencyCostBudget(
         tokenRatio: Math.round(tokenRatio * 100) / 100,
         baselineLatencyMs: baseline.latencyMs,
         baselineTotalTokens: baseline.tokenUsage.total,
+        ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
       }
     );
   }
@@ -807,6 +808,7 @@ export function latencyCostBudget(
       latencyOk,
       tokensOk,
       hasBaseline: false,
+      ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
     }
   );
 }

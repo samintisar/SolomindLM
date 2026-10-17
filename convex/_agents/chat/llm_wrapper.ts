@@ -14,8 +14,12 @@ import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.j
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { invokeStructuredOutput } from "../_shared/structuredLlm.js";
-import { createTokenUsageAccumulator } from "../_shared/tokenUsageAccumulator.js";
-import { fromProviderUsage, fromTogetherUsage } from "../_shared/usageAggregate.js";
+import { createTurnTelemetry, type TurnTelemetry } from "../_shared/tokenUsageAccumulator.js";
+import {
+  fromProviderUsage,
+  fromTogetherUsage,
+  type TogetherUsage,
+} from "../_shared/usageAggregate.js";
 import {
   buildGroundingPrompt,
   estimateTokens,
@@ -66,9 +70,11 @@ export class ChatLLMWrapper {
   /** Together AI SDK client for streaming with structured output */
   private togetherClient: Together;
   private readonly outputLanguage?: string;
-  private readonly tokenUsage = createTokenUsageAccumulator();
+  /** Per-turn usage and call counters; the owning ChatAgent reads them on the `done` chunk. */
+  private readonly telemetry: TurnTelemetry;
 
   constructor(config: LLMWrapperConfig) {
+    this.telemetry = config.telemetry ?? createTurnTelemetry();
     // Smart vs fast: `mergeModelKwargs` — GPT-OSS uses reasoning_effort; Qwen-style uses chat_template thinking.
     this.llm = new ChatTogetherAI({
       apiKey: config.apiKey,
@@ -91,10 +97,6 @@ export class ChatLLMWrapper {
       apiKey: config.apiKey,
     });
     this.outputLanguage = config.outputLanguage;
-  }
-
-  consumeTokenUsage() {
-    return this.tokenUsage.consume();
   }
 
   /**
@@ -137,7 +139,7 @@ export class ChatLLMWrapper {
         toolChoice: "none",
         timeoutMs: DIRECT_RESPONSE_TIMEOUT_MS,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
       return response.content.trim();
     } catch (error) {
       console.warn("[ChatLLMWrapper] Direct response failed:", error);
@@ -175,7 +177,7 @@ Question: ${query}`;
         toolChoice: "none",
         timeoutMs: HYDE_TIMEOUT_MS,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
       const text = response.content.trim();
       console.log("[ChatLLMWrapper] HyDE document:", text.slice(0, 200));
       return text;
@@ -213,7 +215,7 @@ Question: ${query}`;
         toolChoice: "none",
         timeoutMs: FOLLOWUP_GENERATION_TIMEOUT_MS,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
       const text = response.content.trim();
       // Strip Qwen-style <redacted_thinking>...</redacted_thinking> reasoning blocks before parsing
       const stripped = text
@@ -311,7 +313,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         toolChoice: "none",
         timeoutMs,
       });
-      this.tokenUsage.add(fromProviderUsage(response.usage));
+      this.telemetry.recordLlmCall(fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
 
@@ -495,17 +497,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       const chunks: string[] = [];
       let providerUsage: ReturnType<typeof fromTogetherUsage>;
       for await (const chunk of stream) {
-        const mapped = fromTogetherUsage(
-          (
-            chunk as {
-              usage?: {
-                prompt_tokens?: number;
-                completion_tokens?: number;
-                total_tokens?: number;
-              } | null;
-            }
-          ).usage
-        );
+        const mapped = fromTogetherUsage((chunk as { usage?: TogetherUsage | null }).usage);
         if (mapped) {
           providerUsage = mapped;
         }
@@ -516,7 +508,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
       }
 
       const fullResponse = chunks.join("");
-      this.tokenUsage.add(providerUsage);
+      this.telemetry.recordLlmCall(providerUsage);
       console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
 
       // Parse the accumulated JSON
@@ -637,7 +629,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
         logPrefix: "ChatStructuredFallback",
         onUsage: (usage) => {
           fallbackUsage = usage;
-          this.tokenUsage.add(usage);
+          this.telemetry.recordLlmCall(usage);
         },
       });
       const validated = ChatResponseSchema.safeParse(parsed);
