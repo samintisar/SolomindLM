@@ -36,6 +36,30 @@ describe("checkHoldoutPromotion", () => {
     expect(decision.regressions[0]?.metric).toBe("binary_judge_chat_grounding");
   });
 
+  it("skips a flaky grounding row on the after side", () => {
+    const before = report([metric({ metric: "binary_judge_chat_grounding", status: "pass" })]);
+    const after = report([
+      metric({
+        metric: "binary_judge_chat_grounding",
+        status: "warn",
+        breakdown: { flaky: true, statuses: ["pass", "fail"] },
+      }),
+    ]);
+    expect(checkHoldoutPromotion(before, after).ok).toBe(true);
+  });
+
+  it("skips a fail whose before side was flaky", () => {
+    const before = report([
+      metric({
+        metric: "binary_judge_chat_grounding",
+        status: "warn",
+        breakdown: { flaky: true, statuses: ["pass", "fail"] },
+      }),
+    ]);
+    const after = report([metric({ metric: "binary_judge_chat_grounding", status: "fail" })]);
+    expect(checkHoldoutPromotion(before, after).ok).toBe(true);
+  });
+
   it("ignores expected_item_recall regressions", () => {
     const before = report([metric({ metric: "expected_item_recall", status: "pass" })]);
     const after = report([metric({ metric: "expected_item_recall", status: "fail" })]);

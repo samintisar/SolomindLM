@@ -1,4 +1,5 @@
 import type { EvalReport, MetricResult } from "../types";
+import { isFlakyMetric } from "./repeats";
 
 const PROMOTE_PREFIXES = [
   "binary_judge_chat_grounding",
@@ -37,6 +38,8 @@ export function checkHoldoutPromotion(before: EvalReport, after: EvalReport): Pr
   for (const row of after.metrics) {
     if (!isPromoteMetric(row.metric) || row.status !== "fail") continue;
     const prev = beforeByKey.get(key(row));
+    // A flaky verdict on either side is noise, not a regression (see reports/repeats.ts).
+    if (isFlakyMetric(row) || (prev && isFlakyMetric(prev))) continue;
     if (!prev || prev.status !== "fail") {
       regressions.push({
         caseId: row.caseId,

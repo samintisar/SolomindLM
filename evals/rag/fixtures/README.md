@@ -105,6 +105,8 @@ Fixtures for advertised use cases (language learners, medical students, professi
 5. Do not start Loop 3 (prompt compile) until the judge-queue scorer prints
    `readyForPromptCompile: true`.
 
+**Repeats and flaky cases.** The smoke split runs each fixture 3 times by default (`--repeats <n>` overrides; dry runs use 1). Each metric row reports the mean score, `passAll` (pass^k: passed every repeat) and `passAny`. When the verdicts disagree across repeats the row is **flaky**: it is listed under "Flaky (not counted as regressions)" in the report and `--promotion-check` skips it. Artifacts, the Ragas export and the judge queue use the first repeat only.
+
 Do not coach enumeration in `customPrompt` (no “list the 20 names”). Use product-like user requests; keep expected items for metrics only.
 
 

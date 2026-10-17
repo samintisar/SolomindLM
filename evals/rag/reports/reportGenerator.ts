@@ -1,5 +1,6 @@
 import type { EvalReport, MetricResult } from "../types";
 import { groupFailures } from "./failureGrouper";
+import { isFlakyMetric } from "./repeats";
 import { buildScorecard, formatScorecard } from "./scorecard";
 
 export interface GenerateReportOptions {
@@ -39,6 +40,13 @@ export function generateReport(
       ? buildScorecard(metrics, options.useCaseByCase)
       : undefined;
 
+  const flaky = metrics.filter(isFlakyMetric).map((m) => ({
+    caseId: m.caseId,
+    runner: m.runner,
+    metric: m.metric,
+    statuses: (m.breakdown?.statuses as string[] | undefined) ?? [],
+  }));
+
   return {
     timestamp: new Date().toISOString(),
     commitSha: options.commitSha,
@@ -48,6 +56,7 @@ export function generateReport(
     metrics,
     failureGroups,
     ...(scorecard && scorecard.cells.length > 0 ? { scorecard } : {}),
+    ...(flaky.length > 0 ? { flaky } : {}),
   };
 }
 
@@ -101,6 +110,14 @@ export function formatReport(report: EvalReport): string {
 
   if (report.scorecard) {
     lines.push(...formatScorecard(report.scorecard));
+  }
+
+  if (report.flaky && report.flaky.length > 0) {
+    lines.push("  Flaky (not counted as regressions):");
+    for (const f of report.flaky) {
+      lines.push(`    ${f.caseId} (${f.runner}) ${f.metric}: ${f.statuses.join(", ")}`);
+    }
+    lines.push("");
   }
 
   if (report.failureGroups.length > 0) {
