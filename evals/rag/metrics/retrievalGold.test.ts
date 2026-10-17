@@ -329,6 +329,79 @@ describe("abstentionCorrectness with expectedPassages and no expectedItems", () 
   });
 });
 
+describe("abstentionCorrectness passage thresholds", () => {
+  const abstain = "I cannot find this in the notes.";
+  const three = fixture({ expectedPassages: [P.a, P.b, P.c] });
+
+  it("counts two of three passages as sufficient (0.6): an abstention then fails as answer generation", () => {
+    const row = abstentionCorrectness(
+      three,
+      artifact({
+        answer: abstain,
+        preRerankChunks: [chunk("1", P.a), chunk("2", P.b), chunk("3", P.c)],
+        selectedChunks: [chunk("1", P.a), chunk("2", P.b)],
+      })
+    );
+    expect(row).toMatchObject({ status: "fail" });
+    expect(row.breakdown).toMatchObject({ category: "answer_generation" });
+  });
+
+  it("passes an answer that uses two of three selected passages", () => {
+    const row = abstentionCorrectness(
+      three,
+      artifact({
+        answer: `Yes. ${P.a} ${P.b}`,
+        selectedChunks: [chunk("1", P.a), chunk("2", P.b)],
+      })
+    );
+    expect(row).toMatchObject({ status: "pass" });
+  });
+
+  it("fails context selection when only one of three passages survives selection (0.33 < 0.5)", () => {
+    const row = abstentionCorrectness(
+      three,
+      artifact({
+        answer: abstain,
+        preRerankChunks: [chunk("1", P.a), chunk("2", P.b), chunk("3", P.c)],
+        selectedChunks: [chunk("1", P.a)],
+      })
+    );
+    expect(row).toMatchObject({ status: "fail" });
+    expect(row.breakdown).toMatchObject({ category: "context_selection" });
+  });
+
+  it("warns context selection when half of four passages survive selection (0.5)", () => {
+    const four = fixture({ expectedPassages: [P.a, P.b, P.c, P.d] });
+    const row = abstentionCorrectness(
+      four,
+      artifact({
+        answer: abstain,
+        preRerankChunks: [chunk("1", P.a), chunk("2", P.b), chunk("3", P.c), chunk("4", P.d)],
+        selectedChunks: [chunk("1", P.a), chunk("2", P.b)],
+      })
+    );
+    expect(row).toMatchObject({ status: "warn" });
+    expect(row.breakdown).toMatchObject({ category: "context_selection" });
+  });
+
+  it("keeps item mode at 0.7: two of three items selected fails context selection", () => {
+    const items = fixture({
+      expectedItems: ["routing", "parallelization", "reflection"],
+      expectedPassages: undefined,
+    });
+    const row = abstentionCorrectness(
+      items,
+      artifact({
+        answer: abstain,
+        preRerankChunks: [chunk("1", P.a), chunk("2", P.b), chunk("3", P.c)],
+        selectedChunks: [chunk("1", P.a), chunk("2", P.b)],
+      })
+    );
+    expect(row).toMatchObject({ status: "fail" });
+    expect(row.breakdown).toMatchObject({ category: "context_selection" });
+  });
+});
+
 describe("agentic-patterns-20 gold passages", () => {
   it("are three verbatim sentences of the 20-patterns source", async () => {
     const { agenticPatterns20 } = await import("../fixtures/agentic-patterns-20");
