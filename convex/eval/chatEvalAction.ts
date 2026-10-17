@@ -140,6 +140,22 @@ export function evalSmartModel(candidate: string | undefined): SmartModelId | un
   return resolved;
 }
 
+/** Production caps external sources at five (`chat/_streamSources.ts`); the merged list keeps that cap. */
+const EXTERNAL_SOURCE_CAP = 5;
+
+/**
+ * The external chunks the agent gets: production discovery and eval finance, merged, best first by
+ * score (`similarity`, the score slot the chunks carry), capped at production's five.
+ */
+export function mergeExternalChunks(
+  production: ReferenceChunk[],
+  finance: ReferenceChunk[]
+): ReferenceChunk[] {
+  return [...production, ...finance]
+    .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+    .slice(0, EXTERNAL_SOURCE_CAP);
+}
+
 /**
  * Eval-only finance search (Tavily, finance topic). Not production: production chat has no finance
  * channel. Failures return no chunks, as production's discovery does for its channels.
@@ -402,7 +418,7 @@ export const runChatEval = action({
         const finance = externalChannels.includes("finance")
           ? await evalFinanceChunks(ctx, args.question)
           : [];
-        externalChunks = [...discovered.chunks, ...finance];
+        externalChunks = mergeExternalChunks(discovered.chunks, finance);
         console.log(
           `[ChatEval] External search complete: ${externalChunks.length} chunks (${productionChannels.join(", ") || "no production channels"}${finance.length > 0 ? ", finance" : ""})`
         );
