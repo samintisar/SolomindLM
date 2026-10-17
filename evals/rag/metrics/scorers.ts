@@ -12,6 +12,7 @@ import {
 import { getPack } from "../usecases";
 import type { SourceText } from "../usecases/types";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
+import { scoreContextRelevance } from "./contextRelevance";
 import {
   abstentionCorrectness,
   citationValidity,
@@ -138,7 +139,16 @@ export async function scoreAllMetrics(
   // Judge groups run one after another (each parallelises its own judges), so one case never
   // bursts the shared Together key; rows keep the order binary, rubric, Likert.
   const judgeGroups: Array<() => Promise<MetricResult[]>> = [
-    () => scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
+    async () => {
+      const binary = await scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions);
+      // Reference-free context relevance: after the binary judges, on the same invoker. It skips
+      // fixtures with deterministic gold itself.
+      const context =
+        binaryOptions.enabled && invoke
+          ? await scoreContextRelevance(fixture, artifact, { invoke, model: judgeModel })
+          : [];
+      return [...binary, ...context];
+    },
   ];
 
   const useCase = fixture.useCase;

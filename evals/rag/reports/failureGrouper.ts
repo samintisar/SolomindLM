@@ -48,6 +48,9 @@ function classifyFailure(metric: MetricResult): FailureCategory {
   if (metric.metric === "passage_precision_selected" || metric.metric === "passage_ndcg_selected") {
     return "context_selection";
   }
+  if (metric.metric === "llm_context_precision" || metric.metric === "llm_context_waste_tokens") {
+    return "context_selection";
+  }
 
   if (metric.metric === "retrieval_precision_at_k" || metric.metric === "retrieval_ndcg_at_k") {
     return "context_selection";

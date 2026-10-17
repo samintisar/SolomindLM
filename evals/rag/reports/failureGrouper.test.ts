@@ -48,6 +48,11 @@ describe("groupFailures: passage metrics", () => {
     expect(categoryOf(fail("passage_ndcg_selected", 0.2))).toBe("context_selection");
   });
 
+  it("routes the reference-free context judge rows to context selection", () => {
+    expect(categoryOf(fail("llm_context_precision", 0.2))).toBe("context_selection");
+    expect(categoryOf(fail("llm_context_waste_tokens", 300))).toBe("context_selection");
+  });
+
   it("groups passage failures of one case together with their trace hints", () => {
     const groups = groupFailures([
       fail("passage_precision_selected", 0.1),
