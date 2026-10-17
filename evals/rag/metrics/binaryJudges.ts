@@ -79,8 +79,11 @@ export function formatChunks(
 }
 
 /** Chunk context for grounding judges, with a note when passages were cut for judging. */
-function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
-  const { text, truncated } = formatChunks(chunks);
+export function combineChunkContents(
+  chunks: EvalRunArtifact["selectedChunks"],
+  limit = CHUNK_CONTEXT_LIMIT
+): string {
+  const { text, truncated } = formatChunks(chunks, limit);
   if (!truncated) return text;
   return (
     "Some retrieved passages were cut off for judging; do not fail a claim only because its " +

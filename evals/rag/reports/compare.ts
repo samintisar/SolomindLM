@@ -5,8 +5,10 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "f
 import { join } from "path";
 import { caseFileStem } from "../caseFile";
 import { getFixture } from "../fixtures";
+import { combineChunkContents } from "../metrics/binaryJudges";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "../metrics/togetherLlmJudge";
 import type {
+  ChunkSnapshot,
   CompareCaseResult,
   CompareReport,
   ConcreteRunnerKind,
@@ -18,6 +20,8 @@ export interface CompareArtifactsOptions {
   pathB: string;
   judgeModel?: string;
   commitSha?: string;
+  /** Judge invoker; defaults to the Together judge (tests inject a stub) */
+  invoke?: (prompt: string) => Promise<string>;
 }
 
 function artifactFileName(artifact: EvalRunArtifact): string {
@@ -52,10 +56,52 @@ export function loadArtifactsFromDir(dir: string): EvalRunArtifact[] {
   return artifacts;
 }
 
-function comparePrompt(question: string, answerA: string, answerB: string): string {
-  return `You are comparing two AI outputs for the same task. Pick the better answer.
+/** Evidence budget for the pairwise judge: both answers' passages, deduplicated. */
+const COMPARE_EVIDENCE_LIMIT = 24_000;
+const NO_EVIDENCE_NOTE = "(no retrieved passages recorded for these outputs)";
+
+type Verdict = "a" | "b" | "tie";
+
+/**
+ * The passages both answers were built from: one copy of each (whitespace-normalised content),
+ * formatted like the binary judges' chunks. Chunk ids are local to each answer, so the judge is
+ * told to read the passages as evidence, not to look ids up.
+ */
+export function comparisonEvidence(artA: EvalRunArtifact, artB: EvalRunArtifact): string {
+  if (artA.selectedChunks.length === 0 || artB.selectedChunks.length === 0) {
+    return NO_EVIDENCE_NOTE;
+  }
+  const seen = new Set<string>();
+  const unique: ChunkSnapshot[] = [];
+  for (const chunk of [...artA.selectedChunks, ...artB.selectedChunks]) {
+    const key = (chunk.contextText ?? chunk.content).replace(/\s+/g, " ").trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(chunk);
+  }
+  return combineChunkContents(unique, COMPARE_EVIDENCE_LIMIT);
+}
+
+/** One presentation of the pair: `answerA` is shown in slot A, `answerB` in slot B. */
+export function comparePrompt(
+  question: string,
+  answerA: string,
+  answerB: string,
+  evidence: string
+): string {
+  return `You are comparing two AI answers to the same question. Pick the better answer.
+
+Judge in this order:
+1. Grounding: which answer's substantive claims are supported by the evidence? A claim the evidence does not support counts against an answer, however fluent it reads.
+2. Completeness: which answer covers what the question asks, as far as the evidence allows?
+3. Clarity: which answer is easier to follow?
+
+Do not prefer an answer because it is longer. Say "tie" when neither is clearly better.
 
 Question: ${question}
+
+Evidence (passages retrieved for these answers; chunk ids are local to each answer):
+${evidence}
 
 Answer A:
 ${answerA.slice(0, 6000)}
@@ -73,26 +119,56 @@ function parseWinner(raw: string): { winner: "A" | "B" | "tie"; reason: string }
   const w = parsed.winner?.toUpperCase();
   const winner = w === "A" || w === "B" ? w : "tie";
   const reason =
-    typeof parsed.reason === "string" && parsed.reason.trim() ? parsed.reason.trim() : "No reason";
+    typeof parsed.reason === "string" && parsed.reason.trim()
+      ? parsed.reason.trim().replace(/\s+/g, " ")
+      : "No reason";
   return { winner, reason };
 }
 
-async function judgePair(
+export interface PairJudgement {
+  /** Agreed verdict; "tie" when the two orders disagree */
+  winner: Verdict;
+  /** Verdict with A in slot A, mapped back to artifact A / B */
+  forward: Verdict;
+  /** Verdict with B in slot A, mapped back to artifact A / B */
+  backward: Verdict;
+  reasonForward: string;
+  reasonBackward: string;
+}
+
+/** Judge both position orders and map the verdicts back to artifact A / B. */
+export async function judgeArtifactPair(
   invoke: (prompt: string) => Promise<string>,
   question: string,
-  answerA: string,
-  answerB: string
-): Promise<"a" | "b" | "tie"> {
-  const forward = parseWinner(await invoke(comparePrompt(question, answerA, answerB)));
-  const backward = parseWinner(await invoke(comparePrompt(question, answerB, answerA)));
+  artA: EvalRunArtifact,
+  artB: EvalRunArtifact
+): Promise<PairJudgement> {
+  const evidence = comparisonEvidence(artA, artB);
+  const forward = parseWinner(
+    await invoke(comparePrompt(question, artA.answer, artB.answer, evidence))
+  );
+  const backward = parseWinner(
+    await invoke(comparePrompt(question, artB.answer, artA.answer, evidence))
+  );
 
-  const forwardB = forward.winner === "A" ? "a" : forward.winner === "B" ? "b" : "tie";
-  const backwardB = backward.winner === "A" ? "b" : backward.winner === "B" ? "a" : "tie";
+  const forwardVerdict: Verdict =
+    forward.winner === "A" ? "a" : forward.winner === "B" ? "b" : "tie";
+  const backwardVerdict: Verdict =
+    backward.winner === "A" ? "b" : backward.winner === "B" ? "a" : "tie";
+  return {
+    winner: forwardVerdict === backwardVerdict ? forwardVerdict : "tie",
+    forward: forwardVerdict,
+    backward: backwardVerdict,
+    reasonForward: forward.reason,
+    reasonBackward: backward.reason,
+  };
+}
 
-  if (forwardB === backwardB) {
-    return forwardB;
+function summarise(judgement: PairJudgement): string {
+  if (judgement.forward === judgement.backward) {
+    return `${judgement.winner} in both orders`;
   }
-  return "tie";
+  return `position disagreement (forward ${judgement.forward}, swapped ${judgement.backward}): tie`;
 }
 
 type WinTally = { winsA: number; winsB: number; ties: number; winRateB: number };
@@ -125,7 +201,7 @@ export async function compareArtifactDirs(
   options: CompareArtifactsOptions
 ): Promise<CompareReport> {
   const judgeModel = options.judgeModel ?? DEFAULT_JUDGE_MODEL;
-  const invoke = createTogetherJudgeInvoker({ model: judgeModel });
+  const invoke = options.invoke ?? createTogetherJudgeInvoker({ model: judgeModel });
 
   const artifactsA = loadArtifactsFromDir(options.pathA);
   const artifactsB = loadArtifactsFromDir(options.pathB);
@@ -155,12 +231,17 @@ export async function compareArtifactDirs(
         return artA.caseId;
       }
     })();
-    const winner = await judgePair(invoke, question, artA.answer, artB.answer);
+    const judgement = await judgeArtifactPair(invoke, question, artA, artB);
+    const winner = judgement.winner;
     const caseResult: CompareCaseResult = {
       caseId: artA.caseId,
       runner: artA.runner as ConcreteRunnerKind,
       winner,
-      reason: `Position-bias swap: ${winner}`,
+      forward: judgement.forward,
+      backward: judgement.backward,
+      reason: summarise(judgement),
+      reasonForward: judgement.reasonForward,
+      reasonBackward: judgement.reasonBackward,
       useCase: artA.useCase,
     };
     cases.push(caseResult);
@@ -172,6 +253,7 @@ export async function compareArtifactDirs(
 
   const total = winsA + winsB + ties;
   const winRateB = total > 0 ? (winsB + ties / 2) / total : 0;
+  const positionDisagreements = cases.filter((c) => c.forward !== c.backward).length;
 
   return {
     timestamp: new Date().toISOString(),
@@ -180,6 +262,7 @@ export async function compareArtifactDirs(
     pathA: options.pathA,
     pathB: options.pathB,
     casesCompared: cases.length,
+    positionDisagreements,
     winsA,
     winsB,
     ties,

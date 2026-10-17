@@ -326,9 +326,16 @@ export interface EvalReport {
 export interface CompareCaseResult {
   caseId: string;
   runner: ConcreteRunnerKind;
-  /** A wins | B wins | tie */
+  /** A wins | B wins | tie (tie when the two position orders disagree) */
   winner: "a" | "b" | "tie";
+  /** Verdict with A shown first, mapped to artifact A / B */
+  forward: "a" | "b" | "tie";
+  /** Verdict with B shown first, mapped to artifact A / B */
+  backward: "a" | "b" | "tie";
+  /** One-line summary */
   reason: string;
+  reasonForward: string;
+  reasonBackward: string;
   useCase?: string;
 }
 
@@ -339,6 +346,8 @@ export interface CompareReport {
   pathA: string;
   pathB: string;
   casesCompared: number;
+  /** Cases where the judge's verdict flipped with position (counted as ties) */
+  positionDisagreements: number;
   winsA: number;
   winsB: number;
   ties: number;
