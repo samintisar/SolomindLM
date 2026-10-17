@@ -19,9 +19,10 @@ import type { CallCounters } from "../_agents/_shared/tokenUsageAccumulator";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { isListEnumerationQuery } from "../_agents/chat/chat_retrieval_subqueries";
 import { CONTEXT_TOKEN_BUDGET, LIST_QUERY_CONTEXT_TOKEN_BUDGET } from "../_agents/chat/chatConfig";
+import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
-import type { ReferenceChunk } from "../_agents/chat/types";
+import type { ChatAgentContext, ReferenceChunk } from "../_agents/chat/types";
 import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
@@ -55,7 +56,44 @@ export const chatEvalActionArgs = {
       recencyDays: v.optional(v.number()),
     })
   ),
+  /** Prior turns before `question`, oldest first (the question is not included). */
+  conversationHistory: v.optional(
+    v.array(
+      v.object({
+        role: v.union(v.literal("user"), v.literal("assistant")),
+        content: v.string(),
+      })
+    )
+  ),
+  chatSettings: v.optional(
+    v.object({
+      instructionMode: v.optional(v.union(v.literal("default"), v.literal("learningGuide"))),
+    })
+  ),
 };
+
+export type EvalHistoryTurn = { role: "user" | "assistant"; content: string };
+
+/**
+ * The history the agent receives, built as production builds it (`chat/_streamChatResponse.ts`):
+ * the conversation so far with the current user message last, trimmed to the history token budget.
+ */
+export function evalConversationHistory(
+  question: string,
+  priorTurns: EvalHistoryTurn[] | undefined,
+  historyTokenBudget: number
+): EvalHistoryTurn[] {
+  const full: EvalHistoryTurn[] = [...(priorTurns ?? []), { role: "user", content: question }];
+  // budgetConversationHistory returns a subset of its input, so every role is still user or assistant.
+  return budgetConversationHistory(full, historyTokenBudget) as EvalHistoryTurn[];
+}
+
+/** Chat settings the agent runs with, shaped as production's `mergedChatSettings` (responseLength default). */
+export function evalChatSettings(
+  instructionMode: "default" | "learningGuide" | undefined
+): NonNullable<ChatAgentContext["chatSettings"]> {
+  return { instructionMode: instructionMode ?? "default", responseLength: "default" };
+}
 
 // ─── Token Estimation Helpers ────────────────────────────────
 
@@ -96,6 +134,8 @@ export interface ChatEvalResult {
   callCounters?: CallCounters;
   /** Context token budget the agent applied to this question (list budget for list queries). */
   contextTokenBudget?: number;
+  /** Instruction mode the agent ran this question in. */
+  instructionMode?: "default" | "learningGuide" | "custom";
   sourcePolicy?: {
     channels: string[];
     maxResultsPerChannel?: number;
@@ -360,11 +400,21 @@ export const runChatEval = action({
       }
     }
 
+    // Built as production builds them: history budgeted with the same setting, and chat settings
+    // shaped like production's merged settings. Only learning guide mode reads the history.
+    const conversationHistory = evalConversationHistory(
+      args.question,
+      args.conversationHistory,
+      parseInt(env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000", 10)
+    );
+    const chatSettings = evalChatSettings(args.chatSettings?.instructionMode);
+
     for await (const chunk of agent.streamResponse(
       {
         userId: userIdStr,
         noteId: notebookIdStr,
-        conversationHistory: [],
+        conversationHistory,
+        chatSettings,
         documentIds: documentIdStrings,
         enableNotebookSearch: sourcePolicyChannels.includes("notebook"),
         sourcePolicy: {
@@ -512,6 +562,7 @@ export const runChatEval = action({
       contextTokenBudget: isListEnumerationQuery(args.question)
         ? LIST_QUERY_CONTEXT_TOKEN_BUDGET
         : CONTEXT_TOKEN_BUDGET,
+      instructionMode: chatSettings.instructionMode,
       sourcePolicy: args.sourcePolicy,
     };
   },

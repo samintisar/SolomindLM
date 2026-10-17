@@ -190,6 +190,83 @@ export const languageLearnersFixtures: EvalFixture[] = [
     tags: tags("chat", "unanswerable"),
   },
 
+  {
+    ...base,
+    id: "language-learners/chat-followup-etre-examples",
+    split: "train",
+    runner: "chat",
+    question: "Give me two more examples of that.",
+    turns: [
+      { role: "user", content: "Which verbs take être in the passé composé?" },
+      {
+        role: "assistant",
+        content:
+          "Many intransitive verbs of coming and going take être, for example aller (to go): je suis allé(e). " +
+          "Can you think of another verb of movement that might take être?",
+      },
+    ],
+    chatSettings: { instructionMode: "learningGuide" },
+    expectedItems: [],
+    expectedAnswer:
+      "Two more verbs of coming and going that take être in the passé composé, such as venir, partir, arriver or entrer, " +
+      "with the participle agreeing with the subject (for example elle est arrivée).",
+    expectedBehavior:
+      "Stays on the earlier topic, verbs of coming and going that take être in the passé composé, and gives two new examples " +
+      "from the notes. Learning guide mode may guide with a question first, but the reply must build on that topic " +
+      "and must not switch to avoir verbs or another tense.",
+    tags: tags("chat", "multi-turn", "learning-guide", "grammar"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-followup-possessive-examples",
+    split: "train",
+    runner: "chat",
+    question: "Give me two more examples of that rule.",
+    turns: [
+      { role: "user", content: "How do ma, ta and sa change before a vowel?" },
+      {
+        role: "assistant",
+        content:
+          "Before a feminine noun that starts with a vowel sound, ma, ta and sa become mon, ton and son, as in 'mon amie'. " +
+          "Can you think of another feminine noun that starts with a vowel?",
+      },
+    ],
+    chatSettings: { instructionMode: "learningGuide" },
+    expectedItems: [],
+    expectedAnswer:
+      "Two more examples of ma, ta and sa becoming mon, ton and son before a feminine noun that starts with a vowel sound, " +
+      "such as mon adresse, ton école or son histoire.",
+    expectedBehavior:
+      "Stays on the mon/ton/son rule for feminine nouns that begin with a vowel sound and gives two new examples with the " +
+      "correct forms. Learning guide mode may guide with a question first, but must build on that rule.",
+    tags: tags("chat", "multi-turn", "learning-guide", "grammar"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-followup-unresolved-le-la",
+    split: "train",
+    runner: "chat",
+    question: "Give me two more of those.",
+    turns: [
+      { role: "user", content: "What's the difference between le and la?" },
+      {
+        role: "assistant",
+        content:
+          "Le goes with masculine singular nouns and la with feminine singular nouns, for example le tatou and la chatte. " +
+          "Do you want the plural forms too?",
+      },
+    ],
+    chatSettings: { instructionMode: "default" },
+    expectedItems: [],
+    expectedAnswer:
+      "Default mode does not carry the earlier turns into the answer, and 'those' has no clear referent on its own. The correct " +
+      "reply asks what kind of examples are wanted, or says it needs the topic, rather than listing examples as if it knew.",
+    expectedBehavior:
+      "Does not guess what 'those' refers to and answer confidently. Acceptable: a clarifying question, or an explicit note that " +
+      "the question needs the topic. A confident list presented as a continuation of the earlier discussion is a failure.",
+    tags: tags("chat", "multi-turn", "follow-up"),
+  },
+
   // ─── holdout (never tune against these) ───────────────────
   {
     ...base,
@@ -240,5 +317,31 @@ export const languageLearnersFixtures: EvalFixture[] = [
       "Declines, saying the sources do not cover the imperfect. It must not invent imperfect conjugations, " +
       "and must not present general grammar knowledge as if it came from the notes.",
     tags: tags("chat", "unanswerable"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-followup-unresolved-other-example",
+    split: "holdout",
+    runner: "chat",
+    question: "Now do the same thing with the other example from before.",
+    turns: [
+      { role: "user", content: "How do lui and leur replace indirect objects?" },
+      {
+        role: "assistant",
+        content:
+          "Lui replaces an indirect object for one person, as in 'Je parle à Tammy' becoming 'Je lui parle'. " +
+          "Leur replaces one for several people. Would you like another example?",
+      },
+    ],
+    chatSettings: { instructionMode: "default" },
+    expectedItems: [],
+    expectedAnswer:
+      "The question depends on an 'other example' the earlier turns do not contain. The correct reply asks which example " +
+      "is meant, or says it cannot tell without more context, and does not invent an example.",
+    expectedBehavior:
+      "Does not invent the 'other example' or present a made-up pronoun sentence as the one from before. Acceptable: a " +
+      "clarifying question or an explicit note that the question needs the example. A confident answer that treats an " +
+      "invented example as the earlier one is a failure.",
+    tags: tags("chat", "multi-turn", "follow-up"),
   },
 ];

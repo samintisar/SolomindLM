@@ -28,6 +28,7 @@ export interface ChatAgentInvoker {
     stageSpans?: import("../types").AgentStageSpan[];
     callCounters?: CallCounters;
     contextTokenBudget?: number;
+    instructionMode?: "default" | "learningGuide" | "custom";
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
 }
@@ -63,6 +64,15 @@ function validateFixture(fixture: EvalFixture): string[] {
     errors.push("Fixture must have at least one expectedItem or a non-empty expectedAnswer");
   }
 
+  for (const turn of fixture.turns ?? []) {
+    if (turn.role !== "user" && turn.role !== "assistant") {
+      errors.push(`turns must have role "user" or "assistant", got "${String(turn.role)}"`);
+    }
+    if (!turn.content?.trim()) {
+      errors.push("turns must have non-empty content");
+    }
+  }
+
   return errors;
 }
 
@@ -87,12 +97,21 @@ export async function runChatEval(
       // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
       // future invoker starts using it, that invoker must derive a real userId
       // rather than relying on this string.
+      // Prior turns, then the question as the final user turn (production history ends with the
+      // current message too). Learning guide mode is the only one that reads the history.
       const result = await chat.invoke({
         userId: "__eval_unused__",
         noteId: fixture.notebookId ?? "",
-        conversationHistory: [{ role: "user", content: fixture.question }],
+        conversationHistory: [
+          ...(fixture.turns ?? []),
+          { role: "user", content: fixture.question },
+        ],
         documentIds: fixture.documentIds,
         sourcePolicy: fixture.sourcePolicy,
+        chatSettings: {
+          instructionMode: fixture.chatSettings?.instructionMode ?? "default",
+          responseLength: "default",
+        },
       });
 
       // Build source evidence summary from selected chunks
@@ -139,6 +158,7 @@ export async function runChatEval(
         stageSpans: result.stageSpans,
         callCounters: result.callCounters,
         contextTokenBudget: result.contextTokenBudget,
+        instructionMode: result.instructionMode,
         sourcePolicy: result.sourcePolicy,
         sourceEvidence,
         timestamp: new Date().toISOString(),
