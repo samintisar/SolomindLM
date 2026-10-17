@@ -810,6 +810,7 @@ export function latencyCostBudget(
         baselineLatencyMs: baseline.latencyMs,
         baselineTotalTokens: baselineTokens,
         tokensGated,
+        ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
       }
     );
   }
@@ -842,6 +843,7 @@ export function latencyCostBudget(
     tokensOk,
     hasBaseline: false,
     tokensGated: providerTokens,
+    ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
   });
 }
 

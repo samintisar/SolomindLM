@@ -2,8 +2,13 @@ import type { AgentStageName } from "./types";
 
 const STAGES = new Set<AgentStageName>([
   "retrieve",
+  "plan",
+  "hyde",
   "rerank",
   "select",
+  "generate",
+  "grounding",
+  "followup",
   "map",
   "reduce",
   "parse",
