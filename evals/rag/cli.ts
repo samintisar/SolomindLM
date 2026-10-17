@@ -12,7 +12,12 @@
 import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import {
+  CHAT_CONFIG_OVERRIDE_KEYS,
+  type ChatConfigOverrides,
+} from "../../convex/_agents/chat/chatConfigOverrides";
 import { caseFileStem } from "./caseFile";
+import { parseChatConfigFlag } from "./chatConfigFlag";
 import { mapWithConcurrency } from "./concurrency";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
@@ -105,6 +110,8 @@ interface CliOptions {
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
+  /** Chat knob overrides for chat fixtures (`--chat-config key=value,…`) */
+  chatConfigOverrides?: ChatConfigOverrides;
   /** Score a labeled judge-queue.json and exit */
   scoreJudgeQueue?: string;
   /** Holdout promotion check: before/after EvalReport JSON paths */
@@ -188,6 +195,7 @@ const CLI_OPTIONS = {
   "judge-model": { type: "string" },
   rubric: { type: "string" },
   "judge-reasoning": { type: "string" },
+  "chat-config": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
@@ -279,6 +287,8 @@ function parseArgs(args: string[]): CliOptions {
       values["judge-reasoning"] !== undefined
         ? parseOnOff("judge-reasoning", values["judge-reasoning"])
         : undefined,
+    chatConfigOverrides:
+      values["chat-config"] !== undefined ? parseChatConfigFlag(values["chat-config"]) : undefined,
     compareA: values.compare,
     compareB: secondValues.get("compare"),
     scoreJudgeQueue: values["score-judge-queue"],
@@ -318,6 +328,8 @@ Options:
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
   --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
   --judge-reasoning <on|off>  Judge reasoning (default: the model's; off bills far fewer output tokens)
+  --chat-config <k=v[,k=v]>  Override chat knobs for chat fixtures (experiments; recorded in
+                           configHash). Keys: ${CHAT_CONFIG_OVERRIDE_KEYS.join(", ")}
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
@@ -535,6 +547,17 @@ async function main(): Promise<void> {
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}${repeats > 1 ? ` [repeats=${repeats}]` : ""}\n`
   );
+  if (opts.chatConfigOverrides) {
+    console.log(`Chat config overrides: ${JSON.stringify(opts.chatConfigOverrides)}`);
+    const otherFixtures = fixtureIds.filter(
+      (id) => !["chat", "both"].includes(getFixture(id).runner)
+    ).length;
+    if (otherFixtures > 0) {
+      console.log(
+        `Note: --chat-config applies to chat fixtures only; ${otherFixtures} other fixture(s) run with production values.\n`
+      );
+    }
+  }
 
   // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
   let chatInvoker: ChatAgentInvoker | undefined;
@@ -628,6 +651,7 @@ async function main(): Promise<void> {
       researchInvoker,
       literatureReviewInvoker,
       studioInvokers,
+      chatConfigOverrides: opts.chatConfigOverrides,
     },
     scoreAllMetrics,
     scoreOptionsFor: (fixture: EvalFixture) => ({

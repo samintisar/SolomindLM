@@ -29,7 +29,7 @@ export function createConvexChatInvoker(
   const client = new ConvexHttpClient(convexUrl);
 
   return {
-    async invoke(context: ChatAgentContext) {
+    async invoke(context: Parameters<ChatAgentInvoker["invoke"]>[0]) {
       if (!context.noteId) {
         throw new Error(
           "ConvexChatInvoker requires a notebookId (fixture.notebookId) to scope retrieval"
@@ -48,6 +48,7 @@ export function createConvexChatInvoker(
         notebookId: context.noteId as Id<"notebooks">,
         documentIds: context.documentIds as Id<"documents">[] | undefined,
         sourcePolicy: context.sourcePolicy,
+        configOverrides: context.configOverrides,
       });
 
       return {
@@ -66,6 +67,7 @@ export function createConvexChatInvoker(
         callCounters: result.callCounters,
         contextTokenBudget: result.contextTokenBudget,
         sourcePolicy: toEvalSourcePolicy(result.sourcePolicy),
+        configOverrides: result.configOverrides,
       };
     },
   };

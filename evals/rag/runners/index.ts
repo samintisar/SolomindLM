@@ -11,6 +11,7 @@ export { createConvexLiteratureReviewInvoker } from "./convexLiteratureReviewInv
 export { createConvexResearchInvoker } from "./convexResearchInvoker";
 export { createConvexStudioInvokers } from "./convexStudioInvoker";
 
+import type { ChatConfigOverrides } from "../../../convex/_agents/chat/chatConfigOverrides";
 import { type EvalFixture, isStudioRunner, type StudioRunnerKind } from "../types";
 import type { ChatAgentInvoker } from "./chatRunner";
 import { runChatEval } from "./chatRunner";
@@ -29,6 +30,8 @@ export interface RunEvalOptions {
   researchInvoker?: ResearchAgentInvoker;
   literatureReviewInvoker?: LiteratureReviewInvoker;
   studioInvokers?: Partial<Record<StudioRunnerKind, StudioInvoker>>;
+  /** Chat knobs to override for chat fixtures (`--chat-config`); other runners never see them. */
+  chatConfigOverrides?: ChatConfigOverrides;
 }
 
 /**
@@ -47,12 +50,14 @@ export async function runEval(
     config,
     dryRun: options?.dryRun ?? false,
   };
+  const chatOverrides = options?.chatConfigOverrides;
+  const chatConfig = chatOverrides ? snapshotRetrievalConfig({ overrides: chatOverrides }) : config;
 
   const results: EvalRunnerResult[] = [];
   const runner = fixture.runner;
 
   if (runner === "chat" || runner === "both") {
-    results.push(await runChatEval(runnerOpts, options?.chatInvoker));
+    results.push(await runChatEval({ ...runnerOpts, config: chatConfig }, options?.chatInvoker));
   }
   if (runner === "research" || runner === "both") {
     results.push(await runResearchEval(runnerOpts, options?.researchInvoker));
