@@ -24,7 +24,6 @@ import {
   generateReport,
 } from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
-import { aggregateRepeatMetrics } from "./reports/repeats";
 import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
 import {
   createConvexChatInvoker,
