@@ -202,6 +202,22 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     tags: tags("chat", "renal", "values"),
   },
 
+  {
+    ...base,
+    id: "medical-students/chat-unanswerable-vaccine-schedule",
+    split: "train",
+    runner: "chat",
+    question: "What's the recommended vaccine schedule for a newborn?",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The sources cover the heart, nerves and kidney, not immunisation, so the correct reply says the sources do not cover vaccine schedules and gives no doses or ages.",
+    expectedBehavior:
+      "Declines, saying the sources do not cover vaccine schedules. It must not invent doses, ages or schedules, " +
+      "and must not present general medical knowledge as if it came from the sources.",
+    tags: tags("chat", "unanswerable"),
+  },
+
   // ─── holdout (never tune against these) ───────────────────
   {
     ...base,
@@ -241,5 +257,20 @@ export const medicalStudentsFixtures: EvalFixture[] = [
       "without adding diagnoses or treatments the notes do not contain.",
     scenarioCategory: "explanation",
     tags: tags("chat", "nervous-system", "applied"),
+  },
+  {
+    ...base,
+    id: "medical-students/chat-unanswerable-pneumonia-antibiotic",
+    split: "holdout",
+    runner: "chat",
+    question: "Which antibiotic should I prescribe first for pneumonia in an older patient?",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The sources do not cover pneumonia or its treatment, so the correct reply says so and names no antibiotic or dose.",
+    expectedBehavior:
+      "Declines, saying the sources do not cover pneumonia treatment. It must not name an antibiotic, dose or guideline, " +
+      "and must not present general medical knowledge as if it came from the sources.",
+    tags: tags("chat", "unanswerable"),
   },
 ];

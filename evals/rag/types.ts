@@ -149,6 +149,13 @@ export interface EvalFixture {
    * notebookId/documentIds unset; the CLI fills them from the seeded notebook.
    */
   useCase?: string;
+  /**
+   * Unanswerable case: the sources do not contain the answer, so a correct response declines or
+   * says the sources do not cover it. `abstentionCorrectness` scores these first (answering is
+   * `hallucination_under_pressure`). `binary_judge_abstention` also runs on them with the sources
+   * as evidence. That judge is not in PROMOTE_PREFIXES, so it never blocks `--promotion-check`.
+   */
+  expectAbstain?: boolean;
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────

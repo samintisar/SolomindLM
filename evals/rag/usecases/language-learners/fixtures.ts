@@ -173,6 +173,23 @@ export const languageLearnersFixtures: EvalFixture[] = [
     tags: tags("chat", "grammar"),
   },
 
+  {
+    ...base,
+    id: "language-learners/chat-unanswerable-subjunctive",
+    split: "train",
+    runner: "chat",
+    question:
+      "How do I form the subjunctive after 'il faut que'? Show me faire in the subjunctive.",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The notes do not cover the subjunctive, so the correct reply says the sources do not cover it and gives no subjunctive forms or rules.",
+    expectedBehavior:
+      "Declines, saying the sources do not cover the subjunctive. It must not invent subjunctive forms or rules, " +
+      "and must not present general grammar knowledge as if it came from the notes.",
+    tags: tags("chat", "unanswerable"),
+  },
+
   // ─── holdout (never tune against these) ───────────────────
   {
     ...base,
@@ -208,5 +225,20 @@ export const languageLearnersFixtures: EvalFixture[] = [
       "with an example from the notes.",
     scenarioCategory: "explanation",
     tags: tags("chat", "grammar"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-unanswerable-imperfect",
+    split: "holdout",
+    runner: "chat",
+    question: "How do I conjugate the imperfect tense of être? Give me all the forms.",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The notes do not cover the imperfect, so the correct reply says the sources do not cover it and gives no imperfect forms.",
+    expectedBehavior:
+      "Declines, saying the sources do not cover the imperfect. It must not invent imperfect conjugations, " +
+      "and must not present general grammar knowledge as if it came from the notes.",
+    tags: tags("chat", "unanswerable"),
   },
 ];

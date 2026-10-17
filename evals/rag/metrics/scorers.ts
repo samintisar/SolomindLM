@@ -11,6 +11,7 @@ import {
 } from "../types";
 import { getPack } from "../usecases";
 import type { SourceText } from "../usecases/types";
+import { scoreAbstentionJudgeMetrics } from "./abstentionJudge";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
 import {
   abstentionCorrectness,
@@ -132,6 +133,16 @@ export async function scoreAllMetrics(
   const judgeGroups: Array<() => Promise<MetricResult[]>> = [
     () => scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
   ];
+
+  if (fixture.expectAbstain === true && binaryOptions.enabled && invoke) {
+    judgeGroups.push(() =>
+      scoreAbstentionJudgeMetrics(fixture, artifact, {
+        invoke,
+        model: judgeModel,
+        sourceTexts: options.packSourceTexts,
+      })
+    );
+  }
 
   const useCase = fixture.useCase;
   if (useCase && binaryOptions.enabled && invoke) {
