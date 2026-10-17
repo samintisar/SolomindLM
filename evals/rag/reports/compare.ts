@@ -78,20 +78,56 @@ interface SideFill {
   cut: boolean;
 }
 
-/** One copy of each passage of one run (whitespace-normalised content), labelled `[A-3]` etc. */
-function sidePassages(side: Side, chunks: ChunkSnapshot[]): SidePassage[] {
-  const seen = new Set<string>();
-  const passages: SidePassage[] = [];
-  for (const chunk of chunks) {
+/** Every passage of one run in order, duplicates included, labelled `[A-3]` etc. */
+function sideEntries(side: Side, chunks: ChunkSnapshot[]): SidePassage[] {
+  return chunks.map((chunk) => {
     const body = chunk.contextText ?? chunk.content;
-    const key = body.replace(/\s+/g, " ").trim();
-    if (seen.has(key)) continue;
-    seen.add(key);
     const label = `${side}-${chunk.id}`;
     const title = chunk.sourceTitle ? ` ${chunk.sourceTitle}` : "";
-    passages.push({ label, key, text: `[${label}]${title}\n${body}` });
+    return { label, key: body.replace(/\s+/g, " ").trim(), text: `[${label}]${title}\n${body}` };
+  });
+}
+
+interface SidePlacement {
+  kept: SidePassage[];
+  cut: boolean;
+  /** `[B-2] is the same passage as [A-3].` lines: the label's content is shown under another label */
+  aliases: string[];
+  /** Labels whose content is not shown at all (over budget, and no shown copy) */
+  hidden: string[];
+}
+
+/**
+ * Places one run's passages. The first copy of each passage is shown within `budget`, unless the
+ * other run already shows it (then it is an alias). A later copy of a shown passage is an alias
+ * too. Anything else is hidden and listed, so every citation label has a target.
+ */
+function placeSide(
+  entries: SidePassage[],
+  shownElsewhere: Map<string, string>,
+  budget: number
+): SidePlacement {
+  const seen = new Set<string>();
+  const unique: SidePassage[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.key) || shownElsewhere.has(entry.key)) continue;
+    seen.add(entry.key);
+    unique.push(entry);
   }
-  return passages;
+  const fill = fillSide(unique, budget);
+  const shownHere = new Map(fill.kept.map((p) => [p.key, p.label]));
+  const aliases: string[] = [];
+  const hidden: string[] = [];
+  for (const entry of entries) {
+    if (shownHere.get(entry.key) === entry.label) continue;
+    const target = shownElsewhere.get(entry.key) ?? shownHere.get(entry.key);
+    if (target !== undefined) {
+      aliases.push(`[${entry.label}] is the same passage as [${target}].`);
+    } else {
+      hidden.push(entry.label);
+    }
+  }
+  return { kept: fill.kept, cut: fill.cut, aliases, hidden };
 }
 
 /**
@@ -128,50 +164,47 @@ function fillSide(passages: SidePassage[], budget: number): SideFill {
  * the other out. A passage both runs used is shown once, under A, with an alias line for B's label.
  */
 export function comparisonEvidence(artA: EvalRunArtifact, artB: EvalRunArtifact): string {
-  const passagesA = sidePassages("A", artA.selectedChunks);
-  const passagesB = sidePassages("B", artB.selectedChunks);
-  if (passagesA.length === 0 && passagesB.length === 0) return NO_EVIDENCE_NOTE;
+  const entriesA = sideEntries("A", artA.selectedChunks);
+  const entriesB = sideEntries("B", artB.selectedChunks);
+  if (entriesA.length === 0 && entriesB.length === 0) return NO_EVIDENCE_NOTE;
 
-  if (passagesA.length === 0 || passagesB.length === 0) {
-    const onlySide: Side = passagesA.length > 0 ? "A" : "B";
+  if (entriesA.length === 0 || entriesB.length === 0) {
+    const onlySide: Side = entriesA.length > 0 ? "A" : "B";
     const missing: Side = onlySide === "A" ? "B" : "A";
-    const only = fillSide(onlySide === "A" ? passagesA : passagesB, COMPARE_EVIDENCE_LIMIT);
+    const only = placeSide(
+      onlySide === "A" ? entriesA : entriesB,
+      new Map(),
+      COMPARE_EVIDENCE_LIMIT
+    );
     const notes = [`(run ${missing} recorded no passages)`];
-    if (only.skipped.length > 0) notes.push(`[… passages not shown: ${only.skipped.join(", ")}]`);
-    if (only.cut || only.skipped.length > 0) notes.push(CUT_EVIDENCE_NOTE);
-    return [...notes, ...only.kept.map((p) => p.text)].join("\n\n");
+    if (only.hidden.length > 0) notes.push(`[… passages not shown: ${only.hidden.join(", ")}]`);
+    if (only.cut || only.hidden.length > 0) notes.push(CUT_EVIDENCE_NOTE);
+    const parts = [...notes, only.kept.map((p) => p.text).join(SIDE_SEPARATOR)];
+    if (only.aliases.length > 0) parts.push(only.aliases.join("\n"));
+    return parts.join("\n\n");
   }
 
-  const aliasLines: string[] = [];
-  const labelsA = new Map(passagesA.map((p) => [p.key, p.label]));
-  const ownB = passagesB.filter((p) => {
-    const sameAs = labelsA.get(p.key);
-    if (sameAs === undefined) return true;
-    aliasLines.push(`[${p.label}] is the same passage as [${sameAs}].`);
-    return false;
-  });
-
+  // Run A is placed first; run B's passages that A shows become aliases of A's labels.
   const half = Math.floor(COMPARE_EVIDENCE_LIMIT / 2);
-  const fillA = fillSide(passagesA, half);
-  const fillB = fillSide(ownB, half);
+  const a = placeSide(entriesA, new Map(), half);
+  const shownByA = new Map(a.kept.map((p) => [p.key, p.label]));
+  const b = placeSide(entriesB, shownByA, half);
+
   const interleaved: string[] = [];
-  for (let i = 0; i < Math.max(fillA.kept.length, fillB.kept.length); i++) {
-    const a = fillA.kept[i];
-    const b = fillB.kept[i];
-    if (a) interleaved.push(a.text);
-    if (b) interleaved.push(b.text);
+  for (let i = 0; i < Math.max(a.kept.length, b.kept.length); i++) {
+    const fromA = a.kept[i];
+    const fromB = b.kept[i];
+    if (fromA) interleaved.push(fromA.text);
+    if (fromB) interleaved.push(fromB.text);
   }
 
   const notes: string[] = [];
-  if (fillA.skipped.length > 0) {
-    notes.push(`[… passages not shown from run A: ${fillA.skipped.join(", ")}]`);
-  }
-  if (fillB.skipped.length > 0) {
-    notes.push(`[… passages not shown from run B: ${fillB.skipped.join(", ")}]`);
-  }
-  if (fillA.cut || fillB.cut || notes.length > 0) notes.unshift(CUT_EVIDENCE_NOTE);
+  if (a.hidden.length > 0) notes.push(`[… passages not shown from run A: ${a.hidden.join(", ")}]`);
+  if (b.hidden.length > 0) notes.push(`[… passages not shown from run B: ${b.hidden.join(", ")}]`);
+  if (a.cut || b.cut || notes.length > 0) notes.unshift(CUT_EVIDENCE_NOTE);
 
   const parts = [...notes, interleaved.join(SIDE_SEPARATOR)];
+  const aliasLines = [...a.aliases, ...b.aliases];
   if (aliasLines.length > 0) parts.push(aliasLines.join("\n"));
   return parts.join("\n\n");
 }

@@ -74,6 +74,55 @@ describe("comparisonEvidence", () => {
     );
   });
 
+  it("aliases a shared passage only when run A shows it; otherwise run B shows its own copy", () => {
+    const evidence = comparisonEvidence(
+      artifact({
+        caseId: "c",
+        answer: "a",
+        selectedChunks: [
+          chunk("1", `A-big ${"x".repeat(9_000)}`),
+          chunk("2", `HIDDEN-SHARED ${"y".repeat(4_000)}`),
+        ],
+      }),
+      artifact({
+        caseId: "c",
+        answer: "b",
+        selectedChunks: [chunk("7", `HIDDEN-SHARED ${"y".repeat(4_000)}`)],
+      })
+    );
+    expect(evidence).toContain("passages not shown from run A: A-2");
+    expect(evidence).toContain("[B-7] Source 7\nHIDDEN-SHARED");
+    expect(evidence).not.toContain("[B-7] is the same passage as [A-2]");
+    expect(evidence).not.toContain("[A-2]\n");
+  });
+
+  it("aliases a within-run duplicate to its shown copy, and lists it as not shown when that copy is hidden", () => {
+    const shown = comparisonEvidence(
+      artifact({
+        caseId: "c",
+        answer: "a",
+        selectedChunks: [chunk("1", "Repeated passage."), chunk("5", "Repeated   passage.")],
+      }),
+      artifact({ caseId: "c", answer: "b", selectedChunks: [chunk("1", "B own.")] })
+    );
+    expect(shown).toContain("[A-5] is the same passage as [A-1].");
+
+    const hidden = comparisonEvidence(
+      artifact({
+        caseId: "c",
+        answer: "a",
+        selectedChunks: [
+          chunk("1", `Fills ${"f".repeat(11_000)}`),
+          chunk("2", `Hidden twice. ${"h".repeat(2_000)}`),
+          chunk("3", `Hidden twice. ${"h".repeat(2_000)}`),
+        ],
+      }),
+      artifact({ caseId: "c", answer: "b", selectedChunks: [chunk("1", "B own.")] })
+    );
+    expect(hidden).toContain("passages not shown from run A: A-2, A-3");
+    expect(hidden).not.toContain("[A-3] is the same passage as");
+  });
+
   it("shows the side that has passages, noting that the other run recorded none", () => {
     const chat = artifact({
       caseId: "c",

@@ -107,18 +107,18 @@ export function scoreJudgeCalibration(labels: JudgeLabel[]): JudgeCalibrationSco
   return { labeled, unlabeled, agreed, agreement, byJudge, readyForPromptCompile };
 }
 
-/** One line per judge family: the per-judge table the CLI prints. */
-/** Why a family is not ready, for the table; empty when it is ready. */
+/** Why a family is not ready, for the table; empty when it is ready. Every reason that applies. */
 function calibrationReason(row: JudgeFamilyCalibration): string {
   if (row.blockingReady) return "";
-  if (row.singleClass) return "  (single class — label at least one fail/pass)";
   const reasons: string[] = [];
+  if (row.singleClass) reasons.push("single class — label at least one fail/pass");
   if (row.labeled < MIN_LABELED) reasons.push(`under ${MIN_LABELED} labels`);
   if (row.agreement < MIN_AGREEMENT) reasons.push(`agreement below ${MIN_AGREEMENT}`);
   if (row.kappa < MIN_KAPPA) reasons.push(`kappa below ${MIN_KAPPA}`);
-  return reasons.length > 0 ? `  (${reasons.join(", ")})` : "";
+  return reasons.length > 0 ? `  (${reasons.join("; ")})` : "";
 }
 
+/** One line per judge family: the per-judge table the CLI prints. */
 export function formatJudgeCalibrationTable(score: JudgeCalibrationScore): string[] {
   const lines = ["  Judge calibration (per family):"];
   const families = Object.keys(score.byJudge);

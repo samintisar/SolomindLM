@@ -106,6 +106,19 @@ describe("scoreJudgeCalibration", () => {
     expect(table).toContain("single class — label at least one fail/pass");
   });
 
+  it("lists every reason a single-class family misses, not only the single-class one", () => {
+    const labels = labelsFor("binary_judge_chat_grounding", () => true, 19).map((row) => ({
+      ...row,
+      modelStatus: "pass" as const,
+    }));
+    const row = formatJudgeCalibrationTable(scoreJudgeCalibration(labels))[1] ?? "";
+    expect(
+      row.endsWith(
+        "not ready  (single class — label at least one fail/pass; under 20 labels; kappa below 0.6)"
+      )
+    ).toBe(true);
+  });
+
   it("gives no reason for a ready family in the table", () => {
     const score = scoreJudgeCalibration(labelsFor("binary_judge_chat_grounding", () => true));
     expect(score.byJudge.binary_judge_chat_grounding?.singleClass).toBe(false);
