@@ -1,6 +1,156 @@
 import { describe, expect, it } from "vitest";
-import type { TrendEntry } from "./history";
-import { formatTrend } from "./trend";
+import type { HistoryRow, TrendEntry } from "./history";
+import {
+  exitCodeFor,
+  formatTrend,
+  historyRowKey,
+  loadMergedHistory,
+  mergeHistoryRows,
+  type RemoteHistoryReader,
+  remoteHistoryPath,
+} from "./trend";
+
+describe("exitCodeFor", () => {
+  it("exits 1 under --check when there is a new fail", () => {
+    expect(exitCodeFor({ newFailCount: 1 }, { check: true })).toBe(1);
+    expect(exitCodeFor({ newFailCount: 3 }, { check: true })).toBe(1);
+  });
+
+  it("exits 0 under --check when there is no new fail", () => {
+    expect(exitCodeFor({ newFailCount: 0 }, { check: true })).toBe(0);
+  });
+
+  it("exits 0 without --check even when there are new fails", () => {
+    expect(exitCodeFor({ newFailCount: 2 }, { check: false })).toBe(0);
+  });
+});
+
+function histRow(runId: string, partial: Partial<HistoryRow> = {}): HistoryRow {
+  return {
+    runId,
+    timestamp: "2026-10-17T03:17:00.000Z",
+    commitSha: "abc",
+    split: "smoke",
+    caseId: "case-1",
+    runner: "chat",
+    metric: "expected_item_recall",
+    status: "pass",
+    score: 1,
+    configHash: "cfg",
+    ...partial,
+  };
+}
+
+/** Injected reader: no git. Records the calls it receives. */
+function fakeReader(opts: {
+  fetchError?: string;
+  files?: Record<string, string>;
+}): RemoteHistoryReader & { reads: string[] } {
+  const reads: string[] = [];
+  return {
+    reads,
+    fetchBranch: () => opts.fetchError,
+    readFile: (branch, path) => {
+      reads.push(`${branch}:${path}`);
+      return opts.files?.[path];
+    },
+  };
+}
+
+describe("mergeHistoryRows", () => {
+  it("dedupes by runId, caseId, runner and metric, keeping the first occurrence", () => {
+    const remote = [histRow("r1", { status: "pass" }), histRow("r2")];
+    const local = [histRow("r1", { status: "fail" }), histRow("r3")];
+
+    const merged = mergeHistoryRows(remote, local);
+
+    expect(merged.map((r) => r.runId)).toEqual(["r1", "r2", "r3"]);
+    expect(merged[0]?.status).toBe("pass");
+  });
+
+  it("treats rows that differ in caseId, runner or metric as distinct", () => {
+    const rows = [
+      histRow("r1"),
+      histRow("r1", { caseId: "case-2" }),
+      histRow("r1", { runner: "research" }),
+      histRow("r1", { metric: "citation_validity" }),
+    ];
+
+    expect(mergeHistoryRows(rows)).toHaveLength(4);
+    expect(historyRowKey(rows[0] as HistoryRow)).not.toBe(historyRowKey(rows[1] as HistoryRow));
+  });
+});
+
+describe("loadMergedHistory", () => {
+  it("returns the local rows and never touches the reader without --branch", () => {
+    const reader = fakeReader({});
+    const local = [histRow("r1")];
+
+    const out = loadMergedHistory({ local, split: "smoke" }, reader);
+
+    expect(out).toEqual({ rows: local, notes: [] });
+    expect(reader.reads).toEqual([]);
+  });
+
+  it("unions remote and local rows and reads the split file from the branch", () => {
+    const remoteText = `${JSON.stringify(histRow("r1"))}\n${JSON.stringify(histRow("r2"))}\n`;
+    const reader = fakeReader({
+      files: { [remoteHistoryPath("smoke")]: remoteText },
+    });
+
+    const out = loadMergedHistory(
+      { local: [histRow("r2"), histRow("r3")], split: "smoke", branch: "eval-history" },
+      reader
+    );
+
+    expect(reader.reads).toEqual(["eval-history:evals/rag/history/smoke.jsonl"]);
+    expect(out.rows.map((r) => r.runId)).toEqual(["r1", "r2", "r3"]);
+    expect(out.notes).toEqual([]);
+  });
+
+  it("falls back to local rows with a note when the branch is missing", () => {
+    const local = [histRow("r3")];
+
+    const out = loadMergedHistory(
+      { local, split: "smoke", branch: "eval-history" },
+      fakeReader({ fetchError: "fetch failed or no such branch" })
+    );
+
+    expect(out.rows).toEqual(local);
+    expect(out.notes[0]).toContain("origin/eval-history not available");
+  });
+
+  it("treats a missing split file as empty, with a note", () => {
+    const local = [histRow("r3")];
+
+    const out = loadMergedHistory(
+      { local, split: "holdout", branch: "eval-history" },
+      fakeReader({ files: {} })
+    );
+
+    expect(out.rows).toEqual(local);
+    expect(out.notes[0]).toContain("evals/rag/history/holdout.jsonl not found");
+  });
+
+  it("notes malformed remote lines and keeps the valid ones", () => {
+    const text = `${JSON.stringify(histRow("r1"))}\n{broken\n`;
+
+    const out = loadMergedHistory(
+      { local: [], split: "smoke", branch: "eval-history" },
+      fakeReader({ files: { [remoteHistoryPath("smoke")]: text } })
+    );
+
+    expect(out.rows.map((r) => r.runId)).toEqual(["r1"]);
+    expect(out.notes.join("\n")).toContain("skipped 1 malformed line");
+  });
+});
+
+describe("remoteHistoryPath", () => {
+  it("uses 'all' when there is no split", () => {
+    expect(remoteHistoryPath()).toBe("evals/rag/history/all.jsonl");
+    expect(remoteHistoryPath("smoke")).toBe("evals/rag/history/smoke.jsonl");
+  });
+});
 
 function entry(partial: Partial<TrendEntry>): TrendEntry {
   return {

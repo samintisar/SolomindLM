@@ -57,7 +57,8 @@ export function formatWorkOrder(report: EvalReport, opts: WorkOrderOptions): str
     `- Commit: \`${report.commitSha.slice(0, 8)}\``,
     `- Split: ${opts.split ?? "all"}`,
     `- Repeats: ${opts.repeats}`,
-    `- Cases: ${report.totalCases} (pass ${pass}, fail ${fail}, warn ${warn}, info ${info})`,
+    `- Cases: ${report.totalCases}`,
+    `- Metric rows: pass ${pass}, fail ${fail}, warn ${warn}, info ${info}`,
     "",
     "Work the groups top to bottom. Fix each group in its target files (or other pipeline files, per",
     "the rules below), then re-run its cases until they are stable across repeats.",
@@ -85,7 +86,7 @@ export function formatWorkOrder(report: EvalReport, opts: WorkOrderOptions): str
   lines.push(...PROMPT_RULES_FROM_AGENTS_MD);
   lines.push("");
   lines.push(
-    "Prompt files are outside the allowed set by default. Only the eval-fix skill's narrow exception applies.",
+    "Prompt files are outside the allowed set by default. The eval-fix skill's one exception (category prompt_answering, facts already in the retrieval snapshots) must still be generalized and never eval-targeted.",
     ""
   );
   lines.push("Before a fix is promoted, run the holdout and the promotion check:", "");

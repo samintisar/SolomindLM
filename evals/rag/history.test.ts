@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  appendHistory,
   type HistoryRow,
   historyRowsFromReport,
+  loadHistory,
   parseHistoryLines,
   summarizeTrend,
 } from "./history";
@@ -139,6 +144,108 @@ describe("parseHistoryLines", () => {
 
     expect(rows).toHaveLength(2);
     expect(skipped).toBe(2);
+  });
+});
+
+describe("appendHistory and loadHistory", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "eval-history-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const report = (metrics: MetricResult[]): EvalReport => ({
+    timestamp: "2026-10-17T03:17:00.000Z",
+    commitSha: "abc12345",
+    totalCases: 1,
+    split: "smoke",
+    summary: { pass: 0, fail: 0, warn: 0, info: 0 },
+    metrics,
+    failureGroups: [],
+  });
+  const metric = (status: MetricStatus): MetricResult => ({
+    metric: "expected_item_recall",
+    caseId: "c1",
+    runner: "chat",
+    configHash: "h",
+    status,
+    score: status === "pass" ? 1 : 0,
+    detail: "",
+  });
+
+  it("creates the split file on the first append", () => {
+    const written = appendHistory(dir, report([metric("pass")]), { runId: "r1" });
+
+    expect(written).toBe(1);
+    const lines = readFileSync(join(dir, "smoke.jsonl"), "utf-8").trim().split("\n");
+    expect(lines).toHaveLength(1);
+  });
+
+  it("appends a second run to the same file without rewriting the first", () => {
+    appendHistory(dir, report([metric("pass")]), { runId: "r1" });
+    appendHistory(dir, report([metric("fail")]), { runId: "r2" });
+
+    const rows = loadHistory(dir, "smoke");
+    expect(rows.map((r) => r.runId)).toEqual(["r1", "r2"]);
+    expect(rows.map((r) => r.status)).toEqual(["pass", "fail"]);
+  });
+
+  it("loads a missing file as an empty history", () => {
+    expect(loadHistory(dir, "holdout")).toEqual([]);
+  });
+
+  it("does not write info rows", () => {
+    const written = appendHistory(dir, report([metric("pass"), metric("info")]), { runId: "r1" });
+
+    expect(written).toBe(1);
+    expect(loadHistory(dir, "smoke").map((r) => r.status)).toEqual(["pass"]);
+  });
+});
+
+describe("summarizeTrend edge cases", () => {
+  it("orders runs with equal timestamps by first-seen order, not by runId", () => {
+    const same = day(1);
+    // "zz" is seen first (and fails); "aa" is seen second (and passes). Sorting by runId
+    // would make "zz" the latest run and flag a new fail.
+    const rows = [...runRows("zz", same, 0, 1), ...runRows("aa", same, 1, 0)];
+
+    const [entry] = summarizeTrend(rows, { now: NOW });
+
+    expect(entry?.runs.map((r) => r.runId)).toEqual(["zz", "aa"]);
+    expect(entry?.latestStatus).toBe("pass");
+    expect(entry?.newFails).toBe(false);
+  });
+
+  it("gives an info-only run a null pass rate and an info status", () => {
+    const rows = [...runRows("r1", day(2), 1, 0), row("r2", day(1), "info")];
+
+    const [entry] = summarizeTrend(rows, { now: NOW });
+
+    expect(entry?.runs[1]).toMatchObject({ runId: "r2", status: "info", passRate: null });
+    expect(entry?.latestStatus).toBe("info");
+    expect(entry?.newFails).toBe(false);
+  });
+
+  it("breaks a decline at a run with no scored rows", () => {
+    const withGap = [
+      ...runRows("r1", day(5), 9, 1),
+      ...runRows("r2", day(4), 8, 2),
+      row("r3", day(3), "info"),
+      ...runRows("r4", day(2), 6, 4),
+      ...runRows("r5", day(1), 4, 6),
+    ];
+    // Same decline without the gap run: 0.9 > 0.8 > 0.6 > 0.4, a streak of 4.
+    const withoutGap = [
+      ...runRows("r1", day(5), 9, 1),
+      ...runRows("r2", day(4), 8, 2),
+      ...runRows("r4", day(2), 6, 4),
+      ...runRows("r5", day(1), 4, 6),
+    ];
+
+    expect(summarizeTrend(withGap, { now: NOW })[0]?.declining).toBe(false);
+    expect(summarizeTrend(withoutGap, { now: NOW })[0]?.declining).toBe(true);
   });
 });
 

@@ -49,7 +49,8 @@ describe("formatWorkOrder", () => {
     expect(md).toContain("- Commit: `01234567`");
     expect(md).toContain("- Split: smoke");
     expect(md).toContain("- Repeats: 3");
-    expect(md).toContain("- Cases: 3 (pass 4, fail 2, warn 0, info 1)");
+    expect(md).toContain("- Cases: 3\n");
+    expect(md).toContain("- Metric rows: pass 4, fail 2, warn 0, info 1\n");
   });
 
   it("writes each failure group with its category, target files and cases", () => {
@@ -100,11 +101,20 @@ describe("formatWorkOrder", () => {
 });
 
 describe("PROMPT_RULES_FROM_AGENTS_MD", () => {
-  it("matches the Prompt authoring lines in AGENTS.md verbatim", () => {
+  it("equals the whole Prompt authoring section of AGENTS.md, line for line", () => {
     const agents = readFileSync(new URL("../../../AGENTS.md", import.meta.url), "utf-8");
-    for (const line of PROMPT_RULES_FROM_AGENTS_MD) {
-      if (line === "") continue;
-      expect(agents).toContain(line);
-    }
+    const lines = agents.split("\n");
+    const start = lines.findIndex((line) => line.startsWith("## Prompt authoring"));
+    expect(start).toBeGreaterThanOrEqual(0);
+    // The section runs to the next level-2 heading (or end of file).
+    const nextHeading = lines.findIndex((line, i) => i > start && line.startsWith("## "));
+    const end = nextHeading === -1 ? lines.length : nextHeading;
+    const section = lines
+      .slice(start + 1, end)
+      .join("\n")
+      .trim();
+
+    // A new bullet or paragraph in AGENTS.md makes this fail until the quoted block is updated.
+    expect(PROMPT_RULES_FROM_AGENTS_MD.join("\n").trim()).toBe(section);
   });
 });

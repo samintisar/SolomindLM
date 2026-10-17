@@ -48,30 +48,35 @@ export function historyFilePath(dir: string, split?: string): string {
   return join(dir, `${split ?? "all"}.jsonl`);
 }
 
-/** One history row per metric row of the report. Pure. */
+/**
+ * One history row per scored metric row of the report. `info` rows are skipped: they never count
+ * toward a pass rate and they are about half of all rows. Pure.
+ */
 export function historyRowsFromReport(
   report: EvalReport,
   opts: AppendHistoryOptions
 ): HistoryRow[] {
   const split = opts.split ?? report.split ?? "all";
-  return report.metrics.map((m) => {
-    const useCase = opts.useCaseByCase?.get(m.caseId);
-    const row: HistoryRow = {
-      runId: opts.runId,
-      timestamp: report.timestamp,
-      commitSha: report.commitSha,
-      split,
-      caseId: m.caseId,
-      runner: m.runner,
-      ...(useCase !== undefined ? { useCase } : {}),
-      metric: m.metric,
-      status: m.status,
-      score: Number.isFinite(m.score) ? m.score : null,
-      configHash: m.configHash,
-      ...(isFlakyMetric(m) ? { flaky: true as const } : {}),
-    };
-    return row;
-  });
+  return report.metrics
+    .filter((m) => m.status !== "info")
+    .map((m) => {
+      const useCase = opts.useCaseByCase?.get(m.caseId);
+      const row: HistoryRow = {
+        runId: opts.runId,
+        timestamp: report.timestamp,
+        commitSha: report.commitSha,
+        split,
+        caseId: m.caseId,
+        runner: m.runner,
+        ...(useCase !== undefined ? { useCase } : {}),
+        metric: m.metric,
+        status: m.status,
+        score: Number.isFinite(m.score) ? m.score : null,
+        configHash: m.configHash,
+        ...(isFlakyMetric(m) ? { flaky: true as const } : {}),
+      };
+      return row;
+    });
 }
 
 /** Append a report's rows to its split file. Returns the number of rows written. */
@@ -210,7 +215,11 @@ export function summarizeTrend(rows: HistoryRow[], opts: SummarizeTrendOptions =
     runner: string;
     useCase?: string;
     metric: string;
-    byRun: Map<string, { timestamp: number; iso: string; counts: Record<MetricStatus, number> }>;
+    /** Runs in first-seen (file) order; `seq` is the position in that order */
+    byRun: Map<
+      string,
+      { timestamp: number; iso: string; seq: number; counts: Record<MetricStatus, number> }
+    >;
   };
   const buckets = new Map<string, Bucket>();
   const overall = new Map<string, Record<MetricStatus, number>>();
@@ -231,7 +240,12 @@ export function summarizeTrend(rows: HistoryRow[], opts: SummarizeTrendOptions =
     }
     let run = bucket.byRun.get(row.runId);
     if (!run) {
-      run = { timestamp: ts, iso: row.timestamp, counts: emptyCounts() };
+      run = {
+        timestamp: ts,
+        iso: row.timestamp,
+        seq: bucket.byRun.size,
+        counts: emptyCounts(),
+      };
       bucket.byRun.set(row.runId, run);
     }
     run.counts[row.status]++;
@@ -244,7 +258,8 @@ export function summarizeTrend(rows: HistoryRow[], opts: SummarizeTrendOptions =
   const entries: TrendEntry[] = [];
   for (const [key, bucket] of buckets) {
     const runs: TrendRun[] = [...bucket.byRun.entries()]
-      .sort(([idA, a], [idB, b]) => a.timestamp - b.timestamp || idA.localeCompare(idB))
+      // By timestamp; equal timestamps keep first-seen order (not runId order).
+      .sort(([, a], [, b]) => a.timestamp - b.timestamp || a.seq - b.seq)
       .map(([runId, run]) => ({
         runId,
         timestamp: run.iso,
