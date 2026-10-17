@@ -42,8 +42,9 @@ export function contextTokenBudgetRatio(
  * Where the turn's provider tokens went, by stage. Only spans that carry token usage count, so
  * latency-only stages (retrieve, rerank, select, grounding) get no share.
  *
- * `score` is the overhead share: the non-`generate` part of the LLM tokens (planner, HyDE,
- * follow-ups, ...). It is info-only.
+ * `score` is the overhead share, the non-`generate` part of the LLM tokens (planner, HyDE,
+ * follow-ups, ...), for chat artifacts, which have a `generate` span. Artifacts without one (studio)
+ * keep the map share as their score. It is info-only.
  */
 export function stageTokenShare(
   fixture: EvalFixture,
@@ -76,10 +77,22 @@ export function stageTokenShare(
   const generate = byStage.generate ?? 0;
   const planHyde = (byStage.plan ?? 0) + (byStage.hyde ?? 0);
   const overheadShare = (total - generate) / total;
+  const mapShare = (byStage.map ?? 0) / total;
   breakdown.generateShare = generate / total;
   breakdown.planHydeShare = planHyde / total;
   breakdown.overheadShare = overheadShare;
 
+  if (byStage.generate === undefined) {
+    return metricResult(
+      "stage_token_share",
+      fixture,
+      artifact,
+      "info",
+      mapShare,
+      `Map share ${percent(mapShare)} of ${total} stage tokens.`,
+      breakdown
+    );
+  }
   return metricResult(
     "stage_token_share",
     fixture,

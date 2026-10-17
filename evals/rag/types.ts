@@ -207,7 +207,7 @@ export interface AgentStageSpan {
   tokenUsage?: { prompt: number; completion: number; total: number };
 }
 
-/** Provider calls one chat turn made; mirrors `convex/_agents/_shared/callCounters.ts`. */
+/** Provider calls one chat turn made; mirrors `CallCounters` in `convex/_agents/_shared/tokenUsageAccumulator.ts`. */
 export interface CallCounters {
   llmCalls: number;
   embeddingCalls: number;

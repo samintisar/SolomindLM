@@ -1,7 +1,7 @@
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
 import { inferSourceChannel } from "../metrics/sourceAware";
-import type { ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
+import type { CallCounters, ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
 import { runWithHarness } from "./harness";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
@@ -26,7 +26,7 @@ export interface ChatAgentInvoker {
     tokenUsage?: { prompt: number; completion: number; total: number };
     tokenUsageSource?: "provider" | "estimated";
     stageSpans?: import("../types").AgentStageSpan[];
-    callCounters?: import("../types").CallCounters;
+    callCounters?: CallCounters;
     contextTokenBudget?: number;
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;

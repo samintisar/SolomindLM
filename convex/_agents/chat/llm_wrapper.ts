@@ -9,7 +9,7 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 
 import Together from "together-ai";
-import { uncachedLlmCall } from "../_shared/cachedLlm.js";
+import { type LLMResponse, uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
@@ -308,15 +308,22 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
 
     const callModel = async (modelId: string, timeoutMs: number) => {
       const startedAt = Date.now();
-      const response = await uncachedLlmCall({
-        model: modelId,
-        messages,
-        temperature: 0.1,
-        maxTokens: 500,
-        reasoningEnabled: false,
-        toolChoice: "none",
-        timeoutMs,
-      });
+      let response: LLMResponse;
+      try {
+        response = await uncachedLlmCall({
+          model: modelId,
+          messages,
+          temperature: 0.1,
+          maxTokens: 500,
+          reasoningEnabled: false,
+          toolChoice: "none",
+          timeoutMs,
+        });
+      } catch (error) {
+        // A failed attempt reports no usage, but it is still a planner attempt that took time.
+        this.telemetry.recordStage("plan", startedAt);
+        throw error;
+      }
       this.telemetry.recordLlmCall("plan", startedAt, fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
@@ -624,6 +631,8 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string, "ab
     try {
       let fallbackUsage: ReturnType<typeof fromProviderUsage>;
       // One span per attempt that reports usage: each attempt starts when the previous one reported.
+      // Accepted imprecision: a span may include the retry backoff of an earlier attempt that
+      // reported no usage.
       let attemptStartedAt = Date.now();
       const parsed = await invokeStructuredOutput({
         systemPrompt,

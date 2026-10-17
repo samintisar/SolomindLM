@@ -348,6 +348,16 @@ export async function streamChatResponse(
     recordPhase("completed", "Response complete");
   }
 
+  // Usage and call counters describe a complete turn only: an errored turn did not finish, so it
+  // must not be stored as if it had.
+  const turnMetadata = hasError
+    ? {}
+    : {
+        tokenUsage: turnTelemetry?.tokenUsage,
+        tokenUsageSource: turnTelemetry?.tokenUsage ? ("provider" as const) : undefined,
+        callCounters: turnTelemetry?.callCounters,
+      };
+
   const metadataPayload = {
     guidedLearning: {
       awaitingUserResponse:
@@ -364,9 +374,7 @@ export async function streamChatResponse(
     },
     hadStreamError: hasError || undefined,
     externalSources: externalSources.length > 0 ? externalSources : undefined,
-    tokenUsage: turnTelemetry?.tokenUsage,
-    tokenUsageSource: turnTelemetry?.tokenUsage ? "provider" : undefined,
-    callCounters: turnTelemetry?.callCounters,
+    ...turnMetadata,
   };
 
   if (existingMessages.length === 0) {

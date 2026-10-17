@@ -109,5 +109,7 @@ describe("stageTokenShare", () => {
       })
     );
     expect(result.breakdown?.mapShare).toBeCloseTo(100 / 150, 5);
+    // No generate span (studio): the score stays the map share.
+    expect(result.score).toBeCloseTo(100 / 150, 5);
   });
 });
