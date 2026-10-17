@@ -212,6 +212,38 @@ describe("abstentionCorrectness on unanswerable fixtures", () => {
   });
 });
 
+describe("wrongful abstention needs low answer recall", () => {
+  const items = ["cardiac", "renal", "hepatic", "neural", "thyroid"];
+  const itemFixture: EvalFixture = { ...fixture, expectedItems: items };
+  const withChunks = (answer: string) =>
+    artifact({
+      answer,
+      selectedChunks: [chunk("c1", "cardiac renal hepatic neural thyroid organs.")],
+      preRerankChunks: [chunk("c1", "cardiac renal hepatic neural thyroid organs.")],
+    });
+
+  it("is not a wrongful abstention when the answer lists 4 of 5 items and a decline for the fifth", () => {
+    const result = abstentionCorrectness(
+      itemFixture,
+      withChunks(
+        "The notes cover cardiac, renal, hepatic and neural organs. The notes do not mention the fifth."
+      )
+    );
+    expect(result.breakdown?.category).not.toBe("answer_generation");
+    expect(result.breakdown?.category).toBe("none");
+    expect(result.status).toBe("pass");
+  });
+
+  it("is a wrongful abstention when the answer lists 1 of 5 items and declines", () => {
+    const result = abstentionCorrectness(
+      itemFixture,
+      withChunks("Cardiac is covered. The notes do not mention the rest.")
+    );
+    expect(result.breakdown?.category).toBe("answer_generation");
+    expect(result.status).toBe("fail");
+  });
+});
+
 describe("decline forms on unanswerable fixtures", () => {
   const unanswerable: EvalFixture = {
     ...fixture,

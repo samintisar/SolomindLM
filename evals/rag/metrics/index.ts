@@ -603,7 +603,9 @@ function unanswerableAbstention(fixture: EvalFixture, artifact: EvalRunArtifact)
  * warn.
  *
  * Deterministic routing rule (sufficient = the mode's sufficient threshold):
- * - If selected-context recall >= sufficient and answer abstains: "answer_generation" error, fail.
+ * - If selected-context recall >= sufficient and the answer abstains with answer recall < 0.5:
+ *   "answer_generation" error, fail. An answer with recall >= 0.5 has answered, so a decline
+ *   fragment about its missing items falls through to the rules below.
  * - If raw or post-rerank recall >= sufficient but selected-context recall < sufficient:
  *   "context_selection" miss. Fail; in passage mode, warn when selected recall is >= 0.5.
  * - If all snapshots < sufficient: "retrieval_coverage" miss, warn.
@@ -647,8 +649,10 @@ export function abstentionCorrectness(
   const abstains = answerAbstains(artifact.answer);
   const sufficient = passageMode ? PASSAGE_SUFFICIENT_RECALL : ITEM_SUFFICIENT_RECALL;
 
-  // Rule 1: Sufficient context was selected but answer still abstained.
-  if (selectedRecall >= sufficient && abstains) {
+  // Rule 1: Sufficient context was selected but the answer abstained without giving the items.
+  // An answer that lists at least half of them has answered; a decline fragment about the rest
+  // ("the notes do not mention the fifth") does not make it a wrongful abstention.
+  if (selectedRecall >= sufficient && abstains && answerRecall < 0.5) {
     return metricResult(
       "abstention_correctness",
       fixture,
