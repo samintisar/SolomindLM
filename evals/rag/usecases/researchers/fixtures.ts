@@ -105,6 +105,10 @@ export const researchersFixtures: EvalFixture[] = [
     runner: "chat",
     question:
       "In the TILDA cohort, what activity dose was linked to lower depression, and did it differ for people with chronic disease?",
+    variants: [
+      "For the TILDA study, how much activity was tied to less depression, and was that different for people with a chronic disease?",
+      "What physical activity dose did the Irish ageing cohort link to lower depression? Did people with chronic illness show a different pattern?",
+    ],
     expectedItems: ["400", "chronic disease"],
     expectedAnswer:
       "Overall, 400 to <600 MET-min/wk was associated with a 16% lower rate of depressive symptoms (AIRR 0.84) and 43% " +

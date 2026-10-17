@@ -173,6 +173,10 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "Why do the AV valves close at the start of ventricular systole?",
+    variants: [
+      "What closes the AV valves when the ventricles start to squeeze?",
+      "At the beginning of systole, why do the atrioventricular valves shut?",
+    ],
     expectedItems: ["isovolumic contraction"],
     expectedAnswer:
       "When the ventricles start contracting, back-pressure against them builds and forces the AV (mitral and tricuspid) " +

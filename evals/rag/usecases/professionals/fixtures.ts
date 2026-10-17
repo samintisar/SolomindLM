@@ -81,6 +81,10 @@ export const professionalsFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "Why did USDA cut its 2026 corn production forecast this month, and by how much?",
+    variants: [
+      "How much did USDA lower its 2026 corn production forecast this month, and what was the reason?",
+      "This month USDA trimmed its 2026 corn crop estimate. By how much, and why?",
+    ],
     expectedItems: ["178.5", "15.8 billion"],
     expectedAnswer:
       "NASS's first objective-yield estimate lowered the corn yield 2.2 bushels per acre to 178.5 and harvested area " +
