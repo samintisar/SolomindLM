@@ -3,6 +3,11 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import {
+  getChatLinkedLiteratureArtifactIds,
+  isChatLiteratureReport,
+  isChatLiteratureTable,
+} from "../_model/literatureArtifacts";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 import { SHOWCASE_FOLDER_NAME, SHOWCASE_NOTEBOOKS } from "./manifest";
@@ -190,68 +195,125 @@ describe("showcase db", () => {
   });
 });
 
+/** A finished chat literature review (session, table, report) in the notebook. */
+async function insertCompletedReview(
+  t: T,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">,
+  titles = { table: "Spaced Repetition: Evidence Table", report: "Spaced Repetition" }
+) {
+  return await t.run(async (ctx) => {
+    const now = Date.now();
+    const sessionId = await ctx.db.insert("literatureReviewSessions", {
+      query: "q",
+      notebookId,
+      userId,
+      workflowId: "wf_1",
+      status: "completed",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const tableId = await ctx.db.insert("literatureTables", {
+      title: titles.table,
+      notebookId,
+      userId,
+      status: "completed",
+      columns: [],
+      papers: [],
+      literatureReviewSessionId: sessionId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const reportId = await ctx.db.insert("literatureReports", {
+      title: titles.report,
+      notebookId,
+      userId,
+      status: "completed",
+      content: "## Summary\n\nText",
+      citationStyle: "apa",
+      sections: [{ heading: "Summary", content: "Text" }],
+      citationIds: [],
+      tableId,
+      literatureReviewSessionId: sessionId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch("literatureReviewSessions", sessionId, { tableId, reportId });
+    return sessionId;
+  });
+}
+
+/** The notebook's Studio-visible literature tables and reports (not chat outputs). */
+async function studioLiterature(t: T, notebookId: Id<"notebooks">) {
+  return await t.run(async (ctx) => {
+    const chat = await getChatLinkedLiteratureArtifactIds(ctx, notebookId);
+    const tables = await ctx.db
+      .query("literatureTables")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+      .collect();
+    const reports = await ctx.db
+      .query("literatureReports")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+      .collect();
+    return {
+      tables: tables.filter((r) => !isChatLiteratureTable(r, chat.tableIds)),
+      reports: reports.filter((r) => !isChatLiteratureReport(r, chat.reportIds)),
+    };
+  });
+}
+
 describe("showcase db: review outputs and publishing", () => {
   test("copies a finished literature review into Studio once", async () => {
     const { t, ownerId } = await setup();
     const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
-    await t.run(async (ctx) => {
-      const now = Date.now();
-      const sessionId = await ctx.db.insert("literatureReviewSessions", {
-        query: "q",
-        notebookId,
-        userId: ownerId,
-        workflowId: "wf_1",
-        status: "completed",
-        createdAt: now,
-        updatedAt: now,
-      });
-      const tableId = await ctx.db.insert("literatureTables", {
-        title: "Spaced Repetition: Evidence Table",
-        notebookId,
-        userId: ownerId,
-        status: "completed",
-        columns: [],
-        papers: [],
-        literatureReviewSessionId: sessionId,
-        createdAt: now,
-        updatedAt: now,
-      });
-      const reportId = await ctx.db.insert("literatureReports", {
-        title: "Spaced Repetition",
-        notebookId,
-        userId: ownerId,
-        status: "completed",
-        content: "## Summary\n\nText",
-        citationStyle: "apa",
-        sections: [{ heading: "Summary", content: "Text" }],
-        citationIds: [],
-        tableId,
-        literatureReviewSessionId: sessionId,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await ctx.db.patch("literatureReviewSessions", sessionId, { tableId, reportId });
+    await insertCompletedReview(t, notebookId, ownerId);
+
+    await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
+    await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
+
+    const { tables, reports } = await studioLiterature(t, notebookId);
+    expect(tables).toHaveLength(1);
+    expect(reports).toHaveLength(1);
+    expect(tables[0].title).toBe("Spaced Repetition: Evidence Table");
+    expect(reports[0].tableId).toBe(tables[0]._id);
+    expect(reports[0].content).toBe("## Summary\n\nText");
+  });
+
+  test("gives copies titles Studio shows, so a chat-style title is copied only once", async () => {
+    const { t, ownerId } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await insertCompletedReview(t, notebookId, ownerId, {
+      table: "Literature table — Spacing effect",
+      report: "Report - Spacing effect",
     });
 
     await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
     await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
 
-    const { tables, reports } = await t.run(async (ctx) => ({
-      tables: await ctx.db
+    const { tables, reports } = await studioLiterature(t, notebookId);
+    expect(tables.map((r) => r.title)).toEqual(["Spacing effect"]);
+    expect(reports.map((r) => r.title)).toEqual(["Spacing effect"]);
+    const all = await t.run((ctx) =>
+      ctx.db
         .query("literatureTables")
         .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-        .collect(),
-      reports: await ctx.db
-        .query("literatureReports")
-        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-        .collect(),
-    }));
-    const studioTables = tables.filter((r) => !r.literatureReviewSessionId);
-    const studioReports = reports.filter((r) => !r.literatureReviewSessionId);
-    expect(studioTables).toHaveLength(1);
-    expect(studioReports).toHaveLength(1);
-    expect(studioReports[0].tableId).toBe(studioTables[0]._id);
-    expect(studioReports[0].content).toBe("## Summary\n\nText");
+        .collect()
+    );
+    expect(all).toHaveLength(2);
+  });
+
+  test("falls back to a plain title when only the chat prefix is left", async () => {
+    const { t, ownerId } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await insertCompletedReview(t, notebookId, ownerId, {
+      table: "Literature table — ",
+      report: "Report —",
+    });
+    await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
+    await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
+    const { tables, reports } = await studioLiterature(t, notebookId);
+    expect(tables.map((r) => r.title)).toEqual(["Literature Review: Evidence Table"]);
+    expect(reports.map((r) => r.title)).toEqual(["Literature Review"]);
   });
 
   test("publishes a finished notebook as public and featured, and refuses an unfinished one", async () => {

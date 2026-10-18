@@ -219,7 +219,27 @@ async function latestReviewSession(db: Reader, notebookId: Id<"notebooks">) {
     .first();
 }
 
-/** A Studio-visible table and report with the session's titles exist. */
+/** Title prefixes `isChatLiteratureTable/Report` read as chat output ("Literature table —", "Report -"). */
+const CHAT_TITLE_PREFIX = {
+  table: /^literature table\s*[—-]\s*/i,
+  report: /^report\s*[—-]\s*/i,
+} as const;
+
+const PLAIN_TITLE = { table: "Literature Review: Evidence Table", report: "Literature Review" };
+
+/**
+ * The Studio copy's title: the review's title without a chat-output prefix, so Studio lists the
+ * copy (and `reviewOutputsInStudio` finds it). A title that is only the prefix gets a plain one.
+ */
+function studioCopyTitle(title: string, kind: "table" | "report"): string {
+  let clean = title.trim();
+  while (CHAT_TITLE_PREFIX[kind].test(clean)) {
+    clean = clean.replace(CHAT_TITLE_PREFIX[kind], "").trim();
+  }
+  return clean || PLAIN_TITLE[kind];
+}
+
+/** A Studio-visible copy of the session's table and report exists. */
 async function reviewOutputsInStudio(
   ctx: QueryCtx,
   session: Doc<"literatureReviewSessions">
@@ -228,6 +248,8 @@ async function reviewOutputsInStudio(
   const table = await ctx.db.get("literatureTables", session.tableId);
   const report = await ctx.db.get("literatureReports", session.reportId);
   if (!table || !report) return false;
+  const tableTitle = studioCopyTitle(table.title, "table");
+  const reportTitle = studioCopyTitle(report.title, "report");
   const chat = await getChatLinkedLiteratureArtifactIds(ctx, session.notebookId);
   const tables = await ctx.db
     .query("literatureTables")
@@ -238,8 +260,8 @@ async function reviewOutputsInStudio(
     .withIndex("by_notebook", (q) => q.eq("notebookId", session.notebookId))
     .take(MAX_ROWS);
   return (
-    tables.some((t) => t.title === table.title && !isChatLiteratureTable(t, chat.tableIds)) &&
-    reports.some((r) => r.title === report.title && !isChatLiteratureReport(r, chat.reportIds))
+    tables.some((t) => t.title === tableTitle && !isChatLiteratureTable(t, chat.tableIds)) &&
+    reports.some((r) => r.title === reportTitle && !isChatLiteratureReport(r, chat.reportIds))
   );
 }
 
@@ -889,7 +911,7 @@ export const copyLiteratureReviewToStudio = internalMutation({
     if (!table || !report) throw new Error("The review's table or report is missing");
     const now = Date.now();
     const tableId = await ctx.db.insert("literatureTables", {
-      title: table.title,
+      title: studioCopyTitle(table.title, "table"),
       description: table.description,
       notebookId: notebook._id,
       userId: table.userId,
@@ -900,7 +922,7 @@ export const copyLiteratureReviewToStudio = internalMutation({
       updatedAt: now,
     });
     await ctx.db.insert("literatureReports", {
-      title: report.title,
+      title: studioCopyTitle(report.title, "report"),
       notebookId: notebook._id,
       userId: report.userId,
       status: "completed",
