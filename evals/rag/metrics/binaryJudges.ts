@@ -37,11 +37,12 @@ function excerptForJudge(text: string, maxChars: number): string {
 }
 
 /**
- * Passage budget for judge prompts; fits every chunk of a typical chat answer (~30 chunks, under
- * 20K characters). It is a size guide, not a model limit: the cut and skipped-passage notes and the
- * grounding warning are added on top (tens to a few hundred characters).
+ * Passage budget for judge prompts. List questions can hand chat one whole-document passage
+ * (87K characters for the agentic-patterns transcript); a judge that sees only the first half
+ * fails claims from the second half. Same budget as whole-pack source text. It is a size guide,
+ * not a model limit: the cut and skipped-passage notes and the grounding warning are added on top.
  */
-export const CHUNK_CONTEXT_LIMIT = 48_000;
+export const CHUNK_CONTEXT_LIMIT = SOURCE_TEXTS_LIMIT;
 const CHUNK_SEPARATOR = "\n\n---\n\n";
 
 /**
@@ -162,26 +163,44 @@ Pass if citations map to listed sources or the answer has no citations when none
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
+/**
+ * Mirrors the research writer's evidence budget (`synthesize` in convex/_agents/research/nodes.ts:
+ * MAX_ENTRY_CHARS 2,000 per entry, MAX_PROMPT_CHARS 120,000 in all), so the judge sees what the
+ * writer saw. A smaller cut fails claims drawn from evidence the judge never got.
+ */
+const RESEARCH_ENTRY_CHARS = 2_000;
+export const RESEARCH_EVIDENCE_LIMIT = 120_000;
+
 export function formatResearchEvidence(artifact: EvalRunArtifact): string {
   const fromEvidence = (artifact.evidence ?? [])
     .filter((row) => row.content.trim())
-    .map((row) => `[${row.sourceTitle}] ${row.content.slice(0, 500)}`);
+    .map((row) => `[${row.sourceTitle}] ${row.content.slice(0, RESEARCH_ENTRY_CHARS)}`);
   if (fromEvidence.length > 0) {
     return fromEvidence.join("\n");
   }
   return artifact.selectedChunks
-    .map((chunk) => `[${chunk.sourceTitle}] ${chunk.content.slice(0, 500)}`)
+    .map((chunk) => `[${chunk.sourceTitle}] ${chunk.content.slice(0, RESEARCH_ENTRY_CHARS)}`)
     .join("\n");
 }
 
-function researchGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
+/** Research evidence for the judge, marked when the total budget cut it. */
+export function researchEvidenceForJudge(artifact: EvalRunArtifact): string {
   const evidence = formatResearchEvidence(artifact);
+  if (!evidence) return "(no evidence recorded)";
+  if (evidence.length <= RESEARCH_EVIDENCE_LIMIT) return evidence;
+  return (
+    `${evidence.slice(0, RESEARCH_EVIDENCE_LIMIT)}\n[… evidence cut off here for judging]\n` +
+    "Do not fail a claim only because its support would be in evidence past the cut."
+  );
+}
+
+function researchGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
   return `You are evaluating a research synthesis. Pass if the answer is grounded in listed evidence.
 
 Question: ${fixture.question}
 
 Evidence:
-${evidence.slice(0, 12000) || "(no evidence recorded)"}
+${researchEvidenceForJudge(artifact)}
 
 Answer:
 ${excerptForJudge(artifact.answer, 8000)}
