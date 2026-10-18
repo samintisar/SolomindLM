@@ -438,6 +438,38 @@ async function insertResearchPlan(
   });
 }
 
+/** Marks a workflow as paused in `awaitEvent`, as its "awaiting_user_input" step records. */
+async function markAwaitingUserInput(t: T, researchId: string) {
+  await t.run((ctx) =>
+    ctx.db.insert("researchSteps", {
+      researchId,
+      agentType: "research",
+      stepType: "awaiting_user_input",
+      status: "in_progress",
+      order: 1,
+    })
+  );
+}
+
+/** A literature review session paused for column confirmation (workflow step open). */
+async function insertWaitingReview(t: T, notebookId: Id<"notebooks">, userId: Id<"users">) {
+  const sessionId = await t.run((ctx) => {
+    const now = Date.now();
+    return ctx.db.insert("literatureReviewSessions", {
+      query: "q",
+      notebookId,
+      userId,
+      workflowId: "wf_review",
+      status: "awaiting_columns",
+      suggestedColumns: [{ id: "c1", name: "Retention interval", isVisible: true }],
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+  await markAwaitingUserInput(t, sessionId);
+  return sessionId;
+}
+
 describe("showcase db: the owner's review and research runs", () => {
   test("finds the owner's research plan behind many viewer threads, so it starts once", async () => {
     const { t, ownerId } = await setup();
@@ -462,5 +494,30 @@ describe("showcase db: the owner's review and research runs", () => {
     ).toBeNull();
     const plans = await t.run((ctx) => ctx.db.query("researchPlans").collect());
     expect(plans).toHaveLength(1);
+  });
+
+  test("ignores an editor's literature review waiting for columns", async () => {
+    const { t } = await setup();
+    const editorId = await insertUser(t, "editor@example.com");
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    const sessionId = await insertWaitingReview(t, notebookId, editorId);
+
+    expect(
+      await t.mutation(internal.showcase.db.confirmShowcaseLiteratureReview, ref(REVIEW.slug))
+    ).toBeNull();
+    const session = await t.run((ctx) => ctx.db.get("literatureReviewSessions", sessionId));
+    expect(session?.status).toBe("awaiting_columns");
+    expect(session?.confirmedColumns).toBeUndefined();
+  });
+
+  test("doesn't copy an editor's finished review into Studio", async () => {
+    const { t } = await setup();
+    const editorId = await insertUser(t, "editor@example.com");
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await insertCompletedReview(t, notebookId, editorId);
+    await expect(
+      t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug))
+    ).rejects.toThrow("hasn't finished");
+    expect((await studioLiterature(t, notebookId)).tables).toEqual([]);
   });
 });

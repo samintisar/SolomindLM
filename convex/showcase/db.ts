@@ -212,12 +212,18 @@ async function isAwaitingUserInput(db: Reader, researchId: string): Promise<bool
   return step?.status === "in_progress";
 }
 
-async function latestReviewSession(db: Reader, notebookId: Id<"notebooks">) {
-  return await db
+/** The owner's newest literature review in this notebook; editors' reviews are never touched. */
+async function latestReviewSession(
+  db: Reader,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">
+): Promise<Doc<"literatureReviewSessions"> | null> {
+  const sessions = await db
     .query("literatureReviewSessions")
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
     .order("desc")
-    .first();
+    .take(MAX_ROWS);
+  return sessions.find((s) => s.userId === userId) ?? null;
 }
 
 /** Title prefixes `isChatLiteratureTable/Report` read as chat output ("Literature table —", "Report -"). */
@@ -320,7 +326,7 @@ async function loadSeedState(ctx: QueryCtx, ownerEmail: string, slug: string) {
     }
   }
 
-  const session = await latestReviewSession(ctx.db, notebook._id);
+  const session = await latestReviewSession(ctx.db, notebook._id, owner._id);
   const plan = await latestResearchPlan(ctx.db, notebook._id, owner._id);
   const run = plan
     ? await ctx.db
@@ -855,7 +861,7 @@ export const startShowcaseLiteratureReview = internalMutation({
     );
     const review = spec.literatureReview;
     if (!review) throw new Error(`"${spec.title}" has no literature review`);
-    if (await latestReviewSession(ctx.db, notebook._id)) return null;
+    if (await latestReviewSession(ctx.db, notebook._id, owner._id)) return null;
     await assertCanEditNotebook(ctx, notebook._id, owner._id);
     const documentIds = (await listDocuments(ctx.db, notebook._id))
       .filter((d) => d.fileType === "paper_record" && d.status === "completed")
@@ -879,8 +885,8 @@ export const confirmShowcaseLiteratureReview = internalMutation({
   args: ownerSlugArgs,
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
-    const session = await latestReviewSession(ctx.db, notebook._id);
+    const { owner, notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
+    const session = await latestReviewSession(ctx.db, notebook._id, owner._id);
     if (!session || session.status !== "awaiting_columns") return null;
     if (!(await isAwaitingUserInput(ctx.db, session._id))) return null;
     const columns = session.suggestedColumns ?? [];
@@ -907,8 +913,8 @@ export const copyLiteratureReviewToStudio = internalMutation({
   args: ownerSlugArgs,
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
-    const session = await latestReviewSession(ctx.db, notebook._id);
+    const { owner, notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
+    const session = await latestReviewSession(ctx.db, notebook._id, owner._id);
     if (!session || session.status !== "completed" || !session.tableId || !session.reportId) {
       throw new Error("The literature review hasn't finished");
     }
