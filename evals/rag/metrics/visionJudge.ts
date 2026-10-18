@@ -13,7 +13,8 @@ import { metricResult } from "./metricResult";
 // Configuration
 // ============================================================
 
-const VISION_JUDGE_MODEL = "Qwen/Qwen3-VL-8B-Instruct";
+// Qwen3-VL models are dedicated-endpoint only on Together now; Qwen3.5-9B reads images serverless.
+const VISION_JUDGE_MODEL = "Qwen/Qwen3.5-9B";
 
 export interface VisionJudgeConfig {
   apiKey?: string;
