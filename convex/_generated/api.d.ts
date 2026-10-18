@@ -277,6 +277,11 @@ import type * as research_resolveResearchTitle from "../research/resolveResearch
 import type * as research_titles from "../research/titles.js";
 import type * as research_workflowSteps from "../research/workflowSteps.js";
 import type * as server from "../server.js";
+import type * as showcase_gettingStartedGuide from "../showcase/gettingStartedGuide.js";
+import type * as showcase_manifest from "../showcase/manifest.js";
+import type * as showcase_manifestValidation from "../showcase/manifestValidation.js";
+import type * as showcase_papers from "../showcase/papers.js";
+import type * as showcase_plan from "../showcase/plan.js";
 import type * as studio__job_collapsePlan from "../studio/_job/collapsePlan.js";
 import type * as studio__job_invokeStudioLlm from "../studio/_job/invokeStudioLlm.js";
 import type * as studio__job_jobDeadline from "../studio/_job/jobDeadline.js";
@@ -606,6 +611,11 @@ declare const fullApi: ApiFromModules<{
   "research/titles": typeof research_titles;
   "research/workflowSteps": typeof research_workflowSteps;
   server: typeof server;
+  "showcase/gettingStartedGuide": typeof showcase_gettingStartedGuide;
+  "showcase/manifest": typeof showcase_manifest;
+  "showcase/manifestValidation": typeof showcase_manifestValidation;
+  "showcase/papers": typeof showcase_papers;
+  "showcase/plan": typeof showcase_plan;
   "studio/_job/collapsePlan": typeof studio__job_collapsePlan;
   "studio/_job/invokeStudioLlm": typeof studio__job_invokeStudioLlm;
   "studio/_job/jobDeadline": typeof studio__job_jobDeadline;
