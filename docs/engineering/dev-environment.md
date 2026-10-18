@@ -30,6 +30,13 @@ the rubric check a change targets, and `--judge-reasoning off` to skip the judge
 output tokens). Rubric prompts put the check last so a case's checks share Together's prompt cache; the run ends
 with a `Judge tokens:` line showing how much was cached.
 
+Every run prints an estimated cost first and a `Run cost:` block at the end, both from live Together prices
+(Together LLM tokens only; Tavily, embeddings and rerank are not counted). Estimates come from past runs of each case,
+recorded in the main checkout's gitignored `evals/rag/generated/cost-history.jsonl`, which all worktrees share
+(`EVAL_COST_HISTORY` overrides the path). A case that has never run uses its runner's median, or shows `?`. A live run
+asks before starting at $0.25 or more, or when a case has no history; `--yes` skips the question and `--max-cost <usd>`
+refuses to start above a limit. Dry runs print the estimate for the live run without spending anything.
+
 ## Dev servers and worktrees
 
 - `dev:web` / `dev:mobile` go through `apps/web/scripts/dev-server.ts`. The main checkout gets :5173 /

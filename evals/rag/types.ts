@@ -243,8 +243,8 @@ export interface EvalRunArtifact {
   }>;
   /** Latency in ms */
   latencyMs: number;
-  /** Token usage if available */
-  tokenUsage?: { prompt: number; completion: number; total: number };
+  /** Token usage if available; `cachedPrompt` is the part of `prompt` served from the prompt cache */
+  tokenUsage?: { prompt: number; completion: number; total: number; cachedPrompt?: number };
   tokenUsageSource?: TokenUsageSource;
   stageSpans?: AgentStageSpan[];
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
