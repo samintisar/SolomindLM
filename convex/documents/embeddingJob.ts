@@ -272,6 +272,7 @@ export const docEmbedding = internalAction({
             fileUrl: docDetails.fileUrl,
             storageId: docDetails.storageId,
             fullTextSource: docDetails.fullTextSource,
+            fullTextPolicy: docDetails.fullTextPolicy,
           },
           {
             resolveCandidates: resolveOpenAccessCandidates,

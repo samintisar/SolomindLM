@@ -412,6 +412,7 @@ export const getDocumentDetails = internalQuery({
       fulltextStatus: doc.fulltextStatus,
       ingestionStatus: doc.ingestionStatus,
       fullTextSource: doc.fullTextSource,
+      fullTextPolicy: doc.fullTextPolicy,
       extractedMarkdown: doc.extractedMarkdown,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,

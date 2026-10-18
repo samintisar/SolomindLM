@@ -153,6 +153,8 @@ export default defineSchema({
     ingestionStatus: v.optional(ingestionStatusValidator),
     /** Paper full text provenance: uploaded PDF, open-access PDF/HTML, or landing page. Absent = abstract only. */
     fullTextSource: v.optional(fullTextSourceValidator),
+    /** Set by the showcase seed: paper full text is kept only under an open licence (`ingestPaper`). */
+    fullTextPolicy: v.optional(v.literal("open_license_only")),
     /** AI-generated source guide (lazy-cached): summary + topic chips */
     sourceGuide: v.optional(
       v.object({
