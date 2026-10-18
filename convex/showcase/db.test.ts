@@ -9,6 +9,7 @@ import {
   isChatLiteratureTable,
 } from "../_model/literatureArtifacts";
 import { preloadModules } from "../_testing/preloadModules.helpers";
+import { YOUTUBE_INGESTION_STAGGER_MS } from "../documents/ingestionDelay.helpers";
 import schema from "../schema";
 import { SHOWCASE_FOLDER_NAME, SHOWCASE_NOTEBOOKS } from "./manifest";
 
@@ -115,6 +116,32 @@ describe("showcase db", () => {
       status: "pending",
     });
     expect(scheduled.filter((s) => s.name.includes("embeddingJob"))).toHaveLength(1);
+  });
+
+  test("staggers YouTube ingestion like documents.upload; other sources start at once", async () => {
+    const { t } = await setup();
+    await t.mutation(internal.showcase.db.ensureNotebook, ref(ECON.slug));
+    const youtubeIndex = ECON.sources.findIndex((s) => s.kind === "youtube");
+    const urlIndex = ECON.sources.findIndex((s) => s.kind === "url");
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    try {
+      await t.mutation(internal.showcase.db.addSource, {
+        ...ref(ECON.slug),
+        sourceIndex: youtubeIndex,
+      });
+      await t.mutation(internal.showcase.db.addSource, {
+        ...ref(ECON.slug),
+        sourceIndex: urlIndex,
+      });
+    } finally {
+      random.mockRestore();
+    }
+    const now = Date.now();
+    const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    const delays = scheduled
+      .filter((s) => s.name.includes("embeddingJob"))
+      .map((s) => s.scheduledTime - now);
+    expect(delays).toEqual([YOUTUBE_INGESTION_STAGGER_MS / 2, 0]);
   });
 
   test("seedStatus walks the plan: sources first, then Studio items", async () => {

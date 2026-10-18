@@ -29,6 +29,7 @@ import * as Quizzes from "../_model/quizzes";
 import * as Reports from "../_model/reports";
 import * as Spreadsheets from "../_model/spreadsheets";
 import * as WrittenQuestions from "../_model/writtenQuestions";
+import { ingestionDelayMs } from "../documents/ingestionDelay.helpers";
 import {
   deriveFulltextStatus,
   paperRecordValidator,
@@ -468,17 +469,19 @@ async function hasDocumentWithKey(db: Reader, notebookId: Id<"notebooks">, key: 
   return (await listDocuments(db, notebookId)).some((d) => documentKey(d) === key);
 }
 
+/** Schedules ingestion with the same delay `documents.upload` uses (YouTube jobs staggered). */
 async function scheduleIngestion(
   ctx: MutationCtx,
+  fileType: string,
   documentId: Id<"documents">,
   userId: Id<"users">,
   notebookId: Id<"notebooks">
 ) {
-  await ctx.scheduler.runAfter(0, internal.documents.embeddingJob.docEmbedding, {
-    documentId,
-    userId,
-    notebookId,
-  });
+  await ctx.scheduler.runAfter(
+    ingestionDelayMs(fileType),
+    internal.documents.embeddingJob.docEmbedding,
+    { documentId, userId, notebookId }
+  );
 }
 
 /** A web page, YouTube video or pasted text, shaped like `documents.upload` writes it. */
@@ -509,7 +512,7 @@ export const addSource = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
-    await scheduleIngestion(ctx, documentId, owner._id, notebook._id);
+    await scheduleIngestion(ctx, source.kind, documentId, owner._id, notebook._id);
     return documentId;
   },
 });
@@ -547,7 +550,7 @@ export const attachFileSource = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
-    await scheduleIngestion(ctx, documentId, owner._id, notebook._id);
+    await scheduleIngestion(ctx, "file", documentId, owner._id, notebook._id);
     return documentId;
   },
 });
@@ -597,7 +600,7 @@ export const addDiscoveredPapers = internalMutation({
         createdAt: now,
         updatedAt: now,
       });
-      await scheduleIngestion(ctx, documentId, owner._id, notebook._id);
+      await scheduleIngestion(ctx, "paper_record", documentId, owner._id, notebook._id);
       count++;
       added++;
     }

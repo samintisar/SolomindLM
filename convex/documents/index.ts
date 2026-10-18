@@ -20,6 +20,7 @@ import {
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
+import { ingestionDelayMs } from "./ingestionDelay.helpers";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
@@ -134,13 +135,12 @@ export const upload = mutation({
       updatedAt: now,
     });
 
-    // Schedule embedding job; stagger YouTube jobs to avoid Supadata "Limit Exceeded" when uploading multiple at once
-    const delayMs = args.type === "youtube" ? Math.floor(Math.random() * 8000) : 0;
-    await ctx.scheduler.runAfter(delayMs, internal.documents.embeddingJob.docEmbedding, {
-      documentId,
-      userId,
-      notebookId: args.notebookId,
-    });
+    // Schedule embedding job; YouTube jobs are staggered (ingestionDelayMs).
+    await ctx.scheduler.runAfter(
+      ingestionDelayMs(args.type),
+      internal.documents.embeddingJob.docEmbedding,
+      { documentId, userId, notebookId: args.notebookId }
+    );
 
     return {
       documentId,
