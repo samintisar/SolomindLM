@@ -549,4 +549,136 @@ describe("showcase db: the owner's review and research runs", () => {
     ).rejects.toThrow("hasn't finished");
     expect((await studioLiterature(t, notebookId)).tables).toEqual([]);
   });
+
+  test("confirms columns only while the owner's workflow is waiting for them", async () => {
+    const { t, ownerId } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    const sessionId = await t.run((ctx) => {
+      const now = Date.now();
+      return ctx.db.insert("literatureReviewSessions", {
+        query: "q",
+        notebookId,
+        userId: ownerId,
+        workflowId: "wf_review",
+        status: "awaiting_columns",
+        suggestedColumns: [{ id: "c1", name: "Retention interval", isVisible: true }],
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    // Status says awaiting_columns, but the workflow hasn't reached awaitEvent yet.
+    expect(
+      await t.mutation(internal.showcase.db.confirmShowcaseLiteratureReview, ref(REVIEW.slug))
+    ).toBeNull();
+    const session = await t.run((ctx) => ctx.db.get("literatureReviewSessions", sessionId));
+    expect(session).toMatchObject({ status: "awaiting_columns" });
+    expect(session?.confirmedColumns).toBeUndefined();
+  });
+
+  test("approves a plan only while the owner's workflow waits, never another user's", async () => {
+    const { t, ownerId } = await setup();
+    const editorId = await insertUser(t, "editor@example.com");
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    const editorPlan = await insertResearchPlan(t, notebookId, editorId);
+    await markAwaitingUserInput(t, editorPlan);
+    expect(
+      await t.mutation(internal.showcase.db.approveShowcaseDeepResearch, ref(REVIEW.slug))
+    ).toBeNull();
+
+    const ownerPlan = await insertResearchPlan(t, notebookId, ownerId);
+    expect(
+      await t.mutation(internal.showcase.db.approveShowcaseDeepResearch, ref(REVIEW.slug))
+    ).toBeNull();
+
+    const plans = await t.run(async (ctx) => ({
+      editor: await ctx.db.get("researchPlans", editorPlan),
+      owner: await ctx.db.get("researchPlans", ownerPlan),
+    }));
+    expect(plans.editor?.status).toBe("draft");
+    expect(plans.owner?.status).toBe("draft");
+  });
+
+  test("starts the literature review only once", async () => {
+    const { t, ownerId } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await insertCompletedReview(t, notebookId, ownerId);
+    expect(
+      await t.mutation(internal.showcase.db.startShowcaseLiteratureReview, ref(REVIEW.slug))
+    ).toBeNull();
+    const sessions = await t.run((ctx) => ctx.db.query("literatureReviewSessions").collect());
+    expect(sessions).toHaveLength(1);
+  });
+
+  test("starts deep research only once", async () => {
+    const { t, ownerId } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await insertResearchPlan(t, notebookId, ownerId, "approved");
+    expect(
+      await t.mutation(internal.showcase.db.startShowcaseDeepResearch, ref(REVIEW.slug))
+    ).toBeNull();
+    expect(await t.run((ctx) => ctx.db.query("researchPlans").collect())).toHaveLength(1);
+  });
+});
+
+describe("showcase db: rollback touches only the owner's Showcase notebooks", () => {
+  /** The owner's seeded notebook, a same-title notebook outside the folder, and another user's. */
+  async function threeNotebooks() {
+    const { t, ownerId } = await setup();
+    await insertUser(t, "other@example.com");
+    const seeded = await t.mutation(internal.showcase.db.ensureNotebook, ref(TEN_K.slug));
+    const other = await t.mutation(internal.showcase.db.ensureNotebook, {
+      ownerEmail: "other@example.com",
+      slug: TEN_K.slug,
+    });
+    const stray = await t.run((ctx) => {
+      const now = Date.now();
+      return ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: TEN_K.title,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    await t.run(async (ctx) => {
+      for (const id of [seeded, other, stray]) {
+        await ctx.db.patch("notebooks", id, {
+          isPublic: true,
+          isFeatured: true,
+          publishedAt: 1,
+        });
+      }
+    });
+    return { t, seeded, other, stray };
+  }
+
+  test("unpublishShowcase", async () => {
+    const { t, seeded, other, stray } = await threeNotebooks();
+    expect(await t.mutation(internal.showcase.db.unpublishShowcase, { ownerEmail: OWNER })).toEqual(
+      [TEN_K.title]
+    );
+    const rows = await t.run(async (ctx) => ({
+      seeded: await ctx.db.get("notebooks", seeded),
+      other: await ctx.db.get("notebooks", other),
+      stray: await ctx.db.get("notebooks", stray),
+    }));
+    expect(rows.seeded).toMatchObject({ isPublic: false, isFeatured: false });
+    expect(rows.other).toMatchObject({ isPublic: true, isFeatured: true });
+    expect(rows.stray).toMatchObject({ isPublic: true, isFeatured: true });
+  });
+
+  test("deleteShowcaseNotebook", async () => {
+    const { t, seeded, other, stray } = await threeNotebooks();
+    await t.mutation(internal.showcase.db.deleteShowcaseNotebook, {
+      ...ref(TEN_K.slug),
+      confirmTitle: TEN_K.title,
+    });
+    const rows = await t.run(async (ctx) => ({
+      seeded: await ctx.db.get("notebooks", seeded),
+      other: await ctx.db.get("notebooks", other),
+      stray: await ctx.db.get("notebooks", stray),
+    }));
+    expect(rows.seeded).toBeNull();
+    expect(rows.other).not.toBeNull();
+    expect(rows.stray).not.toBeNull();
+  });
 });
