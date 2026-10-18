@@ -785,36 +785,41 @@ const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   writtenQuestions: 90000,
   audioScript: 240000,
 };
-const PER_RUNNER_TOKEN_GATE: Record<string, number> = {
-  chat: 8000,
-  research: 20000,
-  both: 20000,
-  report: 25000,
-  flashcards: 20000,
-  quiz: 20000,
-  mindmap: 20000,
-  infographic: 15000,
-  spreadsheet: 20000,
-  writtenQuestions: 20000,
-  audioScript: 15000,
-  audioScriptOnly: 8000,
-  literatureReview: 30000,
-};
+/** Token ratio to the case's own history: pass up to 1.5x its median, warn up to 2x, fail beyond. */
+const HISTORY_TOKEN_PASS_RATIO = 1.5;
+const HISTORY_TOKEN_WARN_RATIO = 2;
+
+function ratioStatus(ratio: number, passAt: number, warnAt: number): MetricStatus {
+  if (ratio <= passAt) return "pass";
+  if (ratio <= warnAt) return "warn";
+  return "fail";
+}
+
+const STATUS_RANK: Record<MetricStatus, number> = { info: 0, pass: 1, warn: 2, fail: 3 };
+
+function worstStatus(a: MetricStatus, b: MetricStatus): MetricStatus {
+  return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
+}
 
 /**
- * Checks latency and token cost against a baseline or static gates.
+ * Checks latency and token cost.
  *
- * If a baseline is provided: pass if within 1.2x, warn if within 2x, fail otherwise.
- * If no baseline: pass if within per-runner latency and token gates, warn if within 2x, fail otherwise.
+ * Latency: against the baseline (pass within 1.2x, warn within 2x) or, without one, the
+ * per-runner latency gate (pass under it, warn under 2x).
+ *
+ * Tokens (provider counts only; chars/4 estimates are reported, never gated): against the
+ * baseline's tokens when it recorded any (1.2x / 2x), else against `historyTokens`, the median
+ * per-run tokens of this case's recent runs from the cost history (1.5x / 2x). With neither,
+ * tokens are reported but not gated: a fixed per-runner token cap went stale as agents grew.
  */
 export function latencyCostBudget(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline
+  baseline?: EvalBaseline,
+  historyTokens?: number
 ): MetricResult {
   const latencyMs = artifact.latencyMs;
   const totalTokens = artifact.tokenUsage?.total ?? 0;
-  // Estimated usage (chars/4) is not a provider count, so tokens are reported but never gated.
   const providerTokens = artifact.tokenUsageSource === "provider";
 
   if (baseline && artifact.retrievalOnly) {
@@ -830,76 +835,69 @@ export function latencyCostBudget(
     );
   }
 
+  let latencyStatus: MetricStatus;
+  let latencyPart: string;
+  let latencyRatio: number | undefined;
+  const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
   if (baseline) {
-    const latencyRatio = latencyMs / baseline.latencyMs;
-    const baselineTokens = baseline.tokenUsage.total;
-    // A baseline with no recorded usage has no ratio to compare against.
-    const tokensGated = providerTokens && baselineTokens > 0;
-    const tokenRatio = baselineTokens > 0 ? totalTokens / baselineTokens : 0;
-    const worstRatio = tokensGated ? Math.max(latencyRatio, tokenRatio) : latencyRatio;
-
-    let status: MetricStatus;
-    if (worstRatio <= 1.2) status = "pass";
-    else if (worstRatio <= 2.0) status = "warn";
-    else status = "fail";
-
-    const latencyPart = `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x), `;
-    const tokenPart = !providerTokens
-      ? `tokens ${totalTokens} (estimated, not gated)`
-      : tokensGated
-        ? `tokens ${totalTokens} (baseline ${baselineTokens}, ${tokenRatio.toFixed(2)}x).`
-        : `tokens ${totalTokens} (baseline has no token usage)`;
-
-    return metricResult(
-      "latency_cost_budget",
-      fixture,
-      artifact,
-      status,
-      worstRatio,
-      `${latencyPart}${tokenPart}`,
-      {
-        latencyMs,
-        totalTokens,
-        latencyRatio: Math.round(latencyRatio * 100) / 100,
-        ...(tokensGated ? { tokenRatio: Math.round(tokenRatio * 100) / 100 } : {}),
-        baselineLatencyMs: baseline.latencyMs,
-        baselineTotalTokens: baselineTokens,
-        tokensGated,
-        ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
-      }
-    );
+    latencyRatio = latencyMs / baseline.latencyMs;
+    latencyStatus = ratioStatus(latencyRatio, 1.2, 2);
+    latencyPart = `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x)`;
+  } else {
+    latencyStatus = ratioStatus(latencyMs / latencyGate, 1, 2);
+    latencyPart = `Latency ${latencyMs}ms (gate ${latencyGate}ms)`;
   }
 
-  // No baseline: use static gates (per-runner where defined).
-  const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
-  const tokenGate = PER_RUNNER_TOKEN_GATE[artifact.runner] ?? 8000;
-  const latencyOk = latencyMs <= latencyGate;
-  const tokensOk = !providerTokens || totalTokens <= tokenGate;
-  const withinWarnBand =
-    latencyMs <= latencyGate * 2 && (!providerTokens || totalTokens <= tokenGate * 2);
+  const baselineTokens = baseline?.tokenUsage.total ?? 0;
+  const reference =
+    baselineTokens > 0
+      ? { tokens: baselineTokens, label: "baseline", passAt: 1.2, warnAt: 2 }
+      : historyTokens !== undefined && historyTokens > 0
+        ? {
+            tokens: Math.round(historyTokens),
+            label: "case median",
+            passAt: HISTORY_TOKEN_PASS_RATIO,
+            warnAt: HISTORY_TOKEN_WARN_RATIO,
+          }
+        : undefined;
+  const tokensGated = providerTokens && reference !== undefined;
+  const tokenRatio = tokensGated && reference ? totalTokens / reference.tokens : undefined;
+  const tokenStatus =
+    tokenRatio !== undefined && reference
+      ? ratioStatus(tokenRatio, reference.passAt, reference.warnAt)
+      : "pass";
+  const tokenPart = !providerTokens
+    ? `tokens ${totalTokens} (estimated, not gated)`
+    : tokenRatio !== undefined && reference
+      ? `tokens ${totalTokens} (${reference.label} ${reference.tokens}, ${tokenRatio.toFixed(2)}x)`
+      : `tokens ${totalTokens} (no token history yet, not gated)`;
 
-  let status: MetricStatus;
-  if (latencyOk && tokensOk) status = "pass";
-  else if (withinWarnBand) status = "warn";
-  else status = "fail";
+  const status = worstStatus(latencyStatus, tokenStatus);
+  const score = status === "pass" ? 1 : status === "warn" ? 0.5 : 0;
 
-  const score = latencyOk && tokensOk ? 1 : withinWarnBand ? 0.5 : 0;
-
-  const detail = providerTokens
-    ? `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`
-    : `Latency ${latencyMs}ms (gate ${latencyGate}ms), no baseline, tokens ${totalTokens} (estimated, not gated)`;
-
-  return metricResult("latency_cost_budget", fixture, artifact, status, score, detail, {
-    latencyMs,
-    totalTokens,
-    latencyGate,
-    tokenGate,
-    latencyOk,
-    tokensOk,
-    hasBaseline: false,
-    tokensGated: providerTokens,
-    ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
-  });
+  return metricResult(
+    "latency_cost_budget",
+    fixture,
+    artifact,
+    status,
+    score,
+    `${latencyPart}, ${tokenPart}`,
+    {
+      latencyMs,
+      totalTokens,
+      hasBaseline: baseline !== undefined,
+      ...(baseline
+        ? { baselineLatencyMs: baseline.latencyMs, baselineTotalTokens: baselineTokens }
+        : { latencyGate }),
+      ...(latencyRatio !== undefined ? { latencyRatio: Math.round(latencyRatio * 100) / 100 } : {}),
+      tokensGated,
+      ...(tokenRatio !== undefined ? { tokenRatio: Math.round(tokenRatio * 100) / 100 } : {}),
+      ...(reference && tokensGated
+        ? { tokenReference: reference.label, referenceTokens: reference.tokens }
+        : {}),
+      ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
+    }
+  );
 }
 
 // Re-export types for convenience
