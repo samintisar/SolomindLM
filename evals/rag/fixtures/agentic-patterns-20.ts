@@ -29,6 +29,9 @@ export const AGENTIC_20_ITEMS: readonly string[] = [
   "exploration and discovery",
 ];
 
+/** Local copy of the notebook's source, for judges that need the full text. */
+export const AGENTIC_20_SOURCE_FILES: readonly string[] = ["master-20-agentic-patterns.md"];
+
 /** Notebook ID of the test notebook backed by the 20-patterns markdown source. */
 export const AGENTIC_20_NOTEBOOK_ID = "jd702jq641ensjca91c9hwp4d985pgax";
 

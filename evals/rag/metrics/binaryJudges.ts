@@ -447,7 +447,7 @@ function noGroundingEvidence(
     artifact,
     "warn",
     0,
-    "No grounding evidence: studio artifact has no retrieved chunks and no pack source text.",
+    "No grounding evidence: studio artifact has no retrieved chunks and no source text (fixture sourceFiles or pack).",
     { noEvidence: true, model }
   );
 }

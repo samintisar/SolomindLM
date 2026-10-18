@@ -1,5 +1,9 @@
 import type { EvalFixture } from "../../types";
-import { AGENTIC_20_ITEMS, AGENTIC_20_NOTEBOOK_ID } from "../agentic-patterns-20";
+import {
+  AGENTIC_20_ITEMS,
+  AGENTIC_20_NOTEBOOK_ID,
+  AGENTIC_20_SOURCE_FILES,
+} from "../agentic-patterns-20";
 
 /**
  * Studio eval: flashcards covering the 20 agentic-patterns notebook.
@@ -15,6 +19,7 @@ export const studioFlashcardsAgentic20: EvalFixture = {
   question: "Generate flashcards covering the 20 agentic AI design patterns.",
   runner: "flashcards",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: [...AGENTIC_20_ITEMS],
   expectedBehavior:
     "Flashcards should cover all 20 patterns. Each pattern should appear by name " +

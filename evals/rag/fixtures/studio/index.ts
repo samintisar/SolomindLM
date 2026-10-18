@@ -7,6 +7,7 @@ import type { EvalFixture } from "../../types";
 import {
   AGENTIC_20_ITEMS,
   AGENTIC_20_NOTEBOOK_ID,
+  AGENTIC_20_SOURCE_FILES,
   AGENTIC_20_STUDIO_PARAMS,
 } from "../agentic-patterns-20";
 
@@ -34,6 +35,7 @@ const studioReportAgentic20: EvalFixture = {
   question: "Generate a report covering the 20 agentic AI design patterns.",
   runner: "report",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Report should explicitly enumerate and describe each of the 20 agentic AI design patterns " +
@@ -56,6 +58,7 @@ const studioQuizAgentic20: EvalFixture = {
   question: "Generate a quiz covering the 20 agentic AI design patterns.",
   runner: "quiz",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Quiz should include questions covering each of the 20 patterns. Each question must have an answer key.",
@@ -70,6 +73,7 @@ const studioMindmapAgentic20: EvalFixture = {
   question: "Build a mindmap of the 20 agentic AI design patterns.",
   runner: "mindmap",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Mindmap should have a root node plus a node per pattern, with descriptive children where appropriate.",
@@ -83,6 +87,7 @@ const studioInfographicAgentic20: EvalFixture = {
   question: "Create an infographic visualizing the 20 agentic AI design patterns.",
   runner: "infographic",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: [],
   expectedAnswer:
     "An infographic showing 20 agentic AI design patterns with visual icons/labels for each: prompt chaining, routing, parallelization, reflection, tool use, planning, multi-agent collaboration, memory management, learning and adaptation, goal setting and monitoring, exception handling and recovery, human in the loop, knowledge retrieval, inter-agent communication, resource-aware optimization, reasoning techniques, evaluation and monitoring, guardrails and safety patterns, prioritization, exploration and discovery.",
@@ -101,6 +106,7 @@ const studioSpreadsheetAgentic20: EvalFixture = {
   question: "Build a spreadsheet comparing the 20 agentic AI design patterns.",
   runner: "spreadsheet",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Spreadsheet should have one row per pattern with descriptive columns (name, description, use case, etc.).",
@@ -118,6 +124,7 @@ const studioWrittenQuestionsAgentic20: EvalFixture = {
   question: "Generate written-response questions on the 20 agentic AI design patterns.",
   runner: "writtenQuestions",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Set should include open-ended questions exercising understanding of each pattern. Provide an expected-answer or rubric for each.",
@@ -132,6 +139,7 @@ const studioAudioScriptAgentic20: EvalFixture = {
   question: "Generate an audio overview script covering the 20 agentic AI design patterns.",
   runner: "audioScript",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Two-host dialogue script that names and briefly describes each of the 20 patterns. The synthesized audio is NOT evaluated — only the script.",
@@ -144,6 +152,7 @@ const studioAudioScriptShort: EvalFixture = {
   question: "Generate a SHORT audio overview script covering the 20 agentic AI design patterns.",
   runner: "audioScript",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Short two-host dialogue script (~12 min, ~2000 words). Should cover all 20 patterns briefly.",
@@ -158,6 +167,7 @@ const studioAudioScriptDefault: EvalFixture = {
   question: "Generate a DEFAULT audio overview script covering the 20 agentic AI design patterns.",
   runner: "audioScript",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Default two-host dialogue script (~27 min, ~4400 words). Should cover all 20 patterns with depth.",
@@ -172,6 +182,7 @@ const studioAudioScriptLong: EvalFixture = {
   question: "Generate a LONG audio overview script covering the 20 agentic AI design patterns.",
   runner: "audioScript",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Long two-host dialogue script (~43 min, ~7000 words). Should cover all 20 patterns in depth with examples and discussion.",
@@ -188,6 +199,7 @@ const studioAudioScriptOnlyShort: EvalFixture = {
   question: "Generate a SHORT audio overview script (script only, no TTS).",
   runner: "audioScriptOnly",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior: "Short two-host dialogue script (~12 min, ~2000 words).",
   studioParams: { length: "short", audioType: "deep_dive" },
@@ -201,6 +213,7 @@ const studioAudioScriptOnlyDefault: EvalFixture = {
   question: "Generate a DEFAULT audio overview script (script only, no TTS).",
   runner: "audioScriptOnly",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior: "Default two-host dialogue script (~27 min, ~4400 words).",
   studioParams: { length: "default", audioType: "deep_dive" },
@@ -214,6 +227,7 @@ const studioAudioScriptOnlyLong: EvalFixture = {
   question: "Generate a LONG audio overview script (script only, no TTS).",
   runner: "audioScriptOnly",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
+  sourceFiles: [...AGENTIC_20_SOURCE_FILES],
   expectedItems: sharedExpectedItems(),
   expectedBehavior: "Long two-host dialogue script (~43 min, ~7000 words).",
   studioParams: { length: "long", audioType: "deep_dive" },
