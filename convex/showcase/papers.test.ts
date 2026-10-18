@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { paperKey, pickDiscoveredPapers, type ResolvedPaper } from "./papers";
+import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
+import { paperFileName, paperKey, pickDiscoveredPapers, type ResolvedPaper } from "./papers";
 
 const paper = (title: string, doi?: string, license?: string): ResolvedPaper => ({
   title,
@@ -12,6 +13,14 @@ describe("paperKey", () => {
       "doi:10.1371/journal.pone.1"
     );
     expect(paperKey(paper("  A Title "))).toBe("title:a title");
+  });
+
+  test("keys a DOI-less paper by the title its source is stored under", () => {
+    const long = `A ${"very ".repeat(60)}long   title`;
+    const stored = paperFileName(long);
+    expect(stored.length).toBeLessThanOrEqual(TEXT_TITLE_MAX_LENGTH);
+    expect(paperKey(paper(stored))).toBe(paperKey(paper(long)));
+    expect(paperKey(paper("A  spaced\nTitle"))).toBe("title:a spaced title");
   });
 });
 

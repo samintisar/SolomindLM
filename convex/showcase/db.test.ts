@@ -496,6 +496,35 @@ describe("showcase db: the owner's review and research runs", () => {
     expect(plans).toHaveLength(1);
   });
 
+  test("recognises a long DOI-less paper it already added", async () => {
+    const { t } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    const longTitle = `Spacing ${"and retrieval practice ".repeat(12)}in classrooms`;
+    const paper = {
+      title: longTitle,
+      paperRecord: { abstract: "An abstract.", authors: ["A. Author"], isOa: false },
+    };
+    expect(
+      await t.mutation(internal.showcase.db.addDiscoveredPapers, {
+        ...ref(REVIEW.slug),
+        papers: [paper],
+      })
+    ).toBe(1);
+    expect(
+      await t.mutation(internal.showcase.db.addDiscoveredPapers, {
+        ...ref(REVIEW.slug),
+        papers: [paper],
+      })
+    ).toBe(0);
+    const docs = await t.run((ctx) =>
+      ctx.db
+        .query("documents")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+        .collect()
+    );
+    expect(docs).toHaveLength(1);
+  });
+
   test("ignores an editor's literature review waiting for columns", async () => {
     const { t } = await setup();
     const editorId = await insertUser(t, "editor@example.com");

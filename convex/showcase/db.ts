@@ -14,7 +14,6 @@ import {
   type QueryCtx,
 } from "../_generated/server";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
-import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import * as AudioOverviews from "../_model/audioOverviews";
 import * as Flashcards from "../_model/flashcards";
 import * as Infographics from "../_model/infographics";
@@ -49,7 +48,7 @@ import {
   type StudioKind,
   sourceKey,
 } from "./manifest";
-import { paperKey } from "./papers";
+import { paperFileName, paperKey } from "./papers";
 import { DEFAULT_MAX_IN_FLIGHT, planSeed, type SeedSnapshot, seedPlanValidator } from "./plan";
 
 type Reader = QueryCtx["db"];
@@ -595,7 +594,7 @@ export const addDiscoveredPapers = internalMutation({
       const documentId = await ctx.db.insert("documents", {
         userId: owner._id,
         notebookId: notebook._id,
-        fileName: paper.title.trim().slice(0, TEXT_TITLE_MAX_LENGTH),
+        fileName: paperFileName(paper.title),
         fileType: "paper_record",
         fileUrl: primaryLinkUrlForPaper(pr) || undefined,
         status: "pending",

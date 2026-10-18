@@ -1,3 +1,4 @@
+import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { isOpenFullTextLicense } from "../documents/paperIngest";
 import { normalizeDoi, type PaperRecord } from "../documents/paperRecord";
 
@@ -6,10 +7,18 @@ export interface ResolvedPaper {
   paperRecord: PaperRecord;
 }
 
-/** How a paper source is matched: its DOI, else its title (case-insensitive). */
+/** The title a discovered paper's source is stored under (`documents.fileName`). */
+export function paperFileName(title: string): string {
+  return title.replace(/\s+/g, " ").trim().slice(0, TEXT_TITLE_MAX_LENGTH).trim();
+}
+
+/**
+ * How a paper source is matched: its DOI, else its stored title (case-insensitive). A candidate's
+ * full title and a stored source's truncated `fileName` normalise to the same key.
+ */
 export function paperKey(paper: { title: string; paperRecord?: { doi?: string } }): string {
   const doi = normalizeDoi(paper.paperRecord?.doi)?.toLowerCase();
-  return doi ? `doi:${doi}` : `title:${paper.title.trim().toLowerCase()}`;
+  return doi ? `doi:${doi}` : `title:${paperFileName(paper.title).toLowerCase()}`;
 }
 
 /**
