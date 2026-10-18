@@ -21,6 +21,7 @@ const bySlug = (slug: string) => {
 };
 const GUIDE = bySlug("getting-started-with-solomindlm");
 const ECON = bySlug("econ-101-midterm-prep");
+const TEN_K = bySlug("reading-a-10-k");
 const REVIEW = bySlug("spaced-repetition-literature-review");
 const ref = (slug: string) => ({ ownerEmail: OWNER, slug });
 
@@ -186,5 +187,123 @@ describe("showcase db", () => {
         status: "pending",
       });
     }
+  });
+});
+
+describe("showcase db: review outputs and publishing", () => {
+  test("copies a finished literature review into Studio once", async () => {
+    const { t, ownerId } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      const sessionId = await ctx.db.insert("literatureReviewSessions", {
+        query: "q",
+        notebookId,
+        userId: ownerId,
+        workflowId: "wf_1",
+        status: "completed",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const tableId = await ctx.db.insert("literatureTables", {
+        title: "Spaced Repetition: Evidence Table",
+        notebookId,
+        userId: ownerId,
+        status: "completed",
+        columns: [],
+        papers: [],
+        literatureReviewSessionId: sessionId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const reportId = await ctx.db.insert("literatureReports", {
+        title: "Spaced Repetition",
+        notebookId,
+        userId: ownerId,
+        status: "completed",
+        content: "## Summary\n\nText",
+        citationStyle: "apa",
+        sections: [{ heading: "Summary", content: "Text" }],
+        citationIds: [],
+        tableId,
+        literatureReviewSessionId: sessionId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.patch("literatureReviewSessions", sessionId, { tableId, reportId });
+    });
+
+    await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
+    await t.mutation(internal.showcase.db.copyLiteratureReviewToStudio, ref(REVIEW.slug));
+
+    const { tables, reports } = await t.run(async (ctx) => ({
+      tables: await ctx.db
+        .query("literatureTables")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+        .collect(),
+      reports: await ctx.db
+        .query("literatureReports")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+        .collect(),
+    }));
+    const studioTables = tables.filter((r) => !r.literatureReviewSessionId);
+    const studioReports = reports.filter((r) => !r.literatureReviewSessionId);
+    expect(studioTables).toHaveLength(1);
+    expect(studioReports).toHaveLength(1);
+    expect(studioReports[0].tableId).toBe(studioTables[0]._id);
+    expect(studioReports[0].content).toBe("## Summary\n\nText");
+  });
+
+  test("publishes a finished notebook as public and featured, and refuses an unfinished one", async () => {
+    const { t } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(TEN_K.slug));
+    await expect(
+      t.mutation(internal.showcase.db.publishShowcaseNotebook, ref(TEN_K.slug))
+    ).rejects.toThrow("isn't finished");
+
+    await t.mutation(internal.showcase.db.addSource, { ...ref(TEN_K.slug), sourceIndex: 0 });
+    await markSourcesRead(t, notebookId);
+    for (let itemIndex = 0; itemIndex < TEN_K.studio.length; itemIndex++) {
+      await t.mutation(internal.showcase.db.startStudioItem, { ...ref(TEN_K.slug), itemIndex });
+    }
+    await t.run(async (ctx) => {
+      for (const table of ["reports", "quizzes", "spreadsheets"] as const) {
+        const rows = await ctx.db
+          .query(table)
+          .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+          .collect();
+        for (const row of rows) await ctx.db.patch(row._id, { status: "completed" });
+      }
+    });
+
+    await t.mutation(internal.showcase.db.publishShowcaseNotebook, ref(TEN_K.slug));
+    const published = await t.run((ctx) => ctx.db.get("notebooks", notebookId));
+    expect(published).toMatchObject({ isPublic: true, isFeatured: true });
+    expect(published?.publishedAt).toBeTypeOf("number");
+
+    await t.mutation(internal.showcase.db.unpublishShowcase, {
+      ownerEmail: OWNER,
+      slug: TEN_K.slug,
+    });
+    expect(await t.run((ctx) => ctx.db.get("notebooks", notebookId))).toMatchObject({
+      isPublic: false,
+      isFeatured: false,
+    });
+  });
+
+  test("deletes a showcase notebook only when the title is confirmed", async () => {
+    const { t } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(TEN_K.slug));
+    await expect(
+      t.mutation(internal.showcase.db.deleteShowcaseNotebook, {
+        ...ref(TEN_K.slug),
+        confirmTitle: "nope",
+      })
+    ).rejects.toThrow("confirmTitle");
+    await t.mutation(internal.showcase.db.deleteShowcaseNotebook, {
+      ...ref(TEN_K.slug),
+      confirmTitle: TEN_K.title,
+    });
+    expect(await t.run((ctx) => ctx.db.get("notebooks", notebookId))).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "../_generated/server";
+import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import * as AudioOverviews from "../_model/audioOverviews";
 import * as Flashcards from "../_model/flashcards";
@@ -33,6 +34,11 @@ import {
   paperRecordValidator,
   primaryLinkUrlForPaper,
 } from "../documents/paperRecord";
+import { approveResearchPlanAndResume, startDeepResearchRun } from "../research/index";
+import {
+  confirmLiteratureReviewColumnsForSession,
+  startLiteratureReviewRun,
+} from "../studio/literature_tables/index";
 import {
   SHOWCASE_FOLDER_NAME,
   SHOWCASE_NOTEBOOKS,
@@ -805,5 +811,215 @@ export const startStudioItem = internalMutation({
       { userId: owner._id, notebookId: notebook._id, documentIds },
       item
     );
+  },
+});
+
+/** Starts the manifest's literature review over the notebook's papers (once). */
+export const startShowcaseLiteratureReview = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.union(v.id("literatureReviewSessions"), v.null()),
+  handler: async (ctx, args) => {
+    const { spec, owner, notebook } = await requireShowcaseNotebook(
+      ctx,
+      args.ownerEmail,
+      args.slug
+    );
+    const review = spec.literatureReview;
+    if (!review) throw new Error(`"${spec.title}" has no literature review`);
+    if (await latestReviewSession(ctx.db, notebook._id)) return null;
+    await assertCanEditNotebook(ctx, notebook._id, owner._id);
+    const documentIds = (await listDocuments(ctx.db, notebook._id))
+      .filter((d) => d.fileType === "paper_record" && d.status === "completed")
+      .map((d) => d._id);
+    const { sessionId } = await startLiteratureReviewRun(ctx, owner._id, {
+      query: review.question,
+      notebookId: notebook._id,
+      searchOptions: {
+        researchDatabase: review.researchDatabase,
+        ...(review.academicFilters ? { academicFilters: review.academicFilters } : {}),
+      },
+      documentIds,
+      paperScope: "papers_and_search",
+    });
+    return sessionId;
+  },
+});
+
+/** Accepts the planner's suggested columns, as the owner would in the column picker. */
+export const confirmShowcaseLiteratureReview = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
+    const session = await latestReviewSession(ctx.db, notebook._id);
+    if (!session || session.status !== "awaiting_columns") return null;
+    if (!(await isAwaitingUserInput(ctx.db, session._id))) return null;
+    const columns = session.suggestedColumns ?? [];
+    if (columns.length === 0) throw new Error("The review has no suggested columns to confirm");
+    await confirmLiteratureReviewColumnsForSession(
+      ctx,
+      session,
+      columns.map((c) => ({
+        id: c.id,
+        name: c.name,
+        isVisible: c.isVisible,
+        ...(c.instructions ? { instructions: c.instructions } : {}),
+      }))
+    );
+    return null;
+  },
+});
+
+/**
+ * Copies the finished review's table and report into Studio: new rows without a session id
+ * (the fields `performNotebookFork` copies), so viewers can open them and forks keep them.
+ */
+export const copyLiteratureReviewToStudio = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
+    const session = await latestReviewSession(ctx.db, notebook._id);
+    if (!session || session.status !== "completed" || !session.tableId || !session.reportId) {
+      throw new Error("The literature review hasn't finished");
+    }
+    if (await reviewOutputsInStudio(ctx, session)) return null;
+    const table = await ctx.db.get("literatureTables", session.tableId);
+    const report = await ctx.db.get("literatureReports", session.reportId);
+    if (!table || !report) throw new Error("The review's table or report is missing");
+    const now = Date.now();
+    const tableId = await ctx.db.insert("literatureTables", {
+      title: table.title,
+      description: table.description,
+      notebookId: notebook._id,
+      userId: table.userId,
+      status: "completed",
+      columns: table.columns,
+      papers: table.papers,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("literatureReports", {
+      title: report.title,
+      notebookId: notebook._id,
+      userId: report.userId,
+      status: "completed",
+      content: report.content,
+      citationStyle: report.citationStyle,
+      sections: report.sections,
+      citationIds: report.citationIds,
+      tableId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return null;
+  },
+});
+
+/** Starts the manifest's deep research (once). Its table and report land in Studio by themselves. */
+export const startShowcaseDeepResearch = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.union(v.id("researchPlans"), v.null()),
+  handler: async (ctx, args) => {
+    const { spec, owner, notebook } = await requireShowcaseNotebook(
+      ctx,
+      args.ownerEmail,
+      args.slug
+    );
+    const research = spec.deepResearch;
+    if (!research) throw new Error(`"${spec.title}" has no deep research`);
+    if (await latestResearchPlan(ctx.db, notebook._id, owner._id)) return null;
+    await assertCanEditNotebook(ctx, notebook._id, owner._id);
+    const { planId } = await startDeepResearchRun(ctx, owner._id, {
+      notebookId: notebook._id,
+      query: research.query,
+      sourcePolicy: { channels: [...research.channels] },
+    });
+    return planId;
+  },
+});
+
+/** Approves the plan unchanged, as the owner would with "Start research". */
+export const approveShowcaseDeepResearch = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { owner, notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
+    const plan = await latestResearchPlan(ctx.db, notebook._id, owner._id);
+    if (!plan || plan.status !== "draft" || !(await isAwaitingUserInput(ctx.db, plan._id))) {
+      return null;
+    }
+    await approveResearchPlanAndResume(ctx, plan);
+    return null;
+  },
+});
+
+/** Public + featured, only once everything in the manifest exists and finished. */
+export const publishShowcaseNotebook = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { spec, notebook, snapshot } = await loadSeedState(ctx, args.ownerEmail, args.slug);
+    const plan = planSeed(spec, snapshot, { publish: true, maxInFlight: DEFAULT_MAX_IN_FLIGHT });
+    if (
+      !notebook ||
+      plan.steps.some((s) => s.type !== "publish") ||
+      plan.waitingOn.length > 0 ||
+      plan.problems.length > 0
+    ) {
+      const reasons =
+        [...plan.waitingOn, ...plan.problems].join("; ") ||
+        plan.steps.map((s) => s.type).join(", ");
+      throw new Error(`"${spec.title}" isn't finished: ${reasons}`);
+    }
+    await ctx.db.patch("notebooks", notebook._id, {
+      isPublic: true,
+      isFeatured: true,
+      // Re-publishing keeps the original date, as notebooks.public.setPublic does.
+      ...(notebook.isPublic ? {} : { publishedAt: Date.now() }),
+    });
+    return null;
+  },
+});
+
+/** Rollback step 1: take showcase notebooks off the Public tab (all, or one slug). */
+export const unpublishShowcase = internalMutation({
+  args: { ownerEmail: v.string(), slug: v.optional(v.string()) },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) => {
+    const owner = await ownerByEmail(ctx.db, args.ownerEmail);
+    const specs = args.slug ? [showcaseNotebookBySlug(args.slug)] : SHOWCASE_NOTEBOOKS;
+    const changed: string[] = [];
+    for (const spec of specs) {
+      const notebook = await findShowcaseNotebook(ctx.db, owner._id, spec.title);
+      if (!notebook || (!notebook.isPublic && !notebook.isFeatured)) continue;
+      await ctx.db.patch("notebooks", notebook._id, {
+        isPublic: false,
+        isFeatured: false,
+        publishedAt: undefined,
+      });
+      changed.push(spec.title);
+    }
+    return changed;
+  },
+});
+
+/**
+ * Rollback step 2: delete one showcase notebook the way the app's Delete does
+ * (`removeNotebookWithRelated`: members, share links, the notebook row). `confirmTitle` must match.
+ */
+export const deleteShowcaseNotebook = internalMutation({
+  args: { ...ownerSlugArgs, confirmTitle: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const spec = showcaseNotebookBySlug(args.slug);
+    if (args.confirmTitle !== spec.title) {
+      throw new Error(`confirmTitle must be exactly "${spec.title}"`);
+    }
+    const owner = await ownerByEmail(ctx.db, args.ownerEmail);
+    const notebook = await findShowcaseNotebook(ctx.db, owner._id, spec.title);
+    if (!notebook) return null;
+    await Notebooks.removeNotebookWithRelated(ctx, notebook._id);
+    return null;
   },
 });
