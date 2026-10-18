@@ -361,6 +361,27 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
+  // A public notebook viewer's own practice progress on one flashcard set, quiz or written-question
+  // set. Owners and editors practise on the shared row instead (convex/_model/studioProgress.ts).
+  studioProgress: defineTable({
+    userId: v.id("users"),
+    itemType: v.union(v.literal("flashcards"), v.literal("quizzes"), v.literal("writtenQuestions")),
+    /** The flashcards / quizzes / writtenQuestions row id. */
+    itemId: v.string(),
+    notebookId: v.id("notebooks"),
+    /** Mirrors the shared row's per-user fields; shape in convex/_model/practiceProgress.ts. */
+    progress: v.any(),
+    updatedAt: v.number(),
+  })
+    // One viewer's progress on one item (every practice read and write).
+    .index("by_user_and_item", ["userId", "itemId"])
+    // One viewer's progress across a notebook (list overlays) and, by prefix, account purge.
+    .index("by_user_and_notebook", ["userId", "notebookId"])
+    // Every viewer's progress on a notebook (notebook deletion, purge of the notebook's owner).
+    .index("by_notebook", ["notebookId"])
+    // Every viewer's progress on an item (studio item deletion).
+    .index("by_item", ["itemId"]),
+
   // Chat
   conversations: defineTable({
     userId: v.id("users"),

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QuizNote } from "@/shared/types/index";
@@ -8,7 +9,12 @@ import { QuizView } from "./QuizView";
 const submitAnswer = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn().mockResolvedValue(undefined);
 const updateProgress = vi.fn();
+const toastError = vi.fn();
 let latestNote: QuizNote | null = null;
+
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: toastError }),
+}));
 
 vi.mock("@/features/studio/services/quizzesApi", () => ({
   useSubmitQuizAnswer: () => submitAnswer,
@@ -66,21 +72,6 @@ beforeEach(() => {
 });
 
 describe("QuizView", () => {
-  it("read-only locks the options, saves no progress and offers no retry", async () => {
-    const user = userEvent.setup();
-    render(<QuizView note={makeQuiz()} readOnly />);
-    expect(await screen.findByText("Fork this notebook to practise.")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /Right one/ })).toBeDisabled();
-    expect(updateProgress).toHaveBeenCalledWith(null, 0);
-    expect(updateProgress).not.toHaveBeenCalledWith("quiz1", expect.anything());
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Finish" }));
-    await screen.findByRole("heading", { name: "Quiz Complete!" });
-    expect(screen.queryByRole("button", { name: /Try Again/ })).not.toBeInTheDocument();
-    expect(submitAnswer).not.toHaveBeenCalled();
-  });
-
   it("marks the right answer, counts the score and explains", async () => {
     const user = userEvent.setup();
     render(<QuizView note={makeQuiz()} />);
@@ -234,6 +225,18 @@ describe("QuizView", () => {
     expect(resetAnswers).toHaveBeenCalledWith("quiz1");
     expect(await screen.findByText("Score 0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Right one/ })).toHaveAttribute("data-state", "idle");
+  });
+
+  it("shows the server's reason in a toast when Try Again fails", async () => {
+    resetAnswers.mockRejectedValueOnce(
+      new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: "Studio item not found" })
+    );
+    const user = userEvent.setup();
+    render(<QuizView note={makeQuiz()} />);
+    await finishQuiz(user);
+    await user.click(screen.getByRole("button", { name: "Try Again" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Studio item not found"));
+    expect(screen.getByRole("heading", { name: "Quiz Complete!" })).toBeInTheDocument();
   });
 
   it("neither announces nor takes focus when an answered question is restored", async () => {

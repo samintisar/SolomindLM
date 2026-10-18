@@ -1,9 +1,10 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { QuizNote, QuizQuestion } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
+import { useSaveLastViewedIndex } from "./useSaveLastViewedIndex";
 
 export interface CreateQuizParams {
   notebookId: string;
@@ -200,46 +201,20 @@ export function useSubmitQuizAnswer() {
 }
 
 /**
- * Reset all answers for a quiz
+ * Reset all answers for a quiz ("Try again")
  */
 export function useResetQuizAnswers() {
-  const update = useMutation(api.studio.quizzes.index.update);
+  const reset = useMutation(api.studio.practice.resetAnswers);
 
   return async (quizId: string) => {
-    return await update({
-      id: quizId as Id<"quizzes">,
-      metadata: {
-        userAnswers: {},
-        lastViewedIndex: 0,
-      },
-    });
+    return await reset({ itemType: "quizzes", itemId: quizId });
   };
 }
 
 /**
- * Persist quiz progress (last viewed question index)
- * Note: Does NOT use optimistic updates to avoid interfering with quiz state
+ * Persist quiz progress (last viewed question index), skipping a write when it is unchanged.
+ * Viewers of a public notebook save to their own progress.
  */
-export function useUpdateQuizProgress(quizId: string | null, currentIndex: number) {
-  const update = useMutation(api.studio.quizzes.index.update);
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (quizId == null) return;
-
-    // Debounce the update to avoid excessive API calls during navigation
-    timeoutRef.current = setTimeout(() => {
-      update({
-        id: quizId as Id<"quizzes">,
-        metadata: { lastViewedIndex: currentIndex },
-      });
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [quizId, currentIndex, update]);
+export function useUpdateQuizProgress(quizId: string, currentIndex: number, savedIndex: number) {
+  useSaveLastViewedIndex("quizzes", quizId, currentIndex, savedIndex);
 }

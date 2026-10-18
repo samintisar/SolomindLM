@@ -1,9 +1,10 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
+import { useSaveLastViewedIndex } from "./useSaveLastViewedIndex";
 
 export interface CreateWrittenQuestionsParams {
   notebookId: string;
@@ -205,49 +206,24 @@ export function useSaveWrittenAnswerDraft() {
 }
 
 /**
- * Reset all answers for a written questions set
+ * Reset all answers for a written questions set ("Try again")
  */
 export function useResetWrittenAnswers() {
-  const update = useMutation(api.studio.writtenQuestions.index.update);
+  const reset = useMutation(api.studio.practice.resetAnswers);
 
   return async (id: string) => {
-    return await update({
-      id: id as Id<"writtenQuestions">,
-      metadata: {
-        userAnswers: {},
-        lastViewedIndex: 0,
-      },
-    });
+    return await reset({ itemType: "writtenQuestions", itemId: id });
   };
 }
 
 /**
- * Persist written questions progress (last viewed question index)
- * Note: Does NOT use optimistic updates to avoid interfering with questions state
+ * Persist written questions progress (last viewed question index), skipping a write when it is
+ * unchanged. Viewers of a public notebook save to their own progress.
  */
 export function useUpdateWrittenQuestionsProgress(
-  writtenQuestionsId: string | null,
-  currentIndex: number
+  writtenQuestionsId: string,
+  currentIndex: number,
+  savedIndex: number
 ) {
-  const update = useMutation(api.studio.writtenQuestions.index.update);
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (writtenQuestionsId == null) return;
-
-    // Debounce the update to avoid excessive API calls during navigation
-    timeoutRef.current = setTimeout(() => {
-      update({
-        id: writtenQuestionsId as Id<"writtenQuestions">,
-        metadata: { lastViewedIndex: currentIndex },
-      });
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [writtenQuestionsId, currentIndex, update]);
+  useSaveLastViewedIndex("writtenQuestions", writtenQuestionsId, currentIndex, savedIndex);
 }

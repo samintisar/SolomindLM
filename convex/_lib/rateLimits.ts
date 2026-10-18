@@ -67,6 +67,9 @@ function tierWindows<S extends string>(
   ) as Partial<Record<`${DailyFeature}${S}`, LimitConfig>>;
 }
 
+/** AI grades of written answers per user per hour, owners and public-notebook viewers alike. */
+export const WRITTEN_ANSWER_GRADES_PER_HOUR = 100;
+
 /**
  * Full rate-limiter config. Exported so tests can assert every window is
  * derived from the canonical limit maps.
@@ -84,6 +87,8 @@ export const RATE_LIMIT_CONFIG: Record<string, LimitConfig> = {
   feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
   /** "Find full text" / "Upload PDF" on a paper source (per user, per hour); each re-runs OCR and lookups */
   paperFullText: { kind: "fixed window", rate: 20, period: HOUR },
+  /** AI grading of written answers (per user, per hour); each grade is one LLM call */
+  writtenAnswerGrade: { kind: "fixed window", rate: WRITTEN_ANSWER_GRADES_PER_HOUR, period: HOUR },
   /** Free no-signup flashcard tool: runs per salted-hash IP per day */
   freeToolFlashcardsIp: { kind: "fixed window", rate: FREE_FLASHCARD_IP_DAILY_LIMIT, period: DAY },
   /** Free no-signup flashcard tool: all anonymous runs per day (cost circuit breaker, single key) */

@@ -7,6 +7,7 @@ import { FlashcardView } from "./FlashcardView";
 
 const noop = vi.fn().mockResolvedValue(undefined);
 const updateCard = vi.fn().mockResolvedValue(undefined);
+const cardReview = vi.fn().mockResolvedValue(undefined);
 const updatePreferences = vi.fn().mockResolvedValue(undefined);
 const updateProgress = vi.fn();
 
@@ -15,9 +16,10 @@ vi.mock("@/features/studio/services/flashcardsApi", () => ({
   useAddCard: () => noop,
   useUpdateCard: () => updateCard,
   useDeleteCard: () => noop,
-  useCardReview: () => noop,
+  useCardReview: () => cardReview,
   useUpdateFlashcardPreferences: () => updatePreferences,
-  useUpdateFlashcardProgress: (id: string | null, index: number) => updateProgress(id, index),
+  useUpdateFlashcardProgress: (id: string, index: number, savedIndex: number) =>
+    updateProgress(id, index, savedIndex),
 }));
 
 vi.mock("@/shared/contexts/useToast", () => ({
@@ -53,26 +55,57 @@ beforeEach(() => {
 });
 
 describe("FlashcardView", () => {
-  it("read-only browses only: no study or edit mode, no saved progress or preference", async () => {
+  it("read-only studies and saves its own progress, but has no Edit mode", async () => {
     const user = userEvent.setup();
     render(<FlashcardView note={makeNote()} readOnly />);
     expect(await screen.findByText("Front 1")).toBeInTheDocument();
-    expect(screen.getByText("Fork this notebook to practise.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Study Mode" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Fork this notebook to practise.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Study Mode" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Edit Mode" })).not.toBeInTheDocument();
-    expect(updateProgress).toHaveBeenCalledWith(null, 0);
-    expect(updateProgress).not.toHaveBeenCalledWith("fc1", expect.anything());
+    expect(updateProgress).toHaveBeenCalledWith("fc1", 0, 0);
     await user.click(screen.getByRole("button", { name: "All" }));
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(updatePreferences).not.toHaveBeenCalled();
+    expect(updatePreferences).toHaveBeenCalledWith("fc1", { showMastered: true });
   });
 
-  it("read-only starts on All, since a viewer has no review history to be due from", () => {
-    // The owner's deck preference says Due, but a viewer's copy carries no progress.
-    render(<FlashcardView note={makeNote(false)} readOnly />);
+  it("read-only rates a card in Study mode through the card review", async () => {
+    const user = userEvent.setup();
+    render(<FlashcardView note={makeNote()} readOnly />);
+    await user.click(screen.getByRole("button", { name: "Study Mode" }));
+    await user.click(await screen.findByRole("button", { name: "Reveal answer" }));
+    await user.click(screen.getByRole("button", { name: /Good/ }));
+    expect(cardReview).toHaveBeenCalledWith("fc1", 0, "good");
+  });
+
+  it("falls back to Browse when it turns read-only in Edit mode", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<FlashcardView note={makeNote()} />);
+    await user.click(screen.getByRole("button", { name: "Edit Mode" }));
+    expect(screen.getByRole("button", { name: "Edit Mode" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    rerender(<FlashcardView note={makeNote()} readOnly />);
+    expect(screen.queryByRole("button", { name: "Edit Mode" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Browse Mode" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await user.click(await screen.findByText("Front 1"));
+    expect(screen.queryByRole("dialog", { name: "Edit Card" })).not.toBeInTheDocument();
+  });
+
+  it("hands the progress hook the saved position it restored from", () => {
+    const note = makeNote();
+    note.metadata = { ...note.metadata, lastViewedIndex: 1 } as FlashcardNote["metadata"];
+    render(<FlashcardView note={note} />);
+    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(updateProgress).toHaveBeenLastCalledWith("fc1", 1, 1);
+  });
+
+  it("read-only starts on the viewer's own Due/All choice", () => {
+    render(<FlashcardView note={makeNote(true)} readOnly />);
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Due" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("1 of 2")).toBeInTheDocument();
   });
 
   it("shows the first card and flips it on click", async () => {

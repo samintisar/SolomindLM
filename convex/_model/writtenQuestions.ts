@@ -6,6 +6,9 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
  * No query/mutation/action exports — used by convex/writtenQuestions.ts and jobs.
  */
 
+/** Longest written answer saved as a draft or sent for grading (characters). */
+export const MAX_WRITTEN_ANSWER_LENGTH = 50_000;
+
 export async function getWrittenQuestion(
   ctx: QueryCtx,
   writtenQuestionId: Id<"writtenQuestions">

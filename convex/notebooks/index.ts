@@ -5,6 +5,7 @@ import { checkNotebookLimit } from "../_lib/limits";
 import { getNotebookAccess, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
+import { deletePracticeProgress } from "../studio/practice";
 
 /** Shape notebook + source count for API response */
 function toNotebookDTO(
@@ -263,6 +264,8 @@ export const remove = mutation({
     }
 
     await Notebooks.removeNotebookWithRelated(ctx, args.id);
+    // Viewers' practice progress goes with the notebook (its studio rows are kept, as before).
+    await deletePracticeProgress(ctx, { notebookId: args.id });
     return { message: "Notebook deleted successfully" };
   },
 });

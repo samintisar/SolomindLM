@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WrittenQuestionsNote } from "@/shared/types/index";
@@ -10,7 +11,12 @@ const submitAnswer = vi.fn();
 const saveDraft = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn();
 const updateProgress = vi.fn();
+const toastError = vi.fn();
 let latestNote: WrittenQuestionsNote | null = null;
+
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: toastError }),
+}));
 
 vi.mock("../../services/writtenQuestionsApi", () => ({
   useSubmitWrittenAnswer: () => submitAnswer,
@@ -51,37 +57,6 @@ function makeNote(overrides: Partial<WrittenQuestionsNote> = {}): WrittenQuestio
 beforeEach(() => {
   vi.clearAllMocks();
   latestNote = null;
-});
-
-// --- Read-only viewer --------------------------------------------------------
-describe("WrittenQuestionsView read-only", () => {
-  it("locks answering, never saves or grades, and offers no retry", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      // A draft the owner left behind must not be re-saved or graded on the viewer's behalf.
-      const note = makeNote({ userAnswers: { q1: { answer: "owner draft", graded: false } } });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<WrittenQuestionsView note={note} readOnly />);
-      expect(screen.getByText("Fork this notebook to practise.")).toBeInTheDocument();
-      expect(screen.getByRole("textbox")).toBeDisabled();
-      expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
-      expect(updateProgress).toHaveBeenCalledWith(null, 0);
-      expect(updateProgress).not.toHaveBeenCalledWith("wq1", expect.anything());
-
-      await user.click(screen.getByRole("button", { name: "Next" }));
-      await user.click(screen.getByRole("button", { name: "Finish" }));
-      expect(await screen.findByText("Assessment Complete!")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Try Again/ })).not.toBeInTheDocument();
-
-      await act(async () => {
-        vi.advanceTimersByTime(2000);
-      });
-      expect(saveDraft).not.toHaveBeenCalled();
-      expect(submitAnswer).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 });
 
 // --- Results coverage ------------------------------------------------------
@@ -685,5 +660,124 @@ describe("WrittenQuestionsView redesign", () => {
     await screen.findByText("Graded: 5 of 5 points.");
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(submitAnswer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("WrittenQuestionsView grading errors", () => {
+  it("shows the server's reason when grading is refused", async () => {
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    const reason = "You've graded a lot of answers in the last hour. Try again later.";
+    submitAnswer.mockRejectedValueOnce(
+      new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: reason })
+    );
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={makeNote()} />);
+
+    await user.type(screen.getByRole("textbox"), "My answer");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(reason));
+    alertSpy.mockRestore();
+  });
+
+  it("stops grading on Finish at the hourly limit and shows the server's reason", async () => {
+    const reason = "You've graded a lot of answers in the last hour. Try again in 12 minutes.";
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => {
+      if (questionId === "q2") {
+        throw new ConvexError({
+          type: "INPUT_VALIDATION_ERROR",
+          field: "rateLimit",
+          detail: reason,
+        });
+      }
+      return { success: true, score: 5, maxScore: 5 };
+    });
+    const note = makeNote({
+      questions: [
+        {
+          id: "q1",
+          question: "Q1?",
+          questionType: "short",
+          rubric: { maxPoints: 5, criteria: [] },
+        },
+        {
+          id: "q2",
+          question: "Q2?",
+          questionType: "short",
+          rubric: { maxPoints: 5, criteria: [] },
+        },
+        {
+          id: "q3",
+          question: "Q3?",
+          questionType: "short",
+          rubric: { maxPoints: 5, criteria: [] },
+        },
+      ],
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+        q3: { answer: "answer three", graded: false },
+      },
+    } as Partial<WrittenQuestionsNote>);
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(submitAnswer).toHaveBeenCalledTimes(2);
+    expect(submitAnswer).not.toHaveBeenCalledWith(expect.objectContaining({ questionId: "q3" }));
+    expect(screen.queryByText(/press Finish again/)).not.toBeInTheDocument();
+    expect(screen.getByText("Graded 1 of 3 questions")).toBeInTheDocument();
+  });
+
+  it("keeps the retry banner for other grading failures", async () => {
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => {
+      if (questionId === "q1") {
+        throw new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: "Answer is too long." });
+      }
+      return { success: true, score: 5, maxScore: 5 };
+    });
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(await screen.findByText(/1 answer\(s\) couldn't be graded/)).toBeInTheDocument();
+    expect(submitAnswer).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("WrittenQuestionsView Try again errors", () => {
+  it("shows the server's reason in a toast when the reset fails", async () => {
+    resetAnswers.mockRejectedValueOnce(
+      new ConvexError({ type: "INPUT_VALIDATION_ERROR", detail: "Studio item not found" })
+    );
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "a", graded: true, score: 5, maxScore: 5 },
+        q2: { answer: "b", graded: true, score: 5, maxScore: 5 },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    await user.click(await screen.findByRole("button", { name: "Try Again" }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Studio item not found"));
+    expect(screen.getByText("Assessment Complete!")).toBeInTheDocument();
   });
 });

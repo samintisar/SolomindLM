@@ -1,11 +1,12 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { Flashcard, FlashcardNote } from "@/shared/types/index";
 import { downloadBlob } from "@/shared/utils/downloadFile";
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
 import { patchNoteInNotesCache, removeNoteFromNotesCache } from "./notesCache";
+import { useSaveLastViewedIndex } from "./useSaveLastViewedIndex";
 
 export interface CreateFlashcardsParams {
   notebookId: string;
@@ -162,31 +163,15 @@ export function useDeleteFlashcard() {
 }
 
 /**
- * Persist flashcard progress (last viewed card index)
- * Note: Does NOT use optimistic updates to avoid interfering with flashcard state
+ * Persist flashcard progress (last viewed card index), skipping a write when it is unchanged.
+ * Viewers of a public notebook save to their own progress.
  */
-export function useUpdateFlashcardProgress(flashcardId: string | null, currentIndex: number) {
-  const update = useMutation(api.studio.flashcards.index.update);
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (flashcardId == null) return;
-
-    // Debounce the update to avoid excessive API calls during navigation
-    timeoutRef.current = setTimeout(() => {
-      update({
-        id: flashcardId as Id<"flashcards">,
-        metadata: { lastViewedIndex: currentIndex },
-      });
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [flashcardId, currentIndex, update]);
+export function useUpdateFlashcardProgress(
+  flashcardId: string,
+  currentIndex: number,
+  savedIndex: number
+) {
+  useSaveLastViewedIndex("flashcards", flashcardId, currentIndex, savedIndex);
 }
 
 /**
