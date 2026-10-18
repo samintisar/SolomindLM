@@ -1,6 +1,16 @@
 import { describe, expect, test } from "vitest";
 import type { ShowcaseNotebook } from "./manifest";
-import { planSeed, type SeedSnapshot } from "./plan";
+import {
+  BUSY_TICK_MS,
+  discoveryOutcome,
+  MAX_TICKS,
+  nextTickDelay,
+  planSeed,
+  type SeedPlan,
+  type SeedSnapshot,
+  tickGate,
+  WAIT_TICK_MS,
+} from "./plan";
 
 const NOTEBOOK: ShowcaseNotebook = {
   slug: "test-notebook",
@@ -285,5 +295,82 @@ describe("planSeed: literature review and deep research", () => {
         opts
       ).state
     ).toBe("blocked");
+  });
+});
+
+describe("tick decisions", () => {
+  const plan = (over: Partial<SeedPlan>): SeedPlan => ({
+    state: "working",
+    steps: [],
+    waitingOn: [],
+    problems: [],
+    ...over,
+  });
+
+  test("a chain stops when its notebook is done, blocked, or deleted mid-run", () => {
+    expect(tickGate(plan({ state: "done" }), 3)).toEqual({ run: false, reason: "done" });
+    expect(tickGate(plan({ state: "blocked", problems: ["x"] }), 3)).toEqual({
+      run: false,
+      reason: "blocked",
+    });
+    const create = plan({ steps: [{ type: "createNotebook" }] });
+    expect(tickGate(create, 1)).toEqual({ run: true });
+    expect(tickGate(create, 2)).toEqual({ run: false, reason: "notebook_gone" });
+    expect(tickGate(plan({ waitingOn: ["1 source(s) ingesting"] }), 7)).toEqual({ run: true });
+  });
+
+  test("polls fast after starting work, slowly while waiting or backing off, and gives up", () => {
+    expect(nextTickDelay({ tick: 1, ranSteps: 2, backedOff: false })).toBe(BUSY_TICK_MS);
+    expect(nextTickDelay({ tick: 1, ranSteps: 0, backedOff: false })).toBe(WAIT_TICK_MS);
+    expect(nextTickDelay({ tick: 1, ranSteps: 1, backedOff: true })).toBe(WAIT_TICK_MS);
+    expect(nextTickDelay({ tick: MAX_TICKS - 1, ranSteps: 0, backedOff: false })).toBe(
+      WAIT_TICK_MS
+    );
+    expect(nextTickDelay({ tick: MAX_TICKS, ranSteps: 0, backedOff: false })).toBeNull();
+  });
+});
+
+describe("discoveryOutcome", () => {
+  const base = { query: "spacing", pinned: false, searched: 20, resolved: 12, added: 0 };
+
+  test("any new paper is progress", () => {
+    expect(discoveryOutcome({ ...base, added: 2, rateLimited: true })).toEqual({
+      kind: "added",
+    });
+  });
+
+  test("a rate-limited search that added nothing backs off instead of failing", () => {
+    expect(discoveryOutcome({ ...base, searched: 0, resolved: 0, rateLimited: true })).toEqual({
+      kind: "backoff",
+    });
+  });
+
+  test("asks to widen the search only when it found too few candidates", () => {
+    const empty = discoveryOutcome({ ...base, searched: 0, resolved: 0, rateLimited: false });
+    expect(empty).toEqual({
+      kind: "error",
+      message: 'Discovery for "spacing" found no papers; widen the query or filters',
+    });
+    const allKnown = discoveryOutcome({ ...base, rateLimited: false });
+    expect(allKnown).toEqual({
+      kind: "error",
+      message:
+        'Discovery for "spacing" found no papers that aren\'t already in the notebook; widen the query or filters',
+    });
+  });
+
+  test("reports a DOI resolution failure separately", () => {
+    expect(discoveryOutcome({ ...base, resolved: 0, rateLimited: false })).toEqual({
+      kind: "error",
+      message:
+        'Discovery for "spacing" found 20 papers, but none resolved through the DOI resolver (no DOI, or the registries were unreachable); re-run later',
+    });
+    expect(
+      discoveryOutcome({ ...base, pinned: true, searched: 5, resolved: 0, rateLimited: false })
+    ).toEqual({
+      kind: "error",
+      message:
+        "None of the 5 pinned DOIs resolved (check them, or the registries were unreachable); re-run later",
+    });
   });
 });

@@ -219,3 +219,86 @@ export function planSeed(
   }
   return result();
 }
+
+// --- Tick decisions (`seed.ts` `tick`): pure, so they are unit-tested. ---
+
+/** Poll interval while only waiting (or backing off), and after starting something. */
+export const WAIT_TICK_MS = 60_000;
+export const BUSY_TICK_MS = 10_000;
+/** A chain gives up after ~4 hours of polling. */
+export const MAX_TICKS = 240;
+
+export type TickGate = { run: true } | { run: false; reason: "done" | "blocked" | "notebook_gone" };
+
+/** Whether a tick runs its plan's steps, or the chain stops here. */
+export function tickGate(plan: SeedPlan, tick: number): TickGate {
+  if (plan.state === "done") return { run: false, reason: "done" };
+  if (plan.state === "blocked") return { run: false, reason: "blocked" };
+  // The notebook existed on an earlier tick and was deleted (a rollback): don't recreate it.
+  if (tick > 1 && plan.steps.some((s) => s.type === "createNotebook")) {
+    return { run: false, reason: "notebook_gone" };
+  }
+  return { run: true };
+}
+
+/** Delay before the next tick, or null once the chain has polled `MAX_TICKS` times. */
+export function nextTickDelay(input: {
+  tick: number;
+  ranSteps: number;
+  /** A step asked to wait (a rate-limited paper search). */
+  backedOff: boolean;
+}): number | null {
+  if (input.tick >= MAX_TICKS) return null;
+  return input.ranSteps > 0 && !input.backedOff ? BUSY_TICK_MS : WAIT_TICK_MS;
+}
+
+export type DiscoveryOutcome =
+  | { kind: "added" }
+  | { kind: "backoff" }
+  | { kind: "error"; message: string };
+
+/**
+ * What a paper-discovery step amounted to. Any new paper is progress. A rate-limited search that
+ * added nothing waits for the next tick. Otherwise it fails, saying whether the search found too
+ * few papers or the DOI resolver couldn't resolve the ones it found.
+ */
+export function discoveryOutcome(input: {
+  query: string;
+  /** The manifest's pinned DOIs were resolved instead of searching. */
+  pinned: boolean;
+  /** Papers the search returned (or pinned DOIs looked up). */
+  searched: number;
+  /** Of those, papers the DOI resolver returned metadata for. */
+  resolved: number;
+  added: number;
+  rateLimited: boolean;
+}): DiscoveryOutcome {
+  if (input.added > 0) return { kind: "added" };
+  if (input.rateLimited) return { kind: "backoff" };
+  if (input.pinned) {
+    return input.resolved === 0
+      ? {
+          kind: "error",
+          message: `None of the ${input.searched} pinned DOIs resolved (check them, or the registries were unreachable); re-run later`,
+        }
+      : {
+          kind: "error",
+          message:
+            "The pinned DOIs resolved only to papers already in the notebook; check pinnedDois",
+        };
+  }
+  const where = `Discovery for "${input.query}"`;
+  if (input.searched === 0) {
+    return { kind: "error", message: `${where} found no papers; widen the query or filters` };
+  }
+  if (input.resolved === 0) {
+    return {
+      kind: "error",
+      message: `${where} found ${input.searched} papers, but none resolved through the DOI resolver (no DOI, or the registries were unreachable); re-run later`,
+    };
+  }
+  return {
+    kind: "error",
+    message: `${where} found no papers that aren't already in the notebook; widen the query or filters`,
+  };
+}

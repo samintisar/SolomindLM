@@ -17,13 +17,14 @@ import type { DiscoverAcademicPapersResult } from "../_services/search/AcademicS
 import { type PaperDiscovery, SHOWCASE_NOTEBOOKS } from "./manifest";
 import { validateManifest } from "./manifestValidation";
 import { paperKey, pickDiscoveredPapers, type ResolvedPaper } from "./papers";
-import { DEFAULT_MAX_IN_FLIGHT, type SeedStep } from "./plan";
+import {
+  DEFAULT_MAX_IN_FLIGHT,
+  discoveryOutcome,
+  nextTickDelay,
+  type SeedStep,
+  tickGate,
+} from "./plan";
 
-/** Poll interval while only waiting, and after starting something. */
-const WAIT_TICK_MS = 60_000;
-const BUSY_TICK_MS = 10_000;
-/** A chain gives up after ~4 hours of polling. */
-const MAX_TICKS = 240;
 /** Notebook chains start this far apart. */
 const STAGGER_MS = 20_000;
 const MAX_IN_FLIGHT_CAP = 4;
@@ -96,34 +97,38 @@ export const tick = internalAction({
       waitingOn: plan.waitingOn,
       problems: plan.problems,
     });
-    if (plan.state === "done") return null;
-    if (plan.state === "blocked") {
-      logger.warn("showcase_blocked", { slug: args.slug, problems: plan.problems });
+    const gate = tickGate(plan, args.tick);
+    if (!gate.run) {
+      if (gate.reason === "blocked") {
+        logger.warn("showcase_blocked", { slug: args.slug, problems: plan.problems });
+      } else if (gate.reason === "notebook_gone") {
+        logger.warn("showcase_notebook_gone", { slug: args.slug });
+      }
       return null;
     }
-    if (args.tick > 1 && plan.steps.some((s) => s.type === "createNotebook")) {
-      // Deleted while the chain was running (a rollback): don't recreate it.
-      logger.warn("showcase_notebook_gone", { slug: args.slug });
-      return null;
-    }
+    let backedOff = false;
     for (const step of plan.steps) {
       try {
-        await runStep(ctx, args, step, paperKeys);
+        const result = await runStep(ctx, args, step, paperKeys);
+        if (result === "backoff") {
+          backedOff = true;
+          logger.info("showcase_backoff", { slug: args.slug, step: step.type });
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.warn("showcase_step_failed", { slug: args.slug, step: step.type, error: message });
         throw new Error(`Showcase "${args.slug}": ${step.type} failed: ${message}`);
       }
     }
-    if (args.tick >= MAX_TICKS) {
+    const delay = nextTickDelay({ tick: args.tick, ranSteps: plan.steps.length, backedOff });
+    if (delay === null) {
       logger.warn("showcase_gave_up", { slug: args.slug, waitingOn: plan.waitingOn });
       return null;
     }
-    await ctx.scheduler.runAfter(
-      plan.steps.length > 0 ? BUSY_TICK_MS : WAIT_TICK_MS,
-      internal.showcase.seed.tick,
-      { ...args, tick: args.tick + 1 }
-    );
+    await ctx.scheduler.runAfter(delay, internal.showcase.seed.tick, {
+      ...args,
+      tick: args.tick + 1,
+    });
     return null;
   },
 });
@@ -134,17 +139,20 @@ function spec(slug: string) {
   return notebook;
 }
 
+/** "backoff": the step couldn't make progress yet (rate-limited) and the chain should wait. */
+type StepResult = "done" | "backoff";
+
 async function runStep(
   ctx: ActionCtx,
   args: { ownerEmail: string; slug: string },
   step: SeedStep,
   paperKeys: string[]
-): Promise<void> {
+): Promise<StepResult> {
   const ref = { ownerEmail: args.ownerEmail, slug: args.slug };
   switch (step.type) {
     case "createNotebook":
       await ctx.runMutation(internal.showcase.db.ensureNotebook, ref);
-      return;
+      return "done";
     case "addSource": {
       const source = spec(args.slug).sources[step.sourceIndex];
       if (source.kind !== "file") {
@@ -152,7 +160,7 @@ async function runStep(
           ...ref,
           sourceIndex: step.sourceIndex,
         });
-        return;
+        return "done";
       }
       const storageId = await fetchPdfToStorage(ctx, source.url);
       try {
@@ -165,52 +173,51 @@ async function runStep(
         await ctx.storage.delete(storageId);
         throw error;
       }
-      return;
+      return "done";
     }
     case "discoverPapers": {
       const discovery = spec(args.slug).paperDiscovery;
       if (!discovery) throw new Error("No paperDiscovery in the manifest");
-      const { papers, rateLimited } = await discoverPapers(
-        ctx,
-        discovery,
-        new Set(paperKeys),
-        step.needed
-      );
+      const found = await discoverPapers(ctx, discovery, new Set(paperKeys), step.needed);
       const added = await ctx.runMutation(internal.showcase.db.addDiscoveredPapers, {
         ...ref,
-        papers,
+        papers: found.papers,
       });
-      if (added === 0 && !rateLimited) {
-        throw new Error(
-          `Discovery for "${discovery.query}" found no new papers; widen the query or filters`
-        );
-      }
-      return;
+      const outcome = discoveryOutcome({
+        query: discovery.query,
+        pinned: Boolean(discovery.pinnedDois),
+        searched: found.searched,
+        resolved: found.resolved,
+        added,
+        rateLimited: found.rateLimited,
+      });
+      if (outcome.kind === "error") throw new Error(outcome.message);
+      return outcome.kind === "backoff" ? "backoff" : "done";
     }
     case "startStudioItem":
       await ctx.runMutation(internal.showcase.db.startStudioItem, {
         ...ref,
         itemIndex: step.itemIndex,
       });
-      return;
+      return "done";
     case "startLiteratureReview":
       await ctx.runMutation(internal.showcase.db.startShowcaseLiteratureReview, ref);
-      return;
+      return "done";
     case "confirmLiteratureReviewColumns":
       await ctx.runMutation(internal.showcase.db.confirmShowcaseLiteratureReview, ref);
-      return;
+      return "done";
     case "copyLiteratureReviewToStudio":
       await ctx.runMutation(internal.showcase.db.copyLiteratureReviewToStudio, ref);
-      return;
+      return "done";
     case "startDeepResearch":
       await ctx.runMutation(internal.showcase.db.startShowcaseDeepResearch, ref);
-      return;
+      return "done";
     case "approveDeepResearchPlan":
       await ctx.runMutation(internal.showcase.db.approveShowcaseDeepResearch, ref);
-      return;
+      return "done";
     case "publish":
       await ctx.runMutation(internal.showcase.db.publishShowcaseNotebook, ref);
-      return;
+      return "done";
   }
 }
 
@@ -257,29 +264,49 @@ async function resolvePapers(ids: string[]): Promise<ResolvedPaper[]> {
   return resolved;
 }
 
+type DiscoveredPapers = {
+  papers: ResolvedPaper[];
+  /** Candidates looked up (search results, or pinned DOIs). */
+  searched: number;
+  /** Candidates the DOI resolver returned metadata for. */
+  resolved: number;
+  rateLimited: boolean;
+};
+
 /**
  * Pinned DOIs when the manifest has them (prod gets the dev run's papers); otherwise Discover's
- * academic search, then the DOI resolver. Rate-limited searches return nothing; the next tick
- * tries again.
+ * academic search, then the DOI resolver. A rate-limited search returns nothing; the tick backs
+ * off and the next one tries again (`discoveryOutcome`).
  */
 async function discoverPapers(
   ctx: ActionCtx,
   discovery: PaperDiscovery,
   existingKeys: ReadonlySet<string>,
   needed: number
-): Promise<{ papers: ResolvedPaper[]; rateLimited: boolean }> {
+): Promise<DiscoveredPapers> {
   if (discovery.pinnedDois) {
     const pinned = await resolvePapers(discovery.pinnedDois);
     // Keep the pinned order: no licence re-ranking.
     const fresh = pinned.filter((paper) => !existingKeys.has(paperKey(paper)));
-    return { papers: fresh.slice(0, needed), rateLimited: false };
+    return {
+      papers: fresh.slice(0, needed),
+      searched: discovery.pinnedDois.length,
+      resolved: pinned.length,
+      rateLimited: false,
+    };
   }
   const { sources, rateLimited }: DiscoverAcademicPapersResult = await ctx.runAction(
     internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
     { query: discovery.query, maxResults: DISCOVERY_RESULTS, ...discovery.filters }
   );
-  const resolved = await resolvePapers(
-    sources.slice(0, MAX_DOI_LOOKUPS).map((source) => source.metadata?.doi ?? source.url)
-  );
-  return { papers: pickDiscoveredPapers(resolved, existingKeys, needed), rateLimited };
+  const lookups = sources
+    .slice(0, MAX_DOI_LOOKUPS)
+    .map((source) => source.metadata?.doi ?? source.url);
+  const resolved = await resolvePapers(lookups);
+  return {
+    papers: pickDiscoveredPapers(resolved, existingKeys, needed),
+    searched: lookups.length,
+    resolved: resolved.length,
+    rateLimited,
+  };
 }
