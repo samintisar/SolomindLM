@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { ShowcaseNotebook } from "./manifest";
+import { SHOWCASE_NOTEBOOKS, type ShowcaseNotebook } from "./manifest";
 import { validateManifest } from "./manifestValidation";
 
 const valid = (over: Partial<ShowcaseNotebook> = {}): ShowcaseNotebook => ({
@@ -121,5 +121,27 @@ describe("validateManifest", () => {
       'notebook "test-notebook": unknown icon "Rocket"',
       'notebook "test-notebook": unknown cover colour "bg-pink-500"',
     ]);
+  });
+});
+
+describe("SHOWCASE_NOTEBOOKS", () => {
+  test("is valid", () => {
+    expect(validateManifest(SHOWCASE_NOTEBOOKS)).toEqual([]);
+  });
+
+  test("covers every Studio type, a literature review and deep research", () => {
+    const kinds = new Set(SHOWCASE_NOTEBOOKS.flatMap((n) => n.studio.map((item) => item.kind)));
+    expect([...kinds].sort()).toEqual([
+      "audio",
+      "flashcards",
+      "infographic",
+      "mindmap",
+      "quiz",
+      "report",
+      "spreadsheet",
+      "writtenQuestions",
+    ]);
+    expect(SHOWCASE_NOTEBOOKS.filter((n) => n.literatureReview)).toHaveLength(1);
+    expect(SHOWCASE_NOTEBOOKS.filter((n) => n.deepResearch)).toHaveLength(1);
   });
 });
