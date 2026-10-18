@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { workflow } from "../../_agents/literature_review/LiteratureReviewGraph.js";
 import { components, internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { QueryCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { internalMutation, mutation, query } from "../../_generated/server";
 import { getConversationIfReadable } from "../../_lib/conversationAccess";
 import {
@@ -25,7 +25,10 @@ import {
   isChatLiteratureReport,
   isChatLiteratureTable,
 } from "../../_model/literatureArtifacts";
-import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
+import {
+  type LiteratureSearchOptions,
+  literatureSearchOptionsValidator,
+} from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
 import { loadNotebookPaperDocuments } from "../../literatureReview/db";
 import { type PaperScope, resolvePaperScope } from "../../literatureReview/notebookPapers";
@@ -101,6 +104,29 @@ async function canReadLiteratureReport(
   return !isChatLiteratureReport(report, reportIds);
 }
 
+type ConfirmedColumn = { id: string; name: string; instructions?: string; isVisible: boolean };
+
+/** Saves the confirmed columns and resumes the workflow waiting for them. Callers check access. */
+export async function confirmLiteratureReviewColumnsForSession(
+  ctx: MutationCtx,
+  session: Doc<"literatureReviewSessions">,
+  confirmedColumns: ConfirmedColumn[]
+): Promise<void> {
+  if (!session.workflowId) {
+    throw new Error(`Session ${session._id} does not have an associated workflowId`);
+  }
+  await ctx.db.patch(session._id, {
+    confirmedColumns,
+    status: "searching",
+    updatedAt: Date.now(),
+  });
+  await sendEvent(ctx, components.workflow, {
+    name: "columnsConfirmed",
+    workflowId: session.workflowId as WorkflowId,
+    value: { confirmedColumns },
+  });
+}
+
 /**
  * Confirm literature review columns and resume the workflow.
  *
@@ -135,21 +161,7 @@ export const confirmLiteratureReviewColumns = mutation({
 
     await assertCanEditNotebook(ctx, session.notebookId, userId);
 
-    if (!session.workflowId) {
-      throw new Error(`Session ${args.sessionId} does not have an associated workflowId`);
-    }
-
-    await ctx.db.patch(args.sessionId, {
-      confirmedColumns: args.confirmedColumns,
-      status: "searching",
-      updatedAt: Date.now(),
-    });
-
-    await sendEvent(ctx, components.workflow, {
-      name: "columnsConfirmed",
-      workflowId: session.workflowId as WorkflowId,
-      value: { confirmedColumns: args.confirmedColumns },
-    });
+    await confirmLiteratureReviewColumnsForSession(ctx, session, args.confirmedColumns);
 
     return null;
   },
@@ -208,6 +220,146 @@ export const updateLiteratureReviewSessionStatus = internalMutation({
   },
 });
 
+type StartLiteratureReviewArgs = {
+  query: string;
+  notebookId: Id<"notebooks">;
+  conversationId?: Id<"conversations">;
+  searchOptions?: LiteratureSearchOptions;
+  smartModel?: string;
+  documentIds?: Id<"documents">[];
+  paperScope?: PaperScope;
+};
+
+/**
+ * Creates the review session and its chat messages and starts the workflow. Callers check edit
+ * access and run limits first: `startLiteratureReview` for users; the showcase seed is internal
+ * and skips limits.
+ */
+export async function startLiteratureReviewRun(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: StartLiteratureReviewArgs
+): Promise<{
+  sessionId: Id<"literatureReviewSessions">;
+  conversationId: Id<"conversations">;
+}> {
+  // Keep only this notebook's finished PDFs and saved papers; the client list is not trusted.
+  const notebookPaperIds = (
+    await loadNotebookPaperDocuments(ctx, args.notebookId, args.documentIds ?? [])
+  ).map((d) => d._id as Id<"documents">);
+  let paperScope: PaperScope | undefined;
+  try {
+    paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
+  } catch (error) {
+    throw toConvexError(error);
+  }
+
+  const notebook = await ctx.db.get(args.notebookId);
+  const notebookSmartModel = notebook?.chatSettings?.smartModel;
+  const smartModel = resolveSmartModel(args.smartModel ?? notebookSmartModel);
+
+  const now = Date.now();
+
+  // Use the requested thread or start a fresh conversation (never reuse another thread).
+  let conversationId: Id<"conversations">;
+  if (args.conversationId) {
+    const existing = await getConversationIfReadable(ctx, args.conversationId, userId);
+    if (!existing || existing.notebookId !== args.notebookId) {
+      throw new Error("Invalid conversation for this notebook");
+    }
+    conversationId = existing._id;
+  } else {
+    conversationId = await ctx.db.insert("conversations", {
+      userId,
+      notebookId: args.notebookId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const conversation = await ctx.db.get(conversationId);
+  if (!conversation?.title) {
+    await ctx.scheduler.runAfter(0, internal.chat.actions.generateAndSetTitle, {
+      conversationId,
+      content: args.query,
+    });
+  }
+
+  // Insert user message
+  await ctx.runMutation(internal.chat.index.addMessage, {
+    conversationId,
+    role: "user",
+    content: args.query,
+  });
+
+  // Insert assistant placeholder (will be updated as workflow progresses)
+  const assistantMessageId: Id<"messages"> = await ctx.runMutation(internal.chat.index.addMessage, {
+    conversationId,
+    role: "assistant",
+    content: `Starting a literature review on "${args.query}"...`,
+    metadata: {
+      isLiteratureReview: true,
+      sessionId: "pending",
+      status: "planning",
+      query: args.query,
+    },
+  });
+
+  // Create session record linked to the conversation
+  const sessionId: Id<"literatureReviewSessions"> = await ctx.db.insert(
+    "literatureReviewSessions",
+    {
+      query: args.query,
+      notebookId: args.notebookId,
+      userId,
+      workflowId: "", // Will be updated after workflow starts
+      smartModel,
+      searchOptions: args.searchOptions,
+      ...(notebookPaperIds.length > 0 ? { documentIds: notebookPaperIds, paperScope } : {}),
+      status: "planning" as const,
+      conversationId,
+      assistantMessageId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+  );
+
+  // Patch the assistant message with the real sessionId
+  await ctx.runMutation(internal.chat.index.updateMessageMetadata, {
+    messageId: assistantMessageId,
+    metadata: {
+      isLiteratureReview: true,
+      sessionId,
+      status: "planning",
+      query: args.query,
+    },
+  });
+
+  // Start workflow
+  const workflowId = await workflow.start(
+    ctx,
+    internal._agents.literature_review.LiteratureReviewGraph.literatureReviewWorkflow,
+    {
+      query: args.query,
+      notebookId: args.notebookId,
+      userId,
+      sessionId,
+      assistantMessageId,
+      searchOptions: args.searchOptions,
+      smartModel,
+      ...(notebookPaperIds.length > 0 ? { documentIds: notebookPaperIds, paperScope } : {}),
+    }
+  );
+
+  // Update session with workflowId
+  await ctx.db.patch(sessionId, {
+    workflowId,
+    updatedAt: Date.now(),
+  });
+
+  return { sessionId, conversationId };
+}
+
 /**
  * Start a new literature review workflow.
  *
@@ -240,124 +392,7 @@ export const startLiteratureReview = mutation({
     const { isPro } = await takeFeatureRun(ctx, userId, "literatureReview");
     await assertConcurrentRunCapacity(ctx, userId, "literatureReview", isPro);
 
-    // Keep only this notebook's finished PDFs and saved papers; the client list is not trusted.
-    const notebookPaperIds = (
-      await loadNotebookPaperDocuments(ctx, args.notebookId, args.documentIds ?? [])
-    ).map((d) => d._id as Id<"documents">);
-    let paperScope: PaperScope | undefined;
-    try {
-      paperScope = resolvePaperScope(notebookPaperIds.length, args.paperScope);
-    } catch (error) {
-      throw toConvexError(error);
-    }
-
-    const notebook = await ctx.db.get(args.notebookId);
-    const notebookSmartModel = notebook?.chatSettings?.smartModel;
-    const smartModel = resolveSmartModel(args.smartModel ?? notebookSmartModel);
-
-    const now = Date.now();
-
-    // Use the requested thread or start a fresh conversation (never reuse another thread).
-    let conversationId: Id<"conversations">;
-    if (args.conversationId) {
-      const existing = await getConversationIfReadable(ctx, args.conversationId, userId);
-      if (!existing || existing.notebookId !== args.notebookId) {
-        throw new Error("Invalid conversation for this notebook");
-      }
-      conversationId = existing._id;
-    } else {
-      conversationId = await ctx.db.insert("conversations", {
-        userId,
-        notebookId: args.notebookId,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    const conversation = await ctx.db.get(conversationId);
-    if (!conversation?.title) {
-      await ctx.scheduler.runAfter(0, internal.chat.actions.generateAndSetTitle, {
-        conversationId,
-        content: args.query,
-      });
-    }
-
-    // Insert user message
-    await ctx.runMutation(internal.chat.index.addMessage, {
-      conversationId,
-      role: "user",
-      content: args.query,
-    });
-
-    // Insert assistant placeholder (will be updated as workflow progresses)
-    const assistantMessageId: Id<"messages"> = await ctx.runMutation(
-      internal.chat.index.addMessage,
-      {
-        conversationId,
-        role: "assistant",
-        content: `Starting a literature review on "${args.query}"...`,
-        metadata: {
-          isLiteratureReview: true,
-          sessionId: "pending",
-          status: "planning",
-          query: args.query,
-        },
-      }
-    );
-
-    // Create session record linked to the conversation
-    const sessionId: Id<"literatureReviewSessions"> = await ctx.db.insert(
-      "literatureReviewSessions",
-      {
-        query: args.query,
-        notebookId: args.notebookId,
-        userId,
-        workflowId: "", // Will be updated after workflow starts
-        smartModel,
-        searchOptions: args.searchOptions,
-        ...(notebookPaperIds.length > 0 ? { documentIds: notebookPaperIds, paperScope } : {}),
-        status: "planning" as const,
-        conversationId,
-        assistantMessageId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }
-    );
-
-    // Patch the assistant message with the real sessionId
-    await ctx.runMutation(internal.chat.index.updateMessageMetadata, {
-      messageId: assistantMessageId,
-      metadata: {
-        isLiteratureReview: true,
-        sessionId,
-        status: "planning",
-        query: args.query,
-      },
-    });
-
-    // Start workflow
-    const workflowId = await workflow.start(
-      ctx,
-      internal._agents.literature_review.LiteratureReviewGraph.literatureReviewWorkflow,
-      {
-        query: args.query,
-        notebookId: args.notebookId,
-        userId,
-        sessionId,
-        assistantMessageId,
-        searchOptions: args.searchOptions,
-        smartModel,
-        ...(notebookPaperIds.length > 0 ? { documentIds: notebookPaperIds, paperScope } : {}),
-      }
-    );
-
-    // Update session with workflowId
-    await ctx.db.patch(sessionId, {
-      workflowId,
-      updatedAt: Date.now(),
-    });
-
-    return { sessionId, conversationId };
+    return await startLiteratureReviewRun(ctx, userId, args);
   },
 });
 
