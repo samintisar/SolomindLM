@@ -369,3 +369,71 @@ describe("showcase db: review outputs and publishing", () => {
     expect(await t.run((ctx) => ctx.db.get("notebooks", notebookId))).toBeNull();
   });
 });
+
+async function insertUser(t: T, email: string) {
+  return await t.run((ctx) => ctx.db.insert("users", { email, name: email }));
+}
+
+/** A deep-research plan in its own conversation, as `startDeepResearchRun` leaves it. */
+async function insertResearchPlan(
+  t: T,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">,
+  status: "draft" | "approved" = "draft"
+) {
+  return await t.run(async (ctx) => {
+    const now = Date.now();
+    const conversationId = await ctx.db.insert("conversations", {
+      userId,
+      notebookId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const messageId = await ctx.db.insert("messages", {
+      conversationId,
+      role: "assistant",
+      content: "Planning…",
+      createdAt: now,
+    });
+    return await ctx.db.insert("researchPlans", {
+      userId,
+      notebookId,
+      conversationId,
+      messageId,
+      query: "q",
+      subQuestions: [],
+      sourcePolicy: { channels: ["notebook"] },
+      status,
+      workflowId: "wf_plan",
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+}
+
+describe("showcase db: the owner's review and research runs", () => {
+  test("finds the owner's research plan behind many viewer threads, so it starts once", async () => {
+    const { t, ownerId } = await setup();
+    const viewerId = await insertUser(t, "viewer@example.com");
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(REVIEW.slug));
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      for (let i = 0; i < 101; i++) {
+        await ctx.db.insert("conversations", {
+          userId: viewerId,
+          notebookId,
+          isPrivate: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    });
+    await insertResearchPlan(t, notebookId, ownerId);
+
+    expect(
+      await t.mutation(internal.showcase.db.startShowcaseDeepResearch, ref(REVIEW.slug))
+    ).toBeNull();
+    const plans = await t.run((ctx) => ctx.db.query("researchPlans").collect());
+    expect(plans).toHaveLength(1);
+  });
+});

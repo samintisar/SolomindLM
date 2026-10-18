@@ -265,7 +265,11 @@ async function reviewOutputsInStudio(
   );
 }
 
-/** The owner's newest deep-research plan in this notebook (plans hang off conversations). */
+/**
+ * The owner's newest deep-research plan in this notebook. Plans hang off conversations; only the
+ * owner's own threads are read (newest first), so viewers' private threads on a public notebook
+ * can't push the plan out of the read window.
+ */
 async function latestResearchPlan(
   db: Reader,
   notebookId: Id<"notebooks">,
@@ -274,10 +278,10 @@ async function latestResearchPlan(
   let latest: Doc<"researchPlans"> | null = null;
   const conversations = await db
     .query("conversations")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+    .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
+    .order("desc")
     .take(MAX_ROWS);
   for (const conversation of conversations) {
-    if (conversation.userId !== userId) continue;
     const plans = await db
       .query("researchPlans")
       .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
