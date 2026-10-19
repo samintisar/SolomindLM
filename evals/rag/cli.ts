@@ -10,6 +10,7 @@
  */
 
 import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
+import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { DEFAULT_SMART_MODEL_ID } from "../../convex/_lib/defaultSmartModel";
@@ -33,6 +34,7 @@ import {
   readCostHistory,
 } from "./costIo";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { appendHistory, HISTORY_DIR, historyFilePath } from "./history";
 import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
 import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
 import { scoreAllMetrics } from "./metrics/scorers";
@@ -45,6 +47,7 @@ import {
   buildJudgeCalibrationQueue,
   checkHoldoutPromotion,
   formatReport,
+  formatWorkOrder,
   generateReport,
 } from "./reports";
 import {
@@ -152,6 +155,10 @@ interface CliOptions {
   /** Holdout promotion check: before/after EvalReport JSON paths */
   promotionCheckBefore?: string;
   promotionCheckAfter?: string;
+  /** Append the live run's report to evals/rag/history/<split>.jsonl (never on dry runs) */
+  appendHistory: boolean;
+  /** Write the agent work order (markdown) after the report; live and dry runs */
+  outputWorkOrder?: string;
   /** Chat fixtures only: retrieval and selection, no answer, no judges (cheap knob sweeps) */
   retrievalOnly?: boolean;
 }
@@ -253,6 +260,8 @@ const CLI_OPTIONS = {
   "append-calibration": { type: "boolean" },
   /** Takes two paths: `--promotion-check <before.json> <after.json>`. */
   "promotion-check": { type: "string" },
+  "append-history": { type: "boolean" },
+  "output-workorder": { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const satisfies NonNullable<ParseArgsConfig["options"]>;
 
@@ -357,6 +366,8 @@ function parseArgs(args: string[]): CliOptions {
     appendCalibration: values["append-calibration"] ?? false,
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
+    appendHistory: values["append-history"] ?? false,
+    outputWorkOrder: values["output-workorder"],
     retrievalOnly: values["retrieval-only"] ?? false,
   };
 }
@@ -406,6 +417,10 @@ Options:
   --append-calibration     With --score-judge-queue: append the queue's labelled rows to
                            evals/rag/calibration/ (versioned; deduped by labelKey)
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
+  --append-history         After a live run, append the report to evals/rag/history/<split>.jsonl
+                           (off by default; never on dry runs; skipped when invocation errors occur)
+  --output-workorder <path>  Write a markdown task list for a coding agent (failure groups, target
+                           files, re-run commands, rules). Written for live and dry runs
   --retrieval-only         Chat fixtures only: run retrieval and context selection, generate no
                            answer, run no judges. Use for retrieval-knob sweeps (~10x cheaper)
   --help, -h               Show this help
@@ -849,6 +864,9 @@ async function main(): Promise<void> {
 
   // Generate report
   const commitSha = await getCommitSha();
+  const useCaseByCase = new Map(
+    fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
+  );
   const consistency = judgeConsistencyTally();
   const report = generateReport(allMetrics, {
     commitSha,
@@ -856,9 +874,7 @@ async function main(): Promise<void> {
     retrievalOnly: allArtifacts.some((a) => a.retrievalOnly === true),
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
-    useCaseByCase: new Map(
-      fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
-    ),
+    useCaseByCase,
     judgeConsistency:
       consistency.sampled > 0
         ? { ...consistency, rate: consistency.agreed / consistency.sampled }
@@ -872,6 +888,29 @@ async function main(): Promise<void> {
     mkdirSync(dirname(opts.output), { recursive: true });
     writeFileSync(opts.output, JSON.stringify(report, null, 2));
     console.log(`\nReport written to ${opts.output}`);
+  }
+
+  if (opts.outputWorkOrder) {
+    mkdirSync(dirname(opts.outputWorkOrder), { recursive: true });
+    writeFileSync(opts.outputWorkOrder, formatWorkOrder(report, { repeats, split: opts.split }));
+    console.log(`Work order written to ${opts.outputWorkOrder}`);
+  }
+
+  // History: live runs only. A run with invocation errors would record stub scores as metric
+  // failures, so it is not appended.
+  if (opts.appendHistory && !opts.dryRun) {
+    if (runtimeErrorCount === 0) {
+      const rows = appendHistory(HISTORY_DIR, report, {
+        split: opts.split,
+        runId: randomUUID(),
+        useCaseByCase,
+      });
+      console.log(
+        `History: ${rows} row(s) appended to ${historyFilePath(HISTORY_DIR, opts.split ?? report.split)}`
+      );
+    } else {
+      console.warn("History not appended: the run had invocation-layer errors.");
+    }
   }
 
   if (!opts.dryRun) {

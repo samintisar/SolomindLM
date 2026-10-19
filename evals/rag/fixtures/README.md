@@ -231,6 +231,25 @@ bun run eval:literature-review
 bun run eval:rag -- --retrieval-only --runner chat --split train
 ```
 
+## Nightly
+
+[`.github/workflows/eval-nightly.yml`](../../../.github/workflows/eval-nightly.yml) runs the smoke split
+(3 repeats by default, `workflow_dispatch` takes `repeats`), the use-case packs, and `eval:trend --check`
+every night at 03:17 UTC. It needs three repo secrets: `RAG_EVAL_CONVEX_URL`, `RAG_EVAL_SECRET` and
+`TOGETHER_AI_API_KEY`. Without them the job logs a notice and does nothing. Reports and artifacts are
+uploaded for 30 days, and the rows it appends to [`history/`](history/README.md) are published to the
+`eval-history` branch. PR CI stays dry-run only.
+
+Prerequisite: seed the four use-case packs on the target deployment first (`bun run eval:seed -- --use-case all`).
+Otherwise the usecases step exits 2 with `PackNotReadyError`.
+
+The history goes to the unprotected `eval-history` branch, not `main`. `main` is protected
+(`enforce_admins`), so a bot push to it is rejected. To read the nightly trend, merged with any local rows:
+
+```bash
+bun run eval:trend -- --split smoke --branch eval-history
+```
+
 ## Suggested Fixtures for Machine Learning Notebook
 
 Based on the ML notebook, consider these scenarios:
