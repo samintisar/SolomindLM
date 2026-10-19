@@ -326,7 +326,8 @@ export async function runProcessFlashcardMapChunkPhase(
     // a chunk's items (14-18 of 20 listed items in the candidate pool vs 18-19). Reasoning stays off;
     // card writing does not need it and it would share the output budget.
     const structuredLLM = createStructuredLLM(FlashcardArraySchema, {
-      model: smartLlm || env.FLASHCARDS_LLM,
+      // Not `smartLlm`: that override is for the reduce step (eval --smart-llm).
+      model: env.FLASHCARDS_LLM,
       reasoningEnabled: false,
       temperature: 0.3,
       onUsage: (usage) => {
