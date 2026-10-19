@@ -268,11 +268,26 @@ describe("caseTokenMedian", () => {
       record({ pipeline: { prompt: 90_000, cachedPrompt: 0, completion: 0 } }),
       record({ caseId: "other", pipeline: { prompt: 1, cachedPrompt: 0, completion: 0 } }),
     ].map((r) => ({ ...r, pipelineSource: "provider" as const }));
-    expect(caseTokenMedian(history, "case-a")).toBe(12_000);
+    expect(caseTokenMedian(history, "case-a", SMART)).toBe(12_000);
+  });
+
+  it("only counts runs on the same pipeline model and repeats that reported tokens", () => {
+    const history = [
+      record({
+        runs: 3,
+        pipelineRuns: 2,
+        pipeline: { prompt: 20_000, cachedPrompt: 0, completion: 0 },
+      }),
+      record({
+        pipelineModel: "other/model",
+        pipeline: { prompt: 99_000, cachedPrompt: 0, completion: 0 },
+      }),
+    ].map((r) => ({ ...r, pipelineSource: "provider" as const }));
+    expect(caseTokenMedian(history, "case-a", SMART)).toBe(10_000);
   });
 
   it("skips estimated runs and returns undefined without provider history", () => {
     const history = [record({ pipelineSource: "estimated" })];
-    expect(caseTokenMedian(history, "case-a")).toBeUndefined();
+    expect(caseTokenMedian(history, "case-a", SMART)).toBeUndefined();
   });
 });

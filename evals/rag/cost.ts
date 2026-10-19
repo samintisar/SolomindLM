@@ -271,19 +271,26 @@ export function formatActualCost(
 }
 
 /**
- * Median per-run pipeline tokens (prompt + completion) of a case's recent runs, counting only
- * runs whose tokens were provider-reported. Undefined when there are none.
+ * Median per-run pipeline tokens (prompt + completion) of a case's recent runs on `pipelineModel`,
+ * counting only runs whose tokens were provider-reported. Undefined when there are none. Runs on
+ * another model (a `--smart-llm` sweep) say nothing about this one's token use.
  */
-export function caseTokenMedian(history: CostHistoryRecord[], caseId: string): number | undefined {
+export function caseTokenMedian(
+  history: CostHistoryRecord[],
+  caseId: string,
+  pipelineModel: string
+): number | undefined {
   const perRun = history
     .filter(
       (r) =>
         r.caseId === caseId &&
+        r.pipelineModel === pipelineModel &&
         r.pipelineSource === "provider" &&
         r.pipeline.prompt + r.pipeline.completion > 0
     )
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, RECENT_RUNS)
-    .map((r) => (r.pipeline.prompt + r.pipeline.completion) / Math.max(1, r.runs));
+    .map((r) => perRunUsage(r).pipeline)
+    .map((p) => p.prompt + p.completion);
   return perRun.length > 0 ? median(perRun) : undefined;
 }
