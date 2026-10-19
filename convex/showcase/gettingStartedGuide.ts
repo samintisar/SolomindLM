@@ -40,7 +40,11 @@ Studio turns your selected sources into:
 - Infographics that sum up your sources in one image.
 - Spreadsheets that pull structured tables out of your sources: data tables, comparisons, timelines, financial summaries, or your own layout.
 
-Most tools let you set a count, a difficulty or a focus before you generate.
+Most tools let you set a count, a difficulty or a focus before you generate. The Prompt Library holds ready-made prompts for each tool, from you and from other users: pick one in the Create dialog, or save your own prompt to reuse in another notebook.
+
+## Practise in this notebook
+
+Besides this guide, the notebook holds a few short sources about the Moon, one of each kind: a Wikipedia article, two NASA web pages, a NASA PDF and a YouTube video. Select them and try the steps above: ask in chat why we always see the same side of the Moon, open a citation, or make a quiz on the phases and tides.
 
 ## 5. Share a notebook
 

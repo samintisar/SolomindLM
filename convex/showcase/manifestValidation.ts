@@ -1,10 +1,17 @@
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import {
+  PROMPT_DESCRIPTION_MAX_LENGTH,
+  PROMPT_TEXT_MAX_LENGTH,
+  PROMPT_TITLE_MAX_LENGTH,
+} from "../studio/prompts/config";
+import {
+  promptField,
   type ShowcaseNotebook,
   type ShowcaseSource,
   type ShowcaseStudioItem,
   sourceKey,
 } from "./manifest";
+import { SHOWCASE_PROMPTS, type ShowcasePrompt } from "./promptPacks";
 
 /** Counts the Studio dialogs offer (apps/web/src/features/studio/hooks/flows/useCreate*Flow.ts). */
 const FLASHCARD_COUNTS = [20, 35, 55];
@@ -46,8 +53,9 @@ const COVER_COLORS = new Set([
   "bg-vintage-orange-200",
 ]);
 
-const MAX_SOURCES = 6;
-const MAX_PROMPT_CHARS = 600;
+const MAX_SOURCES = 15;
+/** The Prompt Library's limit; the Studio dialogs take a saved prompt as is. */
+const MAX_PROMPT_CHARS = PROMPT_TEXT_MAX_LENGTH;
 const TEXT_SOURCE_CHARS = { min: 500, max: 20_000 };
 
 function httpsUrl(url: string): URL | null {
@@ -88,17 +96,20 @@ function oneOf(name: string, value: number, allowed: number[]): string[] {
 
 function validateStudioItem(item: ShowcaseStudioItem): string[] {
   const errors: string[] = [];
-  const text =
-    "prompt" in item
-      ? item.prompt
-      : "focus" in item
-        ? item.focus
-        : "topic" in item
-          ? item.topic
-          : undefined;
+  const field = promptField(item.kind);
+  const text = (item as Partial<Record<typeof field, string>>)[field];
   if (text !== undefined && (!text.trim() || text.length > MAX_PROMPT_CHARS)) {
     errors.push(`prompt/focus must be 1–${MAX_PROMPT_CHARS} characters`);
   }
+  if (item.promptKey) {
+    const prompt: ShowcasePrompt | undefined = SHOWCASE_PROMPTS[item.promptKey];
+    if (!prompt) errors.push(`unknown promptKey "${item.promptKey}"`);
+    else if (prompt.studioTool !== item.kind) {
+      errors.push(`promptKey "${item.promptKey}" is a ${prompt.studioTool} prompt`);
+    }
+    if (text !== undefined) errors.push(`set promptKey or ${field}, not both`);
+  }
+  const hasPrompt = text !== undefined || item.promptKey !== undefined;
   switch (item.kind) {
     case "flashcards":
       return [...errors, ...oneOf("cardCount", item.cardCount, FLASHCARD_COUNTS)];
@@ -107,16 +118,37 @@ function validateStudioItem(item: ShowcaseStudioItem): string[] {
     case "writtenQuestions":
       return [...errors, ...oneOf("questionCount", item.questionCount, WRITTEN_QUESTION_COUNTS)];
     case "report":
-      return item.reportType === "custom" && !item.prompt
+      return item.reportType === "custom" && !hasPrompt
         ? [...errors, "a custom report needs a prompt"]
         : errors;
     case "spreadsheet":
-      return item.spreadsheetType === "custom" && !item.prompt
+      return item.spreadsheetType === "custom" && !hasPrompt
         ? [...errors, "a custom spreadsheet needs a prompt"]
         : errors;
     default:
       return errors;
   }
+}
+
+/** Every problem with the prompt packs, as readable lines; empty when they are valid. */
+export function validatePromptPacks(prompts: Record<string, ShowcasePrompt>): string[] {
+  const errors: string[] = [];
+  const titles = new Set<string>();
+  for (const [key, prompt] of Object.entries(prompts)) {
+    const where = `prompt "${key}"`;
+    if (!prompt.title.trim() || prompt.title.length > PROMPT_TITLE_MAX_LENGTH) {
+      errors.push(`${where}: title must be 1–${PROMPT_TITLE_MAX_LENGTH} characters`);
+    }
+    if (titles.has(prompt.title)) errors.push(`${where}: duplicate title`);
+    titles.add(prompt.title);
+    if (prompt.description.length > PROMPT_DESCRIPTION_MAX_LENGTH) {
+      errors.push(`${where}: description must be ≤${PROMPT_DESCRIPTION_MAX_LENGTH} characters`);
+    }
+    if (!prompt.text.trim() || prompt.text.length > PROMPT_TEXT_MAX_LENGTH) {
+      errors.push(`${where}: text must be 1–${PROMPT_TEXT_MAX_LENGTH} characters`);
+    }
+  }
+  return errors;
 }
 
 /** Every problem with the manifest, as readable lines; empty when it is valid. */

@@ -12,6 +12,7 @@ import { preloadModules } from "../_testing/preloadModules.helpers";
 import { YOUTUBE_INGESTION_STAGGER_MS } from "../documents/ingestionDelay.helpers";
 import schema from "../schema";
 import { SHOWCASE_FOLDER_NAME, SHOWCASE_NOTEBOOKS } from "./manifest";
+import { SHOWCASE_PROMPTS, type ShowcasePromptKey } from "./promptPacks";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -53,6 +54,25 @@ async function markSourcesRead(t: T, notebookId: Id<"notebooks">) {
       .collect();
     for (const d of docs) await ctx.db.patch("documents", d._id, { status: "completed" });
   });
+}
+
+/** Adds every manifest source (a PDF source gets a stand-in stored file), like the seed's ticks. */
+async function addAllSources(t: T, slug: string) {
+  const spec = bySlug(slug);
+  for (const [sourceIndex, source] of spec.sources.entries()) {
+    if (source.kind === "file") {
+      const storageId = await t.run((ctx) =>
+        ctx.storage.store(new Blob(["%PDF-1.4"], { type: "application/pdf" }))
+      );
+      await t.mutation(internal.showcase.db.attachFileSource, {
+        ...ref(slug),
+        sourceIndex,
+        storageId,
+      });
+    } else {
+      await t.mutation(internal.showcase.db.addSource, { ...ref(slug), sourceIndex });
+    }
+  }
 }
 
 async function status(t: T, slug: string) {
@@ -148,9 +168,11 @@ describe("showcase db", () => {
     const { t } = await setup();
     expect((await status(t, GUIDE.slug)).nextSteps).toEqual(["createNotebook"]);
     const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(GUIDE.slug));
-    expect((await status(t, GUIDE.slug)).nextSteps).toEqual(["addSource"]);
-    await t.mutation(internal.showcase.db.addSource, { ...ref(GUIDE.slug), sourceIndex: 0 });
-    expect((await status(t, GUIDE.slug)).waitingOn).toEqual(["1 source(s) ingesting"]);
+    expect((await status(t, GUIDE.slug)).nextSteps).toEqual(GUIDE.sources.map(() => "addSource"));
+    await addAllSources(t, GUIDE.slug);
+    expect((await status(t, GUIDE.slug)).waitingOn).toEqual([
+      `${GUIDE.sources.length} source(s) ingesting`,
+    ]);
     await markSourcesRead(t, notebookId);
     expect((await status(t, GUIDE.slug)).nextSteps).toEqual(["startStudioItem", "startStudioItem"]);
   });
@@ -158,7 +180,7 @@ describe("showcase db", () => {
   test("starts each Studio item once and never restarts a failed one", async () => {
     const { t } = await setup();
     const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(GUIDE.slug));
-    await t.mutation(internal.showcase.db.addSource, { ...ref(GUIDE.slug), sourceIndex: 0 });
+    await addAllSources(t, GUIDE.slug);
     await markSourcesRead(t, notebookId);
 
     const reportId = await t.mutation(internal.showcase.db.startStudioItem, {
@@ -185,6 +207,24 @@ describe("showcase db", () => {
     expect((await status(t, GUIDE.slug)).problems).toEqual([
       'report "Report" failed. Delete it in the app, then re-run the seed.',
     ]);
+  });
+
+  test("a Studio item with a prompt key runs the Prompt Library text", async () => {
+    const { t } = await setup();
+    const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(ECON.slug));
+    await addAllSources(t, ECON.slug);
+    await markSourcesRead(t, notebookId);
+    const itemIndex = ECON.studio.findIndex((i) => i.kind === "flashcards");
+    const promptKey = ECON.studio[itemIndex].promptKey;
+    expect(promptKey).toBeDefined();
+    await t.mutation(internal.showcase.db.startStudioItem, { ...ref(ECON.slug), itemIndex });
+    const deck = await t.run((ctx) =>
+      ctx.db
+        .query("flashcards")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+        .first()
+    );
+    expect(deck?.metadata?.topic).toBe(SHOWCASE_PROMPTS[promptKey as ShowcasePromptKey].text);
   });
 
   test("adds discovered papers up to the manifest count, with the open-licence policy", async () => {
@@ -350,13 +390,20 @@ describe("showcase db: review outputs and publishing", () => {
       t.mutation(internal.showcase.db.publishShowcaseNotebook, ref(TEN_K.slug))
     ).rejects.toThrow("isn't finished");
 
-    await t.mutation(internal.showcase.db.addSource, { ...ref(TEN_K.slug), sourceIndex: 0 });
+    await addAllSources(t, TEN_K.slug);
     await markSourcesRead(t, notebookId);
     for (let itemIndex = 0; itemIndex < TEN_K.studio.length; itemIndex++) {
       await t.mutation(internal.showcase.db.startStudioItem, { ...ref(TEN_K.slug), itemIndex });
     }
     await t.run(async (ctx) => {
-      for (const table of ["reports", "quizzes", "spreadsheets"] as const) {
+      const tables = [
+        "reports",
+        "quizzes",
+        "spreadsheets",
+        "writtenQuestions",
+        "flashcards",
+      ] as const;
+      for (const table of tables) {
         const rows = await ctx.db
           .query(table)
           .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))

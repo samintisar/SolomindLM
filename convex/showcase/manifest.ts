@@ -6,6 +6,7 @@
  * the ones a user can pick in the Studio dialogs; `validateManifest` checks them.
  */
 import { GETTING_STARTED_GUIDE } from "./gettingStartedGuide";
+import { SHOWCASE_PROMPTS, type ShowcasePromptKey } from "./promptPacks";
 
 /** Folder the seeded notebooks live in, in the owner's account. */
 export const SHOWCASE_FOLDER_NAME = "Showcase";
@@ -32,7 +33,7 @@ export type ShowcaseSource =
   | { kind: "file"; fileName: string; url: string; licence: string }
   | { kind: "text"; title: string; text: string; licence: string };
 
-export type ShowcaseStudioItem =
+type StudioItemOptions =
   | {
       kind: "report";
       reportType:
@@ -78,6 +79,32 @@ export type ShowcaseStudioItem =
         | "custom";
       prompt?: string;
     };
+
+/**
+ * A Studio item as the Create dialogs offer it. `promptKey` uses a Prompt Library prompt from
+ * `promptPacks.ts` as the item's prompt, focus or topic (set one or the other, not both).
+ */
+export type ShowcaseStudioItem = StudioItemOptions & { promptKey?: ShowcasePromptKey };
+
+/** The field each Studio kind's prompt goes in, as the Create dialogs send it. */
+export function promptField(kind: StudioKind): "prompt" | "focus" | "topic" {
+  switch (kind) {
+    case "flashcards":
+      return "topic";
+    case "quiz":
+    case "writtenQuestions":
+    case "audio":
+      return "focus";
+    default:
+      return "prompt";
+  }
+}
+
+/** The item with its Prompt Library prompt (if any) written into the field its job reads. */
+export function withPromptText(item: ShowcaseStudioItem): ShowcaseStudioItem {
+  if (!item.promptKey) return item;
+  return { ...item, [promptField(item.kind)]: SHOWCASE_PROMPTS[item.promptKey].text };
+}
 
 type AcademicFilters = {
   publicationYearFrom?: number;
@@ -142,6 +169,14 @@ const WIKIPEDIA = "CC BY-SA 4.0 (Wikipedia)";
 /** YouTube's "Creative Commons Attribution licence (reuse allowed)" is CC BY 3.0. */
 const YOUTUBE_CC_BY = "CC BY 3.0 (YouTube Creative Commons Attribution licence)";
 const US_GOV = "Public domain (U.S. federal government work)";
+const SEC_FILING =
+  "SEC EDGAR public filing (sec.gov: public information, may be copied with citation)";
+const ARXIV_CC_BY = "CC BY 4.0 (arXiv)";
+const D2L = "CC BY-SA 4.0 (Dive into Deep Learning, d2l.ai)";
+/** Approved for this notebook only (2026-10-19): attribution-only, like CC BY. */
+const PYTORCH_TUTORIALS = "BSD-3-Clause (pytorch/tutorials, © PyTorch contributors)";
+const ONET =
+  "CC BY 4.0 (O*NET OnLine, U.S. Department of Labor, Employment and Training Administration)";
 
 export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
   {
@@ -182,28 +217,70 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         url: "https://www.youtube.com/watch?v=zTqTW5n8wxg",
         licence: YOUTUBE_CC_BY,
       },
+      {
+        kind: "url",
+        title: "Economic surplus",
+        url: "https://en.wikipedia.org/wiki/Economic_surplus",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Price ceiling",
+        url: "https://en.wikipedia.org/wiki/Price_ceiling",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Cost curve",
+        url: "https://en.wikipedia.org/wiki/Cost_curve",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Monopoly",
+        url: "https://en.wikipedia.org/wiki/Monopoly",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Oligopoly",
+        url: "https://en.wikipedia.org/wiki/Oligopoly",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Externality",
+        url: "https://en.wikipedia.org/wiki/Externality",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "youtube",
+        title:
+          "Intermediate Microeconomics: Consumer Surplus (University of Utah, Department of Economics)",
+        url: "https://www.youtube.com/watch?v=O9UfktOERII",
+        licence: YOUTUBE_CC_BY,
+      },
+      {
+        kind: "youtube",
+        title:
+          "Intermediate Microeconomics: Monopoly versus Competition, Part 1 (University of Utah, Department of Economics)",
+        url: "https://www.youtube.com/watch?v=PkRGHZh4XxM",
+        licence: YOUTUBE_CC_BY,
+      },
     ],
     studio: [
+      { kind: "flashcards", cardCount: 55, difficulty: "medium", promptKey: "exam.flashcards" },
+      { kind: "quiz", questionCount: 20, difficulty: "medium", promptKey: "exam.quiz" },
       {
-        kind: "flashcards",
-        cardCount: 55,
+        kind: "writtenQuestions",
+        questionCount: 10,
         difficulty: "medium",
-        topic: "Supply and demand, elasticity, surplus and perfect competition for my midterm",
+        questionType: "short",
+        promptKey: "exam.written",
       },
-      {
-        kind: "quiz",
-        questionCount: 20,
-        difficulty: "medium",
-        focus:
-          "Midterm practice: shifts in supply and demand, price elasticity, consumer and producer surplus",
-      },
-      { kind: "mindmap" },
-      {
-        kind: "audio",
-        audioType: "brief",
-        length: "short",
-        focus: "A quick recap of the main midterm topics for a student revising the night before",
-      },
+      { kind: "report", reportType: "study_guide" },
+      { kind: "mindmap", promptKey: "exam.mindmap" },
+      { kind: "audio", audioType: "brief", length: "short", promptKey: "exam.audio" },
     ],
   },
   {
@@ -242,28 +319,69 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         url: "https://www.youtube.com/watch?v=0-fERRXiOzo",
         licence: YOUTUBE_CC_BY,
       },
+      {
+        kind: "url",
+        title: "Pharmacodynamics",
+        url: "https://en.wikipedia.org/wiki/Pharmacodynamics",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Therapeutic index",
+        url: "https://en.wikipedia.org/wiki/Therapeutic_index",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "ACE inhibitor",
+        url: "https://en.wikipedia.org/wiki/ACE_inhibitor",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Nonsteroidal anti-inflammatory drug",
+        url: "https://en.wikipedia.org/wiki/Nonsteroidal_anti-inflammatory_drug",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Opioid",
+        url: "https://en.wikipedia.org/wiki/Opioid",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Antibiotic",
+        url: "https://en.wikipedia.org/wiki/Antibiotic",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Finding and Learning about Side Effects (adverse reactions) (FDA)",
+        url: "https://www.fda.gov/drugs/find-information-about-drug/finding-and-learning-about-side-effects-adverse-reactions",
+        licence: US_GOV,
+      },
+      {
+        kind: "youtube",
+        title:
+          "Drug Antagonists, Agonist/Antagonists and Inverse Agonists (VetMedAcademy with the MSD Veterinary Manual)",
+        url: "https://www.youtube.com/watch?v=GTZCKeqnpLo",
+        licence: YOUTUBE_CC_BY,
+      },
     ],
     studio: [
-      {
-        kind: "flashcards",
-        cardCount: 55,
-        difficulty: "hard",
-        topic:
-          "Pharmacokinetics, drug classes, mechanisms of action, adverse effects and interactions",
-      },
+      { kind: "flashcards", cardCount: 55, difficulty: "hard", promptKey: "clinical.flashcards" },
+      { kind: "quiz", questionCount: 20, difficulty: "medium", promptKey: "clinical.quiz" },
       {
         kind: "writtenQuestions",
         questionCount: 10,
         difficulty: "medium",
         questionType: "short",
-        focus: "Explain mechanisms and their clinical implications in two or three sentences",
+        promptKey: "clinical.written",
       },
-      {
-        kind: "audio",
-        audioType: "brief",
-        length: "short",
-        focus: "A short review of ADME and beta blockers for a nursing student",
-      },
+      { kind: "report", reportType: "study_guide" },
+      { kind: "mindmap", promptKey: "exam.mindmap" },
+      { kind: "audio", audioType: "brief", length: "short", promptKey: "exam.audio" },
     ],
   },
   {
@@ -271,7 +389,20 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
     title: "Literature Review: Does Spaced Repetition Work?",
     icon: "Search",
     coverColor: "bg-vintage-green-400",
-    sources: [],
+    sources: [
+      {
+        kind: "url",
+        title: "Spacing effect",
+        url: "https://en.wikipedia.org/wiki/Spacing_effect",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Spaced repetition",
+        url: "https://en.wikipedia.org/wiki/Spaced_repetition",
+        licence: WIKIPEDIA,
+      },
+    ],
     paperDiscovery: {
       // "Spacing effect" is the research literature's own term; on dev the narrower "spaced repetition
       // long-term retention" with 10+ citations found only 3 open-access papers with full text.
@@ -282,18 +413,27 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         openAccessOnly: true,
         hasFullText: true,
       },
-      take: 5,
-      // Chosen on dev (2026-10-19): three from the search above plus two openly licensed (CC BY 4.0)
-      // reviews that replaced two off-topic search results (front-loading, interleaving).
+      take: 11,
+      // Chosen 2026-10-19: three from the search above, two openly licensed reviews that replaced
+      // off-topic results, and six CC BY 4.0 studies (lab, classroom, a null result, meta-analyses).
       pinnedDois: [
         "10.1073/pnas.1815156116",
         "10.1186/s12909-022-03324-8",
         "10.29311/ndtps.v0i15.3376",
         "10.1007/s10459-023-10274-3",
         "10.3390/bs15060771",
+        "10.1371/journal.pone.0090656",
+        "10.1002/acp.3485",
+        "10.3389/fpsyg.2020.00811",
+        "10.1007/s10648-022-09677-2",
+        "10.1186/s40594-024-00468-5",
+        "10.1017/s0272263124000706",
       ],
     },
-    studio: [],
+    studio: [
+      { kind: "flashcards", cardCount: 35, difficulty: "medium", promptKey: "papers.flashcards" },
+      { kind: "audio", audioType: "critique", length: "default", promptKey: "papers.critique" },
+    ],
     literatureReview: {
       question:
         "Does spaced repetition (spreading study or retrieval practice over time) improve long-term retention compared with massed study? Include experiments, classroom studies and meta-analyses with human learners and a retention test at least one day after the last study session. Exclude opinion pieces, app or algorithm descriptions without learner outcomes, and studies where spacing can't be separated from extra study time.",
@@ -349,26 +489,56 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         url: "https://www.youtube.com/watch?v=FEz3rMwArQs",
         licence: YOUTUBE_CC_BY,
       },
+      {
+        kind: "url",
+        title: "Hallucination (artificial intelligence)",
+        url: "https://en.wikipedia.org/wiki/Hallucination_(artificial_intelligence)",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Why Language Models Hallucinate",
+        url: "https://arxiv.org/abs/2509.04664",
+        licence: ARXIV_CC_BY,
+      },
+      {
+        kind: "url",
+        title: "Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?",
+        url: "https://arxiv.org/abs/2405.05904",
+        licence: ARXIV_CC_BY,
+      },
+      {
+        kind: "url",
+        title:
+          "LLMs Know More Than They Show: On the Intrinsic Representation of LLM Hallucinations",
+        url: "https://arxiv.org/abs/2410.02707",
+        licence: ARXIV_CC_BY,
+      },
+      {
+        kind: "url",
+        title: "Inference-Time Intervention: Eliciting Truthful Answers from a Language Model",
+        url: "https://arxiv.org/abs/2306.03341",
+        licence: ARXIV_CC_BY,
+      },
+      {
+        kind: "url",
+        title: "Long-form factuality in large language models",
+        url: "https://arxiv.org/abs/2403.18802",
+        licence: "CC0 1.0 (arXiv)",
+      },
+      {
+        kind: "url",
+        title: "HALoGEN: Fantastic LLM Hallucinations and Where to Find Them",
+        url: "https://arxiv.org/abs/2501.08292",
+        licence: ARXIV_CC_BY,
+      },
     ],
     studio: [
-      {
-        kind: "spreadsheet",
-        spreadsheetType: "custom",
-        prompt:
-          "Compare the hallucination methods in these papers: one row per method, with columns for the approach, what it needs (model access, retrieval, extra training), how it was evaluated, the headline result and its limitations.",
-      },
-      {
-        kind: "audio",
-        audioType: "critique",
-        length: "default",
-        focus: "How well each paper's evaluation supports its claims, and what is still unsolved",
-      },
-      {
-        kind: "report",
-        reportType: "technical_report",
-        prompt:
-          "A digest of how these papers define, detect and reduce hallucination, with the trade-offs between the methods",
-      },
+      { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "papers.comparison" },
+      { kind: "report", reportType: "custom", promptKey: "papers.digest" },
+      { kind: "mindmap", promptKey: "papers.mindmap" },
+      { kind: "flashcards", cardCount: 35, difficulty: "medium", promptKey: "papers.flashcards" },
+      { kind: "audio", audioType: "critique", length: "default", promptKey: "papers.critique" },
     ],
   },
   {
@@ -403,27 +573,66 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         url: "https://www.youtube.com/watch?v=U__l-CFg6wM",
         licence: YOUTUBE_CC_BY,
       },
+      {
+        kind: "url",
+        title: "Home energy storage",
+        url: "https://en.wikipedia.org/wiki/Home_energy_storage",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Lithium iron phosphate battery",
+        url: "https://en.wikipedia.org/wiki/Lithium_iron_phosphate_battery",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Virtual power plant",
+        url: "https://en.wikipedia.org/wiki/Virtual_power_plant",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Residential Clean Energy Credit (IRS)",
+        url: "https://www.irs.gov/credits-deductions/residential-clean-energy-credit",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title:
+          "Rooftop solar photovoltaic systems account for 20% of Puerto Rico's capacity mix (EIA)",
+        url: "https://www.eia.gov/todayinenergy/detail.php?id=67406",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Battery storage capacity averaged 70% growth over the last three years (EIA)",
+        url: "https://www.eia.gov/todayinenergy/detail.php?id=67925",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Solar and Resilience Basics (U.S. DOE)",
+        url: "https://www.energy.gov/cmei/systems/solar-and-resilience-basics",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Responding to fires that include energy storage systems (U.S. Fire Administration)",
+        url: "https://www.usfa.fema.gov/blog/responding-to-fires-that-include-energy-storage-systems-are-a-new-and-evolving-hazard/",
+        licence: US_GOV,
+      },
     ],
     studio: [
-      {
-        kind: "report",
-        reportType: "briefing",
-        prompt:
-          "Brief a founder on the home battery market: how big it is and how fast it is growing, what systems cost, why households buy batteries (backup, solar self-consumption, bill savings) and which policies drive demand",
-      },
-      {
-        kind: "spreadsheet",
-        spreadsheetType: "custom",
-        prompt:
-          "A market data table: one row per figure the sources give (installed capacity, annual additions, attachment rate with solar, system size, cost), with columns for the metric, value, unit, year, region and source.",
-      },
+      { kind: "report", reportType: "briefing", promptKey: "market.briefing" },
+      { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "market.table" },
       {
         kind: "infographic",
-        prompt:
-          "Home battery storage at a glance: growth, costs and why households pair batteries with solar",
+        promptKey: "market.infographic",
         orientation: "portrait",
         detailLevel: "standard",
       },
+      { kind: "audio", audioType: "debate", length: "default", promptKey: "decision.debate" },
     ],
   },
   {
@@ -437,24 +646,76 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         title:
           "Costco Wholesale Corporation Form 10-K, fiscal year ended August 30, 2026 (SEC EDGAR)",
         url: "https://www.sec.gov/Archives/edgar/data/909832/000090983226000093/cost-20260830.htm",
-        licence:
-          "SEC EDGAR public filing (sec.gov: public information, may be copied with citation)",
+        licence: SEC_FILING,
+      },
+      {
+        kind: "url",
+        title: "Costco Wholesale Corporation Form 10-Q, quarter ended May 10, 2026 (SEC EDGAR)",
+        url: "https://www.sec.gov/Archives/edgar/data/909832/000090983226000051/cost-20260510.htm",
+        licence: SEC_FILING,
+      },
+      {
+        kind: "url",
+        title:
+          "Costco fourth quarter and fiscal year 2026 results, Form 8-K Exhibit 99.1 (SEC EDGAR)",
+        url: "https://www.sec.gov/Archives/edgar/data/909832/000090983226000084/costex9918-k92426.htm",
+        licence: SEC_FILING,
+      },
+      {
+        kind: "url",
+        title: "Costco 2026 proxy statement, Schedule 14A (SEC EDGAR)",
+        url: "https://www.sec.gov/Archives/edgar/data/909832/000090983225000159/cost-20251204.htm",
+        licence: SEC_FILING,
+      },
+      {
+        kind: "file",
+        fileName: "SEC Investor Bulletin - How to Read a 10-K.pdf",
+        url: "https://www.sec.gov/files/reada10k.pdf",
+        licence: US_GOV,
+      },
+      {
+        kind: "file",
+        fileName: "SEC Investor Bulletin - How to Read an 8-K.pdf",
+        url: "https://www.sec.gov/investor/pubs/readan8k.pdf",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Beginners' Guide to Financial Statements (SEC)",
+        url: "https://www.sec.gov/about/reports-publications/beginners-guide-financial-statements",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Form 10-K",
+        url: "https://en.wikipedia.org/wiki/Form_10-K",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Income statement",
+        url: "https://en.wikipedia.org/wiki/Income_statement",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Cash flow statement",
+        url: "https://en.wikipedia.org/wiki/Cash_flow_statement",
+        licence: WIKIPEDIA,
       },
     ],
     studio: [
       { kind: "spreadsheet", spreadsheetType: "financial_summary" },
+      { kind: "report", reportType: "custom", promptKey: "filing.walkthrough" },
+      { kind: "quiz", questionCount: 20, difficulty: "medium", promptKey: "filing.quiz" },
       {
-        kind: "report",
-        reportType: "briefing",
-        prompt:
-          "Explain this 10-K to a business student: what the company does, how it makes money, the key numbers in the income statement, balance sheet and cash flow statement, and the biggest risk factors",
-      },
-      {
-        kind: "quiz",
-        questionCount: 10,
+        kind: "writtenQuestions",
+        questionCount: 5,
         difficulty: "medium",
-        focus: "Reading a 10-K: the business, the financial statements, MD&A and risk factors",
+        questionType: "short",
+        promptKey: "filing.written",
       },
+      { kind: "flashcards", cardCount: 35, difficulty: "medium", promptKey: "filing.flashcards" },
     ],
   },
   {
@@ -468,6 +729,37 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         title: "Getting Started with SolomindLM",
         text: GETTING_STARTED_GUIDE,
         licence: "Original (SolomindLM)",
+      },
+      // Practice material, one source of each kind, on one topic: the Moon.
+      {
+        kind: "url",
+        title: "Lunar phase",
+        url: "https://en.wikipedia.org/wiki/Lunar_phase",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Moon Phases (NASA Science)",
+        url: "https://science.nasa.gov/moon/moon-phases/",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Tides (NASA Science)",
+        url: "https://science.nasa.gov/moon/tides/",
+        licence: US_GOV,
+      },
+      {
+        kind: "file",
+        fileName: "NASA - Earth's Moon lithograph.pdf",
+        url: "https://www.nasa.gov/wp-content/uploads/2009/12/moon_lithograph.pdf",
+        licence: US_GOV,
+      },
+      {
+        kind: "youtube",
+        title: "Phases and Motions of the Moon (Launch Pad Astronomy)",
+        url: "https://www.youtube.com/watch?v=1CC0P7y90PU",
+        licence: YOUTUBE_CC_BY,
       },
     ],
     studio: [
@@ -491,5 +783,297 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
           "A table of the Studio tools: one row per tool, with columns for what it makes, the options you can set and when to use it.",
       },
     ],
+  },
+  {
+    slug: "learn-pytorch",
+    title: "Learn PyTorch from Scratch",
+    icon: "Monitor",
+    coverColor: "bg-vintage-orange-400",
+    chatMode: "learningGuide",
+    sources: [
+      {
+        kind: "url",
+        title: "Learn the Basics: Tensors (PyTorch Tutorials)",
+        url: "https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html",
+        licence: PYTORCH_TUTORIALS,
+      },
+      {
+        kind: "url",
+        title: "Learn the Basics: Datasets & DataLoaders (PyTorch Tutorials)",
+        url: "https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html",
+        licence: PYTORCH_TUTORIALS,
+      },
+      {
+        kind: "url",
+        title: "Learn the Basics: Build the Neural Network (PyTorch Tutorials)",
+        url: "https://docs.pytorch.org/tutorials/beginner/basics/buildmodel_tutorial.html",
+        licence: PYTORCH_TUTORIALS,
+      },
+      {
+        kind: "url",
+        title:
+          "Learn the Basics: Automatic Differentiation with torch.autograd (PyTorch Tutorials)",
+        url: "https://docs.pytorch.org/tutorials/beginner/basics/autogradqs_tutorial.html",
+        licence: PYTORCH_TUTORIALS,
+      },
+      {
+        kind: "url",
+        title: "Learn the Basics: Optimizing Model Parameters (PyTorch Tutorials)",
+        url: "https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html",
+        licence: PYTORCH_TUTORIALS,
+      },
+      {
+        kind: "url",
+        title: "Learn the Basics: Save and Load the Model (PyTorch Tutorials)",
+        url: "https://docs.pytorch.org/tutorials/beginner/basics/saveloadrun_tutorial.html",
+        licence: PYTORCH_TUTORIALS,
+      },
+      {
+        kind: "url",
+        title: "Data Manipulation (Dive into Deep Learning)",
+        url: "https://d2l.ai/chapter_preliminaries/ndarray.html",
+        licence: D2L,
+      },
+      {
+        kind: "url",
+        title: "Automatic Differentiation (Dive into Deep Learning)",
+        url: "https://d2l.ai/chapter_preliminaries/autograd.html",
+        licence: D2L,
+      },
+      {
+        kind: "url",
+        title: "Linear Regression Implementation from Scratch (Dive into Deep Learning)",
+        url: "https://d2l.ai/chapter_linear-regression/linear-regression-scratch.html",
+        licence: D2L,
+      },
+      {
+        kind: "url",
+        title: "PyTorch",
+        url: "https://en.wikipedia.org/wiki/PyTorch",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Automatic differentiation",
+        url: "https://en.wikipedia.org/wiki/Automatic_differentiation",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Stochastic gradient descent",
+        url: "https://en.wikipedia.org/wiki/Stochastic_gradient_descent",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "youtube",
+        title: "Machine Learning Lecture 23: PyTorch Tutorial (University of Utah)",
+        url: "https://www.youtube.com/watch?v=YhJMd78ctdw",
+        licence: YOUTUBE_CC_BY,
+      },
+    ],
+    studio: [
+      { kind: "report", reportType: "custom", promptKey: "code.cheatsheet" },
+      { kind: "report", reportType: "concept_explainer", promptKey: "code.concepts" },
+      { kind: "flashcards", cardCount: 35, difficulty: "medium", promptKey: "code.flashcards" },
+      { kind: "quiz", questionCount: 20, difficulty: "medium", promptKey: "code.quiz" },
+      {
+        kind: "writtenQuestions",
+        questionCount: 5,
+        difficulty: "medium",
+        questionType: "short",
+        promptKey: "code.written",
+      },
+      { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "code.reference" },
+      { kind: "mindmap", promptKey: "code.mindmap" },
+      { kind: "audio", audioType: "deep_dive", length: "default", promptKey: "code.audio" },
+    ],
+  },
+  {
+    slug: "ap-us-government-founding-documents",
+    title: "AP U.S. Government: Founding Documents",
+    icon: "GraduationCap",
+    coverColor: "bg-vintage-red-400",
+    chatMode: "learningGuide",
+    sources: [
+      {
+        kind: "url",
+        title: "The Declaration of Independence: A Transcription (National Archives)",
+        url: "https://www.archives.gov/founding-docs/declaration-transcript",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Articles of Confederation (National Archives)",
+        url: "https://www.archives.gov/milestone-documents/articles-of-confederation",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "The Constitution of the United States: A Transcription (National Archives)",
+        url: "https://www.archives.gov/founding-docs/constitution-transcript",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "The Bill of Rights: A Transcription (National Archives)",
+        url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "The Federalist Papers, Nos. 1–10 (Library of Congress)",
+        url: "https://guides.loc.gov/federalist-papers/text-1-10",
+        licence: "Public domain (published 1787–88; Library of Congress research guide)",
+      },
+      {
+        kind: "url",
+        title: "The Federalist Papers, Nos. 51–60 (Library of Congress)",
+        url: "https://guides.loc.gov/federalist-papers/text-51-60",
+        licence: "Public domain (published 1788; Library of Congress research guide)",
+      },
+      {
+        kind: "url",
+        title: "The Federalist Papers, Nos. 71–80 (Library of Congress)",
+        url: "https://guides.loc.gov/federalist-papers/text-71-80",
+        licence: "Public domain (published 1788; Library of Congress research guide)",
+      },
+      {
+        kind: "url",
+        title: "Federalist No. 10",
+        url: "https://en.wikipedia.org/wiki/Federalist_No._10",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Anti-Federalism",
+        url: "https://en.wikipedia.org/wiki/Anti-Federalism",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "youtube",
+        title: "Anti-Federalists and the Bill of Rights (U.S. National Archives)",
+        url: "https://www.youtube.com/watch?v=EycxYd5-Ylo",
+        licence: YOUTUBE_CC_BY,
+      },
+      {
+        kind: "youtube",
+        title:
+          "If Men Were Angels: Teaching the Constitution with the Federalist Papers (Teach Democracy)",
+        url: "https://www.youtube.com/watch?v=cAwTVBcn9lk",
+        licence: YOUTUBE_CC_BY,
+      },
+      {
+        kind: "youtube",
+        title: "AP US Government: Foundational Documents, Federalist 10 (Dave Thomer)",
+        url: "https://www.youtube.com/watch?v=ihXaM5Rx4RE",
+        licence: YOUTUBE_CC_BY,
+      },
+    ],
+    studio: [
+      {
+        kind: "writtenQuestions",
+        questionCount: 5,
+        difficulty: "hard",
+        questionType: "essay",
+        promptKey: "documents.essay",
+      },
+      { kind: "audio", audioType: "debate", length: "default", promptKey: "documents.debate" },
+      { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "documents.timeline" },
+      { kind: "report", reportType: "study_guide" },
+      {
+        kind: "flashcards",
+        cardCount: 35,
+        difficulty: "medium",
+        promptKey: "documents.flashcards",
+      },
+      { kind: "quiz", questionCount: 20, difficulty: "medium", promptKey: "documents.quiz" },
+    ],
+  },
+  {
+    slug: "career-research-data-careers",
+    title: "Career Research: Data Scientist vs Software Developer vs Statistician",
+    icon: "BarChart",
+    coverColor: "bg-vintage-green-500",
+    sources: [
+      {
+        kind: "url",
+        title: "Data Scientists, Occupational Outlook Handbook (BLS)",
+        url: "https://www.bls.gov/ooh/math/data-scientists.htm",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title:
+          "Software Developers, Quality Assurance Analysts, and Testers, Occupational Outlook Handbook (BLS)",
+        url: "https://www.bls.gov/ooh/computer-and-information-technology/software-developers.htm",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Mathematicians and Statisticians, Occupational Outlook Handbook (BLS)",
+        url: "https://www.bls.gov/ooh/math/mathematicians-and-statisticians.htm",
+        licence: US_GOV,
+      },
+      {
+        kind: "url",
+        title: "Data Scientists, 15-2051.00 (O*NET OnLine)",
+        url: "https://www.onetonline.org/link/summary/15-2051.00",
+        licence: ONET,
+      },
+      {
+        kind: "url",
+        title: "Software Developers, 15-1252.00 (O*NET OnLine)",
+        url: "https://www.onetonline.org/link/summary/15-1252.00",
+        licence: ONET,
+      },
+      {
+        kind: "url",
+        title: "Statisticians, 15-2041.00 (O*NET OnLine)",
+        url: "https://www.onetonline.org/link/summary/15-2041.00",
+        licence: ONET,
+      },
+      {
+        kind: "url",
+        title: "Data science",
+        url: "https://en.wikipedia.org/wiki/Data_science",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Software engineering",
+        url: "https://en.wikipedia.org/wiki/Software_engineering",
+        licence: WIKIPEDIA,
+      },
+      {
+        kind: "url",
+        title: "Statistician",
+        url: "https://en.wikipedia.org/wiki/Statistician",
+        licence: WIKIPEDIA,
+      },
+    ],
+    studio: [
+      { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "decision.table" },
+      { kind: "report", reportType: "briefing", promptKey: "decision.briefing" },
+      {
+        kind: "infographic",
+        prompt:
+          "The three careers side by side: median pay, projected growth, typical entry education and the core day-to-day tasks of each.",
+        orientation: "landscape",
+        detailLevel: "standard",
+      },
+      {
+        kind: "writtenQuestions",
+        questionCount: 5,
+        difficulty: "medium",
+        questionType: "short",
+        promptKey: "decision.interview",
+      },
+      { kind: "audio", audioType: "debate", length: "default", promptKey: "decision.debate" },
+    ],
+    deepResearch: {
+      query:
+        "How is hiring for entry-level data scientists, software developers and statisticians changing in 2025–2026, including the effect of AI tools on junior roles, and which skills do employers now ask for in each?",
+      channels: ["notebook", "web", "news"],
+    },
   },
 ];
