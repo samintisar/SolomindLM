@@ -363,7 +363,8 @@ Options:
   --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
   --judge-reasoning <on|off>  Judge reasoning (default: the model's; off bills far fewer output tokens)
   --yes, -y                Skip the cost confirmation (asked at ${formatUsd(CONFIRM_ABOVE_USD)}+ or when
-                           a case has no cost history; never asked without a terminal)
+                           a case has no cost history; without a terminal the run
+                           stops instead, unless --yes or --max-cost is given)
   --max-cost <usd>         Abort a live run whose estimated cost is above this
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
@@ -657,7 +658,13 @@ async function main(): Promise<void> {
       process.exit(2);
     }
     const needsConfirm = estimate.total >= CONFIRM_ABOVE_USD || estimate.unknownCases.length > 0;
-    if (needsConfirm && !opts.yes && process.stdin.isTTY) {
+    if (needsConfirm && !opts.yes && opts.maxCost === undefined) {
+      if (!process.stdin.isTTY) {
+        console.error(
+          "No terminal to ask on. Pass --yes, or --max-cost <usd> to run up to a limit. Not running."
+        );
+        process.exit(2);
+      }
       if (!(await confirmOnTerminal("Run it?"))) {
         console.log("Cancelled. Nothing was run.");
         process.exit(0);
@@ -771,6 +778,7 @@ async function main(): Promise<void> {
       caseId: fixture.id,
       runner: fixture.runner,
       runs: repeats,
+      pipelineRuns: pipelineUsage.reported,
       pipelineModel: pipelineModelFor(fixture),
       judgeModel,
       pipeline: {

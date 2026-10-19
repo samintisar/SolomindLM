@@ -34,6 +34,8 @@ export interface CostHistoryRecord {
   runner: string;
   /** Repeats the token counts below cover. */
   runs: number;
+  /** Repeats that reported pipeline tokens; `pipeline` sums only these. Absent in old records. */
+  pipelineRuns?: number;
   /** Model the agent pipeline ran on (its smart model). */
   pipelineModel: string;
   judgeModel: string;
@@ -120,7 +122,7 @@ export function perRunUsage(
 ): Pick<CostHistoryRecord, "pipeline" | "judge"> {
   const runs = Math.max(1, record.runs);
   return {
-    pipeline: divide(record.pipeline, runs),
+    pipeline: divide(record.pipeline, Math.max(1, record.pipelineRuns ?? record.runs)),
     judge: { ...divide(record.judge, runs), calls: record.judge.calls / runs },
   };
 }

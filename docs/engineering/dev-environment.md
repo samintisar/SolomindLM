@@ -34,8 +34,8 @@ Every run prints an estimated cost first and a `Run cost:` block at the end, bot
 (Together LLM tokens only; Tavily, embeddings and rerank are not counted). Estimates come from past runs of each case,
 recorded in the main checkout's gitignored `evals/rag/generated/cost-history.jsonl`, which all worktrees share
 (`EVAL_COST_HISTORY` overrides the path). A case that has never run uses its runner's median, or shows `?`. A live run
-asks before starting at $0.25 or more, or when a case has no history; `--yes` skips the question and `--max-cost <usd>`
-refuses to start above a limit. Dry runs print the estimate for the live run without spending anything.
+asks before starting at $0.25 or more, or when a case has no history; without a terminal to ask on it stops instead.
+`--yes` skips the question, and `--max-cost <usd>` replaces it with a limit the run refuses to start above. Dry runs print the estimate for the live run without spending anything.
 
 ## Dev servers and worktrees
 

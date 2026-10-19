@@ -93,6 +93,19 @@ describe("perRunUsage", () => {
     expect(usage.pipeline).toEqual({ prompt: 100, cachedPrompt: 10, completion: 20 });
     expect(usage.judge).toEqual({ calls: 2, prompt: 200, cachedPrompt: 0, completion: 10 });
   });
+
+  it("divides pipeline tokens by the repeats that reported them", () => {
+    const usage = perRunUsage(
+      record({
+        runs: 3,
+        pipelineRuns: 2,
+        pipeline: { prompt: 200, cachedPrompt: 0, completion: 20 },
+        judge: { calls: 6, prompt: 300, cachedPrompt: 0, completion: 30 },
+      })
+    );
+    expect(usage.pipeline).toEqual({ prompt: 100, cachedPrompt: 0, completion: 10 });
+    expect(usage.judge).toEqual({ calls: 2, prompt: 100, cachedPrompt: 0, completion: 10 });
+  });
 });
 
 describe("estimateRunCost", () => {
