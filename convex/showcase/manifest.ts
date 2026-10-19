@@ -345,8 +345,9 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
       },
       {
         kind: "url",
-        title: "Opioid",
-        url: "https://en.wikipedia.org/wiki/Opioid",
+        // "Opioid" (about 9,000 words) timed out in URL extraction on dev, twice.
+        title: "Drug interaction",
+        url: "https://en.wikipedia.org/wiki/Drug_interaction",
         licence: WIKIPEDIA,
       },
       {
