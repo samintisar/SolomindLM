@@ -166,4 +166,15 @@ describe("ChatAgent full-document expansion", () => {
 
     expect(result).toEqual(chunks);
   });
+
+  it("keeps the passages and fetches once when the whole document is unavailable", async () => {
+    const failingFetch = vi.fn(async () => null);
+    const agent = new ChatAgent({ fetchDocumentFn: failingFetch });
+    const chunks = manyPassages();
+
+    const result = await agent["expandMultiSectionDocuments"](chunks, logger);
+
+    expect(result).toEqual(chunks);
+    expect(failingFetch).toHaveBeenCalledTimes(1);
+  });
 });

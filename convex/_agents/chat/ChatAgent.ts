@@ -289,14 +289,19 @@ export class ChatAgent {
         // Only add full document once per document
         if (!expandedChunks.some((c) => c.documentId === docId && c.chunkIndex === -1)) {
           const loaded = await this.fetchFullDocumentContent(docId);
-          if (loaded && Number.isFinite(tokenCap) && countTokens(loaded.content) > tokenCap) {
+          if (!loaded) {
+            // Fetch failed or came back empty: keep the passages rather than drop them all.
+            logger.warn("Full document unavailable; keeping passages", { documentId: docId });
+            keptDocIds.add(docId);
+            expandedChunks.push(chunk);
+          } else if (Number.isFinite(tokenCap) && countTokens(loaded.content) > tokenCap) {
             logger.info("Full document is over the expansion token cap; keeping passages", {
               documentId: docId,
               tokenCap,
             });
             keptDocIds.add(docId);
             expandedChunks.push(chunk);
-          } else if (loaded) {
+          } else {
             expandedChunks.push({
               id: `full-${docId}`,
               sourceId: String(docId),
