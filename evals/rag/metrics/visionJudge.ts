@@ -125,6 +125,9 @@ export async function evaluateInfographicWithVision(
       ],
       max_tokens: 4096,
       temperature: 0.1,
+      // Qwen3.5 thinks by default and reasoning shares max_tokens; production turns it off too.
+      // Not in the SDK's request type yet; Together reads it from the body.
+      ...({ reasoning: { enabled: false } } as Record<string, unknown>),
     });
 
     let content = response.choices[0]?.message?.content ?? "{}";
