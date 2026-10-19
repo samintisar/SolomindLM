@@ -273,10 +273,12 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
     coverColor: "bg-vintage-green-400",
     sources: [],
     paperDiscovery: {
-      query: "spaced repetition long-term retention",
+      // "Spacing effect" is the research literature's own term; on dev the narrower "spaced repetition
+      // long-term retention" with 10+ citations found only 3 open-access papers with full text.
+      query: "spacing effect long-term retention",
       filters: {
         publicationYearFrom: 2010,
-        minCitations: 10,
+        minCitations: 5,
         openAccessOnly: true,
         hasFullText: true,
       },
