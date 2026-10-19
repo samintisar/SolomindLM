@@ -23,6 +23,8 @@ export const REDUCE_SYSTEM_PROMPT =
 // PROMPT TEMPLATES
 // ============================================================
 
+// Main items come first and each gets its own concept. A fixed "exactly 15 concepts" let dense chunks
+// squeeze listed items out, or fold them into another concept or the summary, so the map never got them.
 export const MAP_PROMPT = `You are a Research Assistant analyzing document chunks.
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}
@@ -36,7 +38,9 @@ CRITICAL GROUNDING REQUIREMENTS:
 Extract EXACTLY this structure:
 1. **Main Theme:** Single sentence identifying the core subject (max 15 words)
 2. **Summary:** 2-3 sentences covering key points (50-100 words)
-3. **Key Concepts:** Exactly 15 distinct concepts as bullet points
+3. **Key Concepts:** 15–25 distinct concepts as bullet points
+   - First, every main item or topic this text covers, each as its own concept, using the text's own names (if the text numbers its items, include every one). Never fold a main item into another concept's context or into the summary.
+   - Then the most important details of those items, until you reach 15–25 concepts in all
    - ONLY concepts explicitly mentioned in the source
    - Format: "Concept name: brief context (5-10 words)"
    - Avoid: Generic terms, duplicates, concepts not in source
