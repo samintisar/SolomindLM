@@ -37,7 +37,6 @@ function agentWithGeneration(hits: ReferenceChunk[] = [passage(1), passage(2)]) 
   agent["llmWrapper"] = {
     generateRetrievalSubqueries: async () => ({ subqueries: ["routing specialists"] }),
     generateHypotheticalDocument: async () => "",
-    consumeTokenUsage: () => ({ prompt: 120, completion: 0, total: 120 }),
     ...generation,
   } as unknown as ChatAgent["llmWrapper"];
   agent["embeddingService"] = {
@@ -67,9 +66,15 @@ describe("ChatAgent with evalRetrievalOnly", () => {
       | ReferenceChunk[]
       | undefined;
     expect(references?.map((c) => c.content)).toEqual([passage(1).content, passage(2).content]);
+    // `done` carries the turn telemetry snapshot. The mocked LLM wrapper records no usage, so the
+    // snapshot shows the one embedding call and no LLM calls, with no answer stage.
     expect(chunks.at(-1)).toEqual({
       type: "done",
-      data: { tokenUsage: { prompt: 120, completion: 0, total: 120 } },
+      data: {
+        tokenUsage: undefined,
+        callCounters: expect.objectContaining({ llmCalls: 0, embeddingCalls: 1 }),
+        stageSpans: [],
+      },
     });
     expect(chunks.filter((c) => c.type === "token")).toEqual([]);
     expect(chunks.filter((c) => c.type === "followups")).toEqual([]);
@@ -95,9 +100,15 @@ describe("ChatAgent with evalRetrievalOnly", () => {
 
     expect(chunks.filter((c) => c.type === "references")).toEqual([]);
     expect(chunks.filter((c) => c.type === "token")).toEqual([]);
+    // `done` carries the turn telemetry snapshot. The mocked LLM wrapper records no usage, so the
+    // snapshot shows the one embedding call and no LLM calls, with no answer stage.
     expect(chunks.at(-1)).toEqual({
       type: "done",
-      data: { tokenUsage: { prompt: 120, completion: 0, total: 120 } },
+      data: {
+        tokenUsage: undefined,
+        callCounters: expect.objectContaining({ llmCalls: 0, embeddingCalls: 1 }),
+        stageSpans: [],
+      },
     });
     expect(generation.generateDirectResponse).not.toHaveBeenCalled();
     expect(generation.generateStructuredResponse).not.toHaveBeenCalled();

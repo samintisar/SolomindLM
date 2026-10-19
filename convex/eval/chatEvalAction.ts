@@ -14,7 +14,11 @@
 "use node";
 
 import { v } from "convex/values";
+import type { AgentStageSpan } from "../_agents/_shared/stageSpans";
+import type { CallCounters } from "../_agents/_shared/tokenUsageAccumulator";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
+import { isListEnumerationQuery } from "../_agents/chat/chat_retrieval_subqueries";
+import { CONTEXT_TOKEN_BUDGET, LIST_QUERY_CONTEXT_TOKEN_BUDGET } from "../_agents/chat/chatConfig";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
 import type { ReferenceChunk } from "../_agents/chat/types";
@@ -89,7 +93,11 @@ export interface ChatEvalResult {
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: "provider" | "estimated";
-  stageSpans?: import("../_agents/_shared/stageSpans").AgentStageSpan[];
+  stageSpans?: AgentStageSpan[];
+  /** Provider calls the agent made this turn (LLM, embedding, rerank). */
+  callCounters?: CallCounters;
+  /** Context token budget the agent applied to this question (list budget for list queries). */
+  contextTokenBudget?: number;
   sourcePolicy?: {
     channels: string[];
     maxResultsPerChannel?: number;
@@ -131,6 +139,8 @@ export const runChatEval = action({
     let selectStartedAt: number | undefined;
     let selectEndedAt: number | undefined;
     let providerUsage: { prompt: number; completion: number; total: number } | undefined;
+    let agentCallCounters: CallCounters | undefined;
+    let agentStageSpans: AgentStageSpan[] | undefined;
 
     // ── Vector search runner: production's, so chunk metadata (totalChunks, titles) and
     // thresholds match what chat sees ──
@@ -409,14 +419,19 @@ export const runChatEval = action({
           throw new Error(`Agent stream error: ${msg}`);
         }
         case "done": {
-          const usage = (
-            chunk.data as
-              | { tokenUsage?: { prompt: number; completion: number; total: number } }
-              | undefined
-          )?.tokenUsage;
+          const doneData = chunk.data as
+            | {
+                tokenUsage?: { prompt: number; completion: number; total: number };
+                callCounters?: CallCounters;
+                stageSpans?: AgentStageSpan[];
+              }
+            | undefined;
+          const usage = doneData?.tokenUsage;
           if (usage && typeof usage.total === "number" && usage.total > 0) {
             providerUsage = usage;
           }
+          agentCallCounters = doneData?.callCounters;
+          agentStageSpans = doneData?.stageSpans;
           break;
         }
         case "warning":
@@ -481,6 +496,8 @@ export const runChatEval = action({
           : undefined,
       provider: providerUsage,
       estimated: estimateChatTokenUsage(args.question, answer, selectedChunks),
+      callCounters: agentCallCounters,
+      agentSpans: agentStageSpans,
     });
 
     return {
@@ -495,6 +512,11 @@ export const runChatEval = action({
       tokenUsage: telemetry.tokenUsage,
       tokenUsageSource: telemetry.tokenUsageSource,
       stageSpans: telemetry.stageSpans,
+      callCounters: telemetry.callCounters,
+      // The context budget the agent applies to this question: the list budget for list queries.
+      contextTokenBudget: isListEnumerationQuery(args.question)
+        ? LIST_QUERY_CONTEXT_TOKEN_BUDGET
+        : CONTEXT_TOKEN_BUDGET,
       sourcePolicy: args.sourcePolicy,
       ...(args.retrievalOnly === true ? { retrievalOnly: true } : {}),
     };
