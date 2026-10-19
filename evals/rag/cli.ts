@@ -12,13 +12,35 @@
 import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { DEFAULT_SMART_MODEL_ID } from "../../convex/_lib/defaultSmartModel";
 import { caseFileStem } from "./caseFile";
 import { mapWithConcurrency } from "./concurrency";
+import {
+  type ActualCaseCost,
+  type CostHistoryRecord,
+  estimateRunCost,
+  formatActualCost,
+  formatEstimate,
+  formatUsd,
+  type PlannedCase,
+  priceUsage,
+} from "./cost";
+import {
+  appendCostHistory,
+  confirmOnTerminal,
+  costHistoryPath,
+  fetchModelRates,
+  readCostHistory,
+} from "./costIo";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
 import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
 import { scoreAllMetrics } from "./metrics/scorers";
-import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
+import {
+  DEFAULT_JUDGE_MODEL,
+  judgeTokenUsage,
+  withJudgeUsageScope,
+} from "./metrics/togetherLlmJudge";
 import {
   buildJudgeCalibrationQueue,
   checkHoldoutPromotion,
@@ -110,6 +132,10 @@ interface CliOptions {
   likertJudges: boolean;
   /** Judge model for binary judges (default DeepSeek Flash) */
   judgeModel?: string;
+  /** Skip the cost confirmation prompt */
+  yes: boolean;
+  /** Abort a live run whose estimated cost is above this many USD */
+  maxCost?: number;
   /** Rubric check ids to judge; every applicable check when unset */
   rubricChecks?: string[];
   /** `false` turns judge reasoning off */
@@ -177,6 +203,17 @@ function parseSplit(value: string): EvalSplit {
   return value;
 }
 
+/** Asks before a live run estimated at or above this many USD (or with cases of unknown cost). */
+const CONFIRM_ABOVE_USD = 0.25;
+
+function parsePositiveNumber(name: string, value: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(`--${name} takes a positive number. See --help.`);
+  }
+  return n;
+}
+
 function parsePositiveInt(name: string, value: string): number {
   const n = Number(value);
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < 1) {
@@ -208,6 +245,8 @@ const CLI_OPTIONS = {
   "judge-reasoning": { type: "string" },
   "retrieval-only": { type: "boolean" },
   "judge-consistency": { type: "string" },
+  yes: { type: "boolean", short: "y" },
+  "max-cost": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
@@ -298,6 +337,11 @@ function parseArgs(args: string[]): CliOptions {
     smartLlm: values["smart-llm"],
     likertJudges: values["likert-judges"] ?? false,
     judgeModel: values["judge-model"],
+    yes: values.yes ?? false,
+    maxCost:
+      values["max-cost"] !== undefined
+        ? parsePositiveNumber("max-cost", values["max-cost"])
+        : undefined,
     rubricChecks: values.rubric !== undefined ? parseRubricChecks(values.rubric) : undefined,
     judgeReasoning:
       values["judge-reasoning"] !== undefined
@@ -352,6 +396,10 @@ Options:
   --judge-consistency <0-1>  Share of binary judge calls re-run to measure self-consistency
                            (rubric judges are not sampled)
                            (default: 0.1 on live runs, 0 on dry runs; a flipped verdict is marked)
+  --yes, -y                Skip the cost confirmation (asked at ${formatUsd(CONFIRM_ABOVE_USD)}+ or when
+                           a case has no cost history; without a terminal the run
+                           stops instead, unless --yes or --max-cost is given)
+  --max-cost <usd>         Abort a live run whose estimated cost is above this
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json (plus evals/rag/calibration/) and exit
                            0 ready / 1 not ready / 2 under-labelled (or not a queue file)
@@ -613,7 +661,7 @@ async function main(): Promise<void> {
   // Repeats: the smoke split defaults to 3 so flaky verdicts show up; dry runs stay at 1.
   const repeats = opts.dryRun ? 1 : (opts.repeats ?? (opts.split === "smoke" ? 3 : 1));
   if (opts.dryRun && (opts.repeats ?? 1) > 1) {
-    console.warn("Dry runs always use 1 repeat; --repeats is ignored.");
+    console.warn("Dry runs always use 1 repeat; --repeats only sizes the cost estimate.");
   }
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}${repeats > 1 ? ` [repeats=${repeats}]` : ""}\n`
@@ -666,6 +714,44 @@ async function main(): Promise<void> {
       expandedFixtures.push(...withSourceMatrix(fixture, matrix));
     } else {
       expandedFixtures.push(fixture);
+    }
+  }
+
+  // Cost: estimate from past runs before anything is billed, and ask on big runs.
+  const judgeModel = opts.judgeModel ?? DEFAULT_JUDGE_MODEL;
+  const pipelineModelFor = (fixture: EvalFixture) =>
+    fixture.studioParams?.smartLlm ?? DEFAULT_SMART_MODEL_ID;
+  const { rates, source: ratesSource } = await fetchModelRates(process.env.TOGETHER_AI_API_KEY);
+  const historyPath = costHistoryPath();
+  const liveRepeats = opts.repeats ?? (opts.split === "smoke" ? 3 : 1);
+  const planned: PlannedCase[] = expandedFixtures.map((f) => ({
+    caseId: f.id,
+    runner: f.runner,
+    pipelineModel: pipelineModelFor(f),
+    judgeModel,
+  }));
+  const estimate = estimateRunCost(planned, liveRepeats, readCostHistory(historyPath), rates);
+  console.log(`${formatEstimate(estimate, liveRepeats, ratesSource)}
+`);
+  if (!opts.dryRun) {
+    if (opts.maxCost !== undefined && estimate.total > opts.maxCost) {
+      console.error(
+        `Estimated ${formatUsd(estimate.total)} is above --max-cost ${formatUsd(opts.maxCost)}. Not running.`
+      );
+      process.exit(2);
+    }
+    const needsConfirm = estimate.total >= CONFIRM_ABOVE_USD || estimate.unknownCases.length > 0;
+    if (needsConfirm && !opts.yes && opts.maxCost === undefined) {
+      if (!process.stdin.isTTY) {
+        console.error(
+          "No terminal to ask on. Pass --yes, or --max-cost <usd> to run up to a limit. Not running."
+        );
+        process.exit(2);
+      }
+      if (!(await confirmOnTerminal("Run it?"))) {
+        console.log("Cancelled. Nothing was run.");
+        process.exit(0);
+      }
     }
   }
 
@@ -729,7 +815,7 @@ async function main(): Promise<void> {
     scoreOptionsFor: (fixture: EvalFixture) => ({
       likertJudges: opts.likertJudges,
       dryRun: opts.dryRun,
-      judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      judgeModel,
       rubricChecks: opts.rubricChecks,
       judgeReasoning: judge.judgeReasoning,
       judgeConsistencySample: judge.judgeConsistencySample,
@@ -749,7 +835,10 @@ async function main(): Promise<void> {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
     });
-    return runFixtureAndFlush(fixture, fixtureDeps);
+    const { result, judgeUsage } = await withJudgeUsageScope(() =>
+      runFixtureAndFlush(fixture, fixtureDeps)
+    );
+    return { ...result, fixture, judgeUsage };
   });
   for (const outcome of outcomes) {
     allMetrics.push(...outcome.metrics);
@@ -786,6 +875,47 @@ async function main(): Promise<void> {
   }
 
   if (!opts.dryRun) {
+    const at = new Date().toISOString();
+    const records: CostHistoryRecord[] = outcomes.map(({ fixture, pipelineUsage, judgeUsage }) => ({
+      at,
+      caseId: fixture.id,
+      runner: fixture.runner,
+      runs: repeats,
+      pipelineRuns: pipelineUsage.reported,
+      pipelineModel: pipelineModelFor(fixture),
+      judgeModel,
+      pipeline: {
+        prompt: pipelineUsage.prompt,
+        cachedPrompt: pipelineUsage.cachedPrompt,
+        completion: pipelineUsage.completion,
+      },
+      judge: {
+        calls: judgeUsage.calls,
+        prompt: judgeUsage.promptTokens,
+        cachedPrompt: judgeUsage.cachedPromptTokens,
+        completion: judgeUsage.completionTokens,
+      },
+      pipelineSource:
+        pipelineUsage.estimated === 0
+          ? "provider"
+          : pipelineUsage.estimated === pipelineUsage.reported
+            ? "estimated"
+            : "mixed",
+    }));
+    const actual: ActualCaseCost[] = records.map((record, i) => {
+      const usage = outcomes[i]?.pipelineUsage;
+      return {
+        caseId: record.caseId,
+        runs: record.runs,
+        cost: priceUsage(record, rates),
+        pipelineEstimated: (usage?.estimated ?? 0) > 0,
+        pipelineMissingRuns: Math.max(0, record.runs - (usage?.reported ?? 0)),
+      };
+    });
+    console.log(`
+${formatActualCost(actual, ratesSource)}`);
+    appendCostHistory(historyPath, records);
+
     const usage = judgeTokenUsage();
     if (usage.calls > 0) {
       const cachedShare = usage.promptTokens
