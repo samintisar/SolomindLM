@@ -115,10 +115,32 @@ describe("researchEvidenceForJudge", () => {
     expect(researchEvidenceForJudge(stubResearchArtifact({}))).toBe("(no evidence recorded)");
   });
 
+  const spread = (subQuestions: number, perSubQuestion: number) =>
+    Array.from({ length: subQuestions * perSubQuestion }, (_, i) => ({
+      ...entry(i),
+      subQuestionId: `q${i % subQuestions}`,
+      content: `fact-q${i % subQuestions} ${"e".repeat(2_000)}`,
+    }));
+
+  it("keeps the 8 most relevant entries of a sub-question, as the writer does", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ ...entry(i), relevanceScore: i / 10 }));
+    const text = researchEvidenceForJudge(stubResearchArtifact({ evidence: rows }));
+    expect(text).toContain("[S9]");
+    expect(text).toContain("[S2]");
+    expect(text).not.toContain("[S1]");
+    expect(text).not.toContain("[S0]");
+  });
+
+  it("shrinks entries over the budget so every sub-question stays in", () => {
+    const text = researchEvidenceForJudge(stubResearchArtifact({ evidence: spread(20, 8) }));
+    expect(text).toContain("fact-q0");
+    expect(text).toContain("fact-q19");
+    expect(text).not.toContain("cut off");
+    expect(text.length).toBeLessThanOrEqual(RESEARCH_EVIDENCE_LIMIT);
+  });
+
   it("marks evidence cut at the total budget", () => {
-    const text = researchEvidenceForJudge(
-      stubResearchArtifact({ evidence: Array.from({ length: 80 }, (_, i) => entry(i)) })
-    );
+    const text = researchEvidenceForJudge(stubResearchArtifact({ evidence: spread(40, 8) }));
     expect(text).toContain("[… evidence cut off here for judging]");
     expect(text.length).toBeLessThan(RESEARCH_EVIDENCE_LIMIT + 200);
   });
