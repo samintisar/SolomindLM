@@ -23,6 +23,38 @@ describe("computeConfigHash", () => {
     const other = snapshotRetrievalConfig({ promptVersion: "2000-01-01" });
     expect(computeConfigHash(other)).not.toBe(computeConfigHash(config));
   });
+
+  it("changes when a chat override is applied", () => {
+    const config = snapshotRetrievalConfig();
+    const other = snapshotRetrievalConfig({ overrides: { hydeEnabled: false } });
+    expect(computeConfigHash(other)).not.toBe(computeConfigHash(config));
+  });
+
+  it("differs between two values of the same override", () => {
+    const small = snapshotRetrievalConfig({ overrides: { contextTokenBudget: 4000 } });
+    const large = snapshotRetrievalConfig({ overrides: { contextTokenBudget: 8000 } });
+    expect(computeConfigHash(small)).not.toBe(computeConfigHash(large));
+  });
+
+  it("ignores the order of override keys", () => {
+    const a = snapshotRetrievalConfig({
+      overrides: { hydeEnabled: false, contextTokenBudget: 4000 },
+    });
+    const b = snapshotRetrievalConfig({
+      overrides: { contextTokenBudget: 4000, hydeEnabled: false },
+    });
+    expect(computeConfigHash(a)).toBe(computeConfigHash(b));
+  });
+
+  it("is the same with no overrides as with an empty override set", () => {
+    const config = snapshotRetrievalConfig();
+    expect(computeConfigHash(snapshotRetrievalConfig({ overrides: {} }))).toBe(
+      computeConfigHash(config)
+    );
+    expect(
+      computeConfigHash(snapshotRetrievalConfig({ overrides: { rerankEnabled: undefined } }))
+    ).toBe(computeConfigHash(config));
+  });
 });
 
 describe("snapshotRetrievalConfig", () => {

@@ -13,12 +13,18 @@ import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
 import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import {
+  CHAT_CONFIG_OVERRIDE_KEYS,
+  type ChatConfigOverrides,
+} from "../../convex/_agents/chat/chatConfigOverrides";
 import { DEFAULT_SMART_MODEL_ID } from "../../convex/_lib/defaultSmartModel";
 import { caseFileStem } from "./caseFile";
+import { parseChatConfigFlag } from "./chatConfigFlag";
 import { mapWithConcurrency } from "./concurrency";
 import {
   type ActualCaseCost,
   type CostHistoryRecord,
+  caseTokenMedian,
   estimateRunCost,
   formatActualCost,
   formatEstimate,
@@ -34,8 +40,10 @@ import {
   readCostHistory,
 } from "./costIo";
 import { getFixture, listFixtureIds, withParaphrases, withSourceMatrix } from "./fixtures";
+import { loadFixtureSourceTexts } from "./fixtures/sourceFiles";
 import { appendHistory, HISTORY_DIR, historyFilePath } from "./history";
 import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
+import { createLiveInvokers } from "./liveInvokers";
 import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
 import { scoreAllMetrics } from "./metrics/scorers";
 import {
@@ -59,13 +67,7 @@ import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import { formatJudgeCalibrationTable, scoreJudgeCalibration } from "./reports/judgeCalibration";
 import type { JudgeCalibrationItem } from "./reports/judgeQueue";
 import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
-import {
-  createConvexChatInvoker,
-  createConvexLiteratureReviewInvoker,
-  createConvexResearchInvoker,
-  createConvexStudioInvokers,
-  runEval,
-} from "./runners";
+import { runEval } from "./runners";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { LiteratureReviewInvoker } from "./runners/literatureReviewRunner";
@@ -86,7 +88,6 @@ import {
   type StudioRunnerKind,
 } from "./types";
 import { USE_CASE_PACKS } from "./usecases";
-import { createConvexSeedApi } from "./usecases/convexSeedApi";
 import { resolveUseCaseIds } from "./usecases/ids";
 import { requireEvalConvexEnv } from "./usecases/prodGuard";
 import {
@@ -148,6 +149,8 @@ interface CliOptions {
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
+  /** Chat knob overrides for chat fixtures (`--chat-config key=value,…`) */
+  chatConfigOverrides?: ChatConfigOverrides;
   /** Score a labeled judge-queue.json and exit */
   scoreJudgeQueue?: string;
   /** With --score-judge-queue: also append the queue's labelled rows to the calibration store */
@@ -254,6 +257,7 @@ const CLI_OPTIONS = {
   "judge-consistency": { type: "string" },
   yes: { type: "boolean", short: "y" },
   "max-cost": { type: "string" },
+  "chat-config": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
@@ -360,6 +364,8 @@ function parseArgs(args: string[]): CliOptions {
       values["judge-consistency"] !== undefined
         ? parseConsistencyFraction(values["judge-consistency"])
         : undefined,
+    chatConfigOverrides:
+      values["chat-config"] !== undefined ? parseChatConfigFlag(values["chat-config"]) : undefined,
     compareA: values.compare,
     compareB: secondValues.get("compare"),
     scoreJudgeQueue: values["score-judge-queue"],
@@ -411,6 +417,8 @@ Options:
                            a case has no cost history; without a terminal the run
                            stops instead, unless --yes or --max-cost is given)
   --max-cost <usd>         Abort a live run whose estimated cost is above this
+  --chat-config <k=v[,k=v]>  Override chat knobs for chat fixtures (experiments; recorded in
+                           configHash). Keys: ${CHAT_CONFIG_OVERRIDE_KEYS.join(", ")}
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json (plus evals/rag/calibration/) and exit
                            0 ready / 1 not ready / 2 under-labelled (or not a queue file)
@@ -681,6 +689,17 @@ async function main(): Promise<void> {
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}${repeats > 1 ? ` [repeats=${repeats}]` : ""}\n`
   );
+  if (opts.chatConfigOverrides) {
+    console.log(`Chat config overrides: ${JSON.stringify(opts.chatConfigOverrides)}`);
+    const otherFixtures = fixtureIds.filter(
+      (id) => !["chat", "both"].includes(getFixture(id).runner)
+    ).length;
+    if (otherFixtures > 0) {
+      console.log(
+        `Note: --chat-config applies to chat fixtures only; ${otherFixtures} other fixture(s) run with production values.\n`
+      );
+    }
+  }
 
   // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
   let chatInvoker: ChatAgentInvoker | undefined;
@@ -699,11 +718,12 @@ async function main(): Promise<void> {
       process.exit(2);
     }
     console.log(`Using Convex at ${convexUrl} (eval mode)`);
-    chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
-    researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
-    literatureReviewInvoker = createConvexLiteratureReviewInvoker(convexUrl, { evalSecret });
-    studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
-    seedApi = createConvexSeedApi(convexUrl, evalSecret);
+    const live = createLiveInvokers(convexUrl, evalSecret);
+    chatInvoker = live.chatInvoker;
+    researchInvoker = live.researchInvoker;
+    literatureReviewInvoker = live.literatureReviewInvoker;
+    studioInvokers = live.studioInvokers;
+    seedApi = live.seedApi;
   }
 
   const allMetrics: MetricResult[] = [];
@@ -748,7 +768,8 @@ async function main(): Promise<void> {
     pipelineModel: pipelineModelFor(f),
     judgeModel,
   }));
-  const estimate = estimateRunCost(planned, liveRepeats, readCostHistory(historyPath), rates);
+  const costHistory = readCostHistory(historyPath);
+  const estimate = estimateRunCost(planned, liveRepeats, costHistory, rates);
   console.log(`${formatEstimate(estimate, liveRepeats, ratesSource)}
 `);
   if (!opts.dryRun) {
@@ -828,6 +849,7 @@ async function main(): Promise<void> {
       researchInvoker,
       literatureReviewInvoker,
       studioInvokers,
+      chatConfigOverrides: opts.chatConfigOverrides,
     },
     scoreAllMetrics,
     scoreOptionsFor: (fixture: EvalFixture) => ({
@@ -837,9 +859,10 @@ async function main(): Promise<void> {
       rubricChecks: opts.rubricChecks,
       judgeReasoning: judge.judgeReasoning,
       judgeConsistencySample: judge.judgeConsistencySample,
+      historyTokens: caseTokenMedian(costHistory, fixture.id, pipelineModelFor(fixture)),
       packSourceTexts: fixture.useCase
         ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
-        : undefined,
+        : loadFixtureSourceTexts(fixture),
     }),
     loadBaseline,
     saveStudioOutput: (artifact: EvalRunArtifact) => saveStudioOutput(artifact, opts.smartLlm),

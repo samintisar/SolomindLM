@@ -80,6 +80,7 @@ export function createConvexChatInvoker(
         documentIds: context.documentIds as Id<"documents">[] | undefined,
         sourcePolicy: context.sourcePolicy,
         ...(context.evalRetrievalOnly ? { retrievalOnly: true } : {}),
+        configOverrides: context.configOverrides,
       });
 
       return {
@@ -100,6 +101,7 @@ export function createConvexChatInvoker(
         instructionMode: result.instructionMode,
         sourcePolicy: toEvalSourcePolicy(result.sourcePolicy),
         ...(result.retrievalOnly ? { retrievalOnly: true } : {}),
+        configOverrides: result.configOverrides,
       };
     },
   };

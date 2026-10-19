@@ -1,4 +1,5 @@
 import { VALID_LANGUAGE_CODES } from "../../../convex/_agents/_shared/languageInstruction";
+import type { ChatConfigOverrides } from "../../../convex/_agents/chat/chatConfigOverrides";
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
 import { AVAILABLE_SMART_MODEL_IDS } from "../../../convex/_lib/resolveSmartModel";
@@ -22,6 +23,8 @@ export interface EvalChatOptions {
 export type ChatInvokeInput = ChatAgentContext & {
   sourcePolicy?: import("../types").SourcePolicyConfig;
   chatOptions?: EvalChatOptions;
+  /** Chat knobs to override for this question; absent for production values. */
+  configOverrides?: ChatConfigOverrides;
 };
 
 export interface ChatAgentInvoker {
@@ -43,6 +46,7 @@ export interface ChatAgentInvoker {
     sourcePolicy?: import("../types").SourcePolicyConfig;
     /** True when the deployment stopped after context selection (no answer). */
     retrievalOnly?: boolean;
+    configOverrides?: ChatConfigOverrides;
   }>;
 }
 
@@ -159,6 +163,7 @@ export async function runChatEval(
           smartModel: fixture.chat?.smartModel,
           outputLanguage: fixture.chat?.outputLanguage,
         },
+        configOverrides: options.config.overrides,
       });
 
       // Build source evidence summary from selected chunks
@@ -207,12 +212,17 @@ export async function runChatEval(
         contextTokenBudget: result.contextTokenBudget,
         instructionMode: result.instructionMode,
         sourcePolicy: result.sourcePolicy,
+        configOverrides: result.configOverrides ?? options.config.overrides,
         sourceEvidence,
         ...(result.retrievalOnly ? { retrievalOnly: true } : {}),
         timestamp: new Date().toISOString(),
       };
     },
   });
+  // Stub artifacts (dry runs, failed invocations) still record the overrides that were requested.
+  if (options.config.overrides) {
+    outcome.artifact.configOverrides ??= options.config.overrides;
+  }
   // Dry runs never reach the invoker: mark their stub so the retrieval-only metric set applies.
   if (options.dryRun && options.retrievalOnly) {
     return { ...outcome, artifact: { ...outcome.artifact, retrievalOnly: true } };

@@ -5,6 +5,7 @@
  * All metric rows are tagged by runner, configHash, and caseId for grouping.
  */
 
+import type { ChatConfigOverrides } from "../../convex/_agents/chat/chatConfigOverrides";
 import type { SourceChannel } from "../../convex/_agents/research/types";
 import type { Scorecard } from "./reports/scorecard";
 
@@ -146,6 +147,12 @@ export interface EvalFixture {
     | "explanation";
   /** Studio-only: parameters forwarded to the generation job */
   studioParams?: StudioParams;
+  /**
+   * Studio: local copies of the notebook's sources, as file names under
+   * `evals/rag/fixtures/sources/`. The grounding judge reads them when the artifact carries no
+   * retrieved chunks (studio jobs read whole sources, not chunks).
+   */
+  sourceFiles?: string[];
   /** Studio-only: structural expectations used by studio metric scorers */
   expectedStructure?: ExpectedStructure;
   /** Source filter configuration for testing retrieval across different channels */
@@ -307,6 +314,8 @@ export interface EvalRunArtifact {
   /** Token usage if available; `cachedPrompt` is the part of `prompt` served from the prompt cache */
   tokenUsage?: { prompt: number; completion: number; total: number; cachedPrompt?: number };
   tokenUsageSource?: TokenUsageSource;
+  /** Chat: the knob overrides the run applied, as the action reported them */
+  configOverrides?: ChatConfigOverrides;
   stageSpans?: AgentStageSpan[];
   /** Chat: provider calls the agent made this turn */
   callCounters?: CallCounters;
@@ -475,6 +484,11 @@ export interface RetrievalConfigSnapshot {
   fastModel: string;
   /** Chat prompt version (convex/_agents/chat/chat_llm_prompts.ts CHAT_PROMPT_VERSION) */
   promptVersion: string;
+  /**
+   * Chat knobs overridden for this run (`--chat-config`, sweep cells). Absent or empty means
+   * production values, and the hash is then the same as before overrides existed.
+   */
+  overrides?: ChatConfigOverrides;
 }
 
 // ─── Baselines ──────────────────────────────────────────────────

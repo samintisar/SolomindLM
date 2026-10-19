@@ -25,4 +25,15 @@ describe("expandQueryWithKeywords", () => {
     const hasSynonym = variations.some((v) => v.toLowerCase().includes("instance"));
     expect(hasSynonym).toBe(true);
   });
+
+  it("adds no variations when the keyword variant cap is zero", () => {
+    expect(expandQueryWithKeywords("What is the definition of entropy?", 0)).toEqual([
+      "What is the definition of entropy?",
+    ]);
+  });
+
+  it("adds at most the given number of variations", () => {
+    const variations = expandQueryWithKeywords("explain the difference between advantages", 1);
+    expect(variations).toHaveLength(2);
+  });
 });

@@ -35,7 +35,10 @@ Every run prints an estimated cost first and a `Run cost:` block at the end, bot
 recorded in the main checkout's gitignored `evals/rag/generated/cost-history.jsonl`, which all worktrees share
 (`EVAL_COST_HISTORY` overrides the path). A case that has never run uses its runner's median, or shows `?`. A live run
 asks before starting at $0.25 or more, or when a case has no history; without a terminal to ask on it stops instead.
-`--yes` skips the question, and `--max-cost <usd>` replaces it with a limit the run refuses to start above. Dry runs print the estimate for the live run without spending anything.
+`--yes` skips the question, and `--max-cost <usd>` replaces it with a limit the run refuses to start above. Dry runs
+print the estimate for the live run without spending anything. The same history drives `latency_cost_budget`'s token
+check: a case passes up to 1.5x the median tokens of its recent runs on the same pipeline model, warns up to 2x, and
+fails beyond; with no history yet its tokens are reported but not gated.
 
 ## Dev servers and worktrees
 
