@@ -61,6 +61,8 @@ export interface ScoreAllMetricsOptions {
   judgeReasoning?: boolean;
   /** Fraction (0–1) of binary judge calls re-run once to measure self-consistency. */
   judgeConsistencySample?: number;
+  /** Median per-run pipeline tokens of this case's recent runs (cost history), for the token gate. */
+  historyTokens?: number;
 }
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
@@ -124,7 +126,7 @@ export async function scoreAllMetrics(
   const results: MetricResult[] = [];
 
   results.push(expectedItemRecall(fixture, artifact, baseline));
-  results.push(latencyCostBudget(fixture, artifact, baseline));
+  results.push(latencyCostBudget(fixture, artifact, baseline, options.historyTokens));
   results.push(contextTokenBudgetRatio(fixture, artifact, baseline));
   results.push(stageTokenShare(fixture, artifact, baseline));
 

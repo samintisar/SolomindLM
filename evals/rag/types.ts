@@ -147,6 +147,12 @@ export interface EvalFixture {
     | "explanation";
   /** Studio-only: parameters forwarded to the generation job */
   studioParams?: StudioParams;
+  /**
+   * Studio: local copies of the notebook's sources, as file names under
+   * `evals/rag/fixtures/sources/`. The grounding judge reads them when the artifact carries no
+   * retrieved chunks (studio jobs read whole sources, not chunks).
+   */
+  sourceFiles?: string[];
   /** Studio-only: structural expectations used by studio metric scorers */
   expectedStructure?: ExpectedStructure;
   /** Source filter configuration for testing retrieval across different channels */
