@@ -335,6 +335,8 @@ export interface EvalReport {
   scorecard?: Scorecard;
   /** Set when any artifact was a retrieval-only run: no answers were generated, so answer metrics are absent */
   retrievalOnly?: boolean;
+  /** Judge self-consistency: repeated judge calls, and how many repeated the verdict (sampled runs) */
+  judgeConsistency?: { sampled: number; agreed: number; rate: number };
   /** Metrics whose repeats disagreed or were missing (`breakdown.flaky`); listed in the report */
   flaky?: Array<{ caseId: string; runner: ConcreteRunnerKind; metric: string; statuses: string[] }>;
 }
@@ -343,9 +345,16 @@ export interface EvalReport {
 export interface CompareCaseResult {
   caseId: string;
   runner: ConcreteRunnerKind;
-  /** A wins | B wins | tie */
+  /** A wins | B wins | tie (tie when the two position orders disagree) */
   winner: "a" | "b" | "tie";
+  /** Verdict with A shown first, mapped to artifact A / B */
+  forward: "a" | "b" | "tie";
+  /** Verdict with B shown first, mapped to artifact A / B */
+  backward: "a" | "b" | "tie";
+  /** One-line summary */
   reason: string;
+  reasonForward: string;
+  reasonBackward: string;
   useCase?: string;
 }
 
@@ -356,6 +365,12 @@ export interface CompareReport {
   pathA: string;
   pathB: string;
   casesCompared: number;
+  /**
+   * Cases where both position orders picked a winner and the winners differ (a flip, counted as a
+   * tie). Splits where one order says tie and the other picks a winner are NOT counted: they are
+   * ties with a lean, not position bias.
+   */
+  positionDisagreements: number;
   winsA: number;
   winsB: number;
   ties: number;

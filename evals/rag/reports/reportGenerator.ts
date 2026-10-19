@@ -16,6 +16,8 @@ export interface GenerateReportOptions {
   useCaseByCase?: Map<string, string>;
   /** At least one artifact was a retrieval-only run (labels the report) */
   retrievalOnly?: boolean;
+  /** Judge self-consistency for this run, when any judge call was re-run */
+  judgeConsistency?: EvalReport["judgeConsistency"];
 }
 
 /**
@@ -64,6 +66,7 @@ export function generateReport(
     failureGroups,
     ...(scorecard && scorecard.cells.length > 0 ? { scorecard } : {}),
     ...(options.retrievalOnly ? { retrievalOnly: true } : {}),
+    ...(options.judgeConsistency ? { judgeConsistency: options.judgeConsistency } : {}),
     ...(flaky.length > 0 ? { flaky } : {}),
   };
 }
