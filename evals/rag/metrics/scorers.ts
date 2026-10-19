@@ -53,6 +53,8 @@ export interface ScoreAllMetricsOptions {
   rubricChecks?: string[];
   /** `false` turns judge reasoning off (`--judge-reasoning off`). */
   judgeReasoning?: boolean;
+  /** Fraction (0–1) of binary judge calls re-run once to measure self-consistency. */
+  judgeConsistencySample?: number;
 }
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
@@ -125,6 +127,7 @@ export async function scoreAllMetrics(
     model: judgeModel,
     enabled: !options.dryRun && invoke !== undefined,
     sourceTexts: options.packSourceTexts,
+    judgeConsistencySample: options.judgeConsistencySample,
   };
 
   // Judge groups run one after another (each parallelises its own judges), so one case never
