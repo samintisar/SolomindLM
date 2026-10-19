@@ -29,6 +29,11 @@ function key(row: MetricResult): string {
   return `${row.caseId}::${row.runner}::${row.metric}`;
 }
 
+/**
+ * A regression is an `after` row with status `fail` whose `before` row was not `fail`.
+ * Flaky warnings are `warn` and never block; a majority-fail flaky row is `fail` and does
+ * (see reports/repeats.ts). Status only, no flaky special case.
+ */
 export function checkHoldoutPromotion(before: EvalReport, after: EvalReport): PromotionDecision {
   const beforeByKey = new Map(
     before.metrics.filter((row) => isPromoteMetric(row.metric)).map((row) => [key(row), row])

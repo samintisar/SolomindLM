@@ -20,64 +20,55 @@ import { metricResult } from "./metricResult";
  * Maps canonical names to alternative names the LLM might use.
  */
 const SYNONYM_MAPPINGS: Record<string, string[]> = {
-  routing: ["tool selection", "tool use", "router", "routing", "intelligent routing"],
-  parallelization: ["parallel workers", "parallel", "parallelization", "multi-worker"],
-  "learning and adaptation": ["feedback loop", "adaptation", "learning", "continuous improvement"],
+  routing: ["tool selection", "router", "routing", "intelligent routing"],
+  parallelization: ["parallel workers", "parallelization", "multi-worker"],
+  "learning and adaptation": ["adaptation", "continuous improvement"],
   "resource-aware optimization": [
     "resource aware",
     "resource optimization",
     "routing by complexity",
   ],
-  prioritization: ["task scoring", "triage", "priority", "task prioritization", "scoring"],
-  "multi-agent collaboration": [
-    "multi agent",
-    "multi-agent",
-    "agent collaboration",
-    "orchestration",
-  ],
-  "memory management": ["memory", "long-term memory", "memory systems"],
+  prioritization: ["task scoring", "triage", "task prioritization"],
+  "multi-agent collaboration": ["multi agent", "multi-agent", "agent collaboration"],
+  "memory management": ["memory systems"],
   "human in the loop": ["human in the loop", "human-in-the-loop", "human intervention", "hitl"],
-  "guardrails and safety patterns": ["guardrails", "safety", "safety patterns", "security"],
-  "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals", "planning"],
-  "exception handling and recovery": [
-    "exception handling",
-    "error handling",
-    "recovery",
-    "fallback",
-  ],
-  "knowledge retrieval": ["retrieval", "knowledge", "rag", "context retrieval"],
-  "inter-agent communication": ["communication", "agent communication", "messaging"],
-  "reasoning techniques": ["reasoning", "tree of thought", "branching", "to"],
-  "evaluation and monitoring": ["evaluation", "monitoring", "testing", "metrics"],
-  "exploration and discovery": ["exploration", "discovery", "research"],
-  "tool use": ["tool", "tools", "tool calling", "function calling"],
-  planning: ["planning", "plan", "step-by-step", "sequential"],
-  reflection: ["reflection", "critique", "self-reflection", "review"],
-  "prompt chaining": ["prompt chaining", "chaining", "chain"],
+  "guardrails and safety patterns": ["guardrails", "guardrail", "safety patterns"],
+  "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals"],
+  "exception handling and recovery": ["exception handling", "error handling"],
+  "knowledge retrieval": ["retrieval augmented generation", "context retrieval"],
+  "inter-agent communication": ["agent communication"],
+  "reasoning techniques": ["tree of thought"],
+  "tool use": ["tool calling", "function calling"],
+  reflection: ["critique", "self-reflection"],
 };
 
+/** Words that never count toward the "significant words" rule for multi-word items. */
+const STOPWORDS = new Set(["and", "the", "with", "for", "from", "into"]);
+
 /**
- * Get all possible names for a canonical term (including the term itself).
+ * Words too common in pattern prose to count as evidence for an item: every answer about "the
+ * 20 patterns" says "patterns", so "reasoning techniques" must not be credited by it.
+ */
+const COMMON_ITEM_WORDS = new Set([
+  "patterns",
+  "techniques",
+  "agent",
+  "agents",
+  "management",
+  "systems",
+  "based",
+]);
+
+/**
+ * The canonical name's variations: the term itself plus the synonyms listed under that exact
+ * canonical key. Another item's synonym list is never consulted.
  */
 function getAllVariations(term: string): string[] {
   const normalized = normalizeForMatch(term);
-  const variations = [normalized];
-
-  // Check if term has synonym mappings
-  for (const [canonical, synonyms] of Object.entries(SYNONYM_MAPPINGS)) {
-    if (
-      normalized === normalizeForMatch(canonical) ||
-      synonyms.some((s) => normalizeForMatch(s) === normalized)
-    ) {
-      // Add all synonyms
-      for (const synonym of synonyms) {
-        variations.push(normalizeForMatch(synonym));
-      }
-      break;
-    }
-  }
-
-  return variations;
+  const entry = Object.entries(SYNONYM_MAPPINGS).find(
+    ([canonical]) => normalizeForMatch(canonical) === normalized
+  );
+  return [normalized, ...(entry ? entry[1].map(normalizeForMatch) : [])];
 }
 
 /** Normalize text for matching: lowercase, remove special chars, normalize spaces */
@@ -90,42 +81,78 @@ function normalizeForMatch(text: string): string {
     .trim();
 }
 
-/** Generate variations of a term for fuzzy matching */
+/**
+ * Whole-phrase variations of a term: the term itself, its explicit synonyms, and each of them with
+ * one adjacent pair of words joined ("feedforward network" for "feed forward network").
+ */
 function generateVariations(term: string): string[] {
-  const normalized = normalizeForMatch(term);
-  const variations = getAllVariations(normalized);
-
-  // Split by space and generate word-level variations
-  const words = normalized.split(" ").filter((w) => w.length > 2);
-
-  // Add individual significant words as variations
-  for (const word of words) {
-    if (word.length >= 4) {
-      // Only meaningful words
-      variations.push(word);
+  const variations = [...new Set(getAllVariations(term))];
+  const joined: string[] = [];
+  for (const variation of variations) {
+    const words = variation.split(" ");
+    for (let i = 0; i < words.length - 1; i++) {
+      joined.push([...words.slice(0, i), words[i] + words[i + 1], ...words.slice(i + 2)].join(" "));
     }
   }
-
-  // Add compound variation (no spaces)
-  if (words.length > 1) {
-    variations.push(words.join(""));
-  }
-
-  return [...new Set(variations)]; // Deduplicate
+  return [...new Set([...variations, ...joined])];
 }
 
-/** Check if any variation of the needle is found in the haystack */
-function containsFuzzy(haystack: string, needle: string): boolean {
-  const normalizedHaystack = normalizeForMatch(haystack);
-  const variations = generateVariations(needle);
+/**
+ * Singular forms of a needle's last word, for the "a neural network" / "neural networks" case.
+ * Words of four letters or fewer, and words ending in ss, us, is or os ("rectus", "analysis"),
+ * keep their s: it belongs to the stem.
+ */
+function singularForms(word: string): string[] {
+  if (word.length < 5 || /(?:ss|us|is|os)$/.test(word)) return [];
+  const forms: string[] = [];
+  if (word.endsWith("es")) forms.push(word.slice(0, -2));
+  if (word.endsWith("s")) forms.push(word.slice(0, -1));
+  return forms;
+}
 
-  for (const variation of variations) {
-    if (normalizedHaystack.includes(variation)) {
-      return true;
-    }
+/**
+ * Whether `phrase` (normalised) appears in the padded haystack as whole words. The last word
+ * matches in either number: the needle's plural or singular form, with an optional "s" or "es" in
+ * the haystack. Apostrophes are already removed by normalizeForMatch ("Routing's" is "routings").
+ */
+function hasWholePhrase(paddedHaystack: string, phrase: string): boolean {
+  const words = phrase.split(" ");
+  const last = words.pop() ?? "";
+  if (last === "") return false;
+  const lastForms = [last, ...singularForms(last)].join("|");
+  const head = words.map((w) => `${w} `).join("");
+  return new RegExp(` ${head}(?:${lastForms})(?:es|s)? `).test(paddedHaystack);
+}
+
+/**
+ * Whether `needle` is found in `haystack` on word boundaries. A multi-word needle matches when
+ * its whole phrase or an explicit synonym appears, or on its significant words (4+ chars, not
+ * stopwords or COMMON_ITEM_WORDS): all of them when there are two, at least two when there are
+ * three or more. An item with fewer than two significant words matches only by phrase or synonym.
+ * A single-word needle matches only as itself or a synonym.
+ */
+function containsFuzzy(haystack: string, needle: string): boolean {
+  const paddedHaystack = ` ${normalizeForMatch(haystack)} `;
+
+  if (generateVariations(needle).some((v) => hasWholePhrase(paddedHaystack, v))) {
+    return true;
   }
 
-  return false;
+  const words = normalizeForMatch(needle).split(" ");
+  if (words.length < 2) {
+    return false;
+  }
+  const significant = [
+    ...new Set(
+      words.filter((w) => w.length >= 4 && !STOPWORDS.has(w) && !COMMON_ITEM_WORDS.has(w))
+    ),
+  ];
+  if (significant.length < 2) {
+    return false;
+  }
+  // Two significant words: both must appear. Three or more: at least two.
+  const found = significant.filter((w) => hasWholePhrase(paddedHaystack, w)).length;
+  return found >= 2;
 }
 
 /** Case-insensitive substring check (kept for backward compatibility). */
@@ -745,16 +772,28 @@ export function latencyCostBudget(
 ): MetricResult {
   const latencyMs = artifact.latencyMs;
   const totalTokens = artifact.tokenUsage?.total ?? 0;
+  // Estimated usage (chars/4) is not a provider count, so tokens are reported but never gated.
+  const providerTokens = artifact.tokenUsageSource === "provider";
 
   if (baseline) {
     const latencyRatio = latencyMs / baseline.latencyMs;
-    const tokenRatio = baseline.tokenUsage.total > 0 ? totalTokens / baseline.tokenUsage.total : 0;
-    const worstRatio = Math.max(latencyRatio, tokenRatio);
+    const baselineTokens = baseline.tokenUsage.total;
+    // A baseline with no recorded usage has no ratio to compare against.
+    const tokensGated = providerTokens && baselineTokens > 0;
+    const tokenRatio = baselineTokens > 0 ? totalTokens / baselineTokens : 0;
+    const worstRatio = tokensGated ? Math.max(latencyRatio, tokenRatio) : latencyRatio;
 
     let status: MetricStatus;
     if (worstRatio <= 1.2) status = "pass";
     else if (worstRatio <= 2.0) status = "warn";
     else status = "fail";
+
+    const latencyPart = `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x), `;
+    const tokenPart = !providerTokens
+      ? `tokens ${totalTokens} (estimated, not gated)`
+      : tokensGated
+        ? `tokens ${totalTokens} (baseline ${baselineTokens}, ${tokenRatio.toFixed(2)}x).`
+        : `tokens ${totalTokens} (baseline has no token usage)`;
 
     return metricResult(
       "latency_cost_budget",
@@ -762,14 +801,15 @@ export function latencyCostBudget(
       artifact,
       status,
       worstRatio,
-      `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x), tokens ${totalTokens} (baseline ${baseline.tokenUsage.total}, ${tokenRatio.toFixed(2)}x).`,
+      `${latencyPart}${tokenPart}`,
       {
         latencyMs,
         totalTokens,
         latencyRatio: Math.round(latencyRatio * 100) / 100,
-        tokenRatio: Math.round(tokenRatio * 100) / 100,
+        ...(tokensGated ? { tokenRatio: Math.round(tokenRatio * 100) / 100 } : {}),
         baselineLatencyMs: baseline.latencyMs,
-        baselineTotalTokens: baseline.tokenUsage.total,
+        baselineTotalTokens: baselineTokens,
+        tokensGated,
         ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
       }
     );
@@ -779,38 +819,32 @@ export function latencyCostBudget(
   const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
   const tokenGate = PER_RUNNER_TOKEN_GATE[artifact.runner] ?? 8000;
   const latencyOk = latencyMs <= latencyGate;
-  const tokensOk = totalTokens <= tokenGate;
+  const tokensOk = !providerTokens || totalTokens <= tokenGate;
+  const withinWarnBand =
+    latencyMs <= latencyGate * 2 && (!providerTokens || totalTokens <= tokenGate * 2);
 
   let status: MetricStatus;
   if (latencyOk && tokensOk) status = "pass";
-  else if (latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2) status = "warn";
+  else if (withinWarnBand) status = "warn";
   else status = "fail";
 
-  const score =
-    latencyOk && tokensOk
-      ? 1
-      : latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2
-        ? 0.5
-        : 0;
+  const score = latencyOk && tokensOk ? 1 : withinWarnBand ? 0.5 : 0;
 
-  return metricResult(
-    "latency_cost_budget",
-    fixture,
-    artifact,
-    status,
-    score,
-    `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`,
-    {
-      latencyMs,
-      totalTokens,
-      latencyGate,
-      tokenGate,
-      latencyOk,
-      tokensOk,
-      hasBaseline: false,
-      ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
-    }
-  );
+  const detail = providerTokens
+    ? `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`
+    : `Latency ${latencyMs}ms (gate ${latencyGate}ms), no baseline, tokens ${totalTokens} (estimated, not gated)`;
+
+  return metricResult("latency_cost_budget", fixture, artifact, status, score, detail, {
+    latencyMs,
+    totalTokens,
+    latencyGate,
+    tokenGate,
+    latencyOk,
+    tokensOk,
+    hasBaseline: false,
+    tokensGated: providerTokens,
+    ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
+  });
 }
 
 // Re-export types for convenience

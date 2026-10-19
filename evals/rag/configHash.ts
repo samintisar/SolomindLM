@@ -23,6 +23,21 @@ export function computeConfigHash(config: RetrievalConfigSnapshot): string {
     rrfK: config.rrfK,
     enableHybrid: config.enableHybrid,
     hybridThreshold: config.hybridThreshold,
+    listQueryContextTokenBudget: config.listQueryContextTokenBudget,
+    listQueryMaxSelectedChunks: config.listQueryMaxSelectedChunks,
+    neighbourPassageTokenBudget: config.neighbourPassageTokenBudget,
+    maxNeighbourPassages: config.maxNeighbourPassages,
+    openingPassageTokenBudget: config.openingPassageTokenBudget,
+    maxOpeningPassages: config.maxOpeningPassages,
+    multiSourceExtraTokensPerDocument: config.multiSourceExtraTokensPerDocument,
+    multiSourceMaxExtraTokens: config.multiSourceMaxExtraTokens,
+    perSourcePassagesPerSearch: config.perSourcePassagesPerSearch,
+    maxPerSourceDocuments: config.maxPerSourceDocuments,
+    chunkSizeTokens: config.chunkSizeTokens,
+    chunkOverlapTokens: config.chunkOverlapTokens,
+    smartModel: config.smartModel,
+    fastModel: config.fastModel,
+    promptVersion: config.promptVersion,
   });
   return createHash("sha256").update(payload).digest("hex").slice(0, 12);
 }

@@ -345,6 +345,8 @@ export interface EvalReport {
   failureGroups: FailureGroup[];
   /** Per use-case pack × runner pass rates (only when pack fixtures ran) */
   scorecard?: Scorecard;
+  /** Metrics whose repeats disagreed or were missing (`breakdown.flaky`); listed in the report */
+  flaky?: Array<{ caseId: string; runner: ConcreteRunnerKind; metric: string; statuses: string[] }>;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
@@ -391,6 +393,24 @@ export interface RetrievalConfigSnapshot {
   rrfK: number;
   enableHybrid: boolean;
   hybridThreshold: number;
+  // Context budgets beyond selection (convex/_agents/chat/chatConfig.ts)
+  listQueryContextTokenBudget: number;
+  listQueryMaxSelectedChunks: number;
+  neighbourPassageTokenBudget: number;
+  maxNeighbourPassages: number;
+  openingPassageTokenBudget: number;
+  maxOpeningPassages: number;
+  multiSourceExtraTokensPerDocument: number;
+  multiSourceMaxExtraTokens: number;
+  perSourcePassagesPerSearch: number;
+  maxPerSourceDocuments: number;
+  // Indexing and models
+  chunkSizeTokens: number;
+  chunkOverlapTokens: number;
+  smartModel: string;
+  fastModel: string;
+  /** Chat prompt version (convex/_agents/chat/chat_llm_prompts.ts CHAT_PROMPT_VERSION) */
+  promptVersion: string;
 }
 
 // ─── Baselines ──────────────────────────────────────────────────
