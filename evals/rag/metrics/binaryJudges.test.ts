@@ -344,7 +344,7 @@ describe("studio grounding judge evidence", () => {
     expect(grounding?.status).toBe("warn");
     expect(grounding?.score).toBe(0);
     expect(grounding?.detail).toBe(
-      "No grounding evidence: studio artifact has no retrieved chunks and no pack source text."
+      "No grounding evidence: studio artifact has no retrieved chunks and no source text (fixture sourceFiles or pack)."
     );
     expect(grounding?.breakdown).toMatchObject({ noEvidence: true });
     // Only the structure judge reaches the invoker; the grounding judge never does.
