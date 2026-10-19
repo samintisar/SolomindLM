@@ -51,6 +51,8 @@ export const chatEvalActionArgs = {
       recencyDays: v.optional(v.number()),
     })
   ),
+  /** Stop after context selection: no answer is generated (retrieval-only sweeps). */
+  retrievalOnly: v.optional(v.boolean()),
 };
 
 // ─── Token Estimation Helpers ────────────────────────────────
@@ -92,6 +94,8 @@ export interface ChatEvalResult {
     channels: string[];
     maxResultsPerChannel?: number;
   };
+  /** True when the run stopped after context selection, so `answer` is empty. */
+  retrievalOnly?: boolean;
 }
 
 // ─── Action ──────────────────────────────────────────────────
@@ -366,6 +370,7 @@ export const runChatEval = action({
           ...(args.sourcePolicy?.recencyDays ? { recencyDays: args.sourcePolicy.recencyDays } : {}),
         },
         externalChunks: externalChunks.length > 0 ? externalChunks : undefined,
+        evalRetrievalOnly: args.retrievalOnly === true,
       },
       args.question,
       `eval-${Date.now()}`
@@ -491,6 +496,7 @@ export const runChatEval = action({
       tokenUsageSource: telemetry.tokenUsageSource,
       stageSpans: telemetry.stageSpans,
       sourcePolicy: args.sourcePolicy,
+      ...(args.retrievalOnly === true ? { retrievalOnly: true } : {}),
     };
   },
 });
