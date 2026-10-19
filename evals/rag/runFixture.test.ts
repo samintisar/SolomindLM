@@ -100,6 +100,36 @@ describe("runFixtureWithRepeats", () => {
     expect(result.firstRepeatMetrics.find((m) => m.metric === GROUNDING)?.status).toBe("pass");
   });
 
+  it("sums pipeline token usage over every repeat, not just the first", async () => {
+    let call = 0;
+    const runEval = vi.fn(async (): Promise<EvalRunnerResult[]> => {
+      call++;
+      const artifact = {
+        caseId: "case-x",
+        runner: "chat",
+        answer: "a",
+        latencyMs: 1,
+        // Repeat 2 reports nothing, repeat 3 is a chars/4 estimate.
+        ...(call === 2
+          ? {}
+          : {
+              tokenUsage: { prompt: 100, completion: 10, total: 110, cachedPrompt: 40 },
+              tokenUsageSource: call === 3 ? "estimated" : "provider",
+            }),
+      } as EvalRunArtifact;
+      return [{ artifact, errors: [] }];
+    });
+    const { deps } = stubDeps({ runEval });
+    const result = await runFixtureWithRepeats(fixture, deps);
+    expect(result.pipelineUsage).toEqual({
+      prompt: 200,
+      cachedPrompt: 80,
+      completion: 20,
+      reported: 2,
+      estimated: 1,
+    });
+  });
+
   it("runs a single repeat without flakiness", async () => {
     const { deps, runEval } = stubDeps({ repeats: 1 });
     const result = await runFixtureWithRepeats(fixture, deps);

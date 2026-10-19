@@ -4,6 +4,7 @@
  * fixtures do not interleave; the caller flushes it when the fixture finishes.
  */
 
+import type { TokenCounts } from "./cost";
 import type { ScoreAllMetricsOptions } from "./metrics/scorers";
 import { aggregateRepeatMetrics } from "./reports/repeats";
 import type { RunEvalOptions } from "./runners";
@@ -69,6 +70,26 @@ export interface FixtureRunResult {
   metrics: MetricResult[];
   /** Invocation-layer errors summed over all repeats */
   runtimeErrors: number;
+  /** Agent pipeline tokens summed over all repeats (cost accounting) */
+  pipelineUsage: PipelineUsage;
+}
+
+interface PipelineUsage extends TokenCounts {
+  /** Artifacts that reported token usage */
+  reported: number;
+  /** Of those, how many were chars/4 estimates rather than provider counts */
+  estimated: number;
+}
+
+/** Adds one artifact's token usage to a running total. */
+function addPipelineUsage(total: PipelineUsage, artifact: EvalRunArtifact): void {
+  const usage = artifact.tokenUsage;
+  if (!usage || usage.total <= 0) return;
+  total.prompt += usage.prompt;
+  total.cachedPrompt += usage.cachedPrompt ?? 0;
+  total.completion += usage.completion;
+  total.reported += 1;
+  if (artifact.tokenUsageSource === "estimated") total.estimated += 1;
 }
 
 export async function runFixtureWithRepeats(
@@ -81,6 +102,13 @@ export async function runFixtureWithRepeats(
   const artifacts: EvalRunArtifact[] = [];
   const repeatRuns: MetricResult[][] = [];
   let runtimeErrors = 0;
+  const pipelineUsage: PipelineUsage = {
+    prompt: 0,
+    cachedPrompt: 0,
+    completion: 0,
+    reported: 0,
+    estimated: 0,
+  };
 
   for (let repeat = 1; repeat <= deps.repeats; repeat++) {
     // Throws in real mode if no invoker is registered
@@ -103,6 +131,7 @@ export async function runFixtureWithRepeats(
       }
 
       if (repeat === 1) artifacts.push(artifact);
+      addPipelineUsage(pipelineUsage, artifact);
 
       if (artifact.studioOutput) {
         log.out(`  Output saved to: ${deps.saveStudioOutput(artifact)}`);
@@ -150,6 +179,7 @@ export async function runFixtureWithRepeats(
     firstRepeatMetrics: repeatRuns[0] ?? [],
     metrics: aggregated,
     runtimeErrors,
+    pipelineUsage,
   };
 }
 
