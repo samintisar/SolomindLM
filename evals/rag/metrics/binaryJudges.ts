@@ -9,6 +9,8 @@ import {
   isStudioRunner,
   type MetricResult,
 } from "../types";
+import type { SourceText } from "../usecases/types";
+import { CUT_NOTE, formatSourceTexts, SOURCE_TEXTS_LIMIT } from "./evidence";
 import type { LlmJudgeOptions } from "./llmJudge";
 import { metricResult } from "./metricResult";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
@@ -21,6 +23,8 @@ interface BinaryJudgeResult {
 export interface BinaryJudgeOptions extends LlmJudgeOptions {
   /** When false, skip network judges (unit tests). */
   enabled?: boolean;
+  /** Pack source text, the grounding evidence for studio artifacts that have no chunks */
+  sourceTexts?: SourceText[];
 }
 
 /**
@@ -213,14 +217,15 @@ Pass if required structure is present (non-empty items, sections, answer keys as
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
-function studioGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
+/** Null when the artifact has neither retrieved chunks nor pack source text to judge against. */
+function studioGroundingPrompt(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  sourceTexts: SourceText[] = []
+): string | null {
   const context = combineChunkContents(artifact.selectedChunks);
-  if (!context.trim()) {
-    return `No chunks available — pass if output is coherent for: ${fixture.question}
-Output: ${excerptForJudge(artifact.answer, 4000)}
-Respond JSON only: {"pass": boolean, "reason": string}`;
-  }
-  return `Pass if studio output is grounded in notebook chunks.
+  if (context.trim()) {
+    return `Pass if studio output is grounded in notebook chunks.
 
 Question: ${fixture.question}
 
@@ -231,6 +236,40 @@ Output:
 ${excerptForJudge(artifact.answer, 8000)}
 
 Respond JSON only: {"pass": boolean, "reason": string}`;
+  }
+  if (sourceTexts.length === 0) return null;
+  const formatted = formatSourceTexts(sourceTexts, SOURCE_TEXTS_LIMIT);
+  const header = formatted.truncated
+    ? "Source text (some documents cut off):"
+    : "Source text (complete):";
+  return `Pass if studio output is grounded in the source text.
+
+Question: ${fixture.question}
+
+${header}
+${formatted.truncated ? `${CUT_NOTE}\n` : ""}${formatted.text}
+
+Output:
+${excerptForJudge(artifact.answer, 8000)}
+
+Respond JSON only: {"pass": boolean, "reason": string}`;
+}
+
+/** Warn, not fail or pass: a silent pass hid the missing evidence, and a fail would be a guess. */
+function noGroundingEvidence(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  model: string
+): MetricResult {
+  return metricResult(
+    "binary_judge_studio_grounding",
+    fixture,
+    artifact,
+    "warn",
+    0,
+    "No grounding evidence: studio artifact has no retrieved chunks and no pack source text.",
+    { noEvidence: true, model }
+  );
 }
 
 /**
@@ -258,7 +297,8 @@ export async function scoreBinaryJudgeMetrics(
   }
 
   const model = options.model ?? DEFAULT_JUDGE_MODEL;
-  const judges: Array<[metric: string, prompt: string]> = [];
+  // A null prompt means the judge has no evidence to read; it is reported without a call.
+  const judges: Array<[metric: string, prompt: string | null]> = [];
 
   if (artifact.runner === "chat") {
     judges.push(["binary_judge_chat_grounding", chatGroundingPrompt(fixture, artifact)]);
@@ -280,13 +320,18 @@ export async function scoreBinaryJudgeMetrics(
 
   if (isStudioRunner(artifact.runner)) {
     judges.push(["binary_judge_studio_structure", studioStructurePrompt(fixture, artifact)]);
-    judges.push(["binary_judge_studio_grounding", studioGroundingPrompt(fixture, artifact)]);
+    judges.push([
+      "binary_judge_studio_grounding",
+      studioGroundingPrompt(fixture, artifact, options.sourceTexts),
+    ]);
   }
 
   // Independent judges of one artifact run concurrently; results keep the order above.
   return Promise.all(
     judges.map(([metric, prompt]) =>
-      runBinaryJudge(metric, fixture, artifact, prompt, invoke, model)
+      prompt === null
+        ? Promise.resolve(noGroundingEvidence(fixture, artifact, model))
+        : runBinaryJudge(metric, fixture, artifact, prompt, invoke, model)
     )
   );
 }

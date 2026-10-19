@@ -201,9 +201,73 @@ describe("judge excerpts", () => {
       { invoke }
     );
 
-    const [longPrompts, shortPrompts] = [prompts.slice(0, 2), prompts.slice(2)];
-    expect(longPrompts).toHaveLength(2);
+    // A studio artifact with no evidence skips the grounding judge, so only the structure judge
+    // calls the invoker.
+    const [longPrompts, shortPrompts] = [prompts.slice(0, 1), prompts.slice(1)];
+    expect(longPrompts).toHaveLength(1);
     for (const prompt of longPrompts) expect(prompt).toMatch(/cut off here for judging/i);
     for (const prompt of shortPrompts) expect(prompt).not.toMatch(/cut off here for judging/i);
+  });
+});
+
+describe("studio grounding judge evidence", () => {
+  const fixture = {
+    schemaVersion: 1,
+    id: "studio-report-agentic",
+    question: "Write a report on agentic patterns.",
+    runner: "report",
+    notebookId: "nb",
+    expectedItems: [],
+    expectedBehavior: "Report grounded in the sources.",
+  } as unknown as Parameters<typeof scoreBinaryJudgeMetrics>[0];
+
+  const sourceTexts = [
+    { fileName: "agentic-patterns.md", text: "Routing sends each request to a specialist." },
+  ];
+
+  it("grounds a chunkless studio artifact in the pack source text", async () => {
+    const prompts: string[] = [];
+    const invoke = vi.fn(async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"pass": false, "reason": "Claims a pattern the sources do not mention."}';
+    });
+    const results = await scoreBinaryJudgeMetrics(
+      fixture,
+      stubResearchArtifact({ runner: "report", answer: "Routing sends requests to a specialist." }),
+      undefined,
+      { invoke, sourceTexts }
+    );
+
+    const grounding = prompts.find((p) => p.includes("Source text (complete):"));
+    expect(grounding).toBeDefined();
+    expect(grounding).toContain("Routing sends each request to a specialist.");
+    expect(grounding).toContain("[agentic-patterns.md]");
+    expect(results.find((r) => r.metric === "binary_judge_studio_grounding")?.status).toBe("fail");
+  });
+
+  it("warns without calling the grounding judge when there is no evidence", async () => {
+    const prompts: string[] = [];
+    const invoke = vi.fn(async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"pass": true, "reason": "ok"}';
+    });
+    const results = await scoreBinaryJudgeMetrics(
+      fixture,
+      stubResearchArtifact({ runner: "report", answer: "A report." }),
+      undefined,
+      { invoke }
+    );
+
+    const grounding = results.find((r) => r.metric === "binary_judge_studio_grounding");
+    expect(grounding?.status).toBe("warn");
+    expect(grounding?.score).toBe(0);
+    expect(grounding?.detail).toBe(
+      "No grounding evidence: studio artifact has no retrieved chunks and no pack source text."
+    );
+    expect(grounding?.breakdown).toMatchObject({ noEvidence: true });
+    // Only the structure judge reaches the invoker; the grounding judge never does.
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(prompts.some((p) => p.includes("Source text"))).toBe(false);
+    expect(prompts.some((p) => p.includes("Pass if studio output is grounded"))).toBe(false);
   });
 });
