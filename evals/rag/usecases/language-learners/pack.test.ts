@@ -42,9 +42,10 @@ describe("language-learners pack", () => {
     }
   });
 
-  it("gives each chat fixture 1 to 3 gold passages and no other fixture any", () => {
+  it("gives each single-turn answerable chat fixture 1 to 3 gold passages and no other fixture any", () => {
+    // Unanswerable fixtures have nothing to retrieve; multi-turn ones test the conversation.
     for (const f of fixtures) {
-      if (f.runner === "chat") {
+      if (f.runner === "chat" && !f.expectAbstain && !f.turns?.length) {
         expect(f.expectedPassages?.length ?? 0).toBeGreaterThanOrEqual(1);
         expect(f.expectedPassages?.length ?? 0).toBeLessThanOrEqual(3);
       } else {

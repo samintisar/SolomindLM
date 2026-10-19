@@ -279,6 +279,10 @@ export const languageLearnersFixtures: EvalFixture[] = [
     runner: "chat",
     question: "How do I form the passé composé with avoir? Give me one example.",
     expectedItems: [],
+    expectedPassages: [
+      "the present tense of an auxiliary verb (either avoir or être), followed by a past participle",
+      "the past participle is formed by replacing the final -er of the infinitive with -é",
+    ],
     expectedAnswer:
       "Subject plus avoir in the present plus the past participle, for example « J'ai mangé » (I ate / I have eaten), explained in French.",
     expectedBehavior:

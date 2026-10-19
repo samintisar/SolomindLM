@@ -165,7 +165,7 @@ describe("scoreAbstentionJudgeMetrics", () => {
 
   it("uses the abstention cut note for cut retrieved passages too", async () => {
     const prompts: string[] = [];
-    const longChunk = { id: "c1", sourceTitle: "Long", content: "y".repeat(60_000) };
+    const longChunk = { id: "c1", sourceTitle: "Long", content: "y".repeat(300_000) };
     await scoreAbstentionJudgeMetrics(
       unanswerable,
       { ...artifact, selectedChunks: [longChunk] },
