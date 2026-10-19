@@ -34,6 +34,7 @@ import {
   readCostHistory,
 } from "./costIo";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { loadFixtureSourceTexts } from "./fixtures/sourceFiles";
 import { appendHistory, HISTORY_DIR, historyFilePath } from "./history";
 import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
 import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
@@ -836,7 +837,7 @@ async function main(): Promise<void> {
       judgeConsistencySample: judge.judgeConsistencySample,
       packSourceTexts: fixture.useCase
         ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
-        : undefined,
+        : loadFixtureSourceTexts(fixture),
     }),
     loadBaseline,
     saveStudioOutput: (artifact: EvalRunArtifact) => saveStudioOutput(artifact, opts.smartLlm),
