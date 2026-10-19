@@ -283,6 +283,15 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         hasFullText: true,
       },
       take: 5,
+      // Chosen on dev (2026-10-19): three from the search above plus two openly licensed (CC BY 4.0)
+      // reviews that replaced two off-topic search results (front-loading, interleaving).
+      pinnedDois: [
+        "10.1073/pnas.1815156116",
+        "10.1186/s12909-022-03324-8",
+        "10.29311/ndtps.v0i15.3376",
+        "10.1007/s10459-023-10274-3",
+        "10.3390/bs15060771",
+      ],
     },
     studio: [],
     literatureReview: {
