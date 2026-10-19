@@ -170,8 +170,9 @@ export const runChatEval = action({
 
     const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
-    // Same rerank as production chat, so eval scores match what users get.
-    const rerankFn = createRerankFn(ctx);
+    // Same rerank as production chat, so eval scores match what users get. Uncached: a cached
+    // score would make repeat runs identical, collapse the rerank span, and warm the prod cache.
+    const rerankFn = createRerankFn(ctx, { bypassCache: true });
 
     // ── Spy wrapper for globalRerankFn ──
 

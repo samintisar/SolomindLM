@@ -335,6 +335,8 @@ export interface EvalReport {
   scorecard?: Scorecard;
   /** Set when any artifact was a retrieval-only run: no answers were generated, so answer metrics are absent */
   retrievalOnly?: boolean;
+  /** Metrics whose repeats disagreed or were missing (`breakdown.flaky`); listed in the report */
+  flaky?: Array<{ caseId: string; runner: ConcreteRunnerKind; metric: string; statuses: string[] }>;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
