@@ -16,7 +16,7 @@ const fixture: EvalFixture = {
 };
 
 describe("runStudioEval tokenUsageSource", () => {
-  it("omits tokenUsageSource when the invoker does not report one", async () => {
+  it("marks usage estimated when the invoker reports usage without a source", async () => {
     const invoker: StudioInvoker = {
       kind: "report",
       invoke: async () => ({
@@ -32,8 +32,23 @@ describe("runStudioEval tokenUsageSource", () => {
     );
 
     expect(errors).toEqual([]);
-    expect(artifact.tokenUsageSource).toBeUndefined();
+    expect(artifact.tokenUsageSource).toBe("estimated");
     expect(artifact.tokenUsage).toEqual({ prompt: 1, completion: 2, total: 3 });
+  });
+
+  it("leaves tokenUsageSource unset when there is no usage at all", async () => {
+    const invoker: StudioInvoker = {
+      kind: "report",
+      invoke: async () => ({ raw: { title: "T", content: "body" }, latencyMs: 12 }),
+    };
+
+    const { artifact } = await runStudioEval(
+      { fixture, config: snapshotRetrievalConfig(), kind: "report" },
+      invoker
+    );
+
+    expect(artifact.tokenUsage).toBeUndefined();
+    expect(artifact.tokenUsageSource).toBeUndefined();
   });
 
   it("copies provider token usage source and stage spans from the invoker", async () => {

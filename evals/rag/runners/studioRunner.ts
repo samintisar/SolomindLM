@@ -266,7 +266,8 @@ export async function runStudioEval(
         studioOutput,
         latencyMs: result.latencyMs,
         tokenUsage: result.tokenUsage,
-        tokenUsageSource: result.tokenUsageSource,
+        // Usage without a provider mark is an estimate, so it is never left unlabelled.
+        tokenUsageSource: result.tokenUsageSource ?? (result.tokenUsage ? "estimated" : undefined),
         stageSpans: result.stageSpans,
         timestamp: new Date().toISOString(),
       };

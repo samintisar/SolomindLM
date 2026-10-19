@@ -124,6 +124,7 @@ export async function scoreAllMetrics(
     invoke,
     model: judgeModel,
     enabled: !options.dryRun && invoke !== undefined,
+    sourceTexts: options.packSourceTexts,
   };
 
   // Judge groups run one after another (each parallelises its own judges), so one case never
