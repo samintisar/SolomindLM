@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type CostHistoryRecord,
+  caseTokenMedian,
   estimateRunCost,
   formatActualCost,
   formatEstimate,
@@ -256,5 +257,37 @@ describe("formatActualCost", () => {
     );
     expect(text).toContain("Total: $0.15");
     expect(text).toContain("built-in prices");
+  });
+});
+
+describe("caseTokenMedian", () => {
+  it("returns the median per-run provider tokens of the case's recent runs", () => {
+    const history = [
+      record({ runs: 2, pipeline: { prompt: 18_000, cachedPrompt: 0, completion: 2_000 } }),
+      record({ pipeline: { prompt: 12_000, cachedPrompt: 0, completion: 0 } }),
+      record({ pipeline: { prompt: 90_000, cachedPrompt: 0, completion: 0 } }),
+      record({ caseId: "other", pipeline: { prompt: 1, cachedPrompt: 0, completion: 0 } }),
+    ].map((r) => ({ ...r, pipelineSource: "provider" as const }));
+    expect(caseTokenMedian(history, "case-a", SMART)).toBe(12_000);
+  });
+
+  it("only counts runs on the same pipeline model and repeats that reported tokens", () => {
+    const history = [
+      record({
+        runs: 3,
+        pipelineRuns: 2,
+        pipeline: { prompt: 20_000, cachedPrompt: 0, completion: 0 },
+      }),
+      record({
+        pipelineModel: "other/model",
+        pipeline: { prompt: 99_000, cachedPrompt: 0, completion: 0 },
+      }),
+    ].map((r) => ({ ...r, pipelineSource: "provider" as const }));
+    expect(caseTokenMedian(history, "case-a", SMART)).toBe(10_000);
+  });
+
+  it("skips estimated runs and returns undefined without provider history", () => {
+    const history = [record({ pipelineSource: "estimated" })];
+    expect(caseTokenMedian(history, "case-a", SMART)).toBeUndefined();
   });
 });

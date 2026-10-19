@@ -42,17 +42,87 @@ const baseline: EvalBaseline = {
 };
 
 describe("latencyCostBudget", () => {
-  it("passes literatureReview under per-runner token gate without baseline", () => {
+  it("reports but does not gate provider tokens with no baseline and no history", () => {
     const result = latencyCostBudget(
-      literatureReviewFixture,
+      chatFixture,
       artifact({
+        runner: "chat",
         latencyMs: 1000,
-        tokenUsage: { prompt: 0, completion: 0, total: 12000 },
+        tokenUsage: { prompt: 24000, completion: 1500, total: 25500 },
         tokenUsageSource: "provider",
       })
     );
     expect(result.status).toBe("pass");
-    expect(result.breakdown).toMatchObject({ tokensGated: true });
+    expect(result.detail).toMatch(/tokens 25500 \(no token history yet, not gated\)$/);
+    expect(result.breakdown).toMatchObject({ tokensGated: false });
+  });
+
+  it.each([
+    [14_000, "pass"],
+    [18_000, "warn"],
+    [25_000, "fail"],
+  ] as const)("gates %i tokens against a 10000-token case median as %s", (total, status) => {
+    const result = latencyCostBudget(
+      chatFixture,
+      artifact({
+        runner: "chat",
+        latencyMs: 1000,
+        tokenUsage: { prompt: total, completion: 0, total },
+        tokenUsageSource: "provider",
+      }),
+      undefined,
+      10_000
+    );
+    expect(result.status).toBe(status);
+    expect(result.breakdown).toMatchObject({ tokensGated: true, tokenReference: "case median" });
+    expect(result.detail).toContain("case median 10000");
+  });
+
+  it("uses the case history when the baseline recorded no tokens", () => {
+    const result = latencyCostBudget(
+      chatFixture,
+      artifact({
+        runner: "chat",
+        latencyMs: 1000,
+        tokenUsage: { prompt: 30_000, completion: 0, total: 30_000 },
+        tokenUsageSource: "provider",
+      }),
+      { ...baseline, tokenUsage: { prompt: 0, completion: 0, total: 0 } },
+      10_000
+    );
+    expect(result.status).toBe("fail");
+    expect(result.breakdown).toMatchObject({ tokenReference: "case median", tokenRatio: 3 });
+  });
+
+  it("prefers a baseline with tokens over the case history", () => {
+    const result = latencyCostBudget(
+      chatFixture,
+      artifact({
+        runner: "chat",
+        latencyMs: 1000,
+        tokenUsage: { prompt: 1000, completion: 0, total: 1000 },
+        tokenUsageSource: "provider",
+      }),
+      baseline,
+      100
+    );
+    expect(result.status).toBe("pass");
+    expect(result.breakdown).toMatchObject({ tokenReference: "baseline", tokenRatio: 1 });
+  });
+
+  it("fails on latency alone even when tokens are fine", () => {
+    const result = latencyCostBudget(
+      chatFixture,
+      artifact({
+        runner: "chat",
+        latencyMs: 130_000,
+        tokenUsage: { prompt: 100, completion: 0, total: 100 },
+        tokenUsageSource: "provider",
+      }),
+      undefined,
+      100
+    );
+    expect(result.status).toBe("fail");
   });
 
   it("does not gate estimated token usage against a baseline", () => {
@@ -113,7 +183,7 @@ describe("latencyCostBudget", () => {
       { ...baseline, tokenUsage: { prompt: 0, completion: 0, total: 0 } }
     );
     expect(result.status).toBe("pass");
-    expect(result.detail).toMatch(/tokens 10000 \(baseline has no token usage\)$/);
+    expect(result.detail).toMatch(/tokens 10000 \(no token history yet, not gated\)$/);
     expect(result.breakdown).toMatchObject({ tokensGated: false });
     expect(result.breakdown).not.toHaveProperty("tokenRatio");
   });

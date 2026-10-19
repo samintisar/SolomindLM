@@ -19,6 +19,7 @@ import { mapWithConcurrency } from "./concurrency";
 import {
   type ActualCaseCost,
   type CostHistoryRecord,
+  caseTokenMedian,
   estimateRunCost,
   formatActualCost,
   formatEstimate,
@@ -746,7 +747,8 @@ async function main(): Promise<void> {
     pipelineModel: pipelineModelFor(f),
     judgeModel,
   }));
-  const estimate = estimateRunCost(planned, liveRepeats, readCostHistory(historyPath), rates);
+  const costHistory = readCostHistory(historyPath);
+  const estimate = estimateRunCost(planned, liveRepeats, costHistory, rates);
   console.log(`${formatEstimate(estimate, liveRepeats, ratesSource)}
 `);
   if (!opts.dryRun) {
@@ -835,6 +837,7 @@ async function main(): Promise<void> {
       rubricChecks: opts.rubricChecks,
       judgeReasoning: judge.judgeReasoning,
       judgeConsistencySample: judge.judgeConsistencySample,
+      historyTokens: caseTokenMedian(costHistory, fixture.id, pipelineModelFor(fixture)),
       packSourceTexts: fixture.useCase
         ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
         : loadFixtureSourceTexts(fixture),
