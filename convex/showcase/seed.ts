@@ -15,7 +15,7 @@ import { DoiResolverService } from "../_services/extraction/DoiResolverService";
 import { openAccessUserAgent } from "../_services/extraction/openAccess/OpenAccessResolver";
 import type { DiscoverAcademicPapersResult } from "../_services/search/AcademicSearchService";
 import { type PaperDiscovery, SHOWCASE_NOTEBOOKS } from "./manifest";
-import { validateManifest } from "./manifestValidation";
+import { validateManifest, validatePromptPacks } from "./manifestValidation";
 import { paperKey, pickDiscoveredPapers, type ResolvedPaper } from "./papers";
 import {
   DEFAULT_MAX_IN_FLIGHT,
@@ -24,6 +24,7 @@ import {
   type SeedStep,
   tickGate,
 } from "./plan";
+import { SHOWCASE_PROMPTS } from "./promptPacks";
 
 /** Notebook chains start this far apart. */
 const STAGGER_MS = 20_000;
@@ -52,11 +53,19 @@ export const seedShowcase = internalAction({
   },
   returns: v.array(v.string()),
   handler: async (ctx, args): Promise<string[]> => {
-    const errors = validateManifest(SHOWCASE_NOTEBOOKS);
+    const errors = [
+      ...validateManifest(SHOWCASE_NOTEBOOKS),
+      ...validatePromptPacks(SHOWCASE_PROMPTS),
+    ];
     if (errors.length > 0) {
       throw new Error(`The showcase manifest is invalid:\n${errors.join("\n")}`);
     }
     await ctx.runQuery(internal.showcase.db.assertOwner, { ownerEmail: args.ownerEmail });
+    // The notebooks' Studio items use these prompts; they go public with the notebooks.
+    await ctx.runMutation(internal.showcase.promptLibrary.syncShowcasePrompts, {
+      ownerEmail: args.ownerEmail,
+      publish: args.publish ?? false,
+    });
     const notebooks = args.slug
       ? SHOWCASE_NOTEBOOKS.filter((n) => n.slug === args.slug)
       : SHOWCASE_NOTEBOOKS;

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { SHOWCASE_NOTEBOOKS, type ShowcaseNotebook } from "./manifest";
-import { validateManifest } from "./manifestValidation";
+import { SHOWCASE_NOTEBOOKS, type ShowcaseNotebook, withPromptText } from "./manifest";
+import { validateManifest, validatePromptPacks } from "./manifestValidation";
+import { SHOWCASE_PROMPTS } from "./promptPacks";
 
 const valid = (over: Partial<ShowcaseNotebook> = {}): ShowcaseNotebook => ({
   slug: "test-notebook",
@@ -74,11 +75,17 @@ describe("validateManifest", () => {
           { kind: "url", title: "A2", url: "http://example.org/a", licence: "CC BY 4.0" },
           { kind: "url", title: "D", url: "https://example.org/d", licence: "CC BY 4.0" },
           { kind: "url", title: "E", url: "https://example.org/e", licence: "CC BY 4.0" },
+          ...Array.from({ length: 9 }, (_, i) => ({
+            kind: "url" as const,
+            title: `F${i}`,
+            url: `https://example.org/f${i}`,
+            licence: "CC BY 4.0",
+          })),
         ],
       }),
     ]);
     expect(errors).toEqual([
-      'notebook "test-notebook": needs 1–6 sources, has 7',
+      'notebook "test-notebook": needs 1–15 sources, has 16',
       'notebook "test-notebook" source 0: url must be https',
       'notebook "test-notebook" source 1: not a YouTube URL',
       'notebook "test-notebook" source 2: a file source must be a .pdf',
@@ -116,6 +123,27 @@ describe("validateManifest", () => {
     ]);
   });
 
+  test("a prompt key must exist, suit the Studio tool and replace the prompt field", () => {
+    const errors = validateManifest([
+      valid({
+        studio: [
+          { kind: "quiz", questionCount: 20, difficulty: "medium", promptKey: "code.quiz" },
+          { kind: "report", reportType: "custom", promptKey: "code.cheatsheet" },
+          { kind: "flashcards", cardCount: 35, difficulty: "medium", promptKey: "code.quiz" },
+          {
+            kind: "mindmap",
+            prompt: "Map it",
+            promptKey: "code.mindmap",
+          },
+        ],
+      }),
+    ]);
+    expect(errors).toEqual([
+      'notebook "test-notebook" studio item 2: promptKey "code.quiz" is a quiz prompt',
+      'notebook "test-notebook" studio item 3: set promptKey or prompt, not both',
+    ]);
+  });
+
   test("checks the icon and cover colour against the app's pickers", () => {
     expect(validateManifest([valid({ icon: "Rocket", coverColor: "bg-pink-500" })])).toEqual([
       'notebook "test-notebook": unknown icon "Rocket"',
@@ -142,6 +170,58 @@ describe("SHOWCASE_NOTEBOOKS", () => {
       "writtenQuestions",
     ]);
     expect(SHOWCASE_NOTEBOOKS.filter((n) => n.literatureReview)).toHaveLength(1);
-    expect(SHOWCASE_NOTEBOOKS.filter((n) => n.deepResearch)).toHaveLength(1);
+    expect(SHOWCASE_NOTEBOOKS.filter((n) => n.deepResearch)).toHaveLength(2);
+  });
+});
+
+describe("SHOWCASE_PROMPTS", () => {
+  test("fit the Prompt Library's limits, with unique titles", () => {
+    expect(validatePromptPacks(SHOWCASE_PROMPTS)).toEqual([]);
+  });
+
+  test("reports titles, descriptions and texts the Prompt Library would refuse", () => {
+    expect(
+      validatePromptPacks({
+        a: { title: "Same", description: "ok", studioTool: "quiz", text: "Ask things." },
+        b: { title: "Same", description: "x".repeat(301), studioTool: "quiz", text: " " },
+      })
+    ).toEqual([
+      'prompt "b": duplicate title',
+      'prompt "b": description must be ≤300 characters',
+      'prompt "b": text must be 1–2000 characters',
+    ]);
+  });
+
+  test("every pack prompt is used by a showcase notebook", () => {
+    const used = new Set(
+      SHOWCASE_NOTEBOOKS.flatMap((n) => n.studio.flatMap((item) => item.promptKey ?? []))
+    );
+    expect(Object.keys(SHOWCASE_PROMPTS).filter((key) => !used.has(key))).toEqual([]);
+  });
+
+  test("withPromptText puts the prompt in the field the Studio job reads", () => {
+    expect(
+      withPromptText({
+        kind: "flashcards",
+        cardCount: 35,
+        difficulty: "medium",
+        promptKey: "code.flashcards",
+      })
+    ).toMatchObject({ topic: SHOWCASE_PROMPTS["code.flashcards"].text });
+    expect(
+      withPromptText({
+        kind: "audio",
+        audioType: "brief",
+        length: "short",
+        promptKey: "exam.audio",
+      })
+    ).toMatchObject({
+      focus: SHOWCASE_PROMPTS["exam.audio"].text,
+    });
+    expect(
+      withPromptText({ kind: "report", reportType: "custom", promptKey: "papers.digest" })
+    ).toMatchObject({
+      prompt: SHOWCASE_PROMPTS["papers.digest"].text,
+    });
   });
 });

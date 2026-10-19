@@ -283,6 +283,8 @@ import type * as showcase_manifest from "../showcase/manifest.js";
 import type * as showcase_manifestValidation from "../showcase/manifestValidation.js";
 import type * as showcase_papers from "../showcase/papers.js";
 import type * as showcase_plan from "../showcase/plan.js";
+import type * as showcase_promptLibrary from "../showcase/promptLibrary.js";
+import type * as showcase_promptPacks from "../showcase/promptPacks.js";
 import type * as showcase_seed from "../showcase/seed.js";
 import type * as studio__job_collapsePlan from "../studio/_job/collapsePlan.js";
 import type * as studio__job_invokeStudioLlm from "../studio/_job/invokeStudioLlm.js";
@@ -619,6 +621,8 @@ declare const fullApi: ApiFromModules<{
   "showcase/manifestValidation": typeof showcase_manifestValidation;
   "showcase/papers": typeof showcase_papers;
   "showcase/plan": typeof showcase_plan;
+  "showcase/promptLibrary": typeof showcase_promptLibrary;
+  "showcase/promptPacks": typeof showcase_promptPacks;
   "showcase/seed": typeof showcase_seed;
   "studio/_job/collapsePlan": typeof studio__job_collapsePlan;
   "studio/_job/invokeStudioLlm": typeof studio__job_invokeStudioLlm;

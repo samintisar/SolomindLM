@@ -47,6 +47,7 @@ import {
   STUDIO_KINDS,
   type StudioKind,
   sourceKey,
+  withPromptText,
 } from "./manifest";
 import { paperFileName, paperKey } from "./papers";
 import { DEFAULT_MAX_IN_FLIGHT, planSeed, type SeedSnapshot, seedPlanValidator } from "./plan";
@@ -67,7 +68,7 @@ function showcaseNotebookBySlug(slug: string): ShowcaseNotebook {
   return notebook;
 }
 
-async function ownerByEmail(db: Reader, email: string): Promise<Doc<"users">> {
+export async function ownerByEmail(db: Reader, email: string): Promise<Doc<"users">> {
   const user = await db
     .query("users")
     .withIndex("email", (q) => q.eq("email", email.trim()))
@@ -843,7 +844,7 @@ export const startStudioItem = internalMutation({
     return await startStudioJob(
       ctx,
       { userId: owner._id, notebookId: notebook._id, documentIds },
-      item
+      withPromptText(item)
     );
   },
 });
