@@ -195,12 +195,33 @@ export interface StudioOutput {
   raw: unknown;
 }
 
-export type AgentStageName = "retrieve" | "rerank" | "select" | "map" | "reduce" | "parse" | "tts";
+export type AgentStageName =
+  | "retrieve"
+  | "plan"
+  | "hyde"
+  | "rerank"
+  | "select"
+  | "generate"
+  | "grounding"
+  | "followup"
+  | "map"
+  | "reduce"
+  | "parse"
+  | "tts";
 
 export interface AgentStageSpan {
   stage: AgentStageName;
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
+}
+
+/** Provider calls one chat turn made; mirrors `CallCounters` in `convex/_agents/_shared/tokenUsageAccumulator.ts`. */
+export interface CallCounters {
+  llmCalls: number;
+  embeddingCalls: number;
+  embeddingTexts: number;
+  rerankCalls: number;
+  rerankDocs: number;
 }
 
 type TokenUsageSource = "provider" | "estimated";
@@ -255,6 +276,10 @@ export interface EvalRunArtifact {
   tokenUsage?: { prompt: number; completion: number; total: number; cachedPrompt?: number };
   tokenUsageSource?: TokenUsageSource;
   stageSpans?: AgentStageSpan[];
+  /** Chat: provider calls the agent made this turn */
+  callCounters?: CallCounters;
+  /** Chat: context token budget the agent applied to this question (list budget for list queries) */
+  contextTokenBudget?: number;
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
   /**
