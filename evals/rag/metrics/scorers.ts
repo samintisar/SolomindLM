@@ -11,8 +11,10 @@ import {
 } from "../types";
 import { getPack } from "../usecases";
 import type { SourceText } from "../usecases/types";
+import { scoreAbstentionJudgeMetrics } from "./abstentionJudge";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
 import { scoreContextRelevance } from "./contextRelevance";
+import { historyMode, historyTokenShare } from "./conversation";
 import {
   abstentionCorrectness,
   citationValidity,
@@ -131,6 +133,8 @@ export async function scoreAllMetrics(
   results.push(stageTokenShare(fixture, artifact, baseline));
 
   if (isChunkRetrievalRunner(artifact.runner)) {
+    results.push(historyTokenShare(fixture, artifact, baseline));
+    results.push(historyMode(fixture, artifact, baseline));
     results.push(retrievalNonEmpty(fixture, artifact, baseline));
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
@@ -184,6 +188,16 @@ export async function scoreAllMetrics(
     },
   ];
 
+  if (fixture.expectAbstain === true && binaryOptions.enabled && invoke) {
+    judgeGroups.push(() =>
+      scoreAbstentionJudgeMetrics(fixture, artifact, {
+        invoke,
+        model: judgeModel,
+        sourceTexts: options.packSourceTexts,
+      })
+    );
+  }
+
   const useCase = fixture.useCase;
   if (useCase && binaryOptions.enabled && invoke) {
     judgeGroups.push(() =>
@@ -213,5 +227,35 @@ export async function scoreAllMetrics(
     results.push(...(await runGroup()));
   }
 
+  if (fixture.expectAbstain === true) {
+    reconcileAbstentionVerdicts(results);
+  }
   return results;
+}
+
+/**
+ * On an unanswerable fixture the deterministic rule and the abstention judge can disagree. When the
+ * judge gave a verdict and it differs, the deterministic row is downgraded to warn and marked with
+ * `overriddenByJudge`; the judge row stands. A judge error gives no verdict, so nothing changes.
+ */
+function reconcileAbstentionVerdicts(results: MetricResult[]): void {
+  const detIndex = results.findIndex((r) => r.metric === "abstention_correctness");
+  const judge = results.find(
+    (r) => r.metric === "binary_judge_abstention" && r.breakdown?.error === undefined
+  );
+  if (detIndex < 0 || !judge) return;
+  const det = results[detIndex]!;
+  const judgePass = judge.status === "pass";
+  const detPass = det.status === "pass";
+  if (judgePass === detPass) return;
+
+  const detail = judgePass
+    ? "Deterministic rule found no decline, but the abstention judge passed the answer (no unsupported facts): downgraded to warn."
+    : "Deterministic rule saw a decline, but the abstention judge failed the answer: downgraded to warn. The judge fail stands.";
+  results[detIndex] = {
+    ...det,
+    status: "warn",
+    detail,
+    breakdown: { ...det.breakdown, overriddenByJudge: true, judgePass },
+  };
 }

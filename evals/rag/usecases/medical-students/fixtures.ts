@@ -173,6 +173,10 @@ export const medicalStudentsFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "Why do the AV valves close at the start of ventricular systole?",
+    variants: [
+      "What closes the AV valves when the ventricles start to squeeze?",
+      "At the beginning of systole, why do the atrioventricular valves shut?",
+    ],
     expectedItems: ["isovolumic contraction"],
     expectedAnswer:
       "When the ventricles start contracting, back-pressure against them builds and forces the AV (mitral and tricuspid) " +
@@ -200,6 +204,22 @@ export const medicalStudentsFixtures: EvalFixture[] = [
       "that set net filtration pressure, with citations. States no pressure values the source does not give.",
     scenarioCategory: "factoid",
     tags: tags("chat", "renal", "values"),
+  },
+
+  {
+    ...base,
+    id: "medical-students/chat-unanswerable-vaccine-schedule",
+    split: "train",
+    runner: "chat",
+    question: "What's the recommended vaccine schedule for a newborn?",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The sources cover the heart, nerves and kidney, not immunisation, so the correct reply says the sources do not cover vaccine schedules and gives no doses or ages.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover vaccine schedules, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
   },
 
   // ─── holdout (never tune against these) ───────────────────
@@ -241,5 +261,20 @@ export const medicalStudentsFixtures: EvalFixture[] = [
       "without adding diagnoses or treatments the notes do not contain.",
     scenarioCategory: "explanation",
     tags: tags("chat", "nervous-system", "applied"),
+  },
+  {
+    ...base,
+    id: "medical-students/chat-unanswerable-pneumonia-antibiotic",
+    split: "holdout",
+    runner: "chat",
+    question: "Which antibiotic should I prescribe first for pneumonia in an older patient?",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The sources do not cover pneumonia or its treatment, so the correct reply says so and names no antibiotic or dose.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover pneumonia treatment, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
   },
 ];

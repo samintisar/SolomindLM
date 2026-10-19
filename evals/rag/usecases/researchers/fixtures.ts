@@ -105,6 +105,10 @@ export const researchersFixtures: EvalFixture[] = [
     runner: "chat",
     question:
       "In the TILDA cohort, what activity dose was linked to lower depression, and did it differ for people with chronic disease?",
+    variants: [
+      "For the TILDA study, how much activity was tied to less depression, and was that different for people with a chronic disease?",
+      "What physical activity dose did the Irish ageing cohort link to lower depression? Did people with chronic disease show a different pattern?",
+    ],
     expectedItems: ["400", "chronic disease"],
     expectedAnswer:
       "Overall, 400 to <600 MET-min/wk was associated with a 16% lower rate of depressive symptoms (AIRR 0.84) and 43% " +
@@ -224,6 +228,22 @@ export const researchersFixtures: EvalFixture[] = [
     tags: tags("mindmap", "synthesis"),
   },
 
+  {
+    ...base,
+    id: "researchers/chat-unanswerable-dementia",
+    split: "train",
+    runner: "chat",
+    question: "Do my papers show that physical activity lowers the risk of dementia?",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The four papers study depression and do not report dementia outcomes, so the correct reply says the sources do not cover dementia and gives no risk estimates.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover dementia outcomes, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
+  },
+
   // ─── holdout ──────────────────────────────────────────────
   {
     ...base,
@@ -270,5 +290,20 @@ export const researchersFixtures: EvalFixture[] = [
       requiredSections: ["Introduction", "Methods", "Results", "Discussion", "Conclusion"],
     },
     tags: tags("literature-review"),
+  },
+  {
+    ...base,
+    id: "researchers/chat-unanswerable-vaccination-status",
+    split: "holdout",
+    runner: "chat",
+    question: "Did any of these studies adjust their results for vaccination status?",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The papers do not mention vaccination, so the correct reply says the sources do not report it as a covariate and gives no adjustment details.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover vaccination status or adjustment for it, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
   },
 ];

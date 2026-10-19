@@ -1,6 +1,8 @@
+import { VALID_LANGUAGE_CODES } from "../../../convex/_agents/_shared/languageInstruction";
 import type { ChatConfigOverrides } from "../../../convex/_agents/chat/chatConfigOverrides";
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
+import { AVAILABLE_SMART_MODEL_IDS } from "../../../convex/_lib/resolveSmartModel";
 import { inferSourceChannel } from "../metrics/sourceAware";
 import type { CallCounters, ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
 import { runWithHarness } from "./harness";
@@ -12,14 +14,21 @@ import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 // or CLI harness) provides an invoker that wraps the real agent
 // call and returns a structured result.
 
+/** Settings production passes the agent outside ChatAgentContext (ChatAgentOptions). */
+export interface EvalChatOptions {
+  smartModel?: string;
+  outputLanguage?: string;
+}
+
+export type ChatInvokeInput = ChatAgentContext & {
+  sourcePolicy?: import("../types").SourcePolicyConfig;
+  chatOptions?: EvalChatOptions;
+  /** Chat knobs to override for this question; absent for production values. */
+  configOverrides?: ChatConfigOverrides;
+};
+
 export interface ChatAgentInvoker {
-  invoke(
-    context: ChatAgentContext & {
-      sourcePolicy?: import("../types").SourcePolicyConfig;
-      /** Chat knobs to override for this question; absent for production values. */
-      configOverrides?: ChatConfigOverrides;
-    }
-  ): Promise<{
+  invoke(context: ChatInvokeInput): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -33,6 +42,7 @@ export interface ChatAgentInvoker {
     stageSpans?: import("../types").AgentStageSpan[];
     callCounters?: CallCounters;
     contextTokenBudget?: number;
+    instructionMode?: "default" | "learningGuide" | "custom";
     sourcePolicy?: import("../types").SourcePolicyConfig;
     /** True when the deployment stopped after context selection (no answer). */
     retrievalOnly?: boolean;
@@ -56,6 +66,22 @@ function toChunkSnapshot(chunk: ReferenceChunk): ChunkSnapshot {
   };
 }
 
+/** Chat settings for a fixture. Notebook instructions make the mode custom, as in production. */
+function fixtureChatSettings(fixture: EvalFixture): NonNullable<ChatAgentContext["chatSettings"]> {
+  const instructions = fixture.chat?.instructions?.trim();
+  if (instructions) {
+    return {
+      instructionMode: "custom",
+      customInstructions: instructions,
+      responseLength: "default",
+    };
+  }
+  return {
+    instructionMode: fixture.chatSettings?.instructionMode ?? "default",
+    responseLength: "default",
+  };
+}
+
 function validateFixture(fixture: EvalFixture): string[] {
   const errors: string[] = [];
 
@@ -69,6 +95,31 @@ function validateFixture(fixture: EvalFixture): string[] {
     errors.push("expectedItems must be an array");
   } else if (fixture.expectedItems.length === 0 && !fixture.expectedAnswer?.trim()) {
     errors.push("Fixture must have at least one expectedItem or a non-empty expectedAnswer");
+  }
+
+  for (const turn of fixture.turns ?? []) {
+    if (turn.role !== "user" && turn.role !== "assistant") {
+      errors.push(`turns must have role "user" or "assistant", got "${String(turn.role)}"`);
+    }
+    if (!turn.content?.trim()) {
+      errors.push("turns must have non-empty content");
+    }
+  }
+
+  const chat = fixture.chat;
+  if (chat?.instructions?.trim() && fixture.chatSettings?.instructionMode === "learningGuide") {
+    errors.push(
+      "chat.instructions cannot be combined with chatSettings.instructionMode learningGuide"
+    );
+  }
+  if (
+    chat?.smartModel &&
+    !(AVAILABLE_SMART_MODEL_IDS as readonly string[]).includes(chat.smartModel)
+  ) {
+    errors.push(`chat.smartModel "${chat.smartModel}" is not a listed model`);
+  }
+  if (chat?.outputLanguage && !VALID_LANGUAGE_CODES.includes(chat.outputLanguage)) {
+    errors.push(`chat.outputLanguage "${chat.outputLanguage}" is not a supported language code`);
   }
 
   return errors;
@@ -95,13 +146,23 @@ export async function runChatEval(
       // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
       // future invoker starts using it, that invoker must derive a real userId
       // rather than relying on this string.
+      // Prior turns, then the question as the final user turn (production history ends with the
+      // current message too). Learning guide mode is the only one that reads the history.
       const result = await chat.invoke({
         userId: "__eval_unused__",
         noteId: fixture.notebookId ?? "",
-        conversationHistory: [{ role: "user", content: fixture.question }],
+        conversationHistory: [
+          ...(fixture.turns ?? []),
+          { role: "user", content: fixture.question },
+        ],
         documentIds: fixture.documentIds,
         sourcePolicy: fixture.sourcePolicy,
         ...(options.retrievalOnly ? { evalRetrievalOnly: true } : {}),
+        chatSettings: fixtureChatSettings(fixture),
+        chatOptions: {
+          smartModel: fixture.chat?.smartModel,
+          outputLanguage: fixture.chat?.outputLanguage,
+        },
         configOverrides: options.config.overrides,
       });
 
@@ -149,6 +210,7 @@ export async function runChatEval(
         stageSpans: result.stageSpans,
         callCounters: result.callCounters,
         contextTokenBudget: result.contextTokenBudget,
+        instructionMode: result.instructionMode,
         sourcePolicy: result.sourcePolicy,
         configOverrides: result.configOverrides ?? options.config.overrides,
         sourceEvidence,

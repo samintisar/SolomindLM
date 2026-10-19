@@ -63,3 +63,22 @@ describe("groupFailures: passage metrics", () => {
     expect(groups[0].cases[0].traceHints?.[0]).toMatch(/^passage_precision_selected: /);
   });
 });
+
+describe("groupFailures on unanswerable fixtures", () => {
+  const failing = (metric: string, breakdown?: Record<string, unknown>) => ({
+    ...fail(metric, 0, breakdown),
+    caseId: "wiring/unanswerable-01",
+  });
+
+  it("groups hallucination_under_pressure under prompt_answering", () => {
+    const groups = groupFailures([
+      failing("abstention_correctness", { category: "hallucination_under_pressure" }),
+    ]);
+    expect(groups.map((g) => g.category)).toEqual(["prompt_answering"]);
+  });
+
+  it("groups the abstention judge under prompt_answering, not context_selection", () => {
+    const groups = groupFailures([failing("binary_judge_abstention")]);
+    expect(groups.map((g) => g.category)).toEqual(["prompt_answering"]);
+  });
+});

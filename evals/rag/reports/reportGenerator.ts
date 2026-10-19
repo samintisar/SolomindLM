@@ -1,5 +1,6 @@
 import type { EvalReport, MetricResult } from "../types";
 import { groupFailures } from "./failureGrouper";
+import { paraphraseConsistency } from "./paraphrase";
 import { isFlakyMetric } from "./repeats";
 import { buildScorecard, formatScorecard } from "./scorecard";
 
@@ -24,9 +25,11 @@ export interface GenerateReportOptions {
  * Generate a full EvalReport from metric results.
  */
 export function generateReport(
-  metrics: MetricResult[],
+  caseMetrics: MetricResult[],
   options: GenerateReportOptions
 ): EvalReport {
+  // Cross-case metric: needs every case's rows, so it is computed here rather than per case.
+  const metrics = [...caseMetrics, ...paraphraseConsistency(caseMetrics)];
   const summary = { pass: 0, fail: 0, warn: 0, info: 0 };
   for (const m of metrics) {
     summary[m.status]++;

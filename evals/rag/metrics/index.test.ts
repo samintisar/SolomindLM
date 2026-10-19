@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AGENTIC_20_ITEMS } from "../fixtures/agentic-patterns-20";
 import type { ChunkSnapshot, EvalFixture, EvalRunArtifact } from "../types";
-import { expectedItemRecall, retrievalNdcgAtK, retrievalPrecisionAtK } from "./index";
+import {
+  abstentionCorrectness,
+  citationValidity,
+  expectedItemRecall,
+  retrievalNdcgAtK,
+  retrievalPrecisionAtK,
+} from "./index";
 
 const fixture: EvalFixture = {
   schemaVersion: 1,
@@ -149,5 +155,169 @@ describe("retrieval metrics on the word 'agent'", () => {
   it("does not treat a chunk containing only the word 'agent' as relevant to nDCG@K", () => {
     const result = retrievalNdcgAtK(fixture, artifact({ selectedChunks: agentOnly }));
     expect(result.score).toBe(0);
+  });
+});
+
+describe("abstentionCorrectness on unanswerable fixtures", () => {
+  const unanswerable: EvalFixture = {
+    ...fixture,
+    id: "wiring/unanswerable-01",
+    expectedItems: [],
+    expectAbstain: true,
+  };
+
+  it("passes with correct_abstention when the answer declines", () => {
+    const result = abstentionCorrectness(
+      unanswerable,
+      artifact({
+        answer: "I cannot find this in your sources, which do not cover it.",
+        selectedChunks: [chunk("c1", "Unrelated text about something else.")],
+      })
+    );
+    expect(result.status).toBe("pass");
+    expect(result.breakdown?.category).toBe("correct_abstention");
+  });
+
+  it("fails with hallucination_under_pressure when the answer asserts facts", () => {
+    const result = abstentionCorrectness(
+      unanswerable,
+      artifact({
+        answer: "The drug is dosed at 5 mg twice daily for adults.",
+        selectedChunks: [chunk("c1", "Unrelated text about something else.")],
+      })
+    );
+    expect(result.status).toBe("fail");
+    expect(result.score).toBe(0);
+    expect(result.breakdown?.category).toBe("hallucination_under_pressure");
+  });
+
+  it("applies the unanswerable rule even when retrieved passages match the question", () => {
+    const result = abstentionCorrectness(
+      unanswerable,
+      artifact({
+        answer: "Here is the answer from the sources.",
+        selectedChunks: [chunk("c1", "The answer appears in this passage.")],
+        preRerankChunks: [chunk("c1", "The answer appears in this passage.")],
+      })
+    );
+    expect(result.breakdown?.category).toBe("hallucination_under_pressure");
+  });
+
+  it("leaves a fixture without expectAbstain on the existing rules", () => {
+    const result = abstentionCorrectness(
+      { ...unanswerable, expectAbstain: false },
+      artifact({ answer: "I cannot find it.", selectedChunks: [] })
+    );
+    expect(result.breakdown?.category).toBe("none");
+  });
+});
+
+describe("wrongful abstention needs low answer recall", () => {
+  const items = ["cardiac", "renal", "hepatic", "neural", "thyroid"];
+  const itemFixture: EvalFixture = { ...fixture, expectedItems: items };
+  const withChunks = (answer: string) =>
+    artifact({
+      answer,
+      selectedChunks: [chunk("c1", "cardiac renal hepatic neural thyroid organs.")],
+      preRerankChunks: [chunk("c1", "cardiac renal hepatic neural thyroid organs.")],
+    });
+
+  it("is not a wrongful abstention when the answer lists 4 of 5 items and a decline for the fifth", () => {
+    const result = abstentionCorrectness(
+      itemFixture,
+      withChunks(
+        "The notes cover cardiac, renal, hepatic and neural organs. The notes do not mention the fifth."
+      )
+    );
+    expect(result.breakdown?.category).not.toBe("answer_generation");
+    expect(result.breakdown?.category).toBe("none");
+    expect(result.status).toBe("pass");
+  });
+
+  it("is a wrongful abstention when the answer lists 1 of 5 items and declines", () => {
+    const result = abstentionCorrectness(
+      itemFixture,
+      withChunks("Cardiac is covered. The notes do not mention the rest.")
+    );
+    expect(result.breakdown?.category).toBe("answer_generation");
+    expect(result.status).toBe("fail");
+  });
+});
+
+describe("decline forms on unanswerable fixtures", () => {
+  const unanswerable: EvalFixture = {
+    ...fixture,
+    id: "wiring/unanswerable-forms",
+    expectedItems: [],
+    expectAbstain: true,
+  };
+  const declines = (answer: string) =>
+    abstentionCorrectness(unanswerable, artifact({ answer })).breakdown?.category ===
+    "correct_abstention";
+
+  it.each([
+    "The documents do not provide information about vaccine schedules.",
+    "This is not covered in the selected documents.",
+    "This is not covered in your notes.",
+    "The sources do not cover that topic.",
+    "The notes don't mention a dose.",
+    "The papers do not discuss dementia.",
+    "The report doesn't address exchange rates.",
+    "The passages do not include anything on the question.",
+    "There is no mention of pneumonia in the sources.",
+    "No mention of statins appears in these papers.",
+    "I don't see any information about the subjunctive.",
+    "The answer is not mentioned in these documents.",
+    "The dosing is not discussed in the notes.",
+    "It is not addressed in the report.",
+  ])("counts %j as a decline", (answer) => {
+    expect(declines(answer)).toBe(true);
+  });
+
+  it("accepts curly apostrophes and quotes", () => {
+    expect(declines("I don’t see any information about that.")).toBe(true);
+    expect(declines("The sources don’t cover that, so I can’t say.")).toBe(true);
+    expect(declines("The notes say “not covered in your documents”.")).toBe(true);
+  });
+
+  it("does not count a technical negation about the subject as a decline", () => {
+    expect(declines("The study did not include children under 12.")).toBe(false);
+    expect(declines("The sources do not agree on the dose.")).toBe(false);
+    expect(declines("Points do not have enough neighbours to form a cluster.")).toBe(false);
+    expect(declines("The drug is dosed at 5 mg twice daily.")).toBe(false);
+  });
+
+  it("does not require citations from a decline whose expectedBehavior names the sources", () => {
+    const result = citationValidity(
+      { ...unanswerable, expectedBehavior: "Pass if it says the sources do not cover it." },
+      artifact({ answer: "The sources do not cover that.", citations: [] })
+    );
+    expect(result.status).toBe("pass");
+    expect(result.breakdown?.expectsCitation).toBe(false);
+  });
+
+  it("accepts the reference answer of each unanswerable fixture", () => {
+    const references = [
+      "The notes do not cover the subjunctive, so the correct reply says the sources do not cover it and gives no subjunctive forms or rules.",
+      "The notes do not cover the imperfect, so the correct reply says the sources do not cover it and gives no imperfect forms.",
+      "The sources cover the heart, nerves and kidney, not immunisation, so the correct reply says the sources do not cover vaccine schedules and gives no doses or ages.",
+      "The sources do not cover pneumonia or its treatment, so the correct reply says so and names no antibiotic or dose.",
+      "The Beige Book covers regional economic conditions and does not mention Bitcoin or crypto mining, so the correct reply says the sources do not cover it and gives no prices or figures.",
+      "The Beige Book is a US report and does not mention the European Central Bank, so the correct reply says the report does not cover it and gives no rate decisions.",
+      "The four papers study depression and do not report dementia outcomes, so the correct reply says the sources do not cover dementia and gives no risk estimates.",
+      "The papers do not mention vaccination, so the correct reply says the sources do not report it as a covariate and gives no adjustment details.",
+    ];
+    for (const reference of references) {
+      expect(declines(reference)).toBe(true);
+    }
+  });
+
+  it("matches the spaced 'I am not able to' and the 'isn't covered in' contraction", () => {
+    expect(declines("I am not able to answer that.")).toBe(true);
+    expect(declines("I’m not able to answer that.")).toBe(true);
+    expect(declines("This isn't covered in the selected documents.")).toBe(true);
+    expect(declines("This isn’t covered in your notes.")).toBe(true);
+    // Technical negations about the subject still do not count as a decline.
+    expect(declines("The model does not include a bias term.")).toBe(false);
   });
 });
