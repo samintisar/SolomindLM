@@ -19,10 +19,12 @@ export function buildJudgeCalibrationQueue(
 ): JudgeCalibrationItem[] {
   const limit = options?.limit ?? 20;
   // Judge errors (truncation, parse, HTTP) carry no verdict, so a human cannot calibrate them.
+  // Rows with no evidence never reached a judge, so there is nothing to calibrate either.
   const judges = metrics.filter(
     (row) =>
       (row.metric.startsWith("binary_judge_") || row.metric.startsWith("rubric:")) &&
-      !isJudgeError(row)
+      !isJudgeError(row) &&
+      row.breakdown?.noEvidence !== true
   );
   const fails = judges.filter((row) => row.status === "fail" || row.status === "warn");
   const passes = judges.filter((row) => row.status === "pass");
