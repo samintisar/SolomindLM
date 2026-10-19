@@ -18,7 +18,11 @@ import type { AgentStageSpan } from "../_agents/_shared/stageSpans";
 import type { CallCounters } from "../_agents/_shared/tokenUsageAccumulator";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { isListEnumerationQuery } from "../_agents/chat/chat_retrieval_subqueries";
-import { CONTEXT_TOKEN_BUDGET, LIST_QUERY_CONTEXT_TOKEN_BUDGET } from "../_agents/chat/chatConfig";
+import {
+  type ChatConfigOverrides,
+  chatConfigOverridesValidator,
+  resolveChatConfig,
+} from "../_agents/chat/chatConfigOverrides";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
 import type { ReferenceChunk } from "../_agents/chat/types";
@@ -57,6 +61,8 @@ export const chatEvalActionArgs = {
   ),
   /** Stop after context selection: no answer is generated (retrieval-only sweeps). */
   retrievalOnly: v.optional(v.boolean()),
+  /** Chat knobs to change from production for this run (`--chat-config` in the eval CLI). */
+  configOverrides: v.optional(chatConfigOverridesValidator),
 };
 
 // ─── Token Estimation Helpers ────────────────────────────────
@@ -104,6 +110,8 @@ export interface ChatEvalResult {
   };
   /** True when the run stopped after context selection, so `answer` is empty. */
   retrievalOnly?: boolean;
+  /** The overrides this run applied, as requested; absent for production values. */
+  configOverrides?: ChatConfigOverrides;
 }
 
 // ─── Action ──────────────────────────────────────────────────
@@ -112,6 +120,7 @@ export const runChatEval = action({
   args: chatEvalActionArgs,
   handler: async (ctx, args): Promise<ChatEvalResult> => {
     assertRagEvalGate(args.evalSecret);
+    const chatConfig = resolveChatConfig(args.configOverrides);
 
     const startTime = Date.now();
     const notebookIdTyped = args.notebookId;
@@ -229,6 +238,7 @@ export const runChatEval = action({
       fetchDocumentFn: createFetchDocumentFn(ctx),
       fetchDocumentTitlesFn: createFetchDocumentTitlesFn(ctx, notebookIdTyped),
       fetchOpeningPassagesFn: createFetchOpeningPassagesFn(ctx, notebookIdTyped),
+      configOverrides: args.configOverrides,
     });
 
     // ── Consume the full generator stream ──
@@ -515,10 +525,11 @@ export const runChatEval = action({
       callCounters: telemetry.callCounters,
       // The context budget the agent applies to this question: the list budget for list queries.
       contextTokenBudget: isListEnumerationQuery(args.question)
-        ? LIST_QUERY_CONTEXT_TOKEN_BUDGET
-        : CONTEXT_TOKEN_BUDGET,
+        ? chatConfig.listQueryContextTokenBudget
+        : chatConfig.contextTokenBudget,
       sourcePolicy: args.sourcePolicy,
       ...(args.retrievalOnly === true ? { retrievalOnly: true } : {}),
+      configOverrides: args.configOverrides,
     };
   },
 });
