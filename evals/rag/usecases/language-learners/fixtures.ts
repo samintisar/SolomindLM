@@ -162,6 +162,11 @@ export const languageLearnersFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "When does the past participle agree in the passé composé? Give me examples.",
+    expectedPassages: [
+      "The past participle of a verb which takes être agrees in gender and number with the subject;",
+      "in most cases, the past participle of pronominal verbs agrees in gender and number with the gender and number of the reflexive pronoun",
+      "The past participle agrees in gender and in number with a preceding direct object.",
+    ],
     expectedAnswer:
       "With être, the past participle agrees with the subject (Elle est partie; Elles sont allées). With avoir, it agrees only " +
       "with a direct object that comes before the verb (Je ne l'ai pas embrassée). Pronominal verbs agree with the reflexive " +
@@ -200,6 +205,10 @@ export const languageLearnersFixtures: EvalFixture[] = [
     split: "holdout",
     runner: "chat",
     question: "Why is it 'mon amie' and not 'ma amie' if amie is feminine?",
+    expectedPassages: [
+      "Ma, ta, sa become mon, ton, son in front of feminine nouns beginning with a vowel sound.",
+      "Tex: Voici Tammy, mon amie, et ses amies Bette et Fiona, c'est-à-dire nos amies.",
+    ],
     expectedAnswer:
       "Ma, ta and sa become mon, ton and son before a feminine noun that starts with a vowel sound, so it is 'mon amie' " +
       "(as in 'Voici Tammy, mon amie'), pronounced with liaison.",

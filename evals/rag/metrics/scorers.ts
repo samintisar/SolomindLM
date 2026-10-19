@@ -12,6 +12,7 @@ import {
 import { getPack } from "../usecases";
 import type { SourceText } from "../usecases/types";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
+import { scoreContextRelevance } from "./contextRelevance";
 import {
   abstentionCorrectness,
   citationValidity,
@@ -27,6 +28,11 @@ import {
   scoreLiteratureReviewMetrics,
 } from "./literatureReview";
 import { type LlmJudgeOptions, scoreAllLlmJudgeMetrics } from "./llmJudge";
+import {
+  passageNdcgSelected,
+  passagePrecisionSelected,
+  passageRecallByStage,
+} from "./retrievalGold";
 import { scoreRubricMetrics } from "./rubric";
 import {
   externalSourceUtilization,
@@ -53,6 +59,8 @@ export interface ScoreAllMetricsOptions {
   rubricChecks?: string[];
   /** `false` turns judge reasoning off (`--judge-reasoning off`). */
   judgeReasoning?: boolean;
+  /** Fraction (0–1) of binary judge calls re-run once to measure self-consistency. */
+  judgeConsistencySample?: number;
 }
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
@@ -77,6 +85,30 @@ function judgeInvoker(options: ScoreAllMetricsOptions): LlmJudgeOptions["invoke"
 }
 
 /**
+ * Retrieval-only runs (`--retrieval-only`) generate no answer, so answer metrics and every judge
+ * are skipped. What was found, selected and how fast is still scored.
+ */
+function scoreRetrievalOnlyMetrics(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  baseline?: EvalBaseline
+): MetricResult[] {
+  return [
+    expectedItemRecall(fixture, artifact, baseline),
+    latencyCostBudget(fixture, artifact, baseline),
+    contextTokenBudgetRatio(fixture, artifact, baseline),
+    stageTokenShare(fixture, artifact, baseline),
+    retrievalNonEmpty(fixture, artifact, baseline),
+    ...retrievalItemRecall(fixture, artifact, baseline),
+    retrievalPrecisionAtK(fixture, artifact, baseline),
+    retrievalNdcgAtK(fixture, artifact, baseline),
+    ...passageRecallByStage(fixture, artifact),
+    passagePrecisionSelected(fixture, artifact),
+    passageNdcgSelected(fixture, artifact),
+  ];
+}
+
+/**
  * Run every metric for a single eval case.
  */
 export async function scoreAllMetrics(
@@ -85,6 +117,10 @@ export async function scoreAllMetrics(
   baseline?: EvalBaseline,
   options: ScoreAllMetricsOptions = {}
 ): Promise<MetricResult[]> {
+  if (artifact.retrievalOnly) {
+    return scoreRetrievalOnlyMetrics(fixture, artifact, baseline);
+  }
+
   const results: MetricResult[] = [];
 
   results.push(expectedItemRecall(fixture, artifact, baseline));
@@ -98,6 +134,9 @@ export async function scoreAllMetrics(
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
     results.push(abstentionCorrectness(fixture, artifact, baseline));
     results.push(...retrievalItemRecall(fixture, artifact, baseline));
+    results.push(...passageRecallByStage(fixture, artifact));
+    results.push(passagePrecisionSelected(fixture, artifact));
+    results.push(passageNdcgSelected(fixture, artifact));
   }
 
   if (isRagRunner(artifact.runner)) {
@@ -125,12 +164,22 @@ export async function scoreAllMetrics(
     model: judgeModel,
     enabled: !options.dryRun && invoke !== undefined,
     sourceTexts: options.packSourceTexts,
+    judgeConsistencySample: options.judgeConsistencySample,
   };
 
   // Judge groups run one after another (each parallelises its own judges), so one case never
   // bursts the shared Together key; rows keep the order binary, rubric, Likert.
   const judgeGroups: Array<() => Promise<MetricResult[]>> = [
-    () => scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
+    async () => {
+      const binary = await scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions);
+      // Reference-free context relevance: after the binary judges, on the same invoker. It skips
+      // fixtures with deterministic gold itself.
+      const context =
+        binaryOptions.enabled && invoke
+          ? await scoreContextRelevance(fixture, artifact, { invoke, model: judgeModel })
+          : [];
+      return [...binary, ...context];
+    },
   ];
 
   const useCase = fixture.useCase;

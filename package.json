@@ -66,6 +66,7 @@
     "eval:rag:train:snapshot": "bun --env-file=.env run evals/rag/cli.ts --split train --export-artifacts --artifacts-dir evals/rag/generated/train-snapshot",
     "eval:holdout": "bun --env-file=.env run evals/rag/cli.ts --split holdout",
     "eval:compare": "bun --env-file=.env run evals/rag/cli.ts --compare",
+    "eval:trend": "bun run evals/rag/trend.ts",
     "eval:studio": "bun --env-file=.env run evals/rag/cli.ts --runner studio",
     "eval:studio:dry": "bun run evals/rag/cli.ts --dry-run --runner studio",
     "eval:literature-review": "bun --env-file=.env run evals/rag/cli.ts --runner literatureReview",

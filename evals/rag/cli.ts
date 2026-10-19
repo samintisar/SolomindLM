@@ -10,20 +10,54 @@
  */
 
 import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
+import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { DEFAULT_SMART_MODEL_ID } from "../../convex/_lib/defaultSmartModel";
 import { caseFileStem } from "./caseFile";
 import { mapWithConcurrency } from "./concurrency";
+import {
+  type ActualCaseCost,
+  type CostHistoryRecord,
+  estimateRunCost,
+  formatActualCost,
+  formatEstimate,
+  formatUsd,
+  type PlannedCase,
+  priceUsage,
+} from "./cost";
+import {
+  appendCostHistory,
+  confirmOnTerminal,
+  costHistoryPath,
+  fetchModelRates,
+  readCostHistory,
+} from "./costIo";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import { appendHistory, HISTORY_DIR, historyFilePath } from "./history";
+import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
+import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
 import { scoreAllMetrics } from "./metrics/scorers";
-import { DEFAULT_JUDGE_MODEL, judgeTokenUsage } from "./metrics/togetherLlmJudge";
+import {
+  DEFAULT_JUDGE_MODEL,
+  judgeTokenUsage,
+  withJudgeUsageScope,
+} from "./metrics/togetherLlmJudge";
 import {
   buildJudgeCalibrationQueue,
   checkHoldoutPromotion,
   formatReport,
+  formatWorkOrder,
   generateReport,
 } from "./reports";
+import {
+  appendCalibrationLabels,
+  combineLabels,
+  loadCalibration,
+} from "./reports/calibrationStore";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
+import { formatJudgeCalibrationTable, scoreJudgeCalibration } from "./reports/judgeCalibration";
+import type { JudgeCalibrationItem } from "./reports/judgeQueue";
 import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
 import {
   createConvexChatInvoker,
@@ -65,7 +99,10 @@ import {
 } from "./usecases/resolve";
 import type { PackSeedApi } from "./usecases/seedClient";
 import type { SourceText } from "./usecases/types";
-import { formatPackProblems, packsToValidate } from "./usecases/validate";
+import { formatPackProblems, missingExpectedPassages, packsToValidate } from "./usecases/validate";
+
+/** Versioned judge calibration labels (committed); see evals/rag/calibration/README.md */
+const CALIBRATION_DIR = "evals/rag/calibration";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -98,18 +135,32 @@ interface CliOptions {
   likertJudges: boolean;
   /** Judge model for binary judges (default DeepSeek Flash) */
   judgeModel?: string;
+  /** Skip the cost confirmation prompt */
+  yes: boolean;
+  /** Abort a live run whose estimated cost is above this many USD */
+  maxCost?: number;
   /** Rubric check ids to judge; every applicable check when unset */
   rubricChecks?: string[];
   /** `false` turns judge reasoning off */
   judgeReasoning?: boolean;
+  /** Fraction (0–1) of judge calls re-run for self-consistency; default by run kind */
+  judgeConsistency?: number;
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
   /** Score a labeled judge-queue.json and exit */
   scoreJudgeQueue?: string;
+  /** With --score-judge-queue: also append the queue's labelled rows to the calibration store */
+  appendCalibration: boolean;
   /** Holdout promotion check: before/after EvalReport JSON paths */
   promotionCheckBefore?: string;
   promotionCheckAfter?: string;
+  /** Append the live run's report to evals/rag/history/<split>.jsonl (never on dry runs) */
+  appendHistory: boolean;
+  /** Write the agent work order (markdown) after the report; live and dry runs */
+  outputWorkOrder?: string;
+  /** Chat fixtures only: retrieval and selection, no answer, no judges (cheap knob sweeps) */
+  retrievalOnly?: boolean;
 }
 
 /**
@@ -159,6 +210,17 @@ function parseSplit(value: string): EvalSplit {
   return value;
 }
 
+/** Asks before a live run estimated at or above this many USD (or with cases of unknown cost). */
+const CONFIRM_ABOVE_USD = 0.25;
+
+function parsePositiveNumber(name: string, value: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(`--${name} takes a positive number. See --help.`);
+  }
+  return n;
+}
+
 function parsePositiveInt(name: string, value: string): number {
   const n = Number(value);
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < 1) {
@@ -188,11 +250,18 @@ const CLI_OPTIONS = {
   "judge-model": { type: "string" },
   rubric: { type: "string" },
   "judge-reasoning": { type: "string" },
+  "retrieval-only": { type: "boolean" },
+  "judge-consistency": { type: "string" },
+  yes: { type: "boolean", short: "y" },
+  "max-cost": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
   "score-judge-queue": { type: "string" },
+  "append-calibration": { type: "boolean" },
   /** Takes two paths: `--promotion-check <before.json> <after.json>`. */
   "promotion-check": { type: "string" },
+  "append-history": { type: "boolean" },
+  "output-workorder": { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const satisfies NonNullable<ParseArgsConfig["options"]>;
 
@@ -248,6 +317,9 @@ function parseArgs(args: string[]): CliOptions {
       throw new Error(`--${name} takes two paths. See --help.`);
     }
   }
+  if (values["append-calibration"] && values["score-judge-queue"] === undefined) {
+    throw new Error("--append-calibration needs --score-judge-queue <path>. See --help.");
+  }
 
   if (values.help) {
     printHelp();
@@ -274,16 +346,29 @@ function parseArgs(args: string[]): CliOptions {
     smartLlm: values["smart-llm"],
     likertJudges: values["likert-judges"] ?? false,
     judgeModel: values["judge-model"],
+    yes: values.yes ?? false,
+    maxCost:
+      values["max-cost"] !== undefined
+        ? parsePositiveNumber("max-cost", values["max-cost"])
+        : undefined,
     rubricChecks: values.rubric !== undefined ? parseRubricChecks(values.rubric) : undefined,
     judgeReasoning:
       values["judge-reasoning"] !== undefined
         ? parseOnOff("judge-reasoning", values["judge-reasoning"])
         : undefined,
+    judgeConsistency:
+      values["judge-consistency"] !== undefined
+        ? parseConsistencyFraction(values["judge-consistency"])
+        : undefined,
     compareA: values.compare,
     compareB: secondValues.get("compare"),
     scoreJudgeQueue: values["score-judge-queue"],
+    appendCalibration: values["append-calibration"] ?? false,
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
+    appendHistory: values["append-history"] ?? false,
+    outputWorkOrder: values["output-workorder"],
+    retrievalOnly: values["retrieval-only"] ?? false,
   };
 }
 
@@ -317,10 +402,27 @@ Options:
   --likert-judges          Enable legacy Likert 0–1 LLM judges (default: binary only)
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
   --rubric <id[,id]>       Judge only these use-case rubric checks (e.g. findings-attributed)
-  --judge-reasoning <on|off>  Judge reasoning (default: the model's; off bills far fewer output tokens)
+  --judge-reasoning <on|off>  Judge reasoning (default: off on smoke, the model's on train/holdout;
+                           off bills far fewer output tokens)
+  --judge-consistency <0-1>  Share of binary judge calls re-run to measure self-consistency
+                           (rubric judges are not sampled)
+                           (default: 0.1 on live runs, 0 on dry runs; a flipped verdict is marked)
+  --yes, -y                Skip the cost confirmation (asked at ${formatUsd(CONFIRM_ABOVE_USD)}+ or when
+                           a case has no cost history; without a terminal the run
+                           stops instead, unless --yes or --max-cost is given)
+  --max-cost <usd>         Abort a live run whose estimated cost is above this
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
-  --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
+  --score-judge-queue <path>  Score labeled judge-queue.json (plus evals/rag/calibration/) and exit
+                           0 ready / 1 not ready / 2 under-labelled (or not a queue file)
+  --append-calibration     With --score-judge-queue: append the queue's labelled rows to
+                           evals/rag/calibration/ (versioned; deduped by labelKey)
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
+  --append-history         After a live run, append the report to evals/rag/history/<split>.jsonl
+                           (off by default; never on dry runs; skipped when invocation errors occur)
+  --output-workorder <path>  Write a markdown task list for a coding agent (failure groups, target
+                           files, re-run commands, rules). Written for live and dry runs
+  --retrieval-only         Chat fixtures only: run retrieval and context selection, generate no
+                           answer, run no judges. Use for retrieval-knob sweeps (~10x cheaper)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -433,9 +535,36 @@ async function main(): Promise<void> {
 
   if (opts.scoreJudgeQueue) {
     const { loadJudgeQueueFile } = await import("./reports/judgeQueueFile");
-    const { scoreJudgeCalibration } = await import("./reports/judgeCalibration");
-    const items = loadJudgeQueueFile(opts.scoreJudgeQueue);
-    const score = scoreJudgeCalibration(items);
+    let stored: ReturnType<typeof loadCalibration>;
+    let items: JudgeCalibrationItem[];
+    try {
+      items = loadJudgeQueueFile(opts.scoreJudgeQueue);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`FATAL: ${opts.scoreJudgeQueue} is not a judge queue file: ${message}`);
+      console.error('  Expected the judge-queue.json an eval run writes: {"items": [...]}.');
+      process.exit(2);
+    }
+    try {
+      if (opts.appendCalibration) {
+        const appended = appendCalibrationLabels(CALIBRATION_DIR, items, {
+          commitSha: await getCommitSha(),
+        });
+        console.log(`Appended ${appended.written} labelled row(s) to ${CALIBRATION_DIR}`);
+        if (appended.conflicts > 0) {
+          console.log(
+            `${appended.conflicts} labels conflict with the store; delete the old row to replace (not overwritten).`
+          );
+        }
+      }
+      stored = loadCalibration(CALIBRATION_DIR);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`FATAL: calibration store ${CALIBRATION_DIR} is unreadable: ${message}`);
+      process.exit(2);
+    }
+    const score = scoreJudgeCalibration(combineLabels(stored, items));
+    for (const line of formatJudgeCalibrationTable(score)) console.log(line);
     console.log(JSON.stringify(score, null, 2));
     if (score.readyForPromptCompile) process.exit(0);
     if (score.labeled < 20) process.exit(2);
@@ -469,6 +598,13 @@ async function main(): Promise<void> {
   if (!opts.dryRun && !opts.caseId && !opts.split) {
     opts.split = "smoke";
   }
+  const judge = resolveJudgeSettings({
+    split: opts.split,
+    dryRun: opts.dryRun,
+    judgeReasoning: opts.judgeReasoning,
+    judgeConsistency: opts.judgeConsistency,
+  });
+  resetJudgeConsistencyTally();
 
   let fixtureIds: string[];
   if (opts.caseId) {
@@ -492,6 +628,16 @@ async function main(): Promise<void> {
         return useCase !== undefined && allowed.has(useCase);
       });
     }
+  }
+  if (opts.retrievalOnly) {
+    // Only chat has a retrieval stage to stop at; other runners would have to generate.
+    const skipped = fixtureIds.filter((id) => getFixture(id).runner !== "chat");
+    if (skipped.length > 0) {
+      console.log(
+        `--retrieval-only runs chat fixtures only; skipping ${skipped.length} other fixture(s).`
+      );
+    }
+    fixtureIds = fixtureIds.filter((id) => getFixture(id).runner === "chat");
   }
   if (opts.useCases && !opts.caseId) {
     if (USE_CASE_PACKS.length === 0) {
@@ -530,7 +676,7 @@ async function main(): Promise<void> {
   // Repeats: the smoke split defaults to 3 so flaky verdicts show up; dry runs stay at 1.
   const repeats = opts.dryRun ? 1 : (opts.repeats ?? (opts.split === "smoke" ? 3 : 1));
   if (opts.dryRun && (opts.repeats ?? 1) > 1) {
-    console.warn("Dry runs always use 1 repeat; --repeats is ignored.");
+    console.warn("Dry runs always use 1 repeat; --repeats only sizes the cost estimate.");
   }
   console.log(
     `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}${repeats > 1 ? ` [repeats=${repeats}]` : ""}\n`
@@ -586,13 +732,52 @@ async function main(): Promise<void> {
     }
   }
 
+  // Cost: estimate from past runs before anything is billed, and ask on big runs.
+  const judgeModel = opts.judgeModel ?? DEFAULT_JUDGE_MODEL;
+  const pipelineModelFor = (fixture: EvalFixture) =>
+    fixture.studioParams?.smartLlm ?? DEFAULT_SMART_MODEL_ID;
+  const { rates, source: ratesSource } = await fetchModelRates(process.env.TOGETHER_AI_API_KEY);
+  const historyPath = costHistoryPath();
+  const liveRepeats = opts.repeats ?? (opts.split === "smoke" ? 3 : 1);
+  const planned: PlannedCase[] = expandedFixtures.map((f) => ({
+    caseId: f.id,
+    runner: f.runner,
+    pipelineModel: pipelineModelFor(f),
+    judgeModel,
+  }));
+  const estimate = estimateRunCost(planned, liveRepeats, readCostHistory(historyPath), rates);
+  console.log(`${formatEstimate(estimate, liveRepeats, ratesSource)}
+`);
+  if (!opts.dryRun) {
+    if (opts.maxCost !== undefined && estimate.total > opts.maxCost) {
+      console.error(
+        `Estimated ${formatUsd(estimate.total)} is above --max-cost ${formatUsd(opts.maxCost)}. Not running.`
+      );
+      process.exit(2);
+    }
+    const needsConfirm = estimate.total >= CONFIRM_ABOVE_USD || estimate.unknownCases.length > 0;
+    if (needsConfirm && !opts.yes && opts.maxCost === undefined) {
+      if (!process.stdin.isTTY) {
+        console.error(
+          "No terminal to ask on. Pass --yes, or --max-cost <usd> to run up to a limit. Not running."
+        );
+        process.exit(2);
+      }
+      if (!(await confirmOnTerminal("Run it?"))) {
+        console.log("Cancelled. Nothing was run.");
+        process.exit(0);
+      }
+    }
+  }
+
   // Use-case packs: resolve seeded notebooks before any job runs, so an
   // unseeded pack costs nothing (spec §3).
   let fixturesToRun = opts.dryRun ? pinForDryRun(expandedFixtures) : expandedFixtures;
   let packSourceTexts = new Map<string, SourceText[]>();
   if (expandedFixtures.some((f) => f.useCase)) {
     console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
-    if (!opts.dryRun && !process.env.TOGETHER_AI_API_KEY?.trim()) {
+    // Retrieval-only runs run no judges, so they need no key.
+    if (!opts.dryRun && !opts.retrievalOnly && !process.env.TOGETHER_AI_API_KEY?.trim()) {
       console.error(
         "Use-case packs are scored by rubric judges: set TOGETHER_AI_API_KEY (repo-root .env)."
       );
@@ -611,6 +796,17 @@ async function main(): Promise<void> {
         }
         throw err;
       }
+      // Gold passages must still be in the extracted text, or a drifted PDF would score as misses.
+      const missingPassages = missingExpectedPassages(fixturesToRun, packSourceTexts);
+      if (missingPassages.length > 0) {
+        console.error(
+          [
+            "Expected passages not found in the pack's extracted source text (quote drift or OCR):",
+            ...missingPassages.map((m) => `  - ${m}`),
+          ].join("\n")
+        );
+        process.exit(2);
+      }
     }
   }
 
@@ -624,6 +820,7 @@ async function main(): Promise<void> {
     runEval,
     runEvalOptions: {
       dryRun: opts.dryRun,
+      retrievalOnly: opts.retrievalOnly,
       chatInvoker,
       researchInvoker,
       literatureReviewInvoker,
@@ -633,9 +830,10 @@ async function main(): Promise<void> {
     scoreOptionsFor: (fixture: EvalFixture) => ({
       likertJudges: opts.likertJudges,
       dryRun: opts.dryRun,
-      judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      judgeModel,
       rubricChecks: opts.rubricChecks,
-      judgeReasoning: opts.judgeReasoning,
+      judgeReasoning: judge.judgeReasoning,
+      judgeConsistencySample: judge.judgeConsistencySample,
       packSourceTexts: fixture.useCase
         ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
         : undefined,
@@ -652,7 +850,10 @@ async function main(): Promise<void> {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
     });
-    return runFixtureAndFlush(fixture, fixtureDeps);
+    const { result, judgeUsage } = await withJudgeUsageScope(() =>
+      runFixtureAndFlush(fixture, fixtureDeps)
+    );
+    return { ...result, fixture, judgeUsage };
   });
   for (const outcome of outcomes) {
     allMetrics.push(...outcome.metrics);
@@ -663,14 +864,21 @@ async function main(): Promise<void> {
 
   // Generate report
   const commitSha = await getCommitSha();
+  const useCaseByCase = new Map(
+    fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
+  );
+  const consistency = judgeConsistencyTally();
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
+    retrievalOnly: allArtifacts.some((a) => a.retrievalOnly === true),
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
-    useCaseByCase: new Map(
-      fixturesToRun.flatMap((f): [string, string][] => (f.useCase ? [[f.id, f.useCase]] : []))
-    ),
+    useCaseByCase,
+    judgeConsistency:
+      consistency.sampled > 0
+        ? { ...consistency, rate: consistency.agreed / consistency.sampled }
+        : undefined,
   });
 
   console.log(formatReport(report));
@@ -682,7 +890,71 @@ async function main(): Promise<void> {
     console.log(`\nReport written to ${opts.output}`);
   }
 
+  if (opts.outputWorkOrder) {
+    mkdirSync(dirname(opts.outputWorkOrder), { recursive: true });
+    writeFileSync(opts.outputWorkOrder, formatWorkOrder(report, { repeats, split: opts.split }));
+    console.log(`Work order written to ${opts.outputWorkOrder}`);
+  }
+
+  // History: live runs only. A run with invocation errors would record stub scores as metric
+  // failures, so it is not appended.
+  if (opts.appendHistory && !opts.dryRun) {
+    if (runtimeErrorCount === 0) {
+      const rows = appendHistory(HISTORY_DIR, report, {
+        split: opts.split,
+        runId: randomUUID(),
+        useCaseByCase,
+      });
+      console.log(
+        `History: ${rows} row(s) appended to ${historyFilePath(HISTORY_DIR, opts.split ?? report.split)}`
+      );
+    } else {
+      console.warn("History not appended: the run had invocation-layer errors.");
+    }
+  }
+
   if (!opts.dryRun) {
+    const at = new Date().toISOString();
+    const records: CostHistoryRecord[] = outcomes.map(({ fixture, pipelineUsage, judgeUsage }) => ({
+      at,
+      caseId: fixture.id,
+      runner: fixture.runner,
+      runs: repeats,
+      pipelineRuns: pipelineUsage.reported,
+      pipelineModel: pipelineModelFor(fixture),
+      judgeModel,
+      pipeline: {
+        prompt: pipelineUsage.prompt,
+        cachedPrompt: pipelineUsage.cachedPrompt,
+        completion: pipelineUsage.completion,
+      },
+      judge: {
+        calls: judgeUsage.calls,
+        prompt: judgeUsage.promptTokens,
+        cachedPrompt: judgeUsage.cachedPromptTokens,
+        completion: judgeUsage.completionTokens,
+      },
+      pipelineSource:
+        pipelineUsage.estimated === 0
+          ? "provider"
+          : pipelineUsage.estimated === pipelineUsage.reported
+            ? "estimated"
+            : "mixed",
+    }));
+    const actual: ActualCaseCost[] = records.map((record, i) => {
+      const usage = outcomes[i]?.pipelineUsage;
+      return {
+        caseId: record.caseId,
+        runs: record.runs,
+        cost: priceUsage(record, rates),
+        pipelineEstimated: (usage?.estimated ?? 0) > 0,
+        pipelineMissingRuns: Math.max(0, record.runs - (usage?.reported ?? 0)),
+      };
+    });
+    console.log(`
+${formatActualCost(actual, ratesSource)}`);
+    appendCostHistory(historyPath, records);
+
     const usage = judgeTokenUsage();
     if (usage.calls > 0) {
       const cachedShare = usage.promptTokens
@@ -694,7 +966,16 @@ Judge tokens: ${usage.calls} calls, ${usage.promptTokens} prompt ` +
           `(${usage.cachedPromptTokens} cached, ${cachedShare}%), ${usage.completionTokens} completion`
       );
     }
-    const queue = buildJudgeCalibrationQueue(firstRepeatMetrics, { limit: 20 });
+    if (consistency.sampled > 0) {
+      const rate = Math.round((consistency.agreed / consistency.sampled) * 100);
+      console.log(
+        `Judge self-consistency: ${consistency.agreed}/${consistency.sampled} (${rate}%)`
+      );
+    }
+    // Retrieval-only runs have no judge verdicts to calibrate, so they write no queue.
+    const queue = opts.retrievalOnly
+      ? []
+      : buildJudgeCalibrationQueue(firstRepeatMetrics, { limit: 20 });
     if (queue.length > 0) {
       const queuePath = join("evals/rag/generated", "judge-queue.json");
       mkdirSync(dirname(queuePath), { recursive: true });

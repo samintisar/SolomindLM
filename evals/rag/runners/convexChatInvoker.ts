@@ -48,6 +48,7 @@ export function createConvexChatInvoker(
         notebookId: context.noteId as Id<"notebooks">,
         documentIds: context.documentIds as Id<"documents">[] | undefined,
         sourcePolicy: context.sourcePolicy,
+        ...(context.evalRetrievalOnly ? { retrievalOnly: true } : {}),
       });
 
       return {
@@ -66,6 +67,7 @@ export function createConvexChatInvoker(
         callCounters: result.callCounters,
         contextTokenBudget: result.contextTokenBudget,
         sourcePolicy: toEvalSourcePolicy(result.sourcePolicy),
+        ...(result.retrievalOnly ? { retrievalOnly: true } : {}),
       };
     },
   };

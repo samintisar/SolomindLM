@@ -12,6 +12,7 @@ import type {
   MetricStatus,
 } from "../types";
 import { metricResult } from "./metricResult";
+import { passageAbstentionRecalls } from "./retrievalGold";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -240,6 +241,16 @@ export function expectedItemRecall(
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
+  if (artifact.retrievalOnly) {
+    return metricResult(
+      "expected_item_recall",
+      fixture,
+      artifact,
+      "info",
+      0,
+      "retrieval-only run: no answer was generated, so answer recall is not scored."
+    );
+  }
   if (fixture.expectedItems.length === 0) {
     return metricResult(
       "expected_item_recall",
@@ -532,19 +543,35 @@ export function retrievalNdcgAtK(
 
 // ─── 5. Abstention Correctness ──────────────────────────────────
 
+/** Item-mode recall needed to count a stage as holding the context (unchanged). */
+const ITEM_SUFFICIENT_RECALL = 0.7;
+/** Passage-mode recall needed to count a stage as holding the context (see abstentionCorrectness). */
+const PASSAGE_SUFFICIENT_RECALL = 0.6;
+/** Passage mode: a selected-stage miss at or above this is a warn, below it a fail. */
+const PASSAGE_PARTIAL_SELECTED_RECALL = 0.5;
+
 /**
- * Deterministic routing rule:
- * - If selected-context item recall >= 0.7 and answer abstains: "answer_generation" error, fail.
- * - If raw or post-rerank recall >= 0.7 but selected-context recall < 0.7: "context_selection" miss, fail.
- * - If all snapshots < 0.7: "retrieval_coverage" miss, warn.
- * - If answer provides items and recall >= 0.7: pass.
+ * Thresholds. Item mode: "sufficient" is 0.7. Passage mode is looser: with 2 or 3 passages, 0.7
+ * would mean every passage, so losing one of three would fail. Passage mode uses 0.6 for
+ * sufficient, and 0.5 as the floor below which a context-selection miss is a fail rather than a
+ * warn.
+ *
+ * Deterministic routing rule (sufficient = the mode's sufficient threshold):
+ * - If selected-context recall >= sufficient and answer abstains: "answer_generation" error, fail.
+ * - If raw or post-rerank recall >= sufficient but selected-context recall < sufficient:
+ *   "context_selection" miss. Fail; in passage mode, warn when selected recall is >= 0.5.
+ * - If all snapshots < sufficient: "retrieval_coverage" miss, warn.
+ * - If answer provides items and recall >= sufficient: pass.
  */
 export function abstentionCorrectness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
-  if (fixture.expectedItems.length === 0) {
+  // Without expectedItems, the same rules run on gold passages when the fixture has them (D1).
+  const passageMode =
+    fixture.expectedItems.length === 0 && (fixture.expectedPassages?.length ?? 0) > 0;
+  if (fixture.expectedItems.length === 0 && !passageMode) {
     return metricResult(
       "abstention_correctness",
       fixture,
@@ -555,25 +582,31 @@ export function abstentionCorrectness(
       { category: "none" }
     );
   }
-  const selectedRecall = chunkRecall(artifact.selectedChunks, fixture.expectedItems).score;
-  const preRerankRecall = chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score;
-  const postRerankRecall = chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score;
+  const unit = passageMode ? "passages" : "items";
+  const { selectedRecall, preRerankRecall, postRerankRecall, answerRecall } = passageMode
+    ? passageAbstentionRecalls(fixture, artifact)
+    : {
+        selectedRecall: chunkRecall(artifact.selectedChunks, fixture.expectedItems).score,
+        preRerankRecall: chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score,
+        postRerankRecall: chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score,
+        answerRecall: recallScore(
+          countMatches(artifact.answer, fixture.expectedItems).matched.length,
+          fixture.expectedItems.length
+        ),
+      };
 
   const abstains = answerAbstains(artifact.answer);
-  const answerRecall = recallScore(
-    countMatches(artifact.answer, fixture.expectedItems).matched.length,
-    fixture.expectedItems.length
-  );
+  const sufficient = passageMode ? PASSAGE_SUFFICIENT_RECALL : ITEM_SUFFICIENT_RECALL;
 
   // Rule 1: Sufficient context was selected but answer still abstained.
-  if (selectedRecall >= 0.7 && abstains) {
+  if (selectedRecall >= sufficient && abstains) {
     return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
       "fail",
       selectedRecall,
-      "Answer abstains despite sufficient context (selected recall >= 0.7). Answer generation error.",
+      `Answer abstains despite sufficient context (selected recall >= ${sufficient}). Answer generation error.`,
       {
         category: "answer_generation",
         selectedRecall,
@@ -586,14 +619,19 @@ export function abstentionCorrectness(
   }
 
   // Rule 2: Pre-rerank or post-rerank had items, but context selection dropped them.
-  if ((preRerankRecall >= 0.7 || postRerankRecall >= 0.7) && selectedRecall < 0.7) {
+  if (
+    (preRerankRecall >= sufficient || postRerankRecall >= sufficient) &&
+    selectedRecall < sufficient
+  ) {
+    const status: MetricStatus =
+      passageMode && selectedRecall >= PASSAGE_PARTIAL_SELECTED_RECALL ? "warn" : "fail";
     return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
-      "fail",
+      status,
       selectedRecall,
-      "Relevant items existed pre-selection but were dropped. Context selection miss.",
+      `Relevant ${unit} existed pre-selection but were dropped. Context selection miss.`,
       {
         category: "context_selection",
         selectedRecall,
@@ -606,14 +644,18 @@ export function abstentionCorrectness(
   }
 
   // Rule 3: Retrieval never found the items.
-  if (selectedRecall < 0.7 && preRerankRecall < 0.7 && postRerankRecall < 0.7) {
+  if (
+    selectedRecall < sufficient &&
+    preRerankRecall < sufficient &&
+    postRerankRecall < sufficient
+  ) {
     return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
       "warn",
       Math.max(selectedRecall, preRerankRecall, postRerankRecall),
-      "Retrieval could not find expected items across any stage. Retrieval coverage miss.",
+      `Retrieval could not find expected ${unit} across any stage. Retrieval coverage miss.`,
       {
         category: "retrieval_coverage",
         selectedRecall,
@@ -632,7 +674,7 @@ export function abstentionCorrectness(
     artifact,
     "pass",
     selectedRecall,
-    "Answer provides expected items with sufficient recall.",
+    `Answer provides expected ${unit} with sufficient recall.`,
     {
       category: "none",
       selectedRecall,
@@ -774,6 +816,19 @@ export function latencyCostBudget(
   const totalTokens = artifact.tokenUsage?.total ?? 0;
   // Estimated usage (chars/4) is not a provider count, so tokens are reported but never gated.
   const providerTokens = artifact.tokenUsageSource === "provider";
+
+  if (baseline && artifact.retrievalOnly) {
+    // A retrieval-only run times retrieval alone; a full-run baseline would always look like a fail.
+    return metricResult(
+      "latency_cost_budget",
+      fixture,
+      artifact,
+      "info",
+      1,
+      "retrieval-only: not compared to a full-run baseline",
+      { latencyMs, totalTokens, retrievalOnly: true }
+    );
+  }
 
   if (baseline) {
     const latencyRatio = latencyMs / baseline.latencyMs;
