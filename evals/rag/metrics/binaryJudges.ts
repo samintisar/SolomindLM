@@ -2,12 +2,15 @@
  * Binary pass/fail LLM judges per failure mode.
  * Default model: deepseek-ai/DeepSeek-V4.1-Flash via Together JSON mode.
  */
+
+import { createHash } from "crypto";
 import {
   type EvalBaseline,
   type EvalFixture,
   type EvalRunArtifact,
   isStudioRunner,
   type MetricResult,
+  type StudioRunnerKind,
 } from "../types";
 import type { SourceText } from "../usecases/types";
 import { CUT_NOTE, formatSourceTexts, SOURCE_TEXTS_LIMIT } from "./evidence";
@@ -25,6 +28,37 @@ export interface BinaryJudgeOptions extends LlmJudgeOptions {
   enabled?: boolean;
   /** Pack source text, the grounding evidence for studio artifacts that have no chunks */
   sourceTexts?: SourceText[];
+  /** Fraction (0–1) of judge calls to run a second time for self-consistency */
+  judgeConsistencySample?: number;
+}
+
+const consistencyTotals = { sampled: 0, agreed: 0 };
+
+/** Self-consistency since the last reset: repeated judge calls, and how many repeated the verdict. */
+export function judgeConsistencyTally(): { sampled: number; agreed: number } {
+  return { ...consistencyTotals };
+}
+
+export function resetJudgeConsistencyTally(): void {
+  consistencyTotals.sampled = 0;
+  consistencyTotals.agreed = 0;
+}
+
+/**
+ * Whether this case and metric are in the self-consistency sample. Deterministic (a hash of
+ * `caseId|metric`), so the same judge calls are re-run on every run and their results compare.
+ */
+export function isConsistencySampled(
+  caseId: string,
+  runner: string,
+  metric: string,
+  sample: number
+): boolean {
+  if (sample <= 0) return false;
+  if (sample >= 1) return true;
+  const key = `${caseId}|${runner}|${metric}`;
+  const bucket = createHash("sha1").update(key).digest().readUInt32BE(0) % 100;
+  return bucket < sample * 100;
 }
 
 /**
@@ -37,11 +71,12 @@ function excerptForJudge(text: string, maxChars: number): string {
 }
 
 /**
- * Passage budget for judge prompts; fits every chunk of a typical chat answer (~30 chunks, under
- * 20K characters). It is a size guide, not a model limit: the cut and skipped-passage notes and the
- * grounding warning are added on top (tens to a few hundred characters).
+ * Passage budget for judge prompts. List questions can hand chat one whole-document passage
+ * (87K characters for the agentic-patterns transcript); a judge that sees only the first half
+ * fails claims from the second half. Same budget as whole-pack source text. It is a size guide,
+ * not a model limit: the cut and skipped-passage notes and the grounding warning are added on top.
  */
-export const CHUNK_CONTEXT_LIMIT = 48_000;
+export const CHUNK_CONTEXT_LIMIT = SOURCE_TEXTS_LIMIT;
 const CHUNK_SEPARATOR = "\n\n---\n\n";
 
 /**
@@ -79,8 +114,11 @@ export function formatChunks(
 }
 
 /** Chunk context for grounding judges, with a note when passages were cut for judging. */
-function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
-  const { text, truncated } = formatChunks(chunks);
+function combineChunkContents(
+  chunks: EvalRunArtifact["selectedChunks"],
+  limit = CHUNK_CONTEXT_LIMIT
+): string {
+  const { text, truncated } = formatChunks(chunks, limit);
   if (!truncated) return text;
   return (
     "Some retrieved passages were cut off for judging; do not fail a claim only because its " +
@@ -103,21 +141,53 @@ function parseBinaryResponse(raw: string): BinaryJudgeResult {
   return { pass: parsed.pass, reason };
 }
 
+/** Verdict from a repeat call, or null when the repeat fails (it is then not counted). */
+async function repeatVerdict(
+  prompt: string,
+  invoke: NonNullable<LlmJudgeOptions["invoke"]>
+): Promise<boolean | null> {
+  try {
+    return parseBinaryResponse(await invoke(prompt)).pass;
+  } catch {
+    return null;
+  }
+}
+
 async function runBinaryJudge(
   metric: string,
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   prompt: string,
   invoke: NonNullable<LlmJudgeOptions["invoke"]>,
-  model: string
+  model: string,
+  consistencySample = 0
 ): Promise<MetricResult> {
   try {
     const raw = await invoke(prompt);
     const { pass, reason } = parseBinaryResponse(raw);
-    return metricResult(metric, fixture, artifact, pass ? "pass" : "fail", pass ? 1 : 0, reason, {
-      model,
-      pass,
-    });
+    const breakdown: Record<string, unknown> = { model, pass };
+    if (isConsistencySampled(artifact.caseId, artifact.runner, metric, consistencySample)) {
+      const second = await repeatVerdict(prompt, invoke);
+      if (second !== null) {
+        consistencyTotals.sampled++;
+        if (second === pass) {
+          consistencyTotals.agreed++;
+        } else {
+          // The first verdict stands; the flip is visible in the row.
+          breakdown.judgeUnstable = true;
+          breakdown.secondVerdict = second ? "pass" : "fail";
+        }
+      }
+    }
+    return metricResult(
+      metric,
+      fixture,
+      artifact,
+      pass ? "pass" : "fail",
+      pass ? 1 : 0,
+      reason,
+      breakdown
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return metricResult(metric, fixture, artifact, "fail", 0, `Binary judge failed: ${message}`, {
@@ -162,26 +232,67 @@ Pass if citations map to listed sources or the answer has no citations when none
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
+/**
+ * Mirrors the research writer's evidence packing (`synthesize` in convex/_agents/research/nodes.ts):
+ * per sub-question, the 8 most relevant entries at up to 2,000 characters each; over 120,000 in
+ * all, every entry shrinks (not below 500) so each sub-question keeps its share. The judge then
+ * sees what the writer saw. A smaller cut fails claims drawn from evidence the judge never got.
+ */
+const RESEARCH_EVIDENCE_PER_SUBQUESTION = 8;
+const RESEARCH_ENTRY_CHARS = 2_000;
+const RESEARCH_MIN_ENTRY_CHARS = 500;
+export const RESEARCH_EVIDENCE_LIMIT = 120_000;
+
+function packResearchEvidence(rows: NonNullable<EvalRunArtifact["evidence"]>): string {
+  const bySubQuestion = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const group = bySubQuestion.get(row.subQuestionId) ?? [];
+    group.push(row);
+    bySubQuestion.set(row.subQuestionId, group);
+  }
+  const kept = [...bySubQuestion.values()].flatMap((group) =>
+    [...group]
+      .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
+      .slice(0, RESEARCH_EVIDENCE_PER_SUBQUESTION)
+  );
+  const format = (entryChars: number) =>
+    kept.map((row) => `[${row.sourceTitle}] ${row.content.slice(0, entryChars)}`).join("\n");
+  const full = format(RESEARCH_ENTRY_CHARS);
+  if (full.length <= RESEARCH_EVIDENCE_LIMIT) return full;
+  // As the writer does, the shrunk budget is split over all evidence rows, not just the kept ones.
+  return format(
+    Math.max(RESEARCH_MIN_ENTRY_CHARS, Math.floor((RESEARCH_EVIDENCE_LIMIT - 5_000) / rows.length))
+  );
+}
+
 export function formatResearchEvidence(artifact: EvalRunArtifact): string {
-  const fromEvidence = (artifact.evidence ?? [])
-    .filter((row) => row.content.trim())
-    .map((row) => `[${row.sourceTitle}] ${row.content.slice(0, 500)}`);
-  if (fromEvidence.length > 0) {
-    return fromEvidence.join("\n");
+  const rows = (artifact.evidence ?? []).filter((row) => row.content.trim());
+  if (rows.length > 0) {
+    return packResearchEvidence(rows);
   }
   return artifact.selectedChunks
-    .map((chunk) => `[${chunk.sourceTitle}] ${chunk.content.slice(0, 500)}`)
+    .map((chunk) => `[${chunk.sourceTitle}] ${chunk.content.slice(0, RESEARCH_ENTRY_CHARS)}`)
     .join("\n");
 }
 
-function researchGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
+/** Research evidence for the judge, marked when the total budget cut it. */
+export function researchEvidenceForJudge(artifact: EvalRunArtifact): string {
   const evidence = formatResearchEvidence(artifact);
+  if (!evidence) return "(no evidence recorded)";
+  if (evidence.length <= RESEARCH_EVIDENCE_LIMIT) return evidence;
+  return (
+    `${evidence.slice(0, RESEARCH_EVIDENCE_LIMIT)}\n[… evidence cut off here for judging]\n` +
+    "Do not fail a claim only because its support would be in evidence past the cut."
+  );
+}
+
+function researchGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
   return `You are evaluating a research synthesis. Pass if the answer is grounded in listed evidence.
 
 Question: ${fixture.question}
 
 Evidence:
-${evidence.slice(0, 12000) || "(no evidence recorded)"}
+${researchEvidenceForJudge(artifact)}
 
 Answer:
 ${excerptForJudge(artifact.answer, 8000)}
@@ -201,19 +312,80 @@ ${subs || "(none)"}
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
+const GENERIC_STRUCTURE_CRITERION =
+  "Pass only if the required structure is present: non-empty items, the required sections, and answer keys as applicable.";
+const GENERIC_GROUNDING_CRITERION =
+  "Pass only if substantive claims are supported by the evidence (minor phrasing ok).";
+
+/**
+ * Per-kind structure criteria. Infographics are not listed: the vision judge covers them, so they
+ * keep the generic line, as do literature reviews (not a studio kind).
+ */
+const STUDIO_STRUCTURE_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
+  flashcards:
+    "Pass only if the output is a non-empty list of cards, and every card has a non-empty front and a non-empty back.",
+  quiz: "Pass only if the output is a non-empty list of questions, and each question has a stem, at least two options and exactly one answer key. Explanations, when present, are non-empty and consistent with the key.",
+  report:
+    "Pass only if the output is a markdown report with a non-empty body under every required section heading.",
+  audioScript:
+    "Pass only if the output is a non-empty script of turns, and every turn has a speaker and non-empty text.",
+  audioScriptOnly:
+    "Pass only if the output is a non-empty script of turns, and every turn has a speaker and non-empty text.",
+  mindmap:
+    "Pass only if the output is a tree with a root node and child nodes, and every node has a non-empty label.",
+  spreadsheet:
+    "Pass only if the output has a header row and data rows, every row has a value for each header column, and the category columns are filled.",
+  writtenQuestions:
+    "Pass only if the output is a non-empty list of questions, and every question has a model answer.",
+};
+
+/**
+ * Per-kind grounding criteria. Infographics keep the generic line (the vision judge handles them).
+ */
+const STUDIO_GROUNDING_CRITERIA: Partial<Record<StudioRunnerKind, string>> = {
+  flashcards:
+    "Pass only if every card's front and back are supported by the sources, and no card contradicts them.",
+  quiz: "Pass only if each correct option is supported by the sources, no distractor is also correct according to the sources, and any explanations given do not invent facts.",
+  report:
+    "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
+  audioScript:
+    "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
+  audioScriptOnly:
+    "Pass only if substantive claims and figures are supported by the sources (minor phrasing ok).",
+  mindmap: "Pass only if the node labels name concepts that are present in the sources.",
+  spreadsheet: "Pass only if cell values and categories are traceable to the sources.",
+  writtenQuestions: "Pass only if the questions and model answers are supported by the sources.",
+};
+
+function criterionFor(
+  table: Partial<Record<StudioRunnerKind, string>>,
+  runner: string,
+  generic: string
+): string {
+  return isStudioRunner(runner) ? (table[runner] ?? generic) : generic;
+}
+
 function studioStructurePrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
   const minItems = fixture.expectedStructure?.minItems;
   const sections = fixture.expectedStructure?.requiredSections?.join(", ") ?? "";
-  return `You are evaluating studio output structure for runner "${artifact.runner}".
+  const criterion = criterionFor(
+    STUDIO_STRUCTURE_CRITERIA,
+    artifact.runner,
+    GENERIC_STRUCTURE_CRITERION
+  );
+  return `You are a strict reviewer checking the structure of a studio ${artifact.runner} output. Check structure only; whether the content is true is judged separately.
 
+Question: ${fixture.question}
 Expected behavior: ${fixture.expectedBehavior}
 Min items: ${minItems ?? "n/a"}
 Required sections: ${sections || "n/a"}
 
+Pass criteria for ${artifact.runner}:
+${criterion}
+
 Output (truncated):
 ${excerptForJudge(artifact.answer, 10000)}
 
-Pass if required structure is present (non-empty items, sections, answer keys as applicable).
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
@@ -223,18 +395,25 @@ function studioGroundingPrompt(
   artifact: EvalRunArtifact,
   sourceTexts: SourceText[] = []
 ): string | null {
+  const criterion = criterionFor(
+    STUDIO_GROUNDING_CRITERIA,
+    artifact.runner,
+    GENERIC_GROUNDING_CRITERION
+  );
+  const pass = `Pass criteria for ${artifact.runner}:\n${criterion}`;
   const context = combineChunkContents(artifact.selectedChunks);
   if (context.trim()) {
-    return `Pass if studio output is grounded in notebook chunks.
+    return `You are a strict evaluator checking a studio ${artifact.runner} output against the notebook passages it was built from.
 
 Question: ${fixture.question}
 
-Chunks:
+Retrieved chunks:
 ${context}
 
 Output:
 ${excerptForJudge(artifact.answer, 8000)}
 
+${pass}
 Respond JSON only: {"pass": boolean, "reason": string}`;
   }
   if (sourceTexts.length === 0) return null;
@@ -242,7 +421,7 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
   const header = formatted.truncated
     ? "Source text (some documents cut off):"
     : "Source text (complete):";
-  return `Pass if studio output is grounded in the source text.
+  return `You are a strict evaluator checking a studio ${artifact.runner} output against the source text it was made from.
 
 Question: ${fixture.question}
 
@@ -252,6 +431,7 @@ ${formatted.truncated ? `${CUT_NOTE}\n` : ""}${formatted.text}
 Output:
 ${excerptForJudge(artifact.answer, 8000)}
 
+${pass}
 Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
@@ -327,11 +507,12 @@ export async function scoreBinaryJudgeMetrics(
   }
 
   // Independent judges of one artifact run concurrently; results keep the order above.
+  const consistencySample = options.judgeConsistencySample ?? 0;
   return Promise.all(
     judges.map(([metric, prompt]) =>
       prompt === null
         ? Promise.resolve(noGroundingEvidence(fixture, artifact, model))
-        : runBinaryJudge(metric, fixture, artifact, prompt, invoke, model)
+        : runBinaryJudge(metric, fixture, artifact, prompt, invoke, model, consistencySample)
     )
   );
 }

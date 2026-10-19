@@ -54,6 +54,12 @@ export const agenticPatterns20: EvalFixture = {
   split: "smoke",
   question: "What are the 20 agentic patterns?",
   expectedItems: [...AGENTIC_20_ITEMS],
+  // Gold passages (D1): one from the start, the middle and the end of the transcript.
+  expectedPassages: [
+    "And the first one we're starting with is prompt chaining.",
+    "This next pattern might be new to a lot of you and it's called resourceaware optimization.",
+    "This is the second last design pattern which is prioritization.",
+  ],
   expectedBehavior:
     "Answer should enumerate all 20 items and cite supporting chunks. " +
     "Must NOT say the list cannot be found or that fewer than 20 patterns exist. " +
