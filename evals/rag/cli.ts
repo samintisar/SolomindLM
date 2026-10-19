@@ -13,6 +13,7 @@ import { type ParseArgsConfig, parseArgs as parseNodeArgs } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { caseFileStem } from "./caseFile";
+import { mapWithConcurrency } from "./concurrency";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { parseConsistencyFraction, resolveJudgeSettings } from "./judgeSettings";
 import { judgeConsistencyTally, resetJudgeConsistencyTally } from "./metrics/binaryJudges";
@@ -32,6 +33,7 @@ import {
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import { formatJudgeCalibrationTable, scoreJudgeCalibration } from "./reports/judgeCalibration";
 import type { JudgeCalibrationItem } from "./reports/judgeQueue";
+import { FixtureFatalError, runFixtureAndFlush } from "./runFixture";
 import {
   createConvexChatInvoker,
   createConvexLiteratureReviewInvoker,
@@ -87,6 +89,10 @@ interface CliOptions {
   runners?: RunnerKind[];
   /** Dataset split filter (default smoke for live runs) */
   split?: EvalSplit;
+  /** Runs per fixture; default 3 for the smoke split, else 1. Dry runs always use 1. */
+  repeats?: number;
+  /** Fixtures in flight at once; default 3 live, 1 dry. Repeats of one fixture stay sequential. */
+  concurrency?: number;
   /** Restrict to use-case pack fixtures (ids from evals/rag/usecases) */
   useCases?: string[];
   dryRun: boolean;
@@ -169,11 +175,21 @@ function parseSplit(value: string): EvalSplit {
   return value;
 }
 
+function parsePositiveInt(name: string, value: string): number {
+  const n = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < 1) {
+    throw new Error(`--${name} takes a positive integer. See --help.`);
+  }
+  return n;
+}
+
 const CLI_OPTIONS = {
   case: { type: "string" },
   prefix: { type: "string" },
   runner: { type: "string" },
   split: { type: "string" },
+  repeats: { type: "string" },
+  concurrency: { type: "string" },
   "use-case": { type: "string" },
   "dry-run": { type: "boolean" },
   // Alias of --verbose (it never changed which fixtures run).
@@ -264,6 +280,11 @@ function parseArgs(args: string[]): CliOptions {
     idPrefix: values.prefix,
     runners: values.runner !== undefined ? parseRunners(values.runner) : undefined,
     split: values.split !== undefined ? parseSplit(values.split) : undefined,
+    repeats: values.repeats !== undefined ? parsePositiveInt("repeats", values.repeats) : undefined,
+    concurrency:
+      values.concurrency !== undefined
+        ? parsePositiveInt("concurrency", values.concurrency)
+        : undefined,
     useCases: values["use-case"] !== undefined ? parseUseCases(values["use-case"]) : undefined,
     dryRun: values["dry-run"] ?? false,
     verbose: (values.verbose ?? false) || (values.full ?? false),
@@ -305,6 +326,12 @@ Options:
   --runner <kinds>         Comma-separated runner filter (chat,research,literatureReview,…);
                            "studio" = every studio kind except audioScriptOnly
   --split <smoke|train|holdout>  Filter fixtures by dataset split (live default: smoke)
+  --repeats <n>            Run each fixture n times; pass^k and mean per metric. Verdicts that
+                           disagree are flaky: a majority of fails (>= half) merges to fail,
+                           a minority of fails to a flaky warning (default: 3 for the smoke
+                           split, else 1; dry runs use 1)
+  --concurrency <n>        Fixtures run in parallel (default: 3 live, 1 dry). Each fixture's
+                           output is printed when it finishes; the report is unchanged
   --use-case <ids|all>     Use-case pack fixtures only (seed first: bun run eval:seed)
   --dry-run                Validate fixtures without running agents
   --verbose, -v            Show detailed metric output (--full is an alias)
@@ -402,6 +429,28 @@ function exportRagasArtifacts(
   const lines = rows.map((r) => JSON.stringify(r));
   writeFileSync(outPath, lines.join("\n") + "\n");
   return outPath;
+}
+
+/** Write one studio artifact's output for manual inspection; returns the file path. */
+function saveStudioOutput(artifact: EvalRunArtifact, smartLlm: string | undefined): string {
+  const outputFile = `evals/rag/generated/${caseFileStem(artifact.caseId)}-${artifact.runner}-${Date.now()}.json`;
+  mkdirSync("evals/rag/generated", { recursive: true });
+  writeFileSync(
+    outputFile,
+    JSON.stringify(
+      {
+        caseId: artifact.caseId,
+        runner: artifact.runner,
+        smartLlm,
+        answer: artifact.answer,
+        raw: artifact.studioOutput?.raw,
+        latencyMs: artifact.latencyMs,
+      },
+      null,
+      2
+    )
+  );
+  return outputFile;
 }
 
 // ─── Main ────────────────────────────────────────────────────
@@ -545,8 +594,13 @@ async function main(): Promise<void> {
   if (opts.caseId && opts.useCases) {
     console.warn("Warning: --use-case is ignored when --case is set.");
   }
+  // Repeats: the smoke split defaults to 3 so flaky verdicts show up; dry runs stay at 1.
+  const repeats = opts.dryRun ? 1 : (opts.repeats ?? (opts.split === "smoke" ? 3 : 1));
+  if (opts.dryRun && (opts.repeats ?? 1) > 1) {
+    console.warn("Dry runs always use 1 repeat; --repeats is ignored.");
+  }
   console.log(
-    `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}\n`
+    `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}${repeats > 1 ? ` [repeats=${repeats}]` : ""}\n`
   );
 
   // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
@@ -627,95 +681,52 @@ async function main(): Promise<void> {
     }
   }
 
-  for (const fixture of fixturesToRun) {
+  // Artifacts, Ragas export and the judge queue use the first repeat only (a flaky verdict
+  // is not a calibration label); the report uses the aggregated rows of all repeats.
+  const firstRepeatMetrics: MetricResult[] = [];
+
+  const fixtureDeps = {
+    repeats,
+    verbose: opts.verbose,
+    runEval,
+    runEvalOptions: {
+      dryRun: opts.dryRun,
+      chatInvoker,
+      researchInvoker,
+      literatureReviewInvoker,
+      studioInvokers,
+    },
+    scoreAllMetrics,
+    scoreOptionsFor: (fixture: EvalFixture) => ({
+      likertJudges: opts.likertJudges,
+      dryRun: opts.dryRun,
+      judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      rubricChecks: opts.rubricChecks,
+      judgeReasoning: judge.judgeReasoning,
+      judgeConsistencySample: judge.judgeConsistencySample,
+      packSourceTexts: fixture.useCase
+        ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
+        : undefined,
+    }),
+    loadBaseline,
+    saveStudioOutput: (artifact: EvalRunArtifact) => saveStudioOutput(artifact, opts.smartLlm),
+  };
+
+  // Fixtures run through a bounded pool; outcomes are merged in fixture order, so the report
+  // and exports do not depend on which fixture finished first.
+  const concurrency = opts.concurrency ?? (opts.dryRun ? 1 : 3);
+  const outcomes = await mapWithConcurrency(fixturesToRun, concurrency, async (fixture) => {
     fixtureMeta.set(fixture.id, {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
     });
-    console.log(`[${fixture.id}] ${fixture.question}`);
-
-    // Run the eval — throws in real mode if no invoker registered
-    let results;
-    try {
-      results = await runEval(fixture, {
-        dryRun: opts.dryRun,
-        chatInvoker,
-        researchInvoker,
-        literatureReviewInvoker,
-        studioInvokers,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`  FATAL: ${message}`);
-      console.error("  Use --dry-run to validate fixtures without invokers.");
-      process.exit(2);
-    }
-
-    for (const { artifact, errors } of results) {
-      artifact.useCase = fixture.useCase;
-      if (errors.length > 0) {
-        console.log(`  Errors: ${errors.join("; ")}`);
-        runtimeErrorCount += errors.length;
-      }
-
-      allArtifacts.push(artifact);
-
-      // Save studio output for manual inspection
-      if (artifact.studioOutput) {
-        const outputFile = `evals/rag/generated/${caseFileStem(artifact.caseId)}-${artifact.runner}-${Date.now()}.json`;
-        mkdirSync("evals/rag/generated", { recursive: true });
-        writeFileSync(
-          outputFile,
-          JSON.stringify(
-            {
-              caseId: artifact.caseId,
-              runner: artifact.runner,
-              smartLlm: opts.smartLlm,
-              answer: artifact.answer,
-              raw: artifact.studioOutput.raw,
-              latencyMs: artifact.latencyMs,
-            },
-            null,
-            2
-          )
-        );
-        console.log(`  Output saved to: ${outputFile}`);
-      }
-
-      // Load baseline for this case+runner if available
-      const baseline = loadBaseline(fixture.id, artifact.runner);
-      if (baseline) {
-        console.log(
-          `  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`
-        );
-      }
-
-      const metrics = await scoreAllMetrics(fixture, artifact, baseline, {
-        likertJudges: opts.likertJudges,
-        dryRun: opts.dryRun,
-        judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
-        rubricChecks: opts.rubricChecks,
-        judgeReasoning: judge.judgeReasoning,
-        judgeConsistencySample: judge.judgeConsistencySample,
-        packSourceTexts: fixture.useCase
-          ? packSourceTextsFor(fixture, packSourceTexts.get(fixture.useCase))
-          : undefined,
-      });
-      allMetrics.push(...metrics);
-
-      if (opts.verbose) {
-        for (const m of metrics) {
-          const icon =
-            m.status === "pass" ? "+" : m.status === "fail" ? "x" : m.status === "warn" ? "!" : "i";
-          console.log(`  [${icon}] ${m.metric}: ${m.score.toFixed(2)} — ${m.detail}`);
-        }
-      } else {
-        const pass = metrics.filter((m) => m.status === "pass").length;
-        const fail = metrics.filter((m) => m.status === "fail").length;
-        console.log(`  ${pass} pass, ${fail} fail (${artifact.runner}, ${artifact.latencyMs}ms)`);
-      }
-    }
-    console.log("");
+    return runFixtureAndFlush(fixture, fixtureDeps);
+  });
+  for (const outcome of outcomes) {
+    allMetrics.push(...outcome.metrics);
+    allArtifacts.push(...outcome.artifacts);
+    firstRepeatMetrics.push(...outcome.firstRepeatMetrics);
+    runtimeErrorCount += outcome.runtimeErrors;
   }
 
   // Generate report
@@ -762,7 +773,7 @@ Judge tokens: ${usage.calls} calls, ${usage.promptTokens} prompt ` +
         `Judge self-consistency: ${consistency.agreed}/${consistency.sampled} (${rate}%)`
       );
     }
-    const queue = buildJudgeCalibrationQueue(allMetrics, { limit: 20 });
+    const queue = buildJudgeCalibrationQueue(firstRepeatMetrics, { limit: 20 });
     if (queue.length > 0) {
       const queuePath = join("evals/rag/generated", "judge-queue.json");
       mkdirSync(dirname(queuePath), { recursive: true });
@@ -826,6 +837,7 @@ async function getCommitSha(): Promise<string> {
 }
 
 main().catch((err) => {
+  if (err instanceof FixtureFatalError) process.exit(2);
   console.error("Fatal error:", err);
   process.exit(2);
 });

@@ -322,6 +322,8 @@ export interface EvalReport {
   scorecard?: Scorecard;
   /** Judge self-consistency: repeated judge calls, and how many repeated the verdict (sampled runs) */
   judgeConsistency?: { sampled: number; agreed: number; rate: number };
+  /** Metrics whose repeats disagreed or were missing (`breakdown.flaky`); listed in the report */
+  flaky?: Array<{ caseId: string; runner: ConcreteRunnerKind; metric: string; statuses: string[] }>;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
