@@ -88,6 +88,11 @@ bun run eval:rag -- --case agentic-patterns-20 --export-artifacts --artifacts-di
 bun run eval:compare -- evals/rag/generated/run-a evals/rag/generated/run-b
 ```
 
+### Judge settings
+
+- `--judge-reasoning on|off`: off by default on the `smoke` split (cheaper and more deterministic); the model default on `train`, `holdout` and single-case runs. An explicit flag always wins.
+- `--judge-consistency <fraction>`: re-runs that share of binary judge calls, chosen deterministically per case and metric (default `0.1` on live runs, `0` on dry runs). A repeat that disagrees keeps the first verdict and marks the row `judgeUnstable` with `secondVerdict`. The run prints `Judge self-consistency: agreed/sampled (rate)` and the report carries `judgeConsistency`.
+
 ### Use-case packs
 
 Fixtures for advertised use cases (language learners, medical students, professionals, researchers) live in [`../usecases/`](../usecases/README.md), not here. Seed with `bun run eval:seed`, run with `bun run eval:usecases`.
@@ -96,7 +101,9 @@ Fixtures for advertised use cases (language learners, medical students, professi
 
 1. Daily: `bun run eval:rag:smoke` (writes `evals/rag/generated/judge-queue.json`).
 2. Label 20 rows (`humanAgree: true|false`). Then:
-   `bun run eval:rag -- --score-judge-queue evals/rag/generated/judge-queue.json`
+   `bun run eval:rag -- --score-judge-queue evals/rag/generated/judge-queue.json --append-calibration`
+   The labels are appended to the committed store in [`../calibration/`](../calibration/README.md); the
+   scorer prints agreement and kappa per judge family.
 3. After a pipeline change: snapshot train (`bun run eval:rag:train:snapshot`) and
    `bun run eval:compare -- <before-dir> <after-dir>`.
 4. Promotion: run holdout, then

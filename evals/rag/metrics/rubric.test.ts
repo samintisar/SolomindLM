@@ -166,7 +166,7 @@ describe("rubric prompts", () => {
       pack.rubric[0],
       fixture,
       artifact({
-        selectedChunks: [{ id: "1", sourceTitle: "", content: "h".repeat(60_000) }],
+        selectedChunks: [{ id: "1", sourceTitle: "", content: "h".repeat(300_000) }],
       } as Partial<EvalRunArtifact>),
       []
     );
