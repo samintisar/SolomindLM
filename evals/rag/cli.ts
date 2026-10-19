@@ -74,7 +74,7 @@ import {
 } from "./usecases/resolve";
 import type { PackSeedApi } from "./usecases/seedClient";
 import type { SourceText } from "./usecases/types";
-import { formatPackProblems, packsToValidate } from "./usecases/validate";
+import { formatPackProblems, missingExpectedPassages, packsToValidate } from "./usecases/validate";
 
 /** Versioned judge calibration labels (committed); see evals/rag/calibration/README.md */
 const CALIBRATION_DIR = "evals/rag/calibration";
@@ -126,6 +126,8 @@ interface CliOptions {
   /** Holdout promotion check: before/after EvalReport JSON paths */
   promotionCheckBefore?: string;
   promotionCheckAfter?: string;
+  /** Chat fixtures only: retrieval and selection, no answer, no judges (cheap knob sweeps) */
+  retrievalOnly?: boolean;
 }
 
 /**
@@ -204,6 +206,7 @@ const CLI_OPTIONS = {
   "judge-model": { type: "string" },
   rubric: { type: "string" },
   "judge-reasoning": { type: "string" },
+  "retrieval-only": { type: "boolean" },
   "judge-consistency": { type: "string" },
   /** Takes two paths: `--compare <dirA> <dirB>` (the second is the next positional). */
   compare: { type: "string" },
@@ -310,6 +313,7 @@ function parseArgs(args: string[]): CliOptions {
     appendCalibration: values["append-calibration"] ?? false,
     promotionCheckBefore: values["promotion-check"],
     promotionCheckAfter: secondValues.get("promotion-check"),
+    retrievalOnly: values["retrieval-only"] ?? false,
   };
 }
 
@@ -354,6 +358,8 @@ Options:
   --append-calibration     With --score-judge-queue: append the queue's labelled rows to
                            evals/rag/calibration/ (versioned; deduped by labelKey)
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
+  --retrieval-only         Chat fixtures only: run retrieval and context selection, generate no
+                           answer, run no judges. Use for retrieval-knob sweeps (~10x cheaper)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -560,6 +566,16 @@ async function main(): Promise<void> {
       });
     }
   }
+  if (opts.retrievalOnly) {
+    // Only chat has a retrieval stage to stop at; other runners would have to generate.
+    const skipped = fixtureIds.filter((id) => getFixture(id).runner !== "chat");
+    if (skipped.length > 0) {
+      console.log(
+        `--retrieval-only runs chat fixtures only; skipping ${skipped.length} other fixture(s).`
+      );
+    }
+    fixtureIds = fixtureIds.filter((id) => getFixture(id).runner === "chat");
+  }
   if (opts.useCases && !opts.caseId) {
     if (USE_CASE_PACKS.length === 0) {
       console.log("No use-case packs registered (evals/rag/usecases/index.ts).");
@@ -659,7 +675,8 @@ async function main(): Promise<void> {
   let packSourceTexts = new Map<string, SourceText[]>();
   if (expandedFixtures.some((f) => f.useCase)) {
     console.log(`Planned use-case jobs:\n${formatPlannedJobs(expandedFixtures)}\n`);
-    if (!opts.dryRun && !process.env.TOGETHER_AI_API_KEY?.trim()) {
+    // Retrieval-only runs run no judges, so they need no key.
+    if (!opts.dryRun && !opts.retrievalOnly && !process.env.TOGETHER_AI_API_KEY?.trim()) {
       console.error(
         "Use-case packs are scored by rubric judges: set TOGETHER_AI_API_KEY (repo-root .env)."
       );
@@ -678,6 +695,17 @@ async function main(): Promise<void> {
         }
         throw err;
       }
+      // Gold passages must still be in the extracted text, or a drifted PDF would score as misses.
+      const missingPassages = missingExpectedPassages(fixturesToRun, packSourceTexts);
+      if (missingPassages.length > 0) {
+        console.error(
+          [
+            "Expected passages not found in the pack's extracted source text (quote drift or OCR):",
+            ...missingPassages.map((m) => `  - ${m}`),
+          ].join("\n")
+        );
+        process.exit(2);
+      }
     }
   }
 
@@ -691,6 +719,7 @@ async function main(): Promise<void> {
     runEval,
     runEvalOptions: {
       dryRun: opts.dryRun,
+      retrievalOnly: opts.retrievalOnly,
       chatInvoker,
       researchInvoker,
       literatureReviewInvoker,
@@ -735,6 +764,7 @@ async function main(): Promise<void> {
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
+    retrievalOnly: allArtifacts.some((a) => a.retrievalOnly === true),
     groupBySourcePolicy: !!opts.sourceMatrix,
     split: opts.split,
     useCaseByCase: new Map(
@@ -773,7 +803,10 @@ Judge tokens: ${usage.calls} calls, ${usage.promptTokens} prompt ` +
         `Judge self-consistency: ${consistency.agreed}/${consistency.sampled} (${rate}%)`
       );
     }
-    const queue = buildJudgeCalibrationQueue(firstRepeatMetrics, { limit: 20 });
+    // Retrieval-only runs have no judge verdicts to calibrate, so they write no queue.
+    const queue = opts.retrievalOnly
+      ? []
+      : buildJudgeCalibrationQueue(firstRepeatMetrics, { limit: 20 });
     if (queue.length > 0) {
       const queuePath = join("evals/rag/generated", "judge-queue.json");
       mkdirSync(dirname(queuePath), { recursive: true });

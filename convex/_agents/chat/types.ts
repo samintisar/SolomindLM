@@ -58,6 +58,12 @@ export interface ChatAgentContext {
   groundingMode?: "async" | "sync" | "off";
   /** Pre-fetched external source chunks (from web search, etc.) to inject into LLM context */
   externalChunks?: ReferenceChunk[];
+  /**
+   * Eval only. Retrieval and context selection run as usual, then the stream ends with done right
+   * after the references chunk, before any answer generation. Used by the retrieval-only eval runner
+   * (`eval:rag -- --retrieval-only`); production never sets it.
+   */
+  evalRetrievalOnly?: boolean;
   /** Per-notebook chat customization (instruction mode, custom instructions, response length) */
   chatSettings?: {
     instructionMode: "default" | "learningGuide" | "custom";

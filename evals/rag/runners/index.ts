@@ -25,6 +25,8 @@ import type { EvalRunnerResult } from "./types";
 
 export interface RunEvalOptions {
   dryRun?: boolean;
+  /** Chat only: retrieval without generation (`--retrieval-only`) */
+  retrievalOnly?: boolean;
   chatInvoker?: ChatAgentInvoker;
   researchInvoker?: ResearchAgentInvoker;
   literatureReviewInvoker?: LiteratureReviewInvoker;
@@ -46,6 +48,7 @@ export async function runEval(
     fixture,
     config,
     dryRun: options?.dryRun ?? false,
+    retrievalOnly: options?.retrievalOnly ?? false,
   };
 
   const results: EvalRunnerResult[] = [];

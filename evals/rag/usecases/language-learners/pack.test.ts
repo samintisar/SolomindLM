@@ -28,6 +28,17 @@ describe("language-learners pack", () => {
     }
   });
 
+  it("gives each chat fixture 1 to 3 gold passages and no other fixture any", () => {
+    for (const f of fixtures) {
+      if (f.runner === "chat") {
+        expect(f.expectedPassages?.length ?? 0).toBeGreaterThanOrEqual(1);
+        expect(f.expectedPassages?.length ?? 0).toBeLessThanOrEqual(3);
+      } else {
+        expect(f.expectedPassages).toBeUndefined();
+      }
+    }
+  });
+
   it("has the six rubric checks from the design", () => {
     expect(pack.rubric.map((c) => c.id)).toEqual([
       "front-hides-answer",
