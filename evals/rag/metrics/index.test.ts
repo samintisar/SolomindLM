@@ -121,6 +121,36 @@ describe("expectedItemRecall", () => {
   });
 });
 
+describe("punctuation between words", () => {
+  const score = (items: string[], answer: string) =>
+    expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;
+
+  it("matches an item in a CSV cell followed by the next cell", () => {
+    expect(score(["prompt chaining"], '"Prompt Chaining","Breaks a task into steps"')).toBe(1);
+    expect(score(["routing"], "Routing,Sends each request")).toBe(1);
+  });
+
+  it("matches an item followed by a slash or a bracket", () => {
+    expect(score(["tool use"], "Tool Use/Function Calling")).toBe(1);
+    expect(score(["reflection"], "(Reflection)")).toBe(1);
+  });
+
+  it("keeps a possessive with a curly apostrophe as one word", () => {
+    expect(score(["routing"], "Routing’s role is to pick the path.")).toBe(1);
+  });
+
+  it("keeps a decimal as one token, so number ranges and lists do not match it", () => {
+    expect(score(["0.75"], "The kappa was 0.75 overall.")).toBe(1);
+    expect(score(["0.75"], "Scores ranged 0–75.")).toBe(0);
+    expect(score(["4.4"], "4/4 trials, aged 4, 4 cohorts")).toBe(0);
+  });
+
+  it("keeps accented letters inside their word", () => {
+    expect(score(["flexion"], "Une réflexion sur la grammaire.")).toBe(0);
+    expect(score(["passé composé"], "Le passé composé avec avoir.")).toBe(1);
+  });
+});
+
 describe("plural and compound matching", () => {
   const score = (items: string[], answer: string) =>
     expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;

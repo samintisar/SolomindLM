@@ -15,6 +15,7 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
+import { countMatches, normalizeForMatch } from "./index";
 import {
   DEFAULT_LLM_JUDGE_MODEL,
   type LlmJudgeOptions,
@@ -37,14 +38,8 @@ function searchWasSkipped(raw: LiteratureReviewEvalResult | undefined): boolean 
 
 const NO_SEARCH_DETAIL = "No database search: the review used only the user's papers.";
 
-/** Normalize text for keyword matching. */
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+/** Normalize text for keyword matching (shared with the chat matchers). */
+const normalize = normalizeForMatch;
 
 /** Common stopwords to ignore in query keyword extraction. */
 const STOPWORDS = new Set([
@@ -603,17 +598,7 @@ function lrExpectedItemRecall(
     );
   }
 
-  const normalizedText = normalize(reportAndAnswer);
-  const matched: string[] = [];
-  const unmatched: string[] = [];
-
-  for (const item of fixture.expectedItems) {
-    const normalizedItem = normalize(item);
-    const keywords = normalizedItem.split(" ").filter((w) => w.length >= 3);
-    const found = keywords.length === 0 || keywords.some((kw) => normalizedText.includes(kw));
-    if (found) matched.push(item);
-    else unmatched.push(item);
-  }
+  const { matched, unmatched } = countMatches(reportAndAnswer, fixture.expectedItems);
 
   const score =
     fixture.expectedItems.length === 0 ? 1 : matched.length / fixture.expectedItems.length;
