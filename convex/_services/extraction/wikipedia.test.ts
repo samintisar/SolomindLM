@@ -41,6 +41,23 @@ describe("wikipediaArticleForLink", () => {
   });
 });
 
+describe("wikipediaExtractToMarkdown: inline-style formulas", () => {
+  it("handles the {\\textstyle …} annotation like {\\displaystyle …}", () => {
+    const extract = [
+      "The rate ",
+      "  ",
+      "    ",
+      "      η",
+      "    ",
+      "    {\\textstyle \\eta }",
+      "  ",
+      " is small.",
+    ].join("\n");
+
+    expect(wikipediaExtractToMarkdown(extract)).toBe("The rate $\\eta$ is small.");
+  });
+});
+
 describe("wikipediaExtractToMarkdown", () => {
   it("turns section markers into headings and drops link and reference sections", () => {
     const extract = [
