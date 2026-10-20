@@ -4,6 +4,8 @@
  *   2. open-access candidates, best version first: PDFs are stored and OCR'd, HTML pages scraped;
  *   3. the landing page, scraped;
  *   4. otherwise the title + abstract stub, marked abstract only.
+ * Under `fullTextPolicy: "open_license_only"` only openly licensed copies count (steps 1–2) and
+ * step 3 is skipped.
  * Scraped text must pass `isFullTextLength`. All I/O comes in through `deps`, so this is unit-tested
  * without Convex; `embeddingJob` supplies the real storage, OCR and scraper.
  *
@@ -39,12 +41,39 @@ const PDF_OCR_RESERVE_MS = 190_000;
 /** Time needed for the landing-page scrape (`SCRAPE_BUDGET_MS`, 55 s). */
 const LANDING_RESERVE_MS = 60_000;
 
+const OPEN_LICENSE_IDS = new Set(["cc-by", "cc-by-sa", "cc0", "public-domain", "pd"]);
+
+/**
+ * True for licences that allow anyone to redistribute the full text, commercially included:
+ * CC BY, CC BY-SA, CC0 and public domain. Accepts Unpaywall/OpenAlex ids ("cc-by"), labels
+ * ("CC BY 4.0") and creativecommons.org URLs (Crossref). NC/ND variants and publisher
+ * licences are not open.
+ */
+export function isOpenFullTextLicense(license: string | undefined): boolean {
+  const raw = license?.trim().toLowerCase();
+  if (!raw) return false;
+  const url = raw.match(/creativecommons\.org\/(licenses|publicdomain)\/([a-z-]+)/);
+  if (url) {
+    return url[1] === "publicdomain"
+      ? url[2] === "zero" || url[2] === "mark"
+      : url[2] === "by" || url[2] === "by-sa";
+  }
+  const id = raw.replace(/[\s_]+/g, "-").replace(/-\d+(\.\d+)*$/, "");
+  return OPEN_LICENSE_IDS.has(id);
+}
+
 export interface PaperIngestInput {
   title: string;
   paperRecord: PaperRecord;
   fileUrl?: string;
   storageId?: string;
   fullTextSource?: FullTextSource;
+  /**
+   * "open_license_only": keep full text only from an open-access copy under an open licence
+   * (`isOpenFullTextLicense`); never the landing page, and a stored PDF only when its recorded
+   * licence is open. Set on sources that get published (the showcase seed).
+   */
+  fullTextPolicy?: "open_license_only";
 }
 
 export interface PaperIngestDeps {
@@ -254,9 +283,10 @@ export async function ingestPaper(
   const pr = input.paperRecord;
   const abstract = pr.abstract ?? "";
   const deadline = deps.now() + INGEST_DEADLINE_MS;
+  const openOnly = input.fullTextPolicy === "open_license_only";
 
   // 1. A PDF already on the source. A transient OCR failure throws so the caller can retry.
-  if (input.storageId) {
+  if (input.storageId && (!openOnly || isOpenFullTextLicense(input.fullTextSource?.license))) {
     let text = "";
     try {
       text = (await deps.ocrStoredPdf(input.storageId)).trim();
@@ -284,7 +314,9 @@ export async function ingestPaper(
 
   // 2. Open-access candidates.
   const ctx: AttemptContext = { abstract, deps, logger, tried: new Set(), deadline };
-  const candidates = await resolveCandidatesSafely(pr, deps, logger);
+  const candidates = (await resolveCandidatesSafely(pr, deps, logger)).filter(
+    (candidate) => !openOnly || isOpenFullTextLicense(candidate.license)
+  );
   let attempts = 0;
   for (const candidate of candidates) {
     if (attempts >= MAX_CANDIDATE_ATTEMPTS) break;
@@ -309,9 +341,9 @@ export async function ingestPaper(
     }
   }
 
-  // 3. The landing page.
+  // 3. The landing page (never under the open-licence policy: a publisher page has no licence).
   const landing = input.fileUrl?.trim() || pr.landingPageUrl?.trim();
-  if (landing && !ctx.tried.has(candidateKey(landing))) {
+  if (!openOnly && landing && !ctx.tried.has(candidateKey(landing))) {
     if (deadline - deps.now() < LANDING_RESERVE_MS) {
       logger.info("Out of time for the landing page", { landing });
     } else {
