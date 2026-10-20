@@ -15,7 +15,7 @@ export const CACHE_TTL = {
   notebookList: 5 * 60 * 1000, // 5 min for notebook lists
   subscription: 60 * 1000, // 1 min for subscription status
   generatedContent: 7 * 24 * 60 * 60 * 1000, // 7 days for LLM outputs
-  sourceSuggestions: 30 * 60 * 1000, // 30 min for source suggestions
+  sourceSuggestions: 24 * 60 * 60 * 1000, // 24 h; keyed by the source list, so new sources miss
 } as const;
 
 /**

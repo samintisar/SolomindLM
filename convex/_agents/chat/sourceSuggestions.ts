@@ -13,8 +13,11 @@
 
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
+import type { Doc } from "../../_generated/dataModel";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
+import { createCachedAction } from "../../_services/cache/cachedAgent";
 import { uncachedLlmCall } from "../_shared/cachedLlm";
 
 /** Best-effort fixes before JSON.parse (models sometimes emit trailing commas). */
@@ -100,49 +103,38 @@ async function generateSuggestionsWithModel(
   return parsed;
 }
 
-export const generateSuggestionsInternal = internalAction({
+/** Thrown by generateSuggestionsForCache so ActionCache does not store a failed generation. */
+const SUGGESTIONS_FAILED_SKIP_CACHE = "SOURCE_SUGGESTIONS_FAILED_SKIP_CACHE";
+
+/** Prompt line for one source: its name, kind and content flags. */
+function describeSource(d: Doc<"documents">): string {
+  const flags: string[] = [];
+  if (d.metadata?.hasMathNotation) flags.push("math");
+  if (d.metadata?.hasCodeBlocks) flags.push("code");
+  const type =
+    d.fileType === "youtube"
+      ? "YouTube video"
+      : d.fileType === "url"
+        ? "webpage"
+        : d.fileType === "text"
+          ? "text note"
+          : d.fileName?.split(".").pop()?.toUpperCase() || "document";
+  return `- "${d.fileName || "Untitled"}" (${type}${flags.length ? `, ${flags.join(", ")}` : ""})`;
+}
+
+/**
+ * The LLM call behind the cache. Its args are the cache key: the notebook plus the exact source
+ * lines the prompt is built from, so a changed source list misses and anything else hits.
+ */
+export const generateSuggestionsForCache = internalAction({
   args: {
     notebookId: v.id("notebooks"),
-    documentSignature: v.string(),
-    userId: v.id("users"),
+    sourceLines: v.array(v.string()),
   },
-  handler: async (ctx, args) => {
-    const documents = await ctx.runQuery(
-      internal.documents.internal.listDocumentsForNotebookReadInternal,
-      {
-        notebookId: args.notebookId,
-        userId: args.userId,
-      }
-    );
-
-    const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
-
-    if (completed.length === 0) {
-      return null;
-    }
-
-    // Build compact document summary for LLM
-    const docLines = completed
-      .slice(0, 20)
-      .map((d: any) => {
-        const flags: string[] = [];
-        if (d.metadata?.hasMathNotation) flags.push("math");
-        if (d.metadata?.hasCodeBlocks) flags.push("code");
-        const type =
-          d.fileType === "youtube"
-            ? "YouTube video"
-            : d.fileType === "url"
-              ? "webpage"
-              : d.fileType === "text"
-                ? "text note"
-                : d.fileName?.split(".").pop()?.toUpperCase() || "document";
-        return `- "${d.fileName || "Untitled"}" (${type}${flags.length ? `, ${flags.join(", ")}` : ""})`;
-      })
-      .join("\n");
-
+  handler: async (_ctx, args): Promise<{ summary: string; suggestions: string[] }> => {
     const prompt = `You are an AI study assistant. A student has uploaded these sources to a notebook:
 
-${docLines}
+${args.sourceLines.join("\n")}
 
 Generate a JSON response with:
 - "summary": a one-line summary of what these sources cover (max 15 words)
@@ -151,21 +143,75 @@ Generate a JSON response with:
 Keep suggestions short (under 10 words each) and varied. Output a single JSON object only — no markdown fences, no commentary before or after the object.`;
 
     try {
-      let parsed: { summary: string; suggestions: string[] };
       try {
-        parsed = await generateSuggestionsWithModel(env.FAST_LLM, prompt);
+        return await generateSuggestionsWithModel(env.FAST_LLM, prompt);
       } catch (firstError) {
-        if (env.SMART_LLM !== env.FAST_LLM) {
-          console.warn(
-            "[sourceSuggestions] fast model failed, retrying with smart model:",
-            firstError
-          );
-          parsed = await generateSuggestionsWithModel(env.SMART_LLM, prompt);
-        } else {
-          throw firstError;
-        }
+        if (env.SMART_LLM === env.FAST_LLM) throw firstError;
+        console.warn(
+          "[sourceSuggestions] fast model failed, retrying with smart model:",
+          firstError
+        );
+        return await generateSuggestionsWithModel(env.SMART_LLM, prompt);
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith("LLM API error:")) {
+        console.warn("[sourceSuggestions] LLM API request failed:", error);
+      } else {
+        console.warn("[sourceSuggestions] LLM output parse failed:", error);
+      }
+      throw new Error(SUGGESTIONS_FAILED_SKIP_CACHE);
+    }
+  },
+});
 
+/**
+ * Every reader of a notebook (its owner, editors, public viewers) opens the same empty chat, so
+ * the suggestions are shared: one LLM call per source list per TTL, not one per open.
+ */
+const suggestionsCache = createCachedAction(
+  internal._agents.chat.sourceSuggestions.generateSuggestionsForCache,
+  { ttl: withJitter(CACHE_TTL.sourceSuggestions, 0.1), name: "source-suggestions-v1" }
+);
+
+export const generateSuggestionsInternal = internalAction({
+  args: {
+    notebookId: v.id("notebooks"),
+    documentSignature: v.string(),
+    userId: v.id("users"),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    sourceCount: number;
+    summary: string | null;
+    suggestions: string[] | null;
+    documentSignature: string;
+  } | null> => {
+    // Also the access check: throws unless the user can read the notebook.
+    const documents = await ctx.runQuery(
+      internal.documents.internal.listDocumentsForNotebookReadInternal,
+      {
+        notebookId: args.notebookId,
+        userId: args.userId,
+      }
+    );
+
+    const completed = documents.filter((d) => d.status === "completed");
+
+    if (completed.length === 0) {
+      return null;
+    }
+
+    // The client's signature is only echoed back; the cache key is built here from the sources.
+    const sourceLines = completed.slice(0, 20).map(describeSource);
+
+    try {
+      const parsed: { summary: string; suggestions: string[] } = await suggestionsCache.fetch(ctx, {
+        notebookId: args.notebookId,
+        sourceLines,
+      });
       return {
         sourceCount: completed.length,
         summary: parsed.summary.slice(0, 100),
@@ -174,10 +220,8 @@ Keep suggestions short (under 10 words each) and varied. Output a single JSON ob
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith("LLM API error:")) {
-        console.warn("[sourceSuggestions] LLM API request failed:", error);
-      } else {
-        console.warn("[sourceSuggestions] LLM output parse failed:", error);
+      if (!message.includes(SUGGESTIONS_FAILED_SKIP_CACHE)) {
+        console.warn("[sourceSuggestions] suggestion cache failed:", error);
       }
       return {
         sourceCount: completed.length,

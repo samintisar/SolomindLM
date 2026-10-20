@@ -5,7 +5,6 @@ import { useSubscriptionStatus } from "../billing/services/subscriptionApi";
 export interface NotebookContextType {
   // Derived data
   notebookList: NotebookItem[];
-  featuredNotebooks: NotebookItem[];
   recentNotebooks: NotebookItem[];
   activeNotebook: NotebookItem | undefined;
   /** True until the notebooks and folders queries have returned. */

@@ -22,6 +22,8 @@ interface LiteratureStudioViewProps {
   onClose: () => void;
   onOpenSavedReport?: (reportId: Id<"reports">) => void;
   onOpenSavedSpreadsheet?: (spreadsheetId: Id<"spreadsheets">) => void;
+  /** Viewer of a public notebook: read and export only. */
+  readOnly?: boolean;
 }
 
 export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
@@ -30,6 +32,7 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
   onClose,
   onOpenSavedReport,
   onOpenSavedSpreadsheet,
+  readOnly = false,
 }) => {
   if (view.kind === "table") {
     return (
@@ -38,6 +41,7 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
         notebookId={notebookId}
         onClose={onClose}
         onOpenSavedSpreadsheet={onOpenSavedSpreadsheet}
+        readOnly={readOnly}
       />
     );
   }
@@ -47,6 +51,7 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
       reportId={view.reportId}
       onClose={onClose}
       onOpenSavedReport={onOpenSavedReport}
+      readOnly={readOnly}
     />
   );
 };
@@ -56,11 +61,13 @@ function LiteratureTableStudioShell({
   notebookId,
   onClose,
   onOpenSavedSpreadsheet,
+  readOnly,
 }: {
   tableId: Id<"literatureTables">;
   notebookId: Id<"notebooks">;
   onClose: () => void;
   onOpenSavedSpreadsheet?: (spreadsheetId: Id<"spreadsheets">) => void;
+  readOnly: boolean;
 }) {
   const table = useLiteratureTable(tableId);
   const saveAsStudioSpreadsheet = useSaveLiteratureTableAsStudioSpreadsheet();
@@ -116,8 +123,9 @@ function LiteratureTableStudioShell({
           }}
           notebookId={notebookId}
           onBack={onClose}
-          onSave={handleSave}
+          onSave={readOnly ? undefined : handleSave}
           isSaving={isSaving}
+          readOnly={readOnly}
         />
       )}
     </PanelShell>
@@ -128,10 +136,12 @@ function LiteratureReportStudioShell({
   reportId,
   onClose,
   onOpenSavedReport,
+  readOnly,
 }: {
   reportId: Id<"literatureReports">;
   onClose: () => void;
   onOpenSavedReport?: (reportId: Id<"reports">) => void;
+  readOnly: boolean;
 }) {
   const detail = useLiteratureReportDetail(reportId);
   const saveAsStudioReport = useSaveLiteratureReportAsStudioReport();
@@ -164,7 +174,8 @@ function LiteratureReportStudioShell({
           citations={detail.citations}
           workflowProvenance={detail.workflowProvenance}
           onBack={onClose}
-          onSaveAndEdit={handleSaveAndEdit}
+          onSaveAndEdit={readOnly ? undefined : handleSaveAndEdit}
+          readOnly={readOnly}
         />
       )}
     </PanelShell>

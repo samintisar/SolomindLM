@@ -1,23 +1,30 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { withWrittenAnswer, withWrittenDraft } from "../../_model/practiceProgress";
 import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  canReadNotebook,
-} from "../../_lib/notebookAccess";
+  getPracticeTarget,
+  saveViewerProgress,
+  viewerPracticeRow,
+  viewerPracticeRows,
+} from "../../_model/studioProgress";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
-
-const MAX_DRAFT_ANSWER_LENGTH = 50_000;
+import { deletePracticeProgress } from "../practice";
 
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    if (!(await canReadNotebook(ctx, args.notebookId, userId))) return [];
-    return await WrittenQuestions.listByNotebook(ctx, args.notebookId);
+    const access = await getNotebookAccess(ctx, args.notebookId, userId);
+    if (!access) return [];
+    const sets = await WrittenQuestions.listByNotebook(ctx, args.notebookId);
+    // Answers and grades on the shared row are the owner's; a viewer sees their own.
+    return access === "viewer"
+      ? await viewerPracticeRows(ctx, "writtenQuestions", sets, userId, args.notebookId)
+      : sets;
   },
 });
 
@@ -28,12 +35,11 @@ export const get = query({
     if (!userId) return null;
     const writtenQuestion = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!writtenQuestion) return null;
-    try {
-      await assertCanReadNotebook(ctx, writtenQuestion.notebookId, userId);
-    } catch {
-      return null;
-    }
-    return writtenQuestion;
+    const access = await getNotebookAccess(ctx, writtenQuestion.notebookId, userId);
+    if (!access) return null;
+    return access === "viewer"
+      ? await viewerPracticeRow(ctx, "writtenQuestions", writtenQuestion, userId)
+      : writtenQuestion;
   },
 });
 
@@ -48,14 +54,15 @@ export const getInternal = internalQuery({
 });
 
 /**
- * Internal: Load written-question set when the user can edit the notebook (actions without query auth).
+ * Internal: Load a written-question set for someone who may practise on it: the owner, an editor
+ * or a public notebook's viewer (actions without query auth). Throws for anyone else.
  */
 export const getWrittenQuestionForUserInternal = internalQuery({
   args: { id: v.id("writtenQuestions"), userId: v.id("users") },
   handler: async (ctx, args) => {
     const wq = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!wq) return null;
-    await assertCanEditNotebook(ctx, wq.notebookId, args.userId);
+    await getPracticeTarget(ctx, wq.notebookId, args.userId);
     return wq;
   },
 });
@@ -140,13 +147,26 @@ export const saveUserAnswerDraft = mutation({
     if (!userId) throw new Error("Unauthenticated");
     const existing = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!existing) throw new Error("Written question set not found or access denied");
-    await assertCanEditNotebook(ctx, existing.notebookId, userId);
+    const target = await getPracticeTarget(ctx, existing.notebookId, userId);
     const known = (existing.questionsData ?? []).some(
       (q: { id?: string }) => q?.id === args.questionId
     );
     if (!known) throw new Error("Question not found");
-    if (args.answer.length > MAX_DRAFT_ANSWER_LENGTH) {
+    if (args.answer.length > WrittenQuestions.MAX_WRITTEN_ANSWER_LENGTH) {
       throw new Error("Answer is too long to save");
+    }
+    if (target === "viewer") {
+      await saveViewerProgress(
+        ctx,
+        {
+          userId,
+          itemType: "writtenQuestions",
+          itemId: existing._id,
+          notebookId: existing.notebookId,
+        },
+        (current) => withWrittenDraft(current, args.questionId, args.answer)
+      );
+      return;
     }
     await WrittenQuestions.saveWrittenQuestionUserAnswerDraft(
       ctx,
@@ -166,6 +186,7 @@ export const remove = mutation({
     if (!writtenQuestion) throw new Error("Written question set not found or access denied");
     await assertCanEditNotebook(ctx, writtenQuestion.notebookId, userId);
     await WrittenQuestions.deleteWrittenQuestion(ctx, args.writtenQuestionId);
+    await deletePracticeProgress(ctx, { itemId: args.writtenQuestionId });
   },
 });
 
@@ -194,13 +215,34 @@ export const patch = internalMutation({
   },
 });
 
+/**
+ * Internal: Record one answer's grading state for `userId`: on the shared set for the owner and
+ * editors, in their own progress for a public notebook's viewer.
+ */
 export const patchUserAnswer = internalMutation({
   args: {
     writtenQuestionId: v.id("writtenQuestions"),
+    userId: v.id("users"),
     questionId: v.string(),
     answerData: v.any(),
   },
   handler: async (ctx, args) => {
+    const set = await WrittenQuestions.getWrittenQuestion(ctx, args.writtenQuestionId);
+    if (!set) throw new Error("Written question set not found");
+    const target = await getPracticeTarget(ctx, set.notebookId, args.userId);
+    if (target === "viewer") {
+      await saveViewerProgress(
+        ctx,
+        {
+          userId: args.userId,
+          itemType: "writtenQuestions",
+          itemId: set._id,
+          notebookId: set.notebookId,
+        },
+        (current) => withWrittenAnswer(current, args.questionId, args.answerData)
+      );
+      return;
+    }
     await WrittenQuestions.patchWrittenQuestionUserAnswer(
       ctx,
       args.writtenQuestionId,

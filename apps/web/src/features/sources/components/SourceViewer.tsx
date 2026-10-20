@@ -116,7 +116,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     }
     if (pdfUrl) return; // already have URL
     setPdfUrlLoading(true);
-    getSignedUrl({ storageId: pdfStorageId })
+    getSignedUrl({ storageId: pdfStorageId, documentId: source.id })
       .then((url) => {
         setPdfUrl(url ?? null);
       })
@@ -125,7 +125,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         setPdfUrl(null);
       })
       .finally(() => setPdfUrlLoading(false));
-  }, [viewMode, pdfStorageId, getSignedUrl, pdfUrl]);
+  }, [viewMode, pdfStorageId, source.id, getSignedUrl, pdfUrl]);
 
   // Reset generation state when switching documents
   useEffect(() => {

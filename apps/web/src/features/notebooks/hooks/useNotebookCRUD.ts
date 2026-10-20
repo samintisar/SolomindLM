@@ -67,7 +67,6 @@ export function useNotebookCRUD({
         if (updates.title !== undefined) updatePayload.title = updates.title;
         if (updates.coverColor !== undefined) updatePayload.coverColor = updates.coverColor;
         if (updates.icon !== undefined) updatePayload.icon = updates.icon;
-        if (updates.isFeatured !== undefined) updatePayload.isFeatured = updates.isFeatured;
 
         await updateNotebook(id, updatePayload);
 

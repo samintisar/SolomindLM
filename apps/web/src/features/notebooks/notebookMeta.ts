@@ -20,13 +20,16 @@ export function formatShortDate(
 
 /**
  * Created date, not "edited": `notebooks.updatedAt` only moves on rename/customize/move, so an
- * "edited" label would be wrong after adding sources or chatting.
+ * "edited" label would be wrong after adding sources or chatting. No count when the listing
+ * doesn't carry one (public listings).
  */
 export function notebookMeta(
   notebook: Pick<NotebookItem, "sourceCount" | "created_at">,
   now?: Date
 ): string {
-  const parts = [count(notebook.sourceCount ?? 0, "source", "sources")];
+  const parts: string[] = [];
+  if (notebook.sourceCount !== undefined)
+    parts.push(count(notebook.sourceCount, "source", "sources"));
   const date = formatShortDate(notebook.created_at, now);
   if (date) parts.push(date);
   return parts.join(" · ");

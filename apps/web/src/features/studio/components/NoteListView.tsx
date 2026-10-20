@@ -19,6 +19,8 @@ interface NoteListViewProps {
   onEditStart: (note: Note) => void;
   onEditSave: () => void;
   onEditKeyDown: (e: React.KeyboardEvent) => void;
+  /** Viewer of a public notebook: no tool grid and no rename/delete. */
+  readOnly?: boolean;
 }
 
 /**
@@ -39,6 +41,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   onEditStart,
   onEditSave,
   onEditKeyDown,
+  readOnly = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -50,7 +53,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
 
   return (
     <div className="p-4 space-y-8">
-      <ToolGrid tools={tools} onToolClick={onToolClick} />
+      {!readOnly && <ToolGrid tools={tools} onToolClick={onToolClick} />}
 
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
@@ -90,6 +93,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                 onClick={() => onNoteClick(note)}
                 onDelete={() => onDeleteNote(note)}
                 onPlayAudio={onPlayAudio}
+                readOnly={readOnly}
               />
             ))}
             {filteredNotes.length === 0 && (
@@ -98,7 +102,9 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                 <p className="text-sm text-muted-foreground">
                   {searchQuery.trim()
                     ? "No notes match your search."
-                    : "No saved notes yet. Create one to get started!"}
+                    : readOnly
+                      ? "No Studio items in this notebook."
+                      : "No saved notes yet. Create one to get started!"}
                 </p>
               </div>
             )}

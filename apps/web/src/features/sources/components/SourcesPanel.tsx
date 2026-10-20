@@ -38,6 +38,8 @@ interface SourcesPanelProps {
   focusSourceRequest?: SourcesPanelFocusRequest | null;
   onFocusSourceHandled?: () => void;
   onDiscussTopic?: (topic: string) => void;
+  /** Viewer of a public notebook: no add, delete, rename, refresh or discover. */
+  readOnly?: boolean;
 }
 
 const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
@@ -49,6 +51,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
   focusSourceRequest,
   onFocusSourceHandled,
   onDiscussTopic,
+  readOnly = false,
 }) => {
   const {
     sources,
@@ -419,6 +422,7 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
           renameValue={renameValue}
           onRenameChange={setRenameValue}
           onRenameSubmit={handleRenameSource}
+          readOnly={readOnly}
         />
 
         <div className="flex-1 overflow-y-auto w-full">
@@ -463,59 +467,64 @@ const SourcesPanelContent: React.FC<SourcesPanelProps> = ({
               onRefreshAll={handleRefreshAll}
               canRefreshAll={canRefreshAll}
               isRefreshing={isRefreshingAll}
+              readOnly={readOnly}
             />
           )}
         </div>
       </div>
 
-      {/* Modals */}
-      <AddSourceDialog
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
-        sourcesCount={sources.length}
-        userId={userId}
-        noteId={noteId}
-        isUploading={sourceUpload.isUploading}
-        isDragging={sourceUpload.isDragging}
-        onDragEnter={sourceUpload.handleDragEnter}
-        onDragLeave={sourceUpload.handleDragLeave}
-        onDragOver={sourceUpload.handleDragOver}
-        onDrop={sourceUpload.handleDrop}
-        fileInputRef={sourceUpload.fileInputRef}
-        onFileSelect={sourceUpload.handleFileSelect}
-        onUrlUpload={sourceUpload.handleUrlUpload}
-        onVideoUpload={sourceUpload.handleSocialMediaUpload}
-        onTextUpload={sourceUpload.handleTextUpload}
-        onDiscoverClick={() => setIsDiscoverOpen(true)}
-        onGoogleDriveClick={() => googleDriveRef.current?.open()}
-      />
+      {/* Modals: none of them apply to a read-only viewer. */}
+      {!readOnly && (
+        <>
+          <AddSourceDialog
+            open={isAddModalOpen}
+            onOpenChange={setIsAddModalOpen}
+            sourcesCount={sources.length}
+            userId={userId}
+            noteId={noteId}
+            isUploading={sourceUpload.isUploading}
+            isDragging={sourceUpload.isDragging}
+            onDragEnter={sourceUpload.handleDragEnter}
+            onDragLeave={sourceUpload.handleDragLeave}
+            onDragOver={sourceUpload.handleDragOver}
+            onDrop={sourceUpload.handleDrop}
+            fileInputRef={sourceUpload.fileInputRef}
+            onFileSelect={sourceUpload.handleFileSelect}
+            onUrlUpload={sourceUpload.handleUrlUpload}
+            onVideoUpload={sourceUpload.handleSocialMediaUpload}
+            onTextUpload={sourceUpload.handleTextUpload}
+            onDiscoverClick={() => setIsDiscoverOpen(true)}
+            onGoogleDriveClick={() => googleDriveRef.current?.open()}
+          />
 
-      <DiscoverSourcesDialog
-        open={isDiscoverOpen}
-        onOpenChange={setIsDiscoverOpen}
-        onAddSource={onAddSource}
-        notebookSources={sources}
-        userId={userId}
-        noteId={noteId}
-        onDocumentUploaded={onDocumentUploaded}
-        onAddSourcesClick={() => {
-          setIsDiscoverOpen(false);
-          setIsAddModalOpen(true);
-        }}
-      />
+          <DiscoverSourcesDialog
+            open={isDiscoverOpen}
+            onOpenChange={setIsDiscoverOpen}
+            onAddSource={onAddSource}
+            notebookSources={sources}
+            userId={userId}
+            noteId={noteId}
+            onDocumentUploaded={onDocumentUploaded}
+            onAddSourcesClick={() => {
+              setIsDiscoverOpen(false);
+              setIsAddModalOpen(true);
+            }}
+          />
 
-      <input
-        ref={pdfInputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="hidden"
-        aria-hidden
-        tabIndex={-1}
-        onChange={handlePdfChosen}
-      />
-      {isGoogleDrivePickerConfigured ? (
-        <GoogleDrivePicker ref={googleDriveRef} onFilesSelected={handleGoogleDriveFiles} />
-      ) : null}
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            className="hidden"
+            aria-hidden
+            tabIndex={-1}
+            onChange={handlePdfChosen}
+          />
+          {isGoogleDrivePickerConfigured ? (
+            <GoogleDrivePicker ref={googleDriveRef} onFilesSelected={handleGoogleDriveFiles} />
+          ) : null}
+        </>
+      )}
       <ConfirmDialogComponent />
     </>
   );

@@ -287,3 +287,49 @@ describe("assertNotebookOwner", () => {
     ).rejects.toThrow("Notebook not found");
   });
 });
+
+describe("public notebooks", () => {
+  async function makePublic(t: ReturnType<typeof convexTest>, notebookId: Id<"notebooks">) {
+    await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: true, publishedAt: Date.now() }));
+  }
+
+  test("a stranger is a viewer of a public notebook", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const stranger = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    await makePublic(t, notebookId);
+    expect(await t.run((ctx) => getNotebookAccess(ctx, notebookId, stranger))).toBe("viewer");
+    expect(await t.run((ctx) => canReadNotebook(ctx, notebookId, stranger))).toBe(true);
+  });
+
+  test("a stranger has no access to a private notebook", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const stranger = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    expect(await t.run((ctx) => getNotebookAccess(ctx, notebookId, stranger))).toBeNull();
+  });
+
+  test("owner and editor keep their roles on a public notebook", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const editor = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    await seedNotebookMember(t, notebookId, editor);
+    await makePublic(t, notebookId);
+    expect(await t.run((ctx) => getNotebookAccess(ctx, notebookId, owner))).toBe("owner");
+    expect(await t.run((ctx) => getNotebookAccess(ctx, notebookId, editor))).toBe("editor");
+  });
+
+  test("a viewer cannot edit", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const stranger = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+    await makePublic(t, notebookId);
+    await expect(t.run((ctx) => assertCanEditNotebook(ctx, notebookId, stranger))).rejects.toThrow(
+      "Access denied"
+    );
+  });
+});
