@@ -172,7 +172,6 @@ const US_GOV = "Public domain (U.S. federal government work)";
 const SEC_FILING =
   "SEC EDGAR public filing (sec.gov: public information, may be copied with citation)";
 const ARXIV_CC_BY = "CC BY 4.0 (arXiv)";
-const D2L = "CC BY-SA 4.0 (Dive into Deep Learning, d2l.ai)";
 /** Approved for this notebook only (2026-10-19): attribution-only, like CC BY. */
 const PYTORCH_TUTORIALS = "BSD-3-Clause (pytorch/tutorials, © PyTorch contributors)";
 const ONET =
@@ -828,24 +827,6 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         title: "Learn the Basics: Save and Load the Model (PyTorch Tutorials)",
         url: "https://docs.pytorch.org/tutorials/beginner/basics/saveloadrun_tutorial.html",
         licence: PYTORCH_TUTORIALS,
-      },
-      {
-        kind: "url",
-        title: "Data Manipulation (Dive into Deep Learning)",
-        url: "https://d2l.ai/chapter_preliminaries/ndarray.html",
-        licence: D2L,
-      },
-      {
-        kind: "url",
-        title: "Automatic Differentiation (Dive into Deep Learning)",
-        url: "https://d2l.ai/chapter_preliminaries/autograd.html",
-        licence: D2L,
-      },
-      {
-        kind: "url",
-        title: "Linear Regression Implementation from Scratch (Dive into Deep Learning)",
-        url: "https://d2l.ai/chapter_linear-regression/linear-regression-scratch.html",
-        licence: D2L,
       },
       {
         kind: "url",
