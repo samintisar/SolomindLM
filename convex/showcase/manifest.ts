@@ -626,12 +626,8 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
     studio: [
       { kind: "report", reportType: "briefing", promptKey: "market.briefing" },
       { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "market.table" },
-      {
-        kind: "infographic",
-        promptKey: "market.infographic",
-        orientation: "portrait",
-        detailLevel: "standard",
-      },
+      // No infographic: the generated image invented most of its figures (the image model gets
+      // no data). Add one back once infographics draw from the sources' numbers.
       { kind: "audio", audioType: "debate", length: "default", promptKey: "decision.debate" },
     ],
   },
