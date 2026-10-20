@@ -5,6 +5,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
+import { CHUNK_PAGE_SIZE } from "./chunks";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -55,28 +56,50 @@ describe("chunk text for Studio jobs", () => {
     const { t, a, chunk } = await setup();
     await chunk(a, 0, [1, 0]);
     await chunk(a, 1, [0, 1]);
-    const rows = await t.query(internal.documents.chunks.listChunkTexts, { documentId: a });
-    expect(rows).toEqual([
+    const rows = await t.query(internal.documents.chunks.listChunkTexts, {
+      documentId: a,
+      cursor: null,
+    });
+    expect(rows.isDone).toBe(true);
+    expect(rows.page).toEqual([
       { documentId: a, chunkIndex: 0, content: `chunk 0 of ${a}`, sectionTitle: "Intro" },
       { documentId: a, chunkIndex: 1, content: `chunk 1 of ${a}` },
     ]);
   });
 
-  test("scores a document against a topic from its best chunks; null with no embeddings", async () => {
-    const { t, a, b, chunk } = await setup();
+  test("scores each chunk against a topic; chunks without a matching embedding are skipped", async () => {
+    const { t, a, chunk } = await setup();
     await chunk(a, 0, [1, 0]);
     await chunk(a, 1, [0, 1]);
-    const score = await t.query(internal.documents.chunks.documentTopicScore, {
+    await chunk(a, 2, []);
+    const { page } = await t.query(internal.documents.chunks.chunkTopicSimilarityPage, {
       documentId: a,
       topicEmbedding: [1, 0],
+      cursor: null,
     });
-    expect(score).toBeCloseTo(0.5);
-    expect(
-      await t.query(internal.documents.chunks.documentTopicScore, {
-        documentId: b,
-        topicEmbedding: [1, 0],
-      })
-    ).toBeNull();
+    expect(page.map((s) => s.similarity).sort()).toEqual([0, 1]);
+  });
+
+  test("fetchChunks reads a source larger than one page, in order", async () => {
+    const { t, a, userId, notebookId } = await setup();
+    const count = CHUNK_PAGE_SIZE + 5;
+    await t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        await ctx.db.insert("documentChunks", {
+          documentId: a,
+          userId,
+          notebookId,
+          content: `chunk ${i}`,
+          chunkIndex: i,
+          embedding: [1, 0],
+          createdAt: Date.now(),
+        });
+      }
+    });
+    const rows = await t.action(internal.documents.chunks.fetchChunks, { documentIds: [a] });
+    expect(rows.map((r) => r.content)).toEqual(
+      Array.from({ length: count }, (_, i) => `chunk ${i}`)
+    );
   });
 
   test("fetchChunks returns every document's text, sorted, with no topic", async () => {

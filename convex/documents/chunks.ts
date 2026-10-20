@@ -91,36 +91,95 @@ type ChunkText = Pick<
   "documentId" | "chunkIndex" | "content" | "sectionTitle"
 >;
 
-/** Internal: One document's chunks in order, without their embeddings. */
+/**
+ * Chunks read per query. A query reads whole rows, embedding included (~13 KB each), so one
+ * large source read in a single query passes Convex's 16 MiB read limit; a page stays well under.
+ */
+export const CHUNK_PAGE_SIZE = 200;
+
+const cursorValidator = v.union(v.string(), v.null());
+
+type Page<T> = { page: T[]; isDone: boolean; continueCursor: string };
+
+/** Every page `readPage` returns, from the first. */
+async function readAllPages<T>(readPage: (cursor: string | null) => Promise<Page<T>>) {
+  const all: T[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const { page, isDone, continueCursor }: Page<T> = await readPage(cursor);
+    all.push(...page);
+    if (isDone) return all;
+    cursor = continueCursor;
+  }
+}
+
+/** Internal: One page of a document's chunks in order, without their embeddings. */
 export const listChunkTexts = internalQuery({
-  args: { documentId: v.id("documents") },
-  handler: async (ctx, args): Promise<ChunkText[]> => {
-    const chunks = await ctx.db
+  args: { documentId: v.id("documents"), cursor: cursorValidator },
+  handler: async (ctx, args): Promise<Page<ChunkText>> => {
+    const result = await ctx.db
       .query("documentChunks")
       .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
       .order("asc")
-      .collect();
-    return chunks.map(({ documentId, chunkIndex, content, sectionTitle }) => ({
-      documentId,
-      chunkIndex,
-      content,
-      ...(sectionTitle !== undefined ? { sectionTitle } : {}),
-    }));
+      .paginate({ cursor: args.cursor, numItems: CHUNK_PAGE_SIZE });
+    return {
+      page: result.page.map(({ documentId, chunkIndex, content, sectionTitle }) => ({
+        documentId,
+        chunkIndex,
+        content,
+        ...(sectionTitle !== undefined ? { sectionTitle } : {}),
+      })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 
-/** Internal: How closely one document matches a topic embedding; null if none of its chunks has one. */
-export const documentTopicScore = internalQuery({
-  args: { documentId: v.id("documents"), topicEmbedding: v.array(v.float64()) },
-  handler: async (ctx, args): Promise<number | null> => {
-    const chunks = await ctx.db
+/** Internal: How closely each chunk on one page of a document matches a topic embedding. */
+export const chunkTopicSimilarityPage = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+    topicEmbedding: v.array(v.float64()),
+    cursor: cursorValidator,
+  },
+  handler: async (ctx, args): Promise<Page<{ documentId: string; similarity: number }>> => {
+    const result = await ctx.db
       .query("documentChunks")
       .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-      .collect();
-    const scores = documentTopicScores(chunkTopicSimilarities(chunks, args.topicEmbedding));
-    return scores.get(args.documentId) ?? null;
+      .paginate({ cursor: args.cursor, numItems: CHUNK_PAGE_SIZE });
+    return {
+      page: chunkTopicSimilarities(result.page, args.topicEmbedding),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
+
+/** How closely one document matches a topic embedding; null if none of its chunks has one. */
+async function documentTopicScore(
+  ctx: ActionCtx,
+  documentId: Id<"documents">,
+  topicEmbedding: number[]
+): Promise<number | null> {
+  const similarities = await readAllPages((cursor) =>
+    ctx.runQuery(internal.documents.chunks.chunkTopicSimilarityPage, {
+      documentId,
+      topicEmbedding,
+      cursor,
+    })
+  );
+  return documentTopicScores(similarities).get(documentId) ?? null;
+}
+
+/** One document's chunks in order, without their embeddings. */
+async function documentChunkTexts(
+  ctx: ActionCtx,
+  documentId: Id<"documents">
+): Promise<ChunkText[]> {
+  return await readAllPages((cursor) =>
+    ctx.runQuery(internal.documents.chunks.listChunkTexts, { documentId, cursor })
+  );
+}
 
 /**
  * The sources that match `topic` (#288). Each source is scored in its own query, so the
@@ -145,14 +204,15 @@ async function documentsForTopic(
     });
     return documentIds;
   }
+  // Each score is one number, so the sources can be scored in parallel.
+  const documentScores = await Promise.all(
+    documentIds.map((documentId) => documentTopicScore(ctx, documentId, topicEmbedding))
+  );
   const scores = new Map<string, number>();
-  for (const documentId of documentIds) {
-    const score = await ctx.runQuery(internal.documents.chunks.documentTopicScore, {
-      documentId,
-      topicEmbedding,
-    });
+  documentIds.forEach((documentId, i) => {
+    const score = documentScores[i];
     if (score !== null) scores.set(documentId, score);
-  }
+  });
   if (scores.size === 0) return documentIds;
   const { keep, dropped } = selectTopicDocuments(scores);
   // The request text is user content, so only its length is logged.
@@ -190,12 +250,9 @@ export const fetchChunks = internalAction({
         : args.documentIds;
 
     // Chunk text only: full rows with embeddings ran a 13-source notebook out of memory.
-    let allChunks: ChunkText[] = [];
-    for (const documentId of documentIds) {
-      allChunks.push(
-        ...(await ctx.runQuery(internal.documents.chunks.listChunkTexts, { documentId }))
-      );
-    }
+    let allChunks: ChunkText[] = (
+      await Promise.all(documentIds.map((documentId) => documentChunkTexts(ctx, documentId)))
+    ).flat();
 
     if (args.excludeReferenceLists) {
       const before = allChunks.length;
