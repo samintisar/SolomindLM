@@ -282,13 +282,6 @@ Rubric criteria: correct figures; the right section of the filing; a sound inter
 6. A checklist of questions to answer before deciding.
 Cite every figure with its date.`,
   },
-  "market.infographic": {
-    title: `${MARKET} · Key numbers at a glance`,
-    description:
-      "An infographic of the five to seven numbers and trends that matter most in a market.",
-    studioTool: "infographic",
-    text: `Show the five to seven numbers and trends that matter most for this market, each with a one-line takeaway and the year it refers to.`,
-  },
 
   // ── Primary sources (history, civics, humanities) ──────────────────────
   "documents.essay": {

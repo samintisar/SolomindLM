@@ -193,14 +193,10 @@ describe("SHOWCASE_PROMPTS", () => {
   });
 
   test("every pack prompt is used by a showcase notebook", () => {
-    // In the Prompt Library for users, but not shown in a notebook (see the battery notebook).
-    const libraryOnly = new Set(["market.infographic"]);
     const used = new Set(
       SHOWCASE_NOTEBOOKS.flatMap((n) => n.studio.flatMap((item) => item.promptKey ?? []))
     );
-    expect(
-      Object.keys(SHOWCASE_PROMPTS).filter((key) => !used.has(key) && !libraryOnly.has(key))
-    ).toEqual([]);
+    expect(Object.keys(SHOWCASE_PROMPTS).filter((key) => !used.has(key))).toEqual([]);
   });
 
   test("withPromptText puts the prompt in the field the Studio job reads", () => {
