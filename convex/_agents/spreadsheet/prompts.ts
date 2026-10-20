@@ -2,7 +2,7 @@
 /**
  * Prompt templates for SpreadsheetGraph.
  * STRATEGY: Context-First Aggregation (The "NotebookLM" Approach)
- * 1. Map: Identify Concepts & Collect Examples (don't format yet).
+ * 1. Map: Note the items the request is about, with their details nested under them (don't format yet).
  * 2. Collapse: Merge & Deduplicate details about the same concepts.
  * 3. Reduce: Synthesize a high-level table where 1 Row = 1 Concept.
  * Every spreadsheet fills {customPrompt} with a request: the user's own, or a built-in format's
@@ -13,8 +13,11 @@
 // SYSTEM PROMPTS
 // ============================================================
 
+// Notes keep the source's own hierarchy. Asked for every "distinct concept, method or entity", the map
+// model promoted an item's techniques and examples to items of their own, and the reduce then filled
+// the table with those sub-points and dropped real items.
 export const MAP_SYSTEM_PROMPT =
-  "You are a Research Assistant. Analyze the text to identify distinct concepts, methods, or entities. Collect all relevant details and examples for each. Do not format as a table yet.";
+  "You are a Research Assistant. Take notes on the text for the user's request: identify the items the request is about and collect every relevant detail and example for each. Keep the text's own structure: the parts, steps, techniques and examples of an item are details of that item, not separate items. Do not format as a table yet.";
 
 export const COLLAPSE_SYSTEM_PROMPT =
   "You are a Technical Editor. Consolidate fragmented research notes into a Master List of Concepts. Merge details about the same concept into single blocks. Remove exact duplicates.";
@@ -28,10 +31,10 @@ export const REDUCE_SYSTEM_PROMPT =
 
 export const MAP_PROMPT = `{customPrompt}
 
-GOAL: Extract details based on the user's request, grouping by the main subject.
-- Identify the main subjects/entities relevant to the prompt.
-- Collect all facts, numbers, and details for each subject.
-- Group related facts together.
+GOAL: Take notes for the request above, organised by the items the request is about.
+- Identify the items of the kind the request asks about that this text covers. Use the names the text gives them, and keep the text's own number for an item when it numbers them.
+- Under each item, collect all of its facts, numbers, steps, techniques and examples. These stay nested under their item; never list them as items of their own.
+- Put anything relevant that belongs to no item under a final "Other details" heading.
 
 Text:
 {chunk}

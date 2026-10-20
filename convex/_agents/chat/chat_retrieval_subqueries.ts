@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_RETRIEVAL_SUBQUERIES } from "./chatConfig.js";
 
 export const RetrievalSubqueriesSchema = z.object({
   subqueries: z.array(z.string()).min(1).max(6),
@@ -64,9 +65,12 @@ export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
  * observable: a sustained spike in "no_json_match" or "schema_invalid" means
  * the prompt or upstream model output drifted and decomposition is effectively
  * disabled.
+ *
+ * @param maxSubqueries - Most sub-queries kept from the reply (the first ones)
  */
 export function parseRetrievalSubqueriesFromLlmContent(
-  rawContent: string
+  rawContent: string,
+  maxSubqueries: number = MAX_RETRIEVAL_SUBQUERIES
 ): { subqueries: string[]; rerankQuery?: string; aboutEachSource: boolean } | null {
   let text = rawContent;
   try {
@@ -102,7 +106,7 @@ export function parseRetrievalSubqueriesFromLlmContent(
     }
     const rq = parsed.data.rerankQuery?.trim();
     return {
-      subqueries: subs.slice(0, 6),
+      subqueries: subs.slice(0, maxSubqueries),
       rerankQuery: rq || undefined,
       aboutEachSource: parsed.data.aboutEachSource === true,
     };
@@ -157,9 +161,9 @@ function extractListTopic(trimmed: string): string {
  */
 export function expandListSubqueries(
   originalQuery: string,
-  existingSubqueries: string[]
+  existingSubqueries: string[],
+  maxSubqueries: number = MAX_RETRIEVAL_SUBQUERIES
 ): string[] {
-  const maxSubqueries = 6;
   const result = [...existingSubqueries];
   const topic = extractListTopic(originalQuery);
 

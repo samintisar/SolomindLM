@@ -33,6 +33,7 @@ export const processSpreadsheetMapChunk = internalAction({
     userId: v.string(),
     notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
+    attempt: v.optional(v.number()),
     totalChunks: v.number(),
     chunk: v.string(),
     spreadsheetType: v.string(),

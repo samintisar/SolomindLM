@@ -21,6 +21,16 @@ describe("createRerankFn", () => {
 
     expect(cachedRerank).toHaveBeenCalledWith(expect.anything(), "query", docs, 37);
   });
+
+  it("bypassCache is passed through, so evals skip the rerank cache", async () => {
+    const docs = [{ id: "d0", content: "chunk 0" }];
+
+    await createRerankFn({} as ActionCtx, { bypassCache: true })("query", docs);
+
+    expect(cachedRerank).toHaveBeenCalledWith(expect.anything(), "query", docs, 1, {
+      bypassCache: true,
+    });
+  });
 });
 
 describe("documentIdsInNotebook", () => {

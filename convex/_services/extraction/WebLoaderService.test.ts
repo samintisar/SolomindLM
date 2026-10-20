@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const scrape = vi.fn();
+const readWikipediaArticle = vi.fn();
 
-vi.mock("../../_lib/env", () => ({ env: { SUPADATA_API_KEY: "test-supadata-key" } }));
+vi.mock("../../_lib/env", () => ({
+  env: { SUPADATA_API_KEY: "test-supadata-key", OPEN_ACCESS_CONTACT_EMAIL: "contact@example.com" },
+}));
+vi.mock("./wikipedia", () => ({ readWikipediaArticle }));
 vi.mock("@supadata/js", () => ({
   Supadata: class {
     web = { scrape };
@@ -77,5 +81,26 @@ describe("WebLoaderService.loadWebPageWithMeta", () => {
     );
     expect(value?.content).toBe("ok");
     expect(scrape).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads Wikipedia articles from the API instead of scraping", async () => {
+    readWikipediaArticle.mockResolvedValueOnce({ title: "Monopoly", content: "Prose." });
+    const url = "https://en.wikipedia.org/wiki/Monopoly";
+    const { value } = await settle(new WebLoaderService().loadWebPageWithMeta(url));
+    expect(value).toEqual({ title: "Monopoly", content: "Prose.", url });
+    expect(readWikipediaArticle.mock.calls[0][1].userAgent).toBe(
+      "SolomindLM/1.0 (mailto:contact@example.com)"
+    );
+    expect(scrape).not.toHaveBeenCalled();
+  });
+
+  it("scrapes a Wikipedia link the API can't serve", async () => {
+    readWikipediaArticle.mockResolvedValueOnce(undefined);
+    scrape.mockResolvedValue({ content: "Scraped", name: "W" });
+    const { value } = await settle(
+      new WebLoaderService().loadWebPageWithMeta("https://en.wikipedia.org/wiki/X")
+    );
+    expect(value?.content).toBe("Scraped");
+    expect(scrape).toHaveBeenCalledTimes(1);
   });
 });

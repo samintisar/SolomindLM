@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  expandListSubqueries,
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
 } from "./chat_retrieval_subqueries";
@@ -36,5 +37,27 @@ describe("parseRetrievalSubqueriesFromLlmContent", () => {
       parseRetrievalSubqueriesFromLlmContent('{"subqueries": ["retrieval augmented generation"]}')
         ?.aboutEachSource
     ).toBe(false);
+  });
+});
+
+describe("subquery cap (maxSubqueries)", () => {
+  const six = '{"subqueries": ["a one", "b two", "c three", "d four", "e five", "f six"]}';
+
+  it("keeps all six by default", () => {
+    expect(parseRetrievalSubqueriesFromLlmContent(six)?.subqueries).toHaveLength(6);
+  });
+
+  it("keeps the first N when the cap is lower", () => {
+    expect(parseRetrievalSubqueriesFromLlmContent(six, 2)?.subqueries).toEqual(["a one", "b two"]);
+  });
+});
+
+describe("expandListSubqueries cap (maxSubqueries)", () => {
+  it("pads a list query up to the cap, and no further", () => {
+    expect(expandListSubqueries("list the 20 agentic patterns", ["x"], 3)).toHaveLength(3);
+  });
+
+  it("keeps the default of six when no cap is given", () => {
+    expect(expandListSubqueries("list the 20 agentic patterns", ["x"])).toHaveLength(6);
   });
 });

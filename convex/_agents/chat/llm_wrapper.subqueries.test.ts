@@ -31,6 +31,19 @@ describe("generateRetrievalSubqueries with several sources selected", () => {
     expect(plan.aboutEachSource).toBe(true);
   });
 
+  it("caps the planner's sub-queries at maxSubqueries", async () => {
+    uncachedLlmCall.mockResolvedValueOnce({
+      content: '{"subqueries": ["one a", "two b", "three c", "four d"]}',
+      usage: undefined,
+    });
+
+    const plan = await wrapper().generateRetrievalSubqueries("compare tensors and matrices", [], {
+      maxSubqueries: 2,
+    });
+
+    expect(plan.subqueries).toEqual(["one a", "two b"]);
+  });
+
   it("keeps the fast path for a short question over one source", async () => {
     uncachedLlmCall.mockClear();
 

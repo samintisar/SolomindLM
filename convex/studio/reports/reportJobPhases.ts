@@ -37,6 +37,11 @@ import {
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
+import {
+  assertMapFailuresAcceptable,
+  mapChunkRetryDelayMs,
+  mapFailureRate,
+} from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { isFailedMapResult } from "./mapResultUtils.js";
 
@@ -68,6 +73,8 @@ export type ProcessReportMapChunkArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   chunkIndex: number;
+  /** 1-based; set when a failed chunk is re-run. */
+  attempt?: number;
   totalChunks: number;
   chunk: string;
   reportType: string;
@@ -370,6 +377,23 @@ IMPORTANT: Respond with a JSON object containing:
       });
     }
   } catch (error) {
+    const retryDelayMs = mapChunkRetryDelayMs(args.attempt);
+    if (retryDelayMs !== null) {
+      console.warn(
+        `[reports] map chunk ${args.chunkIndex + 1} failed on attempt ${args.attempt ?? 1}, retrying in ${retryDelayMs}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await ctx.scheduler.runAfter(
+        retryDelayMs,
+        internal.studio.reports.job.processReportMapChunk,
+        {
+          ...args,
+          attempt: (args.attempt ?? 1) + 1,
+        }
+      );
+      return;
+    }
+
     const errorMeta = createErrorMetadata(error, "map_processing");
 
     console.error(`[ReportJob] ${chunkId} FAILED:`, errorMeta.message);
@@ -493,6 +517,8 @@ export async function runFinalizeReportPhase(
       `[ReportJob] Finalization: ${successfulResults.length} successful, ${failedCount.count} failed`
     );
 
+    assertMapFailuresAcceptable(Object.keys(mapResults).length, failedCount.count);
+
     if (successfulResults.length === 0) {
       throw new Error("No successful map results to process");
     }
@@ -613,6 +639,7 @@ export async function runFinalizeReportPhase(
       title,
       mapSuccess: successfulResults.length,
       mapFailed: failedCount.count,
+      mapFailureRate: mapFailureRate(Object.keys(mapResults).length, failedCount.count),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "finalization");

@@ -5,6 +5,7 @@
  * All metric rows are tagged by runner, configHash, and caseId for grouping.
  */
 
+import type { ChatConfigOverrides } from "../../convex/_agents/chat/chatConfigOverrides";
 import type { SourceChannel } from "../../convex/_agents/research/types";
 import type { Scorecard } from "./reports/scorecard";
 
@@ -111,6 +112,14 @@ export interface EvalFixture {
   /** Items that must appear in the answer (for deterministic metrics) */
   expectedItems: string[];
   /**
+   * Gold passages for retrieval scoring: verbatim quotes from the fixture's sources (8 to 30
+   * words each) that a correct answer needs. A chunk holds a passage when its normalised text
+   * contains the normalised quote (metrics/retrievalGold.ts). Scores retrieval for prose fixtures
+   * that have no expectedItems. Use-case pack quotes are checked against the pack sources by
+   * validatePack and again against the extracted text before a live run.
+   */
+  expectedPassages?: string[];
+  /**
    * Expected answer text for LLM-judge evaluation.
    * Used when expectedItems is insufficient (e.g., prose explanations).
    */
@@ -138,6 +147,12 @@ export interface EvalFixture {
     | "explanation";
   /** Studio-only: parameters forwarded to the generation job */
   studioParams?: StudioParams;
+  /**
+   * Studio: local copies of the notebook's sources, as file names under
+   * `evals/rag/fixtures/sources/`. The grounding judge reads them when the artifact carries no
+   * retrieved chunks (studio jobs read whole sources, not chunks).
+   */
+  sourceFiles?: string[];
   /** Studio-only: structural expectations used by studio metric scorers */
   expectedStructure?: ExpectedStructure;
   /** Source filter configuration for testing retrieval across different channels */
@@ -149,6 +164,38 @@ export interface EvalFixture {
    * notebookId/documentIds unset; the CLI fills them from the seeded notebook.
    */
   useCase?: string;
+  /**
+   * Unanswerable case: the sources do not contain the answer, so a correct response declines or
+   * says the sources do not cover it. `abstentionCorrectness` scores these first (answering is
+   * `hallucination_under_pressure`). `binary_judge_abstention` also runs on them with the sources
+   * as evidence. That judge is not in PROMOTE_PREFIXES, so it never blocks `--promotion-check`.
+   */
+  expectAbstain?: boolean;
+  /**
+   * Prior conversation before `question`, oldest first. The agent receives it as production does
+   * (`_streamChatResponse.ts`); `question` stays the final user turn. Only learning guide mode uses it.
+   */
+  turns?: Array<{ role: "user" | "assistant"; content: string }>;
+  /**
+   * Alternative phrasings of `question`, the same question as a user would type it. Each runs as its
+   * own artifact (`<id>--p1`, ...) and `paraphrase_consistency` checks the verdicts agree with the base.
+   * Variants are not judge calibration items: they share evidence with the base.
+   */
+  variants?: string[];
+  /** Chat settings the agent runs with (production `chatSettings`); default when unset. */
+  chatSettings?: {
+    instructionMode?: "default" | "learningGuide";
+  };
+  /**
+   * Production settings the chat eval passes the agent (chat only). `smartModel` must be a listed
+   * model id, `outputLanguage` a supported code (`convex/_agents/_shared/languageInstruction.ts`).
+   * `instructions` are the notebook's custom instructions (custom mode); they cannot be combined with learning guide mode.
+   */
+  chat?: {
+    smartModel?: string;
+    outputLanguage?: string;
+    instructions?: string;
+  };
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -187,12 +234,33 @@ export interface StudioOutput {
   raw: unknown;
 }
 
-export type AgentStageName = "retrieve" | "rerank" | "select" | "map" | "reduce" | "parse" | "tts";
+export type AgentStageName =
+  | "retrieve"
+  | "plan"
+  | "hyde"
+  | "rerank"
+  | "select"
+  | "generate"
+  | "grounding"
+  | "followup"
+  | "map"
+  | "reduce"
+  | "parse"
+  | "tts";
 
 export interface AgentStageSpan {
   stage: AgentStageName;
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
+}
+
+/** Provider calls one chat turn made; mirrors `CallCounters` in `convex/_agents/_shared/tokenUsageAccumulator.ts`. */
+export interface CallCounters {
+  llmCalls: number;
+  embeddingCalls: number;
+  embeddingTexts: number;
+  rerankCalls: number;
+  rerankDocs: number;
 }
 
 type TokenUsageSource = "provider" | "estimated";
@@ -243,12 +311,25 @@ export interface EvalRunArtifact {
   }>;
   /** Latency in ms */
   latencyMs: number;
-  /** Token usage if available */
-  tokenUsage?: { prompt: number; completion: number; total: number };
+  /** Token usage if available; `cachedPrompt` is the part of `prompt` served from the prompt cache */
+  tokenUsage?: { prompt: number; completion: number; total: number; cachedPrompt?: number };
   tokenUsageSource?: TokenUsageSource;
+  /** Chat: the knob overrides the run applied, as the action reported them */
+  configOverrides?: ChatConfigOverrides;
   stageSpans?: AgentStageSpan[];
+  /** Chat: provider calls the agent made this turn */
+  callCounters?: CallCounters;
+  /** Chat: context token budget the agent applied to this question (list budget for list queries) */
+  contextTokenBudget?: number;
+  /** Chat: instruction mode the agent ran this question in */
+  instructionMode?: "default" | "learningGuide" | "custom";
   /** Use-case pack id copied from the fixture (for scorecards and compare) */
   useCase?: string;
+  /**
+   * Retrieval-only run (`--retrieval-only`): the agent stopped after context selection, so there
+   * is no answer. Only retrieval-side metrics apply; judges are skipped.
+   */
+  retrievalOnly?: boolean;
   /** Timestamp */
   timestamp: string;
 }
@@ -320,15 +401,28 @@ export interface EvalReport {
   failureGroups: FailureGroup[];
   /** Per use-case pack × runner pass rates (only when pack fixtures ran) */
   scorecard?: Scorecard;
+  /** Set when any artifact was a retrieval-only run: no answers were generated, so answer metrics are absent */
+  retrievalOnly?: boolean;
+  /** Judge self-consistency: repeated judge calls, and how many repeated the verdict (sampled runs) */
+  judgeConsistency?: { sampled: number; agreed: number; rate: number };
+  /** Metrics whose repeats disagreed or were missing (`breakdown.flaky`); listed in the report */
+  flaky?: Array<{ caseId: string; runner: ConcreteRunnerKind; metric: string; statuses: string[] }>;
 }
 
 /** Pairwise comparison of two eval artifact sets (no re-generation). */
 export interface CompareCaseResult {
   caseId: string;
   runner: ConcreteRunnerKind;
-  /** A wins | B wins | tie */
+  /** A wins | B wins | tie (tie when the two position orders disagree) */
   winner: "a" | "b" | "tie";
+  /** Verdict with A shown first, mapped to artifact A / B */
+  forward: "a" | "b" | "tie";
+  /** Verdict with B shown first, mapped to artifact A / B */
+  backward: "a" | "b" | "tie";
+  /** One-line summary */
   reason: string;
+  reasonForward: string;
+  reasonBackward: string;
   useCase?: string;
 }
 
@@ -339,6 +433,12 @@ export interface CompareReport {
   pathA: string;
   pathB: string;
   casesCompared: number;
+  /**
+   * Cases where both position orders picked a winner and the winners differ (a flip, counted as a
+   * tie). Splits where one order says tie and the other picks a winner are NOT counted: they are
+   * ties with a lean, not position bias.
+   */
+  positionDisagreements: number;
   winsA: number;
   winsB: number;
   ties: number;
@@ -366,6 +466,29 @@ export interface RetrievalConfigSnapshot {
   rrfK: number;
   enableHybrid: boolean;
   hybridThreshold: number;
+  // Context budgets beyond selection (convex/_agents/chat/chatConfig.ts)
+  listQueryContextTokenBudget: number;
+  listQueryMaxSelectedChunks: number;
+  neighbourPassageTokenBudget: number;
+  maxNeighbourPassages: number;
+  openingPassageTokenBudget: number;
+  maxOpeningPassages: number;
+  multiSourceExtraTokensPerDocument: number;
+  multiSourceMaxExtraTokens: number;
+  perSourcePassagesPerSearch: number;
+  maxPerSourceDocuments: number;
+  // Indexing and models
+  chunkSizeTokens: number;
+  chunkOverlapTokens: number;
+  smartModel: string;
+  fastModel: string;
+  /** Chat prompt version (convex/_agents/chat/chat_llm_prompts.ts CHAT_PROMPT_VERSION) */
+  promptVersion: string;
+  /**
+   * Chat knobs overridden for this run (`--chat-config`, sweep cells). Absent or empty means
+   * production values, and the hash is then the same as before overrides existed.
+   */
+  overrides?: ChatConfigOverrides;
 }
 
 // ─── Baselines ──────────────────────────────────────────────────

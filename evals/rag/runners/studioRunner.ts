@@ -57,6 +57,8 @@ interface QuizQuestion {
   /** Zero-based option index (current quiz schema) or answer text (legacy). */
   answer?: string | number;
   correctAnswer?: string;
+  /** Current quiz schema: why the answer is right (may be absent on legacy rows). */
+  explanation?: string;
 }
 
 function serializeQuiz(raw: unknown): string {
@@ -71,7 +73,8 @@ function serializeQuiz(raw: unknown): string {
         typeof q.answer === "number"
           ? (choices[q.answer] ?? `invalid index ${q.answer}`)
           : (q.answer ?? q.correctAnswer ?? "");
-      return `Q${i + 1}: ${question}${options ? `\n  - ${options}` : ""}\nA: ${answer}`;
+      const explanation = q.explanation?.trim();
+      return `Q${i + 1}: ${question}${options ? `\n  - ${options}` : ""}\nA: ${answer}${explanation ? `\nExplanation: ${explanation}` : ""}`;
     })
     .join("\n\n");
 }
@@ -266,7 +269,8 @@ export async function runStudioEval(
         studioOutput,
         latencyMs: result.latencyMs,
         tokenUsage: result.tokenUsage,
-        tokenUsageSource: result.tokenUsageSource,
+        // Usage without a provider mark is an estimate, so it is never left unlabelled.
+        tokenUsageSource: result.tokenUsageSource ?? (result.tokenUsage ? "estimated" : undefined),
         stageSpans: result.stageSpans,
         timestamp: new Date().toISOString(),
       };

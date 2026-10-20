@@ -76,4 +76,18 @@ describe("buildJudgeCalibrationQueue", () => {
     );
     expect(queue.map((row) => [row.caseId, row.modelStatus])).toEqual([["c2", "pass"]]);
   });
+
+  it("leaves out rows where no judge ran, since there is no verdict to calibrate", () => {
+    const queue = buildJudgeCalibrationQueue([
+      metric({
+        metric: "binary_judge_studio_grounding",
+        status: "warn",
+        caseId: "no-evidence",
+        runner: "report",
+        breakdown: { noEvidence: true, model: "judge" },
+      }),
+      metric({ metric: "binary_judge_studio_grounding", status: "pass", caseId: "c3" }),
+    ]);
+    expect(queue.map((row) => row.caseId)).toEqual(["c3"]);
+  });
 });

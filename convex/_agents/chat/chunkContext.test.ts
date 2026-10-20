@@ -153,6 +153,20 @@ describe("selectChunksByTokenBudget across several documents (#347)", () => {
     expect(selected).toHaveLength(20);
   });
 
+  it("widens the budget by no more than the given multi-source cap", () => {
+    const others = [passage("B", 0, 0.6), passage("B", 1, 0.55), passage("C", 0, 0.5)];
+    const pool = [...dominant(), ...others];
+
+    const selected = selectChunksByTokenBudget(pool, undefined, 0.35, {
+      maxContextTokens: 8000,
+      rerankedKeys: keysOf(pool),
+      multiSourceMaxExtraTokens: 0,
+    });
+
+    // No extra budget for three sources: the plain 8000-token budget, about 8 passages.
+    expect(selected).toHaveLength(8);
+  });
+
   it("ignores selected sources whose passages the rerank never scored", () => {
     // 10 sources selected, the question is about A: the others surface one passage each that
     // missed the rerank and still carries its ~0.5 vector similarity.

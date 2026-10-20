@@ -186,3 +186,6 @@ test-results/
 
 # RAG eval exported artifacts (local)
 evals/rag/generated/
+
+# Local --append-history rows. The nightly history lives on the eval-history branch (git add -f).
+evals/rag/history/*.jsonl

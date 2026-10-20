@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
-import type { EvalRunArtifact } from "../types";
+import type { CompareCaseResult, EvalRunArtifact } from "../types";
 import { exportEvalRunArtifacts, loadArtifactsFromDir, tallyWins } from "./compare";
 
 function stubArtifact(caseId: string, runner: EvalRunArtifact["runner"] = "chat"): EvalRunArtifact {
@@ -85,11 +85,31 @@ describe("eval artifact dump for pairwise compare", () => {
 
 describe("tallyWins", () => {
   it("groups wins by key with ties counting half", () => {
-    const cases = [
-      { caseId: "a", runner: "quiz", winner: "b", reason: "", useCase: "medical-students" },
-      { caseId: "b", runner: "quiz", winner: "tie", reason: "", useCase: "medical-students" },
-      { caseId: "c", runner: "chat", winner: "a", reason: "" },
-    ] as const;
+    const verdicts = {
+      forward: "b",
+      backward: "b",
+      reasonForward: "",
+      reasonBackward: "",
+    } as const;
+    const cases: CompareCaseResult[] = [
+      {
+        ...verdicts,
+        caseId: "a",
+        runner: "quiz",
+        winner: "b",
+        reason: "",
+        useCase: "medical-students",
+      },
+      {
+        ...verdicts,
+        caseId: "b",
+        runner: "quiz",
+        winner: "tie",
+        reason: "",
+        useCase: "medical-students",
+      },
+      { ...verdicts, caseId: "c", runner: "chat", winner: "a", reason: "" },
+    ];
     expect(tallyWins([...cases], (c) => c.useCase)).toEqual({
       "medical-students": { winsA: 0, winsB: 1, ties: 1, winRateB: 0.75 },
     });

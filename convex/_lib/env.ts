@@ -3,7 +3,7 @@
  * Centralized config to avoid circular dependencies
  */
 
-import { DEFAULT_SMART_MODEL_ID } from "./defaultSmartModel.js";
+import { DEFAULT_FAST_MODEL_ID, DEFAULT_SMART_MODEL_ID } from "./defaultSmartModel.js";
 
 export const env = {
   // Together AI
@@ -15,7 +15,7 @@ export const env = {
   INFOGRAPHIC_IMAGE_MODEL: process.env.INFOGRAPHIC_IMAGE_MODEL || "gpt-image-2.5-flare",
   /** low | medium | high | xhigh | max | auto. Cost per image rises steeply with quality. */
   INFOGRAPHIC_IMAGE_QUALITY: process.env.INFOGRAPHIC_IMAGE_QUALITY || "high",
-  FAST_LLM: process.env.FAST_LLM || "Qwen/Qwen3.5-9B",
+  FAST_LLM: process.env.FAST_LLM || DEFAULT_FAST_MODEL_ID,
   SMART_LLM: process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
   REPORT_LLM: process.env.REPORT_LLM || DEFAULT_SMART_MODEL_ID,
   FLASHCARDS_LLM: process.env.FLASHCARDS_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,

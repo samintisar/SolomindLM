@@ -231,7 +231,7 @@ function cosineSimilarity(vec1: number[], vec2: number[]): number {
 export async function validateSemanticGrounding(
   response: string,
   sources: ReferenceChunk[],
-  embeddingService: EmbeddingService
+  embeddingService: Pick<EmbeddingService, "embedText">
 ): Promise<GroundingValidationResult> {
   const issues: string[] = [];
 

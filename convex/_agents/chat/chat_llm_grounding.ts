@@ -99,9 +99,8 @@ export function buildGroundingPrompt(
 
 # MATH FORMAT (MANDATORY WHEN USING EQUATIONS)
 ${MARKDOWN_MATH_RULES_BULLETS}
-- Example (inline): "The level $L_t$ evolves as $L_t = \\alpha y_t + (1-\\alpha) L_{t-1}$ [1]."
-- Example (display): $$L_t = \\alpha y_t + (1-\\alpha) L_{t-1}$$
-- Never write L_t, B_{t-1}, \\eta, or neta without delimiters — they will not render.
+- Format only (placeholders, not content): inline "where $a_t = \\alpha b_t$ [1]."; display $$a_t = \\alpha b_t + (1-\\alpha) a_{t-1}$$
+- Never write a_t, b_{t-1}, \\eta, or neta without delimiters — they will not render.
 
 # RESPONSE FORMATTING (MANDATORY)
 - Use **bold** for key terms when introducing concepts

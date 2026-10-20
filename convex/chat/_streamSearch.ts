@@ -83,9 +83,15 @@ export function createKeywordSearchRunner(
  * costs the same as a top-15 cut, and it keeps every chunk on Voyage's scale: a chunk left
  * unscored would keep its vector similarity (~0.5) and slip past CHAT_MIN_RELEVANCE_THRESHOLD.
  */
-export function createRerankFn(ctx: ActionCtx): RerankFunction {
+export function createRerankFn(
+  ctx: ActionCtx,
+  { bypassCache = false }: { bypassCache?: boolean } = {}
+): RerankFunction {
   return async (query, documents) => {
-    return cachedRerank(ctx, query, documents as RerankDocument[], documents.length);
+    const docs = documents as RerankDocument[];
+    return bypassCache
+      ? cachedRerank(ctx, query, docs, docs.length, { bypassCache: true })
+      : cachedRerank(ctx, query, docs, docs.length);
   };
 }
 

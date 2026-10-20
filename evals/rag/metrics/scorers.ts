@@ -11,7 +11,10 @@ import {
 } from "../types";
 import { getPack } from "../usecases";
 import type { SourceText } from "../usecases/types";
+import { scoreAbstentionJudgeMetrics } from "./abstentionJudge";
 import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
+import { scoreContextRelevance } from "./contextRelevance";
+import { historyMode, historyTokenShare } from "./conversation";
 import {
   abstentionCorrectness,
   citationValidity,
@@ -27,6 +30,11 @@ import {
   scoreLiteratureReviewMetrics,
 } from "./literatureReview";
 import { type LlmJudgeOptions, scoreAllLlmJudgeMetrics } from "./llmJudge";
+import {
+  passageNdcgSelected,
+  passagePrecisionSelected,
+  passageRecallByStage,
+} from "./retrievalGold";
 import { scoreRubricMetrics } from "./rubric";
 import {
   externalSourceUtilization,
@@ -53,6 +61,10 @@ export interface ScoreAllMetricsOptions {
   rubricChecks?: string[];
   /** `false` turns judge reasoning off (`--judge-reasoning off`). */
   judgeReasoning?: boolean;
+  /** Fraction (0–1) of binary judge calls re-run once to measure self-consistency. */
+  judgeConsistencySample?: number;
+  /** Median per-run pipeline tokens of this case's recent runs (cost history), for the token gate. */
+  historyTokens?: number;
 }
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
@@ -77,6 +89,30 @@ function judgeInvoker(options: ScoreAllMetricsOptions): LlmJudgeOptions["invoke"
 }
 
 /**
+ * Retrieval-only runs (`--retrieval-only`) generate no answer, so answer metrics and every judge
+ * are skipped. What was found, selected and how fast is still scored.
+ */
+function scoreRetrievalOnlyMetrics(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  baseline?: EvalBaseline
+): MetricResult[] {
+  return [
+    expectedItemRecall(fixture, artifact, baseline),
+    latencyCostBudget(fixture, artifact, baseline),
+    contextTokenBudgetRatio(fixture, artifact, baseline),
+    stageTokenShare(fixture, artifact, baseline),
+    retrievalNonEmpty(fixture, artifact, baseline),
+    ...retrievalItemRecall(fixture, artifact, baseline),
+    retrievalPrecisionAtK(fixture, artifact, baseline),
+    retrievalNdcgAtK(fixture, artifact, baseline),
+    ...passageRecallByStage(fixture, artifact),
+    passagePrecisionSelected(fixture, artifact),
+    passageNdcgSelected(fixture, artifact),
+  ];
+}
+
+/**
  * Run every metric for a single eval case.
  */
 export async function scoreAllMetrics(
@@ -85,19 +121,28 @@ export async function scoreAllMetrics(
   baseline?: EvalBaseline,
   options: ScoreAllMetricsOptions = {}
 ): Promise<MetricResult[]> {
+  if (artifact.retrievalOnly) {
+    return scoreRetrievalOnlyMetrics(fixture, artifact, baseline);
+  }
+
   const results: MetricResult[] = [];
 
   results.push(expectedItemRecall(fixture, artifact, baseline));
-  results.push(latencyCostBudget(fixture, artifact, baseline));
+  results.push(latencyCostBudget(fixture, artifact, baseline, options.historyTokens));
   results.push(contextTokenBudgetRatio(fixture, artifact, baseline));
   results.push(stageTokenShare(fixture, artifact, baseline));
 
   if (isChunkRetrievalRunner(artifact.runner)) {
+    results.push(historyTokenShare(fixture, artifact, baseline));
+    results.push(historyMode(fixture, artifact, baseline));
     results.push(retrievalNonEmpty(fixture, artifact, baseline));
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
     results.push(abstentionCorrectness(fixture, artifact, baseline));
     results.push(...retrievalItemRecall(fixture, artifact, baseline));
+    results.push(...passageRecallByStage(fixture, artifact));
+    results.push(passagePrecisionSelected(fixture, artifact));
+    results.push(passageNdcgSelected(fixture, artifact));
   }
 
   if (isRagRunner(artifact.runner)) {
@@ -124,13 +169,34 @@ export async function scoreAllMetrics(
     invoke,
     model: judgeModel,
     enabled: !options.dryRun && invoke !== undefined,
+    sourceTexts: options.packSourceTexts,
+    judgeConsistencySample: options.judgeConsistencySample,
   };
 
   // Judge groups run one after another (each parallelises its own judges), so one case never
   // bursts the shared Together key; rows keep the order binary, rubric, Likert.
   const judgeGroups: Array<() => Promise<MetricResult[]>> = [
-    () => scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions),
+    async () => {
+      const binary = await scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions);
+      // Reference-free context relevance: after the binary judges, on the same invoker. It skips
+      // fixtures with deterministic gold itself.
+      const context =
+        binaryOptions.enabled && invoke
+          ? await scoreContextRelevance(fixture, artifact, { invoke, model: judgeModel })
+          : [];
+      return [...binary, ...context];
+    },
   ];
+
+  if (fixture.expectAbstain === true && binaryOptions.enabled && invoke) {
+    judgeGroups.push(() =>
+      scoreAbstentionJudgeMetrics(fixture, artifact, {
+        invoke,
+        model: judgeModel,
+        sourceTexts: options.packSourceTexts,
+      })
+    );
+  }
 
   const useCase = fixture.useCase;
   if (useCase && binaryOptions.enabled && invoke) {
@@ -161,5 +227,35 @@ export async function scoreAllMetrics(
     results.push(...(await runGroup()));
   }
 
+  if (fixture.expectAbstain === true) {
+    reconcileAbstentionVerdicts(results);
+  }
   return results;
+}
+
+/**
+ * On an unanswerable fixture the deterministic rule and the abstention judge can disagree. When the
+ * judge gave a verdict and it differs, the deterministic row is downgraded to warn and marked with
+ * `overriddenByJudge`; the judge row stands. A judge error gives no verdict, so nothing changes.
+ */
+function reconcileAbstentionVerdicts(results: MetricResult[]): void {
+  const detIndex = results.findIndex((r) => r.metric === "abstention_correctness");
+  const judge = results.find(
+    (r) => r.metric === "binary_judge_abstention" && r.breakdown?.error === undefined
+  );
+  if (detIndex < 0 || !judge) return;
+  const det = results[detIndex]!;
+  const judgePass = judge.status === "pass";
+  const detPass = det.status === "pass";
+  if (judgePass === detPass) return;
+
+  const detail = judgePass
+    ? "Deterministic rule found no decline, but the abstention judge passed the answer (no unsupported facts): downgraded to warn."
+    : "Deterministic rule saw a decline, but the abstention judge failed the answer: downgraded to warn. The judge fail stands.";
+  results[detIndex] = {
+    ...det,
+    status: "warn",
+    detail,
+    breakdown: { ...det.breakdown, overriddenByJudge: true, judgePass },
+  };
 }

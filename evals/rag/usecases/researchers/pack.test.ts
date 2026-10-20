@@ -16,7 +16,7 @@ describe("researchers pack", () => {
 
   it("has 2 smoke, 8 train and 2 holdout fixtures", () => {
     const bySplit = (split: EvalSplit) => fixtures.filter((f) => f.split === split).length;
-    expect([bySplit("smoke"), bySplit("train"), bySplit("holdout")]).toEqual([2, 8, 2]);
+    expect([bySplit("smoke"), bySplit("train"), bySplit("holdout")]).toEqual([2, 9, 3]);
   });
 
   it("exercises every feature, with one literature review smoke", () => {

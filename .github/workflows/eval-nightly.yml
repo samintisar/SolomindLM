@@ -1,0 +1,240 @@
+# Nightly live RAG eval: smoke split with repeats, the use-case packs, and a trend check against
+# the stored history. Needs three repo secrets; without them the job logs a notice and does nothing.
+# PR CI stays dry-run only (ci.yml runs eval:rag:dry and eval:usecases:dry).
+#
+# Prerequisite: the four use-case packs must be seeded on the target deployment first
+# (`bun run eval:seed -- --use-case all`). Otherwise the usecases step exits 2 with PackNotReadyError.
+#
+# Results are appended to evals/rag/history/*.jsonl. The "Publish eval history" step pushes them to the
+# unprotected eval-history branch. Nothing is pushed to main: main is protected (enforce_admins), so a
+# bot push to it is rejected.
+
+name: Eval nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Runs per smoke fixture (pass^k and flaky verdicts)"
+        required: false
+        default: "3"
+        type: string
+
+# One nightly at a time: the history commit must not race a second run.
+concurrency:
+  group: eval-nightly
+  cancel-in-progress: false
+
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+jobs:
+  live-smoke:
+    name: Live smoke and trend
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Pushes history to the eval-history branch (see the publish step).
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          # The token is not left in .git/config; only the publish step gets it, via its env.
+          persist-credentials: false
+
+      # Same secrets gate as the e2e job in ci.yml: skip the job's work, not the job.
+      - name: Check for eval secrets
+        id: gate
+        env:
+          RAG_EVAL_CONVEX_URL: ${{ secrets.RAG_EVAL_CONVEX_URL }}
+          RAG_EVAL_SECRET: ${{ secrets.RAG_EVAL_SECRET }}
+          TOGETHER_AI_API_KEY: ${{ secrets.TOGETHER_AI_API_KEY }}
+        run: |
+          if [ -z "${RAG_EVAL_CONVEX_URL}" ] || [ -z "${RAG_EVAL_SECRET}" ] || [ -z "${TOGETHER_AI_API_KEY}" ]; then
+            echo "::notice::Nightly live eval skipped: set the RAG_EVAL_CONVEX_URL, RAG_EVAL_SECRET and TOGETHER_AI_API_KEY repo secrets to enable it."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Bun
+        if: steps.gate.outputs.run == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: package.json
+
+      - name: Restore dependency cache
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: bun install --frozen-lockfile
+
+      # Previous nights' history lives on the eval-history branch (not on main). Restoring it
+      # lets `eval:trend --check` compare tonight's run with earlier runs.
+      # Only the *.jsonl history is restored; the README stays the one on main. A missing branch is
+      # a note. A branch that exists must restore, or the step fails: publish must never overwrite
+      # the cumulative history with one night's rows (publish is gated on this step's outcome).
+      - name: Restore eval history
+        id: restore
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Read-only use of the token, env-scoped like the publish step: it is never written to
+          # .git/config or a remote URL.
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}"
+          rc=0
+          git ls-remote --exit-code --heads origin eval-history >/dev/null || rc=$?
+          if [ "$rc" -eq 2 ]; then
+            echo "no eval-history branch yet"
+            exit 0
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::ls-remote for eval-history failed (exit $rc)"
+            exit "$rc"
+          fi
+          git fetch origin eval-history:refs/remotes/origin/eval-history
+          mapfile -t files < <(git ls-tree --name-only origin/eval-history -- evals/rag/history/ | grep '\.jsonl$' || true)
+          if [ "${#files[@]}" -gt 0 ]; then
+            git checkout origin/eval-history -- "${files[@]}"
+          else
+            echo "eval-history has no history files yet"
+          fi
+
+      # The smoke split runs each fixture `repeats` times; a red run still appends its history rows.
+      - name: Smoke (live, repeats)
+        id: smoke
+        if: steps.gate.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          RAG_EVAL_CONVEX_URL: ${{ secrets.RAG_EVAL_CONVEX_URL }}
+          RAG_EVAL_SECRET: ${{ secrets.RAG_EVAL_SECRET }}
+          TOGETHER_AI_API_KEY: ${{ secrets.TOGETHER_AI_API_KEY }}
+          CI: "true"
+          REPEATS: ${{ inputs.repeats || '3' }}
+        run: |
+          bun run eval:rag:smoke -- --repeats "$REPEATS" \
+            --output evals/rag/generated/nightly-smoke.json \
+            --export-artifacts --artifacts-dir evals/rag/generated/nightly-smoke \
+            --append-history
+
+      - name: Use-case packs (live)
+        id: usecases
+        if: steps.gate.outputs.run == 'true'
+        continue-on-error: true
+        env:
+          RAG_EVAL_CONVEX_URL: ${{ secrets.RAG_EVAL_CONVEX_URL }}
+          RAG_EVAL_SECRET: ${{ secrets.RAG_EVAL_SECRET }}
+          TOGETHER_AI_API_KEY: ${{ secrets.TOGETHER_AI_API_KEY }}
+          CI: "true"
+        run: |
+          bun run eval:usecases -- --output evals/rag/generated/nightly-usecases.json --append-history
+
+      # Exit 1 when any metric's latest run is a new fail. Output is kept for the summary.
+      - name: Trend (new fails vs previous run)
+        id: trend
+        if: steps.gate.outputs.run == 'true'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p evals/rag/generated
+          bun run eval:trend -- --split smoke --check | tee evals/rag/generated/nightly-trend.txt
+
+      - name: Upload nightly outputs
+        if: always() && steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: eval-nightly-${{ github.run_id }}
+          path: |
+            evals/rag/generated/nightly-*.json
+            evals/rag/generated/nightly-smoke/
+            evals/rag/generated/nightly-trend.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+      # History goes to the unprotected eval-history branch, never main. Built in a temporary
+      # worktree so the checked-out main tree stays untouched. Only main runs publish: a manual
+      # run from a feature branch must not write history.
+      - name: Publish eval history
+        if: always() && steps.gate.outputs.run == 'true' && steps.restore.outcome == 'success' && github.ref == 'refs/heads/main'
+        env:
+          EVALUATED_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Auth for this step's fetch and push only: an env-scoped extra header, so the token is
+          # never written to .git/config or a remote URL.
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          short_sha="$(git rev-parse --short "$EVALUATED_SHA")"
+          work="$RUNNER_TEMP/eval-history"
+          rm -rf "$work"
+          git fetch origin eval-history:refs/remotes/origin/eval-history 2>/dev/null || true
+          if git rev-parse --verify --quiet refs/remotes/origin/eval-history >/dev/null; then
+            git worktree add -B eval-history "$work" origin/eval-history
+          else
+            git worktree add --orphan -b eval-history "$work"
+          fi
+          mkdir -p "$work/evals/rag/history"
+          shopt -s nullglob
+          cp evals/rag/history/*.jsonl evals/rag/history/README.md "$work/evals/rag/history/"
+          shopt -u nullglob
+          cd "$work"
+          git add -f evals/rag/history
+          if git diff --cached --quiet; then
+            echo "No history changes to publish."
+          else
+            git commit -m "chore(evals): nightly history $(date -u +%Y-%m-%d) (${short_sha})"
+            git push origin HEAD:eval-history
+          fi
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force "$work"
+
+      - name: Summary and result
+        if: always() && steps.gate.outputs.run == 'true'
+        env:
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          USECASES_OUTCOME: ${{ steps.usecases.outcome }}
+          TREND_OUTCOME: ${{ steps.trend.outcome }}
+          REPEATS: ${{ inputs.repeats || '3' }}
+        run: |
+          {
+            echo "## Nightly live eval"
+            echo ""
+            echo "| Step | Outcome |"
+            echo "| --- | --- |"
+            echo "| Smoke (repeats ${REPEATS}) | ${SMOKE_OUTCOME} |"
+            echo "| Use-case packs | ${USECASES_OUTCOME} |"
+            echo "| Trend (new fails) | ${TREND_OUTCOME} |"
+            echo ""
+            echo "### Trend (smoke)"
+            echo ""
+            echo '```'
+            cat evals/rag/generated/nightly-trend.txt 2>/dev/null || echo "(no trend output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$SMOKE_OUTCOME" = "failure" ] || [ "$USECASES_OUTCOME" = "failure" ] || [ "$TREND_OUTCOME" = "failure" ]; then
+            echo "::error::Nightly eval failed: smoke=${SMOKE_OUTCOME}, usecases=${USECASES_OUTCOME}, trend=${TREND_OUTCOME}"
+            exit 1
+          fi

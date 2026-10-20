@@ -45,6 +45,11 @@ import {
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
+import {
+  assertMapFailuresAcceptable,
+  mapChunkRetryDelayMs,
+  mapFailureRate,
+} from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { fitCardsForRefine, recursiveCollapse, refineFlashcardSelection } from "./collapseReduce";
 
@@ -80,6 +85,8 @@ export type ProcessFlashcardMapChunkPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   chunkIndex: number;
+  /** 1-based; set when a failed chunk is re-run. */
+  attempt?: number;
   totalChunks: number;
   chunk: string;
   cardCount: number;
@@ -322,8 +329,13 @@ export async function runProcessFlashcardMapChunkPhase(
 
     // Process with LLM using structured output
     let tokenUsage: TokenUsage | undefined;
+    // The flashcard model, not FAST_LLM: on 8 cards per chunk the fast model clustered on a few of
+    // a chunk's items (14-18 of 20 listed items in the candidate pool vs 18-19). Reasoning stays off;
+    // card writing does not need it and it would share the output budget.
     const structuredLLM = createStructuredLLM(FlashcardArraySchema, {
-      model: env.FAST_LLM,
+      // Not `smartLlm`: that override is for the reduce step (eval --smart-llm).
+      model: env.FLASHCARDS_LLM,
+      reasoningEnabled: false,
       temperature: 0.3,
       onUsage: (usage) => {
         tokenUsage = usage;
@@ -411,6 +423,23 @@ export async function runProcessFlashcardMapChunkPhase(
       });
     }
   } catch (error) {
+    const retryDelayMs = mapChunkRetryDelayMs(args.attempt);
+    if (retryDelayMs !== null) {
+      console.warn(
+        `[flashcards] map chunk ${args.chunkIndex + 1} failed on attempt ${args.attempt ?? 1}, retrying in ${retryDelayMs}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await ctx.scheduler.runAfter(
+        retryDelayMs,
+        internal.studio.flashcards.job.processFlashcardMapChunk,
+        {
+          ...args,
+          attempt: (args.attempt ?? 1) + 1,
+        }
+      );
+      return;
+    }
+
     const errorMeta = createErrorMetadata(error, "map_processing");
 
     console.error(`[FlashcardJob] ${chunkId} FAILED:`, errorMeta.message);
@@ -552,6 +581,8 @@ export async function runFinalizeFlashcardPhase(
     console.log(
       `[FlashcardJob] Finalization: ${allFlashcards.length} flashcards collected, ${failedCount.count} failed chunks`
     );
+
+    assertMapFailuresAcceptable(Object.keys(mapResults).length, failedCount.count);
 
     if (allFlashcards.length === 0) {
       throw new Error("No successful flashcards generated from any chunk");
@@ -705,6 +736,7 @@ export async function runFinalizeFlashcardPhase(
       title,
       mapSuccess: Object.keys(mapResults).length - failedCount.count,
       mapFailed: failedCount.count,
+      mapFailureRate: mapFailureRate(Object.keys(mapResults).length, failedCount.count),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "finalization");

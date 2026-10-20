@@ -34,6 +34,7 @@ export const processQuizMapChunk = internalAction({
     userId: v.string(),
     notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
+    attempt: v.optional(v.number()),
     totalChunks: v.number(),
     chunk: v.string(),
     questionCount: v.number(),

@@ -177,6 +177,8 @@ const tokenUsageValidator = v.object({
   prompt: v.number(),
   completion: v.number(),
   total: v.number(),
+  /** Prompt tokens the provider served from its cache; present only when it reported them. */
+  cachedPrompt: v.optional(v.number()),
 });
 
 const synthesisInputValidator = v.object({

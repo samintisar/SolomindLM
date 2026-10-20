@@ -8,6 +8,7 @@ import { env } from "../../_lib/env";
 import { ExternalServiceError } from "../../_lib/errors";
 import { mergeModelKwargs } from "./llm_factory.js";
 import { MissingStructuredJsonError } from "./llmErrors.js";
+import { readCachedPromptTokens } from "./usageAggregate.js";
 
 // ============================================================
 // Types
@@ -58,6 +59,8 @@ export interface LLMResponse {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    /** Prompt tokens served from the provider's prompt cache, when it reports them. */
+    cachedPromptTokens?: number;
   };
 }
 
@@ -81,6 +84,8 @@ type TogetherChatCompletionBody = {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number } | null;
+    cached_tokens?: number;
   };
 };
 
@@ -333,6 +338,7 @@ async function executeTogetherLlmRequest(
       const hasStructuredJson = Boolean(structuredJson?.trim());
 
       const usageRaw = data.usage;
+      const cachedPromptTokens = readCachedPromptTokens(usageRaw);
       const usage =
         usageRaw &&
         typeof usageRaw.prompt_tokens === "number" &&
@@ -342,6 +348,7 @@ async function executeTogetherLlmRequest(
               promptTokens: usageRaw.prompt_tokens,
               completionTokens: usageRaw.completion_tokens,
               totalTokens: usageRaw.total_tokens,
+              ...(cachedPromptTokens !== undefined ? { cachedPromptTokens } : {}),
             }
           : undefined;
 

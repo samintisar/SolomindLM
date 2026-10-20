@@ -1,8 +1,13 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { passageFound } from "../metrics/retrievalGold";
 import type { ConcreteRunnerKind, EvalFixture } from "../types";
 import { matchesTitleHint, SOURCE_CONTENT_TYPES, sourceExtension } from "./sources";
-import type { RegisteredPack } from "./types";
+import type { RegisteredPack, SourceText } from "./types";
+
+/** Sources whose text this module can read directly (PDF OCR text is only known at run time). */
+const TEXT_EXTENSIONS = new Set([".md", ".txt"]);
+const PASSAGE_WORDS = { min: 8, max: 30 };
 
 /** Return every consistency problem in a pack (empty = valid). */
 export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] {
@@ -67,6 +72,32 @@ export function validatePack({ pack, fixtures, dir }: RegisteredPack): string[] 
     }
   }
 
+  // Gold passages must be verbatim source text. The text check runs only when every source is
+  // readable text (md/txt). A mixed pack could hold a quote only in its PDF, which this check
+  // cannot read, so it is skipped there and the quotes are checked before the live run instead.
+  // The word-count check always applies.
+  const allSourcesText = pack.sources.every((file) => TEXT_EXTENSIONS.has(sourceExtension(file)));
+  const textOfSources = allSourcesText
+    ? pack.sources
+        .filter((file) => onDisk?.has(file))
+        .map((file) => readFileSync(join(sourcesDir, file), "utf-8"))
+    : [];
+  for (const f of fixtures) {
+    for (const quote of f.expectedPassages ?? []) {
+      const words = quote.trim().split(/\s+/).length;
+      if (words < PASSAGE_WORDS.min || words > PASSAGE_WORDS.max) {
+        problems.push(
+          `${f.id}: expectedPassages quote has ${words} words (${PASSAGE_WORDS.min}-${PASSAGE_WORDS.max} required): "${quote}"`
+        );
+      }
+      if (textOfSources.length > 0 && !textOfSources.some((t) => passageFound(t, quote))) {
+        problems.push(
+          `${f.id}: expectedPassages quote not found in ${pack.id} sources: "${quote}"`
+        );
+      }
+    }
+  }
+
   const seenChecks = new Set<string>();
   for (const check of pack.rubric) {
     if (seenChecks.has(check.id)) problems.push(`${pack.id}: duplicate rubric check "${check.id}"`);
@@ -88,6 +119,24 @@ export function packsToValidate(
   if (useCaseFlag) return registered;
   const used = new Set(selected.flatMap((f) => (f.useCase ? [f.useCase] : [])));
   return registered.filter((p) => used.has(p.pack.id));
+}
+
+/**
+ * Live-run guard: "<fixture id>: <quote>" for every pack fixture quote missing from that pack's
+ * extracted source text (`sourceTexts` by pack id). Catches OCR drift in PDF packs, which the
+ * static check cannot read. Packs without extracted text are not checked.
+ */
+export function missingExpectedPassages(
+  fixtures: EvalFixture[],
+  sourceTexts: Map<string, SourceText[]>
+): string[] {
+  return fixtures.flatMap((f) => {
+    const texts = f.useCase ? sourceTexts.get(f.useCase) : undefined;
+    if (!texts) return [];
+    return (f.expectedPassages ?? [])
+      .filter((quote) => !texts.some((t) => passageFound(t.text, quote)))
+      .map((quote) => `${f.id}: ${quote}`);
+  });
 }
 
 /** "INVALID PACK <id>:" blocks for every invalid pack (empty when all are valid). */

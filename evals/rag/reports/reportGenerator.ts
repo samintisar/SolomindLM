@@ -1,5 +1,7 @@
 import type { EvalReport, MetricResult } from "../types";
 import { groupFailures } from "./failureGrouper";
+import { paraphraseConsistency } from "./paraphrase";
+import { isFlakyMetric } from "./repeats";
 import { buildScorecard, formatScorecard } from "./scorecard";
 
 export interface GenerateReportOptions {
@@ -13,23 +15,34 @@ export interface GenerateReportOptions {
   groupBySourcePolicy?: boolean;
   /** caseId → use-case pack id, for the scorecard */
   useCaseByCase?: Map<string, string>;
+  /** At least one artifact was a retrieval-only run (labels the report) */
+  retrievalOnly?: boolean;
+  /** Judge self-consistency for this run, when any judge call was re-run */
+  judgeConsistency?: EvalReport["judgeConsistency"];
 }
 
 /**
  * Generate a full EvalReport from metric results.
  */
 export function generateReport(
-  metrics: MetricResult[],
+  caseMetrics: MetricResult[],
   options: GenerateReportOptions
 ): EvalReport {
+  // Cross-case metric: needs every case's rows, so it is computed here rather than per case.
+  const metrics = [...caseMetrics, ...paraphraseConsistency(caseMetrics)];
   const summary = { pass: 0, fail: 0, warn: 0, info: 0 };
   for (const m of metrics) {
     summary[m.status]++;
   }
 
-  const failureGroups = groupFailures(metrics, {
-    includeWarnings: options.includeWarnings,
-  });
+  // A flaky warning is listed in `flaky`, not grouped as a failure. A majority-fail flaky row
+  // is status fail and stays in the groups.
+  const failureGroups = groupFailures(
+    metrics.filter((m) => !(isFlakyMetric(m) && m.status === "warn")),
+    {
+      includeWarnings: options.includeWarnings,
+    }
+  );
 
   // Deduplicate case count
   const uniqueCases = new Set(metrics.map((m) => `${m.caseId}::${m.runner}`));
@@ -38,6 +51,13 @@ export function generateReport(
     options.useCaseByCase && options.useCaseByCase.size > 0
       ? buildScorecard(metrics, options.useCaseByCase)
       : undefined;
+
+  const flaky = metrics.filter(isFlakyMetric).map((m) => ({
+    caseId: m.caseId,
+    runner: m.runner,
+    metric: m.metric,
+    statuses: (m.breakdown?.statuses as string[] | undefined) ?? [],
+  }));
 
   return {
     timestamp: new Date().toISOString(),
@@ -48,6 +68,9 @@ export function generateReport(
     metrics,
     failureGroups,
     ...(scorecard && scorecard.cells.length > 0 ? { scorecard } : {}),
+    ...(options.retrievalOnly ? { retrievalOnly: true } : {}),
+    ...(options.judgeConsistency ? { judgeConsistency: options.judgeConsistency } : {}),
+    ...(flaky.length > 0 ? { flaky } : {}),
   };
 }
 
@@ -62,6 +85,12 @@ export function formatReport(report: EvalReport): string {
     `  Timestamp : ${report.timestamp}`,
     `  Commit    : ${report.commitSha.slice(0, 8)}`,
     `  Cases     : ${report.totalCases}`,
+    ...(report.retrievalOnly
+      ? [
+          "  RETRIEVAL-ONLY RUN (answers not generated)",
+          "  Answer metrics and judges were not run.",
+        ]
+      : []),
     "",
     "  Summary:",
     `    PASS : ${report.summary.pass}`,
@@ -101,6 +130,14 @@ export function formatReport(report: EvalReport): string {
 
   if (report.scorecard) {
     lines.push(...formatScorecard(report.scorecard));
+  }
+
+  if (report.flaky && report.flaky.length > 0) {
+    lines.push("  Flaky (repeats disagree):");
+    for (const f of report.flaky) {
+      lines.push(`    ${f.caseId} (${f.runner}) ${f.metric}: ${f.statuses.join(", ")}`);
+    }
+    lines.push("");
   }
 
   if (report.failureGroups.length > 0) {

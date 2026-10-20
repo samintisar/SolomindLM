@@ -6,6 +6,62 @@ import {
   resolveEvalTokenUsage,
 } from "./usageAggregate";
 
+describe("cached prompt tokens", () => {
+  it("fromTogetherUsage reads prompt_tokens_details.cached_tokens", () => {
+    expect(
+      fromTogetherUsage({
+        prompt_tokens: 100,
+        completion_tokens: 5,
+        total_tokens: 105,
+        prompt_tokens_details: { cached_tokens: 64 },
+      })
+    ).toEqual({ prompt: 100, completion: 5, total: 105, cachedPrompt: 64 });
+  });
+
+  it("fromTogetherUsage falls back to a top-level cached_tokens", () => {
+    expect(
+      fromTogetherUsage({ prompt_tokens: 10, completion_tokens: 1, cached_tokens: 3 })
+    ).toEqual({ prompt: 10, completion: 1, total: 11, cachedPrompt: 3 });
+  });
+
+  it("fromTogetherUsage omits cachedPrompt when the provider reports none", () => {
+    const usage = fromTogetherUsage({ prompt_tokens: 10, completion_tokens: 1 });
+    expect(usage).not.toHaveProperty("cachedPrompt");
+  });
+
+  it("fromProviderUsage maps cachedPromptTokens when present", () => {
+    expect(
+      fromProviderUsage({
+        promptTokens: 20,
+        completionTokens: 4,
+        totalTokens: 24,
+        cachedPromptTokens: 16,
+      })
+    ).toEqual({ prompt: 20, completion: 4, total: 24, cachedPrompt: 16 });
+    expect(
+      fromProviderUsage({ promptTokens: 20, completionTokens: 4, totalTokens: 24 })
+    ).not.toHaveProperty("cachedPrompt");
+  });
+
+  it("addTokenUsage sums cachedPrompt and stays absent when neither side has it", () => {
+    expect(
+      addTokenUsage(
+        { prompt: 10, completion: 1, total: 11, cachedPrompt: 4 },
+        { prompt: 5, completion: 1, total: 6, cachedPrompt: 2 }
+      )
+    ).toEqual({ prompt: 15, completion: 2, total: 17, cachedPrompt: 6 });
+    expect(
+      addTokenUsage(
+        { prompt: 10, completion: 1, total: 11, cachedPrompt: 4 },
+        { prompt: 5, completion: 1, total: 6 }
+      )
+    ).toEqual({ prompt: 15, completion: 2, total: 17, cachedPrompt: 4 });
+    expect(addTokenUsage({ prompt: 1, completion: 1, total: 2 })).not.toHaveProperty(
+      "cachedPrompt"
+    );
+  });
+});
+
 describe("fromProviderUsage", () => {
   it("maps provider usage fields", () => {
     expect(

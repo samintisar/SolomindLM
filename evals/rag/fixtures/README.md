@@ -88,6 +88,11 @@ bun run eval:rag -- --case agentic-patterns-20 --export-artifacts --artifacts-di
 bun run eval:compare -- evals/rag/generated/run-a evals/rag/generated/run-b
 ```
 
+### Judge settings
+
+- `--judge-reasoning on|off`: off by default on the `smoke` split (cheaper and more deterministic); the model default on `train`, `holdout` and single-case runs. An explicit flag always wins.
+- `--judge-consistency <fraction>`: re-runs that share of binary judge calls, chosen deterministically per case and metric (default `0.1` on live runs, `0` on dry runs). A repeat that disagrees keeps the first verdict and marks the row `judgeUnstable` with `secondVerdict`. The run prints `Judge self-consistency: agreed/sampled (rate)` and the report carries `judgeConsistency`.
+
 ### Use-case packs
 
 Fixtures for advertised use cases (language learners, medical students, professionals, researchers) live in [`../usecases/`](../usecases/README.md), not here. Seed with `bun run eval:seed`, run with `bun run eval:usecases`.
@@ -96,7 +101,9 @@ Fixtures for advertised use cases (language learners, medical students, professi
 
 1. Daily: `bun run eval:rag:smoke` (writes `evals/rag/generated/judge-queue.json`).
 2. Label 20 rows (`humanAgree: true|false`). Then:
-   `bun run eval:rag -- --score-judge-queue evals/rag/generated/judge-queue.json`
+   `bun run eval:rag -- --score-judge-queue evals/rag/generated/judge-queue.json --append-calibration`
+   The labels are appended to the committed store in [`../calibration/`](../calibration/README.md); the
+   scorer prints agreement and kappa per judge family.
 3. After a pipeline change: snapshot train (`bun run eval:rag:train:snapshot`) and
    `bun run eval:compare -- <before-dir> <after-dir>`.
 4. Promotion: run holdout, then
@@ -104,6 +111,8 @@ Fixtures for advertised use cases (language learners, medical students, professi
    Grounding/structure fails block ship. `expected_item_recall` does not.
 5. Do not start Loop 3 (prompt compile) until the judge-queue scorer prints
    `readyForPromptCompile: true`.
+
+**Repeats and flaky cases.** The smoke split runs each fixture 3 times by default (`--repeats <n>` overrides; dry runs use 1). Each metric row reports the mean score, `passAll` (pass^k: passed every repeat) and `passAny`. When the verdicts disagree across repeats (or the metric is missing from some repeats) the row is **flaky**. A majority of repeats failing (at least half) merges to `fail`, so it still blocks; a minority of fails merges to a `warn` flaky row. Flaky warnings never block `--promotion-check`; a majority-fail flaky row does. Flaky rows are listed under "Flaky (repeats disagree)" in the report. Artifacts, the Ragas export and the judge queue use the first repeat only.
 
 Do not coach enumeration in `customPrompt` (no “list the 20 names”). Use product-like user requests; keep expected items for metrics only.
 
@@ -155,6 +164,30 @@ export const FIXTURES: Record<string, EvalFixture> = {
 | `explanation`      | -                     | correctness, faithfulness, completeness ✓ |
 | `summarization`    | -                     | completeness, faithfulness ✓              |
 
+## Gold passages (`expectedPassages`)
+
+Most prose fixtures have no `expectedItems`, so item-based retrieval metrics cannot score them. `expectedPassages` gives them retrieval gold: verbatim quotes from the fixture's sources that a correct answer needs.
+
+**Authoring.** Copy each quote verbatim from a markdown or text source, 8 to 30 words, with its punctuation. Matching ignores case, punctuation, dash and quote style, and markdown marks, but it keeps decimal points and thousands commas inside numbers. Use one to three quotes per fixture. Studio fixtures take none.
+
+**Checks.** `validatePack` checks that every quote is 8 to 30 words and, for a pack whose sources are all markdown or text, that it appears in those sources. A pack that also has PDFs skips the text check. Before a live run starts, every pack quote is checked against the extracted text of its pack, and the run exits 2 listing any that are missing. That catches OCR drift in PDFs.
+
+**Matching.** Each chunk is checked on its own. A quote never spans two chunks, because chunks are ordered by score, not by position in the document. All three retrieval stages match on the same text: `contextText` when it is set (the passage as the model saw it, with neighbouring previews), otherwise `content`.
+
+**Metrics** (chat artifacts with `expectedPassages`):
+
+| Metric | Stage | Status |
+| --- | --- | --- |
+| `passage_recall_pre_rerank` | share of quotes held | info |
+| `passage_recall_post_rerank` | share of quotes held | info |
+| `passage_recall_selected` | share of quotes held | pass ≥ 0.8, warn ≥ 0.5, else fail |
+| `passage_precision_selected` | share of selected chunks holding a quote | pass ≥ 0.4, warn ≥ 0.2 (lenient, because selection pads with neighbours) |
+| `passage_ndcg_selected` | binary-relevance nDCG over selected chunks | pass ≥ 0.7, warn ≥ 0.4 |
+
+A selected-stage recall miss is routed to `context_selection` when an earlier stage held more quotes, and to `retrieval` otherwise. Abstention correctness applies the same four rules to passage recall. Passage mode uses 0.6 as "sufficient" and warns on a context-selection miss at 0.5 or above. Item mode keeps 0.7.
+
+**Reference-free context judge** (`llm_context_precision`, `llm_context_waste_tokens`). Chat fixtures with neither `expectedItems` nor `expectedPassages` get one judge call per artifact. The judge sees each selected chunk's first 1200 characters of `content` and names the chunks the answer needs. Both metrics are info-only and never fail a run. A judge error shows as warn with `judgeError: true`. Results are cached in process by judge model, question and chunk text. The context judge does not run on dry runs or retrieval-only runs.
+
 ## Running Evaluations
 
 Non-dry runs invoke the gated Convex eval action against a **dev** deployment only.
@@ -189,6 +222,73 @@ bun run eval:rag -- --case agentic-patterns-20
 # Run only literature review fixtures
 bun run eval:literature-review
 ```
+
+### Retrieval-only runs
+
+`--retrieval-only` runs chat fixtures through plan, search, rerank and context selection, then stops before any answer is generated. No answer metrics and no judges run, so a run costs roughly a tenth of a full one. Use it when you are sweeping a retrieval knob (budgets, thresholds, neighbour or opening passages) and only need to know what was found and selected, and how fast. Scores come from the passage metrics (`passage_recall_*`, `passage_precision_selected`, `passage_ndcg_selected`), the item metrics and the latency and token budgets. Use a full run before you judge an answer change. Other runners are skipped with a note. The report is labelled `RETRIEVAL-ONLY RUN`, and latency is not compared to a full-run baseline. A retrieval-only run also stops when retrieval finds no passages. Greetings and clarifying questions still get a direct reply, because they never search, so their artifacts can carry an answer.
+
+```bash
+bun run eval:rag -- --retrieval-only --runner chat --split train
+```
+
+## Nightly
+
+[`.github/workflows/eval-nightly.yml`](../../../.github/workflows/eval-nightly.yml) runs the smoke split
+(3 repeats by default, `workflow_dispatch` takes `repeats`), the use-case packs, and `eval:trend --check`
+every night at 03:17 UTC. It needs three repo secrets: `RAG_EVAL_CONVEX_URL`, `RAG_EVAL_SECRET` and
+`TOGETHER_AI_API_KEY`. Without them the job logs a notice and does nothing. Reports and artifacts are
+uploaded for 30 days, and the rows it appends to [`history/`](history/README.md) are published to the
+`eval-history` branch. PR CI stays dry-run only.
+
+Prerequisite: seed the four use-case packs on the target deployment first (`bun run eval:seed -- --use-case all`).
+Otherwise the usecases step exits 2 with `PackNotReadyError`.
+
+The history goes to the unprotected `eval-history` branch, not `main`. `main` is protected
+(`enforce_admins`), so a bot push to it is rejected. To read the nightly trend, merged with any local rows:
+
+```bash
+bun run eval:trend -- --split smoke --branch eval-history
+```
+
+## Sweeps
+
+`bun run eval:sweep` runs the chat fixtures once per cell of a grid of chat config overrides (the same
+knobs as `--chat-config` in the eval CLI). The empty override set always runs as the baseline. A value equal to
+the production default is the same run as the baseline, so it is not run again: `hydeEnabled=true` is the
+baseline, and a grid's default-valued points collapse into it. Each cell
+writes its artifacts to `<artifacts-dir>/<cellId>/`; the run writes `sweep.json` and `sweep.md`, and
+prints a table sorted by quality, with the Pareto front (quality up, tokens down, p95 latency down) marked `*`.
+
+```bash
+# Shape check, no agents or judges (stub artifacts; the table only shows the pipeline ran)
+bun run eval:sweep -- --dry-run --grid "hydeEnabled=true,false;contextTokenBudget=4000,8000" --prefix ml-factoid
+
+# Ranked experiments (run on the train split; add --compare-best to judge the best cell against the baseline)
+# 1. Cap full-document expansion: off, or only whole documents under 4000 or 8000 tokens
+bun run eval:sweep -- --grid "fullDocumentExpansion=off,4000,8000" --split train --compare-best
+# 2. Few-shot examples only for complex questions, or never
+bun run eval:sweep -- --grid "fewShotPolicy=complex-only,never" --split train --compare-best
+# 3. Keyword variants per sub-query (0 = one search per sub-query; the closest knob to reusing one vector search)
+bun run eval:sweep -- --grid "keywordVariants=0,1,2" --split train --compare-best
+# 4. HyDE gating
+bun run eval:sweep -- --grid "hydeEnabled=true,false" --split train --compare-best
+# Not ranked: the context budget axis
+bun run eval:sweep -- --grid "contextTokenBudget=4000,6000,8000" --split train --compare-best
+```
+
+Ranked items 5–7 (prompt-cache layout, chunk size, skipping follow-ups) are not chat overrides: the
+first needs a prompt change, the second a re-embed of the packs, the third an eval flag.
+
+Quality is the mean pass rate of `binary_judge_chat_grounding` and `expected_item_recall`, over the
+components that have cases. `n/a` means no case had that component, and it is left out of quality
+rather than counted as 0. Recall counts only fixtures with `expectedItems`, since the metric passes by
+definition for the others. A real sweep needs `TOGETHER_AI_API_KEY`, because grounding is the judged
+signal, and it exits 2 without the key. A cell with no quality or no token figure is never on the
+Pareto front. Tokens averaged over only some cases are marked `(partial)`.
+
+With `rerankEnabled=false` the pre-rerank and post-rerank snapshots are empty, so
+`retrieval_item_recall_pre_rerank` and `retrieval_item_recall_post_rerank` read as failures in that
+cell. Only the selected-stage metrics are meaningful there.
 
 ## Suggested Fixtures for Machine Learning Notebook
 

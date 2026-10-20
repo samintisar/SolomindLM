@@ -7,4 +7,10 @@ describe("isAgentStageName", () => {
     expect(isAgentStageName("tts")).toBe(true);
     expect(isAgentStageName("prompt")).toBe(false);
   });
+
+  it("accepts the chat LLM stages", () => {
+    for (const stage of ["plan", "hyde", "generate", "grounding", "followup"]) {
+      expect(isAgentStageName(stage)).toBe(true);
+    }
+  });
 });

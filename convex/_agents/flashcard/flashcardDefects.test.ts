@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findFlashcardDefect } from "./flashcardDefects";
+import { getMapPrompt } from "./prompts";
 
 function defect(front: string, back: string) {
   return findFlashcardDefect({ front, back });
@@ -97,5 +98,49 @@ describe("findFlashcardDefect: clean cards", () => {
 
   it("returns null for an empty back", () => {
     expect(defect("Il cherche ___ (ses) clés.", "")).toBeNull();
+  });
+
+  it("returns null for brackets that hold content, such as citations or code", () => {
+    expect(defect("What does xs[0] return when xs = [3, 4]?", "3 [1]")).toBeNull();
+    expect(defect("What does the [term structure] model explain?", "Yield curves.")).toBeNull();
+  });
+});
+
+describe("findFlashcardDefect: card copied from a prompt template", () => {
+  it("flags an unfilled placeholder on either side", () => {
+    expect(defect("What is the role of [concept] in [process]?", "It regulates it.")).toBe(
+      "unfilled_template"
+    );
+    expect(defect("Define: elasticity", "[The source's definition of the term.]")).toBe(
+      "unfilled_template"
+    );
+  });
+
+  it("catches every placeholder the map prompt's templates use", () => {
+    const prompt = getMapPrompt({
+      chunk: "x",
+      cardCount: 10,
+      cardsPerChunk: 5,
+      difficulty: "medium",
+    });
+    const placeholders = [...prompt.matchAll(/\[[a-z][^\]\n]*\]/gi)].map((m) => m[0]);
+    expect(placeholders.length).toBeGreaterThan(10);
+    for (const placeholder of placeholders) {
+      expect(defect(`Front ${placeholder}`, "Back"), placeholder).toBe("unfilled_template");
+    }
+  });
+});
+
+describe("getMapPrompt: examples", () => {
+  it("holds no topical example a sparse chunk could copy", () => {
+    const prompt = getMapPrompt({
+      chunk: "x",
+      cardCount: 10,
+      cardsPerChunk: 5,
+      difficulty: "hard",
+    });
+    for (const term of ["mitochondri", "nucleus", "ARIMA", "softmax", "foreign key", "foo()"]) {
+      expect(prompt.toLowerCase()).not.toContain(term.toLowerCase());
+    }
   });
 });

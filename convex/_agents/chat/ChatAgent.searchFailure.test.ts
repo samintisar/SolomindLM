@@ -24,7 +24,6 @@ function agentWhoseSearch(
     }),
     generateHypotheticalDocument: async () => "",
     generateDirectResponse,
-    consumeTokenUsage: () => undefined,
   } as unknown as ChatAgent["llmWrapper"];
   agent["embeddingService"] = {
     embedText: async () => [0.1, 0.2],

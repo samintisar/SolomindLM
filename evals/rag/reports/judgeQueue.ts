@@ -1,4 +1,5 @@
 import type { MetricResult, MetricStatus } from "../types";
+import { isParaphraseVariant } from "./paraphrase";
 import { isJudgeError } from "./scorecard";
 
 export interface JudgeCalibrationItem {
@@ -19,10 +20,14 @@ export function buildJudgeCalibrationQueue(
 ): JudgeCalibrationItem[] {
   const limit = options?.limit ?? 20;
   // Judge errors (truncation, parse, HTTP) carry no verdict, so a human cannot calibrate them.
+  // Rows with no evidence never reached a judge, so there is nothing to calibrate either. Paraphrases
+  // share their base's evidence, so a second label on the same evidence would not be independent.
   const judges = metrics.filter(
     (row) =>
       (row.metric.startsWith("binary_judge_") || row.metric.startsWith("rubric:")) &&
-      !isJudgeError(row)
+      !isJudgeError(row) &&
+      row.breakdown?.noEvidence !== true &&
+      !isParaphraseVariant(row.caseId)
   );
   const fails = judges.filter((row) => row.status === "fail" || row.status === "warn");
   const passes = judges.filter((row) => row.status === "pass");

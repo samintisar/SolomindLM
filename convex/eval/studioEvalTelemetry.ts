@@ -3,8 +3,13 @@ import type { TokenUsage, TokenUsageSource } from "../_agents/_shared/usageAggre
 
 const AGENT_STAGE_NAMES: ReadonlySet<AgentStageName> = new Set([
   "retrieve",
+  "plan",
+  "hyde",
   "rerank",
   "select",
+  "generate",
+  "grounding",
+  "followup",
   "map",
   "reduce",
   "parse",

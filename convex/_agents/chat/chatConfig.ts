@@ -81,6 +81,9 @@ export const OPENING_PASSAGE_TOKEN_BUDGET = 3000;
 /** Most opening passages added to one answer's context: one per source. */
 export const MAX_OPENING_PASSAGES = MAX_PER_SOURCE_DOCUMENTS;
 
+/** Most retrieval sub-queries the planner may return; each one runs its own search. */
+export const MAX_RETRIEVAL_SUBQUERIES = 6;
+
 /** Max chunks passed to the LLM for list/enumeration questions after global rerank. */
 export const LIST_QUERY_MAX_SELECTED_CHUNKS = 24;
 

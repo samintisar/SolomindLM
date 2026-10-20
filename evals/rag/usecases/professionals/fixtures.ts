@@ -81,6 +81,10 @@ export const professionalsFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "Why did USDA cut its 2026 corn production forecast this month, and by how much?",
+    variants: [
+      "How much did USDA lower its 2026 corn production forecast this month, and what was the reason?",
+      "This month USDA trimmed its 2026 corn crop estimate. By how much, and why?",
+    ],
     expectedItems: ["178.5", "15.8 billion"],
     expectedAnswer:
       "NASS's first objective-yield estimate lowered the corn yield 2.2 bushels per acre to 178.5 and harvested area " +
@@ -193,6 +197,23 @@ export const professionalsFixtures: EvalFixture[] = [
     tags: tags("mindmap", "economy"),
   },
 
+  {
+    ...base,
+    id: "professionals/chat-unanswerable-bitcoin",
+    split: "train",
+    runner: "chat",
+    question: "What did the Beige Book say about Bitcoin prices and crypto mining?",
+    expectedItems: [],
+    expectAbstain: true,
+    studioParams: { documentTitleHint: BEIGE_BOOK },
+    expectedAnswer:
+      "The Beige Book covers regional economic conditions and does not mention Bitcoin or crypto mining, so the correct reply says the sources do not cover it and gives no prices or figures.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover Bitcoin or crypto mining, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
+  },
+
   // ─── holdout ──────────────────────────────────────────────
   {
     ...base,
@@ -236,5 +257,21 @@ export const professionalsFixtures: EvalFixture[] = [
       "Covers all four reports and keeps each risk under the report it comes from, without merging unrelated findings.",
     expectedStructure: { minItems: 5, jsonShape: "mindmap" },
     tags: tags("mindmap", "cross-report"),
+  },
+  {
+    ...base,
+    id: "professionals/chat-unanswerable-ecb-rates",
+    split: "holdout",
+    runner: "chat",
+    question: "What did the report say about recent European Central Bank interest rate decisions?",
+    expectedItems: [],
+    expectAbstain: true,
+    studioParams: { documentTitleHint: BEIGE_BOOK },
+    expectedAnswer:
+      "The Beige Book is a US report and does not mention the European Central Bank, so the correct reply says the report does not cover it and gives no rate decisions.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover European Central Bank decisions, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
   },
 ];

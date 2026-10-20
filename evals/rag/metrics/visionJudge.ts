@@ -13,7 +13,8 @@ import { metricResult } from "./metricResult";
 // Configuration
 // ============================================================
 
-const VISION_JUDGE_MODEL = "Qwen/Qwen3-VL-8B-Instruct";
+// Qwen3-VL models are dedicated-endpoint only on Together now; Qwen3.5-9B reads images serverless.
+const VISION_JUDGE_MODEL = "Qwen/Qwen3.5-9B";
 
 export interface VisionJudgeConfig {
   apiKey?: string;
@@ -124,6 +125,9 @@ export async function evaluateInfographicWithVision(
       ],
       max_tokens: 4096,
       temperature: 0.1,
+      // Qwen3.5 thinks by default and reasoning shares max_tokens; production turns it off too.
+      // Not in the SDK's request type yet; Together reads it from the body.
+      ...({ reasoning: { enabled: false } } as Record<string, unknown>),
     });
 
     let content = response.choices[0]?.message?.content ?? "{}";

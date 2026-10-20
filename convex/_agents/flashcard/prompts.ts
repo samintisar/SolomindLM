@@ -113,21 +113,22 @@ ${topic ? `**Topic Focus:** ${topic}` : ""}
 
 **CARD VARIETY REQUIREMENT:**
 You MUST generate a DIVERSE mix of flashcard types. Distribute evenly across these 5 types:
+The fronts and backs below are templates: fill every part in square brackets from the source. Never copy them as cards.
 1. **WH-Question** (what, where, when, why, how) - Test factual recall
-   Front: "What is the primary function of mitochondria?"
-   Back: "Producing most of the cell's ATP."
+   Front: "What is the role of [concept] in [process]?"
+   Back: "[The role, in one sentence from the source.]"
 2. **Fill-in-the-Blank** - Test precise knowledge recall
-   Front: "The _____ is the control center of the cell and contains DNA."
-   Back: "nucleus"
+   Front: "[A key sentence from the source with its key term replaced by _____.]"
+   Back: "[The key term]"
 3. **True/False** - Test understanding of misconceptions
-   Front: "True or False: Mitochondria are found only in animal cells."
-   Back: "False - plant cells have mitochondria too."
+   Front: "True or False: [a plausible but wrong claim about the concept]"
+   Back: "False - [the correct statement and why]."
 4. **Definition** - Test concept understanding
-   Front: "Define: mitochondria"
-   Back: "The organelle that generates most of the cell's ATP."
+   Front: "Define: [term]"
+   Back: "[The source's definition of the term.]"
 5. **Scenario/Application** - Test knowledge transfer
-   Front: "If a cell lacks mitochondria, which cellular process would be most impaired?"
-   Back: "ATP production (energy metabolism)."
+   Front: "If [situation built from the source], what happens to [outcome]?"
+   Back: "[The outcome, with the reason.]"
 
 **Card Type Distribution:** Aim for ~20% of each type. Mix them evenly!
 
@@ -147,22 +148,22 @@ CRITICAL: Each flashcard question MUST BE COMPLETELY SELF-CONTAINED. The user wi
 RULES FOR CONTEXT INCLUSION:
 1. If a question references a diagram, chart, or visual element:
    - Describe it thoroughly within the question
-   - Example: "In the ER diagram showing Entities A(id) and B(id) with a one-to-many relationship from A to B, what does the foreign key represent?"
+   - Template: "In the [diagram type] showing [its elements and how they connect], what does [element] represent?"
 
 2. If a question references a code snippet:
    - Include the relevant code in the question
-   - Example: "Given the code 'function foo() { return 1; }', what does foo() return?"
+   - Template: "Given the code [the relevant lines], what does [expression] return?"
 
 3. If a question references a scenario/example:
    - Summarize the key details within the question
-   - Example: "In a scenario where a user attempts login with invalid credentials, what response should the server return?"
+   - Template: "In a scenario where [the key details], what should [actor] do?"
 
 4. NEVER use vague references like "the diagram", "the above", or "the following" without including the actual content
    - REWRITE to include the actual content being referenced
 
 5. If context is too long (>300 chars):
    - Summarize the essential parts needed to answer
-   - Example: "Given a database schema with Users(id, email) and Orders(user_id, total)..." instead of full schema
+   - Template: "Given [a one-line summary of the essential parts]..." instead of the full content
 
 BALANCE: Questions should be complete but concise. Include only what's necessary to answer correctly.
 
