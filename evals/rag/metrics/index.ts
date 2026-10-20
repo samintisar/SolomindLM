@@ -72,16 +72,20 @@ function getAllVariations(term: string): string[] {
   return [normalized, ...(entry ? entry[1].map(normalizeForMatch) : [])];
 }
 
-/** Normalize text for matching: lowercase, remove special chars, normalize spaces */
-function normalizeForMatch(text: string): string {
+/**
+ * Normalize text for matching: lowercase; punctuation becomes a word break; apostrophes are
+ * dropped; a decimal point between digits is kept; whitespace is collapsed.
+ */
+export function normalizeForMatch(text: string): string {
   return (
     text
       .toLowerCase()
       .replace(/[-‐–—]/g, " ") // Replace all dash types with space
       .replace(/['‘’]/g, "") // Drop apostrophes: "routing's" stays one word
       // Other punctuation separates words: a CSV cell `"Prompt Chaining","x"` must not become
-      // "prompt chainingx".
-      .replace(/[^\w\s]/g, " ")
+      // "prompt chainingx". Letters in any script stay in their word ("réflexion"), and "0.75"
+      // stays one token so it cannot match "0–75".
+      .replace(/(?!(?<=\d)\.(?=\d))[^\p{L}\p{N}\s]/gu, " ")
       .replace(/\s+/g, " ") // Normalize spaces
       .trim()
   );
@@ -125,8 +129,10 @@ function hasWholePhrase(paddedHaystack: string, phrase: string): boolean {
   const words = phrase.split(" ");
   const last = words.pop() ?? "";
   if (last === "") return false;
-  const lastForms = [last, ...singularForms(last)].join("|");
-  const head = words.map((w) => `${w} `).join("");
+  // The decimal point kept by normalizeForMatch is the only regex metacharacter that can remain.
+  const escapeDots = (w: string) => w.replace(/\./g, "\\.");
+  const lastForms = [last, ...singularForms(last)].map(escapeDots).join("|");
+  const head = words.map((w) => `${escapeDots(w)} `).join("");
   return new RegExp(` ${head}(?:${lastForms})(?:es|s)? `).test(paddedHaystack);
 }
 
@@ -167,7 +173,7 @@ function containsIgnoreCase(haystack: string, needle: string): boolean {
 }
 
 /** How many items from `items` are found via fuzzy matching in `text`. */
-function countMatches(
+export function countMatches(
   text: string,
   items: string[]
 ): {
