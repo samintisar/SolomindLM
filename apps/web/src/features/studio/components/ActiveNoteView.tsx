@@ -84,6 +84,8 @@ interface ActiveNoteViewProps {
   registerInfographicControls?: (controls: InfographicViewControls | null) => void;
   onInfographicFullscreenChange?: (isFullscreen: boolean) => void;
   onAskInChat?: (prompt: string, documentIds?: string[]) => void;
+  /** Viewer of a public notebook: practice, card edits and sheet edits are locked. */
+  readOnly?: boolean;
 }
 
 /**
@@ -101,10 +103,11 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
   registerInfographicControls,
   onInfographicFullscreenChange,
   onAskInChat,
+  readOnly = false,
 }) => {
   // Report view or report markdown editor
   if (isReportNote(activeNote)) {
-    if (isEditingReportContent && onSaveReportContent && onCancelEditReport) {
+    if (!readOnly && isEditingReportContent && onSaveReportContent && onCancelEditReport) {
       return (
         <ReportMarkdownEditor
           note={activeNote}
@@ -118,7 +121,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
 
   // Flashcard view
   if (isFlashcardNote(activeNote)) {
-    return <FlashcardView note={activeNote} onBack={undefined} />;
+    return <FlashcardView note={activeNote} onBack={undefined} readOnly={readOnly} />;
   }
 
   // Quiz view (no onBack on mobile - StudioPanelHeader provides single header)
@@ -128,6 +131,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         note={activeNote}
         onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
         onBack={undefined}
+        readOnly={readOnly}
       />
     );
   }
@@ -248,6 +252,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         note={activeNote}
         onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
         onBack={undefined}
+        readOnly={readOnly}
       />
     );
   }
@@ -266,7 +271,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
 
   // Spreadsheet view (StudioPanelHeader shows its title and back button)
   if (isSpreadsheetNote(activeNote)) {
-    return <SpreadsheetView note={activeNote} />;
+    return <SpreadsheetView note={activeNote} readOnly={readOnly} />;
   }
 
   // User note view (saved chats and manual notes)

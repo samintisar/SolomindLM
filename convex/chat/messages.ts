@@ -3,11 +3,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, mutation, query } from "../_generated/server";
 import { assertCanEditConversation, getConversationIfReadable } from "../_lib/conversationAccess";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  canReadNotebook,
-} from "../_lib/notebookAccess";
+import { assertCanReadNotebook, getNotebookAccess } from "../_lib/notebookAccess";
 import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
 import * as ConvModel from "../_model/conversations";
 import { getAuthUserId } from "../auth";
@@ -37,7 +33,8 @@ export const listByNotebook = query({
       };
     }
 
-    if (!(await canReadNotebook(ctx, args.notebookId, userId))) {
+    const access = await getNotebookAccess(ctx, args.notebookId, userId);
+    if (!access) {
       return { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
     }
 
@@ -49,7 +46,10 @@ export const listByNotebook = query({
       }
       conversation = c;
     } else {
-      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
+      conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
+        userId,
+        access,
+      });
     }
 
     if (!conversation) {
@@ -87,11 +87,10 @@ export const createConversation = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    const { notebook, access } = await assertCanReadNotebook(ctx, args.notebookId, userId);
 
     // Snapshot the notebook's instruction mode onto the conversation (locked at creation)
-    const notebook = await ctx.db.get(args.notebookId);
-    const chatSettings = notebook?.chatSettings as
+    const chatSettings = notebook.chatSettings as
       | {
           instructionMode?: "default" | "learningGuide" | "custom";
           customInstructions?: string;
@@ -104,13 +103,15 @@ export const createConversation = mutation({
       userId,
       notebookId: args.notebookId,
       title: args.title,
+      ...ConvModel.conversationPrivacy(access),
       instructionMode: chatSettings?.instructionMode,
       customInstructions: chatSettings?.customInstructions,
       createdAt: now,
       updatedAt: now,
     });
 
-    return await ctx.db.get(conversationId);
+    const conversation = await ctx.db.get(conversationId);
+    return conversation ? ConvModel.conversationForRequester(conversation, access) : null;
   },
 });
 
@@ -128,15 +129,19 @@ export const sendMessage = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    const { access } = await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    let conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
+    let conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
+      userId,
+      access,
+    });
 
     if (!conversation) {
       const now = Date.now();
       const conversationId = await ctx.db.insert("conversations", {
         userId,
         notebookId: args.notebookId,
+        ...ConvModel.conversationPrivacy(access),
         createdAt: now,
         updatedAt: now,
       });
@@ -180,7 +185,7 @@ export const sendMessageOptimistic = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    const { access } = await assertCanReadNotebook(ctx, args.notebookId, userId);
 
     let conversation: {
       _id: Id<"conversations">;
@@ -196,13 +201,17 @@ export const sendMessageOptimistic = mutation({
       }
       conversation = c;
     } else {
-      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
+      conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
+        userId,
+        access,
+      });
 
       if (!conversation) {
         const now = Date.now();
         const conversationId = await ctx.db.insert("conversations", {
           userId,
           notebookId: args.notebookId,
+          ...ConvModel.conversationPrivacy(access),
           createdAt: now,
           updatedAt: now,
         });
@@ -270,15 +279,17 @@ export const releaseChatGeneration = mutation({
       throw new Error("Unauthenticated");
     }
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    const { access } = await assertCanReadNotebook(ctx, args.notebookId, userId);
 
     let conversation;
     if (args.conversationId) {
       conversation = await getConversationIfReadable(ctx, args.conversationId, userId);
-      if (!conversation) return;
+      if (!conversation || conversation.notebookId !== args.notebookId) return;
     } else {
-      await assertCanReadNotebook(ctx, args.notebookId, userId);
-      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
+      conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
+        userId,
+        access,
+      });
     }
 
     if (!conversation) {
@@ -386,7 +397,7 @@ export const clearHistory = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
+    const { access } = await assertCanReadNotebook(ctx, args.notebookId, userId);
 
     let conversation;
     if (args.conversationId) {
@@ -396,8 +407,10 @@ export const clearHistory = mutation({
         return { message: "Conversation not found" };
       }
     } else {
-      await assertCanEditNotebook(ctx, args.notebookId, userId);
-      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
+      conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
+        userId,
+        access,
+      });
     }
 
     if (!conversation) {

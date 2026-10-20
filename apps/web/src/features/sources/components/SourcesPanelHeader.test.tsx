@@ -100,6 +100,13 @@ describe("SourcesPanelHeader viewer mode", () => {
     expect(screen.queryByRole("link", { name: "Open source in new tab" })).not.toBeInTheDocument();
   });
 
+  test("read-only shows the title as text, not a rename button", () => {
+    renderHeader({ readOnly: true });
+    expect(screen.queryByRole("button", { name: "Rename ML Lecture" })).not.toBeInTheDocument();
+    expect(screen.getByText("ML Lecture")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy content as Markdown" })).toBeInTheDocument();
+  });
+
   test("goes back to the list", async () => {
     const p = renderHeader();
     await userEvent.click(screen.getByRole("button", { name: "Back to sources" }));

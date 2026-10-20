@@ -3,9 +3,10 @@ import type { FunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { workflow } from "../../_agents/literature_review/LiteratureReviewGraph.js";
 import { components, internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
 import { internalMutation, mutation, query } from "../../_generated/server";
+import { getConversationIfReadable } from "../../_lib/conversationAccess";
 import {
   assertConcurrentRunCapacity,
   assertRetryAllowed,
@@ -14,11 +15,16 @@ import {
 } from "../../_lib/limits";
 import {
   assertCanEditNotebook,
-  assertCanReadNotebook,
   canReadNotebook,
+  getNotebookAccess,
 } from "../../_lib/notebookAccess";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
 import { toConvexError } from "../../_lib/serviceErrors";
+import {
+  getChatLinkedLiteratureArtifactIds,
+  isChatLiteratureReport,
+  isChatLiteratureTable,
+} from "../../_model/literatureArtifacts";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
 import { loadNotebookPaperDocuments } from "../../literatureReview/db";
@@ -53,64 +59,46 @@ const literatureTablePaperValidator = v.object({
   extractionFailed: v.optional(v.boolean()),
 });
 
-/** Chat workflow tables/reports — never listed in the studio sidebar. */
-async function getChatLinkedLiteratureArtifactIds(
+/**
+ * A review session belongs to its creator's chat thread. Only the creator reads it, and only
+ * while they own or edit the notebook: viewers of a public notebook never do (matching
+ * `canReadResearchSteps`), even one who started the session as a since-removed editor.
+ */
+async function canReadReviewSession(
   ctx: QueryCtx,
-  notebookId: Id<"notebooks">
-): Promise<{
-  tableIds: Set<Id<"literatureTables">>;
-  reportIds: Set<Id<"literatureReports">>;
-}> {
-  const sessions = await ctx.db
-    .query("literatureReviewSessions")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-    .collect();
-
-  const tableIds = new Set<Id<"literatureTables">>();
-  const reportIds = new Set<Id<"literatureReports">>();
-  for (const session of sessions) {
-    if (session.tableId) tableIds.add(session.tableId);
-    if (session.reportId) reportIds.add(session.reportId);
-  }
-  return { tableIds, reportIds };
+  session: Doc<"literatureReviewSessions">,
+  userId: Id<"users">
+): Promise<boolean> {
+  if (session.userId !== userId) return false;
+  const access = await getNotebookAccess(ctx, session.notebookId, userId);
+  return access === "owner" || access === "editor";
 }
 
-function isChatLiteratureTableTitle(title: string): boolean {
-  return title.startsWith("Literature table —") || title.startsWith("Literature table - ");
+/**
+ * Anyone who can read the notebook can open its Studio tables and reports. Chat review outputs
+ * belong to the creator's thread, so only the creator opens those.
+ */
+async function canReadLiteratureTable(
+  ctx: QueryCtx,
+  table: Doc<"literatureTables">,
+  userId: Id<"users">
+): Promise<boolean> {
+  if (!(await canReadNotebook(ctx, table.notebookId, userId))) return false;
+  if (table.userId === userId) return true;
+  const { tableIds } = await getChatLinkedLiteratureArtifactIds(ctx, table.notebookId);
+  return !isChatLiteratureTable(table, tableIds);
 }
 
-function isChatLiteratureReportTitle(title: string): boolean {
-  return title.startsWith("Report —") || title.startsWith("Report - ");
-}
-
-function isChatLiteratureTable(
-  table: {
-    _id: Id<"literatureTables">;
-    title: string;
-    literatureReviewSessionId?: Id<"literatureReviewSessions">;
-  },
-  chatTableIds: Set<Id<"literatureTables">>
-): boolean {
-  return (
-    table.literatureReviewSessionId !== undefined ||
-    chatTableIds.has(table._id) ||
-    isChatLiteratureTableTitle(table.title)
-  );
-}
-
-function isChatLiteratureReport(
-  report: {
-    _id: Id<"literatureReports">;
-    title: string;
-    literatureReviewSessionId?: Id<"literatureReviewSessions">;
-  },
-  chatReportIds: Set<Id<"literatureReports">>
-): boolean {
-  return (
-    report.literatureReviewSessionId !== undefined ||
-    chatReportIds.has(report._id) ||
-    isChatLiteratureReportTitle(report.title)
-  );
+/** Same rule as `canReadLiteratureTable`. */
+async function canReadLiteratureReport(
+  ctx: QueryCtx,
+  report: Doc<"literatureReports">,
+  userId: Id<"users">
+): Promise<boolean> {
+  if (!(await canReadNotebook(ctx, report.notebookId, userId))) return false;
+  if (report.userId === userId) return true;
+  const { reportIds } = await getChatLinkedLiteratureArtifactIds(ctx, report.notebookId);
+  return !isChatLiteratureReport(report, reportIds);
 }
 
 /**
@@ -272,7 +260,7 @@ export const startLiteratureReview = mutation({
     // Use the requested thread or start a fresh conversation (never reuse another thread).
     let conversationId: Id<"conversations">;
     if (args.conversationId) {
-      const existing = await ctx.db.get(args.conversationId);
+      const existing = await getConversationIfReadable(ctx, args.conversationId, userId);
       if (!existing || existing.notebookId !== args.notebookId) {
         throw new Error("Invalid conversation for this notebook");
       }
@@ -542,15 +530,7 @@ export const getLiteratureReviewSession = query({
     if (!userId) return null;
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session) return null;
-
-    if (session.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, session.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!session || !(await canReadReviewSession(ctx, session, userId))) return null;
 
     return session;
   },
@@ -614,13 +594,7 @@ export const getRankedPapersForSession = query({
     if (!userId) return null;
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, session.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!session || !(await canReadReviewSession(ctx, session, userId))) return null;
 
     const row = await ctx.db
       .query("literatureReviewRankedPapers")
@@ -692,15 +666,7 @@ export const getLiteratureTable = query({
     if (!userId) return null;
 
     const table = await ctx.db.get(args.tableId);
-    if (!table) return null;
-
-    if (table.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, table.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!table || !(await canReadLiteratureTable(ctx, table, userId))) return null;
 
     const papers = await Promise.all(
       table.papers.map(async (paper) => {
@@ -765,15 +731,7 @@ export const getLiteratureReport = query({
     if (!userId) return null;
 
     const report = await ctx.db.get(args.reportId);
-    if (!report) return null;
-
-    if (report.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, report.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!report || !(await canReadLiteratureReport(ctx, report, userId))) return null;
 
     return report;
   },
@@ -944,13 +902,7 @@ export const getLiteratureReportDetail = query({
     if (!userId) return null;
 
     const report = await ctx.db.get(args.reportId);
-    if (!report || report.userId !== userId) return null;
-
-    try {
-      await assertCanReadNotebook(ctx, report.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!report || !(await canReadLiteratureReport(ctx, report, userId))) return null;
 
     const citations: Record<
       string,
@@ -1024,13 +976,7 @@ export const getLiteratureReviewScreeningDecisions = query({
     if (!userId) return [];
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== userId) return [];
-
-    try {
-      await assertCanReadNotebook(ctx, session.notebookId, userId);
-    } catch {
-      return [];
-    }
+    if (!session || !(await canReadReviewSession(ctx, session, userId))) return [];
 
     const rows = await ctx.db
       .query("literatureReviewScreeningDecisions")

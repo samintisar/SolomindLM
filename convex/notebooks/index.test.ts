@@ -112,3 +112,118 @@ describe("notebooks.index", () => {
     );
   });
 });
+
+describe("notebooks.get access", () => {
+  test("a viewer gets the notebook with access=viewer and the owner's name", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { viewer, notebookId } = await t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Ada" });
+      const viewer = await ctx.db.insert("users", { name: "Viewer" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Public",
+        isPublic: true,
+        publishedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { viewer, notebookId };
+    });
+    const nb = await withAuth(t, viewer).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.access).toBe("viewer");
+    expect(nb?.isPublic).toBe(true);
+    expect(nb?.ownerName).toBe("Ada");
+  });
+
+  test("the owner gets access=owner", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const { owner, notebookId } = await t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Ada" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Mine",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { owner, notebookId };
+    });
+    const nb = await withAuth(t, owner).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.access).toBe("owner");
+    expect(nb?.isPublic).toBe(false);
+  });
+
+  /** A public notebook filed in the owner's folder, with custom chat instructions. */
+  async function seedConfiguredNotebook(t: ReturnType<typeof convexTest>) {
+    const now = Date.now();
+    return t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Ada" });
+      const folderId = await ctx.db.insert("folders", {
+        userId: owner,
+        name: "Private folder",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Public",
+        isPublic: true,
+        publishedAt: now,
+        folderId,
+        chatSettings: {
+          instructionMode: "custom",
+          customInstructions: "Secret prompt",
+          responseLength: "longer",
+          smartModel: "some-model",
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { owner, folderId, notebookId };
+    });
+  }
+
+  test("the owner sees their folder and custom instructions", async () => {
+    const t = convexTest(schema, modules);
+    const { owner, folderId, notebookId } = await seedConfiguredNotebook(t);
+    const nb = await withAuth(t, owner).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.folderId).toBe(folderId);
+    expect(nb?.chatSettings?.customInstructions).toBe("Secret prompt");
+  });
+
+  test("an editor gets access=editor without the owner's folder", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId } = await seedConfiguredNotebook(t);
+    const editor = await t.run(async (ctx) => {
+      const editor = await ctx.db.insert("users", { name: "Ed" });
+      await ctx.db.insert("notebookMembers", {
+        notebookId,
+        userId: editor,
+        role: "editor",
+        joinedAt: Date.now(),
+      });
+      return editor;
+    });
+    const nb = await withAuth(t, editor).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.access).toBe("editor");
+    expect(nb?.isSharedNotebook).toBe(true);
+    expect(nb?.ownerName).toBe("Ada");
+    expect(nb?.folderId).toBeUndefined();
+    expect(nb?.chatSettings?.customInstructions).toBe("Secret prompt");
+  });
+
+  test("a viewer gets chat settings without the custom instructions or the folder", async () => {
+    const t = convexTest(schema, modules);
+    const { notebookId } = await seedConfiguredNotebook(t);
+    const viewer = await t.run((ctx) => ctx.db.insert("users", { name: "Viewer" }));
+    const nb = await withAuth(t, viewer).query(api.notebooks.index.get, { id: notebookId });
+    expect(nb?.access).toBe("viewer");
+    expect(nb?.folderId).toBeUndefined();
+    expect(nb?.chatSettings).toEqual({
+      instructionMode: "custom",
+      responseLength: "longer",
+      smartModel: "some-model",
+    });
+  });
+});

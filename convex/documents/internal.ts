@@ -3,11 +3,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-  getNotebookAccess,
-} from "../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
 
 /**
@@ -27,21 +23,42 @@ export async function deleteAllChunksForDocument(
 }
 
 /**
- * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
+ * True when a document other than `exceptDocumentIds` points at this stored file. Forks reuse
+ * the original's file, so deleting one copy must leave the others readable.
  */
-export const userCanAccessStorage = internalQuery({
-  args: {
-    userId: v.id("users"),
-    storageId: v.string(),
-  },
+export async function isDocumentFileUsedElsewhere(
+  ctx: MutationCtx,
+  storageId: string,
+  exceptDocumentIds: readonly Id<"documents">[] = []
+): Promise<boolean> {
+  const users = await ctx.db
+    .query("documents")
+    .withIndex("by_storage", (q) => q.eq("storageId", storageId))
+    .take(exceptDocumentIds.length + 1);
+  return users.some((doc) => !exceptDocumentIds.includes(doc._id));
+}
+
+/**
+ * Deletes a source's stored file unless another document still uses it (see
+ * `isDocumentFileUsedElsewhere`). Call before deleting the document row, passing its id, or
+ * after the row stopped referencing the file.
+ */
+export async function deleteDocumentFileIfUnused(
+  ctx: MutationCtx,
+  storageId: string,
+  exceptDocumentIds: readonly Id<"documents">[] = []
+): Promise<void> {
+  if (await isDocumentFileUsedElsewhere(ctx, storageId, exceptDocumentIds)) return;
+  await ctx.storage.delete(storageId as Id<"_storage">);
+}
+
+/** For actions that swapped a document's file: delete the old one if nothing else uses it. */
+export const deleteDocumentFileIfUnusedInternal = internalMutation({
+  args: { storageId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
-    const doc = await ctx.db
-      .query("documents")
-      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .first();
-    if (!doc) return false;
-    const access = await getNotebookAccess(ctx, doc.notebookId, args.userId);
-    return access !== null;
+    await deleteDocumentFileIfUnused(ctx, args.storageId);
+    return null;
   },
 });
 
@@ -59,7 +76,7 @@ export async function resetDocumentForReembed(
 
   if (args.newStorageId !== undefined) {
     if (doc.storageId) {
-      await ctx.storage.delete(doc.storageId as Id<"_storage">);
+      await deleteDocumentFileIfUnused(ctx, doc.storageId, [doc._id]);
     }
     await ctx.db.patch(args.documentId, {
       storageId: args.newStorageId,
@@ -272,12 +289,15 @@ export const patch = internalMutation({
 });
 
 /**
- * Internal: Keyword search using full-text search index
+ * Internal: Keyword search using full-text search index, scoped to one notebook. Callers check
+ * notebook access first; chunks carry the uploader's userId, so filtering by the caller's id would
+ * hide every source a Cowork editor or public-notebook viewer did not upload.
  */
 export const keywordSearch = internalQuery({
   args: {
     notebookId: v.id("notebooks"),
-    userId: v.id("users"), // Note: Using v.id("users") from Better Auth
+    /** For logs only. */
+    userId: v.id("users"),
     query: v.string(),
     limit: v.optional(v.number()),
     documentIds: v.optional(v.array(v.id("documents"))),
@@ -290,7 +310,7 @@ export const keywordSearch = internalQuery({
     const results = await ctx.db
       .query("documentChunks")
       .withSearchIndex("search_content", (q) =>
-        q.search("content", args.query).eq("userId", args.userId).eq("notebookId", args.notebookId)
+        q.search("content", args.query).eq("notebookId", args.notebookId)
       )
       .take(limit);
 

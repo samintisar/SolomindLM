@@ -105,6 +105,11 @@ interface ChatPanelProps {
   onOpenLiteratureReport?: (reportId: Id<"literatureReports">) => void;
   onOpenRankedPapers?: (sessionId: Id<"literatureReviewSessions">) => void;
   onOpenScreeningDecisions?: (sessionId: Id<"literatureReviewSessions">) => void;
+  /**
+   * Viewer of a public notebook: plain chat in their own threads only. No chat settings, saving
+   * to notes, deep research, literature review or adding sources to the notebook.
+   */
+  readOnly?: boolean;
 }
 
 const ChatPanelContent: React.FC<ChatPanelProps> = ({
@@ -122,6 +127,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
   onOpenLiteratureReport,
   onOpenRankedPapers,
   onOpenScreeningDecisions,
+  readOnly = false,
 }) => {
   const {
     messages,
@@ -155,13 +161,15 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const {
-    composerMode,
+    composerMode: persistedComposerMode,
     setComposerMode,
     sourceFilters,
     setSourceFilters,
     researchDatabase,
     setResearchDatabase,
   } = usePersistedComposerPrefs(notebookId);
+  // Deep research and literature review write to the notebook, so a viewer always chats.
+  const composerMode: ChatComposerMode = readOnly ? "chat" : persistedComposerMode;
   const [activeLiteratureSessionId, setActiveLiteratureSessionId] =
     useState<Id<"literatureReviewSessions"> | null>(null);
   const [chatAcademicFilters, setChatAcademicFilters] =
@@ -438,7 +446,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     (reference: ReferenceChunk) => {
       const sourceUrl = reference.sourceUrl;
       const isExternal = !reference.documentId && !!sourceUrl;
-      if (!isExternal || !notebookId) return undefined;
+      if (!isExternal || !notebookId || readOnly) return undefined;
       return async () => {
         try {
           const ids = await addExternalSourcesMutation({
@@ -460,7 +468,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
         }
       };
     },
-    [notebookId, addExternalSourcesMutation, success, toastError]
+    [notebookId, readOnly, addExternalSourcesMutation, success, toastError]
   );
 
   const isReferenceAbstractOnly = useCallback(
@@ -795,24 +803,28 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
             </DropdownMenuTrigger>
           </ControlTooltip>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setIsConfigModalOpen(true)}>
-              <DropdownMenuItemIcon>
-                <Settings2 />
-              </DropdownMenuItemIcon>
-              Configure chat
-            </DropdownMenuItem>
+            {!readOnly && (
+              <DropdownMenuItem onSelect={() => setIsConfigModalOpen(true)}>
+                <DropdownMenuItemIcon>
+                  <Settings2 />
+                </DropdownMenuItemIcon>
+                Configure chat
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={handleExportChat}>
               <DropdownMenuItemIcon>
                 <Download />
               </DropdownMenuItemIcon>
               Export chat
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => void handleSaveToNote()}>
-              <DropdownMenuItemIcon>
-                <FileText />
-              </DropdownMenuItemIcon>
-              Save to note
-            </DropdownMenuItem>
+            {!readOnly && (
+              <DropdownMenuItem onSelect={() => void handleSaveToNote()}>
+                <DropdownMenuItemIcon>
+                  <FileText />
+                </DropdownMenuItemIcon>
+                Save to note
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handlePinActiveChat}>
               <DropdownMenuItemIcon>
@@ -904,6 +916,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
                           externalSources={message.externalSources}
                           onOpenExternalSources={handleOpenExternalSources}
                           showSourcesButton={
+                            !readOnly &&
                             message.role === "assistant" &&
                             !!message.externalSources &&
                             message.externalSources.length > 0
@@ -947,7 +960,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
             onStop={onStopChat}
             notebookId={notebookId}
             mode={composerMode}
-            onModeChange={handleComposerModeChange}
+            onModeChange={readOnly ? undefined : handleComposerModeChange}
             researchDatabase={researchDatabase}
             onResearchDatabaseChange={setResearchDatabase}
             notebookPaperCount={notebookPaperIds.length}
@@ -960,16 +973,19 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
               setChatAcademicFilters((prev) => ({ ...prev, ...patch }))
             }
             chatSettings={chatSettings}
-            onModelChange={(modelId) =>
-              handleSaveChatConfig(
-                {
-                  instructionMode: chatSettings?.instructionMode ?? "default",
-                  responseLength: chatSettings?.responseLength ?? "default",
-                  customInstructions: chatSettings?.customInstructions,
-                  smartModel: modelId,
-                },
-                { silentSuccess: true }
-              )
+            onModelChange={
+              readOnly
+                ? undefined
+                : (modelId) =>
+                    handleSaveChatConfig(
+                      {
+                        instructionMode: chatSettings?.instructionMode ?? "default",
+                        responseLength: chatSettings?.responseLength ?? "default",
+                        customInstructions: chatSettings?.customInstructions,
+                        smartModel: modelId,
+                      },
+                      { silentSuccess: true }
+                    )
             }
             onAppendTranscription={(text) => {
               setInputMessage((prev) => {

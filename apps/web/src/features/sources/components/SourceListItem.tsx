@@ -54,6 +54,8 @@ interface SourceListItemProps {
   onMenuOpenChange: (id: string, open: boolean) => void;
   onStartRename: (sourceId: string) => void;
   isMenuOpen: boolean;
+  /** Viewer of a public notebook: no rename/delete/refresh menu. */
+  readOnly?: boolean;
 }
 
 export const SourceListItem: React.FC<SourceListItemProps> = ({
@@ -72,6 +74,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   onMenuOpenChange,
   onStartRename,
   isMenuOpen,
+  readOnly = false,
 }) => {
   const status = source.status || "completed";
   const canRemoteRefresh = Boolean(source.remoteRefreshKind);
@@ -223,69 +226,71 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
           onCheckedChange={() => onToggle(source.id)}
           aria-label={`Include ${source.title} in chat`}
         />
-        <DropdownMenu
-          modal={false}
-          open={isMenuOpen}
-          onOpenChange={(open) => onMenuOpenChange(source.id, open)}
-        >
-          <DropdownMenuTrigger asChild>
-            <Button
-              ref={triggerRef}
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="More options"
-              title="More options"
-            >
-              <MoreVertical />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            onCloseAutoFocus={(e) => {
-              if (renameRequestedRef.current) {
-                renameRequestedRef.current = false;
-                e.preventDefault();
-              }
-            }}
+        {!readOnly && (
+          <DropdownMenu
+            modal={false}
+            open={isMenuOpen}
+            onOpenChange={(open) => onMenuOpenChange(source.id, open)}
           >
-            {canGetFullText && onFindFullText && (
-              <DropdownMenuItem onSelect={() => onFindFullText(source.id)}>
-                <Search />
-                {isFailedPaper ? "Try again" : "Find full text"}
-              </DropdownMenuItem>
-            )}
-            {canGetFullText && onUploadPdf && (
-              <DropdownMenuItem onSelect={() => onUploadPdf(source.id)}>
-                <FileUp />
-                Upload PDF
-              </DropdownMenuItem>
-            )}
-            {canRemoteRefresh && (
-              <DropdownMenuItem onSelect={() => onRefreshSource(source.id)}>
-                <RefreshCw />
-                Refresh
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              onSelect={() => {
-                renameRequestedRef.current = true;
-                onStartRename(source.id);
+            <DropdownMenuTrigger asChild>
+              <Button
+                ref={triggerRef}
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="More options"
+                title="More options"
+              >
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(e) => {
+                if (renameRequestedRef.current) {
+                  renameRequestedRef.current = false;
+                  e.preventDefault();
+                }
               }}
             >
-              <Pencil />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => onDelete(source.id, source.title)}
-            >
-              <Trash2 />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {canGetFullText && onFindFullText && (
+                <DropdownMenuItem onSelect={() => onFindFullText(source.id)}>
+                  <Search />
+                  {isFailedPaper ? "Try again" : "Find full text"}
+                </DropdownMenuItem>
+              )}
+              {canGetFullText && onUploadPdf && (
+                <DropdownMenuItem onSelect={() => onUploadPdf(source.id)}>
+                  <FileUp />
+                  Upload PDF
+                </DropdownMenuItem>
+              )}
+              {canRemoteRefresh && (
+                <DropdownMenuItem onSelect={() => onRefreshSource(source.id)}>
+                  <RefreshCw />
+                  Refresh
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onSelect={() => {
+                  renameRequestedRef.current = true;
+                  onStartRename(source.id);
+                }}
+              >
+                <Pencil />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => onDelete(source.id, source.title)}
+              >
+                <Trash2 />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </ItemActions>
     </Item>
   );

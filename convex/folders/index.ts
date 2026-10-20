@@ -101,6 +101,8 @@ export const getNotebooks = query({
           coverColor: notebook.coverColor ?? "bg-vintage-brown-300",
           icon: notebook.icon ?? "Folder",
           isFeatured: notebook.isFeatured ?? false,
+          isPublic: notebook.isPublic ?? false,
+          access: "owner" as const,
           folderId: notebook.folderId,
           created_at: notebook.createdAt,
           updated_at: notebook.updatedAt,

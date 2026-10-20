@@ -140,6 +140,14 @@ export const saveChat = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
+    // Check before the title's LLM call: a viewer can't save notes, so their call must cost nothing.
+    // createInternal checks again in the same transaction as the write.
+    const canEdit = await ctx.runQuery(internal.notebooks.index.canEditNotebookInternal, {
+      notebookId: args.notebookId,
+      userId,
+    });
+    if (!canEdit) throw new Error("Access denied");
+
     // Generate title from first user message
     let title = "Chat Conversation";
     const firstUserMessage = args.messages.find((m: any) => m.role === "user" && m.content);
