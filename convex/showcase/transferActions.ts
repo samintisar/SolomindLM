@@ -73,14 +73,23 @@ async function fetchOk(url: string): Promise<Response> {
 
 /** Writes one showcase notebook to a bundle in this deployment's storage and returns its URL. */
 export const exportBundle = internalAction({
-  args: { ownerEmail: v.string(), slug: v.string() },
+  args: {
+    ownerEmail: v.string(),
+    slug: v.string(),
+    /** Studio tables left out of the bundle (e.g. "audioOverviews"); the import reads them as empty. */
+    skipStudioTables: v.optional(v.array(v.string())),
+  },
   returns: v.object({
     bundleUrl: v.string(),
     storageIds: v.array(v.string()),
     counts: v.record(v.string(), v.number()),
   }),
   handler: async (ctx, args) => {
-    const rows = await ctx.runQuery(internal.showcase.transfer.exportNotebookRows, args);
+    const rows = await ctx.runQuery(internal.showcase.transfer.exportNotebookRows, {
+      ownerEmail: args.ownerEmail,
+      slug: args.slug,
+    });
+    for (const table of args.skipStudioTables ?? []) delete rows.studio[table];
     const storageIds: string[] = [];
     const counts: Record<string, number> = {
       documents: rows.documents.length,
