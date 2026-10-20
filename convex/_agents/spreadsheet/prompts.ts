@@ -23,7 +23,7 @@ export const COLLAPSE_SYSTEM_PROMPT =
   "You are a Technical Editor. Consolidate fragmented research notes into a Master List of Concepts. Merge details about the same concept into single blocks. Remove exact duplicates.";
 
 export const REDUCE_SYSTEM_PROMPT =
-  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields. Write every cell for someone reading the original sources: when a value is missing, write 'Not reported', and never mention notes, extracts or how the table was made.";
+  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields. Write every cell for someone reading the original sources: when a value is missing, write 'Not reported' unless the request says how to show missing values, and never mention notes, extracts or how the table was made.";
 
 // ============================================================
 // MAP PROMPT (Concept Identification)
@@ -58,6 +58,26 @@ Input Notes:
 CONSOLIDATED NOTES:`;
 
 // ============================================================
+// ROW PLAN PROMPT (choose the rows before writing the table, #451)
+// ============================================================
+
+export const ROW_PLAN_SYSTEM_PROMPT =
+  "You are a Data Analyst planning the rows of a table before it is written. Reply with JSON only.";
+
+export const ROW_PLAN_PROMPT = `User Request: "{customPrompt}"
+
+Decide which rows the table for this request should have, using the research notes below.
+- A row is one item of the kind the request is about. When the request says what a row is (one per source, per paper, per event), follow it.
+- When the sources give those items as a numbered or named list, the rows are that list: every item on it and nothing else.
+- The parts, steps, techniques, examples, datasets, tools and cited works of an item are details of that item, not rows. So is anything a source only mentions in passing.
+- List each item once, under the name the sources give it, in the order a reader would expect.
+
+Reply with JSON only: {"rows": ["first item", "second item"]}
+
+Research Notes:
+{content}`;
+
+// ============================================================
 // REDUCE PROMPT (Final Table Synthesis)
 // ============================================================
 
@@ -66,9 +86,12 @@ Create a comprehensive table based on the user's custom request.
 
 User Request: "{customPrompt}"
 
+{rowPlan}
+
 Rules:
 1. **Columns:** Auto-detect the best columns to represent the data.
-2. **Rows:** One row per distinct item the request is about.
+2. **Rows:** One row per distinct item the request is about. Things the sources
+   only mention in passing are not items.
 3. **Density:** Consolidate details to avoid sparse rows.
 4. **Coverage:** If the items the request is about form a discrete, named list
    in the sources (e.g. "the 7 principles", "frameworks: X, Y, Z"), every named
