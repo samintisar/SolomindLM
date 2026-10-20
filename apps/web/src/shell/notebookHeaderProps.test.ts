@@ -66,6 +66,7 @@ describe("isVisitedNotebookGone", () => {
   const gone = {
     urlNotebookId: "n1",
     hasShareToken: false,
+    signedIn: true,
     listLoaded: true,
     listed: false,
     visited: null,
@@ -73,6 +74,10 @@ describe("isVisitedNotebookGone", () => {
 
   test("an unlisted notebook the server no longer returns is gone", () => {
     expect(isVisitedNotebookGone(gone)).toBe(true);
+  });
+
+  test("not while signed out or signing in: queries then answer as no one, with nothing", () => {
+    expect(isVisitedNotebookGone({ ...gone, signedIn: false })).toBe(false);
   });
 
   test("not while the visited notebook is loading", () => {

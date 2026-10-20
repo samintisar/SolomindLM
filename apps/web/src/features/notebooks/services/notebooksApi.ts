@@ -9,11 +9,12 @@ import type { ChatSettings } from "@/shared/types";
 // ============================================================
 
 /**
- * Get all notebooks for the authenticated user
- * Returns undefined while loading, empty array when loaded but no results
+ * The signed-in user's notebooks: undefined while loading, `[]` when they have none. Also
+ * undefined while signed out: the query would answer as no one with `[]`, which reads as "you
+ * have no notebooks" (the mobile app is briefly signed out while its token refreshes on resume).
  */
-export function useNotebooks() {
-  return useQuery(api.notebooks.index.list);
+export function useNotebooks(signedIn: boolean) {
+  return useQuery(api.notebooks.index.list, signedIn ? {} : "skip");
 }
 
 /**
