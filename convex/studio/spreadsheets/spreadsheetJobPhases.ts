@@ -18,7 +18,13 @@ import {
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { cleanCsvOutput, withoutPipelineWording } from "../../_agents/spreadsheet/csvHelpers";
+import {
+  checkCsvTable,
+  checkTableRows,
+  cleanCsvOutput,
+  parseJsonRows,
+  withoutPipelineWording,
+} from "../../_agents/spreadsheet/csvHelpers";
 import { resolveSpreadsheetRequest } from "../../_agents/spreadsheet/presetRequests";
 import {
   COLLAPSE_PROMPT,
@@ -37,6 +43,7 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { serializeCsv } from "../../_shared/csv.helpers.js";
 import { planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
 import {
   generateTitleWithinDeadline,
@@ -76,6 +83,8 @@ const CONFIG = {
   ROW_PLAN_TIMEOUT_MS: 90_000,
   ROW_PLAN_RESERVE_MS: 210_000, // left for the reduce and save after planning rows
   MIN_ROW_PLAN_CALL_MS: 20_000, // skip planning below this budget; the reduce picks rows itself
+  REDUCE_ATTEMPTS: 2, // a malformed table is written once more, then the job fails (#567)
+  MIN_REDUCE_RETRY_MS: 60_000, // no second reduce below this budget
 } as const;
 
 export type SpreadsheetGenerationPhaseArgs = {
@@ -651,32 +660,9 @@ export async function runFinalizeSpreadsheetPhase(
     console.log(`[SpreadsheetJob] Reduce prompt: ${prompt.length} chars`);
 
     const startTime = Date.now();
-    const rawContent = await invokeWithinBudget({
-      invoke: () =>
-        invokeTogetherText({
-          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-          userPrompt: prompt,
-          model: env.SPREADSHEET_LLM,
-          maxTokens: 32_000,
-          temperature: 0.5,
-          reasoningEnabled: true,
-          onUsage: (usage) => {
-            reduceUsage = addTokenUsage(reduceUsage, usage);
-          },
-        }),
-      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
-      phaseLabel: "SpreadsheetReduce",
+    let finalOutput = await writeSpreadsheetTable(prompt, deadline, language, (usage) => {
+      reduceUsage = addTokenUsage(reduceUsage, usage);
     });
-
-    let finalOutput = withoutPipelineWording(cleanCsvOutput(rawContent));
-
-    if (rawContent.length >= 31_000) {
-      console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
-      const lastNewline = finalOutput.lastIndexOf("\n");
-      if (lastNewline > 0) {
-        finalOutput = finalOutput.substring(0, lastNewline);
-      }
-    }
 
     const aligned = alignRowsToPlan(finalOutput, rowPlan);
     if (aligned.dropped.length > 0) {
@@ -775,6 +761,91 @@ export async function runFinalizeSpreadsheetPhase(
     });
 
     throw error;
+  }
+}
+
+// ============================================================
+// HELPER: Write the table
+// ============================================================
+
+/**
+ * Run the reduce and check its table before it is saved (#567). The reduce writes JSON rows and
+ * the CSV is built here; a reply in CSV instead is repaired where safe. A reply cut off at the
+ * output cap loses its partial last row and is saved. A table whose rows are there but badly formatted is
+ * sent back once to be reformatted (no notes, so it is cheap); one with no header or no rows is
+ * written once more from the notes. If that fails too, or there is no time for it, the job fails
+ * rather than save a broken table.
+ */
+export async function writeSpreadsheetTable(
+  prompt: string,
+  deadline: JobDeadline,
+  language: string | undefined,
+  onUsage: (usage: TokenUsage) => void
+): Promise<string> {
+  let userPrompt = prompt;
+  let reformat = false;
+  for (let attempt = 1; ; attempt++) {
+    let finishReason: string | undefined;
+    const rawContent = await invokeWithinBudget({
+      invoke: () =>
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          userPrompt,
+          model: env.SPREADSHEET_LLM,
+          maxTokens: 32_000,
+          temperature: reformat ? 0 : 0.5,
+          reasoningEnabled: !reformat,
+          onUsage,
+          onFinishReason: (reason) => {
+            finishReason = reason;
+          },
+        }),
+      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+      phaseLabel: reformat ? "SpreadsheetReformat" : "SpreadsheetReduce",
+    });
+
+    // JSON rows are checked as rows and built into CSV here, so their separators and quotes are
+    // always right. A reply that isn't JSON rows is read as CSV and repaired by checkCsvTable; a
+    // cut-off JSON reply has already lost its partial last line in parseJsonRows.
+    const truncated = finishReason === "length";
+    const json = parseJsonRows(rawContent);
+    let csv: string;
+    let check: { problems: string[]; droppedRows: number; needsRewrite: boolean };
+    if (json) {
+      const checked = checkTableRows(json.rows);
+      csv = withoutPipelineWording(serializeCsv(checked.rows, { quoteAll: true }));
+      check = { ...checked, droppedRows: checked.droppedRows + json.skippedLines };
+    } else {
+      console.log("[SpreadsheetJob] Reduce reply wasn't JSON rows, read it as CSV");
+      const checked = checkCsvTable(withoutPipelineWording(cleanCsvOutput(rawContent)), {
+        truncated,
+      });
+      csv = checked.csv;
+      check = checked;
+    }
+    const { problems, droppedRows, needsRewrite } = check;
+    if (droppedRows > 0 || truncated) {
+      console.log(
+        `[SpreadsheetJob] Dropped ${droppedRows} malformed rows or lines${truncated ? " (reply cut off at the output cap)" : ""}`
+      );
+    }
+    if (problems.length === 0) return csv;
+
+    const retryBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
+    console.warn(
+      `[SpreadsheetJob] Reduce attempt ${attempt} wrote a malformed table: ${problems.join("; ")}`
+    );
+    if (attempt >= CONFIG.REDUCE_ATTEMPTS || retryBudgetMs < CONFIG.MIN_REDUCE_RETRY_MS) {
+      throw new Error(`The spreadsheet came out malformed (${problems.join("; ")}).`);
+    }
+    reformat = !needsRewrite;
+    userPrompt = reformat
+      ? `This table could not be saved: ${problems.join("; ")}. Rewrite it with the same rows and content as JSON lines: the column names as one JSON array of strings on the first line, then each row as one JSON array of strings on its own line, with exactly one value per column. Output the JSON lines only.
+
+${rawContent}`
+      : `${prompt}
+
+Your previous table could not be saved: ${problems.join("; ")}. Write the whole table again as JSON lines: the column names as one JSON array on the first line, then one JSON array per row, with exactly one value per column.`;
   }
 }
 
