@@ -65,7 +65,14 @@ export const getChunks = internalQuery({
     chunkIds: v.array(v.id("documentChunks")),
   },
   handler: async (ctx, args) => {
-    return await Promise.all(args.chunkIds.map((id) => ctx.db.get(id)));
+    const chunks = await Promise.all(args.chunkIds.map((id) => ctx.db.get(id)));
+    // A deleted source's chunks are removed in scheduled batches; until then, skip them.
+    const documentIds = [...new Set(chunks.flatMap((c) => (c ? [c.documentId] : [])))];
+    const existing = new Set<string>();
+    for (const id of documentIds) {
+      if (await ctx.db.get(id)) existing.add(id);
+    }
+    return chunks.map((c) => (c && existing.has(c.documentId) ? c : null));
   },
 });
 

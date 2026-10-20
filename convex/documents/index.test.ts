@@ -8,6 +8,7 @@ import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import { performNotebookFork } from "../notebooks/_forkNotebook";
 import schema from "../schema";
+import { CHUNK_DELETE_BATCH_SIZE, deleteAllChunksForDocument } from "./internal";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -624,6 +625,111 @@ describe("documents.remove", () => {
         .collect()
     );
     expect(chunks).toHaveLength(0);
+  });
+});
+
+describe("documents.remove: large sources", () => {
+  async function seedDocWithChunks(t: ReturnType<typeof convexTest>, count: number) {
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const docId = await t.run(async (ctx) =>
+      ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Big source",
+        fileType: "text",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+    await t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        await ctx.db.insert("documentChunks", {
+          documentId: docId,
+          userId,
+          notebookId,
+          content: `Chunk ${i}`,
+          chunkIndex: i,
+          createdAt: Date.now(),
+        });
+      }
+    });
+    return { userId, notebookId, docId };
+  }
+
+  function chunksOf(t: ReturnType<typeof convexTest>, docId: Id<"documents">) {
+    return t.run(async (ctx) =>
+      ctx.db
+        .query("documentChunks")
+        .withIndex("by_document", (q) => q.eq("documentId", docId))
+        .collect()
+    );
+  }
+
+  test("deletes the document at once and drains its chunks in batches", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const count = CHUNK_DELETE_BATCH_SIZE * 2 + 50;
+      const { userId, docId } = await seedDocWithChunks(t, count);
+
+      await withAuth(t, userId).mutation(api.documents.index.remove, { id: docId });
+
+      expect(await t.run(async (ctx) => ctx.db.get(docId))).toBeNull();
+      expect(await chunksOf(t, docId)).toHaveLength(count - CHUNK_DELETE_BATCH_SIZE);
+
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await chunksOf(t, docId)).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("leaves chunks stored after the delete started (re-embed)", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const { userId, notebookId, docId } = await seedDocWithChunks(
+        t,
+        CHUNK_DELETE_BATCH_SIZE + 20
+      );
+
+      await t.run(async (ctx) => deleteAllChunksForDocument(ctx, docId));
+      vi.advanceTimersByTime(5);
+      const fresh = await t.run(async (ctx) =>
+        ctx.db.insert("documentChunks", {
+          documentId: docId,
+          userId,
+          notebookId,
+          content: "Re-embedded chunk",
+          chunkIndex: 0,
+          createdAt: Date.now(),
+        })
+      );
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      expect((await chunksOf(t, docId)).map((c) => c._id)).toEqual([fresh]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("retrieval skips chunks whose document is gone", async () => {
+    const t = convexTest(schema, modules);
+    const { docId } = await seedDocWithChunks(t, 2);
+    const [first, second] = (await chunksOf(t, docId)).map((c) => c._id);
+
+    expect(
+      (await t.query(internal.documents.chunks.getChunks, { chunkIds: [first, second] })).map(
+        (c) => c?._id
+      )
+    ).toEqual([first, second]);
+
+    await t.run(async (ctx) => ctx.db.delete(docId));
+    expect(
+      await t.query(internal.documents.chunks.getChunks, { chunkIds: [first, second] })
+    ).toEqual([null, null]);
   });
 });
 
