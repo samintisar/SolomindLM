@@ -21,7 +21,6 @@ import {
   takeFeatureRun,
 } from "../_lib/limits";
 import { assertCanEditNotebook, getNotebookAccess } from "../_lib/notebookAccess";
-import { isConversationVisible } from "../_model/conversations";
 import { getAuthUserId } from "../auth";
 import { scheduleResearchRunCompletionPush } from "../push/notify";
 import { normalizeResearchTitle } from "./titles";
@@ -47,8 +46,9 @@ async function canReadResearch(
 
 /**
  * Steps are keyed by a run, plan or literature review session id. Each must belong to
- * `notebookId` and be visible to the user. Review sessions have no conversation; they are shared
- * with owners and editors like a shared thread (only they can start one).
+ * `notebookId` and be visible to the user. Review sessions have no conversation; like the session
+ * itself (`canReadReviewSession` in `studio/literature_tables`), only their creator reads them,
+ * and only while they own or edit the notebook.
  */
 async function canReadResearchSteps(
   ctx: QueryCtx,
@@ -63,9 +63,9 @@ async function canReadResearchSteps(
 
   const sessionId = ctx.db.normalizeId("literatureReviewSessions", researchId);
   const session = sessionId ? await ctx.db.get(sessionId) : null;
-  if (!session || session.notebookId !== notebookId) return false;
+  if (!session || session.notebookId !== notebookId || session.userId !== userId) return false;
   const access = await getNotebookAccess(ctx, notebookId, userId);
-  return access !== null && isConversationVisible({ userId: session.userId }, { userId, access });
+  return access === "owner" || access === "editor";
 }
 
 export const getPlan = query({

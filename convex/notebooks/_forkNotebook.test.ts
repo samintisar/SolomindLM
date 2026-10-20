@@ -577,9 +577,8 @@ describe("performNotebookFork infographics", () => {
       imageUrl: "https://example.com/chart.png",
       metadata: { sourceDocumentIds: [forkedDocId], orientation: "portrait" },
     });
-    const draft = forkedInfographics.find((i) => i.title === "Draft");
-    expect(draft?.data).toEqual({});
-    expect(draft?.metadata).toBeUndefined();
+    // An unfinished item has no job in the fork to finish it.
+    expect(forkedInfographics.map((i) => i.title)).toEqual(["Chart"]);
   });
 });
 
@@ -600,7 +599,8 @@ describe("performNotebookFork audio overviews", () => {
         userId: ownerId,
         notebookId,
         title: "Overview",
-        status: "generating",
+        // A finished row can still carry the synthesis record of the job that made it.
+        status: "completed",
         metadata: {
           audioType: "deep_dive",
           synthesis: {
@@ -627,6 +627,46 @@ describe("performNotebookFork audio overviews", () => {
     // Deleting or failing the fork's row deletes the chunk files its metadata names.
     expect(forked.metadata).toEqual({ audioType: "deep_dive" });
     expect(await t.run((ctx) => ctx.db.system.get(chunkFileId))).not.toBeNull();
+  });
+});
+
+describe("performNotebookFork unfinished studio items", () => {
+  test("leaves generating and failed items behind", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const notebookId = await t.run(async (ctx) => {
+      const ownerId = await ctx.db.insert("users", { name: "Owner" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: ownerId,
+        title: "Original",
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (const status of ["completed", "generating", "failed"]) {
+        await ctx.db.insert("reports", {
+          userId: ownerId,
+          notebookId,
+          title: status,
+          content: "",
+          reportType: "summary",
+          status,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      return notebookId;
+    });
+
+    const forkerId = await t.run((ctx) => ctx.db.insert("users", { name: "Forker" }));
+    const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
+
+    const forked = await t.run((ctx) =>
+      ctx.db
+        .query("reports")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", forkId))
+        .collect()
+    );
+    expect(forked.map((r) => r.title)).toEqual(["completed"]);
   });
 });
 

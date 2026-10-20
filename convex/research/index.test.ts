@@ -459,6 +459,24 @@ describe("research queries on a public notebook", () => {
     ).toEqual([]);
   });
 
+  test("an editor reads a review session's steps only if they started it", async () => {
+    const { t, viewer, notebookId, sessionId } = await setup();
+    await t.run((ctx) =>
+      ctx.db.insert("notebookMembers", {
+        notebookId,
+        userId: viewer,
+        role: "editor",
+        joinedAt: Date.now(),
+      })
+    );
+    expect(
+      await as(t, viewer).query(api.research.index.getResearchSteps, {
+        researchId: String(sessionId),
+        notebookId,
+      })
+    ).toEqual([]);
+  });
+
   test("getResearchSteps refuses a research id from another notebook", async () => {
     const { t, owner, runId } = await setup();
     const otherNotebook = await t.run((ctx) =>
