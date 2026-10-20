@@ -1,9 +1,34 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
+import { toConvexError } from "../../_lib/serviceErrors";
 import * as Flashcards from "../../_model/flashcards";
-import { withoutFlashcardProgress } from "../../_model/practiceProgress";
+import {
+  savedCardProficiency,
+  withCardReview,
+  withShowMastered,
+} from "../../_model/practiceProgress";
+import {
+  getPracticeTarget,
+  saveViewerProgress,
+  viewerPracticeRow,
+  viewerPracticeRows,
+} from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
+import { deletePracticeProgress } from "../practice";
+
+/** Refuses a card index that isn't a whole number naming one of the deck's cards. */
+function assertCardIndex(cardsData: unknown[] | undefined, cardIndex: number): void {
+  if (
+    !Array.isArray(cardsData) ||
+    !Number.isInteger(cardIndex) ||
+    cardIndex < 0 ||
+    cardIndex >= cardsData.length
+  ) {
+    throw toConvexError(new InputValidationError("Invalid card index", { field: "cardIndex" }));
+  }
+}
 
 /**
  * Internal: Get a flashcard set by ID (for use by jobs)
@@ -27,8 +52,10 @@ export const list = query({
     const access = await getNotebookAccess(ctx, args.notebookId, userId);
     if (!access) return [];
     const flashcards = await Flashcards.listByNotebook(ctx, args.notebookId);
-    // Review history on the shared row is the owner's; a viewer starts fresh.
-    return access === "viewer" ? flashcards.map(withoutFlashcardProgress) : flashcards;
+    // Review history on the shared row is the owner's; a viewer sees their own.
+    return access === "viewer"
+      ? await viewerPracticeRows(ctx, "flashcards", flashcards, userId, args.notebookId)
+      : flashcards;
   },
 });
 
@@ -50,7 +77,9 @@ export const get = query({
     const access = await getNotebookAccess(ctx, flashcard.notebookId, userId);
     if (!access) return null;
 
-    return access === "viewer" ? withoutFlashcardProgress(flashcard) : flashcard;
+    return access === "viewer"
+      ? await viewerPracticeRow(ctx, "flashcards", flashcard, userId)
+      : flashcard;
   },
 });
 
@@ -158,6 +187,7 @@ export const remove = mutation({
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
     await Flashcards.deleteFlashcard(ctx, args.id);
+    await deletePracticeProgress(ctx, { itemId: args.id });
 
     return { message: "Flashcard set deleted successfully" };
   },
@@ -221,14 +251,38 @@ export const submitCardReview = mutation({
       throw new Error("Flashcard set not found");
     }
 
-    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+    const target = await getPracticeTarget(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
-    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
-      throw new Error("Invalid card index");
-    }
+    assertCardIndex(cardsData, args.cardIndex);
 
     const card = cardsData[args.cardIndex];
+
+    if (target === "viewer") {
+      // A viewer's review goes to their own progress; the shared deck is the owner's.
+      const front = String((card as { front?: unknown }).front ?? "");
+      await saveViewerProgress(
+        ctx,
+        {
+          userId,
+          itemType: "flashcards",
+          itemId: flashcard._id,
+          notebookId: flashcard.notebookId,
+        },
+        (current) =>
+          withCardReview(
+            current,
+            args.cardIndex,
+            front,
+            Flashcards.updateProficiencyAfterReview(
+              savedCardProficiency(current, args.cardIndex, front),
+              args.rating
+            )
+          )
+      );
+      return await viewerPracticeRow(ctx, "flashcards", flashcard, userId);
+    }
+
     const currentProficiency = card.proficiency;
 
     // Update proficiency
@@ -276,9 +330,7 @@ export const updateCard = mutation({
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
-    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
-      throw new Error("Invalid card index");
-    }
+    assertCardIndex(cardsData, args.cardIndex);
 
     const card = cardsData[args.cardIndex];
 
@@ -375,9 +427,7 @@ export const deleteCard = mutation({
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
     const cardsData = flashcard.cardsData as any[];
-    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
-      throw new Error("Invalid card index");
-    }
+    assertCardIndex(cardsData, args.cardIndex);
 
     cardsData.splice(args.cardIndex, 1);
 
@@ -428,7 +478,10 @@ export const getDueCards = query({
     const access = await getNotebookAccess(ctx, flashcard.notebookId, userId);
     if (!access) return [];
 
-    const visible = access === "viewer" ? withoutFlashcardProgress(flashcard) : flashcard;
+    const visible =
+      access === "viewer"
+        ? await viewerPracticeRow(ctx, "flashcards", flashcard, userId)
+        : flashcard;
     const cardsData = visible.cardsData as any[];
     const dueIndices = Flashcards.getDueCardIndices(cardsData, args.nowMs);
 
@@ -457,7 +510,23 @@ export const updatePreferences = mutation({
       throw new Error("Flashcard set not found");
     }
 
-    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+    const target = await getPracticeTarget(ctx, flashcard.notebookId, userId);
+    if (target === "viewer") {
+      const { showMastered } = args;
+      if (showMastered !== undefined) {
+        await saveViewerProgress(
+          ctx,
+          {
+            userId,
+            itemType: "flashcards",
+            itemId: flashcard._id,
+            notebookId: flashcard.notebookId,
+          },
+          (current) => withShowMastered(current, showMastered)
+        );
+      }
+      return await viewerPracticeRow(ctx, "flashcards", flashcard, userId);
+    }
 
     const metadata = {
       ...(flashcard.metadata as Record<string, unknown>),

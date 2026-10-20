@@ -84,7 +84,7 @@ interface ActiveNoteViewProps {
   registerInfographicControls?: (controls: InfographicViewControls | null) => void;
   onInfographicFullscreenChange?: (isFullscreen: boolean) => void;
   onAskInChat?: (prompt: string, documentIds?: string[]) => void;
-  /** Viewer of a public notebook: practice, card edits and sheet edits are locked. */
+  /** Viewer of a public notebook: card, report and sheet edits are locked; practice saves to the viewer's own progress. */
   readOnly?: boolean;
 }
 
@@ -131,7 +131,6 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         note={activeNote}
         onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
         onBack={undefined}
-        readOnly={readOnly}
       />
     );
   }
@@ -252,7 +251,6 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         note={activeNote}
         onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
         onBack={undefined}
-        readOnly={readOnly}
       />
     );
   }

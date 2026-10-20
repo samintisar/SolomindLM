@@ -3,7 +3,8 @@ import type { TableNames } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import { assertCanReadNotebook, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as NotesModel from "../_model/notes";
-import { withoutPracticeProgress } from "../_model/practiceProgress";
+import { forViewer } from "../_model/practiceProgress";
+import { listViewerProgressByItem, viewerPracticeRow } from "../_model/studioProgress";
 import { getAuthUserId } from "../auth";
 import { summarizeListRow } from "./listSummary";
 
@@ -142,12 +143,18 @@ export const list = query({
     }
 
     const results = await Promise.all(queries);
-    const allNotes = results.flat().map((item: Record<string, unknown> & { _type: string }) =>
-      summarizeListRow(
-        // Practice progress on a shared row is the owner's; a viewer starts fresh.
-        access === "viewer" ? withoutPracticeProgress(item._type, item) : item
-      )
-    ) as Array<Record<string, unknown> & { updatedAt: number }>;
+    // Practice progress on a shared row is the owner's; a viewer sees their own instead.
+    const viewerProgress =
+      access === "viewer" ? await listViewerProgressByItem(ctx, userId, args.notebookId) : null;
+    const allNotes = results
+      .flat()
+      .map((item: Record<string, unknown> & { _type: string }) =>
+        summarizeListRow(
+          viewerProgress
+            ? forViewer(item._type, item, viewerProgress.get(item._id as string))
+            : item
+        )
+      ) as Array<Record<string, unknown> & { updatedAt: number }>;
 
     allNotes.sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -219,7 +226,8 @@ export const get = query({
       }
     }
 
-    const visible = access === "viewer" ? withoutPracticeProgress(tableName, note) : note;
+    const visible =
+      access === "viewer" ? await viewerPracticeRow(ctx, tableName, note, userId) : note;
     return { ...visible, _type: args.type };
   },
 });
