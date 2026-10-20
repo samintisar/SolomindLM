@@ -1,5 +1,55 @@
 import { describe, expect, it } from "vitest";
-import { checkCsvTable, cleanCsvOutput, withoutPipelineWording } from "./csvHelpers";
+import { checkCsvTable, cleanCsvOutput, parseJsonRows, withoutPipelineWording } from "./csvHelpers";
+
+describe("parseJsonRows", () => {
+  it("reads JSON lines, with quotes, commas and line breaks inside values", () => {
+    const text = [
+      '["Item","Notes"]',
+      '["Net sales","Up 5%, \\"strong\\" quarter"]',
+      '["Cost","two\\nlines"]',
+    ].join("\n");
+    expect(parseJsonRows(text)).toEqual([
+      ["Item", "Notes"],
+      ["Net sales", 'Up 5%, "strong" quarter'],
+      ["Cost", "two\nlines"],
+    ]);
+  });
+
+  it("turns numbers, booleans and nulls into cell text", () => {
+    expect(parseJsonRows('["A","B","C"]\n[2020, true, null]')).toEqual([
+      ["A", "B", "C"],
+      ["2020", "true", ""],
+    ]);
+  });
+
+  it("reads a fenced block, one wrapping array, or a columns-and-rows object", () => {
+    expect(parseJsonRows('```json\n["A","B"]\n["1","2"]\n```')).toEqual([
+      ["A", "B"],
+      ["1", "2"],
+    ]);
+    expect(parseJsonRows('[\n  ["A","B"],\n  ["1","2"]\n]')).toEqual([
+      ["A", "B"],
+      ["1", "2"],
+    ]);
+    expect(parseJsonRows('{"columns":["A","B"],"rows":[["1","2"]]}')).toEqual([
+      ["A", "B"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("skips the partial last line of a reply cut off at the output cap", () => {
+    expect(parseJsonRows('["A","B"]\n["1","2"]\n["3","cut off in the mid')).toEqual([
+      ["A", "B"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("returns null for CSV, or for a reply that is mostly not JSON rows", () => {
+    expect(parseJsonRows('"A","B"\n"1","2"')).toBeNull();
+    expect(parseJsonRows('["A","B"]\nnot json\nnor this\n["1","2"]')).toBeNull();
+    expect(parseJsonRows('{"note":"no table"}')).toBeNull();
+  });
+});
 
 describe("checkCsvTable", () => {
   const ok = { problems: [], droppedRows: 0, needsRewrite: false };

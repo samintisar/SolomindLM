@@ -226,4 +226,54 @@ middle`;
     expect(long.length).toBeGreaterThan(31_000);
     expect(csv).toBe(long);
   });
+
+  it("builds the CSV from JSON rows", async () => {
+    invokeTogetherText.mockResolvedValue(
+      ['["Item","Amount"]', '["Net sales","$69,154"]', '["Note","said \\"up\\""]'].join("\n")
+    );
+
+    const csv = await writeSpreadsheetTable(
+      "prompt",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe('"Item","Amount"\n"Net sales","$69,154"\n"Note","said ""up"""');
+  });
+
+  it("keeps every complete JSON row of a reply cut off at the output cap", async () => {
+    invokeTogetherText.mockImplementation(async (options) => {
+      options.onFinishReason?.("length");
+      return '["Paper","Year"]\n["RAG","2020"]\n["ReAct","2022"]\n["Self-RAG","20';
+    });
+
+    const csv = await writeSpreadsheetTable(
+      "prompt",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe('"Paper","Year"\n"RAG","2020"\n"ReAct","2022"');
+    expect(invokeTogetherText).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for JSON rows when it sends a table back", async () => {
+    invokeTogetherText
+      .mockResolvedValueOnce('["Paper","Year"]\n["RAG","2020"]\n["ReAct","2022","extra"]')
+      .mockResolvedValueOnce('["Paper","Year"]\n["RAG","2020"]\n["ReAct","2022"]');
+
+    const csv = await writeSpreadsheetTable(
+      "NOTES",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe('"Paper","Year"\n"RAG","2020"\n"ReAct","2022"');
+    const retry = invokeTogetherText.mock.calls[1][0].userPrompt;
+    expect(retry).toContain("as JSON lines");
+    expect(retry).not.toContain("NOTES");
+  });
 });

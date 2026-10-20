@@ -23,7 +23,7 @@ export const COLLAPSE_SYSTEM_PROMPT =
   "You are a Technical Editor. Consolidate fragmented research notes into a Master List of Concepts. Merge details about the same concept into single blocks. Remove exact duplicates.";
 
 export const REDUCE_SYSTEM_PROMPT =
-  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields. Write every cell for someone reading the original sources: when a value is missing, write 'Not reported' unless the request says how to show missing values, and never mention notes, extracts or how the table was made.";
+  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary table. Ensure every row represents a unique concept. Write the table as JSON lines: the column names as one JSON array of strings on the first line, then each row as one JSON array of strings on its own line. Write every cell for someone reading the original sources: when a value is missing, write 'Not reported' unless the request says how to show missing values, and never mention notes, extracts or how the table was made.";
 
 // ============================================================
 // MAP PROMPT (Concept Identification)
@@ -100,13 +100,18 @@ Rules:
 5. **Nested lists stay in cells:** Lists that belong to one item (works it cites,
    studies it includes, examples it gives) go in that item's cells, not in rows
    of their own.
-6. **CSV Formatting (RFC 4180):**
-   - Enclose EVERY field in double quotes ("field")
-   - If a field contains double quotes, escape them by doubling ("")
-   - Preserve line breaks and special characters inside quoted fields
-   - Example: "Field with, comma","Field with ""quotes""","Field with
-   line break"
-7. **Output:** Raw CSV only. No markdown blocks, no code fences.
+6. **Format (JSON lines):**
+   - First line: the column names as a JSON array of strings.
+   - Then one line per row: a JSON array of strings, one value per column, in the
+     columns' order. Every row has exactly as many values as there are columns;
+     use "" for an empty cell.
+   - Use JSON string escapes for quotes and line breaks inside a value, so each
+     array stays on one line.
+   - Example:
+     ["Item","Year","Notes"]
+     ["First item","2020","Uses \\"quotes\\", commas, anything"]
+7. **Output:** The JSON lines only. No markdown blocks, no code fences, no
+   wrapping array or object, no other text.
 
 Research Notes:
 {content}

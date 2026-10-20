@@ -69,6 +69,72 @@ export function cleanCsvOutput(output: string): string {
   return cleaned;
 }
 
+/** A JSON cell as text: strings as they are, null as empty, anything else as JSON. */
+function cellText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
+}
+
+function asRow(value: unknown): string[] | null {
+  return Array.isArray(value) ? value.map(cellText) : null;
+}
+
+/** Past this share of lines that aren't JSON rows, the reply is read as CSV instead. */
+const MAX_NON_JSON_LINE_SHARE = 0.1;
+
+/**
+ * The reduce writes its table as JSON lines (#567): the column names as one JSON array, then one
+ * array per row. Building the CSV from these in code means a row can't lose its separators or
+ * quotes. Also accepts one JSON array of rows, or `{"columns": [...], "rows": [[...]]}`.
+ *
+ * A line that doesn't parse (the last row of a reply cut off at the output cap, a stray remark)
+ * is skipped. Returns null when the reply isn't JSON rows (no header array, or more than 10% of
+ * its lines aren't rows), and the caller reads it as CSV.
+ */
+export function parseJsonRows(text: string): string[][] | null {
+  const body = text
+    .trim()
+    .replace(/^```(?:json|jsonl)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  if (!body.startsWith("[") && !body.startsWith("{")) return null;
+
+  try {
+    const whole: unknown = JSON.parse(body);
+    const table = whole as { columns?: unknown; rows?: unknown };
+    if (Array.isArray(whole) && whole.every(Array.isArray)) {
+      return whole.length > 0 ? whole.map((row) => asRow(row) ?? []) : null;
+    }
+    if (Array.isArray(table.columns) && Array.isArray(table.rows)) {
+      return [table.columns.map(cellText), ...table.rows.map((row) => asRow(row) ?? [])];
+    }
+  } catch {
+    // Not one JSON value: read it line by line.
+  }
+
+  const lines = body
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/,$/, ""))
+    .filter((line) => line !== "" && line !== "[" && line !== "]");
+  const rows: string[][] = [];
+  let skipped = 0;
+  for (const line of lines) {
+    let row: string[] | null = null;
+    try {
+      row = asRow(JSON.parse(line));
+    } catch {
+      row = null;
+    }
+    if (row) rows.push(row);
+    else if (rows.length === 0) return null;
+    else skipped++;
+  }
+  if (skipped > lines.length * MAX_NON_JSON_LINE_SHARE && skipped > 1) return null;
+  return rows;
+}
+
 /**
  * A row the model wrote with its fields quoted back to back and no commas between them:
  * `"Net Sales""$69,154""Revenue"` (#567). RFC 4180 reads that as one field whose escaped quotes

@@ -21,6 +21,7 @@ import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggre
 import {
   checkCsvTable,
   cleanCsvOutput,
+  parseJsonRows,
   withoutPipelineWording,
 } from "../../_agents/spreadsheet/csvHelpers";
 import { resolveSpreadsheetRequest } from "../../_agents/spreadsheet/presetRequests";
@@ -41,6 +42,7 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { serializeCsv } from "../../_shared/csv.helpers.js";
 import { planCollapseGroups, shouldStopCollapsing } from "../_job/collapsePlan";
 import {
   generateTitleWithinDeadline,
@@ -766,8 +768,9 @@ export async function runFinalizeSpreadsheetPhase(
 // ============================================================
 
 /**
- * Run the reduce and check its table before it is saved (#567). A reply cut off at the output cap
- * loses its partial last row and is saved. A table whose rows are there but badly formatted is
+ * Run the reduce and check its table before it is saved (#567). The reduce writes JSON rows and
+ * the CSV is built here; a reply in CSV instead is repaired where safe. A reply cut off at the
+ * output cap loses its partial last row and is saved. A table whose rows are there but badly formatted is
  * sent back once to be reformatted (no notes, so it is cheap); one with no header or no rows is
  * written once more from the notes. If that fails too, or there is no time for it, the job fails
  * rather than save a broken table.
@@ -800,10 +803,19 @@ export async function writeSpreadsheetTable(
       phaseLabel: reformat ? "SpreadsheetReformat" : "SpreadsheetReduce",
     });
 
-    const output = withoutPipelineWording(cleanCsvOutput(rawContent));
+    // JSON rows are built into CSV here, so their separators and quotes are always right; a reply
+    // that isn't JSON rows is read as CSV and repaired by checkCsvTable.
+    const jsonRows = parseJsonRows(rawContent);
+    const output = withoutPipelineWording(
+      jsonRows ? serializeCsv(jsonRows, { quoteAll: true }) : cleanCsvOutput(rawContent)
+    );
     const truncated = finishReason === "length";
-    const { csv, problems, droppedRows, needsRewrite } = checkCsvTable(output, { truncated });
-    if (droppedRows > 0) {
+    // A cut-off JSON reply has already lost its partial last line in parseJsonRows.
+    const { csv, problems, droppedRows, needsRewrite } = checkCsvTable(output, {
+      truncated: truncated && !jsonRows,
+    });
+    if (!jsonRows) console.log("[SpreadsheetJob] Reduce reply wasn't JSON rows, read it as CSV");
+    if (droppedRows > 0 || truncated) {
       console.log(
         `[SpreadsheetJob] Dropped ${droppedRows} malformed rows${truncated ? " (reply cut off at the output cap)" : ""}`
       );
@@ -819,12 +831,12 @@ export async function writeSpreadsheetTable(
     }
     reformat = !needsRewrite;
     userPrompt = reformat
-      ? `This table could not be saved: ${problems.join("; ")}. Rewrite it as valid CSV with the same rows and content: a header row, then one line per row, every field in double quotes, a comma between every pair of fields and the header's number of fields in every row. Output raw CSV only.
+      ? `This table could not be saved: ${problems.join("; ")}. Rewrite it with the same rows and content as JSON lines: the column names as one JSON array of strings on the first line, then each row as one JSON array of strings on its own line, with exactly one value per column. Output the JSON lines only.
 
 ${output}`
       : `${prompt}
 
-Your previous table could not be saved: ${problems.join("; ")}. Write the whole table again as valid CSV: a header row, then one line per row, with a comma between every pair of fields and the header's number of fields in every row.`;
+Your previous table could not be saved: ${problems.join("; ")}. Write the whole table again as JSON lines: the column names as one JSON array on the first line, then one JSON array per row, with exactly one value per column.`;
   }
 }
 
