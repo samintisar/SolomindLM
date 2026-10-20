@@ -50,7 +50,7 @@ const EMPTY_DOCUMENTS: readonly DocumentSummary[] = Object.freeze([]);
  * providers, so it only mounts (and its chunk only loads) on non-public routes.
  */
 export default function AppShell({ animateOnMount }: { animateOnMount: boolean }) {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -80,7 +80,8 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     return null;
   }, [urlNotebookId, activeNotebookId]);
 
-  const notebooks = useNotebooks();
+  // Skipped while signed out, so the visited-notebook query below (which waits for it) is too.
+  const notebooks = useNotebooks(isAuthenticated);
   const folders = useFolders();
   const documents =
     useQuery(
@@ -195,7 +196,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   const visitedGone = isVisitedNotebookGone({
     urlNotebookId,
     hasShareToken: new URLSearchParams(location.search).has("share"),
-    signedIn: isAuthenticated && !authLoading,
+    signedIn: isAuthenticated,
     listLoaded: notebooks !== undefined,
     listed: listedNotebook !== undefined,
     visited: visitedNotebook,

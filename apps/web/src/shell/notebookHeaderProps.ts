@@ -33,12 +33,13 @@ export function notebookHeaderProps(
  *
  * Also false unless signed in: while the auth token loads or refreshes (the mobile app does this
  * on resume), queries run as no one, so the list comes back empty and `get` returns null for a
- * notebook that is still there.
+ * notebook that is still there. AppShell skips those queries while signed out too; this is the
+ * backstop.
  */
 export function isVisitedNotebookGone(state: {
   urlNotebookId: string | null;
   hasShareToken: boolean;
-  /** Signed in, with the auth token loaded (`isAuthenticated && !isLoading`). */
+  /** `isAuthenticated`, which is also false while auth is still loading. */
   signedIn: boolean;
   listLoaded: boolean;
   listed: boolean;
