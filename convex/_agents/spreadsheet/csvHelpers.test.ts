@@ -1,53 +1,96 @@
 import { describe, expect, it } from "vitest";
-import { checkCsvTable, cleanCsvOutput, parseJsonRows, withoutPipelineWording } from "./csvHelpers";
+import {
+  checkCsvTable,
+  checkTableRows,
+  cleanCsvOutput,
+  parseJsonRows,
+  withoutPipelineWording,
+} from "./csvHelpers";
 
 describe("parseJsonRows", () => {
+  const AB = [
+    ["A", "B"],
+    ["1", "2"],
+  ];
+
   it("reads JSON lines, with quotes, commas and line breaks inside values", () => {
     const text = [
       '["Item","Notes"]',
       '["Net sales","Up 5%, \\"strong\\" quarter"]',
       '["Cost","two\\nlines"]',
     ].join("\n");
-    expect(parseJsonRows(text)).toEqual([
-      ["Item", "Notes"],
-      ["Net sales", 'Up 5%, "strong" quarter'],
-      ["Cost", "two\nlines"],
-    ]);
+    expect(parseJsonRows(text)).toEqual({
+      rows: [
+        ["Item", "Notes"],
+        ["Net sales", 'Up 5%, "strong" quarter'],
+        ["Cost", "two\nlines"],
+      ],
+      skippedLines: 0,
+    });
   });
 
   it("turns numbers, booleans and nulls into cell text", () => {
-    expect(parseJsonRows('["A","B","C"]\n[2020, true, null]')).toEqual([
+    expect(parseJsonRows('["A","B","C"]\n[2020, true, null]')?.rows).toEqual([
       ["A", "B", "C"],
       ["2020", "true", ""],
     ]);
   });
 
   it("reads a fenced block, one wrapping array, or a columns-and-rows object", () => {
-    expect(parseJsonRows('```json\n["A","B"]\n["1","2"]\n```')).toEqual([
-      ["A", "B"],
-      ["1", "2"],
-    ]);
-    expect(parseJsonRows('[\n  ["A","B"],\n  ["1","2"]\n]')).toEqual([
-      ["A", "B"],
-      ["1", "2"],
-    ]);
-    expect(parseJsonRows('{"columns":["A","B"],"rows":[["1","2"]]}')).toEqual([
-      ["A", "B"],
-      ["1", "2"],
-    ]);
+    expect(parseJsonRows('```json\n["A","B"]\n["1","2"]\n```')?.rows).toEqual(AB);
+    expect(parseJsonRows('[\n  ["A","B"],\n  ["1","2"]\n]')?.rows).toEqual(AB);
+    expect(parseJsonRows('{"columns":["A","B"],"rows":[["1","2"]]}')?.rows).toEqual(AB);
   });
 
-  it("skips the partial last line of a reply cut off at the output cap", () => {
-    expect(parseJsonRows('["A","B"]\n["1","2"]\n["3","cut off in the mid')).toEqual([
+  it("reads rows written as objects, by the first object's keys", () => {
+    const lines = '{"A":"1","B":"2"}\n{"B":"4","A":"3","C":"x"}\n{"A":"5"}';
+    const expected = [
       ["A", "B"],
       ["1", "2"],
-    ]);
+      ["3", "4"],
+      ["5", ""],
+    ];
+    expect(parseJsonRows(lines)?.rows).toEqual(expected);
+    expect(parseJsonRows(`[${lines.split("\n").join(",")}]`)?.rows).toEqual(expected);
+  });
+
+  it("reads a wrapping array cut off at the output cap", () => {
+    expect(parseJsonRows('[["A","B"],\n["1","2"],\n["3","cut')).toEqual({
+      rows: AB,
+      skippedLines: 1,
+    });
+    expect(parseJsonRows('[["A","B"],\n["1","2"]]')?.rows).toEqual(AB);
+  });
+
+  it("skips and counts the partial last line of a reply cut off at the output cap", () => {
+    expect(parseJsonRows('["A","B"]\n["1","2"]\n["3","cut off in the mid')).toEqual({
+      rows: AB,
+      skippedLines: 1,
+    });
   });
 
   it("returns null for CSV, or for a reply that is mostly not JSON rows", () => {
     expect(parseJsonRows('"A","B"\n"1","2"')).toBeNull();
     expect(parseJsonRows('["A","B"]\nnot json\nnor this\n["1","2"]')).toBeNull();
-    expect(parseJsonRows('{"note":"no table"}')).toBeNull();
+  });
+});
+
+describe("checkTableRows", () => {
+  it("keeps a one-column table", () => {
+    expect(checkTableRows([["Pattern"], ["Routing"], ["Reflection"]])).toMatchObject({
+      problems: [],
+      changed: false,
+    });
+  });
+
+  it("doesn't re-split a JSON cell that holds quotes", () => {
+    const rows = [["Title", "Note", "Year"], ["A", "B", "C"], ['He said "no" twice']];
+    const result = checkTableRows(rows);
+    expect(result.rows).toEqual([
+      ["Title", "Note", "Year"],
+      ["A", "B", "C"],
+    ]);
+    expect(result.droppedRows).toBe(1);
   });
 });
 
@@ -101,12 +144,12 @@ describe("checkCsvTable", () => {
     });
   });
 
-  it("asks for a rewrite when there is no header", () => {
+  it("asks for a rewrite when the table collapsed to one line, or is empty", () => {
     expect(checkCsvTable('"Kalai et al., 2025"')).toMatchObject({
-      problems: ["no header row with at least two columns"],
+      problems: ["no data rows"],
       needsRewrite: true,
     });
-    expect(checkCsvTable("").problems).toEqual(["no header row with at least two columns"]);
+    expect(checkCsvTable("")).toMatchObject({ problems: ["no header row"], needsRewrite: true });
   });
 
   it("pads rows short by up to half the header's fields", () => {

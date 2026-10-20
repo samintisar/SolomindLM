@@ -20,6 +20,7 @@ import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
   checkCsvTable,
+  checkTableRows,
   cleanCsvOutput,
   parseJsonRows,
   withoutPipelineWording,
@@ -803,21 +804,29 @@ export async function writeSpreadsheetTable(
       phaseLabel: reformat ? "SpreadsheetReformat" : "SpreadsheetReduce",
     });
 
-    // JSON rows are built into CSV here, so their separators and quotes are always right; a reply
-    // that isn't JSON rows is read as CSV and repaired by checkCsvTable.
-    const jsonRows = parseJsonRows(rawContent);
-    const output = withoutPipelineWording(
-      jsonRows ? serializeCsv(jsonRows, { quoteAll: true }) : cleanCsvOutput(rawContent)
-    );
+    // JSON rows are checked as rows and built into CSV here, so their separators and quotes are
+    // always right. A reply that isn't JSON rows is read as CSV and repaired by checkCsvTable; a
+    // cut-off JSON reply has already lost its partial last line in parseJsonRows.
     const truncated = finishReason === "length";
-    // A cut-off JSON reply has already lost its partial last line in parseJsonRows.
-    const { csv, problems, droppedRows, needsRewrite } = checkCsvTable(output, {
-      truncated: truncated && !jsonRows,
-    });
-    if (!jsonRows) console.log("[SpreadsheetJob] Reduce reply wasn't JSON rows, read it as CSV");
+    const json = parseJsonRows(rawContent);
+    let csv: string;
+    let check: { problems: string[]; droppedRows: number; needsRewrite: boolean };
+    if (json) {
+      const checked = checkTableRows(json.rows);
+      csv = withoutPipelineWording(serializeCsv(checked.rows, { quoteAll: true }));
+      check = { ...checked, droppedRows: checked.droppedRows + json.skippedLines };
+    } else {
+      console.log("[SpreadsheetJob] Reduce reply wasn't JSON rows, read it as CSV");
+      const checked = checkCsvTable(withoutPipelineWording(cleanCsvOutput(rawContent)), {
+        truncated,
+      });
+      csv = checked.csv;
+      check = checked;
+    }
+    const { problems, droppedRows, needsRewrite } = check;
     if (droppedRows > 0 || truncated) {
       console.log(
-        `[SpreadsheetJob] Dropped ${droppedRows} malformed rows${truncated ? " (reply cut off at the output cap)" : ""}`
+        `[SpreadsheetJob] Dropped ${droppedRows} malformed rows or lines${truncated ? " (reply cut off at the output cap)" : ""}`
       );
     }
     if (problems.length === 0) return csv;
@@ -833,7 +842,7 @@ export async function writeSpreadsheetTable(
     userPrompt = reformat
       ? `This table could not be saved: ${problems.join("; ")}. Rewrite it with the same rows and content as JSON lines: the column names as one JSON array of strings on the first line, then each row as one JSON array of strings on its own line, with exactly one value per column. Output the JSON lines only.
 
-${output}`
+${rawContent}`
       : `${prompt}
 
 Your previous table could not be saved: ${problems.join("; ")}. Write the whole table again as JSON lines: the column names as one JSON array on the first line, then one JSON array per row, with exactly one value per column.`;

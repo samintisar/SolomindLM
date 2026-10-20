@@ -77,23 +77,43 @@ function cellText(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function asRow(value: unknown): string[] | null {
-  return Array.isArray(value) ? value.map(cellText) : null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A JSON row as cells: an array as it is, an object by `columns` (its keys in their order). */
+function asRow(value: unknown, columns: string[] | null): string[] | null {
+  if (Array.isArray(value)) return value.map(cellText);
+  if (isRecord(value) && columns) return columns.map((key) => cellText(value[key]));
+  return null;
+}
+
+/** Rows written as objects: the first object's keys are the header. */
+function objectRows(objects: Record<string, unknown>[]): string[][] {
+  const columns = Object.keys(objects[0] ?? {});
+  return [columns, ...objects.map((o) => columns.map((key) => cellText(o[key])))];
 }
 
 /** Past this share of lines that aren't JSON rows, the reply is read as CSV instead. */
 const MAX_NON_JSON_LINE_SHARE = 0.1;
 
+export type JsonRows = {
+  rows: string[][];
+  /** Lines that didn't parse and were left out (a row cut off at the output cap, a remark). */
+  skippedLines: number;
+};
+
 /**
  * The reduce writes its table as JSON lines (#567): the column names as one JSON array, then one
  * array per row. Building the CSV from these in code means a row can't lose its separators or
- * quotes. Also accepts one JSON array of rows, or `{"columns": [...], "rows": [[...]]}`.
+ * quotes. Also accepts rows written as JSON objects (their keys are the header), one wrapping
+ * array of rows (even cut off), or `{"columns": [...], "rows": [[...]]}`.
  *
  * A line that doesn't parse (the last row of a reply cut off at the output cap, a stray remark)
- * is skipped. Returns null when the reply isn't JSON rows (no header array, or more than 10% of
- * its lines aren't rows), and the caller reads it as CSV.
+ * is skipped and counted. Returns null when the reply isn't JSON rows (no header row, or more
+ * than 10% of its lines aren't rows), and the caller reads it as CSV.
  */
-export function parseJsonRows(text: string): string[][] | null {
+export function parseJsonRows(text: string): JsonRows | null {
   const body = text
     .trim()
     .replace(/^```(?:json|jsonl)?\s*/i, "")
@@ -103,36 +123,53 @@ export function parseJsonRows(text: string): string[][] | null {
 
   try {
     const whole: unknown = JSON.parse(body);
-    const table = whole as { columns?: unknown; rows?: unknown };
-    if (Array.isArray(whole) && whole.every(Array.isArray)) {
-      return whole.length > 0 ? whole.map((row) => asRow(row) ?? []) : null;
+    if (Array.isArray(whole) && whole.length > 0) {
+      if (whole.every(Array.isArray))
+        return { rows: whole.map((row) => row.map(cellText)), skippedLines: 0 };
+      if (whole.every(isRecord)) return { rows: objectRows(whole), skippedLines: 0 };
     }
-    if (Array.isArray(table.columns) && Array.isArray(table.rows)) {
-      return [table.columns.map(cellText), ...table.rows.map((row) => asRow(row) ?? [])];
+    if (isRecord(whole) && Array.isArray(whole.columns) && Array.isArray(whole.rows)) {
+      const columns = whole.columns.map(cellText);
+      const rows = whole.rows.map((row) => asRow(row, columns) ?? []);
+      return { rows: [columns, ...rows], skippedLines: 0 };
     }
   } catch {
     // Not one JSON value: read it line by line.
   }
 
+  // One row per line. A wrapping array's brackets ride on the first and last rows when it is
+  // pretty-printed (`[["A","B"],` … `["1","2"]]`); strip them so a cut-off reply still reads.
   const lines = body
     .split(/\r?\n/)
-    .map((line) => line.trim().replace(/,$/, ""))
+    .map((line) =>
+      line
+        .trim()
+        .replace(/,$/, "")
+        .replace(/^\[(?=\s*[[{])/, "")
+        .replace(/([\]}])\]$/, "$1")
+    )
     .filter((line) => line !== "" && line !== "[" && line !== "]");
   const rows: string[][] = [];
-  let skipped = 0;
+  let columns: string[] | null = null;
+  let skippedLines = 0;
   for (const line of lines) {
-    let row: string[] | null = null;
+    let value: unknown;
     try {
-      row = asRow(JSON.parse(line));
+      value = JSON.parse(line);
     } catch {
-      row = null;
+      value = undefined;
     }
+    if (rows.length === 0 && isRecord(value)) {
+      columns = Object.keys(value);
+      rows.push(columns);
+    }
+    const row = asRow(value, columns);
     if (row) rows.push(row);
     else if (rows.length === 0) return null;
-    else skipped++;
+    else skippedLines++;
   }
-  if (skipped > lines.length * MAX_NON_JSON_LINE_SHARE && skipped > 1) return null;
-  return rows;
+  if (skippedLines > lines.length * MAX_NON_JSON_LINE_SHARE && skippedLines > 1) return null;
+  return { rows, skippedLines };
 }
 
 /**
@@ -149,12 +186,10 @@ function splitAdjacentQuotedFields(field: string, width: number): string[] | nul
 /** Past this share of ragged rows the table is redone rather than trimmed. */
 const MAX_DROPPED_RAGGED_SHARE = 0.1;
 
-export type CsvTableCheck = {
-  /** The table, repaired where that was safe. */
-  csv: string;
+type TableProblems = {
   /** Why the table can't be saved; empty when it can. */
   problems: string[];
-  /** Rows removed: a row cut off at the output cap, or a few rows off the header's width. */
+  /** Rows removed: a row cut off at the output cap, blank rows, a few rows off the header's width. */
   droppedRows: number;
   /**
    * True when the table has to be written again from the notes (no header, no data rows); false
@@ -163,30 +198,31 @@ export type CsvTableCheck = {
   needsRewrite: boolean;
 };
 
+export type TableRowsCheck = TableProblems & {
+  /** The header and the rows kept, repaired where that was safe. */
+  rows: string[][];
+  /** Whether `rows` differs from the input. */
+  changed: boolean;
+};
+
 /**
- * Check a reduce table before it is saved (#567), repairing what is safe to repair:
- * - when the reply was cut off at the output cap (`truncated`), its last, partial row goes;
- * - a row whose fields were quoted back to back with no commas is split again;
+ * Check a table's rows before it is saved (#567), repairing what is safe to repair:
  * - a row short by at most half the header's fields is padded with empty cells;
- * - blank rows go, and so do rows still off the header's width when they are few (up to 10%).
- * Problems left: an unclosed quote, no header with at least two columns, no data rows, or more
- * rows off the header's width than can be dropped.
+ * - blank rows go, and so do rows still off the header's width when they are few (up to 10%);
+ * - with `splitAdjacentFields` (rows read from CSV text), a one-field row whose fields were
+ *   quoted back to back with no commas is split again.
+ * Problems left: no header, no data rows, or more rows off the header's width than can be dropped.
  */
-export function checkCsvTable(csv: string, options: { truncated?: boolean } = {}): CsvTableCheck {
-  const parsed = parseCsvDetailed(csv);
-  let rows = parsed.rows;
-  let droppedRows = 0;
-  if (options.truncated && rows.length > 1) {
-    rows = rows.slice(0, -1);
-    droppedRows++;
-  } else if (parsed.unterminatedQuote) {
-    return { csv, problems: ["a quoted field is never closed"], droppedRows, needsRewrite: false };
-  }
-  if (rows.length === 0 || rows[0].length < 2) {
+export function checkTableRows(
+  rows: string[][],
+  options: { splitAdjacentFields?: boolean } = {}
+): TableRowsCheck {
+  if (rows.length === 0 || rows[0].every((cell) => cell.trim() === "")) {
     return {
-      csv,
-      problems: ["no header row with at least two columns"],
-      droppedRows,
+      rows,
+      changed: false,
+      problems: ["no header row"],
+      droppedRows: 0,
       needsRewrite: true,
     };
   }
@@ -196,7 +232,10 @@ export function checkCsvTable(csv: string, options: { truncated?: boolean } = {}
   const body = rest
     .filter((row) => row.some((cell) => cell.trim() !== ""))
     .map((row) => {
-      const split = row.length === 1 ? splitAdjacentQuotedFields(row[0], width) : null;
+      const split =
+        options.splitAdjacentFields && width > 1 && row.length === 1
+          ? splitAdjacentQuotedFields(row[0], width)
+          : null;
       if (split) return split;
       if (row.length < width && row.length * 2 >= width) {
         return [...row, ...Array<string>(width - row.length).fill("")];
@@ -211,13 +250,46 @@ export function checkCsvTable(csv: string, options: { truncated?: boolean } = {}
   else if (ragged > body.length * MAX_DROPPED_RAGGED_SHARE) {
     problems.push(`${ragged} of ${body.length} rows don't have the header's ${width} fields`);
   }
-  droppedRows += rest.length - kept.length;
-
-  const changed = droppedRows > 0 || kept.some((row, i) => row !== rest[i]);
+  const droppedRows = rest.length - kept.length;
   return {
-    csv: changed ? serializeCsv([header, ...kept], { quoteAll: true }) : csv,
+    rows: [header, ...kept],
+    changed: droppedRows > 0 || kept.some((row, i) => row !== rest[i]),
     problems,
     droppedRows,
     needsRewrite: kept.length === 0,
+  };
+}
+
+export type CsvTableCheck = TableProblems & {
+  /** The table, repaired where that was safe. */
+  csv: string;
+};
+
+/**
+ * Check a table the reduce wrote as CSV text (#567): `checkTableRows` with back-to-back fields
+ * split again, and, when the reply was cut off at the output cap (`truncated`), its last,
+ * partial row dropped. An unclosed quote in a reply that wasn't cut off is a problem.
+ */
+export function checkCsvTable(csv: string, options: { truncated?: boolean } = {}): CsvTableCheck {
+  const parsed = parseCsvDetailed(csv);
+  let rows = parsed.rows;
+  let cutRows = 0;
+  if (options.truncated && rows.length > 1) {
+    rows = rows.slice(0, -1);
+    cutRows = 1;
+  } else if (parsed.unterminatedQuote) {
+    return {
+      csv,
+      problems: ["a quoted field is never closed"],
+      droppedRows: 0,
+      needsRewrite: false,
+    };
+  }
+  const checked = checkTableRows(rows, { splitAdjacentFields: true });
+  return {
+    csv: checked.changed || cutRows > 0 ? serializeCsv(checked.rows, { quoteAll: true }) : csv,
+    problems: checked.problems,
+    droppedRows: checked.droppedRows + cutRows,
+    needsRewrite: checked.needsRewrite,
   };
 }

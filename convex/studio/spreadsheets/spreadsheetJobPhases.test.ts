@@ -146,9 +146,7 @@ describe("writeSpreadsheetTable", () => {
 
     expect(csv).toBe(good);
     expect(invokeTogetherText).toHaveBeenCalledTimes(2);
-    expect(invokeTogetherText.mock.calls[1][0].userPrompt).toContain(
-      "no header row with at least two columns"
-    );
+    expect(invokeTogetherText.mock.calls[1][0].userPrompt).toContain("no data rows");
   });
 
   it("fails rather than save a table that is malformed twice", async () => {
