@@ -1028,13 +1028,8 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
     studio: [
       { kind: "spreadsheet", spreadsheetType: "custom", promptKey: "decision.table" },
       { kind: "report", reportType: "briefing", promptKey: "decision.briefing" },
-      {
-        kind: "infographic",
-        prompt:
-          "The three careers side by side: median pay, projected growth, typical entry education and the core day-to-day tasks of each.",
-        orientation: "landscape",
-        detailLevel: "standard",
-      },
+      // No infographic: the generated image showed the wrong careers and invented pay and
+      // growth figures (the image model gets no data). Add one back once that is fixed.
       {
         kind: "writtenQuestions",
         questionCount: 5,
