@@ -50,7 +50,7 @@ const EMPTY_DOCUMENTS: readonly DocumentSummary[] = Object.freeze([]);
  * providers, so it only mounts (and its chunk only loads) on non-public routes.
  */
 export default function AppShell({ animateOnMount }: { animateOnMount: boolean }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -195,6 +195,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   const visitedGone = isVisitedNotebookGone({
     urlNotebookId,
     hasShareToken: new URLSearchParams(location.search).has("share"),
+    signedIn: isAuthenticated && !authLoading,
     listLoaded: notebooks !== undefined,
     listed: listedNotebook !== undefined,
     visited: visitedNotebook,
