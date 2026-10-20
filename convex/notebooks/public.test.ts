@@ -86,6 +86,20 @@ describe("notebooks.public", () => {
     expect(JSON.stringify(page[0])).not.toContain("ada@example.com");
   });
 
+  test("a pin left from the old per-user isFeatured doesn't feature a newly published notebook", async () => {
+    const { t, owner, other, notebookId } = await setup();
+    await t.run((ctx) => ctx.db.patch(notebookId, { isFeatured: true }));
+    await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {
+      notebookId,
+      isPublic: true,
+    });
+    expect(await withAuth(t, other).query(api.notebooks.public.listFeatured, {})).toEqual([]);
+    const { page } = await withAuth(t, other).query(api.notebooks.public.listPublic, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(page.map((n) => n.id)).toEqual([notebookId]);
+  });
+
   test("publishing an already public notebook keeps its publishedAt", async () => {
     const { t, owner, notebookId } = await setup();
     await withAuth(t, owner).mutation(api.notebooks.public.setPublic, {

@@ -5,6 +5,7 @@
  * Designed for eval scripts running outside of Convex.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import Together from "together-ai";
 import type { LlmJudgeOptions } from "./llmJudge";
 
@@ -64,14 +65,37 @@ type UsageWithCache = {
   prompt_tokens_details?: { cached_tokens?: number };
 };
 
-function recordUsage(usage: UsageWithCache | undefined | null): void {
-  usageTotals.calls++;
+/** Per-fixture judge totals; concurrent fixtures each see only their own judge calls. */
+const usageScope = new AsyncLocalStorage<JudgeTokenUsage>();
+
+/** Runs `fn` and returns the judge tokens its calls used, alongside its result. */
+export async function withJudgeUsageScope<T>(
+  fn: () => Promise<T>
+): Promise<{ result: T; judgeUsage: JudgeTokenUsage }> {
+  const judgeUsage: JudgeTokenUsage = {
+    calls: 0,
+    promptTokens: 0,
+    cachedPromptTokens: 0,
+    completionTokens: 0,
+  };
+  const result = await usageScope.run(judgeUsage, fn);
+  return { result, judgeUsage };
+}
+
+function addUsage(totals: JudgeTokenUsage, usage: UsageWithCache | undefined | null): void {
+  totals.calls++;
   if (!usage) return;
-  usageTotals.promptTokens += usage.prompt_tokens ?? 0;
+  totals.promptTokens += usage.prompt_tokens ?? 0;
   // Models report cached tokens in either place.
-  usageTotals.cachedPromptTokens +=
+  totals.cachedPromptTokens +=
     usage.prompt_tokens_details?.cached_tokens ?? usage.cached_tokens ?? 0;
-  usageTotals.completionTokens += usage.completion_tokens ?? 0;
+  totals.completionTokens += usage.completion_tokens ?? 0;
+}
+
+function recordUsage(usage: UsageWithCache | undefined | null): void {
+  addUsage(usageTotals, usage);
+  const scoped = usageScope.getStore();
+  if (scoped) addUsage(scoped, usage);
 }
 
 /** Default judge model for eval binary judges and pairwise compare */

@@ -92,6 +92,8 @@ export type SelectChunksOptions = {
    * guaranteed share and the budget is not widened.
    */
   rerankedKeys?: ReadonlySet<string>;
+  /** Override MULTI_SOURCE_MAX_EXTRA_TOKENS: the most extra tokens several sources can add. */
+  multiSourceMaxExtraTokens?: number;
 };
 
 /** Count significant query tokens appearing in chunk text (cheap lexical grounding signal). */
@@ -248,7 +250,7 @@ export function selectChunksByTokenBudget(
     relevantDocuments.length > 1
       ? Math.min(
           (relevantDocuments.length - 1) * MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
-          MULTI_SOURCE_MAX_EXTRA_TOKENS
+          options?.multiSourceMaxExtraTokens ?? MULTI_SOURCE_MAX_EXTRA_TOKENS
         )
       : 0;
   const tokenBudget = (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) + extraTokens;

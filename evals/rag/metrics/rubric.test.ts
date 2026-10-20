@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EvalFixture, EvalRunArtifact } from "../types";
 import type { UseCasePack } from "../usecases/types";
-import {
-  buildRubricPrompt,
-  formatSourceTexts,
-  rubricMetricName,
-  scoreRubricMetrics,
-} from "./rubric";
+import { formatSourceTexts } from "./evidence";
+import { buildRubricPrompt, rubricMetricName, scoreRubricMetrics } from "./rubric";
 
 const pack: UseCasePack = {
   id: "professionals",
@@ -170,7 +166,7 @@ describe("rubric prompts", () => {
       pack.rubric[0],
       fixture,
       artifact({
-        selectedChunks: [{ id: "1", sourceTitle: "", content: "h".repeat(60_000) }],
+        selectedChunks: [{ id: "1", sourceTitle: "", content: "h".repeat(300_000) }],
       } as Partial<EvalRunArtifact>),
       []
     );

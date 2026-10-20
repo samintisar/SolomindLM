@@ -162,6 +162,11 @@ export const languageLearnersFixtures: EvalFixture[] = [
     split: "train",
     runner: "chat",
     question: "When does the past participle agree in the passé composé? Give me examples.",
+    expectedPassages: [
+      "The past participle of a verb which takes être agrees in gender and number with the subject;",
+      "in most cases, the past participle of pronominal verbs agrees in gender and number with the gender and number of the reflexive pronoun",
+      "The past participle agrees in gender and in number with a preceding direct object.",
+    ],
     expectedAnswer:
       "With être, the past participle agrees with the subject (Elle est partie; Elles sont allées). With avoir, it agrees only " +
       "with a direct object that comes before the verb (Je ne l'ai pas embrassée). Pronominal verbs agree with the reflexive " +
@@ -171,6 +176,120 @@ export const languageLearnersFixtures: EvalFixture[] = [
       "and the pronominal-verb rule, each with an example from the notes.",
     scenarioCategory: "explanation",
     tags: tags("chat", "grammar"),
+  },
+
+  {
+    ...base,
+    id: "language-learners/chat-unanswerable-subjunctive",
+    split: "train",
+    runner: "chat",
+    question:
+      "How do I form the subjunctive after 'il faut que'? Show me faire in the subjunctive.",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The notes do not cover the subjunctive, so the correct reply says the sources do not cover it and gives no subjunctive forms or rules.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover the subjunctive, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
+  },
+
+  {
+    ...base,
+    id: "language-learners/chat-followup-etre-examples",
+    split: "train",
+    runner: "chat",
+    question: "What are two more examples of that from my notes?",
+    turns: [
+      { role: "user", content: "Which verbs take être in the passé composé?" },
+      {
+        role: "assistant",
+        content:
+          "Many intransitive verbs of coming and going take être, for example aller (to go): je suis allé(e). " +
+          "Other verbs of movement follow the same pattern.",
+      },
+    ],
+    chatSettings: { instructionMode: "learningGuide" },
+    expectedItems: [],
+    expectedAnswer:
+      "Two more verbs of coming and going that take être in the passé composé, such as venir, partir, arriver or entrer, " +
+      "with the participle agreeing with the subject (for example elle est arrivée).",
+    expectedBehavior:
+      "Stays on the earlier topic, verbs of coming and going that take être in the passé composé, and gives two new examples " +
+      "from the notes. Learning guide mode may guide with a question first, but the reply must build on that topic " +
+      "and must not switch to avoir verbs or another tense.",
+    tags: tags("chat", "multi-turn", "learning-guide", "grammar"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-followup-possessive-examples",
+    split: "train",
+    runner: "chat",
+    question: "What are two more examples of that rule from my notes?",
+    turns: [
+      { role: "user", content: "How do ma, ta and sa change before a vowel?" },
+      {
+        role: "assistant",
+        content:
+          "Before a feminine noun that starts with a vowel sound, ma, ta and sa become mon, ton and son, as in 'mon amie'. " +
+          "This is the liaison rule for possessive determiners.",
+      },
+    ],
+    chatSettings: { instructionMode: "learningGuide" },
+    expectedItems: [],
+    expectedAnswer:
+      "Two more examples of ma, ta and sa becoming mon, ton and son before a feminine noun that starts with a vowel sound, " +
+      "such as mon adresse, ton école or son histoire.",
+    expectedBehavior:
+      "Stays on the mon/ton/son rule for feminine nouns that begin with a vowel sound and gives two new examples with the " +
+      "correct forms. Learning guide mode may guide with a question first, but must build on that rule.",
+    tags: tags("chat", "multi-turn", "learning-guide", "grammar"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-followup-unresolved-le-la",
+    split: "train",
+    runner: "chat",
+    question: "Give me two more of those.",
+    turns: [
+      { role: "user", content: "What's the difference between le and la?" },
+      {
+        role: "assistant",
+        content:
+          "Le goes with masculine singular nouns and la with feminine singular nouns, for example le tatou and la chatte. " +
+          "Do you want the plural forms too?",
+      },
+    ],
+    chatSettings: { instructionMode: "default" },
+    expectedItems: [],
+    expectedAnswer:
+      "Default mode does not carry the earlier turns into the answer, and 'those' has no clear referent on its own. The correct " +
+      "reply asks what kind of examples are wanted, or says it needs the topic, rather than listing examples as if it knew.",
+    expectedBehavior:
+      "Does not guess what 'those' refers to and answer confidently. Acceptable: a clarifying question, or an explicit note that " +
+      "the question needs the topic. A confident list presented as a continuation of the earlier discussion is a failure.",
+    tags: tags("chat", "multi-turn", "follow-up"),
+  },
+
+  {
+    ...base,
+    id: "language-learners/chat-answer-in-french",
+    split: "train",
+    runner: "chat",
+    question: "How do I form the passé composé with avoir? Give me one example.",
+    expectedItems: [],
+    expectedPassages: [
+      "the present tense of an auxiliary verb (either avoir or être), followed by a past participle",
+      "the past participle is formed by replacing the final -er of the infinitive with -é",
+    ],
+    expectedAnswer:
+      "Subject plus avoir in the present plus the past participle, for example « J'ai mangé » (I ate / I have eaten), explained in French.",
+    expectedBehavior:
+      "The whole answer is written in French, although the question is in English, because the notebook output language is French. " +
+      "The grammar is grounded in the notes and includes an example. An English answer fails this case; French grammar terms and example sentences are fine.",
+    chat: { outputLanguage: "fr" },
+    tags: tags("chat", "output-language", "grammar"),
   },
 
   // ─── holdout (never tune against these) ───────────────────
@@ -200,6 +319,10 @@ export const languageLearnersFixtures: EvalFixture[] = [
     split: "holdout",
     runner: "chat",
     question: "Why is it 'mon amie' and not 'ma amie' if amie is feminine?",
+    expectedPassages: [
+      "Ma, ta, sa become mon, ton, son in front of feminine nouns beginning with a vowel sound.",
+      "Tex: Voici Tammy, mon amie, et ses amies Bette et Fiona, c'est-à-dire nos amies.",
+    ],
     expectedAnswer:
       "Ma, ta and sa become mon, ton and son before a feminine noun that starts with a vowel sound, so it is 'mon amie' " +
       "(as in 'Voici Tammy, mon amie'), pronounced with liaison.",
@@ -208,5 +331,46 @@ export const languageLearnersFixtures: EvalFixture[] = [
       "with an example from the notes.",
     scenarioCategory: "explanation",
     tags: tags("chat", "grammar"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-unanswerable-imperfect",
+    split: "holdout",
+    runner: "chat",
+    question: "How do I conjugate the imperfect tense of être? Give me all the forms.",
+    expectedItems: [],
+    expectAbstain: true,
+    expectedAnswer:
+      "The notes do not cover the imperfect, so the correct reply says the sources do not cover it and gives no imperfect forms.",
+    expectedBehavior:
+      "Pass if the answer clearly states that the sources do not cover the imperfect, and any additional content is explicitly labelled as general knowledge not from the sources. " +
+      "Fail if it presents facts as if drawn from the sources, or answers without acknowledging the gap.",
+    tags: tags("chat", "unanswerable"),
+  },
+  {
+    ...base,
+    id: "language-learners/chat-followup-unresolved-other-example",
+    split: "holdout",
+    runner: "chat",
+    question: "Now do the same thing with the other example from before.",
+    turns: [
+      { role: "user", content: "How do lui and leur replace indirect objects?" },
+      {
+        role: "assistant",
+        content:
+          "Lui replaces an indirect object for one person, as in 'Je parle à Tammy' becoming 'Je lui parle'. " +
+          "Leur replaces one for several people. Would you like another example?",
+      },
+    ],
+    chatSettings: { instructionMode: "default" },
+    expectedItems: [],
+    expectedAnswer:
+      "The question depends on an 'other example' the earlier turns do not contain. The correct reply asks which example " +
+      "is meant, or says it cannot tell without more context, and does not invent an example.",
+    expectedBehavior:
+      "Does not invent the 'other example' or present a made-up pronoun sentence as the one from before. Acceptable: a " +
+      "clarifying question or an explicit note that the question needs the example. A confident answer that treats an " +
+      "invented example as the earlier one is a failure.",
+    tags: tags("chat", "multi-turn", "follow-up"),
   },
 ];

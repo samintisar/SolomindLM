@@ -1,6 +1,8 @@
 import type { EvalReport, MetricResult } from "../types";
+import { isParaphraseVariant } from "./paraphrase";
 
-const PROMOTE_PREFIXES = [
+/** Judge families that gate holdout promotion (and must be calibrated before prompt compile). */
+export const PROMOTE_PREFIXES = [
   "binary_judge_chat_grounding",
   "binary_judge_research_grounding",
   "binary_judge_studio_grounding",
@@ -29,13 +31,20 @@ function key(row: MetricResult): string {
   return `${row.caseId}::${row.runner}::${row.metric}`;
 }
 
+/**
+ * A regression is an `after` row with status `fail` whose `before` row was not `fail`.
+ * Flaky warnings are `warn` and never block; a majority-fail flaky row is `fail` and does
+ * (see reports/repeats.ts). Status only, no flaky special case.
+ */
 export function checkHoldoutPromotion(before: EvalReport, after: EvalReport): PromotionDecision {
   const beforeByKey = new Map(
     before.metrics.filter((row) => isPromoteMetric(row.metric)).map((row) => [key(row), row])
   );
   const regressions: PromotionRegression[] = [];
   for (const row of after.metrics) {
+    // Paraphrases are compared through the base's paraphrase_consistency row, not on their own.
     if (!isPromoteMetric(row.metric) || row.status !== "fail") continue;
+    if (isParaphraseVariant(row.caseId)) continue;
     const prev = beforeByKey.get(key(row));
     if (!prev || prev.status !== "fail") {
       regressions.push({
