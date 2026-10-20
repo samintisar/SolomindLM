@@ -22,6 +22,8 @@ interface SourcesPanelHeaderProps {
   renameValue: string;
   onRenameChange: (value: string) => void;
   onRenameSubmit: (id: string, newTitle: string) => void;
+  /** Viewer of a public notebook: the title is plain text, not a rename button. */
+  readOnly?: boolean;
 }
 
 export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
@@ -38,6 +40,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
   renameValue,
   onRenameChange,
   onRenameSubmit,
+  readOnly = false,
 }) => {
   const titleRef = React.useRef<HTMLButtonElement>(null);
   // Enter/Escape already settle the rename; the blur that follows the input
@@ -122,7 +125,11 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
       >
         <ArrowLeft />
       </Button>
-      {isRenaming ? (
+      {readOnly ? (
+        <span className="min-w-0 flex-1 truncate px-2 font-display text-sm font-bold tracking-wide">
+          {viewingSource.title}
+        </span>
+      ) : isRenaming ? (
         <Input
           autoFocus
           aria-label="Rename source"

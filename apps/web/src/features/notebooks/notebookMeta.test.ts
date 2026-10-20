@@ -28,6 +28,9 @@ describe("notebookMeta", () => {
   test("no date when created_at is missing", () => {
     expect(notebookMeta({ sourceCount: 0 }, NOW)).toBe("0 sources");
   });
+  test("no count when the listing doesn't carry one", () => {
+    expect(notebookMeta({ created_at: SEP_12 }, NOW)).toBe("Sep 12");
+  });
 });
 
 describe("folderMeta", () => {

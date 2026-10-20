@@ -42,7 +42,7 @@ export const QuizQuestionSchema = z.object({
 
 // 2. Intermediate Candidate Schema (The Draft)
 export const QuizCandidateSchema = z.object({
-  topic: z.string().describe('Short topic identifier (e.g. "Seasonality", "Error Metrics")'),
+  topic: z.string().describe("Short topic identifier: a 1-3 word category taken from the source"),
   question: z
     .string()
     .describe("The draft question text (focus on concepts, not specific data values)"),
@@ -133,7 +133,7 @@ export const getCandidateMapPrompt = (params: {
 
 **CRITICAL — OUTPUT COUNT:**
 • The JSON field "questions" MUST be an array of exactly ${questionsPerChunk} objects (not fewer, not zero).
-• If the excerpt has code, R output, LaTeX, slide titles, or figure captions, ask what they *mean* (interpretation, assumptions, when to use, notation, model order, comparison of methods)—do not skip the section as "non-quizzable."
+• If the excerpt has code, program output, LaTeX, slide titles, or figure captions, ask what they *mean* (interpretation, assumptions, when to use, notation, model order, comparison of methods)—do not skip the section as "non-quizzable."
 • Placeholder text like "Examples forthcoming" still has surrounding context: quiz that context.
 
 **QUESTION TYPES (in priority order):**
@@ -146,7 +146,7 @@ export const getCandidateMapPrompt = (params: {
 ${examples[difficulty] || examples.medium}
 
 **AVOID:**
-•❌ Specific fact lookup: "What was the RMSE in 2008?"
+•❌ Specific fact lookup: "What was [one figure] in [one table row]?"
 •❌ Single data points without context
 •✅ INSTEAD ask about: patterns, trends, comparisons
 
@@ -182,8 +182,8 @@ export const getCandidateMapRecoveryPrompt = (params: {
 Generate exactly ${need} distinct candidates (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ""}). The "questions" array MUST contain ${need} objects.
 
 **HOW TO FIND MATERIAL:**
-• Definitions, theorems, assumptions, notation (e.g. ARMA, ACF, conditional expectation, ML vs OLS).
-• Code or software output: ask about interpretation (coefficients, orders, residuals, forecasts), not row numbers.
+• Definitions, theorems, assumptions, notation, and comparisons between methods the text names.
+• Code or software output: ask what the values mean and what they imply, not row numbers.
 • Slides or sparse pages: quiz the narrative around any equation, bullet, or caption present.
 
 **OUTPUT:** Same JSON shape as before (topic, question, correctAnswer, contextSnippet, difficulty).

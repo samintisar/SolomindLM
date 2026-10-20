@@ -43,12 +43,15 @@ interface LiteraturePapersPanelProps {
   sessionId: Id<"literatureReviewSessions">;
   notebookId: Id<"notebooks">;
   onClose: () => void;
+  /** Viewer of a public notebook: cite and export only, no adding papers to the notebook. */
+  readOnly?: boolean;
 }
 
 export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
   sessionId,
   notebookId,
   onClose,
+  readOnly = false,
 }) => {
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -159,7 +162,7 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
           onClose={onClose}
         />
 
-        {selectedKeys.size > 0 && (
+        {!readOnly && selectedKeys.size > 0 && (
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-muted/40 px-4 py-2">
             <Button variant="ghost" size="xs" onClick={clearSelection}>
               <X />
@@ -193,6 +196,7 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
           onToggleSelect={toggleSelect}
           onCite={setCiteTarget}
           onAdd={handleAddSingle}
+          readOnly={readOnly}
         />
       </div>
 
@@ -286,6 +290,7 @@ function PaperList({
   onToggleSelect,
   onCite,
   onAdd,
+  readOnly,
 }: {
   isLoading: boolean;
   isEmpty: boolean;
@@ -296,6 +301,7 @@ function PaperList({
   onToggleSelect: (key: string) => void;
   onCite: (target: { paper: RankedPaper; index: number }) => void;
   onAdd: (paper: RankedPaper, index: number) => void;
+  readOnly: boolean;
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
@@ -332,6 +338,7 @@ function PaperList({
               onToggleSelect={() => onToggleSelect(key)}
               onCite={() => onCite({ paper, index })}
               onAdd={() => void onAdd(paper, index)}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -349,6 +356,7 @@ interface RankedPaperCardProps {
   onToggleSelect: () => void;
   onCite: () => void;
   onAdd: () => void;
+  readOnly: boolean;
 }
 
 const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
@@ -360,6 +368,7 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
   onToggleSelect,
   onCite,
   onAdd,
+  readOnly,
 }) => {
   const summary =
     paper.abstract.length > 320 ? `${paper.abstract.slice(0, 320).trim()}…` : paper.abstract;
@@ -385,12 +394,14 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
         >
           {rank}
         </span>
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={() => onToggleSelect()}
-          className="mt-1"
-          aria-label={`Select ${paper.title}`}
-        />
+        {!readOnly && (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect()}
+            className="mt-1"
+            aria-label={`Select ${paper.title}`}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center justify-between gap-2">
             <SourceRow source={sourceLabel(paper.source)} />
@@ -421,12 +432,14 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
 
       <div className="mt-3 flex flex-wrap items-center gap-1">
         <PaperAction icon={<Quote aria-hidden />} label="Cite" onClick={onCite} />
-        <PaperAction
-          icon={isAdding ? <Spinner aria-hidden /> : <CirclePlus aria-hidden />}
-          label={isAdding ? "Adding…" : isInNotebook ? "In notebook" : "Add to notebook"}
-          onClick={onAdd}
-          disabled={isInNotebook || isAdding}
-        />
+        {!readOnly && (
+          <PaperAction
+            icon={isAdding ? <Spinner aria-hidden /> : <CirclePlus aria-hidden />}
+            label={isAdding ? "Adding…" : isInNotebook ? "In notebook" : "Add to notebook"}
+            onClick={onAdd}
+            disabled={isInNotebook || isAdding}
+          />
+        )}
         {pdfHref && (
           <PaperAction icon={<FileText aria-hidden />} label="PDF" href={pdfHref} external />
         )}

@@ -38,7 +38,8 @@ interface ChatInputProps {
   onAppendTranscription?: (text: string) => void;
   onVoiceError?: (message: string) => void;
   mode: ChatComposerMode;
-  onModeChange: (mode: ChatComposerMode) => void;
+  /** Omit to hide the mode menu (a public-notebook viewer can only chat). */
+  onModeChange?: (mode: ChatComposerMode) => void;
   researchDatabase: ResearchDatabaseOption;
   onResearchDatabaseChange: (db: ResearchDatabaseOption) => void;
   /** Literature review: selected PDFs and saved papers; the scope menu shows when above zero. */
@@ -209,12 +210,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {/* Wraps the right cluster onto its own line only if the controls can't fit at all. */}
         <InputGroupAddon align="block-end" className="flex-wrap justify-between">
           <div className="flex min-w-0 items-center gap-1">
-            <ModeMenu
-              mode={mode}
-              onModeChange={onModeChange}
-              disabled={isDisabled}
-              crowded={showResearchDatabases || showPaperScope}
-            />
+            {onModeChange ? (
+              <ModeMenu
+                mode={mode}
+                onModeChange={onModeChange}
+                disabled={isDisabled}
+                crowded={showResearchDatabases || showPaperScope}
+              />
+            ) : null}
             {showPaperScope && onPaperScopeChange ? (
               <PaperScopeMenu
                 value={paperScope}

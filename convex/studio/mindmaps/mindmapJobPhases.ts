@@ -43,8 +43,13 @@ import {
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
+import {
+  assertMapFailuresAcceptable,
+  mapChunkRetryDelayMs,
+  mapFailureRate,
+} from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
-import { conceptsFromSource, createSmartFallback } from "./mindmapFallback";
+import { compactReduceInput, conceptsFromSource, createSmartFallback } from "./mindmapFallback";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("MindMapGraph");
 
@@ -72,6 +77,8 @@ export type ProcessMindMapMapChunkPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   chunkIndex: number;
+  /** 1-based; set when a failed chunk is re-run. */
+  attempt?: number;
   totalChunks: number;
   chunk: string;
   customPrompt?: string;
@@ -429,6 +436,23 @@ export async function runProcessMindMapMapChunkPhase(
       });
     }
   } catch (error) {
+    const retryDelayMs = mapChunkRetryDelayMs(args.attempt);
+    if (retryDelayMs !== null) {
+      console.warn(
+        `[mindmaps] map chunk ${args.chunkIndex + 1} failed on attempt ${args.attempt ?? 1}, retrying in ${retryDelayMs}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await ctx.scheduler.runAfter(
+        retryDelayMs,
+        internal.studio.mindmaps.job.processMindMapMapChunk,
+        {
+          ...args,
+          attempt: (args.attempt ?? 1) + 1,
+        }
+      );
+      return;
+    }
+
     const errorMeta = createErrorMetadata(error, "map_processing");
 
     console.error(`[MindMapJob] ${chunkId} FAILED:`, errorMeta.message);
@@ -565,6 +589,8 @@ export async function runFinalizeMindMapPhase(
       `[MindMapJob] Finalization: ${allExtractions.length} extractions collected, ${failedCount.count} failed chunks`
     );
 
+    assertMapFailuresAcceptable(Object.keys(mapResults).length, failedCount.count);
+
     if (allExtractions.length === 0) {
       throw new Error("No successful extractions from any chunk");
     }
@@ -593,47 +619,68 @@ export async function runFinalizeMindMapPhase(
       `[MindMapJob] Reduce input: ${safeInput.length} chars from ${allExtractions.length} extractions`
     );
 
-    let finalMindMap: FinalMindMap;
+    let finalMindMap: FinalMindMap | undefined;
     let reduceUsage: TokenUsage | undefined;
     let reduceLatencyMs = 0;
 
-    try {
-      const startTime = Date.now();
-      const markdown = await invokeWithinBudget({
-        invoke: () =>
-          invokeTogetherText({
-            systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-            userPrompt: withMindMapRequest(
-              fillTemplate(REDUCE_PROMPT, { extractions: safeInput }),
-              customPrompt ? sanitizeUserInput(customPrompt) : undefined
-            ),
-            model: env.MINDMAP_LLM,
-            maxTokens: 16_000,
-            temperature: 0.3,
-            reasoningEnabled: true,
-            onUsage: (usage) => {
-              reduceUsage = usage;
-            },
-          }),
-        timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
-        phaseLabel: "MindMapReduce",
-      });
+    // The full input gets most of the reduce budget; if it fails, a compact input (themes and
+    // concepts, no summaries) gets the rest. The rule-based fallback is the last resort.
+    const reduceBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
+    const reduceAttempts = [
+      { input: safeInput, timeoutMs: () => Math.round(reduceBudgetMs * 0.6) },
+      {
+        input: compactReduceInput(allExtractions),
+        timeoutMs: () => deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+      },
+    ];
+    for (const [attemptIndex, attempt] of reduceAttempts.entries()) {
+      try {
+        const startTime = Date.now();
+        const markdown = await invokeWithinBudget({
+          invoke: () =>
+            invokeTogetherText({
+              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              userPrompt: withMindMapRequest(
+                fillTemplate(REDUCE_PROMPT, { extractions: attempt.input }),
+                customPrompt ? sanitizeUserInput(customPrompt) : undefined
+              ),
+              model: env.MINDMAP_LLM,
+              maxTokens: 16_000,
+              temperature: 0.3,
+              reasoningEnabled: true,
+              onUsage: (usage) => {
+                reduceUsage = usage;
+              },
+            }),
+          timeoutMs: attempt.timeoutMs(),
+          phaseLabel: "MindMapReduce",
+        });
 
-      const validation = validateWithPreset(markdown, "mindmap");
-      if (!validation.isValid) {
-        console.log(`[MindMapJob] Validation warnings: ${validation.warnings.join(", ")}`);
+        const validation = validateWithPreset(markdown, "mindmap");
+        if (!validation.isValid) {
+          console.log(`[MindMapJob] Validation warnings: ${validation.warnings.join(", ")}`);
+        }
+
+        const parsedTree = parseMarkdownToTree(markdown);
+        if (!parsedTree.children?.length) {
+          throw new Error("Reduce returned a map with no branches");
+        }
+        reduceLatencyMs = Date.now() - startTime;
+
+        console.log(
+          `[MindMapJob] Reduce completed in ${reduceLatencyMs}ms (attempt ${attemptIndex + 1}), root: "${parsedTree.topic}", branches: ${parsedTree.children.length}`
+        );
+
+        finalMindMap = { nodeData: parsedTree };
+        break;
+      } catch (error) {
+        console.log(
+          `[MindMapJob] Reduce attempt ${attemptIndex + 1} (${attempt.input.length} chars) failed: ${error}`
+        );
       }
-
-      const parsedTree = parseMarkdownToTree(markdown);
-      reduceLatencyMs = Date.now() - startTime;
-
-      console.log(
-        `[MindMapJob] Reduce completed in ${reduceLatencyMs}ms, root: "${parsedTree.topic}", branches: ${parsedTree.children?.length || 0}`
-      );
-
-      finalMindMap = { nodeData: parsedTree };
-    } catch (error) {
-      console.log(`[MindMapJob] Reduce failed, using smart fallback: ${error}`);
+    }
+    if (!finalMindMap) {
+      console.log("[MindMapJob] Reduce failed on full and compact input, using smart fallback");
       finalMindMap = createSmartFallback(allExtractions);
     }
 
@@ -695,6 +742,7 @@ export async function runFinalizeMindMapPhase(
       title,
       mapSuccess: Object.keys(mapResults).length - failedCount.count,
       mapFailed: failedCount.count,
+      mapFailureRate: mapFailureRate(Object.keys(mapResults).length, failedCount.count),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "finalization");

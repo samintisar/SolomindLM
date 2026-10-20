@@ -161,6 +161,11 @@ describe("ChatInput toolbar", () => {
     expect(filtersTrigger()).not.toBeInTheDocument();
   });
 
+  test("no mode menu without a mode handler", () => {
+    renderInput({ onModeChange: undefined });
+    expect(modeTrigger()).not.toBeInTheDocument();
+  });
+
   test("no model menu without a model handler", () => {
     renderInput();
     expect(modelTrigger()).not.toBeInTheDocument();

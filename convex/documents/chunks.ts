@@ -92,16 +92,112 @@ export const listChunksByNotebook = internalQuery({
   },
 });
 
+/** The chunk fields Studio jobs read: no embedding, which is most of a chunk row's size. */
+type ChunkText = Pick<
+  Doc<"documentChunks">,
+  "documentId" | "chunkIndex" | "content" | "sectionTitle"
+>;
+
 /**
- * Narrow chunks to the sources that match `topic` (#288). Best-effort: if the topic cannot be
- * embedded, every source stays.
+ * Chunks read per query. A query reads whole rows, embedding included (~13 KB each), so one
+ * large source read in a single query passes Convex's 16 MiB read limit; a page stays well under.
  */
-async function filterChunksToTopic(
+export const CHUNK_PAGE_SIZE = 200;
+
+const cursorValidator = v.union(v.string(), v.null());
+
+type Page<T> = { page: T[]; isDone: boolean; continueCursor: string };
+
+/** Every page `readPage` returns, from the first. */
+async function readAllPages<T>(readPage: (cursor: string | null) => Promise<Page<T>>) {
+  const all: T[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const { page, isDone, continueCursor }: Page<T> = await readPage(cursor);
+    all.push(...page);
+    if (isDone) return all;
+    cursor = continueCursor;
+  }
+}
+
+/** Internal: One page of a document's chunks in order, without their embeddings. */
+export const listChunkTexts = internalQuery({
+  args: { documentId: v.id("documents"), cursor: cursorValidator },
+  handler: async (ctx, args): Promise<Page<ChunkText>> => {
+    const result = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+      .order("asc")
+      .paginate({ cursor: args.cursor, numItems: CHUNK_PAGE_SIZE });
+    return {
+      page: result.page.map(({ documentId, chunkIndex, content, sectionTitle }) => ({
+        documentId,
+        chunkIndex,
+        content,
+        ...(sectionTitle !== undefined ? { sectionTitle } : {}),
+      })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** Internal: How closely each chunk on one page of a document matches a topic embedding. */
+export const chunkTopicSimilarityPage = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+    topicEmbedding: v.array(v.float64()),
+    cursor: cursorValidator,
+  },
+  handler: async (ctx, args): Promise<Page<{ documentId: string; similarity: number }>> => {
+    const result = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+      .paginate({ cursor: args.cursor, numItems: CHUNK_PAGE_SIZE });
+    return {
+      page: chunkTopicSimilarities(result.page, args.topicEmbedding),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** How closely one document matches a topic embedding; null if none of its chunks has one. */
+async function documentTopicScore(
   ctx: ActionCtx,
-  chunks: Doc<"documentChunks">[],
-  topic: string,
-  documentCount: number
-): Promise<Doc<"documentChunks">[]> {
+  documentId: Id<"documents">,
+  topicEmbedding: number[]
+): Promise<number | null> {
+  const similarities = await readAllPages((cursor) =>
+    ctx.runQuery(internal.documents.chunks.chunkTopicSimilarityPage, {
+      documentId,
+      topicEmbedding,
+      cursor,
+    })
+  );
+  return documentTopicScores(similarities).get(documentId) ?? null;
+}
+
+/** One document's chunks in order, without their embeddings. */
+async function documentChunkTexts(
+  ctx: ActionCtx,
+  documentId: Id<"documents">
+): Promise<ChunkText[]> {
+  return await readAllPages((cursor) =>
+    ctx.runQuery(internal.documents.chunks.listChunkTexts, { documentId, cursor })
+  );
+}
+
+/**
+ * The sources that match `topic` (#288). Each source is scored in its own query, so the
+ * embeddings never sit in this action's memory together (64 MB). Best-effort: if the topic cannot
+ * be embedded, every source stays.
+ */
+async function documentsForTopic(
+  ctx: ActionCtx,
+  documentIds: Id<"documents">[],
+  topic: string
+): Promise<Id<"documents">[]> {
   const logger = createServiceLogger("documents", "fetchChunks.topicFilter");
   let topicEmbedding: number[];
   try {
@@ -113,23 +209,31 @@ async function filterChunksToTopic(
     logger.warn("Topic embedding failed; keeping every source", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return chunks;
+    return documentIds;
   }
-  const scores = documentTopicScores(chunkTopicSimilarities(chunks, topicEmbedding));
-  if (scores.size === 0) return chunks;
+  // Each score is one number, so the sources can be scored in parallel.
+  const documentScores = await Promise.all(
+    documentIds.map((documentId) => documentTopicScore(ctx, documentId, topicEmbedding))
+  );
+  const scores = new Map<string, number>();
+  documentIds.forEach((documentId, i) => {
+    const score = documentScores[i];
+    if (score !== null) scores.set(documentId, score);
+  });
+  if (scores.size === 0) return documentIds;
   const { keep, dropped } = selectTopicDocuments(scores);
   // The request text is user content, so only its length is logged.
   logger.info("Topic source selection", {
     topicChars: topic.length,
-    documentCount,
+    documentCount: documentIds.length,
     kept: keep.length,
     dropped: dropped.length,
     scores: Object.fromEntries([...scores].map(([id, s]) => [id, Number(s.toFixed(3))])),
   });
-  if (dropped.length === 0) return chunks;
+  if (dropped.length === 0) return documentIds;
   // A source with no embedded chunks has no score; it stays.
   const droppedIds = new Set(dropped);
-  return chunks.filter((c) => !droppedIds.has(c.documentId));
+  return documentIds.filter((id) => !droppedIds.has(id));
 }
 
 /**
@@ -146,15 +250,16 @@ export const fetchChunks = internalAction({
     excludeReferenceLists: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<Array<{ content: string; documentId: Id<"documents"> }>> => {
-    // Get all chunks for the specified documents
-    let allChunks: Doc<"documentChunks">[] = [];
+    const topic = args.topic?.trim();
+    const documentIds =
+      topic && args.documentIds.length > 1
+        ? await documentsForTopic(ctx, args.documentIds, topic)
+        : args.documentIds;
 
-    for (const documentId of args.documentIds) {
-      const chunks = await ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
-        documentId,
-      });
-      allChunks.push(...chunks);
-    }
+    // Chunk text only: full rows with embeddings ran a 13-source notebook out of memory.
+    let allChunks: ChunkText[] = (
+      await Promise.all(documentIds.map((documentId) => documentChunkTexts(ctx, documentId)))
+    ).flat();
 
     if (args.excludeReferenceLists) {
       const before = allChunks.length;
@@ -166,11 +271,6 @@ export const fetchChunks = internalAction({
       });
     }
 
-    const topic = args.topic?.trim();
-    if (topic && args.documentIds.length > 1) {
-      allChunks = await filterChunksToTopic(ctx, allChunks, topic, args.documentIds.length);
-    }
-
     // Sort by document and chunk index
     allChunks.sort((a, b) => {
       if (a.documentId !== b.documentId) {
@@ -179,12 +279,8 @@ export const fetchChunks = internalAction({
       return a.chunkIndex - b.chunkIndex;
     });
 
-    // Callers only ever read `content` (see studio job phases). Stripping
-    // the embedding vector (EMBEDDING_DIMENSIONS floats/chunk, see
-    // convex/_lib/embeddingConfig.ts) and other chunk metadata before
-    // returning keeps this action's serialized result well under Convex's
-    // 16 MiB return-value limit for notebooks with many sources — the full
-    // rows previously blew past that limit around ~30 sources.
+    // Callers only read `content` and `documentId`; returning just those keeps the result well
+    // under Convex's 16 MiB return-value limit for notebooks with many sources.
     return allChunks.map((chunk) => ({ content: chunk.content, documentId: chunk.documentId }));
   },
 });

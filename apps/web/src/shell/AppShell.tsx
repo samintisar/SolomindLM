@@ -2,7 +2,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import type { DocumentSummary } from "@convex/documents/listSummary";
 import { useQuery } from "convex/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/useAuth";
 import { BillingPage } from "@/features/billing/components/BillingPage";
@@ -21,7 +21,7 @@ import { useFolderCRUD } from "@/features/notebooks/hooks/useFolderCRUD";
 import { useNotebookCRUD } from "@/features/notebooks/hooks/useNotebookCRUD";
 import { NotebookProvider } from "@/features/notebooks/NotebookContext";
 import { useFolders } from "@/features/notebooks/services/foldersApi";
-import { useNotebooks } from "@/features/notebooks/services/notebooksApi";
+import { useForkPublicNotebook, useNotebooks } from "@/features/notebooks/services/notebooksApi";
 import { ChecklistCard } from "@/features/onboarding/components/ChecklistCard";
 import { TourTooltip } from "@/features/onboarding/components/TourTooltip";
 import { OnboardingProvider } from "@/features/onboarding/OnboardingProvider";
@@ -34,9 +34,13 @@ import { useNoteCRUD } from "@/features/studio/hooks/useNoteCRUD";
 import { StudioProvider } from "@/features/studio/StudioContext";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { RouteTransition } from "@/shared/components/RouteTransition";
+import { useToast } from "@/shared/contexts/useToast";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { NotebookItem } from "@/shared/types/index";
 import { Header } from "@/shared/ui/Header";
 import { isNativeShell } from "@/utils/platformDetection";
+import { isVisitedNotebookGone, notebookHeaderProps } from "./notebookHeaderProps";
 
 /** Stable fallback while the documents query is skipped or loading, so consumers' effects don't re-run each render. */
 const EMPTY_DOCUMENTS: readonly DocumentSummary[] = Object.freeze([]);
@@ -137,6 +141,7 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     return null;
   }, [location.pathname]);
 
+  const isNotebookRoute = location.pathname.startsWith("/notebook/");
   const isHomePage =
     location.pathname === "/home" ||
     location.pathname === "/billing" ||
@@ -144,18 +149,21 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
 
   const notebookList = useMemo(() => notebooks ?? [], [notebooks]);
   const folderList = useMemo(() => folders ?? [], [folders]);
-  const featuredNotebooks = useMemo(
-    () => notebookList.filter((nb: NotebookItem) => nb.isFeatured),
-    [notebookList]
+  const recentNotebooks = notebookList;
+  const listedNotebook = useMemo(
+    () =>
+      urlNotebookId ? notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId) : undefined,
+    [urlNotebookId, notebookList]
   );
-  const recentNotebooks = useMemo(
-    () => notebookList.filter((nb: NotebookItem) => !nb.isFeatured),
-    [notebookList]
+  // A public notebook you don't own or cowork on isn't in your list; fetch it directly.
+  const visitedNotebook = useQuery(
+    api.notebooks.index.get,
+    urlNotebookId && urlNotebookId !== "new" && notebooks !== undefined && !listedNotebook
+      ? { id: urlNotebookId as Id<"notebooks"> }
+      : "skip"
   );
-  const activeNotebook = useMemo(() => {
-    if (!urlNotebookId || notebookList.length === 0) return undefined;
-    return notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
-  }, [urlNotebookId, notebookList]);
+  const activeNotebook: NotebookItem | undefined = listedNotebook ?? visitedNotebook ?? undefined;
+  const headerProps = notebookHeaderProps(activeNotebook, isNotebookRoute);
 
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
@@ -168,21 +176,64 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     }
   }, [urlNotebookId, currentView, activeNotebookId]);
 
+  const activeNotebookTitle = activeNotebook?.title;
   useEffect(() => {
-    if (urlNotebookId && notebookList.length > 0) {
-      const notebook = notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
-      if (notebook) {
-        setNotebookTitle(notebook.title);
-      }
-    }
-  }, [urlNotebookId, notebookList]);
+    if (urlNotebookId && activeNotebookTitle !== undefined) setNotebookTitle(activeNotebookTitle);
+  }, [urlNotebookId, activeNotebookTitle]);
 
   useEffect(() => {
     if (!shareModalOpen) return;
-    if (!urlNotebookId || !activeNotebook || activeNotebook.isSharedNotebook) {
+    if (!urlNotebookId || !activeNotebook || activeNotebook.access !== "owner") {
       setShareModalOpen(false);
     }
   }, [shareModalOpen, urlNotebookId, activeNotebook]);
+
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  // An unlisted (public) notebook that was unpublished or deleted: say so and go home, once per id.
+  const goneNotebookRef = useRef<string | null>(null);
+  const visitedGone = isVisitedNotebookGone({
+    urlNotebookId,
+    hasShareToken: new URLSearchParams(location.search).has("share"),
+    listLoaded: notebooks !== undefined,
+    listed: listedNotebook !== undefined,
+    visited: visitedNotebook,
+  });
+  useEffect(() => {
+    // Leaving the notebook re-arms it, so a later visit to a still-missing one says so again.
+    if (urlNotebookId !== goneNotebookRef.current) goneNotebookRef.current = null;
+    if (!visitedGone || !urlNotebookId || goneNotebookRef.current === urlNotebookId) return;
+    goneNotebookRef.current = urlNotebookId;
+    toastError("This notebook is no longer available");
+    navigate("/home", { replace: true });
+  }, [visitedGone, urlNotebookId, toastError, navigate]);
+
+  const forkPublic = useForkPublicNotebook();
+  const { handleLimitError } = useLimitErrorToast();
+  const { showError: showServiceError } = useServiceErrorToast();
+  const [forking, setForking] = useState(false);
+  const handleFork = useCallback(async () => {
+    if (!urlNotebookId || forking) return;
+    setForking(true);
+    try {
+      const { newNotebookId } = await forkPublic({ notebookId: urlNotebookId as Id<"notebooks"> });
+      toastSuccess("Copied to your notebooks");
+      navigate(`/notebook/${newNotebookId}`);
+    } catch (error) {
+      const handled = await handleLimitError(error);
+      if (!handled.isLimitError) showServiceError(error);
+    } finally {
+      setForking(false);
+    }
+  }, [
+    forkPublic,
+    forking,
+    navigate,
+    handleLimitError,
+    showServiceError,
+    toastSuccess,
+    urlNotebookId,
+  ]);
 
   // Signed in, / only bounces back to /home (useAuthGuard), and crossing to the public shell would
   // unmount this whole shell on the way. Signed-out visitors still get the landing page.
@@ -208,7 +259,6 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
   const notebookContextValue = useMemo(
     () => ({
       notebookList,
-      featuredNotebooks,
       recentNotebooks,
       activeNotebook,
       notebooksLoading: notebooks === undefined || folders === undefined,
@@ -238,7 +288,6 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
     }),
     [
       notebookList,
-      featuredNotebooks,
       recentNotebooks,
       activeNotebook,
       notebooks,
@@ -314,8 +363,12 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
 
   return (
     <OnboardingProvider key={user?.id ?? "anon"} isAuthenticated={isAuthenticated}>
-      {shareModalOpen && urlNotebookId && activeNotebook && !activeNotebook.isSharedNotebook && (
-        <ShareNotebookModal notebookId={urlNotebookId} onClose={() => setShareModalOpen(false)} />
+      {shareModalOpen && urlNotebookId && activeNotebook?.access === "owner" && (
+        <ShareNotebookModal
+          notebookId={urlNotebookId}
+          isPublic={activeNotebook.isPublic ?? false}
+          onClose={() => setShareModalOpen(false)}
+        />
       )}
 
       <div className="w-full bg-background text-foreground font-serif flex flex-col h-screen overflow-hidden">
@@ -331,19 +384,11 @@ export default function AppShell({ animateOnMount }: { animateOnMount: boolean }
           onLogoClick={handleLogoClick}
           onBillingClick={() => navigate("/billing")}
           hasSubscription={subscriptionStatus.hasSubscription}
-          notebookRenamable={
-            location.pathname.startsWith("/notebook/") &&
-            activeNotebook !== undefined &&
-            !activeNotebook?.isSharedNotebook
-          }
-          onShare={
-            location.pathname.startsWith("/notebook/") &&
-            urlNotebookId &&
-            activeNotebook &&
-            !activeNotebook.isSharedNotebook
-              ? () => setShareModalOpen(true)
-              : undefined
-          }
+          notebookRenamable={headerProps.renamable}
+          onShare={headerProps.canShare ? () => setShareModalOpen(true) : undefined}
+          byline={headerProps.byline}
+          onFork={headerProps.canFork ? () => void handleFork() : undefined}
+          forkPending={forking}
         />
 
         <NotebookProvider value={notebookContextValue}>

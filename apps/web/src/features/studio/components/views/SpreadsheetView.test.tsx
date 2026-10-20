@@ -154,6 +154,16 @@ describe("SpreadsheetView", () => {
     expect(screen.queryByRole("button", { name: /Add row/ })).toBeNull();
   });
 
+  it("is read-only for a viewer of a public notebook", () => {
+    render(<SpreadsheetView note={makeNote()} readOnly />);
+    expect(screen.getByRole("grid", { name: "Spreadsheet" })).toHaveAttribute(
+      "aria-readonly",
+      "true"
+    );
+    expect(screen.queryByRole("button", { name: /Add row/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download CSV" })).toBeEnabled();
+  });
+
   it("shows the failure alert and stays read-only for a failed note", () => {
     render(
       <SpreadsheetView

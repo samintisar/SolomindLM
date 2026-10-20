@@ -20,7 +20,12 @@ export default defineSchema({
     title: v.string(),
     coverColor: v.optional(v.string()),
     icon: v.optional(v.string()),
+    /** Admin-curated: shows on the Public tab's Featured shelf. Only honoured while `isPublic`. */
     isFeatured: v.optional(v.boolean()),
+    /** Visible to every signed-in user (read, private chat, fork). */
+    isPublic: v.optional(v.boolean()),
+    /** When `isPublic` was last turned on; orders the Public tab. */
+    publishedAt: v.optional(v.number()),
     folderId: v.optional(v.id("folders")),
     /** Overrides env CHAT_GROUNDING_MODE when set: async | sync | off */
     chatGroundingMode: v.optional(v.union(v.literal("async"), v.literal("sync"), v.literal("off"))),
@@ -42,6 +47,8 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_createdAt", ["userId", "createdAt"])
     .index("by_folder", ["folderId"])
+    .index("by_isPublic_and_publishedAt", ["isPublic", "publishedAt"])
+    .index("by_isFeatured_and_publishedAt", ["isFeatured", "publishedAt"])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["userId", "folderId"],
@@ -146,6 +153,8 @@ export default defineSchema({
     ingestionStatus: v.optional(ingestionStatusValidator),
     /** Paper full text provenance: uploaded PDF, open-access PDF/HTML, or landing page. Absent = abstract only. */
     fullTextSource: v.optional(fullTextSourceValidator),
+    /** Set by the showcase seed: paper full text is kept only under an open licence (`ingestPaper`). */
+    fullTextPolicy: v.optional(v.literal("open_license_only")),
     /** AI-generated source guide (lazy-cached): summary + topic chips */
     sourceGuide: v.optional(
       v.object({
@@ -352,6 +361,27 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
+  // A public notebook viewer's own practice progress on one flashcard set, quiz or written-question
+  // set. Owners and editors practise on the shared row instead (convex/_model/studioProgress.ts).
+  studioProgress: defineTable({
+    userId: v.id("users"),
+    itemType: v.union(v.literal("flashcards"), v.literal("quizzes"), v.literal("writtenQuestions")),
+    /** The flashcards / quizzes / writtenQuestions row id. */
+    itemId: v.string(),
+    notebookId: v.id("notebooks"),
+    /** Mirrors the shared row's per-user fields; shape in convex/_model/practiceProgress.ts. */
+    progress: v.any(),
+    updatedAt: v.number(),
+  })
+    // One viewer's progress on one item (every practice read and write).
+    .index("by_user_and_item", ["userId", "itemId"])
+    // One viewer's progress across a notebook (list overlays) and, by prefix, account purge.
+    .index("by_user_and_notebook", ["userId", "notebookId"])
+    // Every viewer's progress on a notebook (notebook deletion, purge of the notebook's owner).
+    .index("by_notebook", ["notebookId"])
+    // Every viewer's progress on an item (studio item deletion).
+    .index("by_item", ["itemId"]),
+
   // Chat
   conversations: defineTable({
     userId: v.id("users"),
@@ -361,6 +391,8 @@ export default defineSchema({
     chatGenerationInFlight: v.optional(v.number()),
     /** Last time a generation was started (UX / stale detection). */
     chatGenerationStartedAt: v.optional(v.number()),
+    /** Started by a viewer of a public notebook: only that user sees it. */
+    isPrivate: v.optional(v.boolean()),
     // Deprecated/unused fields (kept for schema compatibility)
     activeModes: v.optional(
       v.object({
@@ -387,7 +419,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_notebook", ["userId", "notebookId"])
-    .index("by_notebook", ["notebookId"]),
+    .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_isPrivate", ["notebookId", "isPrivate"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),

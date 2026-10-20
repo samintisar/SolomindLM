@@ -61,7 +61,7 @@ CRITICAL GROUNDING REQUIREMENTS:
 OUTPUT FORMAT:
 - Use Markdown bullet points (* or -).
 - Indentation determines depth (2 spaces per level).
-- The first line must be the Root Topic prefixed with # (e.g., "# Roman Empire").
+- The first line must be the Root Topic prefixed with # (e.g., "# [Root topic]").
 
 MANDATORY STRUCTURE:
 - Level 0 (Root): # Single overarching topic
@@ -74,24 +74,19 @@ VALIDATION:
 - No generic labels like "Overview", "Introduction", "Conclusion", "Aspect", "Category"
 - Each terminal node must be a specific concept from the source, not a category
 
-EXAMPLE:
-# Machine Learning in Healthcare
-* Clinical Applications
-  * Diagnostic Systems
-    * Medical imaging analysis
-      * CT scan interpretation
-      * MRI anomaly detection
-    * Disease prediction models
-      * Early warning systems
-      * Risk stratification
-* Data Processing
-  * Feature engineering
-    * Signal processing
-    * Image normalization
-  * Model training
-    * Supervised learning
-      * Classification algorithms
-      * Regression analysis
+EXAMPLE SHAPE (placeholders only; every label must come from the data below):
+# [Root topic]
+* [Main branch]
+  * [Sub-topic]
+    * [Specific concept]
+      * [Detail]
+      * [Detail]
+    * [Specific concept]
+  * [Sub-topic]
+    * [Specific concept]
+* [Main branch]
+  * [Sub-topic]
+    * [Specific concept]
 
 DATA (Themes and Concepts from documents):
 {extractions}

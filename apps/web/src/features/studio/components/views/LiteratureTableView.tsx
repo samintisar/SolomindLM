@@ -86,6 +86,8 @@ export interface LiteratureTableViewProps {
   isSaving?: boolean;
   onExport?: (format: "csv" | "excel") => void;
   onAddPapers?: () => void;
+  /** Viewer of a public notebook: read and export only (no selecting, adding, columns or save). */
+  readOnly?: boolean;
 }
 
 function exportToCSV(table: LiteratureTable, filename: string) {
@@ -128,6 +130,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   isSaving = false,
   onExport,
   onAddPapers,
+  readOnly = false,
 }) => {
   const { success: toastSuccess, error: toastError } = useToast();
   const [table, setTable] = useState<LiteratureTable>(initialTable);
@@ -158,9 +161,9 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   useLayoutEffect(() => {
     const previous = previousFitsBeside.current;
     previousFitsBeside.current = fitsBeside;
-    if (previous === null && fitsBeside) setShowColumnManager(true);
+    if (previous === null && fitsBeside && !readOnly) setShowColumnManager(true);
     else if (previous && fitsBeside === false) setShowColumnManager(false);
-  }, [fitsBeside]);
+  }, [fitsBeside, readOnly]);
 
   const existingPapers = useGetExistingPapers(notebookId);
   const bulkUpload = useBulkUpload();
@@ -345,7 +348,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {onAddPapers && (
+          {onAddPapers && !readOnly && (
             <Button
               variant="ghost"
               size="sm-adaptive"
@@ -357,34 +360,38 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
               <span className="hidden @xl/table-toolbar:inline">Add Papers</span>
             </Button>
           )}
-          <Button
-            ref={manageColumnsButtonRef}
-            variant={columnManagerOpen ? "secondary" : "ghost"}
-            size="sm-adaptive"
-            onClick={() => {
-              setIsFocusMode(false);
-              setShowColumnManager((open) => !open);
-            }}
-            title="Manage columns"
-            aria-label="Manage columns"
-            aria-pressed={columnManagerOpen}
-          >
-            <Columns3 />
-            <span className="hidden @2xl/table-toolbar:inline">Manage Columns</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm-adaptive"
-            onClick={() => void onSave?.(table)}
-            disabled={!onSave || isSaving}
-            title="Save table to Studio"
-            aria-label={isSaving ? "Saving table" : "Save table to Studio"}
-          >
-            {isSaving ? <Spinner aria-hidden /> : <Save />}
-            <span className="hidden @3xl/table-toolbar:inline">
-              {isSaving ? "Saving..." : "Save table"}
-            </span>
-          </Button>
+          {!readOnly && (
+            <>
+              <Button
+                ref={manageColumnsButtonRef}
+                variant={columnManagerOpen ? "secondary" : "ghost"}
+                size="sm-adaptive"
+                onClick={() => {
+                  setIsFocusMode(false);
+                  setShowColumnManager((open) => !open);
+                }}
+                title="Manage columns"
+                aria-label="Manage columns"
+                aria-pressed={columnManagerOpen}
+              >
+                <Columns3 />
+                <span className="hidden @2xl/table-toolbar:inline">Manage Columns</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm-adaptive"
+                onClick={() => void onSave?.(table)}
+                disabled={!onSave || isSaving}
+                title="Save table to Studio"
+                aria-label={isSaving ? "Saving table" : "Save table to Studio"}
+              >
+                {isSaving ? <Spinner aria-hidden /> : <Save />}
+                <span className="hidden @3xl/table-toolbar:inline">
+                  {isSaving ? "Saving..." : "Save table"}
+                </span>
+              </Button>
+            </>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -440,7 +447,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
         </div>
       </div>
 
-      {selectedIds.size > 0 && (
+      {!readOnly && selectedIds.size > 0 && (
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-muted/40 px-4 py-2">
           <Button variant="ghost" size="xs" onClick={() => setSelectedIds(new Set())}>
             <X />
@@ -479,7 +486,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                 </EmptyMedia>
                 <EmptyTitle>No papers in this table yet</EmptyTitle>
               </EmptyHeader>
-              {onAddPapers && (
+              {onAddPapers && !readOnly && (
                 <EmptyContent>
                   <Button onClick={onAddPapers}>Add Papers</Button>
                 </EmptyContent>
@@ -491,11 +498,13 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                 <TableRow>
                   <TableHead pinned className={PAPER_COLUMN_CLASS}>
                     <div className="flex items-center gap-3 pl-9.5">
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={toggleSelectAll}
-                        aria-label="Select all papers"
-                      />
+                      {!readOnly && (
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Select all papers"
+                        />
+                      )}
                       <span>Papers ({paperCount})</span>
                     </div>
                   </TableHead>
@@ -534,6 +543,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                             onToggleSelect={() => toggleSelect(paper.citationId)}
                             onCite={() => setCiteTarget({ paper, index })}
                             onAddToNotebook={() => void handleAddSingle(paper)}
+                            readOnly={readOnly}
                           />
                         </TableCell>
                         {dataColumns.map((col) => (

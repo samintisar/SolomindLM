@@ -272,6 +272,7 @@ export const docEmbedding = internalAction({
             fileUrl: docDetails.fileUrl,
             storageId: docDetails.storageId,
             fullTextSource: docDetails.fullTextSource,
+            fullTextPolicy: docDetails.fullTextPolicy,
           },
           {
             resolveCandidates: resolveOpenAccessCandidates,
@@ -328,7 +329,10 @@ export const docEmbedding = internalAction({
           currentStorageId !== originalStorageId
         ) {
           try {
-            await ctx.storage.delete(originalStorageId as Id<"_storage">);
+            // A fork may still use the replaced file.
+            await ctx.runMutation(internal.documents.internal.deleteDocumentFileIfUnusedInternal, {
+              storageId: originalStorageId,
+            });
           } catch (e) {
             logger.warn("Could not delete the replaced PDF", {
               storageId: originalStorageId,
