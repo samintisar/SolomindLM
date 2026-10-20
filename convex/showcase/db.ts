@@ -1017,6 +1017,34 @@ export const publishShowcaseNotebook = internalMutation({
   },
 });
 
+/** Read cap for the pending-ticks scan: one chain per notebook, plus a few overlapping re-runs. */
+const MAX_PENDING_SCAN = 1000;
+
+/**
+ * Stops every seed chain: cancels the pending `tick`s (all, or one slug's). Jobs a tick already
+ * started keep running; re-run `seedShowcase` to continue.
+ */
+export const stopSeed = internalMutation({
+  args: { slug: v.optional(v.string()) },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const pending = await ctx.db.system
+      .query("_scheduled_functions")
+      .withIndex("by_creation_time")
+      .order("desc")
+      .take(MAX_PENDING_SCAN);
+    let cancelled = 0;
+    for (const job of pending) {
+      if (job.state.kind !== "pending" || !job.name.startsWith("showcase/seed")) continue;
+      const tickArgs = job.args[0] as { slug?: string } | undefined;
+      if (args.slug && tickArgs?.slug !== args.slug) continue;
+      await ctx.scheduler.cancel(job._id);
+      cancelled++;
+    }
+    return cancelled;
+  },
+});
+
 /** Rollback step 1: take showcase notebooks off the Public tab (all, or one slug). */
 export const unpublishShowcase = internalMutation({
   args: { ownerEmail: v.string(), slug: v.optional(v.string()) },
