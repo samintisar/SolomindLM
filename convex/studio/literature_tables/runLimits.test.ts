@@ -80,3 +80,29 @@ describe("literature review limits", () => {
     expect(session?.retryCount).toBe(3);
   });
 });
+
+// Lives here because this file already wires the rate limiter that startLiteratureReview needs.
+describe("startLiteratureReview conversation", () => {
+  test("refuses to attach to another user's private thread", async () => {
+    const { t, notebookId, asUser } = await setup();
+    const viewerConv = await t.run(async (ctx) => {
+      await ctx.db.patch(notebookId, { isPublic: true, publishedAt: Date.now() });
+      const viewer = await ctx.db.insert("users", { name: "Viewer" });
+      return ctx.db.insert("conversations", {
+        userId: viewer,
+        notebookId,
+        isPrivate: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    await expect(
+      asUser.mutation(api.studio.literature_tables.index.startLiteratureReview, {
+        query: "retrieval-augmented generation",
+        notebookId,
+        conversationId: viewerConv,
+      })
+    ).rejects.toThrow("Invalid conversation for this notebook");
+  });
+});

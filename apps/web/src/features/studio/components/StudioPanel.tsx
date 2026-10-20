@@ -44,6 +44,8 @@ interface StudioPanelProps {
   sources?: any[];
   notebookId?: string | null;
   onAskInChat?: (prompt: string, documentIds?: string[]) => void;
+  /** Viewer of a public notebook: no generating, renaming, deleting, editing or practising. */
+  readOnly?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ const StudioPanelContent: React.FC<StudioPanelProps> = ({
   sources = [],
   notebookId,
   onAskInChat,
+  readOnly = false,
 }) => {
   const { notes, onUpdateNote, onUpdateNoteFull, onDeleteNote, onAddNote, onSaveReportContent } =
     useStudioContext();
@@ -314,6 +317,7 @@ const StudioPanelContent: React.FC<StudioPanelProps> = ({
           canExportFlashcards={noteActions.canExportFlashcards}
           isExporting={noteActions.isExporting}
           isMobile={isMobile}
+          readOnly={readOnly}
         />
 
         {/* Main Content */}
@@ -338,6 +342,7 @@ const StudioPanelContent: React.FC<StudioPanelProps> = ({
                 registerInfographicControls={handleInfographicControlsRegister}
                 onInfographicFullscreenChange={setIsInfographicFullscreen}
                 onAskInChat={onAskInChat}
+                readOnly={readOnly}
               />
             )
           ) : (
@@ -355,6 +360,7 @@ const StudioPanelContent: React.FC<StudioPanelProps> = ({
               onEditStart={noteActions.handleStartEdit}
               onEditSave={noteActions.handleSaveEdit}
               onEditKeyDown={noteActions.handleKeyDown}
+              readOnly={readOnly}
             />
           )}
         </div>

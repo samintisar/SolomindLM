@@ -47,14 +47,23 @@ import { type DueFlashcard, StudyMode } from "./StudyMode";
 export interface FlashcardViewProps {
   note: FlashcardNote;
   onBack?: () => void;
+  /**
+   * Viewer of a public notebook: no Edit mode, since card edits change the shared deck. Study
+   * reviews, the Due/All choice and the last card viewed save to the viewer's own progress.
+   */
+  readOnly?: boolean;
 }
 
 type ViewMode = "browse" | "study" | "edit";
 
-export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
+export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack, readOnly = false }) => {
   // State
-  const [mode, setMode] = useState<ViewMode>("browse");
-  const [showMastered, setShowMastered] = useState((note.metadata as any)?.showMastered ?? false);
+  const [selectedMode, setMode] = useState<ViewMode>("browse");
+  // The effective mode: a deck that turns read-only while in Edit mode falls back to Browse.
+  const mode: ViewMode = readOnly && selectedMode === "edit" ? "browse" : selectedMode;
+  const [showMastered, setShowMastered] = useState<boolean>(
+    (note.metadata as { showMastered?: boolean } | undefined)?.showMastered ?? false
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -108,7 +117,9 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
 
   // Persist progress
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateFlashcardProgress(note.id, stableCurrentIndex);
+  const savedIndex =
+    (displayNote.metadata as { lastViewedIndex?: number } | undefined)?.lastViewedIndex ?? 0;
+  useUpdateFlashcardProgress(note.id, stableCurrentIndex, savedIndex);
 
   // Sync showMastered with server
   useEffect(() => {
@@ -214,6 +225,11 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
     { value: "edit", name: "Edit Mode", tip: "Edit", icon: <Edit3 /> },
   ] as const;
 
+  // A viewer studies the shared deck but can't edit it.
+  const visibleModeToggles = readOnly
+    ? modeToggles.filter(({ value }) => value !== "edit")
+    : modeToggles;
+
   return (
     <div
       className={cn(
@@ -235,7 +251,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <ButtonGroup variant="tray" aria-label="Mode">
-            {modeToggles.map(({ value, name, tip, icon }) => (
+            {visibleModeToggles.map(({ value, name, tip, icon }) => (
               <Tooltip key={value}>
                 {/* The trigger overrides the toggle's data-state; the pressed look comes from the tray's aria-pressed styling. */}
                 <TooltipTrigger asChild>

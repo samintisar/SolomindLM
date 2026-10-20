@@ -4,7 +4,7 @@ import type { ViewMode } from "./CardGrid";
 import { CreateMenuButton } from "./CreateMenuButton";
 import { ViewControls } from "./ViewControls";
 
-export type HomeTab = "all" | "mine" | "featured";
+export type HomeTab = "all" | "mine" | "public";
 
 interface HomeHeaderProps {
   viewMode: ViewMode;
@@ -19,9 +19,7 @@ export function HomeHeader(props: HomeHeaderProps) {
   return (
     <header className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-xl font-bold text-foreground sm:text-3xl">
-          Your notebooks
-        </h1>
+        <h1 className="font-display text-xl font-bold text-foreground sm:text-3xl">Notebooks</h1>
         <CreateMenuButton
           onCreateNotebook={props.onCreateNotebook}
           onCreateFolder={props.onCreateFolder}
@@ -31,7 +29,7 @@ export function HomeHeader(props: HomeHeaderProps) {
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="mine">My notebooks</TabsTrigger>
-          <TabsTrigger value="featured">Featured</TabsTrigger>
+          <TabsTrigger value="public">Public</TabsTrigger>
         </TabsList>
         <ViewControls
           viewMode={props.viewMode}

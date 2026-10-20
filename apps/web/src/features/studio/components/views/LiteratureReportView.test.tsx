@@ -76,6 +76,13 @@ describe("LiteratureReportView", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
+  it("read-only has no Save and edit", () => {
+    render(<LiteratureReportView report={REPORT} onSaveAndEdit={vi.fn()} readOnly />);
+    expect(
+      screen.queryByRole("button", { name: "Save and edit document" })
+    ).not.toBeInTheDocument();
+  });
+
   it("Save and edit shows its saving state until the save resolves", async () => {
     const user = userEvent.setup();
     let resolve: () => void = () => {};

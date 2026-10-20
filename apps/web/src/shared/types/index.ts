@@ -464,13 +464,24 @@ export interface NotebookItem {
   id: string;
   title: string;
   date: string;
-  sourceCount: number;
+  /** Missing on public listings (too costly to count per card). */
+  sourceCount?: number;
   author?: string;
   coverColor?: string; // e.g. 'bg-amber-200'
   icon?: string;
+  /** Admin-curated Featured shelf (public notebooks only). */
   isFeatured?: boolean;
+  /** Visible to every signed-in user. */
+  isPublic?: boolean;
+  /** Your role here: owner, editor via a cowork link, or viewer of someone's public notebook. */
+  access?: "owner" | "editor" | "viewer";
   /** True when this notebook is owned by someone else and you are an editor via share link */
   isSharedNotebook?: boolean;
+  /** Owner's display name, for notebooks you don't own. */
+  ownerName?: string;
+  /** Public listings: true when you are the owner. */
+  isOwnedByViewer?: boolean;
+  publishedAt?: number;
   folderId?: string;
   created_at?: string | number;
   updated_at?: string | number;
