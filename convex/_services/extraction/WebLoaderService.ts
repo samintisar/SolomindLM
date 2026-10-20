@@ -5,6 +5,8 @@ import { invokeWithTimeout } from "../../_agents/_shared/timeout.js";
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { validateUrl } from "../../_lib/utils/urlValidation.js";
+import { openAccessUserAgent } from "./openAccess/OpenAccessResolver";
+import { readWikipediaArticle } from "./wikipedia";
 
 /**
  * One Supadata scrape call may take this long. The SDK takes no abort signal, so a timed-out request is
@@ -136,8 +138,9 @@ export class WebLoaderService {
   }
 
   /**
-   * Extract content plus page title using Supadata web scrape.
-   * Supadata returns the page title in the `name` field.
+   * Extract content plus page title. Wikipedia articles come from Wikipedia's API (prose only, no
+   * navboxes or references); everything else, and any article the API can't serve, from a Supadata
+   * web scrape, which returns the page title in the `name` field.
    */
   async loadWebPageWithMeta(url: string): Promise<WebPageMeta> {
     const validation = validateUrl(url);
@@ -146,6 +149,15 @@ export class WebLoaderService {
     }
 
     const logger = createServiceLogger("web_loader", "loadWebPageWithMeta");
+    const article = await readWikipediaArticle(url, { userAgent: openAccessUserAgent() });
+    if (article) {
+      logger.info("Read Wikipedia article from the API", {
+        url,
+        title: article.title,
+        chars: article.content.length,
+      });
+      return { title: article.title, content: article.content, url };
+    }
     const deadline = Date.now() + SCRAPE_BUDGET_MS;
     return invokeWithRetry(
       () =>
