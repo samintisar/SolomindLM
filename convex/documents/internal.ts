@@ -11,20 +11,64 @@ import {
 import { getAuthUserId } from "../auth";
 
 /**
- * Helper: Delete all chunks for a document.
+ * Chunks deleted per mutation. Each chunk carries a 1536-dim embedding (~12 KB read), so one
+ * mutation can't read a large source's chunks at once (16 MiB limit).
+ */
+export const CHUNK_DELETE_BATCH_SIZE = 100;
+
+/** Deletes up to one batch of the document's chunks created at or before `before`; true if more remain. */
+async function deleteChunkBatch(
+  ctx: MutationCtx,
+  documentId: Id<"documents">,
+  before: number
+): Promise<boolean> {
+  const chunks = await ctx.db
+    .query("documentChunks")
+    .withIndex("by_document", (q) => q.eq("documentId", documentId).lte("_creationTime", before))
+    .take(CHUNK_DELETE_BATCH_SIZE + 1);
+  for (const chunk of chunks.slice(0, CHUNK_DELETE_BATCH_SIZE)) {
+    await ctx.db.delete(chunk._id);
+  }
+  return chunks.length > CHUNK_DELETE_BATCH_SIZE;
+}
+
+/**
+ * Deletes a document's chunks: the first batch now, the rest in scheduled batches
+ * (`drainDocumentChunks`). Only chunks that exist now are deleted, so a re-embed can store new
+ * chunks for the same document while the old ones drain. Retrieval drops chunks whose document
+ * is gone (`chunks.getChunks`), so a deleted source stops showing up right away.
  */
 export async function deleteAllChunksForDocument(
   ctx: MutationCtx,
   documentId: Id<"documents">
 ): Promise<void> {
-  const chunks = await ctx.db
+  // The cutoff is the newest chunk that exists now (the index orders by _creationTime).
+  const newest = await ctx.db
     .query("documentChunks")
     .withIndex("by_document", (q) => q.eq("documentId", documentId))
-    .collect();
-  for (const chunk of chunks) {
-    await ctx.db.delete(chunk._id);
+    .order("desc")
+    .first();
+  if (!newest) return;
+  const before = newest._creationTime;
+  if (await deleteChunkBatch(ctx, documentId, before)) {
+    await ctx.scheduler.runAfter(0, internal.documents.internal.drainDocumentChunks, {
+      documentId,
+      before,
+    });
   }
 }
+
+/** Internal: deletes the next batch of a document's old chunks and reschedules until none are left. */
+export const drainDocumentChunks = internalMutation({
+  args: { documentId: v.id("documents"), before: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (await deleteChunkBatch(ctx, args.documentId, args.before)) {
+      await ctx.scheduler.runAfter(0, internal.documents.internal.drainDocumentChunks, args);
+    }
+    return null;
+  },
+});
 
 /**
  * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
