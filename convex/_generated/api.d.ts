@@ -95,6 +95,7 @@ import type * as _agents_research_types from "../_agents/research/types.js";
 import type * as _agents_spreadsheet_csvHelpers from "../_agents/spreadsheet/csvHelpers.js";
 import type * as _agents_spreadsheet_presetRequests from "../_agents/spreadsheet/presetRequests.js";
 import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompts.js";
+import type * as _agents_spreadsheet_rowPlan from "../_agents/spreadsheet/rowPlan.js";
 import type * as _agents_spreadsheet_sourcePacking from "../_agents/spreadsheet/sourcePacking.js";
 import type * as _agents_spreadsheet_title from "../_agents/spreadsheet/title.js";
 import type * as _agents_written_questions_config from "../_agents/written_questions/config.js";
@@ -442,6 +443,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/spreadsheet/csvHelpers": typeof _agents_spreadsheet_csvHelpers;
   "_agents/spreadsheet/presetRequests": typeof _agents_spreadsheet_presetRequests;
   "_agents/spreadsheet/prompts": typeof _agents_spreadsheet_prompts;
+  "_agents/spreadsheet/rowPlan": typeof _agents_spreadsheet_rowPlan;
   "_agents/spreadsheet/sourcePacking": typeof _agents_spreadsheet_sourcePacking;
   "_agents/spreadsheet/title": typeof _agents_spreadsheet_title;
   "_agents/written_questions/config": typeof _agents_written_questions_config;

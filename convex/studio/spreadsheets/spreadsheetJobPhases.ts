@@ -27,7 +27,10 @@ import {
   MAP_SYSTEM_PROMPT,
   REDUCE_PROMPT,
   REDUCE_SYSTEM_PROMPT,
+  ROW_PLAN_PROMPT,
+  ROW_PLAN_SYSTEM_PROMPT,
 } from "../../_agents/spreadsheet/prompts";
+import { alignRowsToPlan, formatRowPlan, parseRowPlan } from "../../_agents/spreadsheet/rowPlan";
 import { labelWithSource, packChunksBySource } from "../../_agents/spreadsheet/sourcePacking";
 import { spreadsheetTitleSource } from "../../_agents/spreadsheet/title";
 import { internal } from "../../_generated/api";
@@ -70,6 +73,9 @@ const CONFIG = {
   // Largest combined collapse output sent to the reduce call; beyond this the
   // prompt cannot fit the model context alongside a 32k-token response.
   REDUCE_MAX_INPUT_TOKENS: 100_000,
+  ROW_PLAN_TIMEOUT_MS: 90_000,
+  ROW_PLAN_RESERVE_MS: 210_000, // left for the reduce and save after planning rows
+  MIN_ROW_PLAN_CALL_MS: 20_000, // skip planning below this budget; the reduce picks rows itself
 } as const;
 
 export type SpreadsheetGenerationPhaseArgs = {
@@ -626,8 +632,19 @@ export async function runFinalizeSpreadsheetPhase(
       );
     }
 
+    const rowPlan = await planSpreadsheetRows(
+      combined,
+      customPrompt,
+      deadline,
+      language,
+      (usage) => {
+        reduceUsage = addTokenUsage(reduceUsage, usage);
+      }
+    );
+
     const prompt = fillTemplate(REDUCE_PROMPT, {
       customPrompt: sanitizeUserInput(customPrompt || ""),
+      rowPlan: formatRowPlan(rowPlan),
       content: combined,
     });
 
@@ -659,6 +676,14 @@ export async function runFinalizeSpreadsheetPhase(
       if (lastNewline > 0) {
         finalOutput = finalOutput.substring(0, lastNewline);
       }
+    }
+
+    const aligned = alignRowsToPlan(finalOutput, rowPlan);
+    if (aligned.dropped.length > 0) {
+      console.log(
+        `[SpreadsheetJob] Dropped ${aligned.dropped.length} rows outside the ${rowPlan.length}-row plan or duplicated: ${aligned.dropped.slice(0, 10).join(" | ")}`
+      );
+      finalOutput = aligned.csv;
     }
 
     const elapsed = Date.now() - startTime;
@@ -750,6 +775,56 @@ export async function runFinalizeSpreadsheetPhase(
     });
 
     throw error;
+  }
+}
+
+// ============================================================
+// HELPER: Row Plan
+// ============================================================
+
+/**
+ * Ask for the table's rows before the reduce writes it (#451). Best-effort: a failed, slow or
+ * unusable plan returns [] and the reduce picks its own rows as before.
+ */
+export async function planSpreadsheetRows(
+  notes: string,
+  customPrompt: string,
+  deadline: JobDeadline,
+  language: string | undefined,
+  onUsage: (usage: TokenUsage) => void
+): Promise<string[]> {
+  const timeoutMs = deadline.stepTimeoutMs(CONFIG.ROW_PLAN_TIMEOUT_MS, CONFIG.ROW_PLAN_RESERVE_MS);
+  if (timeoutMs < CONFIG.MIN_ROW_PLAN_CALL_MS) {
+    console.log(`[SpreadsheetJob] Skipping row plan: ${timeoutMs}ms left for it`);
+    return [];
+  }
+  try {
+    const reply = await invokeWithinBudget({
+      invoke: () =>
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(ROW_PLAN_SYSTEM_PROMPT, language),
+          userPrompt: fillTemplate(ROW_PLAN_PROMPT, {
+            customPrompt: sanitizeUserInput(customPrompt || ""),
+            content: notes,
+          }),
+          model: env.SPREADSHEET_LLM,
+          maxTokens: 12_000,
+          temperature: 0,
+          reasoningEnabled: true,
+          onUsage,
+        }),
+      timeoutMs,
+      phaseLabel: "SpreadsheetRowPlan",
+    });
+    const plan = parseRowPlan(reply);
+    console.log(`[SpreadsheetJob] Row plan: ${plan.length} rows`);
+    return plan;
+  } catch (error) {
+    console.warn(
+      "[SpreadsheetJob] Row plan failed, the reduce picks rows itself:",
+      error instanceof Error ? error.message : String(error)
+    );
+    return [];
   }
 }
 

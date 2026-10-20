@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createJobDeadline } from "../_job/jobDeadline";
-import { recursiveCollapse } from "./spreadsheetJobPhases";
+import { planSpreadsheetRows, recursiveCollapse } from "./spreadsheetJobPhases";
 
 const { invokeTogetherText } = vi.hoisted(() => ({ invokeTogetherText: vi.fn() }));
 
@@ -63,5 +63,50 @@ describe("recursiveCollapse", () => {
       [outputs[2], outputs[3]].join(SEPARATOR),
       [outputs[4], outputs[5]].join(SEPARATOR),
     ]);
+  });
+});
+
+describe("planSpreadsheetRows", () => {
+  const noUsage = () => {};
+
+  it("returns the planned rows", async () => {
+    invokeTogetherText.mockResolvedValue('{"rows": ["Alpha", "Beta"]}');
+
+    const plan = await planSpreadsheetRows(
+      "notes",
+      "request",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(plan).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("leaves the rows to the reduce when the plan call fails", async () => {
+    invokeTogetherText.mockRejectedValue(new Error("bad gateway"));
+
+    const plan = await planSpreadsheetRows(
+      "notes",
+      "request",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(plan).toEqual([]);
+  });
+
+  it("skips the plan call when the reduce needs what is left of the budget", async () => {
+    const plan = await planSpreadsheetRows(
+      "notes",
+      "request",
+      createJobDeadline(220_000),
+      undefined,
+      noUsage
+    );
+
+    expect(plan).toEqual([]);
+    expect(invokeTogetherText).not.toHaveBeenCalled();
   });
 });
