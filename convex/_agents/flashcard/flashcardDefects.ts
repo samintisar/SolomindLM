@@ -6,12 +6,21 @@
  *   cards, written out elsewhere in the prompt.
  * - `blank_duplicates_neighbor`: substituting the answer into the blank repeats
  *   the word beside it ("Je ___ habite" → "j'" reads "Je j'habite").
+ * - `unfilled_template`: a side still holds a [bracketed placeholder] from the
+ *   card templates in the generation prompt, so the model copied a template.
  *
  * Language-agnostic: works on Unicode word tokens, never on topic vocabulary.
  * Kept free of `"use node"` so both Convex actions and evals can import it.
  */
 
-export type FlashcardDefect = "answer_in_front" | "blank_duplicates_neighbor";
+export type FlashcardDefect = "answer_in_front" | "blank_duplicates_neighbor" | "unfilled_template";
+
+/**
+ * Placeholders used by the card templates in the flashcard map prompt (`prompts.ts`): the
+ * one-word ones exactly, the phrase ones by their opening words.
+ */
+const TEMPLATE_PLACEHOLDER =
+  /\[(?:(?:concept|process|term|outcome|element|expression|actor|diagram type)\]|(?:the key term|the key details|the relevant lines|the role|the outcome|the source's definition|a key sentence|a plausible but wrong claim|the correct statement|situation built from|its elements|a one-line summary)\b[^\]]*\])/i;
 
 const BLANK = /_{2,}/g;
 const PARENTHETICAL = /\(([^()]*)\)/g;
@@ -77,6 +86,10 @@ function blankDuplicatesNeighbor(front: string, answer: string[]): boolean {
 }
 
 export function findFlashcardDefect(card: { front: string; back: string }): FlashcardDefect | null {
+  if (TEMPLATE_PLACEHOLDER.test(card.front) || TEMPLATE_PLACEHOLDER.test(card.back)) {
+    return "unfilled_template";
+  }
+
   const answer = coreAnswerTokens(card.back);
   if (answer.length === 0) return null;
 
