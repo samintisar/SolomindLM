@@ -46,6 +46,11 @@ import {
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
+import {
+  assertMapFailuresAcceptable,
+  mapChunkRetryDelayMs,
+  mapFailureRate,
+} from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("SpreadsheetGraph");
@@ -81,6 +86,8 @@ export type ProcessSpreadsheetMapChunkPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   chunkIndex: number;
+  /** 1-based; set when a failed chunk is re-run. */
+  attempt?: number;
   totalChunks: number;
   chunk: string;
   spreadsheetType: string;
@@ -413,6 +420,23 @@ export async function runProcessSpreadsheetMapChunkPhase(
       });
     }
   } catch (error) {
+    const retryDelayMs = mapChunkRetryDelayMs(args.attempt);
+    if (retryDelayMs !== null) {
+      console.warn(
+        `[spreadsheets] map chunk ${args.chunkIndex + 1} failed on attempt ${args.attempt ?? 1}, retrying in ${retryDelayMs}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await ctx.scheduler.runAfter(
+        retryDelayMs,
+        internal.studio.spreadsheets.job.processSpreadsheetMapChunk,
+        {
+          ...args,
+          attempt: (args.attempt ?? 1) + 1,
+        }
+      );
+      return;
+    }
+
     const errorMeta = createErrorMetadata(error, "map_processing");
 
     console.error(`[SpreadsheetJob] ${chunkId} FAILED:`, errorMeta.message);
@@ -550,6 +574,8 @@ export async function runFinalizeSpreadsheetPhase(
     console.log(
       `[SpreadsheetJob] Finalization: ${allOutputs.length} outputs collected, ${failedCount.count} failed chunks`
     );
+
+    assertMapFailuresAcceptable(Object.keys(mapResults).length, failedCount.count);
 
     if (allOutputs.length === 0) {
       throw new Error("No successful outputs generated from any chunk");
@@ -700,6 +726,7 @@ export async function runFinalizeSpreadsheetPhase(
       outputLength: finalOutput.length,
       mapSuccess: Object.keys(mapResults).length - failedCount.count,
       mapFailed: failedCount.count,
+      mapFailureRate: mapFailureRate(Object.keys(mapResults).length, failedCount.count),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "finalization");
