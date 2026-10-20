@@ -8,7 +8,12 @@
  * Deliberately not listed, because viewers may call them: forkPublic, getSignedUrl,
  * getSourceSuggestions, generateSourceGuide (fills a shared cache on the source; charged to the
  * caller's own daily limit), createConversation / sendMessageOptimistic / releaseChatGeneration
- * (the viewer's own private thread), transcribeChatAudio (the viewer's own recording).
+ * (the viewer's own private thread), transcribeChatAudio (the viewer's own recording), the
+ * practice calls (flashcards.submitCardReview / updatePreferences, quizzes.submitAnswer,
+ * writtenQuestions.saveUserAnswerDraft, writtenQuestions.grading.submitAndGrade,
+ * practice.setLastViewedIndex / resetAnswers), which write only to the viewer's own
+ * studioProgress (tested below, in studio/viewerPracticeProgress.test.ts and in
+ * studio/writtenQuestions/grading.test.ts).
  *
  * Not listed because they take no notebook, source or studio id: generateUploadUrl, resolveDoi,
  * parseBibliography, redeemCollaborateLink / forkNotebookFromToken (need a token the owner made),
@@ -34,6 +39,7 @@ preloadModules(modules, [
   "./documents/index.ts",
   "./studio/scheduling/reports.ts",
   "./studio/writtenQuestions/grading.ts",
+  "./studio/practice.ts",
 ]);
 preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 
@@ -623,16 +629,7 @@ const cases: Case[] = [
       }),
   ],
 
-  // Practice on the owner's rows
-  [
-    "flashcards.submitCardReview",
-    (s) =>
-      s.asViewer.mutation(api.studio.flashcards.index.submitCardReview, {
-        id: s.flashcardId,
-        cardIndex: 0,
-        rating: "good",
-      }),
-  ],
+  // Card edits on the owner's deck
   [
     "flashcards.updateCard",
     (s) =>
@@ -657,41 +654,6 @@ const cases: Case[] = [
       s.asViewer.mutation(api.studio.flashcards.index.deleteCard, {
         id: s.flashcardId,
         cardIndex: 0,
-      }),
-  ],
-  [
-    "flashcards.updatePreferences",
-    (s) =>
-      s.asViewer.mutation(api.studio.flashcards.index.updatePreferences, {
-        id: s.flashcardId,
-        showMastered: true,
-      }),
-  ],
-  [
-    "quizzes.submitAnswer",
-    (s) =>
-      s.asViewer.mutation(api.studio.quizzes.index.submitAnswer, {
-        id: s.quizId,
-        questionIndex: 0,
-        selectedOption: 1,
-      }),
-  ],
-  [
-    "writtenQuestions.saveUserAnswerDraft",
-    (s) =>
-      s.asViewer.mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
-        id: s.writtenId,
-        questionId: "q1",
-        answer: "x",
-      }),
-  ],
-  [
-    "writtenQuestions.submitAndGrade",
-    (s) =>
-      s.asViewer.action(api.studio.writtenQuestions.grading.submitAndGrade, {
-        writtenQuestionsId: s.writtenId,
-        questionId: "q1",
-        answer: "x",
       }),
   ],
 
@@ -781,5 +743,70 @@ describe("a public notebook's viewer can't write to it", () => {
     expect(after.flashcard?.metadata).toBeUndefined();
     expect(after.messages.map((m) => m.content)).toEqual(["Owner's question"]);
     expect(after.notebookDocuments).toHaveLength(1);
+  });
+});
+
+describe("a public notebook's viewer practises on their own progress", () => {
+  test("practice calls leave the owner's rows untouched", async () => {
+    const s = await seed();
+    await s.asViewer.mutation(api.studio.flashcards.index.submitCardReview, {
+      id: s.flashcardId,
+      cardIndex: 0,
+      rating: "good",
+    });
+    await s.asViewer.mutation(api.studio.flashcards.index.updatePreferences, {
+      id: s.flashcardId,
+      showMastered: true,
+    });
+    await s.asViewer.mutation(api.studio.quizzes.index.submitAnswer, {
+      id: s.quizId,
+      questionIndex: 0,
+      selectedOption: 1,
+    });
+    await s.asViewer.mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: s.writtenId,
+      questionId: "q1",
+      answer: "x",
+    });
+    for (const [itemType, itemId] of [
+      ["flashcards", s.flashcardId],
+      ["quizzes", s.quizId],
+      ["writtenQuestions", s.writtenId],
+    ] as const) {
+      await s.asViewer.mutation(api.studio.practice.setLastViewedIndex, {
+        itemType,
+        itemId,
+        index: 1,
+      });
+    }
+    await s.asViewer.mutation(api.studio.practice.resetAnswers, {
+      itemType: "quizzes",
+      itemId: s.quizId,
+    });
+    await s.asViewer.mutation(api.studio.practice.resetAnswers, {
+      itemType: "writtenQuestions",
+      itemId: s.writtenId,
+    });
+
+    const after = await s.t.run(async (ctx) => ({
+      flashcard: await ctx.db.get(s.flashcardId),
+      quiz: await ctx.db.get(s.quizId),
+      written: await ctx.db.get(s.writtenId),
+      progress: await ctx.db
+        .query("studioProgress")
+        .withIndex("by_user_and_notebook", (q) =>
+          q.eq("userId", s.viewer).eq("notebookId", s.notebookId)
+        )
+        .collect(),
+    }));
+    expect(after.flashcard?.cardsData).toEqual([{ front: "Q", back: "A" }]);
+    for (const row of [after.flashcard, after.quiz, after.written]) {
+      expect(row?.metadata).toBeUndefined();
+    }
+    expect(after.progress.map((p) => p.itemType).sort()).toEqual([
+      "flashcards",
+      "quizzes",
+      "writtenQuestions",
+    ]);
   });
 });
