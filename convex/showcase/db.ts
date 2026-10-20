@@ -1018,6 +1018,29 @@ export const publishShowcaseNotebook = internalMutation({
 });
 
 /**
+ * Deletes up to `limit` chunks of one of the owner's showcase sources and returns how many it
+ * deleted. A large source's chunks (with embeddings) exceed one mutation's read limit, so the
+ * app's delete fails on it; call this until it returns 0, then delete the source in the app.
+ */
+export const deleteShowcaseDocumentChunks = internalMutation({
+  args: { ownerEmail: v.string(), documentId: v.id("documents"), limit: v.optional(v.number()) },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const owner = await ownerByEmail(ctx.db, args.ownerEmail);
+    const document = await ctx.db.get("documents", args.documentId);
+    if (!document || document.userId !== owner._id) {
+      throw new Error("Not one of the owner's documents");
+    }
+    const chunks = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+      .take(Math.min(args.limit ?? 100, 200));
+    for (const chunk of chunks) await ctx.db.delete(chunk._id);
+    return chunks.length;
+  },
+});
+
+/**
  * Clears the owner's unfinished literature review (e.g. one stuck waiting for columns it never
  * suggested), so the next seed run starts it again. A finished review is never touched.
  */
