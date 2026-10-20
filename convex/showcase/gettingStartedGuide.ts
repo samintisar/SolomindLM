@@ -40,7 +40,18 @@ Studio turns your selected sources into:
 - Infographics that sum up your sources in one image.
 - Spreadsheets that pull structured tables out of your sources: data tables, comparisons, timelines, financial summaries, or your own layout.
 
-Most tools let you set a count, a difficulty or a focus before you generate. The Prompt Library holds ready-made prompts for each tool, from you and from other users: pick one in the Create dialog, or save your own prompt to reuse in another notebook.
+What you can set before you generate depends on the tool:
+
+- Reports: the format, plus your own instructions.
+- Flashcards: the number of cards, the difficulty (easy, medium or hard) and a topic to focus on.
+- Quizzes: the number of questions, the difficulty and a focus.
+- Written questions: the number of questions, the difficulty, short-answer or essay, and a focus.
+- Mind maps: your own instructions for what to cover and how to organise it.
+- Audio overviews: the format, the length and a focus.
+- Infographics: your own instructions, the orientation (landscape, portrait or square), the visual style and the level of detail.
+- Spreadsheets: the kind of table, plus your own instructions.
+
+The Prompt Library holds ready-made prompts for each tool, from you and from other users: pick one in the Create dialog, or save your own prompt to reuse in another notebook.
 
 ## Practise in this notebook
 
