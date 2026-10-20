@@ -956,13 +956,9 @@ export const SHOWCASE_NOTEBOOKS: ShowcaseNotebook[] = [
         url: "https://www.youtube.com/watch?v=EycxYd5-Ylo",
         licence: YOUTUBE_CC_BY,
       },
-      {
-        kind: "youtube",
-        title:
-          "If Men Were Angels: Teaching the Constitution with the Federalist Papers (Teach Democracy)",
-        url: "https://www.youtube.com/watch?v=cAwTVBcn9lk",
-        licence: YOUTUBE_CC_BY,
-      },
+      // "If Men Were Angels" (Teach Democracy, cAwTVBcn9lk) was dropped on 2026-10-20: a talk on
+      // teaching the Constitution. Any essay-writing prompt matched it so closely that the topic
+      // filter kept it alone, and the essays came out about classroom role-play.
       {
         kind: "youtube",
         title: "AP US Government: Foundational Documents, Federalist 10 (Dave Thomer)",
