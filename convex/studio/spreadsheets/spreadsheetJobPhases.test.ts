@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createJobDeadline } from "../_job/jobDeadline";
-import { planSpreadsheetRows, recursiveCollapse } from "./spreadsheetJobPhases";
+import {
+  planSpreadsheetRows,
+  recursiveCollapse,
+  writeSpreadsheetTable,
+} from "./spreadsheetJobPhases";
 
 const { invokeTogetherText } = vi.hoisted(() => ({ invokeTogetherText: vi.fn() }));
 
@@ -108,5 +112,60 @@ describe("planSpreadsheetRows", () => {
 
     expect(plan).toEqual([]);
     expect(invokeTogetherText).not.toHaveBeenCalled();
+  });
+});
+
+describe("writeSpreadsheetTable", () => {
+  const noUsage = () => {};
+  const good = `"Paper","Year"
+"ReAct","2022"`;
+
+  it("returns a well-formed table from the first reduce", async () => {
+    invokeTogetherText.mockResolvedValue(good);
+
+    const csv = await writeSpreadsheetTable(
+      "prompt",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe(good);
+    expect(invokeTogetherText).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes a malformed table once more, naming what was wrong", async () => {
+    invokeTogetherText.mockResolvedValueOnce(`"Kalai et al., 2025"`).mockResolvedValueOnce(good);
+
+    const csv = await writeSpreadsheetTable(
+      "prompt",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe(good);
+    expect(invokeTogetherText).toHaveBeenCalledTimes(2);
+    expect(invokeTogetherText.mock.calls[1][0].userPrompt).toContain(
+      "no header row with at least two columns"
+    );
+  });
+
+  it("fails rather than save a table that is malformed twice", async () => {
+    invokeTogetherText.mockResolvedValue(`"Paper","Year"`);
+
+    await expect(
+      writeSpreadsheetTable("prompt", createJobDeadline(540_000), undefined, noUsage)
+    ).rejects.toThrow("The spreadsheet came out malformed (no data rows).");
+    expect(invokeTogetherText).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails without a second reduce when the budget is nearly spent", async () => {
+    invokeTogetherText.mockResolvedValue(`"Paper","Year"`);
+
+    await expect(
+      writeSpreadsheetTable("prompt", createJobDeadline(80_000), undefined, noUsage)
+    ).rejects.toThrow("malformed");
+    expect(invokeTogetherText).toHaveBeenCalledTimes(1);
   });
 });

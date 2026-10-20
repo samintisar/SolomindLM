@@ -18,7 +18,11 @@ import {
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { cleanCsvOutput, withoutPipelineWording } from "../../_agents/spreadsheet/csvHelpers";
+import {
+  checkCsvTable,
+  cleanCsvOutput,
+  withoutPipelineWording,
+} from "../../_agents/spreadsheet/csvHelpers";
 import { resolveSpreadsheetRequest } from "../../_agents/spreadsheet/presetRequests";
 import {
   COLLAPSE_PROMPT,
@@ -76,6 +80,8 @@ const CONFIG = {
   ROW_PLAN_TIMEOUT_MS: 90_000,
   ROW_PLAN_RESERVE_MS: 210_000, // left for the reduce and save after planning rows
   MIN_ROW_PLAN_CALL_MS: 20_000, // skip planning below this budget; the reduce picks rows itself
+  REDUCE_ATTEMPTS: 2, // a malformed table is written once more, then the job fails (#567)
+  MIN_REDUCE_RETRY_MS: 60_000, // no second reduce below this budget
 } as const;
 
 export type SpreadsheetGenerationPhaseArgs = {
@@ -651,32 +657,9 @@ export async function runFinalizeSpreadsheetPhase(
     console.log(`[SpreadsheetJob] Reduce prompt: ${prompt.length} chars`);
 
     const startTime = Date.now();
-    const rawContent = await invokeWithinBudget({
-      invoke: () =>
-        invokeTogetherText({
-          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-          userPrompt: prompt,
-          model: env.SPREADSHEET_LLM,
-          maxTokens: 32_000,
-          temperature: 0.5,
-          reasoningEnabled: true,
-          onUsage: (usage) => {
-            reduceUsage = addTokenUsage(reduceUsage, usage);
-          },
-        }),
-      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
-      phaseLabel: "SpreadsheetReduce",
+    let finalOutput = await writeSpreadsheetTable(prompt, deadline, language, (usage) => {
+      reduceUsage = addTokenUsage(reduceUsage, usage);
     });
-
-    let finalOutput = withoutPipelineWording(cleanCsvOutput(rawContent));
-
-    if (rawContent.length >= 31_000) {
-      console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
-      const lastNewline = finalOutput.lastIndexOf("\n");
-      if (lastNewline > 0) {
-        finalOutput = finalOutput.substring(0, lastNewline);
-      }
-    }
 
     const aligned = alignRowsToPlan(finalOutput, rowPlan);
     if (aligned.dropped.length > 0) {
@@ -775,6 +758,64 @@ export async function runFinalizeSpreadsheetPhase(
     });
 
     throw error;
+  }
+}
+
+// ============================================================
+// HELPER: Write the table
+// ============================================================
+
+/**
+ * Run the reduce and check its table before it is saved (#567): fields quoted back to back are
+ * split again, and a table still malformed (no header, no data rows, rows off the header's width)
+ * is written once more with the problems named. If that fails too, or there is no time for it,
+ * the job fails rather than save a broken table.
+ */
+export async function writeSpreadsheetTable(
+  prompt: string,
+  deadline: JobDeadline,
+  language: string | undefined,
+  onUsage: (usage: TokenUsage) => void
+): Promise<string> {
+  let userPrompt = prompt;
+  for (let attempt = 1; ; attempt++) {
+    const rawContent = await invokeWithinBudget({
+      invoke: () =>
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          userPrompt,
+          model: env.SPREADSHEET_LLM,
+          maxTokens: 32_000,
+          temperature: 0.5,
+          reasoningEnabled: true,
+          onUsage,
+        }),
+      timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+      phaseLabel: "SpreadsheetReduce",
+    });
+
+    let output = withoutPipelineWording(cleanCsvOutput(rawContent));
+    if (rawContent.length >= 31_000) {
+      console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
+      const lastNewline = output.lastIndexOf("\n");
+      if (lastNewline > 0) {
+        output = output.substring(0, lastNewline);
+      }
+    }
+
+    const { csv, problems } = checkCsvTable(output);
+    if (problems.length === 0) return csv;
+
+    const retryBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
+    console.warn(
+      `[SpreadsheetJob] Reduce attempt ${attempt} wrote a malformed table: ${problems.join("; ")}`
+    );
+    if (attempt >= CONFIG.REDUCE_ATTEMPTS || retryBudgetMs < CONFIG.MIN_REDUCE_RETRY_MS) {
+      throw new Error(`The spreadsheet came out malformed (${problems.join("; ")}).`);
+    }
+    userPrompt = `${prompt}
+
+Your previous table could not be saved: ${problems.join("; ")}. Write the whole table again as valid CSV: a header row, then one line per row, with a comma between every pair of fields and the header's number of fields in every row.`;
   }
 }
 

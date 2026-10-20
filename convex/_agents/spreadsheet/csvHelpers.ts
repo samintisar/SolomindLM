@@ -70,73 +70,64 @@ export function cleanCsvOutput(output: string): string {
 }
 
 /**
- * Validate CSV completeness.
- * Checks for header row and consistent column counts.
+ * A row the model wrote with its fields quoted back to back and no commas between them:
+ * `"Net Sales""$69,154""Revenue"` (#567). RFC 4180 reads that as one field with escaped quotes.
+ * Re-split it when it splits into exactly `width` fields; otherwise it may be a real quote.
  */
-export function validateTableCompleteness(
-  output: string,
-  spreadsheetType: string
-): {
-  isComplete: boolean;
-  missing: string[];
-} {
-  const missing: string[] = [];
-  const lines = output.trim().split("\n");
+function splitAdjacentQuotedFields(line: string, width: number): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('"') || !trimmed.endsWith('"') || trimmed.length < 2) return null;
+  const parts = trimmed.slice(1, -1).split('""');
+  return parts.length === width ? parts : null;
+}
 
-  if (lines.length < 2) {
-    missing.push("CSV has insufficient rows (need at least header + data)");
-    return { isComplete: false, missing };
+export type CsvTableCheck = {
+  /** The table, repaired where that was safe. */
+  csv: string;
+  /** Why the table can't be saved; empty when it can. */
+  problems: string[];
+};
+
+/**
+ * Check a reduce table before it is saved (#567), repairing what is safe to repair:
+ * - a row whose fields were quoted back to back with no commas is split again;
+ * - a row short by fewer than half the header's fields is padded with empty cells.
+ * Problems left: no header with at least two columns, no data rows, or rows whose field count
+ * still differs from the header's.
+ */
+export function checkCsvTable(csv: string): CsvTableCheck {
+  const lines = csv.split(/\r?\n/).filter((line) => line.trim() !== "");
+  const { rows, unterminatedQuote } = parseCsvDetailed(csv);
+  if (unterminatedQuote) {
+    return { csv, problems: ["a quoted field is never closed"] };
   }
-
-  // Check for CSV format (header should have commas)
-  if (!lines[0].includes(",")) {
-    missing.push("Header row does not contain commas (not valid CSV)");
+  if (rows.length === 0 || rows[0].length < 2) {
+    return { csv, problems: ["no header row with at least two columns"] };
   }
+  const width = rows[0].length;
+  // Re-split back-to-back fields. Only when no field spans lines, so rows and lines line up.
+  const repaired =
+    rows.length === lines.length
+      ? rows.map((row, i) =>
+          row.length === 1 && i > 0 ? (splitAdjacentQuotedFields(lines[i], width) ?? row) : row
+        )
+      : rows;
 
-  const headerCount = lines[0].split(",").length;
-
-  // Check sample rows for consistency (allow small variance for quoted commas)
-  const sampleIndices = [1, Math.floor(lines.length / 2), lines.length - 1];
-  for (const idx of sampleIndices) {
-    if (idx < lines.length && idx > 0) {
-      const rowCount = lines[idx].split(",").length;
-      // Allow small variance for quoted commas, but flag major discrepancies
-      if (Math.abs(rowCount - headerCount) > 2) {
-        missing.push(`Row ${idx + 1} has ${rowCount} columns but header has ${headerCount}`);
-      }
+  const problems: string[] = [];
+  const body = repaired.slice(1).map((row) => {
+    if (row.length < width && row.length * 2 > width) {
+      return [...row, ...Array<string>(width - row.length).fill("")];
     }
-  }
+    return row;
+  });
+  if (body.length === 0) problems.push("no data rows");
+  const ragged = body.filter((row) => row.length !== width).length;
+  if (ragged > 0)
+    problems.push(`${ragged} of ${body.length} rows don't have the header's ${width} fields`);
 
-  // Check for abrupt ending (last line should be complete)
-  const lastLine = lines[lines.length - 1] || "";
-  if (lastLine.length > 0 && lastLine.split(",").length < headerCount - 2) {
-    missing.push("Last row appears incomplete (truncated output)");
-  }
-
-  // Type-specific validation
-  if (spreadsheetType === "financial_summary") {
-    // Check for currency symbols or numbers
-    const hasCurrency =
-      /\$[\d,]+\.?\d*/.test(output) || /[\d,]+\.?\d*\s*(USD|EUR|GBP)/.test(output);
-    if (!hasCurrency) {
-      missing.push("Financial CSV should contain currency values");
-    }
-  }
-
-  if (spreadsheetType === "timeline") {
-    // Check for dates
-    const hasDates =
-      /\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(output) ||
-      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/i.test(
-        output
-      );
-    if (!hasDates) {
-      missing.push("Timeline CSV should contain dates");
-    }
-  }
-
+  const changed = body.some((row, i) => row !== rows[i + 1]);
   return {
-    isComplete: missing.length === 0,
-    missing,
+    csv: changed ? serializeCsv([repaired[0], ...body], { quoteAll: true }) : csv,
+    problems,
   };
 }
