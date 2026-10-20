@@ -2,6 +2,7 @@ import { PersistentTextStreaming, type StreamId } from "@convex-dev/persistent-t
 import { components } from "../_generated/api";
 import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { isDocumentFileUsedElsewhere } from "../documents/internal";
 import { deleteSynthesisChunkFiles } from "../studio/jobMutations/audio";
 
 /**
@@ -129,6 +130,35 @@ function direct<R extends Row>(
 }
 
 /**
+ * The user's flashcard sets, quizzes or written-question sets, each after every viewer's practice
+ * progress on it: an item the user made in someone else's notebook outlives that notebook's
+ * clean-up, so its viewers' rows would otherwise be orphaned.
+ */
+function practiceItems<R extends Row>(
+  table: "flashcards" | "quizzes" | "writtenQuestions",
+  take: (ctx: MutationCtx, userId: Id<"users">, n: number) => Promise<R[]>
+): PurgeStep {
+  return {
+    tables: [table, "studioProgress"],
+    run: (ctx, userId, budget) =>
+      drainWithChildren(
+        ctx,
+        budget,
+        (n) => take(ctx, userId, n),
+        (item) => [
+          {
+            take: (n) =>
+              ctx.db
+                .query("studioProgress")
+                .withIndex("by_item", (q) => q.eq("itemId", item._id))
+                .take(n),
+          },
+        ]
+      ),
+  };
+}
+
+/**
  * Everything a user owns, in deletion order. Notebook deletion doesn't cascade today,
  * so content is found by owner rather than through notebooks.
  */
@@ -154,7 +184,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
           },
         ],
         async (doc) => {
-          if (doc.storageId) await deleteStoredFile(ctx, doc.storageId);
+          // Forks share the source's file; keep it while another document still uses it.
+          if (
+            doc.storageId &&
+            !(await isDocumentFileUsedElsewhere(ctx, doc.storageId, [doc._id]))
+          ) {
+            await deleteStoredFile(ctx, doc.storageId);
+          }
         }
       ),
   },
@@ -328,7 +364,8 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       ),
   },
   {
-    tables: ["notebooks", "notebookShareLinks", "notebookMembers"],
+    // Viewers' practice progress on the user's public notebooks goes with the notebooks.
+    tables: ["notebooks", "notebookShareLinks", "notebookMembers", "studioProgress"],
     run: (ctx, userId, budget) =>
       drainWithChildren(
         ctx,
@@ -350,6 +387,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             take: (n) =>
               ctx.db
                 .query("notebookMembers")
+                .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
+                .take(n),
+          },
+          {
+            take: (n) =>
+              ctx.db
+                .query("studioProgress")
                 .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
                 .take(n),
           },
@@ -385,6 +429,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
     ctx.db
       .query("notebookMembers")
       .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(n)
+  ),
+  // Practice progress on other people's public notebooks.
+  direct("studioProgress", (ctx, userId, n) =>
+    ctx.db
+      .query("studioProgress")
+      .withIndex("by_user_and_notebook", (q) => q.eq("userId", userId))
       .take(n)
   ),
   // The user's saves, ratings and reports of other people's prompts.
@@ -430,7 +481,7 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(n)
   ),
-  direct("flashcards", (ctx, userId, n) =>
+  practiceItems("flashcards", (ctx, userId, n) =>
     ctx.db
       .query("flashcards")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -442,7 +493,7 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(n)
   ),
-  direct("quizzes", (ctx, userId, n) =>
+  practiceItems("quizzes", (ctx, userId, n) =>
     ctx.db
       .query("quizzes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -460,7 +511,7 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(n)
   ),
-  direct("writtenQuestions", (ctx, userId, n) =>
+  practiceItems("writtenQuestions", (ctx, userId, n) =>
     ctx.db
       .query("writtenQuestions")
       .withIndex("by_user", (q) => q.eq("userId", userId))

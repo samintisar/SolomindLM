@@ -152,7 +152,7 @@ describe("assertCanReadConversation", () => {
 
     await expect(
       t.run(async (ctx) => assertCanReadConversation(ctx, conversationId, otherId))
-    ).rejects.toThrow("Notebook not found");
+    ).rejects.toThrow("Conversation not found");
   });
 
   test("throws for non-existent conversation", async () => {
@@ -194,16 +194,16 @@ describe("assertCanEditConversation", () => {
     expect(result._id).toBe(conversationId);
   });
 
-  test("throws for notebook viewer", async () => {
+  test("throws for a stranger on a private notebook", async () => {
     const t = convexTest(schema, modules);
     const ownerId = await seedUser(t);
-    const viewerId = await seedUser(t);
+    const strangerId = await seedUser(t);
     const notebookId = await seedNotebook(t, ownerId);
     const conversationId = await seedConversation(t, notebookId, ownerId);
 
     await expect(
-      t.run(async (ctx) => assertCanEditConversation(ctx, conversationId, viewerId))
-    ).rejects.toThrow("Notebook not found");
+      t.run(async (ctx) => assertCanEditConversation(ctx, conversationId, strangerId))
+    ).rejects.toThrow("Conversation not found");
   });
 
   test("throws for non-member", async () => {
@@ -215,7 +215,7 @@ describe("assertCanEditConversation", () => {
 
     await expect(
       t.run(async (ctx) => assertCanEditConversation(ctx, conversationId, otherId))
-    ).rejects.toThrow("Notebook not found");
+    ).rejects.toThrow("Conversation not found");
   });
 
   test("throws for non-existent conversation", async () => {
@@ -227,5 +227,70 @@ describe("assertCanEditConversation", () => {
         assertCanEditConversation(ctx, "non-existent" as Id<"conversations">, userId)
       )
     ).rejects.toThrow("Conversation not found");
+  });
+});
+
+describe("public notebook conversations", () => {
+  async function setup() {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const ids = await t.run(async (ctx) => {
+      const owner = await ctx.db.insert("users", { name: "Owner" });
+      const viewer = await ctx.db.insert("users", { name: "Viewer" });
+      const otherViewer = await ctx.db.insert("users", { name: "Other" });
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId: owner,
+        title: "Public",
+        isPublic: true,
+        publishedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const ownerConv = await ctx.db.insert("conversations", {
+        userId: owner,
+        notebookId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const viewerConv = await ctx.db.insert("conversations", {
+        userId: viewer,
+        notebookId,
+        isPrivate: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { owner, viewer, otherViewer, notebookId, ownerConv, viewerConv };
+    });
+    return { t, ...ids };
+  }
+
+  test("a viewer cannot read the owner's conversation", async () => {
+    const { t, viewer, ownerConv } = await setup();
+    expect(await t.run((ctx) => getConversationIfReadable(ctx, ownerConv, viewer))).toBeNull();
+  });
+
+  test("the owner cannot read a viewer's private conversation", async () => {
+    const { t, owner, viewerConv } = await setup();
+    expect(await t.run((ctx) => getConversationIfReadable(ctx, viewerConv, owner))).toBeNull();
+  });
+
+  test("another viewer cannot read it either", async () => {
+    const { t, otherViewer, viewerConv } = await setup();
+    await expect(
+      t.run((ctx) => assertCanReadConversation(ctx, viewerConv, otherViewer))
+    ).rejects.toThrow("Conversation not found");
+  });
+
+  test("a viewer can edit their own private conversation", async () => {
+    const { t, viewer, viewerConv } = await setup();
+    const conv = await t.run((ctx) => assertCanEditConversation(ctx, viewerConv, viewer));
+    expect(conv._id).toBe(viewerConv);
+  });
+
+  test("a viewer cannot edit the owner's conversation", async () => {
+    const { t, viewer, ownerConv } = await setup();
+    await expect(t.run((ctx) => assertCanEditConversation(ctx, ownerConv, viewer))).rejects.toThrow(
+      "Conversation not found"
+    );
   });
 });

@@ -1,24 +1,27 @@
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
 import { restart, sendEvent, type WorkflowId } from "@convex-dev/workflow";
 import type { FunctionReference } from "convex/server";
-import { ConvexError, v } from "convex/values";
+import { ConvexError, type Infer, v } from "convex/values";
 import { workflow } from "../_agents/research/DeepResearchGraph.js";
 import { components, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import {
   internalAction,
   internalMutation,
   internalQuery,
+  type MutationCtx,
   mutation,
+  type QueryCtx,
   query,
 } from "../_generated/server";
+import { getConversationIfReadable } from "../_lib/conversationAccess";
 import {
   assertConcurrentRunCapacity,
   assertRetryAllowed,
   isProUser,
   takeFeatureRun,
 } from "../_lib/limits";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
+import { assertCanEditNotebook, getNotebookAccess } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
 import { scheduleResearchRunCompletionPush } from "../push/notify";
 import { normalizeResearchTitle } from "./titles";
@@ -29,6 +32,43 @@ export { createResearchArtifacts } from "./artifacts";
 // QUERIES
 // ============================================================
 
+/**
+ * A plan or run is readable when the user can see the conversation it belongs to, so a viewer of
+ * a public notebook never reads research from someone else's thread.
+ */
+async function canReadResearch(
+  ctx: QueryCtx,
+  row: { notebookId: Id<"notebooks">; conversationId: Id<"conversations"> },
+  userId: Id<"users">
+): Promise<boolean> {
+  const conversation = await getConversationIfReadable(ctx, row.conversationId, userId);
+  return conversation !== null && conversation.notebookId === row.notebookId;
+}
+
+/**
+ * Steps are keyed by a run, plan or literature review session id. Each must belong to
+ * `notebookId` and be visible to the user. Review sessions have no conversation; like the session
+ * itself (`canReadReviewSession` in `studio/literature_tables`), only their creator reads them,
+ * and only while they own or edit the notebook.
+ */
+async function canReadResearchSteps(
+  ctx: QueryCtx,
+  researchId: string,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">
+): Promise<boolean> {
+  const runId = ctx.db.normalizeId("researchRuns", researchId);
+  const planId = ctx.db.normalizeId("researchPlans", researchId);
+  const row = runId ? await ctx.db.get(runId) : planId ? await ctx.db.get(planId) : null;
+  if (row) return row.notebookId === notebookId && (await canReadResearch(ctx, row, userId));
+
+  const sessionId = ctx.db.normalizeId("literatureReviewSessions", researchId);
+  const session = sessionId ? await ctx.db.get(sessionId) : null;
+  if (!session || session.notebookId !== notebookId || session.userId !== userId) return false;
+  const access = await getNotebookAccess(ctx, notebookId, userId);
+  return access === "owner" || access === "editor";
+}
+
 export const getPlan = query({
   args: { planId: v.id("researchPlans") },
   returns: v.union(v.null(), v.any()),
@@ -37,11 +77,7 @@ export const getPlan = query({
     if (!userId) return null;
     const plan = await ctx.db.get(args.planId);
     if (!plan) return null;
-    try {
-      await assertCanReadNotebook(ctx, plan.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!(await canReadResearch(ctx, plan, userId))) return null;
     return plan;
   },
 });
@@ -55,11 +91,7 @@ export const getLatestRunForPlan = query({
     if (!userId) return null;
     const plan = await ctx.db.get(args.planId);
     if (!plan) return null;
-    try {
-      await assertCanReadNotebook(ctx, plan.notebookId, userId);
-    } catch {
-      return null;
-    }
+    if (!(await canReadResearch(ctx, plan, userId))) return null;
     const run = await ctx.db
       .query("researchRuns")
       .withIndex("by_planId_and_createdAt", (q) => q.eq("planId", args.planId))
@@ -78,11 +110,7 @@ export const getResearchSteps = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    try {
-      await assertCanReadNotebook(ctx, args.notebookId, userId);
-    } catch {
-      return [];
-    }
+    if (!(await canReadResearchSteps(ctx, args.researchId, args.notebookId, userId))) return [];
     return await ctx.db
       .query("researchSteps")
       .withIndex("by_research", (q) => q.eq("researchId", args.researchId))
@@ -99,11 +127,7 @@ export const getRunEvidence = query({
     if (!userId) return [];
     const run = await ctx.db.get(args.runId);
     if (!run) return [];
-    try {
-      await assertCanReadNotebook(ctx, run.notebookId, userId);
-    } catch {
-      return [];
-    }
+    if (!(await canReadResearch(ctx, run, userId))) return [];
     return await ctx.db
       .query("researchEvidence")
       .withIndex("by_run", (q) => q.eq("runId", args.runId))
@@ -211,6 +235,33 @@ export const createResearchPlan = internalMutation({
   },
 });
 
+type SubQuestionEdit = {
+  id: string;
+  question: string;
+  searchQueries: string[];
+  sourceChannels: string[];
+};
+
+/** Approves the plan (with the user's edits, if any) and resumes its workflow. Callers check access. */
+export async function approveResearchPlanAndResume(
+  ctx: MutationCtx,
+  plan: Doc<"researchPlans">,
+  modifiedSubQuestions?: SubQuestionEdit[]
+): Promise<void> {
+  const subQuestions = modifiedSubQuestions
+    ? modifiedSubQuestions.map((sq) => ({ ...sq, status: "pending" as const }))
+    : plan.subQuestions;
+  await ctx.db.patch(plan._id, { subQuestions, status: "approved", updatedAt: Date.now() });
+  // Resume the workflow if this plan has an associated workflow
+  if (plan.workflowId) {
+    await sendEvent(ctx, components.workflow, {
+      name: "planApproved",
+      workflowId: plan.workflowId as WorkflowId,
+      value: { planId: plan._id, modifiedSubQuestions },
+    });
+  }
+}
+
 export const approveResearchPlan = mutation({
   args: {
     planId: v.id("researchPlans"),
@@ -237,28 +288,7 @@ export const approveResearchPlan = mutation({
     }
     await assertCanEditNotebook(ctx, plan.notebookId, userId);
 
-    const subQuestions = args.modifiedSubQuestions
-      ? args.modifiedSubQuestions.map((sq) => ({ ...sq, status: "pending" as const }))
-      : plan.subQuestions;
-
-    await ctx.db.patch(args.planId, {
-      subQuestions,
-      status: "approved",
-      updatedAt: Date.now(),
-    });
-
-    // Resume the workflow if this plan has an associated workflow
-    if (plan.workflowId) {
-      await sendEvent(ctx, components.workflow, {
-        name: "planApproved",
-        workflowId: plan.workflowId as WorkflowId,
-        value: {
-          planId: args.planId,
-          modifiedSubQuestions: args.modifiedSubQuestions,
-        },
-      });
-    }
-
+    await approveResearchPlanAndResume(ctx, plan, args.modifiedSubQuestions);
     return args.planId;
   },
 });
@@ -513,33 +543,112 @@ export const setPlanResearchTitle = internalMutation({
   },
 });
 
+/** Where deep research looks; the same shape the workflow takes. */
+const sourcePolicyValidator = v.object({
+  channels: v.array(v.string()),
+  domainAllowlist: v.optional(v.array(v.string())),
+  dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
+  maxResultsPerChannel: v.optional(v.number()),
+  credibilityTier: v.optional(v.string()),
+  requirePrimarySources: v.optional(v.boolean()),
+  recencyDays: v.optional(v.number()),
+  dedupeStrategy: v.optional(v.string()),
+  academicFilters: v.optional(
+    v.object({
+      publicationYearFrom: v.optional(v.number()),
+      publicationYearTo: v.optional(v.number()),
+      minCitations: v.optional(v.number()),
+      openAccessOnly: v.optional(v.boolean()),
+      hasFullText: v.optional(v.boolean()),
+      fieldOfStudyTerms: v.optional(v.array(v.string())),
+    })
+  ),
+});
+
+type SourcePolicy = Infer<typeof sourcePolicyValidator>;
+
+/**
+ * Creates the chat messages and plan row and starts the deep-research workflow. Callers check
+ * edit access and run limits first (`startDeepResearch`; the showcase seed is internal).
+ */
+export async function startDeepResearchRun(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: {
+    notebookId: Id<"notebooks">;
+    conversationId?: Id<"conversations">;
+    query: string;
+    sourcePolicy?: SourcePolicy;
+    smartModel?: string;
+  }
+): Promise<{ planId: Id<"researchPlans">; conversationId: Id<"conversations"> }> {
+  // Ensure conversation exists
+  const conversationId: Id<"conversations"> = await ctx.runMutation(
+    internal.chat.index.ensureConversation,
+    {
+      notebookId: args.notebookId,
+      userId,
+      conversationId: args.conversationId,
+    }
+  );
+
+  // Insert user message
+  const userMessageId: Id<"messages"> = await ctx.runMutation(internal.chat.index.addMessage, {
+    conversationId,
+    role: "user",
+    content: args.query,
+  });
+
+  // Insert assistant placeholder
+  const assistantMessageId: Id<"messages"> = await ctx.runMutation(internal.chat.index.addMessage, {
+    conversationId,
+    role: "assistant",
+    content: `Planning deep research...`,
+    metadata: { isDeepResearch: true, status: "planning" as const },
+  });
+
+  // Create placeholder plan row
+  const planId: Id<"researchPlans"> = await ctx.db.insert("researchPlans", {
+    userId,
+    notebookId: args.notebookId,
+    conversationId,
+    messageId: userMessageId,
+    query: args.query,
+    subQuestions: [],
+    sourcePolicy: args.sourcePolicy ?? { channels: ["notebook", "web"] },
+    status: "planning" as const,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+
+  // Start workflow
+  const workflowId: string = await workflow.start(
+    ctx,
+    internal._agents.research.DeepResearchGraph.deepResearchWorkflow,
+    {
+      query: args.query,
+      notebookId: args.notebookId,
+      userId,
+      conversationId,
+      assistantMessageId,
+      planId,
+      sourcePolicy: args.sourcePolicy ?? { channels: ["notebook", "web"] },
+      smartModel: args.smartModel,
+    }
+  );
+
+  // Patch plan with workflowId
+  await ctx.db.patch(planId, { workflowId, updatedAt: Date.now() });
+
+  return { planId, conversationId };
+}
+
 export const startDeepResearch = mutation({
   args: {
     notebookId: v.id("notebooks"),
     conversationId: v.optional(v.id("conversations")),
     query: v.string(),
-    sourcePolicy: v.optional(
-      v.object({
-        channels: v.array(v.string()),
-        domainAllowlist: v.optional(v.array(v.string())),
-        dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
-        maxResultsPerChannel: v.optional(v.number()),
-        credibilityTier: v.optional(v.string()),
-        requirePrimarySources: v.optional(v.boolean()),
-        recencyDays: v.optional(v.number()),
-        dedupeStrategy: v.optional(v.string()),
-        academicFilters: v.optional(
-          v.object({
-            publicationYearFrom: v.optional(v.number()),
-            publicationYearTo: v.optional(v.number()),
-            minCitations: v.optional(v.number()),
-            openAccessOnly: v.optional(v.boolean()),
-            hasFullText: v.optional(v.boolean()),
-            fieldOfStudyTerms: v.optional(v.array(v.string())),
-          })
-        ),
-      })
-    ),
+    sourcePolicy: v.optional(sourcePolicyValidator),
     smartModel: v.optional(v.string()),
   },
   returns: v.object({
@@ -559,68 +668,7 @@ export const startDeepResearch = mutation({
     const { isPro } = await takeFeatureRun(ctx, userId, "deepResearch");
     await assertConcurrentRunCapacity(ctx, userId, "deepResearch", isPro);
 
-    // Ensure conversation exists
-    const conversationId: Id<"conversations"> = await ctx.runMutation(
-      internal.chat.index.ensureConversation,
-      {
-        notebookId: args.notebookId,
-        userId,
-        conversationId: args.conversationId,
-      }
-    );
-
-    // Insert user message
-    const userMessageId: Id<"messages"> = await ctx.runMutation(internal.chat.index.addMessage, {
-      conversationId,
-      role: "user",
-      content: args.query,
-    });
-
-    // Insert assistant placeholder
-    const assistantMessageId: Id<"messages"> = await ctx.runMutation(
-      internal.chat.index.addMessage,
-      {
-        conversationId,
-        role: "assistant",
-        content: `Planning deep research...`,
-        metadata: { isDeepResearch: true, status: "planning" as const },
-      }
-    );
-
-    // Create placeholder plan row
-    const planId: Id<"researchPlans"> = await ctx.db.insert("researchPlans", {
-      userId,
-      notebookId: args.notebookId,
-      conversationId,
-      messageId: userMessageId,
-      query: args.query,
-      subQuestions: [],
-      sourcePolicy: args.sourcePolicy ?? { channels: ["notebook", "web"] },
-      status: "planning" as const,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-
-    // Start workflow
-    const workflowId: string = await workflow.start(
-      ctx,
-      internal._agents.research.DeepResearchGraph.deepResearchWorkflow,
-      {
-        query: args.query,
-        notebookId: args.notebookId,
-        userId,
-        conversationId,
-        assistantMessageId,
-        planId,
-        sourcePolicy: args.sourcePolicy ?? { channels: ["notebook", "web"] },
-        smartModel: args.smartModel,
-      }
-    );
-
-    // Patch plan with workflowId
-    await ctx.db.patch(planId, { workflowId, updatedAt: Date.now() });
-
-    return { planId, conversationId };
+    return await startDeepResearchRun(ctx, userId, args);
   },
 });
 

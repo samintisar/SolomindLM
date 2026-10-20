@@ -1,10 +1,12 @@
 import type { Doc } from "@convex/_generated/dataModel";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ToastProvider } from "@/shared/contexts/ToastContext";
 import type { Message } from "@/shared/types/index";
 import type { useChatStreamingContext } from "../useChatStreaming";
+import type { ChatInput } from "./ChatInput";
 import { ChatPanel } from "./ChatPanel";
 
 const conversations = [
@@ -56,8 +58,12 @@ vi.mock("../services/researchApi", () => ({
   useRejectResearchPlan: () => vi.fn(),
 }));
 vi.mock("../services/userNotesApi", () => ({ useSaveChat: () => vi.fn() }));
+let chatInputProps: Partial<ComponentProps<typeof ChatInput>> = {};
 vi.mock("./ChatInput", () => ({
-  ChatInput: () => <div data-onboarding="chat-input" />,
+  ChatInput: (props: ComponentProps<typeof ChatInput>) => {
+    chatInputProps = props;
+    return <div data-onboarding="chat-input" />;
+  },
 }));
 vi.mock("./ChatEmptyState", () => ({ ChatEmptyState: () => null }));
 vi.mock("./ConfigureChatModal", () => ({
@@ -68,7 +74,7 @@ vi.mock("./MessageBubble", () => ({ MessageBubble: () => null }));
 vi.mock("./ResearchPlanMessage", () => ({ ResearchPlanMessage: () => null }));
 vi.mock("./LiteratureReviewMessage", () => ({ LiteratureReviewMessage: () => null }));
 
-function setup() {
+function setup({ readOnly = false }: { readOnly?: boolean } = {}) {
   render(
     <ToastProvider>
       <ChatPanel
@@ -77,6 +83,7 @@ function setup() {
         toggleLeft={vi.fn()}
         toggleRight={vi.fn()}
         notebookId={"n1" as never}
+        readOnly={readOnly}
       />
     </ToastProvider>
   );
@@ -97,6 +104,27 @@ beforeEach(() => {
 });
 
 describe("ChatPanel header", () => {
+  test("offers chat settings, save to note and every composer mode to editors", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "Chat options" }));
+    expect(await screen.findByRole("menuitem", { name: "Configure chat" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Save to note" })).toBeInTheDocument();
+    expect(chatInputProps.onModeChange).toBeTypeOf("function");
+    expect(chatInputProps.onModelChange).toBeTypeOf("function");
+  });
+
+  test("read-only keeps export and pin but drops settings, notes and research modes", async () => {
+    setup({ readOnly: true });
+    await userEvent.click(screen.getByRole("button", { name: "Chat options" }));
+    expect(await screen.findByRole("menuitem", { name: "Export chat" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Pin chat|Unpin chat/ })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Configure chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Save to note" })).not.toBeInTheDocument();
+    expect(chatInputProps.mode).toBe("chat");
+    expect(chatInputProps.onModeChange).toBeUndefined();
+    expect(chatInputProps.onModelChange).toBeUndefined();
+  });
+
   test("icon buttons are labelled by aria-label, without native titles", () => {
     setup();
     for (const name of ["Open Sources", "Open Studio", "Thread history", "Chat options"]) {

@@ -269,11 +269,19 @@ export function useDocumentContent(documentId: string | null) {
 }
 
 /**
- * Get a signed URL for a document's stored file (e.g. PDF). Call the returned
- * function with storageId to get a URL, or use the hook pattern with effect.
+ * Get a signed URL for a document's stored file (e.g. PDF). Pass the source's own id with the
+ * file's storageId: forks share files, and the server checks access through that source.
  */
 export function useGetSignedUrl() {
-  return useMutation(api.documents.index.getSignedUrl);
+  const getSignedUrl = useMutation(api.documents.index.getSignedUrl);
+  return useCallback(
+    async (args: { storageId: string; documentId: string }) =>
+      await getSignedUrl({
+        storageId: args.storageId,
+        documentId: args.documentId as Id<"documents">,
+      }),
+    [getSignedUrl]
+  );
 }
 
 /**

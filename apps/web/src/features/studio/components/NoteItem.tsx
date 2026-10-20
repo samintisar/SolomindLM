@@ -32,6 +32,8 @@ interface NoteItemProps {
   onClick: () => void;
   onDelete: () => void;
   onPlayAudio?: (note: Note) => void;
+  /** Viewer of a public notebook: no rename/delete menu. */
+  readOnly?: boolean;
 }
 
 /** Step text, percentage and progress bar for a generating row. The step text rolls in as it changes. */
@@ -80,6 +82,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   onClick,
   onDelete,
   onPlayAudio,
+  readOnly = false,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -204,51 +207,53 @@ export const NoteItem: React.FC<NoteItemProps> = ({
               <Play className="fill-current text-studio-audio" />
             </Button>
           ) : null}
-          <DropdownMenu
-            modal={false}
-            onOpenChange={(open) => {
-              // Reopened during the exit animation: onCloseAutoFocus never ran, so drop the stale request.
-              if (open) renameRequestedRef.current = false;
-            }}
-          >
-            <DropdownMenuTrigger asChild>
-              <Button
-                ref={triggerRef}
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="More options"
-                title="More options"
-              >
-                <MoreVertical />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              data-note-item-menu
-              onCloseAutoFocus={(e) => {
-                if (renameRequestedRef.current) {
-                  renameRequestedRef.current = false;
-                  e.preventDefault();
-                  onEditStart();
-                }
+          {!readOnly && (
+            <DropdownMenu
+              modal={false}
+              onOpenChange={(open) => {
+                // Reopened during the exit animation: onCloseAutoFocus never ran, so drop the stale request.
+                if (open) renameRequestedRef.current = false;
               }}
             >
-              <DropdownMenuItem
-                onSelect={() => {
-                  renameRequestedRef.current = true;
+              <DropdownMenuTrigger asChild>
+                <Button
+                  ref={triggerRef}
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="More options"
+                  title="More options"
+                >
+                  <MoreVertical />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                data-note-item-menu
+                onCloseAutoFocus={(e) => {
+                  if (renameRequestedRef.current) {
+                    renameRequestedRef.current = false;
+                    e.preventDefault();
+                    onEditStart();
+                  }
                 }}
               >
-                <Pencil />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                <Trash2 />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    renameRequestedRef.current = true;
+                  }}
+                >
+                  <Pencil />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                  <Trash2 />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </Card>

@@ -6,6 +6,7 @@ import {
   HTML_ATTEMPT_RESERVE_MS,
   INGEST_DEADLINE_MS,
   ingestPaper,
+  isOpenFullTextLicense,
   MAX_CANDIDATE_ATTEMPTS,
   type PaperIngestDeps,
   type PaperIngestInput,
@@ -654,5 +655,79 @@ describe("fulltextStatusAfterIngest", () => {
     expect(fulltextStatusAfterIngest("abstract_only", "external_only")).toBe("external_only");
     expect(fulltextStatusAfterIngest("abstract_only", "available")).toBe("unavailable");
     expect(fulltextStatusAfterIngest("abstract_only", undefined)).toBe("unavailable");
+  });
+});
+
+describe("isOpenFullTextLicense", () => {
+  it.each([
+    ["cc-by", true],
+    ["CC BY 4.0", true],
+    ["cc-by-sa", true],
+    ["cc0", true],
+    ["public-domain", true],
+    ["https://creativecommons.org/licenses/by/4.0/", true],
+    ["http://creativecommons.org/publicdomain/zero/1.0/", true],
+    ["cc-by-nc", false],
+    ["cc-by-nc-nd", false],
+    ["https://creativecommons.org/licenses/by-nc/4.0/", false],
+    ["publisher-specific-oa", false],
+    ["https://www.elsevier.com/tdm/userlicense/1.0/", false],
+    [undefined, false],
+  ])("%s → %s", (license, expected) => {
+    expect(isOpenFullTextLicense(license)).toBe(expected);
+  });
+});
+
+describe("open_license_only", () => {
+  it("skips open-access copies without an open licence and never scrapes the landing page", async () => {
+    const deps = makeDeps({
+      resolveCandidates: vi
+        .fn()
+        .mockResolvedValue([
+          candidate({ url: "https://a.example/1.pdf", host: "a.example", license: "cc-by-nc" }),
+          candidate({ url: "https://b.example/2.pdf", host: "b.example" }),
+        ]),
+      scrape: vi.fn().mockResolvedValue({ title: "Landing", content: longText }),
+    });
+    const out = await ingestPaper(input({ fullTextPolicy: "open_license_only" }), deps, logger);
+    expect(out.outcome).toBe("abstract_only");
+    expect(deps.fetchCandidate).not.toHaveBeenCalled();
+    expect(deps.scrape).not.toHaveBeenCalled();
+  });
+
+  it("keeps full text from a CC BY open-access PDF", async () => {
+    const deps = makeDeps({
+      resolveCandidates: vi.fn().mockResolvedValue([candidate({ license: "cc-by" })]),
+      fetchCandidate: vi.fn().mockResolvedValue({
+        type: "pdf",
+        bytes: pdfBytes,
+        finalUrl: "https://arxiv.org/pdf/1304.1068",
+      }),
+    });
+    const out = await ingestPaper(input({ fullTextPolicy: "open_license_only" }), deps, logger);
+    expect(out).toMatchObject({
+      outcome: "full_text",
+      content: OCR_TEXT,
+      fullTextSource: { method: "oa_pdf", license: "cc-by" },
+    });
+  });
+
+  it("does not read a stored PDF whose licence is unknown", async () => {
+    const deps = makeDeps();
+    const out = await ingestPaper(
+      input({ storageId: "storage_1", fullTextPolicy: "open_license_only" }),
+      deps,
+      logger
+    );
+    expect(deps.ocrStoredPdf).not.toHaveBeenCalled();
+    expect(out.outcome).toBe("abstract_only");
+  });
+
+  it("without the policy, still scrapes the landing page", async () => {
+    const deps = makeDeps({
+      scrape: vi.fn().mockResolvedValue({ title: "Landing", content: longText }),
+    });
+    const out = await ingestPaper(input(), deps, logger);
+    expect(out).toMatchObject({ outcome: "full_text", fullTextSource: { method: "landing_page" } });
   });
 });

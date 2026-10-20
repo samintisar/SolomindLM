@@ -43,6 +43,8 @@ interface StudioPanelHeaderProps {
   canExportFlashcards: boolean;
   isExporting: boolean;
   isMobile: boolean;
+  /** Viewer of a public notebook: the title is plain text and reports can't be edited. */
+  readOnly?: boolean;
 }
 
 /**
@@ -74,6 +76,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   canExportFlashcards: _canExportFlashcards,
   isExporting,
   isMobile,
+  readOnly = false,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -134,7 +137,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
             </div>
             {isReportNote(activeNote) && (
               <div className="flex items-center gap-1 shrink-0">
-                {onEditReport && (
+                {onEditReport && !readOnly && (
                   <button
                     type="button"
                     onClick={onEditReport}
@@ -261,7 +264,11 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
             >
               <ArrowLeft className="w-5 h-5 shrink-0" />
             </button>
-            {editingId === activeNote.id ? (
+            {readOnly ? (
+              <span className="font-display font-bold text-sm tracking-wide truncate min-w-0 flex-1">
+                {activeNote.title}
+              </span>
+            ) : editingId === activeNote.id ? (
               <input
                 ref={inputRef}
                 type="text"
@@ -313,7 +320,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
           </div>
           {isReportNote(activeNote) && (
             <div className="flex items-center gap-1 shrink-0">
-              {onEditReport && (
+              {onEditReport && !readOnly && (
                 <button
                   type="button"
                   onClick={onEditReport}

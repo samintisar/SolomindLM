@@ -366,9 +366,8 @@ describe("SourceViewer PDF view switch", () => {
 
   test("switches between the markdown and original PDF views", async () => {
     const user = userEvent.setup();
-    (useGetSignedUrl as ReturnType<typeof vi.fn>).mockReturnValue(
-      vi.fn().mockResolvedValue("https://files.test/paper.pdf")
-    );
+    const getSignedUrl = vi.fn().mockResolvedValue("https://files.test/paper.pdf");
+    (useGetSignedUrl as ReturnType<typeof vi.fn>).mockReturnValue(getSignedUrl);
     renderViewer({ source: pdfSource, pdfStorageId: "storage1" });
 
     const group = screen.getByRole("radiogroup", { name: "Source view" });
@@ -390,6 +389,8 @@ describe("SourceViewer PDF view switch", () => {
     expect(await screen.findByTestId("pdf-viewer")).toHaveTextContent(
       "https://files.test/paper.pdf"
     );
+    // The source's own id lets the server check this source, whatever else shares the file.
+    expect(getSignedUrl).toHaveBeenCalledWith({ storageId: "storage1", documentId: "doc-pdf" });
   });
 
   test("shows a visible error and logs when the PDF link can't be fetched", async () => {
