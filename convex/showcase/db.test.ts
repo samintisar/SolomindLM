@@ -209,6 +209,14 @@ describe("showcase db", () => {
     ]);
   });
 
+  test("stopSeed cancels the pending ticks, all or one notebook's", async () => {
+    const { t } = await setup();
+    const slugs = await t.action(internal.showcase.seed.seedShowcase, { ownerEmail: OWNER });
+    expect(await t.mutation(internal.showcase.db.stopSeed, { slug: ECON.slug })).toBe(1);
+    expect(await t.mutation(internal.showcase.db.stopSeed, {})).toBe(slugs.length - 1);
+    expect(await t.mutation(internal.showcase.db.stopSeed, {})).toBe(0);
+  });
+
   test("a Studio item with a prompt key runs the Prompt Library text", async () => {
     const { t } = await setup();
     const notebookId = await t.mutation(internal.showcase.db.ensureNotebook, ref(ECON.slug));
