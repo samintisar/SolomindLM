@@ -1017,6 +1017,23 @@ export const publishShowcaseNotebook = internalMutation({
   },
 });
 
+/**
+ * Clears the owner's unfinished literature review (e.g. one stuck waiting for columns it never
+ * suggested), so the next seed run starts it again. A finished review is never touched.
+ */
+export const resetShowcaseLiteratureReview = internalMutation({
+  args: ownerSlugArgs,
+  returns: v.union(v.id("literatureReviewSessions"), v.null()),
+  handler: async (ctx, args) => {
+    const { owner, notebook } = await requireShowcaseNotebook(ctx, args.ownerEmail, args.slug);
+    const session = await latestReviewSession(ctx.db, notebook._id, owner._id);
+    if (!session) return null;
+    if (session.status === "completed") throw new Error("The literature review has finished");
+    await ctx.db.delete("literatureReviewSessions", session._id);
+    return session._id;
+  },
+});
+
 /** Read cap for the pending-ticks scan: one chain per notebook, plus a few overlapping re-runs. */
 const MAX_PENDING_SCAN = 1000;
 
