@@ -167,6 +167,7 @@ import type * as _services_extraction_openAccess_fullTextTest from "../_services
 import type * as _services_extraction_openAccess_publicUrl from "../_services/extraction/openAccess/publicUrl.js";
 import type * as _services_extraction_openAccess_resolveHost from "../_services/extraction/openAccess/resolveHost.js";
 import type * as _services_extraction_urlSource from "../_services/extraction/urlSource.js";
+import type * as _services_extraction_wikipedia from "../_services/extraction/wikipedia.js";
 import type * as _services_extractors from "../_services/extractors.js";
 import type * as _services_grading_WrittenQuestionsGradingService from "../_services/grading/WrittenQuestionsGradingService.js";
 import type * as _services_processing_DocumentMetadataExtractor from "../_services/processing/DocumentMetadataExtractor.js";
@@ -494,6 +495,7 @@ declare const fullApi: ApiFromModules<{
   "_services/extraction/openAccess/publicUrl": typeof _services_extraction_openAccess_publicUrl;
   "_services/extraction/openAccess/resolveHost": typeof _services_extraction_openAccess_resolveHost;
   "_services/extraction/urlSource": typeof _services_extraction_urlSource;
+  "_services/extraction/wikipedia": typeof _services_extraction_wikipedia;
   "_services/extractors": typeof _services_extractors;
   "_services/grading/WrittenQuestionsGradingService": typeof _services_grading_WrittenQuestionsGradingService;
   "_services/processing/DocumentMetadataExtractor": typeof _services_processing_DocumentMetadataExtractor;
