@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { checkCsvTable, cleanCsvOutput, withoutPipelineWording } from "./csvHelpers";
 
 describe("checkCsvTable", () => {
+  const ok = { problems: [], droppedRows: 0, needsRewrite: false };
+
   it("passes a well-formed table through unchanged", () => {
     const csv = '"Item","Amount"\n"Net sales","$69,154"';
-    expect(checkCsvTable(csv)).toEqual({ csv, problems: [] });
+    expect(checkCsvTable(csv)).toEqual({ csv, ...ok });
   });
 
   it("re-splits rows whose fields were quoted back to back without commas", () => {
@@ -19,43 +21,96 @@ describe("checkCsvTable", () => {
         '"Net Sales","Net sales","$69,154"',
         '"Cost","Cost of sales","$61,012"',
       ].join("\n"),
+      ...ok,
+    });
+  });
+
+  it("re-splits back-to-back rows even when another cell spans lines", () => {
+    const csv = [
+      '"Category","Item","Note"',
+      '"Revenue","Net sales","two\nlines"',
+      '"Cost""Cost of sales""$61,012"',
+    ].join("\n");
+    const result = checkCsvTable(csv);
+    expect(result.problems).toEqual([]);
+    expect(result.csv.split("\n").at(-1)).toBe('"Cost","Cost of sales","$61,012"');
+  });
+
+  it("keeps a real escaped quote that doesn't split into the header's width", () => {
+    const csv = '"Title","Note"\n"A","B"\n"He said ""hi"" twice"';
+    expect(checkCsvTable(csv)).toMatchObject({
+      csv: '"Title","Note"\n"A","B"\n"He said ""hi"" twice",""',
       problems: [],
     });
   });
 
-  it("keeps a real escaped quote that doesn't split into the header's width", () => {
-    const csv = '"Title","Note"\n"He said ""hi"" twice"';
-    expect(checkCsvTable(csv)).toEqual({
-      csv,
-      problems: ["1 of 1 rows don't have the header's 2 fields"],
+  it("asks for a rewrite when there are no data rows", () => {
+    expect(checkCsvTable('"Paper","Year"')).toMatchObject({
+      problems: ["no data rows"],
+      needsRewrite: true,
     });
   });
 
-  it("flags a table with a header and no data rows", () => {
-    expect(checkCsvTable('"Paper","Year"').problems).toEqual(["no data rows"]);
-  });
-
-  it("flags a missing header", () => {
-    expect(checkCsvTable('"Kalai et al., 2025"').problems).toEqual([
-      "no header row with at least two columns",
-    ]);
+  it("asks for a rewrite when there is no header", () => {
+    expect(checkCsvTable('"Kalai et al., 2025"')).toMatchObject({
+      problems: ["no header row with at least two columns"],
+      needsRewrite: true,
+    });
     expect(checkCsvTable("").problems).toEqual(["no header row with at least two columns"]);
   });
 
-  it("pads a row short by a field or two, and flags rows far off the header's width", () => {
-    const csv = ['"A","B","C","D"', '"1","2","3"', '"x"', '"1","2","3","4","5"'].join("\n");
-    const result = checkCsvTable(csv);
-    expect(result.csv.split("\n")[1]).toBe('"1","2","3",""');
-    expect(result.problems).toEqual(["2 of 3 rows don't have the header's 4 fields"]);
+  it("pads rows short by up to half the header's fields", () => {
+    const four = checkCsvTable(['"A","B","C","D"', '"1","2","3"', '"1","2"'].join("\n"));
+    expect(four.csv.split("\n").slice(1)).toEqual(['"1","2","3",""', '"1","2","",""']);
+    const two = checkCsvTable(['"Paper","Notes"', '"Kalai et al."'].join("\n"));
+    expect(two).toMatchObject({ csv: '"Paper","Notes"\n"Kalai et al.",""', problems: [] });
   });
 
-  it("flags an unclosed quote", () => {
-    expect(checkCsvTable('"A","B"\n"1","2').problems).toEqual(["a quoted field is never closed"]);
+  it("drops a few rows off the header's width, and flags many", () => {
+    const good = Array.from({ length: 10 }, (_, i) => `"${i}","x","y"`);
+    const few = checkCsvTable(['"A","B","C"', ...good, '"1","2","3","4"'].join("\n"));
+    expect(few).toMatchObject({ problems: [], droppedRows: 1 });
+    expect(few.csv.split("\n")).toHaveLength(11);
+
+    const many = checkCsvTable(['"A","B","C"', '"1","2","3"', '"1","2","3","4"'].join("\n"));
+    expect(many).toMatchObject({
+      problems: ["1 of 2 rows don't have the header's 3 fields"],
+      needsRewrite: false,
+    });
+  });
+
+  it("drops blank rows", () => {
+    const result = checkCsvTable('"A","B"\n" "\n"1","2"');
+    expect(result).toEqual({
+      csv: '"A","B"\n"1","2"',
+      problems: [],
+      droppedRows: 1,
+      needsRewrite: false,
+    });
+  });
+
+  it("flags an unclosed quote as a formatting problem", () => {
+    expect(checkCsvTable('"A","B"\n"1","2')).toMatchObject({
+      problems: ["a quoted field is never closed"],
+      needsRewrite: false,
+    });
+  });
+
+  it("drops the partial last row of a reply cut off at the output cap", () => {
+    const result = checkCsvTable('"A","B"\n"1","2"\n"3","cut off in a\nquoted', {
+      truncated: true,
+    });
+    expect(result).toEqual({
+      csv: '"A","B"\n"1","2"',
+      problems: [],
+      droppedRows: 1,
+      needsRewrite: false,
+    });
   });
 
   it("keeps quoted line breaks inside a cell", () => {
     const csv = '"A","B"\n"1","two\nlines"';
-    expect(checkCsvTable(csv)).toEqual({ csv, problems: [] });
+    expect(checkCsvTable(csv)).toEqual({ csv, ...ok });
   });
 });
 

@@ -168,4 +168,62 @@ describe("writeSpreadsheetTable", () => {
     ).rejects.toThrow("malformed");
     expect(invokeTogetherText).toHaveBeenCalledTimes(1);
   });
+
+  it("sends a badly formatted table back to be reformatted, without the notes", async () => {
+    const ragged = `"Paper","Year"
+"RAG","2020"
+"ReAct","2022","extra"`;
+    invokeTogetherText.mockResolvedValueOnce(ragged).mockResolvedValueOnce(good);
+
+    const csv = await writeSpreadsheetTable(
+      "NOTES",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe(good);
+    const retry = invokeTogetherText.mock.calls[1][0];
+    expect(retry.userPrompt).toContain(ragged);
+    expect(retry.userPrompt).not.toContain("NOTES");
+    expect(retry.reasoningEnabled).toBe(false);
+  });
+
+  it("saves a reply cut off at the output cap without its partial last row", async () => {
+    invokeTogetherText.mockImplementation(async (options) => {
+      options.onFinishReason?.("length");
+      return `${good}
+"Self-RAG","a cell cut off in the
+middle`;
+    });
+
+    const csv = await writeSpreadsheetTable(
+      "prompt",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(csv).toBe(good);
+    expect(invokeTogetherText).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the last row of a complete reply however long it is", async () => {
+    const rows = Array.from({ length: 400 }, (_, i) => `"Paper ${i}","${"x".repeat(80)}"`);
+    const long = [`"Paper","Notes"`, ...rows].join("\n");
+    invokeTogetherText.mockImplementation(async (options) => {
+      options.onFinishReason?.("stop");
+      return long;
+    });
+
+    const csv = await writeSpreadsheetTable(
+      "prompt",
+      createJobDeadline(540_000),
+      undefined,
+      noUsage
+    );
+
+    expect(long.length).toBeGreaterThan(31_000);
+    expect(csv).toBe(long);
+  });
 });

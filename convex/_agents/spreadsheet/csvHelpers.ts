@@ -71,63 +71,87 @@ export function cleanCsvOutput(output: string): string {
 
 /**
  * A row the model wrote with its fields quoted back to back and no commas between them:
- * `"Net Sales""$69,154""Revenue"` (#567). RFC 4180 reads that as one field with escaped quotes.
- * Re-split it when it splits into exactly `width` fields; otherwise it may be a real quote.
+ * `"Net Sales""$69,154""Revenue"` (#567). RFC 4180 reads that as one field whose escaped quotes
+ * mark the missing separators (`Net Sales"$69,154"Revenue`). Re-split it when it splits into
+ * exactly `width` fields; otherwise it may hold a real quote.
  */
-function splitAdjacentQuotedFields(line: string, width: number): string[] | null {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith('"') || !trimmed.endsWith('"') || trimmed.length < 2) return null;
-  const parts = trimmed.slice(1, -1).split('""');
+function splitAdjacentQuotedFields(field: string, width: number): string[] | null {
+  const parts = field.split('"');
   return parts.length === width ? parts : null;
 }
+
+/** Past this share of ragged rows the table is redone rather than trimmed. */
+const MAX_DROPPED_RAGGED_SHARE = 0.1;
 
 export type CsvTableCheck = {
   /** The table, repaired where that was safe. */
   csv: string;
   /** Why the table can't be saved; empty when it can. */
   problems: string[];
+  /** Rows removed: a row cut off at the output cap, or a few rows off the header's width. */
+  droppedRows: number;
+  /**
+   * True when the table has to be written again from the notes (no header, no data rows); false
+   * when its rows are there and only their formatting is wrong.
+   */
+  needsRewrite: boolean;
 };
 
 /**
  * Check a reduce table before it is saved (#567), repairing what is safe to repair:
+ * - when the reply was cut off at the output cap (`truncated`), its last, partial row goes;
  * - a row whose fields were quoted back to back with no commas is split again;
- * - a row short by fewer than half the header's fields is padded with empty cells.
- * Problems left: no header with at least two columns, no data rows, or rows whose field count
- * still differs from the header's.
+ * - a row short by at most half the header's fields is padded with empty cells;
+ * - blank rows go, and so do rows still off the header's width when they are few (up to 10%).
+ * Problems left: an unclosed quote, no header with at least two columns, no data rows, or more
+ * rows off the header's width than can be dropped.
  */
-export function checkCsvTable(csv: string): CsvTableCheck {
-  const lines = csv.split(/\r?\n/).filter((line) => line.trim() !== "");
-  const { rows, unterminatedQuote } = parseCsvDetailed(csv);
-  if (unterminatedQuote) {
-    return { csv, problems: ["a quoted field is never closed"] };
+export function checkCsvTable(csv: string, options: { truncated?: boolean } = {}): CsvTableCheck {
+  const parsed = parseCsvDetailed(csv);
+  let rows = parsed.rows;
+  let droppedRows = 0;
+  if (options.truncated && rows.length > 1) {
+    rows = rows.slice(0, -1);
+    droppedRows++;
+  } else if (parsed.unterminatedQuote) {
+    return { csv, problems: ["a quoted field is never closed"], droppedRows, needsRewrite: false };
   }
   if (rows.length === 0 || rows[0].length < 2) {
-    return { csv, problems: ["no header row with at least two columns"] };
+    return {
+      csv,
+      problems: ["no header row with at least two columns"],
+      droppedRows,
+      needsRewrite: true,
+    };
   }
-  const width = rows[0].length;
-  // Re-split back-to-back fields. Only when no field spans lines, so rows and lines line up.
-  const repaired =
-    rows.length === lines.length
-      ? rows.map((row, i) =>
-          row.length === 1 && i > 0 ? (splitAdjacentQuotedFields(lines[i], width) ?? row) : row
-        )
-      : rows;
+  const [header, ...rest] = rows;
+  const width = header.length;
+
+  const body = rest
+    .filter((row) => row.some((cell) => cell.trim() !== ""))
+    .map((row) => {
+      const split = row.length === 1 ? splitAdjacentQuotedFields(row[0], width) : null;
+      if (split) return split;
+      if (row.length < width && row.length * 2 >= width) {
+        return [...row, ...Array<string>(width - row.length).fill("")];
+      }
+      return row;
+    });
+  const kept = body.filter((row) => row.length === width);
+  const ragged = body.length - kept.length;
 
   const problems: string[] = [];
-  const body = repaired.slice(1).map((row) => {
-    if (row.length < width && row.length * 2 > width) {
-      return [...row, ...Array<string>(width - row.length).fill("")];
-    }
-    return row;
-  });
-  if (body.length === 0) problems.push("no data rows");
-  const ragged = body.filter((row) => row.length !== width).length;
-  if (ragged > 0)
+  if (kept.length === 0) problems.push("no data rows");
+  else if (ragged > body.length * MAX_DROPPED_RAGGED_SHARE) {
     problems.push(`${ragged} of ${body.length} rows don't have the header's ${width} fields`);
+  }
+  droppedRows += rest.length - kept.length;
 
-  const changed = body.some((row, i) => row !== rows[i + 1]);
+  const changed = droppedRows > 0 || kept.some((row, i) => row !== rest[i]);
   return {
-    csv: changed ? serializeCsv([repaired[0], ...body], { quoteAll: true }) : csv,
+    csv: changed ? serializeCsv([header, ...kept], { quoteAll: true }) : csv,
     problems,
+    droppedRows,
+    needsRewrite: kept.length === 0,
   };
 }

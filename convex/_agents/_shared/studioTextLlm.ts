@@ -14,6 +14,8 @@ export type InvokeTogetherTextOptions = {
   /** Default false for map phases; true for reduce/synthesis with smart models. */
   reasoningEnabled?: boolean;
   onUsage?: (usage: TokenUsage) => void;
+  /** Provider `finish_reason` ("stop", "length", …), e.g. to tell a reply cut off at `maxTokens`. */
+  onFinishReason?: (finishReason: string | undefined) => void;
 };
 
 /**
@@ -33,6 +35,7 @@ export async function invokeTogetherText(options: InvokeTogetherTextOptions): Pr
     reasoningEnabled: options.reasoningEnabled ?? false,
   });
 
+  options.onFinishReason?.(response.finishReason);
   // Report usage before the empty check: an empty completion can still burn the whole budget.
   const usage = fromProviderUsage(response.usage);
   if (usage) {

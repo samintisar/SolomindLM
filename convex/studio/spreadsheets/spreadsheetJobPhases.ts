@@ -766,10 +766,11 @@ export async function runFinalizeSpreadsheetPhase(
 // ============================================================
 
 /**
- * Run the reduce and check its table before it is saved (#567): fields quoted back to back are
- * split again, and a table still malformed (no header, no data rows, rows off the header's width)
- * is written once more with the problems named. If that fails too, or there is no time for it,
- * the job fails rather than save a broken table.
+ * Run the reduce and check its table before it is saved (#567). A reply cut off at the output cap
+ * loses its partial last row and is saved. A table whose rows are there but badly formatted is
+ * sent back once to be reformatted (no notes, so it is cheap); one with no header or no rows is
+ * written once more from the notes. If that fails too, or there is no time for it, the job fails
+ * rather than save a broken table.
  */
 export async function writeSpreadsheetTable(
   prompt: string,
@@ -778,7 +779,9 @@ export async function writeSpreadsheetTable(
   onUsage: (usage: TokenUsage) => void
 ): Promise<string> {
   let userPrompt = prompt;
+  let reformat = false;
   for (let attempt = 1; ; attempt++) {
+    let finishReason: string | undefined;
     const rawContent = await invokeWithinBudget({
       invoke: () =>
         invokeTogetherText({
@@ -786,24 +789,25 @@ export async function writeSpreadsheetTable(
           userPrompt,
           model: env.SPREADSHEET_LLM,
           maxTokens: 32_000,
-          temperature: 0.5,
-          reasoningEnabled: true,
+          temperature: reformat ? 0 : 0.5,
+          reasoningEnabled: !reformat,
           onUsage,
+          onFinishReason: (reason) => {
+            finishReason = reason;
+          },
         }),
       timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
-      phaseLabel: "SpreadsheetReduce",
+      phaseLabel: reformat ? "SpreadsheetReformat" : "SpreadsheetReduce",
     });
 
-    let output = withoutPipelineWording(cleanCsvOutput(rawContent));
-    if (rawContent.length >= 31_000) {
-      console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
-      const lastNewline = output.lastIndexOf("\n");
-      if (lastNewline > 0) {
-        output = output.substring(0, lastNewline);
-      }
+    const output = withoutPipelineWording(cleanCsvOutput(rawContent));
+    const truncated = finishReason === "length";
+    const { csv, problems, droppedRows, needsRewrite } = checkCsvTable(output, { truncated });
+    if (droppedRows > 0) {
+      console.log(
+        `[SpreadsheetJob] Dropped ${droppedRows} malformed rows${truncated ? " (reply cut off at the output cap)" : ""}`
+      );
     }
-
-    const { csv, problems } = checkCsvTable(output);
     if (problems.length === 0) return csv;
 
     const retryBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
@@ -813,7 +817,12 @@ export async function writeSpreadsheetTable(
     if (attempt >= CONFIG.REDUCE_ATTEMPTS || retryBudgetMs < CONFIG.MIN_REDUCE_RETRY_MS) {
       throw new Error(`The spreadsheet came out malformed (${problems.join("; ")}).`);
     }
-    userPrompt = `${prompt}
+    reformat = !needsRewrite;
+    userPrompt = reformat
+      ? `This table could not be saved: ${problems.join("; ")}. Rewrite it as valid CSV with the same rows and content: a header row, then one line per row, every field in double quotes, a comma between every pair of fields and the header's number of fields in every row. Output raw CSV only.
+
+${output}`
+      : `${prompt}
 
 Your previous table could not be saved: ${problems.join("; ")}. Write the whole table again as valid CSV: a header row, then one line per row, with a comma between every pair of fields and the header's number of fields in every row.`;
   }
