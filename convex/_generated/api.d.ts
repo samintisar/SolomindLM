@@ -278,6 +278,7 @@ import type * as research_titles from "../research/titles.js";
 import type * as research_workflowSteps from "../research/workflowSteps.js";
 import type * as server from "../server.js";
 import type * as showcase_db from "../showcase/db.js";
+import type * as showcase_edit from "../showcase/edit.js";
 import type * as showcase_gettingStartedGuide from "../showcase/gettingStartedGuide.js";
 import type * as showcase_manifest from "../showcase/manifest.js";
 import type * as showcase_manifestValidation from "../showcase/manifestValidation.js";
@@ -619,6 +620,7 @@ declare const fullApi: ApiFromModules<{
   "research/workflowSteps": typeof research_workflowSteps;
   server: typeof server;
   "showcase/db": typeof showcase_db;
+  "showcase/edit": typeof showcase_edit;
   "showcase/gettingStartedGuide": typeof showcase_gettingStartedGuide;
   "showcase/manifest": typeof showcase_manifest;
   "showcase/manifestValidation": typeof showcase_manifestValidation;
