@@ -58,6 +58,11 @@ import {
 } from "../../_services/ai/togetherTts.js";
 import { concatenateWavBuffers, getPcmWavDurationSeconds } from "../../_services/ai/wav.js";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import {
+  assertMapFailuresAcceptable,
+  mapChunkRetryDelayMs,
+  mapFailureRate,
+} from "../_job/mapFailures";
 import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
 import { buildTranscriptLines, planSynthesisChunks } from "./synthesisChunks";
 
@@ -101,6 +106,8 @@ export type ProcessAudioMapChunkPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   chunkIndex: number;
+  /** 1-based; set when a failed chunk is re-run. */
+  attempt?: number;
   totalChunks: number;
   chunk: string;
 };
@@ -399,6 +406,19 @@ export async function runProcessAudioMapChunkPhase(
       });
     }
   } catch (error) {
+    const retryDelayMs = mapChunkRetryDelayMs(args.attempt);
+    if (retryDelayMs !== null) {
+      console.warn(
+        `[audio] map chunk ${args.chunkIndex + 1} failed on attempt ${args.attempt ?? 1}, retrying in ${retryDelayMs}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await ctx.scheduler.runAfter(retryDelayMs, internal.studio.audio.job.processAudioMapChunk, {
+        ...args,
+        attempt: (args.attempt ?? 1) + 1,
+      });
+      return;
+    }
+
     const errorMeta = createErrorMetadata(error, "map_processing");
 
     console.error(`[AudioJob] ${chunkId} FAILED:`, errorMeta.message);
@@ -538,6 +558,8 @@ export async function runFinalizeAudioOverviewPhase(
     console.log(
       `[AudioJob] Finalization: ${allBeats.length} beat extractions collected, ${failedCount.count} failed chunks`
     );
+
+    assertMapFailuresAcceptable(Object.keys(mapResults).length, failedCount.count);
 
     if (allBeats.length === 0) {
       throw new Error("No successful beat extractions from any chunk");
@@ -760,6 +782,8 @@ export async function runFinalizeAudioOverviewPhase(
     });
     logger.info("Script ready, scheduled synthesis", {
       dialogueLines: fullDialogueScript.length,
+      mapFailed: failedCount.count,
+      mapFailureRate: mapFailureRate(Object.keys(mapResults).length, failedCount.count),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "finalization");

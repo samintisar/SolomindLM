@@ -52,6 +52,11 @@ import {
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
+import {
+  assertMapFailuresAcceptable,
+  mapChunkRetryDelayMs,
+  mapFailureRate,
+} from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("WrittenQuestionsGraph");
@@ -113,6 +118,8 @@ export type ProcessWrittenQuestionsMapChunkPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
   chunkIndex: number;
+  /** 1-based; set when a failed chunk is re-run. */
+  attempt?: number;
   totalChunks: number;
   chunk: string;
   questionCount: number;
@@ -512,6 +519,23 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       );
     }
   } catch (error) {
+    const retryDelayMs = mapChunkRetryDelayMs(args.attempt);
+    if (retryDelayMs !== null) {
+      console.warn(
+        `[writtenQuestions] map chunk ${args.chunkIndex + 1} failed on attempt ${args.attempt ?? 1}, retrying in ${retryDelayMs}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await ctx.scheduler.runAfter(
+        retryDelayMs,
+        internal.studio.writtenQuestions.job.processWrittenQuestionsMapChunk,
+        {
+          ...args,
+          attempt: (args.attempt ?? 1) + 1,
+        }
+      );
+      return;
+    }
+
     const errorMeta = createErrorMetadata(error, "map_processing");
 
     console.error(`[WrittenQuestionsJob] ${chunkId} FAILED:`, errorMeta.message);
@@ -662,6 +686,8 @@ export async function runFinalizeWrittenQuestionsPhase(
     console.log(
       `[WrittenQuestionsJob] Finalization: ${allQuestions.length} questions collected, ${failedCount.count} failed chunks`
     );
+
+    assertMapFailuresAcceptable(Object.keys(mapResults).length, failedCount.count);
 
     if (allQuestions.length === 0) {
       throw new Error("No successful questions generated from any chunk");
@@ -857,6 +883,7 @@ export async function runFinalizeWrittenQuestionsPhase(
       title,
       mapSuccess: Object.keys(mapResults).length - failedCount.count,
       mapFailed: failedCount.count,
+      mapFailureRate: mapFailureRate(Object.keys(mapResults).length, failedCount.count),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "finalization");

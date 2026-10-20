@@ -32,6 +32,7 @@ export const processMindMapMapChunk = internalAction({
     userId: v.string(),
     notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
+    attempt: v.optional(v.number()),
     totalChunks: v.number(),
     chunk: v.string(),
     customPrompt: v.optional(v.string()),
