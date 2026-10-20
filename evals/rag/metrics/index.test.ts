@@ -121,6 +121,21 @@ describe("expectedItemRecall", () => {
   });
 });
 
+describe("punctuation between words", () => {
+  const score = (items: string[], answer: string) =>
+    expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;
+
+  it("matches an item in a CSV cell followed by the next cell", () => {
+    expect(score(["prompt chaining"], '"Prompt Chaining","Breaks a task into steps"')).toBe(1);
+    expect(score(["routing"], "Routing,Sends each request")).toBe(1);
+  });
+
+  it("matches an item followed by a slash or a bracket", () => {
+    expect(score(["tool use"], "Tool Use/Function Calling")).toBe(1);
+    expect(score(["reflection"], "(Reflection)")).toBe(1);
+  });
+});
+
 describe("plural and compound matching", () => {
   const score = (items: string[], answer: string) =>
     expectedItemRecall({ ...fixture, expectedItems: items }, artifact({ answer })).score;

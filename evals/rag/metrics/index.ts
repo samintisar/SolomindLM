@@ -74,12 +74,17 @@ function getAllVariations(term: string): string[] {
 
 /** Normalize text for matching: lowercase, remove special chars, normalize spaces */
 function normalizeForMatch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[-‐–—]/g, " ") // Replace all dash types with space
-    .replace(/[^\w\s]/g, "") // Remove other special chars
-    .replace(/\s+/g, " ") // Normalize spaces
-    .trim();
+  return (
+    text
+      .toLowerCase()
+      .replace(/[-‐–—]/g, " ") // Replace all dash types with space
+      .replace(/['‘’]/g, "") // Drop apostrophes: "routing's" stays one word
+      // Other punctuation separates words: a CSV cell `"Prompt Chaining","x"` must not become
+      // "prompt chainingx".
+      .replace(/[^\w\s]/g, " ")
+      .replace(/\s+/g, " ") // Normalize spaces
+      .trim()
+  );
 }
 
 /**
