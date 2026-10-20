@@ -71,6 +71,7 @@ describe("buildScorecard", () => {
         pass: 1,
         fail: 2,
         judgeErrors: 1,
+        noEvidence: 0,
         passRate: 1 / 3,
         failedChecks: ["rubric:language-learners:one-item"],
       },
@@ -80,6 +81,7 @@ describe("buildScorecard", () => {
         pass: 1,
         fail: 0,
         judgeErrors: 0,
+        noEvidence: 0,
         passRate: 1,
         failedChecks: [],
       },
@@ -124,6 +126,7 @@ describe("judge-error-only cells", () => {
         pass: 0,
         fail: 0,
         judgeErrors: 1,
+        noEvidence: 0,
         passRate: null,
         failedChecks: [],
       },
@@ -151,5 +154,30 @@ describe("scorecard in reports", () => {
     const report = generateReport(metrics, { commitSha: "abc12345" });
     expect(report.scorecard).toBeUndefined();
     expect(formatReport(report)).not.toContain("Use-case scorecard:");
+  });
+});
+
+describe("buildScorecard no-evidence rows", () => {
+  const noEvidence = m({
+    caseId: "language-learners/a",
+    metric: "binary_judge_studio_grounding",
+    status: "warn",
+    breakdown: { noEvidence: true, model: "judge" },
+  });
+
+  it("counts rows where no judge ran apart from pass, fail and judge errors", () => {
+    const scorecard = buildScorecard([...metrics, noEvidence], useCaseByCase);
+    const cell = scorecard.cells.find((c) => c.runner === "flashcards");
+    expect(cell).toMatchObject({ pass: 1, fail: 2, judgeErrors: 1, noEvidence: 1 });
+    expect(cell?.failedChecks).not.toContain("binary_judge_studio_grounding");
+    expect(formatScorecard(scorecard)).toContain(
+      "      flashcards  33% (1/3)  judge errors: 1  no evidence: 1  failing: rubric:language-learners:one-item"
+    );
+  });
+
+  it("leaves the no-evidence count out of the line when there are none", () => {
+    expect(formatScorecard(buildScorecard(metrics, useCaseByCase)).join("\n")).not.toContain(
+      "no evidence"
+    );
   });
 });

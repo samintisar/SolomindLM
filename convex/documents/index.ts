@@ -264,60 +264,30 @@ export const getContent = query({
   },
 });
 
-/** Bounds the rows read when looking for a notebook through which the caller may read a file. */
-const MAX_DOCUMENTS_SHARING_A_FILE_CHECKED = 20;
-
 /**
  * Get a signed URL for a document's storage file
  */
 export const getSignedUrl = mutation({
   args: {
     storageId: v.string(),
-    /** The source being viewed. Checked directly, so access never depends on how many forks share the file. */
-    documentId: v.optional(v.id("documents")),
+    /**
+     * The source being viewed. Forks share their sources' files, so access is checked through
+     * this source rather than whichever document first names the file.
+     */
+    documentId: v.id("documents"),
   },
   returns: v.union(v.null(), v.string()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    if (args.documentId !== undefined) {
-      const document = await ctx.db.get(args.documentId);
-      if (!document || document.storageId !== args.storageId) {
-        throw new Error("Document not found");
-      }
-      if (!(await canReadNotebook(ctx, document.notebookId, userId))) {
-        throw new Error("Notebook not found");
-      }
-      return await ctx.storage.getUrl(args.storageId as Id<"_storage">);
-    }
-
-    // Callers without a source id: a fork shares its sources' files, so several notebooks can hold
-    // this file, and the caller may read it through any of them (the original may since have been
-    // unpublished or deleted). Only the first rows are checked.
-    const documents = await ctx.db
-      .query("documents")
-      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .take(MAX_DOCUMENTS_SHARING_A_FILE_CHECKED);
-
-    if (documents.length === 0) {
+    const document = await ctx.db.get(args.documentId);
+    if (!document || document.storageId !== args.storageId) {
       throw new Error("Document not found");
     }
-
-    const checked = new Set<Id<"notebooks">>();
-    let readable = false;
-    for (const document of documents) {
-      if (checked.has(document.notebookId)) continue;
-      checked.add(document.notebookId);
-      if (await canReadNotebook(ctx, document.notebookId, userId)) {
-        readable = true;
-        break;
-      }
-    }
-    if (!readable) {
+    if (!(await canReadNotebook(ctx, document.notebookId, userId))) {
       throw new Error("Notebook not found");
     }
-
     return await ctx.storage.getUrl(args.storageId as Id<"_storage">);
   },
 });

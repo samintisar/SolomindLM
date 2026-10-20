@@ -49,7 +49,13 @@ export const setPublic = mutation({
     if (args.isPublic) {
       // Re-publishing must not move the notebook to the top of the Community grid.
       if (!notebook.isPublic) {
-        await ctx.db.patch(args.notebookId, { isPublic: true, publishedAt: Date.now() });
+        // `isFeatured` used to be a per-user pin; a pin left from then must not feature the
+        // notebook. Only an admin features a public notebook (`setFeatured`).
+        await ctx.db.patch(args.notebookId, {
+          isPublic: true,
+          isFeatured: false,
+          publishedAt: Date.now(),
+        });
       }
     } else {
       await ctx.db.patch(args.notebookId, {

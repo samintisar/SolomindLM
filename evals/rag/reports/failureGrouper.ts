@@ -27,11 +27,31 @@ function classifyFailure(metric: MetricResult): FailureCategory {
     const category = (metric.breakdown?.category as string) ?? "prompt_answering";
     if (category === "retrieval_coverage") return "retrieval";
     if (category === "context_selection") return "context_selection";
+    // Answered an unanswerable question from non-existent evidence: fix the answer prompt.
+    if (category === "hallucination_under_pressure") return "prompt_answering";
     return "prompt_answering";
   }
 
   if (metric.metric.startsWith("retrieval_item_recall_")) {
     return "retrieval";
+  }
+
+  if (metric.metric === "passage_recall_selected") {
+    // Passages an earlier stage held but selection dropped are a selection miss, not a retrieval one.
+    const upstream = Math.max(
+      Number(metric.breakdown?.preRerankRecall ?? 0),
+      Number(metric.breakdown?.postRerankRecall ?? 0)
+    );
+    return upstream > metric.score ? "context_selection" : "retrieval";
+  }
+  if (metric.metric.startsWith("passage_recall_")) {
+    return "retrieval";
+  }
+  if (metric.metric === "passage_precision_selected" || metric.metric === "passage_ndcg_selected") {
+    return "context_selection";
+  }
+  if (metric.metric === "llm_context_precision" || metric.metric === "llm_context_waste_tokens") {
+    return "context_selection";
   }
 
   if (metric.metric === "retrieval_precision_at_k" || metric.metric === "retrieval_ndcg_at_k") {
@@ -83,6 +103,8 @@ function classifyFailure(metric: MetricResult): FailureCategory {
   if (metric.metric === "citation_validity") return "citation";
   if (metric.metric === "latency_cost_budget") return "latency_cost";
   if (metric.metric === "expected_item_recall") return "retrieval";
+  // The same question answered differently in other words: the answer prompt or its grounding.
+  if (metric.metric === "paraphrase_consistency") return "prompt_answering";
 
   return "prompt_answering";
 }

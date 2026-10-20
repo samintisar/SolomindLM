@@ -771,15 +771,23 @@ describe("documents.getSignedUrl for a file a fork shares", () => {
     await t.run((ctx) => performNotebookFork(ctx, notebookId, forker));
     // The owner takes the notebook off the Public tab; the forker keeps their copy.
     await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
-    return { owner, forker, stranger, fileId };
+    const forkDocId = await t.run(async (ctx) => {
+      const [doc] = await ctx.db
+        .query("documents")
+        .withIndex("by_user", (q) => q.eq("userId", forker))
+        .collect();
+      return doc._id;
+    });
+    return { owner, forker, stranger, fileId, forkDocId };
   }
 
   test("the forker still gets a URL after the original is unpublished", async () => {
     const t = convexTest(schema, modules);
-    const { forker, fileId } = await seedPublicSourceForkedAway(t);
+    const { forker, fileId, forkDocId } = await seedPublicSourceForkedAway(t);
 
     const url = await withAuth(t, forker).mutation(api.documents.index.getSignedUrl, {
       storageId: fileId,
+      documentId: forkDocId,
     });
 
     expect(url).toEqual(expect.any(String));
@@ -787,14 +795,17 @@ describe("documents.getSignedUrl for a file a fork shares", () => {
 
   test("a user who can read neither notebook is refused", async () => {
     const t = convexTest(schema, modules);
-    const { stranger, fileId } = await seedPublicSourceForkedAway(t);
+    const { stranger, fileId, forkDocId } = await seedPublicSourceForkedAway(t);
 
     await expect(
-      withAuth(t, stranger).mutation(api.documents.index.getSignedUrl, { storageId: fileId })
+      withAuth(t, stranger).mutation(api.documents.index.getSignedUrl, {
+        storageId: fileId,
+        documentId: forkDocId,
+      })
     ).rejects.toThrow("Notebook not found");
   });
 
-  /** A showcase notebook forked more times than the storage scan reads, then unpublished. */
+  /** A public notebook forked `forkCount` times, then unpublished. */
   async function seedManyForks(t: ReturnType<typeof convexTest>, forkCount: number) {
     const owner = await seedUser(t);
     const notebookId = await seedNotebook(t, owner);

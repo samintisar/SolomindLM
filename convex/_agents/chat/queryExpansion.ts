@@ -1,10 +1,18 @@
 "use node";
 
+/** Most keyword variations added to the original query (production default). */
+export const DEFAULT_KEYWORD_VARIANTS = 2;
+
 /**
  * Expand query with keyword-based variations (no LLM overhead, ~10ms latency)
  * Helps find content when user's terminology doesn't match document terminology
+ *
+ * @param maxVariants - Most variations added to the original (0 returns only the query)
  */
-export function expandQueryWithKeywords(query: string): string[] {
+export function expandQueryWithKeywords(
+  query: string,
+  maxVariants: number = DEFAULT_KEYWORD_VARIANTS
+): string[] {
   const variations = [query];
   const lowerQuery = query.toLowerCase();
 
@@ -27,7 +35,7 @@ export function expandQueryWithKeywords(query: string): string[] {
 
   // Apply variations (limit to avoid too many search calls)
   let variationCount = 0;
-  const maxVariations = 2;
+  const maxVariations = maxVariants;
 
   for (const [term, synonyms] of Object.entries(termVariations)) {
     if (lowerQuery.includes(term) && variationCount < maxVariations) {
@@ -45,5 +53,5 @@ export function expandQueryWithKeywords(query: string): string[] {
     }
   }
 
-  return variations.slice(0, 3); // Limit to 3 total variations (original + 2)
+  return variations.slice(0, maxVariants + 1); // The original query plus at most maxVariants
 }

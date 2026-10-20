@@ -1,5 +1,6 @@
 "use node";
 
+import type { ChatConfigOverrides } from "./chatConfigOverrides.js";
 import type { VectorSearchHandler } from "./vector_search.js";
 
 /**
@@ -58,6 +59,12 @@ export interface ChatAgentContext {
   groundingMode?: "async" | "sync" | "off";
   /** Pre-fetched external source chunks (from web search, etc.) to inject into LLM context */
   externalChunks?: ReferenceChunk[];
+  /**
+   * Eval only. Retrieval and context selection run as usual, then the stream ends with done right
+   * after the references chunk, before any answer generation. Used by the retrieval-only eval runner
+   * (`eval:rag -- --retrieval-only`); production never sets it.
+   */
+  evalRetrievalOnly?: boolean;
   /** Per-notebook chat customization (instruction mode, custom instructions, response length) */
   chatSettings?: {
     instructionMode: "default" | "learningGuide" | "custom";
@@ -114,4 +121,6 @@ export interface ChatAgentOptions {
   fetchOpeningPassagesFn?: (documentIds: string[]) => Promise<ReferenceChunk[]>;
   /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
   outputLanguage?: string;
+  /** Chat knobs to change from production for this agent (eval experiments). Omitted in production. */
+  configOverrides?: ChatConfigOverrides;
 }

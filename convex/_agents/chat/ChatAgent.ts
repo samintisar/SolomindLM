@@ -11,24 +11,22 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel";
 import { EmbeddingService } from "../../_services/ai/embeddingClient";
 import { countTokens } from "../_shared/tokenizer";
+import { createTurnTelemetry, type TurnTelemetry } from "../_shared/tokenUsageAccumulator";
 import type { SelectedSources } from "./chat_llm_grounding.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
-  CONTEXT_TOKEN_BUDGET,
   EMBEDDING_TIMEOUT_MS,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
   GLOBAL_RERANK_TIMEOUT_MS,
-  LIST_QUERY_CONTEXT_TOKEN_BUDGET,
   LIST_QUERY_MAX_SELECTED_CHUNKS,
   MAX_CHUNKS_HARD_LIMIT,
   MAX_NEIGHBOUR_PASSAGES,
   MAX_OPENING_PASSAGES,
-  NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
-  OPENING_PASSAGE_TOKEN_BUDGET,
   PER_SOURCE_PASSAGES_PER_SEARCH,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
+import { type ResolvedChatConfig, resolveChatConfig } from "./chatConfigOverrides.js";
 import { budgetConversationHistory } from "./chatHistoryBudget.js";
 import { routeChatMessage } from "./chatRouter.js";
 import {
@@ -43,7 +41,11 @@ import {
   selectedSourceIds,
   titlesOfSources,
 } from "./chunkContext.js";
-import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
+import {
+  type GroundingValidationResult,
+  validateGrounding,
+  validateSemanticGrounding,
+} from "./grounding_validator.js";
 import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
 import type {
   ChatAgentContext,
@@ -72,10 +74,11 @@ import { sliceParagraphForStream } from "./streamSlice.js";
 
 export class ChatAgent {
   private llmWrapper: ChatLLMWrapper;
+  /** Usage and call counters for the turn in progress; reported on its `done` chunk. */
+  private readonly telemetry: TurnTelemetry = createTurnTelemetry();
 
   private doneChunk(): StreamChunk {
-    const tokenUsage = this.llmWrapper.consumeTokenUsage();
-    return tokenUsage !== undefined ? { type: "done", data: { tokenUsage } } : { type: "done" };
+    return { type: "done", data: this.telemetry.snapshot() };
   }
   private vectorSearch: VectorSearchHandler;
   private embeddingService: EmbeddingService;
@@ -83,8 +86,11 @@ export class ChatAgent {
   private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
   private fetchDocumentTitlesFn?: ChatAgentOptions["fetchDocumentTitlesFn"];
   private fetchOpeningPassagesFn?: ChatAgentOptions["fetchOpeningPassagesFn"];
+  /** Production values, with any configOverrides applied. */
+  private readonly config: ResolvedChatConfig;
 
   constructor(options?: ChatAgentOptions) {
+    this.config = resolveChatConfig(options?.configOverrides);
     const smartModel = resolveSmartModel(options?.smartModel);
     this.llmWrapper = new ChatLLMWrapper({
       apiKey: env.TOGETHER_AI_API_KEY,
@@ -93,6 +99,8 @@ export class ChatAgent {
       fastModel: env.FAST_LLM,
       fastApiKey: env.TOGETHER_AI_API_KEY,
       outputLanguage: options?.outputLanguage,
+      telemetry: this.telemetry,
+      fewShotPolicy: this.config.fewShotPolicy,
     });
 
     this.vectorSearch =
@@ -160,7 +168,7 @@ export class ChatAgent {
       }
     }
     const withOpenings = addOpeningPassages(passages, [...fromPool, ...fetched], {
-      tokenBudget: OPENING_PASSAGE_TOKEN_BUDGET,
+      tokenBudget: this.config.openingPassageTokenBudget,
       maxPassages: MAX_OPENING_PASSAGES,
     });
     if (withOpenings.length > passages.length) {
@@ -213,6 +221,7 @@ export class ChatAgent {
     rerankedKeys?: ReadonlySet<string>
   ): Promise<ReferenceChunk[]> {
     if (!this.fetchDocumentFn || chunks.length === 0) return chunks;
+    if (this.config.fullDocumentExpansion === "off") return chunks;
 
     // Group chunks by document
     const chunksByDocument = new Map<string, ReferenceChunk[]>();
@@ -266,15 +275,33 @@ export class ChatAgent {
     // Fetch full content for documents to expand
     const expandedChunks: ReferenceChunk[] = [];
     const expandedDocIds = new Set<string>(documentsToExpand);
+    // Documents whose full text is over the cap: their passages stay as they are.
+    const keptDocIds = new Set<string>();
+    const tokenCap =
+      typeof this.config.fullDocumentExpansion === "number"
+        ? this.config.fullDocumentExpansion
+        : Number.POSITIVE_INFINITY;
 
     for (const chunk of chunks) {
       const docId = chunk.documentId;
 
-      if (docId && expandedDocIds.has(docId)) {
+      if (docId && expandedDocIds.has(docId) && !keptDocIds.has(docId)) {
         // Only add full document once per document
         if (!expandedChunks.some((c) => c.documentId === docId && c.chunkIndex === -1)) {
           const loaded = await this.fetchFullDocumentContent(docId);
-          if (loaded) {
+          if (!loaded) {
+            // Fetch failed or came back empty: keep the passages rather than drop them all.
+            logger.warn("Full document unavailable; keeping passages", { documentId: docId });
+            keptDocIds.add(docId);
+            expandedChunks.push(chunk);
+          } else if (Number.isFinite(tokenCap) && countTokens(loaded.content) > tokenCap) {
+            logger.info("Full document is over the expansion token cap; keeping passages", {
+              documentId: docId,
+              tokenCap,
+            });
+            keptDocIds.add(docId);
+            expandedChunks.push(chunk);
+          } else {
             expandedChunks.push({
               id: `full-${docId}`,
               sourceId: String(docId),
@@ -390,22 +417,27 @@ export class ChatAgent {
 
     const searchOpts = { skipRerank: true, allowEmpty: true, isListQuery } as const;
 
-    logger.apiCall("ChatLLMWrapper", "generateHypotheticalDocument", { query });
     // HyDE only sharpens the embedding: when it stalls or fails, search with the query alone.
     // Its own deadline (HYDE_TIMEOUT_MS) is applied to the LLM call; this only keeps the budget.
-    const hydeText = await withTimeout(
-      this.llmWrapper.generateHypotheticalDocument(query),
-      remainingMs(),
-      "hyde_generation"
-    ).catch((error) => {
-      logger.warn("HyDE skipped, searching with the query alone", {
-        query,
-        error: String(error),
+    // Disabled by config: no call at all, the query alone is embedded.
+    let hydeText = "";
+    if (this.config.hydeEnabled) {
+      logger.apiCall("ChatLLMWrapper", "generateHypotheticalDocument", { query });
+      hydeText = await withTimeout(
+        this.llmWrapper.generateHypotheticalDocument(query),
+        remainingMs(),
+        "hyde_generation"
+      ).catch((error) => {
+        logger.warn("HyDE skipped, searching with the query alone", {
+          query,
+          error: String(error),
+        });
+        return "";
       });
-      return "";
-    });
+    }
 
     const textForVectorEmbedding = [query.trim(), hydeText.trim()].filter(Boolean).join("\n\n");
+    this.telemetry.recordEmbeddingCall();
     const hydeEmbedding = await withTimeout(
       this.embeddingService.embedText(textForVectorEmbedding),
       Math.min(EMBEDDING_TIMEOUT_MS, remainingMs()),
@@ -420,7 +452,7 @@ export class ChatAgent {
         remainingMs,
         logger
       );
-      const expandedQueries = expandQueryWithKeywords(query);
+      const expandedQueries = expandQueryWithKeywords(query, this.config.keywordVariants);
       const allResults: ReferenceChunk[] = [];
       const seenChunkKeys = new Set<string>();
 
@@ -491,13 +523,36 @@ export class ChatAgent {
     return results;
   }
 
+  /**
+   * Semantic grounding check. Its embedding requests are counted, and its latency is recorded as a
+   * `grounding` span, in the turn telemetry.
+   */
+  private async semanticGrounding(
+    answer: string,
+    chunks: ReferenceChunk[]
+  ): Promise<GroundingValidationResult> {
+    const startedAt = Date.now();
+    const embeddings = {
+      embedText: (text: string) => {
+        this.telemetry.recordEmbeddingCall();
+        return this.embeddingService.embedText(text);
+      },
+    };
+    try {
+      return await validateSemanticGrounding(answer, chunks, embeddings);
+    } finally {
+      this.telemetry.recordStage("grounding", startedAt);
+    }
+  }
+
   private async applyGlobalRerank(
     merged: ReferenceChunk[],
     rerankQueryFromDecomposer: string | undefined,
     userMessage: string,
     logger: ServiceLogger
   ): Promise<{ chunks: ReferenceChunk[]; rerankedKeys?: Set<string> }> {
-    if (!this.globalRerankFn || merged.length === 0) {
+    // Disabled by config, or no rerank wired: the merged hybrid order stands (ADR 0002 fallback).
+    if (!this.config.rerankEnabled || !this.globalRerankFn || merged.length === 0) {
       return { chunks: merged };
     }
     const rerankQueryForCache =
@@ -509,6 +564,7 @@ export class ChatAgent {
     }));
 
     const rerankStart = Date.now();
+    this.telemetry.recordRerankCall(docs.length);
     try {
       const reranked = await withTimeout(
         this.globalRerankFn(rerankQueryForCache, docs),
@@ -719,6 +775,7 @@ export class ChatAgent {
       const subqueryStart = Date.now();
       const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns, {
         severalSourcesSelected: selectedSources.length > 0,
+        maxSubqueries: this.config.maxSubqueries,
       });
       rerankQueryOpt = plan.rerankQuery;
       const { subqueries } = plan;
@@ -849,14 +906,19 @@ export class ChatAgent {
         isListQuery
           ? {
               maxSelectedChunks: maxForRest,
-              maxContextTokens: Math.max(LIST_QUERY_CONTEXT_TOKEN_BUDGET - pinnedTokens, 800),
+              maxContextTokens: Math.max(
+                this.config.listQueryContextTokenBudget - pinnedTokens,
+                800
+              ),
               lexicalQuery: userMessage,
               rerankedKeys,
+              multiSourceMaxExtraTokens: this.config.multiSourceMaxExtraTokens,
             }
           : {
               maxSelectedChunks: maxForRest,
-              maxContextTokens: Math.max(CONTEXT_TOKEN_BUDGET - pinnedTokens, 800),
+              maxContextTokens: Math.max(this.config.contextTokenBudget - pinnedTokens, 800),
               rerankedKeys,
+              multiSourceMaxExtraTokens: this.config.multiSourceMaxExtraTokens,
             }
       ),
     ];
@@ -867,7 +929,7 @@ export class ChatAgent {
     // selection usually fills the cap, and evals showed neighbours sharing it were almost never
     // added.
     const withNeighbours = addNeighbourPassages(selectedChunks, restNotebook, {
-      tokenBudget: NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+      tokenBudget: this.config.neighbourPassageTokenBudget,
       maxPassages: MAX_NEIGHBOUR_PASSAGES,
     });
     if (withNeighbours.length > selectedChunks.length) {
@@ -896,6 +958,11 @@ export class ChatAgent {
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");
+      // Eval only: no passages to answer from, and retrieval-only runs generate nothing.
+      if (context.evalRetrievalOnly) {
+        yield this.doneChunk();
+        return;
+      }
       yield { type: "status", status: "thinking", message: "Generating response..." };
       const directAnswer = await this.llmWrapper.generateDirectResponse(
         userMessage,
@@ -952,6 +1019,11 @@ export class ChatAgent {
       message: `Reading ${citationChunks.length} passages...`,
     };
     yield { type: "references", data: citationChunks };
+    // Eval only: the passages are chosen, so stop before any generation (see ChatAgentContext).
+    if (context.evalRetrievalOnly) {
+      yield this.doneChunk();
+      return;
+    }
 
     logger.info("Generating grounded response", {
       chunkCount: citationChunks.length,
@@ -995,11 +1067,7 @@ export class ChatAgent {
         citationChunks
       );
       semanticValidation = syntacticValidation.isGrounded
-        ? await validateSemanticGrounding(
-            structuredResponse.answer_markdown,
-            citationChunks,
-            this.embeddingService
-          )
+        ? await this.semanticGrounding(structuredResponse.answer_markdown, citationChunks)
         : { isGrounded: false, issues: [], missingCitations: false };
 
       isGrounded = syntacticValidation.isGrounded && semanticValidation.isGrounded;
@@ -1026,11 +1094,7 @@ export class ChatAgent {
             citationChunks
           );
           const retrySemantic = retrySyntactic.isGrounded
-            ? await validateSemanticGrounding(
-                structuredResponse.answer_markdown,
-                citationChunks,
-                this.embeddingService
-              )
+            ? await this.semanticGrounding(structuredResponse.answer_markdown, citationChunks)
             : { isGrounded: false, issues: [], missingCitations: false };
           isGrounded = retrySyntactic.isGrounded && retrySemantic.isGrounded;
           semanticValidation = retrySemantic;
@@ -1046,11 +1110,7 @@ export class ChatAgent {
       const groundingPromise = (async () => {
         const syn = validateGrounding(structuredResponse.answer_markdown, citationChunks);
         const sem = syn.isGrounded
-          ? await validateSemanticGrounding(
-              structuredResponse.answer_markdown,
-              citationChunks,
-              this.embeddingService
-            )
+          ? await this.semanticGrounding(structuredResponse.answer_markdown, citationChunks)
           : { isGrounded: false, issues: [] as string[], missingCitations: false };
         const g = syn.isGrounded && sem.isGrounded;
         const semOnly = syn.isGrounded && !sem.isGrounded;

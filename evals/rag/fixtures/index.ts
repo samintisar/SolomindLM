@@ -16,6 +16,7 @@ import { researchFixtures } from "./research";
 import { allSourceFixtures } from "./sourceTests";
 import { STUDIO_FIXTURES } from "./studio";
 
+export { withParaphrases } from "./paraphraseVariants";
 export { withSourceMatrix } from "./sourceFilterVariants";
 
 /** Registry of all golden eval fixtures */

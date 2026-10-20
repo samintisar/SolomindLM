@@ -596,9 +596,6 @@ export const runLiteratureReviewEval = action({
       abstract: paper.abstract.length > 500 ? paper.abstract.slice(0, 500) + "..." : paper.abstract,
     });
 
-    const truncateContent = (content: string, maxLen = 15000) =>
-      content.length > maxLen ? content.slice(0, maxLen) + "..." : content;
-
     return {
       sessionId,
       tableId: tableResult.tableId,
@@ -647,13 +644,12 @@ export const runLiteratureReviewEval = action({
           })
         ),
       },
+      // The whole report: metrics look for sections, tables and citations anywhere in it, and a
+      // cut at 15K characters (4K per section) hid a Summary of Evidence table 26K characters in.
       report: {
         title: report.title,
-        content: truncateContent(report.content),
-        sections: report.sections.map((s) => ({
-          heading: s.heading,
-          content: truncateContent(s.content, 4000),
-        })),
+        content: report.content,
+        sections: report.sections.map((s) => ({ heading: s.heading, content: s.content })),
       },
       latencyMs: Date.now() - startTime,
     };

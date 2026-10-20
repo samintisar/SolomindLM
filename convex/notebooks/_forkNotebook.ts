@@ -248,6 +248,14 @@ function withoutSynthesisChunks(metadata: unknown): unknown {
 }
 
 /**
+ * Only finished Studio items are copied: a generating item has no job in the fork to finish it,
+ * and a failed one is nothing to keep.
+ */
+function isCompleted(row: { status: string }): boolean {
+  return row.status === "completed";
+}
+
+/**
  * Deep-copies a notebook into forkUserId's account (a helper for fork mutations, not an API).
  * Copies everything but the sources' text and chunks in this transaction; those follow in one
  * scheduled copyForkedDocumentContent run per source, each source showing as processing until then.
@@ -340,7 +348,7 @@ export async function performNotebookFork(
     .query("reports")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of reports) {
+  for (const r of reports.filter(isCompleted)) {
     await ctx.db.insert("reports", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -359,7 +367,7 @@ export async function performNotebookFork(
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
   // Practice progress on the source rows is the owner's; the forker starts fresh.
-  for (const r of flashcards.map(withoutFlashcardProgress)) {
+  for (const r of flashcards.filter(isCompleted).map(withoutFlashcardProgress)) {
     await ctx.db.insert("flashcards", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -376,7 +384,7 @@ export async function performNotebookFork(
     .query("quizzes")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of quizzes.map(withoutQuizProgress)) {
+  for (const r of quizzes.filter(isCompleted).map(withoutQuizProgress)) {
     await ctx.db.insert("quizzes", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -393,7 +401,7 @@ export async function performNotebookFork(
     .query("mindmaps")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of mindmaps) {
+  for (const r of mindmaps.filter(isCompleted)) {
     await ctx.db.insert("mindmaps", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -410,7 +418,7 @@ export async function performNotebookFork(
     .query("audioOverviews")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of audioOverviews) {
+  for (const r of audioOverviews.filter(isCompleted)) {
     await ctx.db.insert("audioOverviews", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -431,7 +439,7 @@ export async function performNotebookFork(
     .query("infographics")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of infographics) {
+  for (const r of infographics.filter(isCompleted)) {
     await ctx.db.insert("infographics", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -448,7 +456,7 @@ export async function performNotebookFork(
     .query("spreadsheets")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of spreadsheets) {
+  for (const r of spreadsheets.filter(isCompleted)) {
     await ctx.db.insert("spreadsheets", {
       userId: forkUserId,
       notebookId: newNotebookId,
@@ -465,7 +473,7 @@ export async function performNotebookFork(
     .query("writtenQuestions")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of writtenQuestions.map(withoutWrittenQuestionProgress)) {
+  for (const r of writtenQuestions.filter(isCompleted).map(withoutWrittenQuestionProgress)) {
     await ctx.db.insert("writtenQuestions", {
       userId: forkUserId,
       notebookId: newNotebookId,
