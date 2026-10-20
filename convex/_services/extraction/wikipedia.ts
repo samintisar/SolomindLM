@@ -71,7 +71,7 @@ export function wikipediaArticleForLink(link: string): WikipediaArticleRef | und
 /**
  * Markdown from a TextExtracts plain-text extract: `== Heading ==` lines become Markdown headings,
  * link and reference sections are dropped, and math (MathML tokens, one per line, followed by a
- * `{\displaystyle …}` line) becomes inline `$…$` LaTeX.
+ * `{\displaystyle …}` or `{\textstyle …}` line) becomes inline `$…$` LaTeX.
  */
 export function wikipediaExtractToMarkdown(extract: string): string {
   const lines = collapseMath(extract.replace(/⁠/g, "").split("\n"));
@@ -95,7 +95,8 @@ export function wikipediaExtractToMarkdown(extract: string): string {
     .trim();
 }
 
-const DISPLAYSTYLE_REGEX = /^\s*\{\\displaystyle\s*(.*)\}\s*$/;
+/** The TeX annotation that ends a rendered formula: display (`\displaystyle`) or inline (`\textstyle`). */
+const DISPLAYSTYLE_REGEX = /^\s*\{\\(?:displaystyle|textstyle)\s*(.*)\}\s*$/;
 /**
  * A line of a rendered formula: indented by two or more spaces, or whitespace only. Prose that
  * resumes after a formula is indented by at most one space (" and computes…"), and paragraph
