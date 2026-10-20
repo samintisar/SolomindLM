@@ -31,6 +31,16 @@ describe("remapDeep", () => {
   test("leaves unknown tokens alone", () => {
     expect(remapDeep({ x: CITE }, ids, exact)).toEqual({ x: CITE });
   });
+
+  test("matches whole ids of other lengths, never the start of a longer token", () => {
+    const longId = `${DOC}x`;
+    const newLongId = `${NEW_DOC}y`;
+    const both = new Map([...ids, [longId, newLongId]]);
+    expect(remapDeep({ a: longId, b: `${DOC}xyzxyzxyz` }, both, exact)).toEqual({
+      a: newLongId,
+      b: `${DOC}xyzxyzxyz`,
+    });
+  });
 });
 
 describe("leftoverSourceRefs", () => {
@@ -39,6 +49,11 @@ describe("leftoverSourceRefs", () => {
       leftoverSourceRefs({ a: CITE, b: NEW_DOC, c: URL }, new Set([CITE, DOC]), "dev-host")
     ).toEqual([CITE, "dev-host"]);
     expect(leftoverSourceRefs({ a: NEW_DOC }, new Set([CITE, DOC]), "dev-host")).toEqual([]);
+  });
+
+  test("names a leftover id longer than 32 characters", () => {
+    const longId = `${DOC}x`;
+    expect(leftoverSourceRefs({ a: longId }, new Set([longId]), "dev-host")).toEqual([longId]);
   });
 });
 

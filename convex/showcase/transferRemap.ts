@@ -4,8 +4,12 @@
  * copy on the target, and anything left over is reported instead of being written.
  */
 
-/** Convex document and storage ids are 32 lowercase base-32 characters. */
-const ID_TOKEN = /[0-9a-z]{32}/g;
+/**
+ * A whole run of lowercase base-32 characters as long as a Convex document or storage id. Ids are
+ * usually 32 characters but not guaranteed to be, and a fixed-length match would take only the
+ * start of a longer id, which then neither gets remapped nor reported as a leftover.
+ */
+const ID_TOKEN = /(?<![0-9a-z])[0-9a-z]{31,37}(?![0-9a-z])/g;
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
