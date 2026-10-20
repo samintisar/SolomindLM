@@ -129,10 +129,10 @@ function hasWholePhrase(paddedHaystack: string, phrase: string): boolean {
   const words = phrase.split(" ");
   const last = words.pop() ?? "";
   if (last === "") return false;
-  // The decimal point kept by normalizeForMatch is the only regex metacharacter that can remain.
-  const escapeDots = (w: string) => w.replace(/\./g, "\\.");
-  const lastForms = [last, ...singularForms(last)].map(escapeDots).join("|");
-  const head = words.map((w) => `${escapeDots(w)} `).join("");
+  // Escape every regex metacharacter (normalizeForMatch keeps the decimal point in "0.75").
+  const escapeRegex = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const lastForms = [last, ...singularForms(last)].map(escapeRegex).join("|");
+  const head = words.map((w) => `${escapeRegex(w)} `).join("");
   return new RegExp(` ${head}(?:${lastForms})(?:es|s)? `).test(paddedHaystack);
 }
 
