@@ -16,7 +16,7 @@ const fixture: EvalFixture = {
 };
 
 describe("runStudioEval tokenUsageSource", () => {
-  it("omits tokenUsageSource when the invoker does not report one", async () => {
+  it("marks usage estimated when the invoker reports usage without a source", async () => {
     const invoker: StudioInvoker = {
       kind: "report",
       invoke: async () => ({
@@ -32,8 +32,23 @@ describe("runStudioEval tokenUsageSource", () => {
     );
 
     expect(errors).toEqual([]);
-    expect(artifact.tokenUsageSource).toBeUndefined();
+    expect(artifact.tokenUsageSource).toBe("estimated");
     expect(artifact.tokenUsage).toEqual({ prompt: 1, completion: 2, total: 3 });
+  });
+
+  it("leaves tokenUsageSource unset when there is no usage at all", async () => {
+    const invoker: StudioInvoker = {
+      kind: "report",
+      invoke: async () => ({ raw: { title: "T", content: "body" }, latencyMs: 12 }),
+    };
+
+    const { artifact } = await runStudioEval(
+      { fixture, config: snapshotRetrievalConfig(), kind: "report" },
+      invoker
+    );
+
+    expect(artifact.tokenUsage).toBeUndefined();
+    expect(artifact.tokenUsageSource).toBeUndefined();
   });
 
   it("copies provider token usage source and stage spans from the invoker", async () => {
@@ -72,7 +87,12 @@ describe("runStudioEval quiz serialization", () => {
       invoke: async () => ({
         raw: {
           questions: [
-            { question: "Which is prime?", options: ["4", "6", "7", "9"], answer: 2 },
+            {
+              question: "Which is prime?",
+              options: ["4", "6", "7", "9"],
+              answer: 2,
+              explanation: "7 has no divisors besides 1 and itself.",
+            },
             { question: "Legacy shape", options: ["x", "y"], correctAnswer: "y" },
           ],
         },
@@ -89,5 +109,34 @@ describe("runStudioEval quiz serialization", () => {
     expect(artifact.answer).toContain("A: 7");
     expect(artifact.answer).not.toMatch(/A: 2\b/);
     expect(artifact.answer).toContain("A: y");
+  });
+
+  it("prints the explanation after the answer when the question has one", async () => {
+    const invoker: StudioInvoker = {
+      kind: "quiz",
+      invoke: async () => ({
+        raw: {
+          questions: [
+            {
+              question: "Which is prime?",
+              options: ["4", "6", "7", "9"],
+              answer: 2,
+              explanation: "7 has no divisors besides 1 and itself.",
+            },
+            { question: "No explanation", options: ["x", "y"], answer: 0 },
+          ],
+        },
+        latencyMs: 5,
+      }),
+    };
+
+    const { artifact } = await runStudioEval(
+      { fixture: { ...fixture, runner: "quiz" }, config: snapshotRetrievalConfig(), kind: "quiz" },
+      invoker
+    );
+
+    expect(artifact.answer).toContain("A: 7\nExplanation: 7 has no divisors besides 1 and itself.");
+    expect(artifact.answer).not.toMatch(/Explanation: \n/);
+    expect(artifact.answer.match(/Explanation:/g)).toHaveLength(1);
   });
 });

@@ -12,6 +12,7 @@ import type {
   MetricStatus,
 } from "../types";
 import { metricResult } from "./metricResult";
+import { passageAbstentionRecalls } from "./retrievalGold";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -20,64 +21,55 @@ import { metricResult } from "./metricResult";
  * Maps canonical names to alternative names the LLM might use.
  */
 const SYNONYM_MAPPINGS: Record<string, string[]> = {
-  routing: ["tool selection", "tool use", "router", "routing", "intelligent routing"],
-  parallelization: ["parallel workers", "parallel", "parallelization", "multi-worker"],
-  "learning and adaptation": ["feedback loop", "adaptation", "learning", "continuous improvement"],
+  routing: ["tool selection", "router", "routing", "intelligent routing"],
+  parallelization: ["parallel workers", "parallelization", "multi-worker"],
+  "learning and adaptation": ["adaptation", "continuous improvement"],
   "resource-aware optimization": [
     "resource aware",
     "resource optimization",
     "routing by complexity",
   ],
-  prioritization: ["task scoring", "triage", "priority", "task prioritization", "scoring"],
-  "multi-agent collaboration": [
-    "multi agent",
-    "multi-agent",
-    "agent collaboration",
-    "orchestration",
-  ],
-  "memory management": ["memory", "long-term memory", "memory systems"],
+  prioritization: ["task scoring", "triage", "task prioritization"],
+  "multi-agent collaboration": ["multi agent", "multi-agent", "agent collaboration"],
+  "memory management": ["memory systems"],
   "human in the loop": ["human in the loop", "human-in-the-loop", "human intervention", "hitl"],
-  "guardrails and safety patterns": ["guardrails", "safety", "safety patterns", "security"],
-  "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals", "planning"],
-  "exception handling and recovery": [
-    "exception handling",
-    "error handling",
-    "recovery",
-    "fallback",
-  ],
-  "knowledge retrieval": ["retrieval", "knowledge", "rag", "context retrieval"],
-  "inter-agent communication": ["communication", "agent communication", "messaging"],
-  "reasoning techniques": ["reasoning", "tree of thought", "branching", "to"],
-  "evaluation and monitoring": ["evaluation", "monitoring", "testing", "metrics"],
-  "exploration and discovery": ["exploration", "discovery", "research"],
-  "tool use": ["tool", "tools", "tool calling", "function calling"],
-  planning: ["planning", "plan", "step-by-step", "sequential"],
-  reflection: ["reflection", "critique", "self-reflection", "review"],
-  "prompt chaining": ["prompt chaining", "chaining", "chain"],
+  "guardrails and safety patterns": ["guardrails", "guardrail", "safety patterns"],
+  "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals"],
+  "exception handling and recovery": ["exception handling", "error handling"],
+  "knowledge retrieval": ["retrieval augmented generation", "context retrieval"],
+  "inter-agent communication": ["agent communication"],
+  "reasoning techniques": ["tree of thought"],
+  "tool use": ["tool calling", "function calling"],
+  reflection: ["critique", "self-reflection"],
 };
 
+/** Words that never count toward the "significant words" rule for multi-word items. */
+const STOPWORDS = new Set(["and", "the", "with", "for", "from", "into"]);
+
 /**
- * Get all possible names for a canonical term (including the term itself).
+ * Words too common in pattern prose to count as evidence for an item: every answer about "the
+ * 20 patterns" says "patterns", so "reasoning techniques" must not be credited by it.
+ */
+const COMMON_ITEM_WORDS = new Set([
+  "patterns",
+  "techniques",
+  "agent",
+  "agents",
+  "management",
+  "systems",
+  "based",
+]);
+
+/**
+ * The canonical name's variations: the term itself plus the synonyms listed under that exact
+ * canonical key. Another item's synonym list is never consulted.
  */
 function getAllVariations(term: string): string[] {
   const normalized = normalizeForMatch(term);
-  const variations = [normalized];
-
-  // Check if term has synonym mappings
-  for (const [canonical, synonyms] of Object.entries(SYNONYM_MAPPINGS)) {
-    if (
-      normalized === normalizeForMatch(canonical) ||
-      synonyms.some((s) => normalizeForMatch(s) === normalized)
-    ) {
-      // Add all synonyms
-      for (const synonym of synonyms) {
-        variations.push(normalizeForMatch(synonym));
-      }
-      break;
-    }
-  }
-
-  return variations;
+  const entry = Object.entries(SYNONYM_MAPPINGS).find(
+    ([canonical]) => normalizeForMatch(canonical) === normalized
+  );
+  return [normalized, ...(entry ? entry[1].map(normalizeForMatch) : [])];
 }
 
 /** Normalize text for matching: lowercase, remove special chars, normalize spaces */
@@ -90,42 +82,78 @@ function normalizeForMatch(text: string): string {
     .trim();
 }
 
-/** Generate variations of a term for fuzzy matching */
+/**
+ * Whole-phrase variations of a term: the term itself, its explicit synonyms, and each of them with
+ * one adjacent pair of words joined ("feedforward network" for "feed forward network").
+ */
 function generateVariations(term: string): string[] {
-  const normalized = normalizeForMatch(term);
-  const variations = getAllVariations(normalized);
-
-  // Split by space and generate word-level variations
-  const words = normalized.split(" ").filter((w) => w.length > 2);
-
-  // Add individual significant words as variations
-  for (const word of words) {
-    if (word.length >= 4) {
-      // Only meaningful words
-      variations.push(word);
+  const variations = [...new Set(getAllVariations(term))];
+  const joined: string[] = [];
+  for (const variation of variations) {
+    const words = variation.split(" ");
+    for (let i = 0; i < words.length - 1; i++) {
+      joined.push([...words.slice(0, i), words[i] + words[i + 1], ...words.slice(i + 2)].join(" "));
     }
   }
-
-  // Add compound variation (no spaces)
-  if (words.length > 1) {
-    variations.push(words.join(""));
-  }
-
-  return [...new Set(variations)]; // Deduplicate
+  return [...new Set([...variations, ...joined])];
 }
 
-/** Check if any variation of the needle is found in the haystack */
-function containsFuzzy(haystack: string, needle: string): boolean {
-  const normalizedHaystack = normalizeForMatch(haystack);
-  const variations = generateVariations(needle);
+/**
+ * Singular forms of a needle's last word, for the "a neural network" / "neural networks" case.
+ * Words of four letters or fewer, and words ending in ss, us, is or os ("rectus", "analysis"),
+ * keep their s: it belongs to the stem.
+ */
+function singularForms(word: string): string[] {
+  if (word.length < 5 || /(?:ss|us|is|os)$/.test(word)) return [];
+  const forms: string[] = [];
+  if (word.endsWith("es")) forms.push(word.slice(0, -2));
+  if (word.endsWith("s")) forms.push(word.slice(0, -1));
+  return forms;
+}
 
-  for (const variation of variations) {
-    if (normalizedHaystack.includes(variation)) {
-      return true;
-    }
+/**
+ * Whether `phrase` (normalised) appears in the padded haystack as whole words. The last word
+ * matches in either number: the needle's plural or singular form, with an optional "s" or "es" in
+ * the haystack. Apostrophes are already removed by normalizeForMatch ("Routing's" is "routings").
+ */
+function hasWholePhrase(paddedHaystack: string, phrase: string): boolean {
+  const words = phrase.split(" ");
+  const last = words.pop() ?? "";
+  if (last === "") return false;
+  const lastForms = [last, ...singularForms(last)].join("|");
+  const head = words.map((w) => `${w} `).join("");
+  return new RegExp(` ${head}(?:${lastForms})(?:es|s)? `).test(paddedHaystack);
+}
+
+/**
+ * Whether `needle` is found in `haystack` on word boundaries. A multi-word needle matches when
+ * its whole phrase or an explicit synonym appears, or on its significant words (4+ chars, not
+ * stopwords or COMMON_ITEM_WORDS): all of them when there are two, at least two when there are
+ * three or more. An item with fewer than two significant words matches only by phrase or synonym.
+ * A single-word needle matches only as itself or a synonym.
+ */
+function containsFuzzy(haystack: string, needle: string): boolean {
+  const paddedHaystack = ` ${normalizeForMatch(haystack)} `;
+
+  if (generateVariations(needle).some((v) => hasWholePhrase(paddedHaystack, v))) {
+    return true;
   }
 
-  return false;
+  const words = normalizeForMatch(needle).split(" ");
+  if (words.length < 2) {
+    return false;
+  }
+  const significant = [
+    ...new Set(
+      words.filter((w) => w.length >= 4 && !STOPWORDS.has(w) && !COMMON_ITEM_WORDS.has(w))
+    ),
+  ];
+  if (significant.length < 2) {
+    return false;
+  }
+  // Two significant words: both must appear. Three or more: at least two.
+  const found = significant.filter((w) => hasWholePhrase(paddedHaystack, w)).length;
+  return found >= 2;
 }
 
 /** Case-insensitive substring check (kept for backward compatibility). */
@@ -159,9 +187,27 @@ function recallScore(matched: number, total: number): number {
   return matched / total;
 }
 
+/**
+ * Decline forms that are not plain phrases. Each names a source (documents, notes, papers, the
+ * report) or a stated absence, so a technical negation about the subject ("the study did not
+ * include children") does not match.
+ */
+const DECLINE_PATTERNS: RegExp[] = [
+  /\bdo(?:es)?(?:n't|\s+not)\s+provide\s+(?:any\s+)?information\b/,
+  /\b(?:is(?:n't|\s+not)\s+|not\s+)covered\s+in\s+(?:your|the|these|the\s+selected)\s+(?:documents|sources|notes|papers)\b/,
+  /\b(?:sources|notes|papers|documents|report|passages)\s+(?:do|does)(?:n't|\s+not)\s+(?:cover|mention|discuss|contain|address|include)\b/,
+  /\b(?:there\s+is\s+)?no\s+mention\s+of\b/,
+  /\bi\s+don't\s+see\s+any\s+information\b/,
+  /\bnot\s+(?:mentioned|discussed|addressed)\s+in\b/,
+];
+
 /** Check whether the answer text exhibits abstention language. */
 function answerAbstains(answer: string): boolean {
-  const lower = answer.toLowerCase();
+  // Models write curly apostrophes and quotes; match them as straight ones.
+  const text = answer
+    .replace(/[‘’‛′]/g, "'")
+    .replace(/[“”„]/g, '"')
+    .toLowerCase();
   // Phrases must be specific enough not to fire on legitimate negations in source-backed
   // technical prose (e.g. "points do not have enough neighbours").
   const phraseSignals = [
@@ -184,9 +230,9 @@ function answerAbstains(answer: string): boolean {
     "based on the retrieved passages, i cannot",
     "based on what's available, i cannot",
   ];
-  if (phraseSignals.some((s) => lower.includes(s))) return true;
-  if (/\bi ['']?(?:m|am) not able to\b/i.test(answer)) return true;
-  return false;
+  if (phraseSignals.some((s) => text.includes(s))) return true;
+  if (/\bi(?:'m|\s+am)\s+not\s+able\s+to\b/.test(text)) return true;
+  return DECLINE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /** Recall of expected items within a set of chunks (checks all chunk content). */
@@ -213,6 +259,16 @@ export function expectedItemRecall(
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
+  if (artifact.retrievalOnly) {
+    return metricResult(
+      "expected_item_recall",
+      fixture,
+      artifact,
+      "info",
+      0,
+      "retrieval-only run: no answer was generated, so answer recall is not scored."
+    );
+  }
   if (fixture.expectedItems.length === 0) {
     return metricResult(
       "expected_item_recall",
@@ -505,19 +561,68 @@ export function retrievalNdcgAtK(
 
 // ─── 5. Abstention Correctness ──────────────────────────────────
 
+/** Item-mode recall needed to count a stage as holding the context (unchanged). */
+const ITEM_SUFFICIENT_RECALL = 0.7;
+/** Passage-mode recall needed to count a stage as holding the context (see abstentionCorrectness). */
+const PASSAGE_SUFFICIENT_RECALL = 0.6;
+/** Passage mode: a selected-stage miss at or above this is a warn, below it a fail. */
+const PASSAGE_PARTIAL_SELECTED_RECALL = 0.5;
+
 /**
- * Deterministic routing rule:
- * - If selected-context item recall >= 0.7 and answer abstains: "answer_generation" error, fail.
- * - If raw or post-rerank recall >= 0.7 but selected-context recall < 0.7: "context_selection" miss, fail.
- * - If all snapshots < 0.7: "retrieval_coverage" miss, warn.
- * - If answer provides items and recall >= 0.7: pass.
+ * Unanswerable fixtures (`expectAbstain`): the sources lack the answer, so declining is correct and
+ * any answer that does not abstain is hallucination under pressure. Item and passage rules do not
+ * apply, since there are no expected items to recall.
+ */
+function unanswerableAbstention(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
+  if (answerAbstains(artifact.answer)) {
+    return metricResult(
+      "abstention_correctness",
+      fixture,
+      artifact,
+      "pass",
+      1,
+      "Answer declines: the sources do not contain the answer.",
+      { category: "correct_abstention", abstains: true }
+    );
+  }
+  return metricResult(
+    "abstention_correctness",
+    fixture,
+    artifact,
+    "fail",
+    0,
+    "Answer does not decline although the sources do not contain the answer.",
+    { category: "hallucination_under_pressure", abstains: false }
+  );
+}
+
+/**
+ * Thresholds. Item mode: "sufficient" is 0.7. Passage mode is looser: with 2 or 3 passages, 0.7
+ * would mean every passage, so losing one of three would fail. Passage mode uses 0.6 for
+ * sufficient, and 0.5 as the floor below which a context-selection miss is a fail rather than a
+ * warn.
+ *
+ * Deterministic routing rule (sufficient = the mode's sufficient threshold):
+ * - If selected-context recall >= sufficient and the answer abstains with answer recall < 0.5:
+ *   "answer_generation" error, fail. An answer with recall >= 0.5 has answered, so a decline
+ *   fragment about its missing items falls through to the rules below.
+ * - If raw or post-rerank recall >= sufficient but selected-context recall < sufficient:
+ *   "context_selection" miss. Fail; in passage mode, warn when selected recall is >= 0.5.
+ * - If all snapshots < sufficient: "retrieval_coverage" miss, warn.
+ * - If answer provides items and recall >= sufficient: pass.
  */
 export function abstentionCorrectness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
 ): MetricResult {
-  if (fixture.expectedItems.length === 0) {
+  if (fixture.expectAbstain === true) {
+    return unanswerableAbstention(fixture, artifact);
+  }
+  // Without expectedItems, the same rules run on gold passages when the fixture has them (D1).
+  const passageMode =
+    fixture.expectedItems.length === 0 && (fixture.expectedPassages?.length ?? 0) > 0;
+  if (fixture.expectedItems.length === 0 && !passageMode) {
     return metricResult(
       "abstention_correctness",
       fixture,
@@ -528,25 +633,33 @@ export function abstentionCorrectness(
       { category: "none" }
     );
   }
-  const selectedRecall = chunkRecall(artifact.selectedChunks, fixture.expectedItems).score;
-  const preRerankRecall = chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score;
-  const postRerankRecall = chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score;
+  const unit = passageMode ? "passages" : "items";
+  const { selectedRecall, preRerankRecall, postRerankRecall, answerRecall } = passageMode
+    ? passageAbstentionRecalls(fixture, artifact)
+    : {
+        selectedRecall: chunkRecall(artifact.selectedChunks, fixture.expectedItems).score,
+        preRerankRecall: chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score,
+        postRerankRecall: chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score,
+        answerRecall: recallScore(
+          countMatches(artifact.answer, fixture.expectedItems).matched.length,
+          fixture.expectedItems.length
+        ),
+      };
 
   const abstains = answerAbstains(artifact.answer);
-  const answerRecall = recallScore(
-    countMatches(artifact.answer, fixture.expectedItems).matched.length,
-    fixture.expectedItems.length
-  );
+  const sufficient = passageMode ? PASSAGE_SUFFICIENT_RECALL : ITEM_SUFFICIENT_RECALL;
 
-  // Rule 1: Sufficient context was selected but answer still abstained.
-  if (selectedRecall >= 0.7 && abstains) {
+  // Rule 1: Sufficient context was selected but the answer abstained without giving the items.
+  // An answer that lists at least half of them has answered; a decline fragment about the rest
+  // ("the notes do not mention the fifth") does not make it a wrongful abstention.
+  if (selectedRecall >= sufficient && abstains && answerRecall < 0.5) {
     return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
       "fail",
       selectedRecall,
-      "Answer abstains despite sufficient context (selected recall >= 0.7). Answer generation error.",
+      `Answer abstains despite sufficient context (selected recall >= ${sufficient}). Answer generation error.`,
       {
         category: "answer_generation",
         selectedRecall,
@@ -559,14 +672,19 @@ export function abstentionCorrectness(
   }
 
   // Rule 2: Pre-rerank or post-rerank had items, but context selection dropped them.
-  if ((preRerankRecall >= 0.7 || postRerankRecall >= 0.7) && selectedRecall < 0.7) {
+  if (
+    (preRerankRecall >= sufficient || postRerankRecall >= sufficient) &&
+    selectedRecall < sufficient
+  ) {
+    const status: MetricStatus =
+      passageMode && selectedRecall >= PASSAGE_PARTIAL_SELECTED_RECALL ? "warn" : "fail";
     return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
-      "fail",
+      status,
       selectedRecall,
-      "Relevant items existed pre-selection but were dropped. Context selection miss.",
+      `Relevant ${unit} existed pre-selection but were dropped. Context selection miss.`,
       {
         category: "context_selection",
         selectedRecall,
@@ -579,14 +697,18 @@ export function abstentionCorrectness(
   }
 
   // Rule 3: Retrieval never found the items.
-  if (selectedRecall < 0.7 && preRerankRecall < 0.7 && postRerankRecall < 0.7) {
+  if (
+    selectedRecall < sufficient &&
+    preRerankRecall < sufficient &&
+    postRerankRecall < sufficient
+  ) {
     return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
       "warn",
       Math.max(selectedRecall, preRerankRecall, postRerankRecall),
-      "Retrieval could not find expected items across any stage. Retrieval coverage miss.",
+      `Retrieval could not find expected ${unit} across any stage. Retrieval coverage miss.`,
       {
         category: "retrieval_coverage",
         selectedRecall,
@@ -605,7 +727,7 @@ export function abstentionCorrectness(
     artifact,
     "pass",
     selectedRecall,
-    "Answer provides expected items with sufficient recall.",
+    `Answer provides expected ${unit} with sufficient recall.`,
     {
       category: "none",
       selectedRecall,
@@ -635,9 +757,10 @@ export function citationValidity(
   const selectedChunkIds = new Set(artifact.selectedChunks.map((c) => c.id));
   const citations = artifact.citations;
   // Word-boundary cues only — avoid false positives (e.g. "resources" contains "source").
-  const expectsCitation = /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(
-    fixture.expectedBehavior
-  );
+  // A decline has nothing to cite, even when its expectedBehavior names the sources.
+  const expectsCitation =
+    fixture.expectAbstain !== true &&
+    /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(fixture.expectedBehavior);
 
   // No citations found in the answer.
   if (citations.length === 0) {
@@ -716,81 +839,95 @@ const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   writtenQuestions: 90000,
   audioScript: 240000,
 };
-const PER_RUNNER_TOKEN_GATE: Record<string, number> = {
-  chat: 8000,
-  research: 20000,
-  both: 20000,
-  report: 25000,
-  flashcards: 20000,
-  quiz: 20000,
-  mindmap: 20000,
-  infographic: 15000,
-  spreadsheet: 20000,
-  writtenQuestions: 20000,
-  audioScript: 15000,
-  audioScriptOnly: 8000,
-  literatureReview: 30000,
-};
+/** Token ratio to the case's own history: pass up to 1.5x its median, warn up to 2x, fail beyond. */
+const HISTORY_TOKEN_PASS_RATIO = 1.5;
+const HISTORY_TOKEN_WARN_RATIO = 2;
+
+function ratioStatus(ratio: number, passAt: number, warnAt: number): MetricStatus {
+  if (ratio <= passAt) return "pass";
+  if (ratio <= warnAt) return "warn";
+  return "fail";
+}
+
+const STATUS_RANK: Record<MetricStatus, number> = { info: 0, pass: 1, warn: 2, fail: 3 };
+
+function worstStatus(a: MetricStatus, b: MetricStatus): MetricStatus {
+  return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
+}
 
 /**
- * Checks latency and token cost against a baseline or static gates.
+ * Checks latency and token cost.
  *
- * If a baseline is provided: pass if within 1.2x, warn if within 2x, fail otherwise.
- * If no baseline: pass if within per-runner latency and token gates, warn if within 2x, fail otherwise.
+ * Latency: against the baseline (pass within 1.2x, warn within 2x) or, without one, the
+ * per-runner latency gate (pass under it, warn under 2x).
+ *
+ * Tokens (provider counts only; chars/4 estimates are reported, never gated): against the
+ * baseline's tokens when it recorded any (1.2x / 2x), else against `historyTokens`, the median
+ * per-run tokens of this case's recent runs from the cost history (1.5x / 2x). With neither,
+ * tokens are reported but not gated: a fixed per-runner token cap went stale as agents grew.
  */
 export function latencyCostBudget(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline
+  baseline?: EvalBaseline,
+  historyTokens?: number
 ): MetricResult {
   const latencyMs = artifact.latencyMs;
   const totalTokens = artifact.tokenUsage?.total ?? 0;
+  const providerTokens = artifact.tokenUsageSource === "provider";
 
-  if (baseline) {
-    const latencyRatio = latencyMs / baseline.latencyMs;
-    const tokenRatio = baseline.tokenUsage.total > 0 ? totalTokens / baseline.tokenUsage.total : 0;
-    const worstRatio = Math.max(latencyRatio, tokenRatio);
-
-    let status: MetricStatus;
-    if (worstRatio <= 1.2) status = "pass";
-    else if (worstRatio <= 2.0) status = "warn";
-    else status = "fail";
-
+  if (baseline && artifact.retrievalOnly) {
+    // A retrieval-only run times retrieval alone; a full-run baseline would always look like a fail.
     return metricResult(
       "latency_cost_budget",
       fixture,
       artifact,
-      status,
-      worstRatio,
-      `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x), tokens ${totalTokens} (baseline ${baseline.tokenUsage.total}, ${tokenRatio.toFixed(2)}x).`,
-      {
-        latencyMs,
-        totalTokens,
-        latencyRatio: Math.round(latencyRatio * 100) / 100,
-        tokenRatio: Math.round(tokenRatio * 100) / 100,
-        baselineLatencyMs: baseline.latencyMs,
-        baselineTotalTokens: baseline.tokenUsage.total,
-      }
+      "info",
+      1,
+      "retrieval-only: not compared to a full-run baseline",
+      { latencyMs, totalTokens, retrievalOnly: true }
     );
   }
 
-  // No baseline: use static gates (per-runner where defined).
+  let latencyStatus: MetricStatus;
+  let latencyPart: string;
+  let latencyRatio: number | undefined;
   const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
-  const tokenGate = PER_RUNNER_TOKEN_GATE[artifact.runner] ?? 8000;
-  const latencyOk = latencyMs <= latencyGate;
-  const tokensOk = totalTokens <= tokenGate;
+  if (baseline) {
+    latencyRatio = latencyMs / baseline.latencyMs;
+    latencyStatus = ratioStatus(latencyRatio, 1.2, 2);
+    latencyPart = `Latency ${latencyMs}ms (baseline ${baseline.latencyMs}ms, ${latencyRatio.toFixed(2)}x)`;
+  } else {
+    latencyStatus = ratioStatus(latencyMs / latencyGate, 1, 2);
+    latencyPart = `Latency ${latencyMs}ms (gate ${latencyGate}ms)`;
+  }
 
-  let status: MetricStatus;
-  if (latencyOk && tokensOk) status = "pass";
-  else if (latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2) status = "warn";
-  else status = "fail";
+  const baselineTokens = baseline?.tokenUsage.total ?? 0;
+  const reference =
+    baselineTokens > 0
+      ? { tokens: baselineTokens, label: "baseline", passAt: 1.2, warnAt: 2 }
+      : historyTokens !== undefined && historyTokens > 0
+        ? {
+            tokens: Math.round(historyTokens),
+            label: "case median",
+            passAt: HISTORY_TOKEN_PASS_RATIO,
+            warnAt: HISTORY_TOKEN_WARN_RATIO,
+          }
+        : undefined;
+  const tokensGated = providerTokens && reference !== undefined;
+  const tokenRatio = tokensGated && reference ? totalTokens / reference.tokens : undefined;
+  const tokenStatus =
+    tokenRatio !== undefined && reference
+      ? ratioStatus(tokenRatio, reference.passAt, reference.warnAt)
+      : "pass";
+  const tokenPart = !providerTokens
+    ? `tokens ${totalTokens} (estimated, not gated)`
+    : tokenRatio !== undefined && reference
+      ? `tokens ${totalTokens} (${reference.label} ${reference.tokens}, ${tokenRatio.toFixed(2)}x)`
+      : `tokens ${totalTokens} (no token history yet, not gated)`;
 
-  const score =
-    latencyOk && tokensOk
-      ? 1
-      : latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2
-        ? 0.5
-        : 0;
+  const status = worstStatus(latencyStatus, tokenStatus);
+  const score = status === "pass" ? 1 : status === "warn" ? 0.5 : 0;
 
   return metricResult(
     "latency_cost_budget",
@@ -798,15 +935,21 @@ export function latencyCostBudget(
     artifact,
     status,
     score,
-    `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`,
+    `${latencyPart}, ${tokenPart}`,
     {
       latencyMs,
       totalTokens,
-      latencyGate,
-      tokenGate,
-      latencyOk,
-      tokensOk,
-      hasBaseline: false,
+      hasBaseline: baseline !== undefined,
+      ...(baseline
+        ? { baselineLatencyMs: baseline.latencyMs, baselineTotalTokens: baselineTokens }
+        : { latencyGate }),
+      ...(latencyRatio !== undefined ? { latencyRatio: Math.round(latencyRatio * 100) / 100 } : {}),
+      tokensGated,
+      ...(tokenRatio !== undefined ? { tokenRatio: Math.round(tokenRatio * 100) / 100 } : {}),
+      ...(reference && tokensGated
+        ? { tokenReference: reference.label, referenceTokens: reference.tokens }
+        : {}),
+      ...(artifact.callCounters ? { callCounters: artifact.callCounters } : {}),
     }
   );
 }

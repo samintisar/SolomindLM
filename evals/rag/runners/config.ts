@@ -1,3 +1,24 @@
+import { CHAT_PROMPT_VERSION } from "../../../convex/_agents/chat/chat_llm_prompts";
+import {
+  LIST_QUERY_CONTEXT_TOKEN_BUDGET,
+  LIST_QUERY_MAX_SELECTED_CHUNKS,
+  MAX_NEIGHBOUR_PASSAGES,
+  MAX_OPENING_PASSAGES,
+  MAX_PER_SOURCE_DOCUMENTS,
+  MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
+  MULTI_SOURCE_MAX_EXTRA_TOKENS,
+  NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+  OPENING_PASSAGE_TOKEN_BUDGET,
+  PER_SOURCE_PASSAGES_PER_SEARCH,
+} from "../../../convex/_agents/chat/chatConfig";
+import {
+  DEFAULT_FAST_MODEL_ID,
+  DEFAULT_SMART_MODEL_ID,
+} from "../../../convex/_lib/defaultSmartModel";
+import {
+  RAG_CHUNK_OVERLAP_TOKENS,
+  RAG_CHUNK_SIZE_TOKENS,
+} from "../../../convex/_lib/embeddingConfig";
 import { env } from "../../../convex/_lib/env";
 import type { RetrievalConfigSnapshot } from "../types";
 
@@ -30,6 +51,25 @@ export function snapshotRetrievalConfig(
     rrfK: parseInt(env.CHAT_RRF_K, 10),
     enableHybrid: env.CHAT_ENABLE_HYBRID_SEARCH !== "false",
     hybridThreshold: parseFloat(env.CHAT_HYBRID_THRESHOLD),
+
+    // Context budgets beyond selection (convex/_agents/chat/chatConfig.ts)
+    listQueryContextTokenBudget: LIST_QUERY_CONTEXT_TOKEN_BUDGET,
+    listQueryMaxSelectedChunks: LIST_QUERY_MAX_SELECTED_CHUNKS,
+    neighbourPassageTokenBudget: NEIGHBOUR_PASSAGE_TOKEN_BUDGET,
+    maxNeighbourPassages: MAX_NEIGHBOUR_PASSAGES,
+    openingPassageTokenBudget: OPENING_PASSAGE_TOKEN_BUDGET,
+    maxOpeningPassages: MAX_OPENING_PASSAGES,
+    multiSourceExtraTokensPerDocument: MULTI_SOURCE_EXTRA_TOKENS_PER_DOCUMENT,
+    multiSourceMaxExtraTokens: MULTI_SOURCE_MAX_EXTRA_TOKENS,
+    perSourcePassagesPerSearch: PER_SOURCE_PASSAGES_PER_SEARCH,
+    maxPerSourceDocuments: MAX_PER_SOURCE_DOCUMENTS,
+
+    // Indexing and models
+    chunkSizeTokens: RAG_CHUNK_SIZE_TOKENS,
+    chunkOverlapTokens: RAG_CHUNK_OVERLAP_TOKENS,
+    smartModel: DEFAULT_SMART_MODEL_ID,
+    fastModel: DEFAULT_FAST_MODEL_ID,
+    promptVersion: CHAT_PROMPT_VERSION,
   };
 
   return { ...defaults, ...overrides };

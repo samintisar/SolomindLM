@@ -102,6 +102,22 @@ describe("storeAudioOverviewScript", () => {
       })
     ).resolves.toBe(false);
   });
+
+  test("stores telemetry whose usage carries cachedPrompt", async () => {
+    const t = convexTest(schema, modules);
+    const cachedUsage = { prompt: 10, completion: 2, total: 12, cachedPrompt: 6 };
+    const audioOverviewId = await runToSynthesis(t, {
+      ...synthesisInput,
+      telemetry: {
+        tokenUsage: cachedUsage,
+        tokenUsageSource: "provider" as const,
+        stageSpans: [{ stage: "reduce" as const, latencyMs: 5, tokenUsage: cachedUsage }],
+      },
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(audioOverviewId));
+    expect(row?.metadata.synthesisInput.telemetry.tokenUsage).toEqual(cachedUsage);
+  });
 });
 
 describe("synthesis handoff cleanup", () => {

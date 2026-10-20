@@ -1,7 +1,10 @@
+import { VALID_LANGUAGE_CODES } from "../../../convex/_agents/_shared/languageInstruction";
+import type { ChatConfigOverrides } from "../../../convex/_agents/chat/chatConfigOverrides";
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext, ReferenceChunk } from "../../../convex/_agents/chat/types";
+import { AVAILABLE_SMART_MODEL_IDS } from "../../../convex/_lib/resolveSmartModel";
 import { inferSourceChannel } from "../metrics/sourceAware";
-import type { ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
+import type { CallCounters, ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
 import { runWithHarness } from "./harness";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
@@ -11,10 +14,21 @@ import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 // or CLI harness) provides an invoker that wraps the real agent
 // call and returns a structured result.
 
+/** Settings production passes the agent outside ChatAgentContext (ChatAgentOptions). */
+export interface EvalChatOptions {
+  smartModel?: string;
+  outputLanguage?: string;
+}
+
+export type ChatInvokeInput = ChatAgentContext & {
+  sourcePolicy?: import("../types").SourcePolicyConfig;
+  chatOptions?: EvalChatOptions;
+  /** Chat knobs to override for this question; absent for production values. */
+  configOverrides?: ChatConfigOverrides;
+};
+
 export interface ChatAgentInvoker {
-  invoke(
-    context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }
-  ): Promise<{
+  invoke(context: ChatInvokeInput): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -26,7 +40,13 @@ export interface ChatAgentInvoker {
     tokenUsage?: { prompt: number; completion: number; total: number };
     tokenUsageSource?: "provider" | "estimated";
     stageSpans?: import("../types").AgentStageSpan[];
+    callCounters?: CallCounters;
+    contextTokenBudget?: number;
+    instructionMode?: "default" | "learningGuide" | "custom";
     sourcePolicy?: import("../types").SourcePolicyConfig;
+    /** True when the deployment stopped after context selection (no answer). */
+    retrievalOnly?: boolean;
+    configOverrides?: ChatConfigOverrides;
   }>;
 }
 
@@ -46,6 +66,22 @@ function toChunkSnapshot(chunk: ReferenceChunk): ChunkSnapshot {
   };
 }
 
+/** Chat settings for a fixture. Notebook instructions make the mode custom, as in production. */
+function fixtureChatSettings(fixture: EvalFixture): NonNullable<ChatAgentContext["chatSettings"]> {
+  const instructions = fixture.chat?.instructions?.trim();
+  if (instructions) {
+    return {
+      instructionMode: "custom",
+      customInstructions: instructions,
+      responseLength: "default",
+    };
+  }
+  return {
+    instructionMode: fixture.chatSettings?.instructionMode ?? "default",
+    responseLength: "default",
+  };
+}
+
 function validateFixture(fixture: EvalFixture): string[] {
   const errors: string[] = [];
 
@@ -61,6 +97,31 @@ function validateFixture(fixture: EvalFixture): string[] {
     errors.push("Fixture must have at least one expectedItem or a non-empty expectedAnswer");
   }
 
+  for (const turn of fixture.turns ?? []) {
+    if (turn.role !== "user" && turn.role !== "assistant") {
+      errors.push(`turns must have role "user" or "assistant", got "${String(turn.role)}"`);
+    }
+    if (!turn.content?.trim()) {
+      errors.push("turns must have non-empty content");
+    }
+  }
+
+  const chat = fixture.chat;
+  if (chat?.instructions?.trim() && fixture.chatSettings?.instructionMode === "learningGuide") {
+    errors.push(
+      "chat.instructions cannot be combined with chatSettings.instructionMode learningGuide"
+    );
+  }
+  if (
+    chat?.smartModel &&
+    !(AVAILABLE_SMART_MODEL_IDS as readonly string[]).includes(chat.smartModel)
+  ) {
+    errors.push(`chat.smartModel "${chat.smartModel}" is not a listed model`);
+  }
+  if (chat?.outputLanguage && !VALID_LANGUAGE_CODES.includes(chat.outputLanguage)) {
+    errors.push(`chat.outputLanguage "${chat.outputLanguage}" is not a supported language code`);
+  }
+
   return errors;
 }
 
@@ -71,7 +132,7 @@ export async function runChatEval(
   invoker?: ChatAgentInvoker
 ): Promise<EvalRunnerResult> {
   const { fixture } = options;
-  return runWithHarness(options, invoker, {
+  const outcome = await runWithHarness(options, invoker, {
     runner: "chat",
     validate: validateFixture,
     missingInvokerMessage:
@@ -85,12 +146,24 @@ export async function runChatEval(
       // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
       // future invoker starts using it, that invoker must derive a real userId
       // rather than relying on this string.
+      // Prior turns, then the question as the final user turn (production history ends with the
+      // current message too). Learning guide mode is the only one that reads the history.
       const result = await chat.invoke({
         userId: "__eval_unused__",
         noteId: fixture.notebookId ?? "",
-        conversationHistory: [{ role: "user", content: fixture.question }],
+        conversationHistory: [
+          ...(fixture.turns ?? []),
+          { role: "user", content: fixture.question },
+        ],
         documentIds: fixture.documentIds,
         sourcePolicy: fixture.sourcePolicy,
+        ...(options.retrievalOnly ? { evalRetrievalOnly: true } : {}),
+        chatSettings: fixtureChatSettings(fixture),
+        chatOptions: {
+          smartModel: fixture.chat?.smartModel,
+          outputLanguage: fixture.chat?.outputLanguage,
+        },
+        configOverrides: options.config.overrides,
       });
 
       // Build source evidence summary from selected chunks
@@ -135,10 +208,24 @@ export async function runChatEval(
         tokenUsage: result.tokenUsage,
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
         stageSpans: result.stageSpans,
+        callCounters: result.callCounters,
+        contextTokenBudget: result.contextTokenBudget,
+        instructionMode: result.instructionMode,
         sourcePolicy: result.sourcePolicy,
+        configOverrides: result.configOverrides ?? options.config.overrides,
         sourceEvidence,
+        ...(result.retrievalOnly ? { retrievalOnly: true } : {}),
         timestamp: new Date().toISOString(),
       };
     },
   });
+  // Stub artifacts (dry runs, failed invocations) still record the overrides that were requested.
+  if (options.config.overrides) {
+    outcome.artifact.configOverrides ??= options.config.overrides;
+  }
+  // Dry runs never reach the invoker: mark their stub so the retrieval-only metric set applies.
+  if (options.dryRun && options.retrievalOnly) {
+    return { ...outcome, artifact: { ...outcome.artifact, retrievalOnly: true } };
+  }
+  return outcome;
 }

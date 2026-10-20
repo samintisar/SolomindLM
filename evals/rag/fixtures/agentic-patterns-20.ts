@@ -29,6 +29,9 @@ export const AGENTIC_20_ITEMS: readonly string[] = [
   "exploration and discovery",
 ];
 
+/** Local copy of the notebook's source, for judges that need the full text. */
+export const AGENTIC_20_SOURCE_FILES: readonly string[] = ["master-20-agentic-patterns.md"];
+
 /** Notebook ID of the test notebook backed by the 20-patterns markdown source. */
 export const AGENTIC_20_NOTEBOOK_ID = "jd702jq641ensjca91c9hwp4d985pgax";
 
@@ -54,6 +57,12 @@ export const agenticPatterns20: EvalFixture = {
   split: "smoke",
   question: "What are the 20 agentic patterns?",
   expectedItems: [...AGENTIC_20_ITEMS],
+  // Gold passages (D1): one from the start, the middle and the end of the transcript.
+  expectedPassages: [
+    "And the first one we're starting with is prompt chaining.",
+    "This next pattern might be new to a lot of you and it's called resourceaware optimization.",
+    "This is the second last design pattern which is prioritization.",
+  ],
   expectedBehavior:
     "Answer should enumerate all 20 items and cite supporting chunks. " +
     "Must NOT say the list cannot be found or that fewer than 20 patterns exist. " +

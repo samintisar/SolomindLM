@@ -42,6 +42,7 @@ import type * as _agents_audio_overview_scriptParsing from "../_agents/audio_ove
 import type * as _agents_audio_overview_state from "../_agents/audio_overview/state.js";
 import type * as _agents_chat_ChatAgent from "../_agents/chat/ChatAgent.js";
 import type * as _agents_chat_chatConfig from "../_agents/chat/chatConfig.js";
+import type * as _agents_chat_chatConfigOverrides from "../_agents/chat/chatConfigOverrides.js";
 import type * as _agents_chat_chatHistoryBudget from "../_agents/chat/chatHistoryBudget.js";
 import type * as _agents_chat_chatRouter from "../_agents/chat/chatRouter.js";
 import type * as _agents_chat_chat_llm_grounding from "../_agents/chat/chat_llm_grounding.js";
@@ -371,6 +372,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/audio_overview/state": typeof _agents_audio_overview_state;
   "_agents/chat/ChatAgent": typeof _agents_chat_ChatAgent;
   "_agents/chat/chatConfig": typeof _agents_chat_chatConfig;
+  "_agents/chat/chatConfigOverrides": typeof _agents_chat_chatConfigOverrides;
   "_agents/chat/chatHistoryBudget": typeof _agents_chat_chatHistoryBudget;
   "_agents/chat/chatRouter": typeof _agents_chat_chatRouter;
   "_agents/chat/chat_llm_grounding": typeof _agents_chat_chat_llm_grounding;
