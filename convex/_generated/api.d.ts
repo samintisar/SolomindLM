@@ -170,6 +170,7 @@ import type * as _services_extraction_openAccess_fullTextTest from "../_services
 import type * as _services_extraction_openAccess_publicUrl from "../_services/extraction/openAccess/publicUrl.js";
 import type * as _services_extraction_openAccess_resolveHost from "../_services/extraction/openAccess/resolveHost.js";
 import type * as _services_extraction_urlSource from "../_services/extraction/urlSource.js";
+import type * as _services_extraction_wikipedia from "../_services/extraction/wikipedia.js";
 import type * as _services_extractors from "../_services/extractors.js";
 import type * as _services_grading_WrittenQuestionsGradingService from "../_services/grading/WrittenQuestionsGradingService.js";
 import type * as _services_processing_DocumentMetadataExtractor from "../_services/processing/DocumentMetadataExtractor.js";
@@ -294,6 +295,7 @@ import type * as showcase_transferRemap from "../showcase/transferRemap.js";
 import type * as studio__job_collapsePlan from "../studio/_job/collapsePlan.js";
 import type * as studio__job_invokeStudioLlm from "../studio/_job/invokeStudioLlm.js";
 import type * as studio__job_jobDeadline from "../studio/_job/jobDeadline.js";
+import type * as studio__job_mapFailures from "../studio/_job/mapFailures.js";
 import type * as studio__job_studioChunks from "../studio/_job/studioChunks.js";
 import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhases.js";
 import type * as studio_audio_index from "../studio/audio/index.js";
@@ -514,6 +516,7 @@ declare const fullApi: ApiFromModules<{
   "_services/extraction/openAccess/publicUrl": typeof _services_extraction_openAccess_publicUrl;
   "_services/extraction/openAccess/resolveHost": typeof _services_extraction_openAccess_resolveHost;
   "_services/extraction/urlSource": typeof _services_extraction_urlSource;
+  "_services/extraction/wikipedia": typeof _services_extraction_wikipedia;
   "_services/extractors": typeof _services_extractors;
   "_services/grading/WrittenQuestionsGradingService": typeof _services_grading_WrittenQuestionsGradingService;
   "_services/processing/DocumentMetadataExtractor": typeof _services_processing_DocumentMetadataExtractor;
@@ -638,6 +641,7 @@ declare const fullApi: ApiFromModules<{
   "studio/_job/collapsePlan": typeof studio__job_collapsePlan;
   "studio/_job/invokeStudioLlm": typeof studio__job_invokeStudioLlm;
   "studio/_job/jobDeadline": typeof studio__job_jobDeadline;
+  "studio/_job/mapFailures": typeof studio__job_mapFailures;
   "studio/_job/studioChunks": typeof studio__job_studioChunks;
   "studio/audio/audioJobPhases": typeof studio_audio_audioJobPhases;
   "studio/audio/index": typeof studio_audio_index;
