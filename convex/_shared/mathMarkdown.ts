@@ -355,3 +355,91 @@ export function normalizeMathMarkdownDeep<T>(value: T): T {
 
   return value;
 }
+
+// ============================================================
+// Currency dollars (#569)
+// ============================================================
+
+/** LaTeX markup that only a formula would contain. */
+const LATEX_MARKUP = /[\\^_{}]/;
+/** A word of two or more letters: prose, not a bare expression like `5x + 3`. */
+const PROSE_WORD = /\p{L}{2,}/u;
+
+/** Index of the `$` closing an inline span opened at `open`, or -1 (none before a blank line). */
+function findInlineClose(text: string, open: number): number {
+  for (let i = open + 1; i < text.length; i++) {
+    const char = text[i];
+    if (char === "\\") {
+      i++;
+    } else if (char === "\n" && text[i + 1] === "\n") {
+      return -1;
+    } else if (char === "$") {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Whether the span `$…$` from `open` to `close` is currency rather than inline math. Only a `$`
+ * followed by a digit can be currency. It's math when the span holds LaTeX markup, or is a bare
+ * expression (no words) that doesn't end at another amount.
+ */
+function isCurrencySpan(text: string, open: number, close: number): boolean {
+  if (!/\d/.test(text[open + 1] ?? "")) return false;
+  const span = text.slice(open + 1, close);
+  if (LATEX_MARKUP.test(span)) return false;
+  const endsAtAmount = /\d/.test(text[close + 1] ?? "");
+  return endsAtAmount || PROSE_WORD.test(span);
+}
+
+function escapeCurrencyInText(text: string): string {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const char = text[i];
+    if (char === "\\") {
+      out += text.slice(i, i + 2);
+      i += 2;
+    } else if (char === "$" && text[i + 1] === "$") {
+      // Display math: copied whole.
+      const end = text.indexOf("$$", i + 2);
+      const stop = end < 0 ? text.length : end + 2;
+      out += text.slice(i, stop);
+      i = stop;
+    } else if (char === "$") {
+      const close = findInlineClose(text, i);
+      if (close < 0) {
+        // Nothing to pair with, so it can't render as math: leave it.
+        out += char;
+        i++;
+      } else if (isCurrencySpan(text, i, close)) {
+        // Escape only this `$`; the next one is weighed on its own as a possible opener.
+        out += "\\$";
+        i++;
+      } else {
+        // Real math: copied whole, so its closing `$` isn't read as an opener.
+        out += text.slice(i, close + 1);
+        i = close + 1;
+      }
+    } else {
+      out += char;
+      i++;
+    }
+  }
+  return out;
+}
+
+/**
+ * Escape dollar signs that are currency, so single-dollar math doesn't read the text between two
+ * amounts as a formula ("costs $5 and $10" rendered "5and10" in math type). Real inline math
+ * (`$x^2$`, `$0 < \theta < 1$`, `$P > AVC$`, `$5$`), `$$…$$` display math, escaped `\$`, and code
+ * spans and fences are left alone.
+ */
+export function escapeCurrencyDollars(markdown: string): string {
+  if (!markdown.includes("$")) return markdown;
+  return markdown
+    .split(INLINE_CODE_OR_FENCE_PATTERN)
+    .map((part, index) => (index % 2 === 1 ? part : escapeCurrencyInText(part)))
+    .join("");
+}

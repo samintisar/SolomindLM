@@ -1,3 +1,5 @@
+import { escapeCurrencyDollars } from "@convex/_shared/mathMarkdown";
+import { useMemo } from "react";
 import { Streamdown } from "streamdown";
 import {
   DEFAULT_SHIKI_THEME,
@@ -25,6 +27,8 @@ export default function MarkdownRenderer({
   shikiTheme = DEFAULT_SHIKI_THEME,
   ...rest
 }: MarkdownRendererProps) {
+  // Single-dollar math would read the text between two amounts as a formula (#569).
+  const markdown = useMemo(() => escapeCurrencyDollars(children), [children]);
   return (
     <Streamdown
       mode={mode}
@@ -39,7 +43,7 @@ export default function MarkdownRenderer({
       shikiTheme={shikiTheme}
       {...rest}
     >
-      {children}
+      {markdown}
     </Streamdown>
   );
 }
