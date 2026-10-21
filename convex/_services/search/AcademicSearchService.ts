@@ -62,6 +62,8 @@ export interface DiscoveredSource {
     doi?: string;
     citationCount?: number;
     sourceApi?: AcademicPaperSource;
+    authors?: string[];
+    year?: number;
   };
 }
 
@@ -171,6 +173,8 @@ export function toDiscoveredSource(paper: AcademicPaper): DiscoveredSource {
       doi: paper.doi,
       citationCount: paper.citationCount,
       sourceApi: paper.source,
+      authors: paper.authors,
+      year: paper.year,
     },
   };
 }

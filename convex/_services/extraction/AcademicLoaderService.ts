@@ -31,8 +31,13 @@ export class AcademicLoaderService {
       });
   }
 
+  /**
+   * `pdfOnly` throws instead of scraping the landing page or building metadata markdown, for
+   * callers that already hold the abstract: a publisher page is mostly site chrome (#558).
+   */
   async loadPaper(
-    paper: AcademicPaper
+    paper: AcademicPaper,
+    options: { pdfOnly?: boolean } = {}
   ): Promise<{ title: string; content: string; source: AcademicPaper["source"] }> {
     const logger = createServiceLogger("academic_loader", "loadPaper");
     logger.operationStart({ title: paper.title, source: paper.source });
@@ -52,6 +57,10 @@ export class AcademicLoaderService {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+    }
+
+    if (options.pdfOnly) {
+      throw new Error(paper.pdfUrl ? "PDF text could not be read" : "Paper has no PDF link");
     }
 
     // 2. If no PDF but URL exists, use loadWebPage to scrape

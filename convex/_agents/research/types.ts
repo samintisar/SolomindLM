@@ -40,6 +40,10 @@ export interface EvidenceEntry {
     publishedAt?: number;
     doi?: string;
     citationCount?: number;
+    authors?: string[];
+    year?: number;
+    sourceApi?: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+    pdfUrl?: string;
   };
 }
 

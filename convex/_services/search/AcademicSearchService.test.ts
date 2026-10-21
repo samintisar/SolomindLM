@@ -206,6 +206,8 @@ describe("AcademicSearchService - Utility Helpers", () => {
         doi: "10.1234/test",
         citationCount: 42,
         sourceApi: "arxiv",
+        authors: ["Author One", "Author Two"],
+        year: 2023,
       });
     });
 

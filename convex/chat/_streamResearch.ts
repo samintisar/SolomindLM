@@ -7,8 +7,10 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
+import type { AcademicPaperSource } from "../_model/literatureReviewSearchOptions.js";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService.js";
+import { checkPaperOffTopic } from "../literatureReview/screenPaper.helpers.js";
 import {
   createHybridSearch,
   createKeywordSearchRunner,
@@ -18,6 +20,9 @@ import {
 } from "./_streamSearch";
 import { createDiscoverSources, type DiscoveredSource } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
+
+/** Per-paper ceiling for the topic screen; the whole run has about four minutes. */
+const PAPER_SCREEN_TIMEOUT_MS = 20_000;
 
 export interface ResearchAgentConfig {
   apiKey: string;
@@ -97,13 +102,21 @@ export async function buildResearchAgentDeps(
         sourceType: r.sourceType,
         score: r.score,
         rawContent: r.rawContent,
+        metadata: r.metadata
+          ? {
+              ...r.metadata,
+              sourceApi: r.metadata.sourceApi as AcademicPaperSource | undefined,
+            }
+          : undefined,
       }));
     },
     loadWebPage: tavilyExtract,
     loadPaper: async (paper) => {
       const loader = new AcademicLoaderService(tavilyExtract);
-      return loader.loadPaper(paper);
+      return loader.loadPaper(paper, { pdfOnly: true });
     },
+    isPaperOnTopic: async (paper, query) =>
+      !(await checkPaperOffTopic(paper, query, PAPER_SCREEN_TIMEOUT_MS)).offTopic,
     onProgress,
   };
 }

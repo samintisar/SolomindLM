@@ -203,6 +203,16 @@ function getFirstAuthorLastName(author: string): string {
   return parseAuthorName(author).family || "Unknown";
 }
 
+/** APA and Harvard cite a work with no author by the first few words of its title. */
+function shortTitle(title: string): string {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  const short = words
+    .slice(0, 4)
+    .join(" ")
+    .replace(/[.,;:!?]+$/, "");
+  return short || "Unknown";
+}
+
 // ==================== APA 7 ====================
 
 function formatAPA7Authors(authors: string[] | undefined): string {
@@ -256,7 +266,7 @@ function formatInlineAPA7(citation: Citation): string {
   const year = citation.year || "n.d.";
 
   if (safeAuthors.length === 0) {
-    return `(Unknown, ${year})`;
+    return `("${shortTitle(citation.title)}," ${year})`;
   }
 
   if (safeAuthors.length > 2) {
@@ -590,7 +600,7 @@ function formatInlineHarvard(citation: Citation): string {
   const author = getFirstAuthorLastName(safeAuthors[0] || "Unknown");
   const year = citation.year || "n.d.";
 
-  if (safeAuthors.length === 0) return `(Unknown, ${year})`;
+  if (safeAuthors.length === 0) return `(${shortTitle(citation.title)}, ${year})`;
   if (safeAuthors.length > 2) return `(${author} et al., ${year})`;
   if (safeAuthors.length === 2) {
     const author2 = getFirstAuthorLastName(safeAuthors[1] || "Unknown");

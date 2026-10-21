@@ -646,6 +646,19 @@ export default defineSchema({
         chunkIndex: v.optional(v.number()),
         domain: v.optional(v.string()),
         publishedAt: v.optional(v.number()),
+        doi: v.optional(v.string()),
+        citationCount: v.optional(v.number()),
+        authors: v.optional(v.array(v.string())),
+        year: v.optional(v.number()),
+        sourceApi: v.optional(
+          v.union(
+            v.literal("openalex"),
+            v.literal("arxiv"),
+            v.literal("semantic_scholar"),
+            v.literal("pubmed")
+          )
+        ),
+        pdfUrl: v.optional(v.string()),
       })
     ),
     createdAt: v.number(),

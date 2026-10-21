@@ -1,3 +1,5 @@
+import type { DiscoveredPaperMetadata } from "../_agents/research/nodes";
+
 /**
  * Normalize discovery action results.
  * Tavily returns an array; academic search returns `{ sources }`.
@@ -10,6 +12,8 @@ export type DiscoveredSourceRow = {
   abstract?: string;
   score?: number;
   rawContent?: string;
+  /** Academic results only: paper details (see `DiscoveredPaperMetadata`). */
+  metadata?: DiscoveredPaperMetadata;
 };
 
 export function sourcesFromDiscoverResult(results: unknown): DiscoveredSourceRow[] {

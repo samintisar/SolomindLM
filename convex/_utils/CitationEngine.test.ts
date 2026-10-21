@@ -90,7 +90,7 @@ describe("CitationEngine", () => {
 
     it("formats APA 7 inline citation with no authors", () => {
       const result = engine.formatInline(noAuthorsCitation, "apa7");
-      expect(result).toBe("(Unknown, 2021)");
+      expect(result).toBe('("No Authors Paper," 2021)');
     });
   });
 
@@ -398,7 +398,7 @@ describe("CitationEngine", () => {
 
     it("formats Harvard inline citation with no authors", () => {
       const result = engine.formatInline(noAuthorsCitation, "harvard");
-      expect(result).toBe("(Unknown, 2021)");
+      expect(result).toBe("(No Authors Paper, 2021)");
     });
 
     it("formats Harvard inline citation with no year", () => {

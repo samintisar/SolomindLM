@@ -1,9 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it, test } from "vitest";
 import {
   applyNumericCitations,
   buildOrderedEvidence,
   isReferencesHeading,
   parseMarkdownSections,
+  shortenColumnName,
 } from "./reportSections";
 
 describe("parseMarkdownSections", () => {
@@ -81,5 +82,22 @@ describe("applyNumericCitations", () => {
   test("leaves unknown citation numbers unchanged", () => {
     const result = applyNumericCitations("See [99].", [], () => "cite");
     expect(result).toBe("See [99].");
+  });
+});
+
+describe("shortenColumnName", () => {
+  it("keeps a short sub-question whole", () => {
+    expect(shortenColumnName("What spacing gaps work best?")).toBe("What spacing gaps work best?");
+  });
+
+  // #558: headers were cut mid-word at 60 characters ("…intervals co").
+  it("shortens a long sub-question at a word boundary with an ellipsis", () => {
+    const question =
+      "How do optimal spacing intervals compare between laboratory studies and real classroom settings over a semester?";
+    const name = shortenColumnName(question);
+    expect(name.length).toBeLessThanOrEqual(81);
+    expect(name.endsWith("…")).toBe(true);
+    expect(question.startsWith(name.slice(0, -1))).toBe(true);
+    expect(question[name.length - 1]).toBe(" ");
   });
 });
