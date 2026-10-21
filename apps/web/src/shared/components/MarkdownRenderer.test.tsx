@@ -34,6 +34,18 @@ describe("MarkdownRenderer", () => {
     expect(screen.queryByText("Card one")).not.toBeInTheDocument();
   });
 
+  // Single-dollar math read "costs $5 and $10" as the formula "5and10" (#569).
+  test("renders two amounts in one paragraph as text, and real formulas as math", () => {
+    const { container } = render(
+      <MarkdownRenderer>
+        {"Price rose to $33.00 after a $1.00 increase, where $x^2$ is demand."}
+      </MarkdownRenderer>
+    );
+
+    expect(container.textContent).toContain("Price rose to $33.00 after a $1.00 increase");
+    expect(container.querySelectorAll(".katex")).toHaveLength(1);
+  });
+
   // Streamdown's top-level memo compares props by identity: a fresh default array per render
   // would defeat it for every caller.
   test("passes the same default theme and plugins on every render", () => {
