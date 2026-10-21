@@ -6,6 +6,7 @@ import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { validateUrl } from "../../_lib/utils/urlValidation.js";
 import { openAccessUserAgent } from "./openAccess/OpenAccessResolver";
+import { stripPageBoilerplate } from "./pageBoilerplate.helpers";
 import { readWikipediaArticle } from "./wikipedia";
 
 /**
@@ -195,11 +196,14 @@ export class WebLoaderService {
       };
       const text = result.content || "";
       const title = result.name ?? "";
-      const cleanedText = this.stripCookieConsentNoise(this.stripMedia(text));
+      // Site chrome (menus, link lists, "related" sections, skip links) goes before chunking (#570).
+      const boilerplate = stripPageBoilerplate(this.stripCookieConsentNoise(this.stripMedia(text)));
+      const cleanedText = boilerplate.text;
 
       logger.operationComplete({
         rawChars: text.length,
         cleanedChars: cleanedText.length,
+        boilerplateRemovedShare: Math.round(boilerplate.removedShare * 100) / 100,
         title,
         url,
       });
