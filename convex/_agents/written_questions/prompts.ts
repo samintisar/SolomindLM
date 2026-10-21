@@ -120,7 +120,7 @@ Generate exactly ${questionsPerChunk} questions based **exclusively** on the tex
 **Configuration:**
 - Difficulty: ${difficulty.toUpperCase()} (${difficultyGuidance[difficulty] || difficulty})
 - Type: ${questionType.toUpperCase()}
-${focus ? `- Focus Topic: ${focus}` : ""}
+${focus ? `- User request: "${focus}" (follow it for topics and focus; if it says how answers should be graded, put those points in every rubric's criteria)` : ""}
 
 ${typeSpecificInstructions}
 
@@ -188,4 +188,55 @@ ${MARKDOWN_MATH_NOTATION_FOR_APP}
 
 **Input Text (same excerpt):**
 ${chunk}`;
+};
+
+// ============================================================
+// ANSWER CHECK (#555)
+// ============================================================
+
+/** System prompt for checking that each question, model answer and rubric agree */
+export const CHECK_SYSTEM_PROMPT =
+  "You are a meticulous exam editor. You check that every question, its model answer and its rubric agree and are correct, recompute every calculation yourself, and fix or reject questions that don't hold up.";
+
+export const WrittenQuestionChecksSchema = z.object({
+  checks: z.array(
+    z.object({
+      id: z.string(),
+      verdict: z.enum(["ok", "fix", "drop"]),
+      reason: z.string().describe("One sentence on why"),
+      question: z.string().describe('The corrected question for "fix"; otherwise ""'),
+      modelAnswer: z.string().describe('The corrected model answer for "fix"; otherwise ""'),
+      criteria: z
+        .array(z.string())
+        .describe('The corrected rubric criteria for "fix"; otherwise []'),
+    })
+  ),
+});
+
+/** Check prompt: one verdict per question, recomputing arithmetic from the question's own figures */
+export const getCheckPrompt = (params: {
+  questions: WrittenQuestion[];
+  request?: string;
+}): string => {
+  const items = params.questions.map((q) => ({
+    id: q.id,
+    question: q.question,
+    modelAnswer: q.modelAnswer ?? "",
+    criteria: q.rubric.criteria,
+  }));
+  return `Check each written question below. Its question, model answer and rubric criteria must agree on every number, fact and conclusion, and every calculation must be right.
+
+Return one check per question id:
+- "ok": everything agrees and is correct.
+- "fix": the right answer can be worked out from what the question and answer already state (their figures, definitions and steps), but the model answer or a criterion gets it wrong, contradicts another part, or contains the writer's working ("Wait, let me re-calculate", "Self-correction note"). Return the corrected question, model answer and criteria. The model answer states the reasoning and the final result once, with no working-out notes.
+- "drop": the parts disagree and what they state can't settle which is right, the answer only restates the question (circular), or the question can't be answered from what it says.
+
+Recompute every calculation before you decide. Keep each question's meaning, difficulty and point value, and don't add facts the question and answer don't already contain.${
+    params.request
+      ? `\nThe user asked for: "${params.request}". If that request says how answers should be graded, every rubric's criteria must include those points.`
+      : ""
+  }
+
+Questions (JSON):
+${JSON.stringify(items, null, 2)}`;
 };

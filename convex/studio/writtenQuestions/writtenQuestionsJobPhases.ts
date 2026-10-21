@@ -20,18 +20,24 @@ import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
   appendUniqueWrittenQuestions,
+  applyQuestionChecks,
   applySelectedQuestionIds,
   dedupeQuestions,
   getSelectionIdsPrompt,
+  hasAnswerWorking,
   padQuestionsToTarget,
+  type WrittenQuestionCheck,
 } from "../../_agents/written_questions/postprocess";
 import {
+  CHECK_SYSTEM_PROMPT,
+  getCheckPrompt,
   getMapPrompt,
   getMapRecoveryPrompt,
   getMapTopUpPrompt,
   MAP_SYSTEM_PROMPT,
   REDUCE_SELECT_SYSTEM_PROMPT,
   type WrittenQuestion,
+  WrittenQuestionChecksSchema,
   WrittenQuestionsArraySchema,
   type WrittenQuestionsResponse,
 } from "../../_agents/written_questions/prompts";
@@ -49,6 +55,7 @@ import {
 } from "../_job/invokeStudioLlm";
 import {
   createJobDeadline,
+  type JobDeadline,
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
@@ -83,6 +90,10 @@ const CONFIG = {
   BUFFER_MULTIPLIER: 2.5,
   /** Extra map rounds when the model returns empty or too few candidates */
   MAP_MAX_ROUNDS: 4,
+  // Answer check (#555): one call per round; a second round checks replacements for dropped ones.
+  CHECK_ROUNDS: 2,
+  CHECK_TIMEOUT_MS: 150_000,
+  MIN_CHECK_CALL_MS: 30_000,
 } as const;
 
 function normalizeMapQuestions(raw: WrittenQuestion[], questionType: string): WrittenQuestion[] {
@@ -752,7 +763,10 @@ export async function runFinalizeWrittenQuestionsPhase(
               new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
               new HumanMessage(selectionPrompt),
             ]),
-          timeoutMs: deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+          timeoutMs: deadline.stepTimeoutMs(
+            CONFIG.REDUCE_TIMEOUT_MS,
+            STUDIO_SAVE_RESERVE_MS + CONFIG.CHECK_TIMEOUT_MS
+          ),
           phaseLabel: "WrittenQuestionsSelect",
           retry: { maxAttempts: 2, baseDelayMs: 1000 },
         });
@@ -810,6 +824,25 @@ export async function runFinalizeWrittenQuestionsPhase(
       console.log(
         `[WrittenQuestionsJob] Re-padded after final dedupe to ${finalQuestions.length}/${questionCount}`
       );
+    }
+
+    // Check that each question, model answer and rubric agree before saving (#555).
+    const checked = await checkWrittenQuestions({
+      questions: finalQuestions,
+      pool: dedupedQuestions,
+      request: focus ? sanitizeUserInput(focus) : undefined,
+      deadline,
+      language,
+      onUsage: (usage) => {
+        reduceUsage = addTokenUsage(reduceUsage, usage);
+      },
+    });
+    finalQuestions = checked.questions;
+    console.log(
+      `[WrittenQuestionsJob] Answer check: ${checked.fixed} fixed, ${checked.dropped} dropped, ${finalQuestions.length}/${questionCount} kept`
+    );
+    if (finalQuestions.length === 0) {
+      throw new Error("Every question failed the answer check");
     }
 
     // Update status for finalizing
@@ -911,4 +944,96 @@ export async function runFinalizeWrittenQuestionsPhase(
 
     throw error;
   }
+}
+
+// ============================================================
+// HELPER: Answer check
+// ============================================================
+
+/**
+ * Check that each question, its model answer and its rubric agree, with every calculation
+ * recomputed (#555). The map writes questions with the fast model and selection only picks ids,
+ * so nothing else catches a rubric that contradicts its answer, wrong arithmetic, a circular
+ * question or leftover working ("Wait, let me re-calculate"). Fixable questions come back
+ * corrected; dropped ones are replaced from the unused pool, and the replacements are checked in
+ * a second round. A question that can't be checked (no time, or the call fails) is kept unless
+ * its answer shows the writer's working; replacements left unchecked are not added.
+ */
+export async function checkWrittenQuestions(args: {
+  questions: WrittenQuestion[];
+  pool: WrittenQuestion[];
+  request?: string;
+  deadline: JobDeadline;
+  language?: string;
+  onUsage: (usage: TokenUsage) => void;
+}): Promise<{ questions: WrittenQuestion[]; dropped: number; fixed: number }> {
+  const { request, deadline, language, onUsage } = args;
+  const used = new Set(args.questions.map((q) => q.id));
+  const spare = args.pool.filter((q) => !used.has(q.id));
+  const kept: WrittenQuestion[] = [];
+  let dropped = 0;
+  let fixed = 0;
+  let batch = args.questions;
+
+  for (let round = 1; round <= CONFIG.CHECK_ROUNDS && batch.length > 0; round++) {
+    const timeoutMs = deadline.stepTimeoutMs(CONFIG.CHECK_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
+    let checks: WrittenQuestionCheck[] | null = null;
+    if (timeoutMs >= CONFIG.MIN_CHECK_CALL_MS) {
+      try {
+        const llm = createStructuredLLM<z.infer<typeof WrittenQuestionChecksSchema>>(
+          WrittenQuestionChecksSchema,
+          {
+            model: env.WRITTEN_QUESTIONS_LLM,
+            schemaName: "written_question_checks",
+            maxTokens: 32_000,
+            temperature: 0,
+            reasoningEnabled: true,
+            onUsage,
+          }
+        );
+        const response = await invokeWithinBudget({
+          invoke: () =>
+            llm.invoke([
+              new SystemMessage(withLanguageInstruction(CHECK_SYSTEM_PROMPT, language)),
+              new HumanMessage(getCheckPrompt({ questions: batch, request })),
+            ]),
+          timeoutMs,
+          phaseLabel: "WrittenQuestionsCheck",
+        });
+        checks = response.checks;
+      } catch (error) {
+        console.warn(
+          `[WrittenQuestionsJob] Answer check round ${round} failed, keeping unchecked questions without working:`,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    } else {
+      console.log(
+        `[WrittenQuestionsJob] Skipping answer check round ${round}: ${timeoutMs}ms left`
+      );
+    }
+
+    if (!checks) {
+      // Unchecked: a first-round question stays unless its answer shows working; replacements
+      // were never in the selected set, so they aren't added unchecked.
+      if (round === 1) {
+        const clean = batch.filter((q) => !hasAnswerWorking(q.modelAnswer));
+        dropped += batch.length - clean.length;
+        kept.push(...clean);
+      }
+      break;
+    }
+
+    const applied = applyQuestionChecks(batch, checks);
+    for (const q of applied.dropped) {
+      const reason =
+        checks.find((c) => c.id === q.id)?.reason ?? "answer shows the writer's working";
+      console.log(`[WrittenQuestionsJob] Dropped "${q.question.slice(0, 80)}": ${reason}`);
+    }
+    kept.push(...applied.kept);
+    dropped += applied.dropped.length;
+    fixed += applied.fixed;
+    batch = spare.splice(0, applied.dropped.length);
+  }
+  return { questions: kept, dropped, fixed };
 }
