@@ -18,7 +18,7 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
-import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
   MAP_PROMPT,
   MAP_SYSTEM_PROMPT,
@@ -40,6 +40,7 @@ import {
 } from "../_job/invokeStudioLlm";
 import {
   createJobDeadline,
+  type JobDeadline,
   STUDIO_FINALIZE_BUDGET_MS,
   STUDIO_SAVE_RESERVE_MS,
 } from "../_job/jobDeadline";
@@ -61,6 +62,8 @@ const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 480_000, // all reduce attempts together
+  // Reasoning shares this budget; at 16K a 13-source map was cut off mid-branch (#568).
+  REDUCE_MAX_TOKENS: 32_000,
 } as const;
 
 export type MindmapGenerationPhaseArgs = {
@@ -619,70 +622,17 @@ export async function runFinalizeMindMapPhase(
       `[MindMapJob] Reduce input: ${safeInput.length} chars from ${allExtractions.length} extractions`
     );
 
-    let finalMindMap: FinalMindMap | undefined;
-    let reduceUsage: TokenUsage | undefined;
-    let reduceLatencyMs = 0;
-
-    // The full input gets most of the reduce budget; if it fails, a compact input (themes and
-    // concepts, no summaries) gets the rest. The rule-based fallback is the last resort.
-    const reduceBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
-    const reduceAttempts = [
-      { input: safeInput, timeoutMs: () => Math.round(reduceBudgetMs * 0.6) },
-      {
-        input: compactReduceInput(allExtractions),
-        timeoutMs: () => deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
-      },
-    ];
-    for (const [attemptIndex, attempt] of reduceAttempts.entries()) {
-      try {
-        const startTime = Date.now();
-        const markdown = await invokeWithinBudget({
-          invoke: () =>
-            invokeTogetherText({
-              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-              userPrompt: withMindMapRequest(
-                fillTemplate(REDUCE_PROMPT, { extractions: attempt.input }),
-                customPrompt ? sanitizeUserInput(customPrompt) : undefined
-              ),
-              model: env.MINDMAP_LLM,
-              maxTokens: 16_000,
-              temperature: 0.3,
-              reasoningEnabled: true,
-              onUsage: (usage) => {
-                reduceUsage = usage;
-              },
-            }),
-          timeoutMs: attempt.timeoutMs(),
-          phaseLabel: "MindMapReduce",
-        });
-
-        const validation = validateWithPreset(markdown, "mindmap");
-        if (!validation.isValid) {
-          console.log(`[MindMapJob] Validation warnings: ${validation.warnings.join(", ")}`);
-        }
-
-        const parsedTree = parseMarkdownToTree(markdown);
-        if (!parsedTree.children?.length) {
-          throw new Error("Reduce returned a map with no branches");
-        }
-        reduceLatencyMs = Date.now() - startTime;
-
-        console.log(
-          `[MindMapJob] Reduce completed in ${reduceLatencyMs}ms (attempt ${attemptIndex + 1}), root: "${parsedTree.topic}", branches: ${parsedTree.children.length}`
-        );
-
-        finalMindMap = { nodeData: parsedTree };
-        break;
-      } catch (error) {
-        console.log(
-          `[MindMapJob] Reduce attempt ${attemptIndex + 1} (${attempt.input.length} chars) failed: ${error}`
-        );
-      }
-    }
-    if (!finalMindMap) {
-      console.log("[MindMapJob] Reduce failed on full and compact input, using smart fallback");
-      finalMindMap = createSmartFallback(allExtractions);
-    }
+    const {
+      mindMap: finalMindMap,
+      usage: reduceUsage,
+      latencyMs: reduceLatencyMs,
+    } = await reduceMindMap({
+      fullInput: safeInput,
+      extractions: allExtractions,
+      customPrompt,
+      language,
+      deadline,
+    });
 
     // Update status for finalizing
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.updateMindMapStatus, {
@@ -767,4 +717,97 @@ export async function runFinalizeMindMapPhase(
 
     throw error;
   }
+}
+
+// ============================================================
+// HELPER: Reduce
+// ============================================================
+
+/** A reduce reply cut off at the output cap: its tree is incomplete, so it is never saved (#568). */
+export class MindMapTruncatedError extends Error {
+  constructor() {
+    super("Reduce was cut off at the output-token cap");
+    this.name = "MindMapTruncatedError";
+  }
+}
+
+/** Added to the next attempt after a cut-off reply, so it fits the output budget. */
+const SHORTER_MAP_INSTRUCTION =
+  "Your previous map was too long and was cut off before it ended. Write a smaller map that ends cleanly: fewer branches and sub-topics, short node labels, and at most about 150 nodes in total.";
+
+/**
+ * Build the tree from the map extractions. The full input gets most of the reduce budget; if it
+ * fails or is cut off at the output cap, a compact input (themes and concepts, no summaries) gets
+ * the rest, asked for a smaller map after a cut-off. The rule-based fallback is the last resort.
+ */
+export async function reduceMindMap(args: {
+  fullInput: string;
+  extractions: ConceptExtraction[];
+  customPrompt?: string;
+  language?: string;
+  deadline: JobDeadline;
+}): Promise<{ mindMap: FinalMindMap; usage?: TokenUsage; latencyMs: number }> {
+  const { fullInput, extractions, customPrompt, language, deadline } = args;
+  let usage: TokenUsage | undefined;
+  const reduceBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
+  const attempts = [
+    { input: fullInput, timeoutMs: () => Math.round(reduceBudgetMs * 0.6) },
+    {
+      input: compactReduceInput(extractions),
+      timeoutMs: () => deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS),
+    },
+  ];
+  let previousWasCutOff = false;
+  for (const [attemptIndex, attempt] of attempts.entries()) {
+    try {
+      const startTime = Date.now();
+      let finishReason: string | undefined;
+      const prompt = withMindMapRequest(
+        fillTemplate(REDUCE_PROMPT, { extractions: attempt.input }),
+        customPrompt ? sanitizeUserInput(customPrompt) : undefined
+      );
+      const markdown = await invokeWithinBudget({
+        invoke: () =>
+          invokeTogetherText({
+            systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+            userPrompt: previousWasCutOff ? `${prompt}\n\n${SHORTER_MAP_INSTRUCTION}` : prompt,
+            model: env.MINDMAP_LLM,
+            maxTokens: CONFIG.REDUCE_MAX_TOKENS,
+            temperature: 0.3,
+            reasoningEnabled: true,
+            onUsage: (callUsage) => {
+              usage = addTokenUsage(usage, callUsage);
+            },
+            onFinishReason: (reason) => {
+              finishReason = reason;
+            },
+          }),
+        timeoutMs: attempt.timeoutMs(),
+        phaseLabel: "MindMapReduce",
+      });
+      if (finishReason === "length") throw new MindMapTruncatedError();
+
+      const validation = validateWithPreset(markdown, "mindmap");
+      if (!validation.isValid) {
+        console.log(`[MindMapJob] Validation warnings: ${validation.warnings.join(", ")}`);
+      }
+
+      const parsedTree = parseMarkdownToTree(markdown);
+      if (!parsedTree.children?.length) {
+        throw new Error("Reduce returned a map with no branches");
+      }
+      const latencyMs = Date.now() - startTime;
+      console.log(
+        `[MindMapJob] Reduce completed in ${latencyMs}ms (attempt ${attemptIndex + 1}), root: "${parsedTree.topic}", branches: ${parsedTree.children.length}`
+      );
+      return { mindMap: { nodeData: parsedTree }, usage, latencyMs };
+    } catch (error) {
+      previousWasCutOff = error instanceof MindMapTruncatedError;
+      console.log(
+        `[MindMapJob] Reduce attempt ${attemptIndex + 1} (${attempt.input.length} chars) failed: ${error}`
+      );
+    }
+  }
+  console.log("[MindMapJob] Reduce failed on full and compact input, using smart fallback");
+  return { mindMap: createSmartFallback(extractions), usage, latencyMs: 0 };
 }
