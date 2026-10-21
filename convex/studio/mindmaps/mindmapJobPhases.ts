@@ -62,8 +62,10 @@ const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 480_000, // all reduce attempts together
-  // Reasoning shares this budget; at 16K a 13-source map was cut off mid-branch (#568).
-  REDUCE_MAX_TOKENS: 32_000,
+  // Reasoning shares this budget. A reply cut off here is never saved (#568): it goes to the
+  // compact retry, asked for a smaller map. Kept at 16K so a long reply still ends inside its
+  // attempt's time; at 32K a big map could run past it and time out both attempts.
+  REDUCE_MAX_TOKENS: 16_000,
 } as const;
 
 export type MindmapGenerationPhaseArgs = {
@@ -626,6 +628,7 @@ export async function runFinalizeMindMapPhase(
       mindMap: finalMindMap,
       usage: reduceUsage,
       latencyMs: reduceLatencyMs,
+      fallbackReason,
     } = await reduceMindMap({
       fullInput: safeInput,
       extractions: allExtractions,
@@ -671,6 +674,8 @@ export async function runFinalizeMindMapPhase(
           completedAt: Date.now(),
           mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
           mapFailedCount: failedCount.count,
+          // A simplified rule-based map, not the LLM's: recorded so it can be told apart.
+          ...(fallbackReason ? { usedFallback: true, fallbackReason } : {}),
         },
         aggregateStudioJobTelemetry({
           mapResults: Object.values(mapResults),
@@ -731,6 +736,19 @@ export class MindMapTruncatedError extends Error {
   }
 }
 
+/**
+ * Whether a reduce reply stopped at the output cap: the provider says so ("length", or
+ * "max_tokens" on some endpoints), or it used every completion token it was allowed.
+ */
+export function isCutOffReply(
+  finishReason: string | undefined,
+  completionTokens: number | undefined,
+  maxTokens: number
+): boolean {
+  if (finishReason === "length" || finishReason === "max_tokens") return true;
+  return completionTokens !== undefined && completionTokens >= maxTokens;
+}
+
 /** Added to the next attempt after a cut-off reply, so it fits the output budget. */
 const SHORTER_MAP_INSTRUCTION =
   "Your previous map was too long and was cut off before it ended. Write a smaller map that ends cleanly: fewer branches and sub-topics, short node labels, and at most about 150 nodes in total.";
@@ -746,7 +764,13 @@ export async function reduceMindMap(args: {
   customPrompt?: string;
   language?: string;
   deadline: JobDeadline;
-}): Promise<{ mindMap: FinalMindMap; usage?: TokenUsage; latencyMs: number }> {
+}): Promise<{
+  mindMap: FinalMindMap;
+  usage?: TokenUsage;
+  latencyMs: number;
+  /** Why the rule-based fallback map was used; absent when the LLM map was saved. */
+  fallbackReason?: string;
+}> {
   const { fullInput, extractions, customPrompt, language, deadline } = args;
   let usage: TokenUsage | undefined;
   const reduceBudgetMs = deadline.stepTimeoutMs(CONFIG.REDUCE_TIMEOUT_MS, STUDIO_SAVE_RESERVE_MS);
@@ -758,10 +782,12 @@ export async function reduceMindMap(args: {
     },
   ];
   let previousWasCutOff = false;
+  let lastError = "";
   for (const [attemptIndex, attempt] of attempts.entries()) {
     try {
       const startTime = Date.now();
       let finishReason: string | undefined;
+      let completionTokens: number | undefined;
       const prompt = withMindMapRequest(
         fillTemplate(REDUCE_PROMPT, { extractions: attempt.input }),
         customPrompt ? sanitizeUserInput(customPrompt) : undefined
@@ -777,6 +803,7 @@ export async function reduceMindMap(args: {
             reasoningEnabled: true,
             onUsage: (callUsage) => {
               usage = addTokenUsage(usage, callUsage);
+              completionTokens = callUsage.completion;
             },
             onFinishReason: (reason) => {
               finishReason = reason;
@@ -785,7 +812,9 @@ export async function reduceMindMap(args: {
         timeoutMs: attempt.timeoutMs(),
         phaseLabel: "MindMapReduce",
       });
-      if (finishReason === "length") throw new MindMapTruncatedError();
+      if (isCutOffReply(finishReason, completionTokens, CONFIG.REDUCE_MAX_TOKENS)) {
+        throw new MindMapTruncatedError();
+      }
 
       const validation = validateWithPreset(markdown, "mindmap");
       if (!validation.isValid) {
@@ -803,11 +832,17 @@ export async function reduceMindMap(args: {
       return { mindMap: { nodeData: parsedTree }, usage, latencyMs };
     } catch (error) {
       previousWasCutOff = error instanceof MindMapTruncatedError;
+      lastError = error instanceof Error ? error.message : String(error);
       console.log(
         `[MindMapJob] Reduce attempt ${attemptIndex + 1} (${attempt.input.length} chars) failed: ${error}`
       );
     }
   }
   console.log("[MindMapJob] Reduce failed on full and compact input, using smart fallback");
-  return { mindMap: createSmartFallback(extractions), usage, latencyMs: 0 };
+  return {
+    mindMap: createSmartFallback(extractions),
+    usage,
+    latencyMs: 0,
+    fallbackReason: lastError || "reduce failed",
+  };
 }

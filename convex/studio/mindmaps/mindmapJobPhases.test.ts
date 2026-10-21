@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createJobDeadline } from "../_job/jobDeadline";
-import { reduceMindMap } from "./mindmapJobPhases";
+import { isCutOffReply, reduceMindMap } from "./mindmapJobPhases";
 
 const { invokeTogetherText } = vi.hoisted(() => ({ invokeTogetherText: vi.fn() }));
 
@@ -78,5 +78,43 @@ describe("reduceMindMap", () => {
     await run();
 
     expect(invokeTogetherText.mock.calls[1][0].userPrompt).not.toContain("was cut off");
+  });
+});
+
+describe("isCutOffReply", () => {
+  it("reads the provider's finish reason, or a reply that used every token", () => {
+    expect(isCutOffReply("length", 100, 16_000)).toBe(true);
+    expect(isCutOffReply("max_tokens", 100, 16_000)).toBe(true);
+    expect(isCutOffReply(undefined, 16_000, 16_000)).toBe(true);
+    expect(isCutOffReply("stop", 9_000, 16_000)).toBe(false);
+    expect(isCutOffReply(undefined, undefined, 16_000)).toBe(false);
+  });
+});
+
+describe("reduceMindMap usage-based cut-off and fallback marker", () => {
+  it("treats a reply that used the whole budget as cut off even without a finish reason", async () => {
+    invokeTogetherText
+      .mockImplementationOnce(
+        async (options: {
+          onUsage?: (u: { prompt: number; completion: number; total: number }) => void;
+        }) => {
+          options.onUsage?.({ prompt: 1, completion: 16_000, total: 16_001 });
+          return CUT_OFF;
+        }
+      )
+      .mockImplementationOnce(reply(MAP, "stop"));
+
+    const { mindMap, fallbackReason } = await run();
+
+    expect(mindMap.nodeData.children.map((c) => c.topic)).toEqual(["Supply", "Demand"]);
+    expect(fallbackReason).toBeUndefined();
+  });
+
+  it("says why it fell back to the rule-based map", async () => {
+    invokeTogetherText.mockImplementation(reply(CUT_OFF, "length"));
+
+    const { fallbackReason } = await run();
+
+    expect(fallbackReason).toBe("Reduce was cut off at the output-token cap");
   });
 });
