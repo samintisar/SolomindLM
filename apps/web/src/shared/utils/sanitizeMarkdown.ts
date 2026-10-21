@@ -1,4 +1,8 @@
-import { normalizeMathMarkdown, splitByMathDelimiters } from "@convex/_shared/mathMarkdown";
+import {
+  escapeCurrencyDollars,
+  normalizeMathMarkdown,
+  splitByMathDelimiters,
+} from "@convex/_shared/mathMarkdown";
 import DOMPurify from "dompurify";
 
 /**
@@ -35,7 +39,9 @@ export function restoreAngleBracketsAfterDomPurify(content: string): string {
  * math (e.g. $0 < \\theta < 1$) and in ordinary text.
  */
 export function sanitizeMarkdown(content: string): string {
-  const withoutAnsi = stripAnsiCodes(content);
+  // Currency first, so every later step that pairs `$…$` (math normalizing, the DOMPurify split,
+  // citation markers) sees amounts as text, not math (#569).
+  const withoutAnsi = escapeCurrencyDollars(stripAnsiCodes(content));
   const normalizedMath = normalizeMathMarkdown(withoutAnsi);
 
   // Run DOMPurify only outside $...$ / $$...$$. Inside math, `<` is common (e.g. $0<\lambda<s\mu$);

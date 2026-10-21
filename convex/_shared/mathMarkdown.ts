@@ -125,12 +125,27 @@ export type MathBoundarySegment = { kind: "text"; s: string } | { kind: "math"; 
  * parenthetical regex would wrongly wrap `(Y_{t-i}-\mu\bigr)` as `($...$)`, producing
  * `\bigl($Y_{t-i}-\mu\bigr$)` and breaking KaTeX/remark-math.
  */
+/**
+ * Index of `needle` at or after `from` that isn't escaped (preceded by an odd run of `\`), or -1.
+ * An escaped `\$` is a literal dollar (currency, see {@link escapeCurrencyDollars}), not a delimiter.
+ */
+export function indexOfUnescaped(text: string, needle: string, from = 0): number {
+  let at = text.indexOf(needle, from);
+  while (at !== -1) {
+    let slashes = 0;
+    for (let i = at - 1; i >= 0 && text[i] === "\\"; i--) slashes++;
+    if (slashes % 2 === 0) return at;
+    at = text.indexOf(needle, at + 1);
+  }
+  return -1;
+}
+
 export function splitByMathDelimiters(value: string): MathBoundarySegment[] {
   const out: MathBoundarySegment[] = [];
   let remaining = value;
 
   while (remaining.length > 0) {
-    const dollarAt = remaining.indexOf("$");
+    const dollarAt = indexOfUnescaped(remaining, "$");
     if (dollarAt === -1) {
       out.push({ kind: "text", s: remaining });
       break;
@@ -141,7 +156,7 @@ export function splitByMathDelimiters(value: string): MathBoundarySegment[] {
     }
     const isDisplay = remaining.startsWith("$$");
     const delim = isDisplay ? "$$" : "$";
-    const close = remaining.indexOf(delim, delim.length);
+    const close = indexOfUnescaped(remaining, delim, delim.length);
     if (close === -1) {
       out.push({ kind: "text", s: remaining });
       break;
@@ -362,16 +377,20 @@ export function normalizeMathMarkdownDeep<T>(value: T): T {
 
 /** LaTeX markup that only a formula would contain. */
 const LATEX_MARKUP = /[\\^_{}]/;
-/** A word of two or more letters: prose, not a bare expression like `5x + 3`. */
-const PROSE_WORD = /\p{L}{2,}/u;
+/** Words of two or more letters; two or more of them make a span prose, not `$5 mod 3$`. */
+const PROSE_WORDS = /\p{L}{2,}/gu;
+/** How an amount can start after its `$`: `$5`, `$.50`, `$ 5`, `$-3`. */
+const AMOUNT_START = /^(?:\d|\.\d| \d|-\d)/;
+/** What starts a new block after a line break: a blank line, list item, heading, quote or table row. */
+const BLOCK_START = /^[ \t]*(?:\n|$|[-*+][ \t]|\d+[.)][ \t]|#|>|\|)/;
 
-/** Index of the `$` closing an inline span opened at `open`, or -1 (none before a blank line). */
+/** Index of the `$` closing an inline span opened at `open`, or -1 (none in the same block). */
 function findInlineClose(text: string, open: number): number {
   for (let i = open + 1; i < text.length; i++) {
     const char = text[i];
     if (char === "\\") {
       i++;
-    } else if (char === "\n" && text[i + 1] === "\n") {
+    } else if (char === "\n" && BLOCK_START.test(text.slice(i + 1, i + 41))) {
       return -1;
     } else if (char === "$") {
       return i;
@@ -380,17 +399,22 @@ function findInlineClose(text: string, open: number): number {
   return -1;
 }
 
+function startsAmount(text: string, dollar: number): boolean {
+  return AMOUNT_START.test(text.slice(dollar + 1, dollar + 3));
+}
+
 /**
  * Whether the span `$…$` from `open` to `close` is currency rather than inline math. Only a `$`
- * followed by a digit can be currency. It's math when the span holds LaTeX markup, or is a bare
- * expression (no words) that doesn't end at another amount.
+ * that starts an amount can be currency. It's math when the span holds LaTeX markup, or reads as
+ * an expression: it doesn't end at another amount, doesn't end in a space (a formula ends at its
+ * last symbol: "$110,000, where $x$" is prose), and has fewer than two words (`$17 mod 5 = 2$`).
  */
 function isCurrencySpan(text: string, open: number, close: number): boolean {
-  if (!/\d/.test(text[open + 1] ?? "")) return false;
+  if (!startsAmount(text, open)) return false;
   const span = text.slice(open + 1, close);
   if (LATEX_MARKUP.test(span)) return false;
-  const endsAtAmount = /\d/.test(text[close + 1] ?? "");
-  return endsAtAmount || PROSE_WORD.test(span);
+  const endsAtAmount = startsAmount(text, close);
+  return endsAtAmount || /\s$/.test(span) || (span.match(PROSE_WORDS)?.length ?? 0) >= 2;
 }
 
 function escapeCurrencyInText(text: string): string {
@@ -410,8 +434,9 @@ function escapeCurrencyInText(text: string): string {
     } else if (char === "$") {
       const close = findInlineClose(text, i);
       if (close < 0) {
-        // Nothing to pair with, so it can't render as math: leave it.
-        out += char;
+        // Nothing to pair with in its block. An amount is escaped anyway, so later steps that
+        // pair dollars across blocks (splitByMathDelimiters, citation markers) don't either.
+        out += startsAmount(text, i) ? "\\$" : char;
         i++;
       } else if (isCurrencySpan(text, i, close)) {
         // Escape only this `$`; the next one is weighed on its own as a possible opener.
@@ -431,15 +456,23 @@ function escapeCurrencyInText(text: string): string {
 }
 
 /**
+ * Code where `$` is literal: ``` and ~~~ fences (closed, or still streaming to the end), double-
+ * and single-backtick spans, and indented code lines (four spaces or a tab, not a list item).
+ */
+const CODE_FOR_CURRENCY_PATTERN =
+  /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|``[^\n]+?``|`[^`\n]+`|(?:^|\n)(?: {4}|\t)(?![-*+] |\d+[.)] )[^\n]*)/g;
+
+/**
  * Escape dollar signs that are currency, so single-dollar math doesn't read the text between two
  * amounts as a formula ("costs $5 and $10" rendered "5and10" in math type). Real inline math
- * (`$x^2$`, `$0 < \theta < 1$`, `$P > AVC$`, `$5$`), `$$…$$` display math, escaped `\$`, and code
- * spans and fences are left alone.
+ * (`$x^2$`, `$0 < \theta < 1$`, `$P > AVC$`, `$5$`, `$17 mod 5 = 2$`), `$$…$$` display math,
+ * escaped `\$`, and code are left alone. Runs first in the shared pipeline (sanitizeMarkdown) and
+ * again in the renderer; it's idempotent.
  */
 export function escapeCurrencyDollars(markdown: string): string {
   if (!markdown.includes("$")) return markdown;
   return markdown
-    .split(INLINE_CODE_OR_FENCE_PATTERN)
+    .split(CODE_FOR_CURRENCY_PATTERN)
     .map((part, index) => (index % 2 === 1 ? part : escapeCurrencyInText(part)))
     .join("");
 }

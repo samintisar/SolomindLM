@@ -1,8 +1,10 @@
 import { replaceCitationMarkersWithPlaceholders } from "@convex/_agents/_shared/citationExtract";
+import { indexOfUnescaped } from "@convex/_shared/mathMarkdown";
 
 /**
  * Replaces citation markers [1], [2], etc. (also \[1\] when models escape brackets) with `CITE:n`
  * only in non-math segments. Avoids corrupting LaTeX (e.g. matrix [1, 0]) inside $...$ or $$...$$.
+ * An escaped `\$` (currency, escaped by sanitizeMarkdown) is text, not a delimiter (#569).
  */
 export function replaceCitationMarkersOutsideMath(content: string): string {
   const parts: string[] = [];
@@ -10,7 +12,7 @@ export function replaceCitationMarkersOutsideMath(content: string): string {
 
   while (remaining.length > 0) {
     // Prefer $$ over $ so we don't split display math
-    const nextDollar = remaining.indexOf("$");
+    const nextDollar = indexOfUnescaped(remaining, "$");
     if (nextDollar === -1) {
       parts.push(replaceCitationMarkersWithPlaceholders(remaining));
       break;
@@ -19,7 +21,7 @@ export function replaceCitationMarkersOutsideMath(content: string): string {
     const isDisplayMath = remaining.slice(nextDollar, nextDollar + 2) === "$$";
     const delim = isDisplayMath ? "$$" : "$";
     const afterOpen = nextDollar + delim.length;
-    const closeIndex = remaining.indexOf(delim, afterOpen);
+    const closeIndex = indexOfUnescaped(remaining, delim, afterOpen);
 
     if (closeIndex === -1) {
       // Unclosed delimiter: treat rest as text and replace citations

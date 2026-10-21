@@ -1,4 +1,7 @@
+// @vitest-environment jsdom
+// jsdom for sanitizeMarkdown (DOMPurify) in the chat-pipeline test.
 import { describe, expect, it } from "vitest";
+import { sanitizeMarkdown } from "@/shared/utils";
 import { replaceCitationMarkersOutsideMath } from "./citationMarkers";
 
 describe("replaceCitationMarkersOutsideMath", () => {
@@ -59,5 +62,15 @@ describe("replaceCitationMarkersOutsideMath", () => {
     const result = replaceCitationMarkersOutsideMath(input);
     expect(result).toContain("$0<\\theta<1$");
     expect(result).toContain("`CITE:1`");
+  });
+
+  // #569: a citation between two amounts used to sit inside a "math" span and stay plain text.
+  it("links citations between amounts once sanitizeMarkdown has escaped the currency", () => {
+    const result = replaceCitationMarkersOutsideMath(
+      sanitizeMarkdown("Median pay is $120,230 [1], up from $110,000 [2], where $x^2$ [3] is pay.")
+    );
+    expect(result).toContain("`CITE:1`");
+    expect(result).toContain("`CITE:2`");
+    expect(result).toContain("$x^2$");
   });
 });
