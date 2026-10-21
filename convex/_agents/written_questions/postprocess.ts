@@ -258,3 +258,104 @@ export function applySelectedQuestionIds(
 
   return resolvedQuestions;
 }
+
+// ============================================================
+// ANSWER CHECK (#555)
+// ============================================================
+
+/**
+ * The map model sometimes leaves its working in the model answer: "Wait, let me re-calculate…",
+ * "(Self-Correction Note: …)". Such an answer usually holds two contradicting results.
+ */
+const ANSWER_WORKING =
+  /(?:(?:^|[.!?:]\s+|\(\s*)(?:wait|hmm)[,.!…])|\blet me (?:re-?calculate|recalculate|re-?check|recheck|double-check|redo|reconsider)\b|\bon second thought\b|\bself[- ]?correction\b|\bcorrection note\b|\bnote to self\b/im;
+
+export function hasAnswerWorking(text: string | null | undefined): boolean {
+  return ANSWER_WORKING.test(text ?? "");
+}
+
+/** One verdict from the answer check: keep, keep corrected, or drop. */
+export type WrittenQuestionCheck = {
+  id: string;
+  verdict: "ok" | "fix" | "drop";
+  reason: string;
+  question: string;
+  modelAnswer: string;
+  criteria: string[];
+};
+
+/**
+ * Apply the answer check's verdicts. "fix" replaces the question, model answer and criteria with
+ * the corrected ones (keeping any part the check left empty); "drop" removes the question. A
+ * question the check didn't return is kept as it is. Any kept question whose model answer still
+ * shows the writer's working is dropped.
+ */
+export function applyQuestionChecks(
+  questions: WrittenQuestion[],
+  checks: WrittenQuestionCheck[]
+): { kept: WrittenQuestion[]; dropped: WrittenQuestion[]; fixed: number } {
+  const byId = new Map(checks.map((c) => [c.id, c]));
+  const kept: WrittenQuestion[] = [];
+  const dropped: WrittenQuestion[] = [];
+  let fixed = 0;
+  for (const question of questions) {
+    const check = byId.get(question.id);
+    let result = question;
+    if (check?.verdict === "drop") {
+      dropped.push(question);
+      continue;
+    }
+    if (check?.verdict === "fix") {
+      result = {
+        ...question,
+        question: check.question.trim() || question.question,
+        modelAnswer: check.modelAnswer.trim() || question.modelAnswer,
+        rubric: {
+          ...question.rubric,
+          criteria: check.criteria.length > 0 ? check.criteria : question.rubric.criteria,
+        },
+      };
+      fixed++;
+    }
+    if (hasAnswerWorking(result.modelAnswer)) dropped.push(question);
+    else kept.push(result);
+  }
+  return { kept, dropped, fixed };
+}
+
+function contentWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length > 3)
+  );
+}
+
+/**
+ * Replacements for questions the answer check dropped: for each, the unused question whose
+ * wording overlaps it most (so its topic isn't lost), or the next unused one when none overlaps.
+ * Chosen questions are removed from `spare`.
+ */
+export function pickReplacements(
+  dropped: WrittenQuestion[],
+  spare: WrittenQuestion[]
+): WrittenQuestion[] {
+  const picked: WrittenQuestion[] = [];
+  for (const question of dropped) {
+    if (spare.length === 0) break;
+    const words = contentWords(question.question);
+    let best = 0;
+    let bestOverlap = 0;
+    spare.forEach((candidate, i) => {
+      let overlap = 0;
+      for (const word of contentWords(candidate.question)) if (words.has(word)) overlap++;
+      if (overlap > bestOverlap) {
+        best = i;
+        bestOverlap = overlap;
+      }
+    });
+    picked.push(...spare.splice(best, 1));
+  }
+  return picked;
+}
