@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyQuestionChecks, hasAnswerWorking, type WrittenQuestionCheck } from "./postprocess.js";
+import {
+  applyQuestionChecks,
+  hasAnswerWorking,
+  pickReplacements,
+  type WrittenQuestionCheck,
+} from "./postprocess.js";
 import type { WrittenQuestion } from "./prompts.js";
 
 function question(id: string, modelAnswer: string, criteria = ["accuracy"]): WrittenQuestion {
@@ -68,5 +73,43 @@ describe("applyQuestionChecks", () => {
     );
     expect(result.kept.map((q) => q.id)).toEqual(["b"]);
     expect(result.dropped.map((q) => q.id)).toEqual(["a"]);
+  });
+});
+
+describe("hasAnswerWorking at the start of a sentence", () => {
+  it("needs punctuation after Wait or Hmm, so prose starting with them stays", () => {
+    expect(hasAnswerWorking("Wait times fell from 12 to 9 minutes after the change.")).toBe(false);
+    expect(hasAnswerWorking("Profit rose. Wait, that uses the old price.")).toBe(true);
+    expect(hasAnswerWorking("Hmm. The rate is 8%.")).toBe(true);
+  });
+});
+
+describe("pickReplacements", () => {
+  it("replaces each dropped question with the unused one closest in wording", () => {
+    const spare = [
+      question("tides", "x"),
+      question("elasticity", "x"),
+      question("monopoly", "x"),
+    ].map((q, i) => ({
+      ...q,
+      question: [
+        "Explain how tides depend on the Moon",
+        "Define price elasticity of demand",
+        "Why can a monopoly restrict output",
+      ][i],
+    }));
+    const dropped = [{ ...question("d", "x"), question: "Compute the price elasticity of demand" }];
+
+    expect(pickReplacements(dropped, spare).map((q) => q.id)).toEqual(["elasticity"]);
+    expect(spare.map((q) => q.id)).toEqual(["tides", "monopoly"]);
+  });
+
+  it("takes the next unused question when none overlaps, and stops when none are left", () => {
+    const spare = [question("a", "x"), question("b", "x")].map((q) => ({ ...q, question: "Zzz" }));
+    const dropped = [1, 2, 3].map((i) => ({
+      ...question(`d${i}`, "x"),
+      question: "Unrelated words here",
+    }));
+    expect(pickReplacements(dropped, spare).map((q) => q.id)).toEqual(["a", "b"]);
   });
 });

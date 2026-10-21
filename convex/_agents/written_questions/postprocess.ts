@@ -268,7 +268,7 @@ export function applySelectedQuestionIds(
  * "(Self-Correction Note: …)". Such an answer usually holds two contradicting results.
  */
 const ANSWER_WORKING =
-  /(?:(?:^|[.!?:]\s+|\(\s*)(?:wait|hmm)\b)|\blet me (?:re-?calculate|recalculate|re-?check|recheck|double-check|redo|reconsider)\b|\bon second thought\b|\bself[- ]?correction\b|\bcorrection note\b|\bnote to self\b/im;
+  /(?:(?:^|[.!?:]\s+|\(\s*)(?:wait|hmm)[,.!…])|\blet me (?:re-?calculate|recalculate|re-?check|recheck|double-check|redo|reconsider)\b|\bon second thought\b|\bself[- ]?correction\b|\bcorrection note\b|\bnote to self\b/im;
 
 export function hasAnswerWorking(text: string | null | undefined): boolean {
   return ANSWER_WORKING.test(text ?? "");
@@ -321,4 +321,41 @@ export function applyQuestionChecks(
     else kept.push(result);
   }
   return { kept, dropped, fixed };
+}
+
+function contentWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length > 3)
+  );
+}
+
+/**
+ * Replacements for questions the answer check dropped: for each, the unused question whose
+ * wording overlaps it most (so its topic isn't lost), or the next unused one when none overlaps.
+ * Chosen questions are removed from `spare`.
+ */
+export function pickReplacements(
+  dropped: WrittenQuestion[],
+  spare: WrittenQuestion[]
+): WrittenQuestion[] {
+  const picked: WrittenQuestion[] = [];
+  for (const question of dropped) {
+    if (spare.length === 0) break;
+    const words = contentWords(question.question);
+    let best = 0;
+    let bestOverlap = 0;
+    spare.forEach((candidate, i) => {
+      let overlap = 0;
+      for (const word of contentWords(candidate.question)) if (words.has(word)) overlap++;
+      if (overlap > bestOverlap) {
+        best = i;
+        bestOverlap = overlap;
+      }
+    });
+    picked.push(...spare.splice(best, 1));
+  }
+  return picked;
 }

@@ -86,3 +86,75 @@ describe("checkWrittenQuestions", () => {
     expect(invokeStructuredOutput).not.toHaveBeenCalled();
   });
 });
+
+describe("checkWrittenQuestions outcomes", () => {
+  const deadline = () => createJobDeadline(540_000);
+
+  it("checks questions in batches of 10", async () => {
+    invokeStructuredOutput.mockImplementation(async (options: { userPrompt: string }) => ({
+      checks: [...options.userPrompt.matchAll(/"id": "(q\d+)"/g)].map((m) => verdict(m[1], "ok")),
+    }));
+    const questions = Array.from({ length: 12 }, (_, i) => question(`q${i}`));
+
+    const result = await checkWrittenQuestions({
+      questions,
+      pool: questions,
+      deadline: deadline(),
+      onUsage: noUsage,
+    });
+
+    expect(invokeStructuredOutput).toHaveBeenCalledTimes(2);
+    expect(result.questions).toHaveLength(12);
+  });
+
+  it("keeps the selected set when the check drops every question", async () => {
+    invokeStructuredOutput.mockResolvedValue({
+      checks: [verdict("a", "drop"), verdict("b", "drop")],
+    });
+    const questions = [question("a"), question("b", "Wait, let me re-calculate.")];
+
+    const result = await checkWrittenQuestions({
+      questions,
+      pool: questions,
+      deadline: deadline(),
+      onUsage: noUsage,
+    });
+
+    expect(result.fellBack).toBe(true);
+    expect(result.questions.map((q) => q.id)).toEqual(["a"]);
+  });
+
+  it("comes out short, without failing, when there are no replacements left", async () => {
+    invokeStructuredOutput.mockResolvedValue({
+      checks: [verdict("a", "ok"), verdict("b", "drop")],
+    });
+    const questions = [question("a"), question("b")];
+
+    const result = await checkWrittenQuestions({
+      questions,
+      pool: questions,
+      deadline: deadline(),
+      onUsage: noUsage,
+    });
+
+    expect(result).toMatchObject({ dropped: 1, fellBack: false });
+    expect(result.questions.map((q) => q.id)).toEqual(["a"]);
+  });
+
+  it("doesn't add replacements when their check round fails", async () => {
+    invokeStructuredOutput
+      .mockResolvedValueOnce({ checks: [verdict("a", "ok"), verdict("b", "drop")] })
+      .mockRejectedValueOnce(new Error("bad gateway"));
+    const pool = [question("a"), question("b"), question("c")];
+
+    const result = await checkWrittenQuestions({
+      questions: pool.slice(0, 2),
+      pool,
+      deadline: deadline(),
+      onUsage: noUsage,
+    });
+
+    expect(result.questions.map((q) => q.id)).toEqual(["a"]);
+    expect(invokeStructuredOutput).toHaveBeenCalledTimes(2);
+  });
+});
