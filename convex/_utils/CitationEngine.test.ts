@@ -401,6 +401,16 @@ describe("CitationEngine", () => {
       expect(result).toBe("(No Authors Paper, 2021)");
     });
 
+    // #558: notebook uploads are titled by file name.
+    it("cites an uploaded file by a readable title, without the extension", () => {
+      const fileCitation = {
+        ...noAuthorsCitation,
+        title: "Mawson_et_al_2023.pdf",
+        year: undefined,
+      };
+      expect(engine.formatInline(fileCitation, "apa7")).toBe('("Mawson et al 2023," n.d.)');
+    });
+
     it("formats Harvard inline citation with no year", () => {
       const result = engine.formatInline(noYearCitation, "harvard");
       expect(result).toBe("(Miller, n.d.)");

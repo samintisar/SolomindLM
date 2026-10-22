@@ -7,6 +7,7 @@ import type { DiscoveredResearchSource, ResearchNodeDeps } from "./nodes";
 import {
   dropOffTopicPapers,
   packEvidenceForWriter,
+  rememberTopicVerdicts,
   retrieverNode,
   withNotebookChannel,
 } from "./nodes";
@@ -70,7 +71,6 @@ function academicDeps(overrides: Partial<ResearchNodeDeps> = {}): ResearchNodeDe
     smartModel: "test-model",
     runHybridSearch: async () => [],
     discoverSources: async () => [spacingPaper, loggingPaper],
-    loadPaper: vi.fn(async () => ({ title: "x", content: "PDF text", source: "openalex" })),
     onProgress: async () => {},
     ...overrides,
   };
@@ -88,22 +88,6 @@ describe("academic retrieval", () => {
     });
     // The full abstract, not the 500-character snippet.
     expect(entry.content).toBe(spacingPaper.rawContent);
-  });
-
-  it("loads full text only for papers with a PDF link", async () => {
-    const loadPaper = vi.fn(async () => ({ title: "x", content: "PDF text", source: "arxiv" }));
-    const withPdf = {
-      ...loggingPaper,
-      metadata: { ...loggingPaper.metadata, pdfUrl: "https://example.org/logging.pdf" },
-    };
-    await retrieverNode(
-      academicState(),
-      academicDeps({ loadPaper, discoverSources: async () => [spacingPaper, withPdf] })
-    );
-    expect(loadPaper).toHaveBeenCalledTimes(1);
-    expect(loadPaper).toHaveBeenCalledWith(
-      expect.objectContaining({ pdfUrl: "https://example.org/logging.pdf" })
-    );
   });
 
   it("drops papers the screen calls off topic, against the user's question", async () => {
@@ -124,6 +108,39 @@ describe("dropOffTopicPapers", () => {
       return true;
     });
     expect(kept).toEqual([spacingPaper, loggingPaper]);
+  });
+});
+
+describe("rememberTopicVerdicts", () => {
+  it("screens a paper once per question and retries a failed screen", async () => {
+    let calls = 0;
+    const screen = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("model down");
+      return true;
+    });
+    const paper = { title: "Distributed practice", abstract: "a" };
+    await expect(rememberTopicVerdicts(screen)(paper, "q")).rejects.toThrow("model down");
+    expect(await rememberTopicVerdicts(screen)(paper, "q")).toBe(true);
+    expect(await rememberTopicVerdicts(screen)(paper, "q")).toBe(true);
+    expect(screen).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("evidence dedupe", () => {
+  it("keeps different papers that have no abstract", async () => {
+    const noAbstract = (title: string): DiscoveredResearchSource => ({
+      title,
+      url: `https://example.org/${title}`,
+      snippet: "",
+      sourceType: "semantic_scholar",
+      score: 0.5,
+    });
+    const result = await retrieverNode(
+      academicState(),
+      academicDeps({ discoverSources: async () => [noAbstract("p1"), noAbstract("p2")] })
+    );
+    expect(result.evidence!.map((e) => e.sourceTitle)).toEqual(["p1", "p2"]);
   });
 });
 

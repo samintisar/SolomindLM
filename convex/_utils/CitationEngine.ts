@@ -203,9 +203,16 @@ function getFirstAuthorLastName(author: string): string {
   return parseAuthorName(author).family || "Unknown";
 }
 
-/** APA and Harvard cite a work with no author by the first few words of its title. */
+/**
+ * APA and Harvard cite a work with no author by the first few words of its title. An uploaded
+ * file's title is often its file name, so the extension goes and underscores become spaces.
+ */
 function shortTitle(title: string): string {
-  const words = title.trim().split(/\s+/).filter(Boolean);
+  const readable = title
+    .trim()
+    .replace(/\.(?:pdf|docx?|txt|md|pptx?|epub|html?)$/i, "")
+    .replace(/_+/g, " ");
+  const words = readable.split(/\s+/).filter(Boolean);
   const short = words
     .slice(0, 4)
     .join(" ")

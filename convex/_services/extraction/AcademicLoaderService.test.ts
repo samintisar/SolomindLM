@@ -132,26 +132,6 @@ describe("AcademicLoaderService.loadPaper", () => {
     expect(result.content).toContain("## Abstract");
   });
 
-  // #558: deep research keeps the abstract rather than a publisher page full of site chrome.
-  test("pdfOnly never scrapes the landing page", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("OCR failed"));
-    const mockWebLoader = vi.fn().mockResolvedValue({ title: "Page", content: "19k Accesses" });
-    const service = new AcademicLoaderService(mockWebLoader);
-    const paper = {
-      title: "Test Paper",
-      authors: ["Author"],
-      abstract: "Abstract",
-      url: "https://example.com/article",
-      source: "openalex" as const,
-    };
-
-    await expect(service.loadPaper(paper, { pdfOnly: true })).rejects.toThrow("no PDF link");
-    await expect(
-      service.loadPaper({ ...paper, pdfUrl: "https://example.com/paper.pdf" }, { pdfOnly: true })
-    ).rejects.toThrow("could not be read");
-    expect(mockWebLoader).not.toHaveBeenCalled();
-  });
-
   test("uses original title when web scrape returns no title", async () => {
     const mockWebLoader = vi.fn().mockResolvedValue({
       title: "",

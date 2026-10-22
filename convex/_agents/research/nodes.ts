@@ -92,18 +92,6 @@ export interface ResearchNodeDeps {
   ) => Promise<DiscoveredResearchSource[]>;
   // Web page loader for scraping discovered sources
   loadWebPage?: (url: string) => Promise<{ title: string; content: string; url: string }>;
-  // Academic paper loader
-  loadPaper?: (paper: {
-    title: string;
-    authors: string[];
-    year?: number;
-    abstract: string;
-    url: string;
-    pdfUrl?: string;
-    source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
-    citationCount?: number;
-    doi?: string;
-  }) => Promise<{ title: string; content: string; source: string }>;
   /**
    * Whether a paper is on the research question's topic (title and abstract). Academic search
    * matches on single words ("retention", "schedule"), so results are screened before they become
@@ -132,6 +120,31 @@ export function withNotebookChannel(
 }
 
 const PAPER_SCREEN_CONCURRENCY = 4;
+
+type TopicScreen = NonNullable<ResearchNodeDeps["isPaperOnTopic"]>;
+
+/** Verdicts per screen function, so one run never screens a paper twice (sub-questions overlap). */
+const topicVerdicts = new WeakMap<TopicScreen, Map<string, Promise<boolean>>>();
+
+/** The screen with each verdict remembered by paper and question; a failed call is not kept. */
+export function rememberTopicVerdicts(screen: TopicScreen): TopicScreen {
+  let verdicts = topicVerdicts.get(screen);
+  if (!verdicts) {
+    verdicts = new Map();
+    topicVerdicts.set(screen, verdicts);
+  }
+  const cache = verdicts;
+  return (paper, query) => {
+    const key = `${query}\u0000${paper.title}`;
+    let verdict = cache.get(key);
+    if (!verdict) {
+      verdict = screen(paper, query);
+      cache.set(key, verdict);
+      verdict.catch(() => cache.delete(key));
+    }
+    return verdict;
+  };
+}
 
 /**
  * Drops papers the screen calls clearly off topic. A failed screen keeps the paper: the check is
@@ -402,7 +415,7 @@ export async function retrieverNode(
     }
 
     // ── Academic retrieval ──
-    if (sq.sourceChannels.includes("academic") && deps.discoverSources && deps.loadPaper) {
+    if (sq.sourceChannels.includes("academic") && deps.discoverSources) {
       const academicQuery = sq.searchQueries[0];
       if (!academicQuery) {
         await deps.onProgress("retrieving_web", sq.id, 0);
@@ -425,12 +438,16 @@ export async function retrieverNode(
         discoveredPapers.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
         let topPapers = discoveredPapers.slice(0, externalMaxResults);
         if (deps.isPaperOnTopic && topPapers.length > 0) {
-          topPapers = await dropOffTopicPapers(topPapers, state.query, deps.isPaperOnTopic);
+          topPapers = await dropOffTopicPapers(
+            topPapers,
+            state.query,
+            rememberTopicVerdicts(deps.isPaperOnTopic)
+          );
         }
 
-        // ── Abstract-first loading: the full abstract by default, PDF text for the top papers ──
-
-        // Step 1: Add all top papers using the abstract (fast, no OCR)
+        // Papers are cited from their abstract. No full text: a landing page is mostly publisher
+        // chrome, and a PDF's opening text is masthead and affiliations, which is what the evidence
+        // table would show (#558).
         const academicChunks: EvidenceEntry[] = topPapers.map((paper) => ({
           subQuestionId: sq.id,
           sourceType: "academic",
@@ -452,53 +469,17 @@ export async function retrieverNode(
           },
         }));
 
-        // Step 2: Lazy full-text load — PDFs only, for the top papers, with timeout. A paper with no
-        // PDF keeps its abstract: its landing page is mostly publisher chrome (#558).
-        const FULL_TEXT_LOAD_LIMIT = 3;
-
-        for (let i = 0; i < Math.min(topPapers.length, FULL_TEXT_LOAD_LIMIT); i++) {
-          const paper = topPapers[i]!;
-          const pdfUrl = paper.metadata?.pdfUrl;
-          if (!pdfUrl) continue;
-          try {
-            const loaded = await withTimeout(
-              deps.loadPaper({
-                title: paper.title,
-                authors: paper.metadata?.authors ?? [],
-                year: paper.metadata?.year,
-                abstract: paper.rawContent ?? paper.snippet,
-                url: paper.url,
-                pdfUrl,
-                source: paper.metadata?.sourceApi ?? "arxiv",
-                citationCount: paper.metadata?.citationCount,
-                doi: paper.metadata?.doi,
-              }),
-              10_000,
-              `loadPaper(${paper.title.slice(0, 30)})`
-            );
-
-            // Replace the abstract with full content for this paper
-            academicChunks[i]!.content = truncateEvidenceContent(
-              loaded.content,
-              MAX_EVIDENCE_CONTENT_LENGTH
-            );
-          } catch (_err) {
-            // Keep the abstract fallback — no action needed
-            retrieverLog.warn("fulltext_load_failed_using_abstract", {
-              title: paper.title.slice(0, 40),
-              error: _err instanceof Error ? _err.message : String(_err),
-            });
-          }
-        }
-
         allChunks.push(...academicChunks);
       }
     }
 
-    // Deduplicate by content similarity (simple exact match on first 200 chars)
+    // Deduplicate by content similarity (simple exact match on first 200 chars). Entries with no
+    // text (a paper without an abstract) are told apart by their source instead.
     const seen = new Set<string>();
     const deduped = allChunks.filter((e) => {
-      const key = e.content.slice(0, 200);
+      const key = e.content.trim()
+        ? e.content.slice(0, 200)
+        : `source:${e.sourceUrl || e.sourceTitle}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
