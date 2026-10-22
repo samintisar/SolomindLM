@@ -204,6 +204,7 @@ export const runResearchEval = action({
                 sourceType: "academic",
                 score: r.score,
                 rawContent: r.rawContent ?? undefined,
+                metadata: r.metadata,
               }));
             } catch (e) {
               console.warn("[ResearchEval] Academic search failed:", e);
@@ -239,14 +240,9 @@ export const runResearchEval = action({
       loadWebPage: async (url: string) => {
         return ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url });
       },
-      loadPaper: async (paper: any) => {
-        const { AcademicLoaderService } = await import(
-          "../_services/extraction/AcademicLoaderService.js"
-        );
-        const loader = new AcademicLoaderService(async (url: string) =>
-          ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url })
-        );
-        return loader.loadPaper(paper);
+      isPaperOnTopic: async (paper: { title: string; abstract: string }, query: string) => {
+        const { checkPaperOffTopic } = await import("../literatureReview/screenPaper.helpers.js");
+        return !(await checkPaperOffTopic(paper, query, 20_000)).offTopic;
       },
       onProgress: async () => undefined,
     };

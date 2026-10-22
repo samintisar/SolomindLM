@@ -26,9 +26,6 @@ import {
   PLAN_REVIEW_PROMPT,
   PLAN_REVIEW_SYSTEM_PROMPT,
   PlanReviewOutputSchema,
-  SCREEN_PAPERS_SYSTEM_PROMPT,
-  SCREEN_SINGLE_PAPER_PROMPT,
-  ScreenSinglePaperOutputSchema,
 } from "../_agents/literature_review/prompts.js";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
@@ -83,8 +80,6 @@ import {
 import {
   criterionAssessmentValidator,
   DEFAULT_SCREENING_CRITERIA,
-  decideScreening,
-  formatCriteriaForPrompt,
   normalizeScreeningCriteria,
   resolveScreeningDecisions,
   type ScreeningCriterion,
@@ -92,6 +87,7 @@ import {
   screeningCriterionValidator,
   screeningFailureDecision,
 } from "./screeningCriteria.js";
+import { checkPaperOffTopic, screenOnePaperWithLlm } from "./screenPaper.helpers.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -104,8 +100,6 @@ function delay(ms: number): Promise<void> {
 
 /** Per-paper LLM ceiling (fast model; fail fast → metadata / conservative fallback). */
 const EXTRACT_DATA_PER_PAPER_TIMEOUT_MS = 90_000;
-
-const SCREEN_SINGLE_PAPER_TIMEOUT_MS = 45_000;
 
 export { EXTRACT_DATA_CHUNK_SIZE } from "./batchSizes.js";
 
@@ -493,51 +487,8 @@ export const rankPapers = internalAction({
   handler: rankPapersHandler,
 });
 
-/** Screens one paper against the eligibility criteria; throws when the model call fails. */
-async function screenOnePaperWithLlm(
-  paper: { title: string; abstract: string },
-  query: string,
-  criteria: ScreeningCriterion[]
-): Promise<ScreeningDecision> {
-  const llm = createLLM({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    mapModel: bulkLlmModel(),
-    temperatures: 0.2,
-    // Room for one short check per criterion plus the reason (the old 256 fit a verdict only).
-    maxTokens: 1_200,
-    phase: "fast",
-  });
-
-  const structuredLlm = llm.withStructuredOutput(ScreenSinglePaperOutputSchema, {
-    name: "screen_single_paper",
-  });
-
-  const prompt = SCREEN_SINGLE_PAPER_PROMPT.replace(/{query}/g, query)
-    .replace(/{criteria}/g, () => formatCriteriaForPrompt(criteria))
-    .replace(/{title}/g, paper.title)
-    .replace(/{abstract}/g, () => truncateForLiteratureLlm(paper.abstract));
-
-  const response = await invokeWithHttpRetry(
-    () =>
-      invokeWithTimeout(
-        () =>
-          structuredLlm.invoke([
-            new SystemMessage(SCREEN_PAPERS_SYSTEM_PROMPT),
-            new HumanMessage(prompt),
-          ]),
-        SCREEN_SINGLE_PAPER_TIMEOUT_MS,
-        "screenPapers"
-      ),
-    "screenPapers"
-  );
-
-  return decideScreening(response, criteria);
-}
-
 const PDF_METADATA_TEXT_MAX_CHARS = 4_000;
 
-/** The off-topic check for the user's own notebook papers: the topic criterion alone. */
-const NOTEBOOK_TOPIC_CRITERIA: ScreeningCriterion[] = [DEFAULT_SCREENING_CRITERIA[0]];
 const PDF_METADATA_TIMEOUT_MS = 45_000;
 
 /** Title, authors and year from the start of an uploaded paper, so its citation key is right. */
@@ -613,11 +564,8 @@ export async function loadNotebookPapersHandler(
       try {
         // The user chose these papers, so only the topic is checked, and only a clear "not met"
         // flags one: an unclear abstract or a missing kind of evidence is not "off topic".
-        const verdict = await screenOnePaperWithLlm(paper, args.query, NOTEBOOK_TOPIC_CRITERIA);
-        const offTopic = verdict.criteria
-          ? verdict.criteria.some((c) => c.status === "not_met")
-          : !verdict.isIncluded;
-        if (offTopic) offTopicReason = verdict.reason;
+        const verdict = await checkPaperOffTopic(paper, args.query);
+        if (verdict.offTopic) offTopicReason = verdict.reason;
       } catch (error) {
         logger.error("Off-topic check failed; leaving the paper unflagged", error, {
           documentId: doc._id,

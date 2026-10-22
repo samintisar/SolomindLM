@@ -2,6 +2,7 @@
 
 import type { ActionCtx } from "../../_generated/server";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { allWithConcurrency } from "../_shared/concurrency";
 import { createLLM } from "../_shared/llm_factory";
 import { buildPlanPrompt, buildWriterPrompt, PlannerOutputSchema } from "./prompts";
 import type { ResearchStateType } from "./state";
@@ -42,6 +43,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
+/** Paper details from academic search, carried into evidence so citations have authors and year. */
+export interface DiscoveredPaperMetadata {
+  pdfUrl?: string;
+  doi?: string;
+  citationCount?: number;
+  sourceApi?: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+  authors?: string[];
+  year?: number;
+}
+
+export interface DiscoveredResearchSource {
+  title: string;
+  url: string;
+  snippet: string;
+  sourceType: string;
+  score?: number;
+  rawContent?: string;
+  metadata?: DiscoveredPaperMetadata;
+}
+
 // Dependencies injected from the Convex action that runs the agent.
 export interface ResearchNodeDeps {
   ctx?: ActionCtx;
@@ -68,36 +89,99 @@ export interface ResearchNodeDeps {
     query: string,
     channels: Array<"web" | "news" | "academic">,
     maxResults?: number
-  ) => Promise<
-    Array<{
-      title: string;
-      url: string;
-      snippet: string;
-      sourceType: string;
-      score?: number;
-      rawContent?: string;
-    }>
-  >;
+  ) => Promise<DiscoveredResearchSource[]>;
   // Web page loader for scraping discovered sources
   loadWebPage?: (url: string) => Promise<{ title: string; content: string; url: string }>;
-  // Academic paper loader
-  loadPaper?: (paper: {
-    title: string;
-    authors: string[];
-    year?: number;
-    abstract: string;
-    url: string;
-    pdfUrl?: string;
-    source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
-    citationCount?: number;
-    doi?: string;
-  }) => Promise<{ title: string; content: string; source: string }>;
+  /**
+   * Whether a paper is on the research question's topic (title and abstract). Academic search
+   * matches on single words ("retention", "schedule"), so results are screened before they become
+   * evidence (#558). Optional: without it every result is kept.
+   */
+  isPaperOnTopic?: (paper: { title: string; abstract: string }, query: string) => Promise<boolean>;
   // Stream progress callback
   onProgress: (
     phase: ResearchPhase,
     subQuestionId?: string,
     sourcesFound?: number
   ) => Promise<void>;
+}
+
+/**
+ * The user's own sources are searched for every sub-question when the notebook channel is on: the
+ * planner often routes sub-questions to web or academic only, and the notebook search is local and
+ * cheap (#558).
+ */
+export function withNotebookChannel(
+  channels: SourceChannel[],
+  enabledChannels: SourceChannel[]
+): SourceChannel[] {
+  if (!enabledChannels.includes("notebook") || channels.includes("notebook")) return channels;
+  return ["notebook", ...channels];
+}
+
+const PAPER_SCREEN_CONCURRENCY = 4;
+
+type TopicScreen = NonNullable<ResearchNodeDeps["isPaperOnTopic"]>;
+
+/** Verdicts per screen function, so one run never screens a paper twice (sub-questions overlap). */
+const topicVerdicts = new WeakMap<TopicScreen, Map<string, Promise<boolean>>>();
+
+/** The screen with each verdict remembered by paper and question; a failed call is not kept. */
+export function rememberTopicVerdicts(screen: TopicScreen): TopicScreen {
+  let verdicts = topicVerdicts.get(screen);
+  if (!verdicts) {
+    verdicts = new Map();
+    topicVerdicts.set(screen, verdicts);
+  }
+  const cache = verdicts;
+  return (paper, query) => {
+    const key = `${query}\u0000${paper.title}`;
+    let verdict = cache.get(key);
+    if (!verdict) {
+      verdict = screen(paper, query);
+      cache.set(key, verdict);
+      verdict.catch(() => cache.delete(key));
+    }
+    return verdict;
+  };
+}
+
+/**
+ * Drops papers the screen calls clearly off topic. A failed screen keeps the paper: the check is
+ * best-effort and must not empty the evidence when the model is down.
+ */
+export async function dropOffTopicPapers<
+  T extends { title: string; snippet: string; rawContent?: string },
+>(
+  papers: T[],
+  query: string,
+  isPaperOnTopic: NonNullable<ResearchNodeDeps["isPaperOnTopic"]>
+): Promise<T[]> {
+  const verdicts = await allWithConcurrency(
+    papers.map((paper) => async () => {
+      try {
+        return await isPaperOnTopic(
+          { title: paper.title, abstract: paper.rawContent?.trim() || paper.snippet },
+          query
+        );
+      } catch (err) {
+        retrieverLog.warn("paper_screen_failed_keeping_paper", {
+          title: paper.title.slice(0, 40),
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return true;
+      }
+    }),
+    PAPER_SCREEN_CONCURRENCY
+  );
+  const kept = papers.filter((_, i) => verdicts[i]);
+  if (kept.length < papers.length) {
+    retrieverLog.info("off_topic_papers_dropped", {
+      dropped: papers.length - kept.length,
+      kept: kept.length,
+    });
+  }
+  return kept;
 }
 
 // ============================================================
@@ -139,9 +223,12 @@ export async function plannerNode(
     id: sq.id,
     question: sq.question,
     searchQueries: sq.searchQueries,
-    sourceChannels: sq.sourceChannels.filter((ch) =>
-      enabledChannels.includes(ch as SourceChannel)
-    ) as SourceChannel[],
+    sourceChannels: withNotebookChannel(
+      sq.sourceChannels.filter((ch) =>
+        enabledChannels.includes(ch as SourceChannel)
+      ) as SourceChannel[],
+      enabledChannels
+    ),
     status: "pending",
   }));
 
@@ -328,104 +415,71 @@ export async function retrieverNode(
     }
 
     // ── Academic retrieval ──
-    if (sq.sourceChannels.includes("academic") && deps.discoverSources && deps.loadPaper) {
+    if (sq.sourceChannels.includes("academic") && deps.discoverSources) {
       const academicQuery = sq.searchQueries[0];
       if (!academicQuery) {
         await deps.onProgress("retrieving_web", sq.id, 0);
       } else {
         await deps.onProgress("retrieving_web", sq.id, 0); // Reuse web phase for academic
 
-        const discoveredPapers: Array<{
-          title: string;
-          url: string;
-          snippet: string;
-          sourceType: string;
-          score?: number;
-          rawContent?: string;
-          metadata?: {
-            pdfUrl?: string;
-            doi?: string;
-            citationCount?: number;
-            sourceApi?: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
-          };
-        }> = [];
+        let discoveredPapers: DiscoveredResearchSource[] = [];
 
         try {
-          const sources = await deps.discoverSources(
+          discoveredPapers = await deps.discoverSources(
             academicQuery,
             ["academic"],
             externalMaxResults
           );
-          discoveredPapers.push(...sources);
         } catch (_err) {
           retrieverLog.error("academic_discovery_failed", _err, { query: academicQuery });
         }
 
         // Sort by score and take top results
         discoveredPapers.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-        const topPapers = discoveredPapers.slice(0, externalMaxResults);
+        let topPapers = discoveredPapers.slice(0, externalMaxResults);
+        if (deps.isPaperOnTopic && topPapers.length > 0) {
+          topPapers = await dropOffTopicPapers(
+            topPapers,
+            state.query,
+            rememberTopicVerdicts(deps.isPaperOnTopic)
+          );
+        }
 
-        // ── Abstract-first loading: use snippets by default, escalate to full text selectively ──
-
-        // Step 1: Add all top papers using abstract/snippet (fast, no OCR)
+        // Papers are cited from their abstract. No full text: a landing page is mostly publisher
+        // chrome, and a PDF's opening text is masthead and affiliations, which is what the evidence
+        // table would show (#558).
         const academicChunks: EvidenceEntry[] = topPapers.map((paper) => ({
           subQuestionId: sq.id,
           sourceType: "academic",
           sourceTitle: paper.title,
           sourceUrl: paper.url,
-          content: truncateEvidenceContent(paper.snippet, MAX_EVIDENCE_CONTENT_LENGTH),
+          content: truncateEvidenceContent(
+            paper.rawContent?.trim() || paper.snippet,
+            MAX_EVIDENCE_CONTENT_LENGTH
+          ),
           relevanceScore: paper.score,
           iteration,
           metadata: {
             doi: paper.metadata?.doi,
             citationCount: paper.metadata?.citationCount,
+            authors: paper.metadata?.authors,
+            year: paper.metadata?.year,
+            sourceApi: paper.metadata?.sourceApi,
+            pdfUrl: paper.metadata?.pdfUrl,
           },
         }));
-
-        // Step 2: Lazy full-text load — only for top 1-2 papers, with timeout
-        const FULL_TEXT_LOAD_LIMIT = 3;
-        const papersToLoad = topPapers.slice(0, FULL_TEXT_LOAD_LIMIT);
-
-        for (let i = 0; i < papersToLoad.length; i++) {
-          const paper = papersToLoad[i];
-          try {
-            const loaded = await withTimeout(
-              deps.loadPaper({
-                title: paper.title,
-                authors: [],
-                abstract: paper.snippet,
-                url: paper.url,
-                pdfUrl: paper.metadata?.pdfUrl,
-                source: paper.metadata?.sourceApi ?? "arxiv",
-                citationCount: paper.metadata?.citationCount,
-                doi: paper.metadata?.doi,
-              }),
-              10_000,
-              `loadPaper(${paper.title.slice(0, 30)})`
-            );
-
-            // Replace the snippet with full content for this paper
-            academicChunks[i].content = truncateEvidenceContent(
-              loaded.content,
-              MAX_EVIDENCE_CONTENT_LENGTH
-            );
-          } catch (_err) {
-            // Keep the abstract/snippet fallback — no action needed
-            retrieverLog.warn("fulltext_load_failed_using_abstract", {
-              title: paper.title.slice(0, 40),
-              error: _err instanceof Error ? _err.message : String(_err),
-            });
-          }
-        }
 
         allChunks.push(...academicChunks);
       }
     }
 
-    // Deduplicate by content similarity (simple exact match on first 200 chars)
+    // Deduplicate by content similarity (simple exact match on first 200 chars). Entries with no
+    // text (a paper without an abstract) are told apart by their source instead.
     const seen = new Set<string>();
     const deduped = allChunks.filter((e) => {
-      const key = e.content.slice(0, 200);
+      const key = e.content.trim()
+        ? e.content.slice(0, 200)
+        : `source:${e.sourceUrl || e.sourceTitle}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -486,21 +540,11 @@ export async function writerNode(
   const MAX_EVIDENCE_PER_SQ = 8;
   const MAX_ENTRY_CHARS = 2_000;
 
-  // Group evidence by sub-question
+  // Pick the evidence the writer sees, then truncate each entry for the prompt
+  const packedBySubQuestion = packEvidenceForWriter(evidence, MAX_EVIDENCE_PER_SQ);
   const evidenceBySubQuestion: Record<string, EvidenceEntry[]> = {};
-  for (const entry of evidence) {
-    if (!evidenceBySubQuestion[entry.subQuestionId]) {
-      evidenceBySubQuestion[entry.subQuestionId] = [];
-    }
-    evidenceBySubQuestion[entry.subQuestionId].push(entry);
-  }
-
-  // Sort each group by relevance, keep top-K, truncate each entry
-  for (const sqId of Object.keys(evidenceBySubQuestion)) {
-    const entries = evidenceBySubQuestion[sqId];
-    entries.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
-    const topEntries = entries.slice(0, MAX_EVIDENCE_PER_SQ);
-    evidenceBySubQuestion[sqId] = topEntries.map((e) => ({
+  for (const [sqId, entries] of Object.entries(packedBySubQuestion)) {
+    evidenceBySubQuestion[sqId] = entries.map((e) => ({
       ...e,
       content: truncateEvidenceContent(e.content, MAX_ENTRY_CHARS),
     }));
@@ -559,7 +603,54 @@ export async function writerNode(
 
   return {
     finalResponse,
+    // The writer's [N] markers number this evidence, so it replaces the full set: the citations,
+    // references and evidence table are built from it and must count the same way (#558).
+    evidence: subQuestions.flatMap((sq) => packedBySubQuestion[sq.id] ?? []),
     shouldStop: true,
     stopReason: "completed",
   };
+}
+
+const CHANNEL_ORDER: SourceChannel[] = ["notebook", "academic", "web", "news"];
+
+/**
+ * The evidence the writer sees per sub-question, at most `maxPerSubQuestion` entries. Scores are
+ * not comparable across channels (notebook hybrid search, Tavily and academic ranking each use
+ * their own scale), so entries are ranked within their channel and the channels take turns,
+ * notebook first. One global sort let web and paper scores push the user's own sources out (#558).
+ */
+export function packEvidenceForWriter(
+  evidence: EvidenceEntry[],
+  maxPerSubQuestion: number
+): Record<string, EvidenceEntry[]> {
+  const bySubQuestion: Record<string, EvidenceEntry[]> = {};
+  for (const entry of evidence) {
+    (bySubQuestion[entry.subQuestionId] ??= []).push(entry);
+  }
+
+  const packed: Record<string, EvidenceEntry[]> = {};
+  for (const [sqId, entries] of Object.entries(bySubQuestion)) {
+    const channels = [...new Set(entries.map((e) => e.sourceType))].sort(
+      (a, b) => channelRank(a) - channelRank(b)
+    );
+    const queues = channels.map((channel) =>
+      entries
+        .filter((e) => e.sourceType === channel)
+        .sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
+    );
+    const picked: EvidenceEntry[] = [];
+    while (picked.length < maxPerSubQuestion && queues.some((q) => q.length > 0)) {
+      for (const queue of queues) {
+        const next = queue.shift();
+        if (next && picked.length < maxPerSubQuestion) picked.push(next);
+      }
+    }
+    packed[sqId] = picked;
+  }
+  return packed;
+}
+
+function channelRank(channel: string): number {
+  const index = CHANNEL_ORDER.indexOf(channel as SourceChannel);
+  return index === -1 ? CHANNEL_ORDER.length : index;
 }

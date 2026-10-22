@@ -90,6 +90,18 @@ export function applyNumericCitations(
   });
 }
 
+const MAX_COLUMN_NAME_CHARS = 80;
+
+/** A sub-question as a table header: whole words, with an ellipsis when shortened (#558). */
+export function shortenColumnName(question: string): string {
+  const text = question.trim().replace(/\s+/g, " ");
+  if (text.length <= MAX_COLUMN_NAME_CHARS) return text;
+  const cut = text.slice(0, MAX_COLUMN_NAME_CHARS);
+  const lastSpace = cut.lastIndexOf(" ");
+  const words = lastSpace > MAX_COLUMN_NAME_CHARS / 2 ? cut.slice(0, lastSpace) : cut;
+  return `${words.replace(/[\s,;:.!?-]+$/, "")}…`;
+}
+
 export function sortReportSections(sections: ReportSection[]): ReportSection[] {
   const orderIndex = new Map(STANDARD_SECTION_ORDER.map((h, i) => [h.toLowerCase(), i]));
   return [...sections].sort((a, b) => {

@@ -1,5 +1,6 @@
 "use node";
 
+import { MIN_RELEVANCE_THRESHOLD } from "../_agents/chat/chatConfig.js";
 import type { VectorSearchRunner } from "../_agents/chat/vector_search.js";
 import { ResearchAgent } from "../_agents/research/index.js";
 import type { ResearchNodeDeps } from "../_agents/research/nodes";
@@ -7,8 +8,9 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
+import type { AcademicPaperSource } from "../_model/literatureReviewSearchOptions.js";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
-import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService.js";
+import { checkPaperOffTopic } from "../literatureReview/screenPaper.helpers.js";
 import {
   createHybridSearch,
   createKeywordSearchRunner,
@@ -18,6 +20,9 @@ import {
 } from "./_streamSearch";
 import { createDiscoverSources, type DiscoveredSource } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
+
+/** Per-paper ceiling for the topic screen; the whole run has about four minutes. */
+const PAPER_SCREEN_TIMEOUT_MS = 20_000;
 
 export interface ResearchAgentConfig {
   apiKey: string;
@@ -82,11 +87,19 @@ export async function buildResearchAgentDeps(
     smartModel,
     runHybridSearch: async (query, docIds) => {
       const embedding = await embeddingService.embedText(query);
-      return hybridSearch.search(userId, String(notebookId), query, docIds, embedding, undefined, {
-        skipRerank: true,
-        allowEmpty: true,
-        quiet: true,
-      });
+      const results = await hybridSearch.search(
+        userId,
+        String(notebookId),
+        query,
+        docIds,
+        embedding,
+        undefined,
+        { allowEmpty: true, quiet: true }
+      );
+      // Reranked, so scores are on Voyage's scale and chat's relevance floor applies: the notebook
+      // is searched for every sub-question, and a notebook off the question's topic must not fill
+      // the writer's notebook share (#558).
+      return results.filter((r) => (r.similarity ?? 0) >= MIN_RELEVANCE_THRESHOLD);
     },
     discoverSources: async (query, channels, maxResults) => {
       const results = await discoverSources(query, channels, maxResults);
@@ -97,13 +110,17 @@ export async function buildResearchAgentDeps(
         sourceType: r.sourceType,
         score: r.score,
         rawContent: r.rawContent,
+        metadata: r.metadata
+          ? {
+              ...r.metadata,
+              sourceApi: r.metadata.sourceApi as AcademicPaperSource | undefined,
+            }
+          : undefined,
       }));
     },
     loadWebPage: tavilyExtract,
-    loadPaper: async (paper) => {
-      const loader = new AcademicLoaderService(tavilyExtract);
-      return loader.loadPaper(paper);
-    },
+    isPaperOnTopic: async (paper, query) =>
+      !(await checkPaperOffTopic(paper, query, PAPER_SCREEN_TIMEOUT_MS)).offTopic,
     onProgress,
   };
 }

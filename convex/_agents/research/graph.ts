@@ -75,6 +75,10 @@ export async function runExecuteGraph(
   const graphStartTime = Date.now();
   const MAX_GRAPH_DURATION_MS = 240_000; // 4 minutes — stay under Convex's ~5 min action limit
 
+  // Sub-questions that found no evidence in the last pass; only these are retrieved again, so a
+  // second pass doesn't duplicate evidence the first one already has (#558).
+  let gapIds = new Set<string>();
+
   // Iterative retrieve loop
   while (state.iteration < state.maxIterations) {
     // Reset sub-question statuses for re-retrieval on subsequent iterations
@@ -82,7 +86,9 @@ export async function runExecuteGraph(
       state = {
         ...state,
         subQuestions: state.subQuestions.map((sq) =>
-          sq.status === "completed" ? { ...sq, status: "pending" as const } : sq
+          sq.status === "completed" && gapIds.has(sq.id)
+            ? { ...sq, status: "pending" as const }
+            : sq
         ),
       };
     }
@@ -135,6 +141,8 @@ export async function runExecuteGraph(
     if (gaps.length === 0 || state.iteration >= state.maxIterations) {
       break;
     }
+
+    gapIds = new Set(gaps.map((g) => g.subQuestionId));
 
     // Log gap analysis for debugging
     graphLog.info("iteration_gaps", { iteration: state.iteration, gapCount: gaps.length });

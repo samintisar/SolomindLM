@@ -10,6 +10,7 @@ import {
   buildOrderedEvidence,
   parseMarkdownSections,
   type ReportSection,
+  shortenColumnName,
   sortReportSections,
 } from "./reportSections";
 import {
@@ -139,7 +140,7 @@ export const createResearchArtifacts = internalMutation({
     // 3. Build custom columns from sub-questions (3-4 themes)
     const customColumns = args.subQuestions.slice(0, 4).map((sq, idx) => ({
       id: `col_${sq.id}`,
-      name: sq.question.slice(0, 60),
+      name: shortenColumnName(sq.question),
       type: "custom" as const,
       instructions: `Extract information relevant to: ${sq.question}`,
       isVisible: true,

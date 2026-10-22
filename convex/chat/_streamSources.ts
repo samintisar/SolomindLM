@@ -22,6 +22,8 @@ export interface DiscoveredSource {
     doi?: string;
     citationCount?: number;
     sourceApi?: string;
+    authors?: string[];
+    year?: number;
   };
 }
 
@@ -135,6 +137,8 @@ export function createDiscoverSources(
                 doi: r.metadata?.doi,
                 citationCount: r.metadata?.citationCount,
                 sourceApi: r.metadata?.sourceApi,
+                authors: r.metadata?.authors,
+                year: r.metadata?.year,
               },
             }))
           )
