@@ -2,15 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import type { AcademicPaper } from "./AcademicSearchService";
 import {
   calculateScore,
-  deduplicatePapers,
   extractAllTags,
   extractAttribute,
   extractDomain,
   extractTag,
   extractXmlBlocks,
   filterPapers,
+  fusePapersByProviderRank,
   normalizePublicationYear,
   normalizeTitle,
+  orderPapersByRelevance,
   sortPapers,
   stripXmlTags,
   toDiscoveredSource,
@@ -230,7 +231,91 @@ describe("AcademicSearchService - Utility Helpers", () => {
 });
 
 describe("AcademicSearchService - Result Processing", () => {
-  describe("deduplicatePapers", () => {
+  // #586: the merged pool was sorted by citations and recency, so recent off-topic papers
+  // outranked each provider's best matches.
+  describe("orderPapersByRelevance", () => {
+    const paper = (title: string): AcademicPaper => ({
+      title,
+      authors: [],
+      abstract: "",
+      url: `http://${title}`,
+      source: "openalex",
+      score: 0.9,
+    });
+
+    it("orders by rerank relevance, which becomes the score", () => {
+      const ordered = orderPapersByRelevance(
+        [paper("a"), paper("b"), paper("c")],
+        new Map([
+          [0, 0.2],
+          [1, 0.9],
+          [2, 0.5],
+        ])
+      );
+      expect(ordered.map((p) => [p.title, p.score])).toEqual([
+        ["b", 0.9],
+        ["c", 0.5],
+        ["a", 0.2],
+      ]);
+    });
+
+    it("keeps unscored papers in their order after the scored ones", () => {
+      const ordered = orderPapersByRelevance(
+        [paper("a"), paper("b"), paper("c")],
+        new Map([[2, 0.4]])
+      );
+      expect(ordered.map((p) => p.title)).toEqual(["c", "a", "b"]);
+      expect(ordered[1]!.score).toBe(0.9);
+    });
+  });
+
+  describe("fusePapersByProviderRank: ranking", () => {
+    const paper = (title: string, extra: Partial<AcademicPaper> = {}): AcademicPaper => ({
+      title,
+      authors: [],
+      abstract: "",
+      url: `http://${title}`,
+      source: "openalex",
+      score: 0,
+      ...extra,
+    });
+
+    it("keeps each provider's own order rather than citations and recency", () => {
+      const fused = fusePapersByProviderRank([
+        [paper("best match", { year: 2001 }), paper("second", { year: 2002 })],
+        [paper("other best"), paper("recent and cited", { year: 2024, citationCount: 5000 })],
+      ]);
+      expect(
+        fused
+          .map((p) => p.title)
+          .slice(0, 2)
+          .sort()
+      ).toEqual(["best match", "other best"]);
+      expect(fused.at(-1)?.title).not.toBe("best match");
+      expect(fused.findIndex((p) => p.title === "recent and cited")).toBeGreaterThan(1);
+    });
+
+    it("ranks a paper several providers return above one found once", () => {
+      const fused = fusePapersByProviderRank([
+        [paper("only here"), paper("shared", { doi: "10.1/x" })],
+        [paper("shared again", { doi: "10.1/X" })],
+      ]);
+      expect(fused.map((p) => p.title)).toEqual(["shared", "only here"]);
+    });
+
+    it("scores relevance from 1 for the best paper down towards 0.5", () => {
+      const fused = fusePapersByProviderRank([[paper("a"), paper("b"), paper("c")]]);
+      expect(fused[0]?.score).toBe(1);
+      expect(fused[2]!.score).toBeGreaterThan(0.5);
+      expect(fused[2]!.score).toBeLessThan(fused[1]!.score);
+    });
+
+    it("returns nothing for no results", () => {
+      expect(fusePapersByProviderRank([[], []])).toEqual([]);
+    });
+  });
+
+  describe("fusePapersByProviderRank: duplicates", () => {
     it("removes duplicates by DOI", () => {
       const papers: AcademicPaper[] = [
         {
@@ -253,7 +338,7 @@ describe("AcademicSearchService - Result Processing", () => {
         },
       ];
 
-      const result = deduplicatePapers(papers);
+      const result = fusePapersByProviderRank([papers]);
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe("Paper A");
     });
@@ -278,7 +363,7 @@ describe("AcademicSearchService - Result Processing", () => {
         },
       ];
 
-      const result = deduplicatePapers(papers);
+      const result = fusePapersByProviderRank([papers]);
       expect(result).toHaveLength(1);
     });
 
@@ -302,7 +387,7 @@ describe("AcademicSearchService - Result Processing", () => {
         },
       ];
 
-      const result = deduplicatePapers(papers);
+      const result = fusePapersByProviderRank([papers]);
       expect(result).toHaveLength(2);
     });
   });
