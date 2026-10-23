@@ -286,27 +286,29 @@ export async function retrieverNode(
     if (sq.sourceChannels.includes("notebook")) {
       await deps.onProgress("retrieving_notebook", sq.id, 0);
 
-      for (const searchQuery of sq.searchQueries) {
-        try {
-          const results = await deps.runHybridSearch(searchQuery, state.documentIds);
-          for (const chunk of results.slice(0, maxResultsPerChannel)) {
-            allChunks.push({
-              subQuestionId: sq.id,
-              sourceType: "notebook",
-              sourceTitle: chunk.sourceTitle,
-              sourceUrl: chunk.sourceUrl,
-              content: truncateEvidenceContent(chunk.content, MAX_EVIDENCE_CONTENT_LENGTH),
-              relevanceScore: chunk.similarity,
-              iteration,
-              metadata: {
-                documentId: chunk.documentId,
-                chunkIndex: chunk.chunkIndex,
-              },
-            });
-          }
-        } catch (err) {
-          retrieverLog.error("notebook_search_failed", err, { query: searchQuery });
+      // The notebook is searched with the sub-question itself: notebook search and its relevance
+      // floor are tuned on natural questions, and the planner's keyword queries (written for web
+      // and paper indexes) rerank below that floor, leaving one chunk per sub-question (#558).
+      const searchQuery = sq.question;
+      try {
+        const results = await deps.runHybridSearch(searchQuery, state.documentIds);
+        for (const chunk of results.slice(0, maxResultsPerChannel)) {
+          allChunks.push({
+            subQuestionId: sq.id,
+            sourceType: "notebook",
+            sourceTitle: chunk.sourceTitle,
+            sourceUrl: chunk.sourceUrl,
+            content: truncateEvidenceContent(chunk.content, MAX_EVIDENCE_CONTENT_LENGTH),
+            relevanceScore: chunk.similarity,
+            iteration,
+            metadata: {
+              documentId: chunk.documentId,
+              chunkIndex: chunk.chunkIndex,
+            },
+          });
         }
+      } catch (err) {
+        retrieverLog.error("notebook_search_failed", err, { query: searchQuery });
       }
 
       await deps.onProgress("retrieving_notebook", sq.id, allChunks.length);
@@ -425,18 +427,20 @@ export async function retrieverNode(
         let discoveredPapers: DiscoveredResearchSource[] = [];
 
         try {
+          // A wider pool when papers are screened: paper indexes match loosely, and the screen
+          // drops most of a small pool, so the sub-question would keep no papers at all.
           discoveredPapers = await deps.discoverSources(
             academicQuery,
             ["academic"],
-            externalMaxResults
+            deps.isPaperOnTopic ? EXTERNAL_RESULTS_HARD_CAP : externalMaxResults
           );
         } catch (_err) {
           retrieverLog.error("academic_discovery_failed", _err, { query: academicQuery });
         }
 
-        // Sort by score and take top results
+        // Sort by score, screen out off-topic papers, and take top results
         discoveredPapers.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-        let topPapers = discoveredPapers.slice(0, externalMaxResults);
+        let topPapers = discoveredPapers;
         if (deps.isPaperOnTopic && topPapers.length > 0) {
           topPapers = await dropOffTopicPapers(
             topPapers,
@@ -444,6 +448,7 @@ export async function retrieverNode(
             rememberTopicVerdicts(deps.isPaperOnTopic)
           );
         }
+        topPapers = topPapers.slice(0, externalMaxResults);
 
         // Papers are cited from their abstract. No full text: a landing page is mostly publisher
         // chrome, and a PDF's opening text is masthead and affiliations, which is what the evidence

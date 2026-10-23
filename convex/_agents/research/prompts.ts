@@ -14,7 +14,7 @@ export const SubQuestionSchema = z.object({
     .array(z.string())
     .min(1)
     .max(2)
-    .describe("1-2 highly targeted search queries (fewer precise queries beat many vague ones)"),
+    .describe("1-2 short keyword queries of 2-5 key terms each, as typed into a search engine"),
   sourceChannels: z.array(z.string()).describe("Target channels: notebook, web, academic, news"),
 });
 
@@ -43,7 +43,7 @@ ENABLED SOURCE CHANNELS: ${channelList}
 
 For each sub-question:
 - Write a clear, specific question
-- Provide exactly 1 search query (highly targeted, not broad)
+- Provide exactly 1 search query: the 2-5 key terms you would type into a search engine or a scholarly index such as Google Scholar (not a sentence, and not a long list of terms; indexes match loosely on every extra word)
 - Assign source channels based on where the best evidence would come from (use only from: ${channelList})
   - Use "web" for general facts, concepts, and broad information
   - Use "news" ONLY for current events, recent developments, or time-sensitive facts
