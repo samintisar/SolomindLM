@@ -265,7 +265,8 @@ describe("AcademicSearchService - Result Processing", () => {
         new Map([[2, 0.4]])
       );
       expect(ordered.map((p) => p.title)).toEqual(["c", "a", "b"]);
-      expect(ordered[1]!.score).toBe(0.9);
+      // Unscored papers score 0, so a later sort by score cannot lift them above reranked ones.
+      expect(ordered[1]!.score).toBe(0);
     });
   });
 
@@ -308,6 +309,15 @@ describe("AcademicSearchService - Result Processing", () => {
       expect(fused[0]?.score).toBe(1);
       expect(fused[2]!.score).toBeGreaterThan(0.5);
       expect(fused[2]!.score).toBeLessThan(fused[1]!.score);
+    });
+
+    it("fills a duplicate's missing abstract from a later provider", () => {
+      const fused = fusePapersByProviderRank([
+        [paper("shared", { doi: "10.1/x", source: "semantic_scholar" })],
+        [paper("shared", { doi: "10.1/x", abstract: "Full abstract." })],
+      ]);
+      expect(fused).toHaveLength(1);
+      expect(fused[0]).toMatchObject({ source: "semantic_scholar", abstract: "Full abstract." });
     });
 
     it("returns nothing for no results", () => {

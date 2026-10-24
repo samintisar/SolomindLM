@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { ConvexError, type Value, v } from "convex/values";
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { cachedRerank } from "../../_agents/chat/rerankCache";
 import { internal } from "../../_generated/api";
@@ -972,8 +972,9 @@ const PROVIDER_RANK_FUSION_K = 60;
  * Sorting the merged pool by citations and recency alone pushed recent, unrelated papers above
  * the ones that matched the query (#586).
  *
- * Duplicates (same DOI, or same normalized title) keep the first provider's record. `score`
- * becomes the fused relevance, 1 for the best paper down to 0.5.
+ * Duplicates (same DOI, or same normalized title) keep the first provider's record, with a later
+ * provider's abstract when the first has none. `score` becomes the fused relevance, 1 for the best
+ * paper down to 0.5.
  */
 export function fusePapersByProviderRank(providerResults: AcademicPaper[][]): AcademicPaper[] {
   const fused = new Map<string, { paper: AcademicPaper; relevance: number }>();
@@ -982,8 +983,14 @@ export function fusePapersByProviderRank(providerResults: AcademicPaper[][]): Ac
       const key = paper.doi ? paper.doi.toLowerCase() : normalizeTitle(paper.title);
       const contribution = 1 / (PROVIDER_RANK_FUSION_K + rank + 1);
       const entry = fused.get(key);
-      if (entry) entry.relevance += contribution;
-      else fused.set(key, { paper, relevance: contribution });
+      if (!entry) {
+        fused.set(key, { paper, relevance: contribution });
+        return;
+      }
+      entry.relevance += contribution;
+      if (!entry.paper.abstract.trim() && paper.abstract.trim()) {
+        entry.paper = { ...entry.paper, abstract: paper.abstract };
+      }
     });
   }
   const ranked = [...fused.values()]
@@ -1046,6 +1053,12 @@ export function sortPapers(papers: AcademicPaper[], sortBy: string): AcademicPap
 
 /** Thrown by searchInternalForCache so ActionCache does not store empty results. */
 export const ACADEMIC_SEARCH_EMPTY_SKIP_CACHE = "ACADEMIC_SEARCH_EMPTY_SKIP_CACHE";
+
+/**
+ * Thrown by searchInternalForCache, carrying the result, so ActionCache does not store a
+ * rate-limited result: it is missing a provider's papers, so the next search should go live (#586).
+ */
+const ACADEMIC_SEARCH_RATE_LIMITED_SKIP_CACHE = "ACADEMIC_SEARCH_RATE_LIMITED_SKIP_CACHE";
 
 export interface SearchInternalResult {
   papers: AcademicPaper[];
@@ -1256,6 +1269,12 @@ export const searchInternalForCache = internalAction({
     if (result.papers.length === 0) {
       throw new Error(ACADEMIC_SEARCH_EMPTY_SKIP_CACHE);
     }
+    if (result.rateLimited) {
+      throw new ConvexError({
+        code: ACADEMIC_SEARCH_RATE_LIMITED_SKIP_CACHE,
+        result: result as unknown as Value,
+      });
+    }
     return result;
   },
 });
@@ -1275,9 +1294,8 @@ export interface AcademicSearchCacheResult {
 }
 
 /**
- * Cached academic search. Empty results are never stored (retry can hit live APIs), and a result
- * that came back rate-limited is removed right after it is read: it is missing a provider's papers,
- * so the next search for the same query goes live again (#586).
+ * Cached academic search. Empty results are never stored (retry can hit live APIs), and neither
+ * are rate-limited ones, so the next search for the same query goes live again (#586).
  */
 export const searchCache = {
   async fetch(
@@ -1285,12 +1303,14 @@ export const searchCache = {
     args: SearchInternalArgs
   ): Promise<AcademicSearchCacheResult> {
     try {
-      const result: AcademicSearchCacheResult = await academicSearchActionCache.fetch(ctx, args);
-      if (result.rateLimited) {
-        await academicSearchActionCache.remove(ctx, args);
-      }
-      return result;
+      return await academicSearchActionCache.fetch(ctx, args);
     } catch (error) {
+      if (
+        error instanceof ConvexError &&
+        error.data?.code === ACADEMIC_SEARCH_RATE_LIMITED_SKIP_CACHE
+      ) {
+        return error.data.result as AcademicSearchCacheResult;
+      }
       if (error instanceof Error && error.message === ACADEMIC_SEARCH_EMPTY_SKIP_CACHE) {
         const live = await searchInternalHandler(args, ctx);
         return { papers: live.papers, rateLimited: live.rateLimited };
@@ -1378,12 +1398,14 @@ const RERANK_POOL_MULTIPLIER = 3;
 
 /**
  * Orders papers by their rerank relevance to the query (title and abstract), which also becomes
- * their `score`. Papers the rerank did not score keep their order, after the scored ones.
+ * their `score`. Papers the rerank did not score keep their order, after the scored ones, with a
+ * score of 0 so a later sort by score keeps them there.
  */
 export function orderPapersByRelevance(
   papers: AcademicPaper[],
   relevance: ReadonlyMap<number, number>
 ): AcademicPaper[] {
+  if (relevance.size === 0) return papers;
   return papers
     .map((paper, index) => ({ paper, index, relevance: relevance.get(index) }))
     .sort(
@@ -1391,7 +1413,7 @@ export function orderPapersByRelevance(
         (b.relevance ?? Number.NEGATIVE_INFINITY) - (a.relevance ?? Number.NEGATIVE_INFINITY) ||
         a.index - b.index
     )
-    .map(({ paper, relevance: score }) => (score === undefined ? paper : { ...paper, score }));
+    .map(({ paper, relevance: score }) => ({ ...paper, score: score ?? 0 }));
 }
 
 /**

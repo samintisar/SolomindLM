@@ -49,10 +49,5 @@ export function createCachedAction(
 
       return result;
     },
-
-    /** Drop the cached result for these args, so the next fetch runs the action again. */
-    async remove(ctx: any, args: any): Promise<void> {
-      await cache.remove(ctx, args);
-    },
   };
 }
