@@ -9,6 +9,7 @@ import {
   isChatLiteratureReport,
   isChatLiteratureTable,
 } from "../_model/literatureArtifacts";
+import * as Notebooks from "../_model/notebooks";
 import {
   withoutFlashcardProgress,
   withoutQuizProgress,
@@ -278,6 +279,7 @@ export async function performNotebookFork(
     icon: source.icon,
     isFeatured: false,
     folderId: undefined,
+    sourceCount: 0,
     createdAt: now,
     updatedAt: now,
   });
@@ -335,6 +337,7 @@ export async function performNotebookFork(
       createdAt: now,
       updatedAt: now,
     });
+    await Notebooks.adjustNotebookSourceCount(ctx, newNotebookId, 1);
     docIdMap.set(d._id, newDocId);
     await ctx.scheduler.runAfter(0, internal.notebooks._forkNotebook.copyForkedDocumentContent, {
       sourceDocumentId: d._id,

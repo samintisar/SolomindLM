@@ -68,7 +68,7 @@ export const list = query({
     const owned = await Notebooks.getUserNotebooks(ctx, userId);
     const ownedDtos = await Promise.all(
       owned.map(async (notebook) => {
-        const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
+        const sourceCount = await Notebooks.getNotebookSourceCount(ctx, notebook);
         return toNotebookDTO(notebook, sourceCount, { access: "owner" });
       })
     );
@@ -82,7 +82,7 @@ export const list = query({
     for (const m of memberships) {
       const notebook = await ctx.db.get(m.notebookId);
       if (!notebook) continue;
-      const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
+      const sourceCount = await Notebooks.getNotebookSourceCount(ctx, notebook);
       sharedDtos.push(toNotebookDTO(notebook, sourceCount, { access: "editor" }));
     }
 
@@ -137,7 +137,7 @@ export const get = query({
     const access = await getNotebookAccess(ctx, args.id, userId);
     if (!access) return null;
 
-    const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
+    const sourceCount = await Notebooks.getNotebookSourceCount(ctx, notebook);
     if (access === "owner") return toNotebookDTO(notebook, sourceCount, { access });
 
     const owner = await ctx.db.get(notebook.userId);
@@ -242,8 +242,8 @@ export const update = mutation({
     await Notebooks.updateNotebook(ctx, id, updates);
 
     const updated = await Notebooks.getNotebook(ctx, id);
-    const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, id);
     if (!updated) throw new Error("Notebook not found");
+    const sourceCount = await Notebooks.getNotebookSourceCount(ctx, updated);
 
     return toNotebookDTO(updated, sourceCount, { access: "owner" });
   },

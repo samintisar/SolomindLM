@@ -2,6 +2,7 @@ import { PersistentTextStreaming, type StreamId } from "@convex-dev/persistent-t
 import { components } from "../_generated/api";
 import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { adjustNotebookSourceCount } from "../_model/notebooks";
 import { isDocumentFileUsedElsewhere } from "../documents/internal";
 import { deleteSynthesisChunkFiles } from "../studio/jobMutations/audio";
 
@@ -184,6 +185,8 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
           },
         ],
         async (doc) => {
+          // An editor's documents can sit in someone else's notebook, which keeps its count.
+          await adjustNotebookSourceCount(ctx, doc.notebookId, -1);
           // Forks share the source's file; keep it while another document still uses it.
           if (
             doc.storageId &&

@@ -24,6 +24,10 @@ export async function getUserNotebooks(
     .collect();
 }
 
+/**
+ * Counts a notebook's documents by reading every row, extracted text included. Only for writes and
+ * for notebooks without a stored count; reads go through `getNotebookSourceCount` (#589).
+ */
 export async function getDocumentCountByNotebook(
   ctx: QueryCtx,
   notebookId: Id<"notebooks">
@@ -33,6 +37,35 @@ export async function getDocumentCountByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
     .collect();
   return documents.length;
+}
+
+/**
+ * The notebook's source count. It is stored on the notebook, so the notebook list doesn't read
+ * every document (with its extracted text) of every notebook each time it re-runs (#589).
+ * Notebooks written before the count existed are counted until the backfill sets it.
+ */
+export async function getNotebookSourceCount(
+  ctx: QueryCtx,
+  notebook: Doc<"notebooks">
+): Promise<number> {
+  return notebook.sourceCount ?? (await getDocumentCountByNotebook(ctx, notebook._id));
+}
+
+/**
+ * Keeps the stored source count in step after documents are added (`delta` > 0) or deleted.
+ * Call it in the same mutation as the insert or delete. A notebook without a stored count is
+ * left for the backfill, since it is counted on read.
+ */
+export async function adjustNotebookSourceCount(
+  ctx: MutationCtx,
+  notebookId: Id<"notebooks">,
+  delta: number
+): Promise<void> {
+  const notebook = await ctx.db.get("notebooks", notebookId);
+  if (!notebook || notebook.sourceCount === undefined) return;
+  await ctx.db.patch("notebooks", notebookId, {
+    sourceCount: Math.max(0, notebook.sourceCount + delta),
+  });
 }
 
 export type NotebookCreate = {
@@ -54,6 +87,7 @@ export async function createNotebook(
     coverColor: data.coverColor,
     icon: data.icon,
     folderId: data.folderId,
+    sourceCount: 0,
     createdAt: now,
     updatedAt: now,
   });

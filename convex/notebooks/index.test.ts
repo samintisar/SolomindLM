@@ -227,3 +227,59 @@ describe("notebooks.get access", () => {
     });
   });
 });
+
+// #589: the list reads the count stored on the notebook instead of every document.
+describe("notebook source count", () => {
+  test("stays in step as sources are added and removed", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const asUser = withAuth(t, userId);
+    const created = await asUser.mutation(api.notebooks.index.create, { title: "NB" });
+    const notebookId = created.id as Id<"notebooks">;
+
+    const upload = (fileName: string) =>
+      asUser.mutation(api.documents.index.upload, {
+        notebookId,
+        type: "text",
+        source: "Some pasted text.",
+        fileName,
+      });
+    const first = await upload("One");
+    await upload("Two");
+    expect((await asUser.query(api.notebooks.index.list, {}))[0]?.sourceCount).toBe(2);
+
+    await asUser.mutation(api.documents.index.remove, {
+      id: first.documentId as Id<"documents">,
+    });
+    expect((await asUser.query(api.notebooks.index.list, {}))[0]?.sourceCount).toBe(1);
+    const stored = await t.run((ctx) => ctx.db.get(notebookId));
+    expect(stored?.sourceCount).toBe(1);
+  });
+
+  test("counts the documents of a notebook without a stored count", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      const notebookId = await ctx.db.insert("notebooks", {
+        userId,
+        title: "Old NB",
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (const fileName of ["a", "b", "c"]) {
+        await ctx.db.insert("documents", {
+          userId,
+          notebookId,
+          fileName,
+          fileType: "text",
+          status: "completed",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    });
+    const list = await withAuth(t, userId).query(api.notebooks.index.list, {});
+    expect(list[0]?.sourceCount).toBe(3);
+  });
+});

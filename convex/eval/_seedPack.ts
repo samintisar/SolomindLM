@@ -200,6 +200,7 @@ export const insertPackDocument = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, 1);
     await ctx.scheduler.runAfter(0, internal.documents.embeddingJob.docEmbedding, {
       documentId,
       userId,
@@ -230,6 +231,7 @@ export const deletePackDocument = internalMutation({
       await deleteDocumentFileIfUnused(ctx, document.storageId, [args.documentId]);
     }
     await ctx.db.delete(args.documentId);
+    await Notebooks.adjustNotebookSourceCount(ctx, document.notebookId, -1);
     return null;
   },
 });

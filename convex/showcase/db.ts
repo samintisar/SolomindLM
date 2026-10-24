@@ -518,6 +518,7 @@ export const addSource = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await Notebooks.adjustNotebookSourceCount(ctx, notebook._id, 1);
     await scheduleIngestion(ctx, source.kind, documentId, owner._id, notebook._id);
     return documentId;
   },
@@ -556,6 +557,7 @@ export const attachFileSource = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await Notebooks.adjustNotebookSourceCount(ctx, notebook._id, 1);
     await scheduleIngestion(ctx, "file", documentId, owner._id, notebook._id);
     return documentId;
   },
@@ -606,6 +608,7 @@ export const addDiscoveredPapers = internalMutation({
         createdAt: now,
         updatedAt: now,
       });
+      await Notebooks.adjustNotebookSourceCount(ctx, notebook._id, 1);
       await scheduleIngestion(ctx, "paper_record", documentId, owner._id, notebook._id);
       count++;
       added++;

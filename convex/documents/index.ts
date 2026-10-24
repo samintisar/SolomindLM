@@ -19,6 +19,7 @@ import {
 } from "../_lib/notebookAccess";
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
+import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
 import { ingestionDelayMs } from "./ingestionDelay.helpers";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
@@ -134,6 +135,7 @@ export const upload = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, 1);
 
     // Schedule embedding job; YouTube jobs are staggered (ingestionDelayMs).
     await ctx.scheduler.runAfter(
@@ -390,6 +392,7 @@ export const remove = mutation({
     }
 
     await ctx.db.delete(args.id);
+    await Notebooks.adjustNotebookSourceCount(ctx, document.notebookId, -1);
 
     return { message: "Document deleted successfully" };
   },
@@ -422,6 +425,7 @@ export const removeMany = mutation({
       }
 
       await ctx.db.delete(id);
+      await Notebooks.adjustNotebookSourceCount(ctx, document.notebookId, -1);
       deleted += 1;
     }
 
@@ -516,6 +520,7 @@ export const addExternalSources = mutation({
         createdAt: now,
         updatedAt: now,
       });
+      await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, 1);
 
       createdIds.push(documentId);
 
