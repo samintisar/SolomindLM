@@ -18,6 +18,7 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
+import { formatCodeInText } from "../../_agents/written_questions/codeFormatting";
 import {
   appendUniqueWrittenQuestions,
   applyQuestionChecks,
@@ -880,7 +881,12 @@ export async function runFinalizeWrittenQuestionsPhase(
       internal.studio.jobMutations.writtenQuestions.saveWrittenQuestionsResults,
       {
         writtenQuestionId,
-        questions: finalQuestions,
+        // Unwrap $ around code and fence unfenced code before the math normalization (#573).
+        questions: finalQuestions.map((q) => ({
+          ...q,
+          question: formatCodeInText(q.question),
+          modelAnswer: q.modelAnswer ? formatCodeInText(q.modelAnswer) : q.modelAnswer,
+        })),
         metadata: withStudioTelemetryMetadata(
           {
             title,
