@@ -77,13 +77,23 @@ function academicDeps(overrides: Partial<ResearchNodeDeps> = {}): ResearchNodeDe
 }
 
 describe("retrieval queries", () => {
-  it("searches the notebook with the sub-question, not the keyword query", async () => {
+  it("searches the notebook with the sub-question first, then the keyword query", async () => {
     const runHybridSearch = vi.fn(async () => []);
     const state = academicState();
     state.subQuestions[0]!.sourceChannels = ["notebook"];
     await retrieverNode(state, academicDeps({ runHybridSearch }));
-    expect(runHybridSearch).toHaveBeenCalledTimes(1);
-    expect(runHybridSearch).toHaveBeenCalledWith("What spacing gaps work best?", undefined);
+    expect(runHybridSearch.mock.calls).toEqual([
+      ["What spacing gaps work best?", undefined],
+      ["spacing effect retention interval", undefined],
+    ]);
+  });
+
+  it("skips the notebook on a gap pass, which would get the same chunks", async () => {
+    const runHybridSearch = vi.fn(async () => []);
+    const state = { ...academicState(), iteration: 1 };
+    state.subQuestions[0]!.sourceChannels = ["notebook"];
+    await retrieverNode(state, academicDeps({ runHybridSearch }));
+    expect(runHybridSearch).not.toHaveBeenCalled();
   });
 
   it("asks for a wider paper pool when papers are screened, then keeps the cap", async () => {
@@ -94,15 +104,16 @@ describe("retrieval queries", () => {
       rawContent: `Abstract of paper ${i} on spacing.`,
     }));
     const discoverSources = vi.fn(async () => papers);
+    const isPaperOnTopic = vi.fn(
+      async (paper: { title: string }) => Number(paper.title.split(" ")[1]) % 2 === 0
+    );
     const result = await retrieverNode(
       academicState(),
-      academicDeps({
-        discoverSources,
-        isPaperOnTopic: async (paper) => Number(paper.title.split(" ")[1]) % 2 === 0,
-      })
+      academicDeps({ discoverSources, isPaperOnTopic })
     );
     expect(discoverSources).toHaveBeenCalledWith(expect.any(String), ["academic"], 12);
-    // 6 of 12 pass the screen; the per-channel cap (5) still applies.
+    // Screened in batches of the cap (5): two batches keep 5 papers, so the last 2 are never screened.
+    expect(isPaperOnTopic).toHaveBeenCalledTimes(10);
     expect(result.evidence!.map((e) => e.sourceTitle)).toEqual([
       "Paper 0",
       "Paper 2",
