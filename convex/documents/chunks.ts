@@ -7,13 +7,9 @@ import {
 } from "../_agents/_shared/topicSourceFilter";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import {
-  type ActionCtx,
-  internalAction,
-  internalMutation,
-  internalQuery,
-} from "../_generated/server";
+import { type ActionCtx, internalAction, internalQuery } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { internalMutation } from "../functions";
 
 /**
  * Internal: List chunks by document

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { internalQuery, type QueryCtx } from "../_generated/server";
+import { internalMutation } from "../functions";
 import {
   isNotebookPaperDocument,
   NOTEBOOK_PAPER_TEXT_MAX_CHARS,

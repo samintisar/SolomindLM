@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { Id } from "../_generated/dataModel";
-import { internalMutation, MutationCtx, QueryCtx } from "../_generated/server";
+import { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { internalMutation } from "../functions";
 import {
   CONCURRENT_RUN_LIMITS,
   createConcurrentRunLimitError,

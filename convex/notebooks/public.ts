@@ -1,12 +1,13 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { mutation, type QueryCtx, query } from "../_generated/server";
+import { type QueryCtx, query } from "../_generated/server";
 import { assertFeedbackAdmin } from "../_lib/feedbackAdmin";
 import { checkNotebookLimit } from "../_lib/limits";
 import { assertNotebookOwner } from "../_lib/notebookAccess";
 import { rateLimiter } from "../_lib/rateLimits";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { performNotebookFork } from "./_forkNotebook";
 
 /** The Featured shelf is curated by hand, so a small cap is plenty. */

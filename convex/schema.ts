@@ -382,6 +382,39 @@ export default defineSchema({
     // Every viewer's progress on an item (studio item deletion).
     .index("by_item", ["itemId"]),
 
+  // One light row per studio output and note, so the Studio panel list reads these instead of the
+  // outputs themselves (#600). Kept in sync by the triggers in convex/functions.ts; shape and rules
+  // in convex/_model/studioItems.ts.
+  studioItems: defineTable({
+    notebookId: v.id("notebooks"),
+    itemType: v.union(
+      v.literal("reports"),
+      v.literal("flashcards"),
+      v.literal("quizzes"),
+      v.literal("mindmaps"),
+      v.literal("audioOverviews"),
+      v.literal("infographics"),
+      v.literal("spreadsheets"),
+      v.literal("writtenQuestions"),
+      v.literal("notes")
+    ),
+    /** The output's row id in `itemType`'s table. */
+    itemId: v.string(),
+    /**
+     * The author's user id on saved chats, which only they see. A plain string, not a users id:
+     * the row is deleted with its note (account purge included), so it needs no purge step.
+     */
+    privateToUserId: v.optional(v.string()),
+    /** The output's `updatedAt`. */
+    updatedAt: v.number(),
+    /** The list row: the output without its heavy payloads (`notes/listSummary.ts`). */
+    row: v.any(),
+  })
+    // The Studio panel list, newest first.
+    .index("by_notebook_and_updatedAt", ["notebookId", "updatedAt"])
+    // Keeping one item's row in sync.
+    .index("by_item", ["itemId"]),
+
   // Chat
   conversations: defineTable({
     userId: v.id("users"),

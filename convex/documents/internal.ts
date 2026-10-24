@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import { internalQuery, type MutationCtx } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { internalMutation } from "../functions";
 
 /**
  * Chunks deleted per mutation. Each chunk carries a 1536-dim embedding (~12 KB read), so one

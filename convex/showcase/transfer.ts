@@ -7,7 +7,7 @@
  */
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
 import {
   getChatLinkedLiteratureArtifactIds,
   isChatLiteratureReport,
@@ -19,6 +19,7 @@ import {
   withoutQuizProgress,
   withoutWrittenQuestionProgress,
 } from "../_model/practiceProgress";
+import { internalMutation } from "../functions";
 import { ownerByEmail } from "./db";
 import { SHOWCASE_FOLDER_NAME, SHOWCASE_NOTEBOOKS } from "./manifest";
 

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../functions";
 
 const providerValidator = v.union(v.literal("semantic_scholar"), v.literal("arxiv"));
 

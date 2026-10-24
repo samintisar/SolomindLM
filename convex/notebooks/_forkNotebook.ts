@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, type MutationCtx } from "../_generated/server";
+import { type MutationCtx } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
 import { toConvexError } from "../_lib/serviceErrors";
 import {
@@ -15,6 +15,7 @@ import {
   withoutWrittenQuestionProgress,
 } from "../_model/practiceProgress";
 import { deleteDocumentFileIfUnused } from "../documents/internal";
+import { internalMutation } from "../functions";
 
 const MAX_FORK_DOCUMENTS = 200;
 
