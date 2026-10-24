@@ -307,6 +307,7 @@ import type * as studio_flashcards_collapseReduce from "../studio/flashcards/col
 import type * as studio_flashcards_flashcardJobPhases from "../studio/flashcards/flashcardJobPhases.js";
 import type * as studio_flashcards_index from "../studio/flashcards/index.js";
 import type * as studio_flashcards_job from "../studio/flashcards/job.js";
+import type * as studio_infographic_figureCheck from "../studio/infographic/figureCheck.js";
 import type * as studio_infographic_generate from "../studio/infographic/generate.js";
 import type * as studio_infographic_index from "../studio/infographic/index.js";
 import type * as studio_jobMutations_audio from "../studio/jobMutations/audio.js";
@@ -655,6 +656,7 @@ declare const fullApi: ApiFromModules<{
   "studio/flashcards/flashcardJobPhases": typeof studio_flashcards_flashcardJobPhases;
   "studio/flashcards/index": typeof studio_flashcards_index;
   "studio/flashcards/job": typeof studio_flashcards_job;
+  "studio/infographic/figureCheck": typeof studio_infographic_figureCheck;
   "studio/infographic/generate": typeof studio_infographic_generate;
   "studio/infographic/index": typeof studio_infographic_index;
   "studio/jobMutations/audio": typeof studio_jobMutations_audio;
