@@ -86,8 +86,8 @@ type MessageListContext = { hasOlderMessages: boolean };
 /** Shown at the top while older pages remain; reaching it loads the next page. */
 const MessageListHeader = ({ context }: { context?: MessageListContext }) =>
   context?.hasOlderMessages ? (
-    <div className="flex justify-center py-3">
-      <Spinner aria-label="Loading earlier messages" className="text-muted-foreground" />
+    <div className="flex justify-center py-3 text-muted-foreground">
+      <Spinner aria-label="Loading earlier messages" />
     </div>
   ) : null;
 const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter, Header: MessageListHeader };
