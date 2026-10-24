@@ -11,6 +11,12 @@ export interface ChatStreamingContextType {
   remoteChatGenerating: boolean;
   /** When true, block starting a new message (last DB row is not assistant while server refcount > 0). */
   remoteGenerationBlocksSend: boolean;
+  /** The thread has messages older than the loaded pages. */
+  hasOlderMessages?: boolean;
+  /** Loads the next page of older messages. */
+  loadOlderMessages?: () => void;
+  /** Every message in the thread, oldest first, including pages not loaded yet. */
+  loadFullHistory?: () => Promise<Message[]>;
   onSendMessage: (
     messageText: string,
     deepResearch?: boolean,

@@ -12,6 +12,8 @@ const modules = Object.fromEntries(
 );
 preloadModules(modules, ["./chat/messages.ts"]);
 
+const FIRST_PAGE = { numItems: 50, cursor: null };
+
 function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId as string}|session1` });
 }
@@ -65,19 +67,78 @@ describe("chat.messages", () => {
 
     expect(messageId).toBeDefined();
 
-    const bundle = await asUser.query(api.chat.messages.listByNotebook, { notebookId });
-    expect(bundle?.messages).toHaveLength(1);
-    expect(bundle?.messages[0]?.content).toBe("Hello");
+    const bundle = await asUser.query(api.chat.messages.listPage, {
+      notebookId,
+      paginationOpts: FIRST_PAGE,
+    });
+    expect(bundle.page).toHaveLength(1);
+    expect(bundle.page[0]?.content).toBe("Hello");
   });
 
-  test("listByNotebook returns empty for unauthenticated user", async () => {
+  test("listPage returns the newest messages first and continues with older ones", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const conversationId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("conversations", {
+        userId,
+        notebookId,
+        chatGenerationInFlight: 1,
+        chatGenerationStartedAt: 123,
+        createdAt: 0,
+        updatedAt: 0,
+      });
+      for (let i = 0; i < 60; i++) {
+        await ctx.db.insert("messages", {
+          conversationId: id,
+          role: "user",
+          content: `m${i}`,
+          createdAt: i,
+        });
+      }
+      return id;
+    });
+    const asUser = withAuth(t, userId);
+
+    const first = await asUser.query(api.chat.messages.listPage, {
+      notebookId,
+      conversationId,
+      paginationOpts: FIRST_PAGE,
+    });
+    expect(first.page.map((m) => m.content)).toEqual(
+      Array.from({ length: 50 }, (_, i) => `m${59 - i}`)
+    );
+    expect(first.isDone).toBe(false);
+
+    const rest = await asUser.query(api.chat.messages.listPage, {
+      notebookId,
+      conversationId,
+      paginationOpts: { numItems: 50, cursor: first.continueCursor },
+    });
+    expect(rest.page.map((m) => m.content)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `m${9 - i}`)
+    );
+    expect(rest.isDone).toBe(true);
+
+    const state = await asUser.query(api.chat.messages.generationState, {
+      notebookId,
+      conversationId,
+    });
+    expect(state).toEqual({ chatGenerating: true, chatGenerationStartedAt: 123 });
+  });
+
+  test("listPage and generationState return empty for an unauthenticated user", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     const notebookId = await seedNotebook(t, userId);
 
-    const bundle = await t.query(api.chat.messages.listByNotebook, { notebookId });
-    expect(bundle.messages).toEqual([]);
-    expect(bundle.chatGenerating).toBe(false);
+    const page = await t.query(api.chat.messages.listPage, {
+      notebookId,
+      paginationOpts: FIRST_PAGE,
+    });
+    expect(page.page).toEqual([]);
+    const state = await t.query(api.chat.messages.generationState, { notebookId });
+    expect(state).toEqual({ chatGenerating: false, chatGenerationStartedAt: null });
   });
 });
 
@@ -170,10 +231,11 @@ describe("viewer chat on a public notebook", () => {
 
   test("a viewer does not see the owner's messages", async () => {
     const { t, viewer, notebookId } = await setup();
-    const result = await withAuth(t, viewer).query(api.chat.messages.listByNotebook, {
+    const result = await withAuth(t, viewer).query(api.chat.messages.listPage, {
+      paginationOpts: FIRST_PAGE,
       notebookId,
     });
-    expect(result.messages).toEqual([]);
+    expect(result.page).toEqual([]);
   });
 
   test("the owner's thread list hides viewers' threads", async () => {
@@ -240,13 +302,14 @@ describe("viewer chat on a public notebook", () => {
     expect(conv?.userId).toBe(viewer);
   });
 
-  test("listByNotebook with the owner's conversationId is empty for a viewer", async () => {
+  test("listPage with the owner's conversationId is empty for a viewer", async () => {
     const { t, viewer, notebookId, ownerConv } = await setup();
-    const result = await withAuth(t, viewer).query(api.chat.messages.listByNotebook, {
+    const result = await withAuth(t, viewer).query(api.chat.messages.listPage, {
+      paginationOpts: FIRST_PAGE,
       notebookId,
       conversationId: ownerConv,
     });
-    expect(result.messages).toEqual([]);
+    expect(result.page).toEqual([]);
   });
 
   test("an editor sees another editor's shared thread but not a viewer's private one", async () => {
@@ -285,11 +348,12 @@ describe("viewer chat on a public notebook", () => {
       { notebookId, message: "viewer question" }
     );
     await t.run((ctx) => ctx.db.patch(notebookId, { isPublic: false }));
-    const result = await withAuth(t, viewer).query(api.chat.messages.listByNotebook, {
+    const result = await withAuth(t, viewer).query(api.chat.messages.listPage, {
+      paginationOpts: FIRST_PAGE,
       notebookId,
       conversationId,
     });
-    expect(result.messages).toEqual([]);
+    expect(result.page).toEqual([]);
     const list = await withAuth(t, viewer).query(api.chat.conversations.listForNotebook, {
       notebookId,
     });

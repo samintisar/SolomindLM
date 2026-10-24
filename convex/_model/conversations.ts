@@ -21,7 +21,9 @@ export async function getConversationByUserAndNotebook(
 ): Promise<Doc<"conversations"> | null> {
   return await ctx.db
     .query("conversations")
-    .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
+    .withIndex("by_user_notebook_and_updatedAt", (q) =>
+      q.eq("userId", userId).eq("notebookId", notebookId)
+    )
     .first();
 }
 
@@ -97,7 +99,7 @@ export async function listVisibleConversations(
 ): Promise<Doc<"conversations">[]> {
   const own = await ctx.db
     .query("conversations")
-    .withIndex("by_user_notebook", (q) =>
+    .withIndex("by_user_notebook_and_updatedAt", (q) =>
       q.eq("userId", requester.userId).eq("notebookId", notebookId)
     )
     .collect();
@@ -106,7 +108,7 @@ export async function listVisibleConversations(
   const sharedRange = (isPrivate: false | undefined) =>
     ctx.db
       .query("conversations")
-      .withIndex("by_notebook_and_isPrivate", (q) =>
+      .withIndex("by_notebook_and_isPrivate_and_updatedAt", (q) =>
         q.eq("notebookId", notebookId).eq("isPrivate", isPrivate)
       )
       .collect();
@@ -124,8 +126,30 @@ export async function getPrimaryVisibleConversation(
   notebookId: Id<"notebooks">,
   requester: ConversationRequester
 ): Promise<Doc<"conversations"> | null> {
-  const visible = await listVisibleConversations(ctx, notebookId, requester);
-  return visible.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  // The newest of each range `listVisibleConversations` reads, instead of every thread in them.
+  const own = ctx.db
+    .query("conversations")
+    .withIndex("by_user_notebook_and_updatedAt", (q) =>
+      q.eq("userId", requester.userId).eq("notebookId", notebookId)
+    )
+    .order("desc")
+    .first();
+  const newestShared = (isPrivate: false | undefined) =>
+    ctx.db
+      .query("conversations")
+      .withIndex("by_notebook_and_isPrivate_and_updatedAt", (q) =>
+        q.eq("notebookId", notebookId).eq("isPrivate", isPrivate)
+      )
+      .order("desc")
+      .first();
+  const candidates =
+    requester.access === "viewer"
+      ? [await own]
+      : await Promise.all([own, newestShared(undefined), newestShared(false)]);
+  return candidates.reduce<Doc<"conversations"> | null>(
+    (newest, c) => (c && (!newest || c.updatedAt > newest.updatedAt) ? c : newest),
+    null
+  );
 }
 
 /**

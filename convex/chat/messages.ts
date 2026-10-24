@@ -1,76 +1,73 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
-import { internalAction, internalMutation, mutation, query } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import {
+  internalAction,
+  internalMutation,
+  mutation,
+  type QueryCtx,
+  query,
+} from "../_generated/server";
 import { assertCanEditConversation, getConversationIfReadable } from "../_lib/conversationAccess";
 import { assertCanReadNotebook, getNotebookAccess } from "../_lib/notebookAccess";
-import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
 import * as ConvModel from "../_model/conversations";
 import { getAuthUserId } from "../auth";
 
+const conversationArgs = {
+  notebookId: v.id("notebooks"),
+  /** Omit for the notebook's most recently updated thread the user can see. */
+  conversationId: v.optional(v.id("conversations")),
+};
+
+/** The thread a chat query reads: the requested one if the user can read it, else the primary. */
+async function resolveReadableConversation(
+  ctx: QueryCtx,
+  args: { notebookId: Id<"notebooks">; conversationId?: Id<"conversations"> }
+): Promise<Doc<"conversations"> | null> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+  const access = await getNotebookAccess(ctx, args.notebookId, userId);
+  if (!access) return null;
+
+  if (args.conversationId) {
+    const conversation = await getConversationIfReadable(ctx, args.conversationId, userId);
+    return conversation && conversation.notebookId === args.notebookId ? conversation : null;
+  }
+  return await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, { userId, access });
+}
+
 /**
- * Get all messages for a notebook
- * Note: This assumes conversations are linked to notebooks
- * You may need to adjust this based on your actual data model
+ * A thread's messages, newest first, a page at a time (#601). The client loads the newest page
+ * and fetches older ones as the user scrolls up. It used to read the whole history (up to 10,000
+ * messages) and re-read it whenever the thread or any message changed.
  */
-export const listByNotebook = query({
-  args: {
-    notebookId: v.id("notebooks"),
-    conversationId: v.optional(v.id("conversations")),
+export const listPage = query({
+  args: { ...conversationArgs, paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const conversation = await resolveReadableConversation(ctx, args);
+    if (!conversation) return { page: [], isDone: true, continueCursor: "" };
+
+    return await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
+});
+
+/** Whether an assistant reply is being generated in the thread (a paginated query can't carry it). */
+export const generationState = query({
+  args: conversationArgs,
   returns: v.object({
-    messages: v.array(v.any()),
     chatGenerating: v.boolean(),
     chatGenerationStartedAt: v.union(v.null(), v.number()),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      return {
-        messages: [],
-        chatGenerating: false,
-        chatGenerationStartedAt: null,
-      };
-    }
-
-    const access = await getNotebookAccess(ctx, args.notebookId, userId);
-    if (!access) {
-      return { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
-    }
-
-    let conversation;
-    if (args.conversationId) {
-      const c = await getConversationIfReadable(ctx, args.conversationId, userId);
-      if (!c || c.notebookId !== args.notebookId) {
-        return { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
-      }
-      conversation = c;
-    } else {
-      conversation = await ConvModel.getPrimaryVisibleConversation(ctx, args.notebookId, {
-        userId,
-        access,
-      });
-    }
-
-    if (!conversation) {
-      return {
-        messages: [],
-        chatGenerating: false,
-        chatGenerationStartedAt: null,
-      };
-    }
-
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
-      .order("asc")
-      .take(MAX_MESSAGES_PER_CONVERSATION);
-
-    const inFlight = conversation.chatGenerationInFlight ?? 0;
+    const conversation = await resolveReadableConversation(ctx, args);
     return {
-      messages,
-      chatGenerating: inFlight > 0,
-      chatGenerationStartedAt: conversation.chatGenerationStartedAt ?? null,
+      chatGenerating: (conversation?.chatGenerationInFlight ?? 0) > 0,
+      chatGenerationStartedAt: conversation?.chatGenerationStartedAt ?? null,
     };
   },
 });

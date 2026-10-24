@@ -34,7 +34,8 @@ preloadModules(modules, [
 
 type T = ReturnType<typeof convexTest>;
 
-const EMPTY_CHAT = { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
+const EMPTY_CHAT_STATE = { chatGenerating: false, chatGenerationStartedAt: null };
+const EMPTY_PAGE = { page: [], isDone: true, continueCursor: "" };
 
 const NOTEBOOK_LIST_QUERIES = [
   { name: "documents.index.list", fn: api.documents.index.list, empty: [] },
@@ -48,7 +49,17 @@ const NOTEBOOK_LIST_QUERIES = [
     fn: api.chat.conversations.listForNotebook,
     empty: [],
   },
-  { name: "chat.messages.listByNotebook", fn: api.chat.messages.listByNotebook, empty: EMPTY_CHAT },
+  {
+    name: "chat.messages.listPage",
+    fn: api.chat.messages.listPage,
+    empty: EMPTY_PAGE,
+    args: { paginationOpts: { numItems: 50, cursor: null } },
+  },
+  {
+    name: "chat.messages.generationState",
+    fn: api.chat.messages.generationState,
+    empty: EMPTY_CHAT_STATE,
+  },
   { name: "notes.userNotes.list", fn: api.notes.userNotes.list, empty: [] },
   { name: "studio.quizzes.index.list", fn: api.studio.quizzes.index.list, empty: [] },
   { name: "studio.mindmaps.index.list", fn: api.studio.mindmaps.index.list, empty: [] },
@@ -91,28 +102,32 @@ async function seedNotebook(t: T, userId: Id<"users">): Promise<Id<"notebooks">>
   );
 }
 
-/** Calls a query with only a notebook id; the ref union is too wide for a typed call. */
+type ListQuery = (typeof NOTEBOOK_LIST_QUERIES)[number];
+
+/** Calls a query with a notebook id (plus its fixed args); the ref union is too wide for a typed call. */
 async function callList(
   client: ReturnType<typeof withAuth>,
-  fn: (typeof NOTEBOOK_LIST_QUERIES)[number]["fn"],
+  entry: ListQuery,
   notebookId: Id<"notebooks">
 ): Promise<unknown> {
+  const extra = "args" in entry ? entry.args : {};
   return (
     client.query as unknown as (
       ref: unknown,
       args: { notebookId: Id<"notebooks"> }
     ) => Promise<unknown>
-  )(fn, { notebookId });
+  )(entry.fn, { notebookId, ...extra });
 }
 
-describe.each(NOTEBOOK_LIST_QUERIES)("$name", ({ fn, empty }) => {
+describe.each(NOTEBOOK_LIST_QUERIES)("$name", (entry) => {
+  const { empty } = entry;
   test("returns empty for a deleted notebook instead of throwing", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     const notebookId = await seedNotebook(t, userId);
     await t.run(async (ctx) => ctx.db.delete(notebookId));
 
-    await expect(callList(withAuth(t, userId), fn, notebookId)).resolves.toEqual(empty);
+    await expect(callList(withAuth(t, userId), entry, notebookId)).resolves.toEqual(empty);
   });
 
   test("returns empty for a notebook the user cannot access instead of throwing", async () => {
@@ -121,7 +136,7 @@ describe.each(NOTEBOOK_LIST_QUERIES)("$name", ({ fn, empty }) => {
     const strangerId = await seedUser(t);
     const notebookId = await seedNotebook(t, ownerId);
 
-    await expect(callList(withAuth(t, strangerId), fn, notebookId)).resolves.toEqual(empty);
+    await expect(callList(withAuth(t, strangerId), entry, notebookId)).resolves.toEqual(empty);
   });
 
   test("still resolves for the notebook owner", async () => {
@@ -129,6 +144,6 @@ describe.each(NOTEBOOK_LIST_QUERIES)("$name", ({ fn, empty }) => {
     const userId = await seedUser(t);
     const notebookId = await seedNotebook(t, userId);
 
-    await expect(callList(withAuth(t, userId), fn, notebookId)).resolves.toBeDefined();
+    await expect(callList(withAuth(t, userId), entry, notebookId)).resolves.toBeDefined();
   });
 });
