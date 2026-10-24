@@ -17,6 +17,7 @@
  */
 
 import { isHttpAwareRetryableError } from "../_agents/_shared/retry";
+import { ExternalServiceError } from "../_lib/errors";
 import type { FetchedCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
 import {
   isFullTextLength,
@@ -101,10 +102,15 @@ type FullTextResult = Extract<PaperIngestResult, { outcome: "full_text" }>;
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** OCR failures worth retrying later: HTTP 429/5xx, network errors and timeouts. */
+/**
+ * OCR failures worth retrying later: HTTP 429/5xx, network errors and timeouts, and 402 (the OCR
+ * account's spending limit is reached). Falling through would store the paper as abstract only for
+ * good, as though no full text existed (#591).
+ */
 function isTransientOcrError(error: Error): boolean {
   return (
     isHttpAwareRetryableError(error) ||
+    (error instanceof ExternalServiceError && error.statusCode === 402) ||
     error.name === "AbortError" ||
     error.name === "TimeoutError" ||
     /\btim(?:ed|e)[ -]?out\b/i.test(error.message)

@@ -240,6 +240,8 @@ describe("ingestPaper", () => {
   it.each([
     ["a 503", new ExternalServiceError("mistral", "Mistral 503", { statusCode: 503 })],
     ["a timeout", new Error("Mistral OCR request timed out")],
+    // #591: a spending-limit rejection must not store the paper as abstract only for good.
+    ["a 402", new ExternalServiceError("mistral", "Mistral 402", { statusCode: 402 })],
   ])("rethrows %s on an open-access PDF's OCR after deleting it", async (_label, error) => {
     const deps = makeDeps({
       resolveCandidates: vi
