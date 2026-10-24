@@ -20,10 +20,11 @@ import {
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
+import { CHUNK_PAGE_SIZE } from "./chunks";
 import { ingestionDelayMs } from "./ingestionDelay.helpers";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
-import { MAX_STORED_MARKDOWN_CHARS } from "./storedMarkdown.helpers";
+import { MAX_STORED_MARKDOWN_CHARS, withTruncationNote } from "./storedMarkdown.helpers";
 
 /**
  * Get a presigned URL for uploading a file to Convex Storage
@@ -216,7 +217,6 @@ export const getContent = query({
     v.object({
       documentId: v.id("documents"),
       content: v.string(),
-      chunkCount: v.number(),
     })
   ),
   handler: async (ctx, args) => {
@@ -238,23 +238,24 @@ export const getContent = query({
     // reading them here re-reads every chunk on each insert (#599). Stored markdown needs none.
     const stored = document.extractedMarkdown?.trim();
     if (stored) {
-      return {
-        documentId: args.id,
-        content: stored,
-        chunkCount: document.totalChunks ?? 0,
-      };
+      return { documentId: args.id, content: stored };
     }
 
     // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view. Read lazily and stop
-    // at the stored-markdown cap so a very large document doesn't read every row.
+    // after a page of rows (each row's embedding counts against the read limit, however short its
+    // text) or at the stored-markdown cap, whichever comes first.
     const chunks: Array<{ chunkIndex: number; content: string }> = [];
     let chars = 0;
+    let truncated = false;
     for await (const chunk of ctx.db
       .query("documentChunks")
       .withIndex("by_document", (q) => q.eq("documentId", args.id))) {
+      if (chunks.length >= CHUNK_PAGE_SIZE || chars >= MAX_STORED_MARKDOWN_CHARS) {
+        truncated = true;
+        break;
+      }
       chunks.push({ chunkIndex: chunk.chunkIndex, content: chunk.content });
       chars += chunk.content.length;
-      if (chars >= MAX_STORED_MARKDOWN_CHARS) break;
     }
 
     if (chunks.length === 0) {
@@ -268,8 +269,7 @@ export const getContent = query({
 
     return {
       documentId: args.id,
-      content: fullContent,
-      chunkCount: document.totalChunks ?? chunks.length,
+      content: truncated ? withTruncationNote(fullContent) : fullContent,
     };
   },
 });

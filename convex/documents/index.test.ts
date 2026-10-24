@@ -8,8 +8,9 @@ import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import { performNotebookFork } from "../notebooks/_forkNotebook";
 import schema from "../schema";
+import { CHUNK_PAGE_SIZE } from "./chunks";
 import { CHUNK_DELETE_BATCH_SIZE, deleteAllChunksForDocument } from "./internal";
-import { MAX_STORED_MARKDOWN_CHARS } from "./storedMarkdown.helpers";
+import { MAX_STORED_MARKDOWN_CHARS, withTruncationNote } from "./storedMarkdown.helpers";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -457,10 +458,9 @@ describe("documents.getContent", () => {
 
     expect(content).not.toBeNull();
     expect(content?.content).toBe("# Markdown Content\n\nThis is the text.");
-    expect(content?.chunkCount).toBe(0);
   });
 
-  test("counts chunks from totalChunks, not chunk rows, when markdown is stored", async () => {
+  test("shows stored markdown, not chunk text, while ingestion is partway through", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     const notebookId = await seedNotebook(t, userId);
@@ -492,8 +492,7 @@ describe("documents.getContent", () => {
 
     const content = await asUser.query(api.documents.index.getContent, { id: docId });
 
-    expect(content?.content).toBe("Full text.");
-    expect(content?.chunkCount).toBe(5);
+    expect(content).toEqual({ documentId: docId, content: "Full text." });
   });
 
   test("legacy fallback stops reading chunks at the stored-markdown cap", async () => {
@@ -528,10 +527,76 @@ describe("documents.getContent", () => {
 
     const content = await asUser.query(api.documents.index.getContent, { id: docId });
 
-    expect(content?.content).toContain("a");
-    expect(content?.content).toContain("b");
-    expect(content?.content).not.toContain("c");
-    expect(content?.chunkCount).toBe(2);
+    expect(content?.content).toBe(withTruncationNote(`${"a".repeat(half)}\n${"b".repeat(half)}`));
+  });
+
+  test("legacy fallback stops after a page of chunk rows, however short their text", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+
+    const docId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Many Small Chunks",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      for (let chunkIndex = 0; chunkIndex <= CHUNK_PAGE_SIZE; chunkIndex++) {
+        await ctx.db.insert("documentChunks", {
+          documentId: id,
+          userId,
+          notebookId,
+          content: `c${chunkIndex}`,
+          chunkIndex,
+          createdAt: Date.now(),
+        });
+      }
+      return id;
+    });
+
+    const content = await asUser.query(api.documents.index.getContent, { id: docId });
+    const shown = Array.from({ length: CHUNK_PAGE_SIZE }, (_, i) => `c${i}`).join("\n");
+
+    expect(content?.content).toBe(withTruncationNote(shown));
+  });
+
+  test("legacy fallback orders chunks by chunkIndex, not by when they were stored", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+
+    const docId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Out Of Order",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      for (const chunkIndex of [2, 0, 1]) {
+        await ctx.db.insert("documentChunks", {
+          documentId: id,
+          userId,
+          notebookId,
+          content: `chunk ${chunkIndex}`,
+          chunkIndex,
+          createdAt: Date.now(),
+        });
+      }
+      return id;
+    });
+
+    const content = await asUser.query(api.documents.index.getContent, { id: docId });
+
+    expect(content?.content).toBe("chunk 0\nchunk 1\nchunk 2");
   });
 
   test("stitches chunks as legacy fallback", async () => {
@@ -578,7 +643,6 @@ describe("documents.getContent", () => {
     expect(content).not.toBeNull();
     expect(content?.content).toContain("First chunk content.");
     expect(content?.content).toContain("Second chunk content.");
-    expect(content?.chunkCount).toBe(2);
   });
 });
 
