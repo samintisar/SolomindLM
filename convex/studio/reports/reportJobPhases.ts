@@ -16,6 +16,7 @@ import {
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
+import { markSourceReferences } from "../../_agents/chat/passageContext";
 import {
   MAP_PROMPTS,
   MAP_STRUCTURED_SYSTEM_PROMPT,
@@ -23,6 +24,7 @@ import {
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/report/prompts";
 import { invokeMapStructuredOutput } from "../../_agents/report/structuredLlm";
+import { labelWithSource, packChunksBySource } from "../../_agents/spreadsheet/sourcePacking";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -133,24 +135,55 @@ export async function runReportGenerationPhase(
       },
     });
 
-    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
+    // Reference lists left out: their entries read as findings of the source itself (#350, #477).
+    const fetchedChunks = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
       topic: customPrompt,
+      excludeReferenceLists: true,
     });
+    // A source's own reference markers become "(ref. 6)", so a sentence reporting a study it
+    // cites doesn't read as its own finding (#477).
+    const chunkObjects = fetchedChunks.map((chunk) => ({
+      documentId: chunk.documentId as string,
+      content: markSourceReferences(chunk.content),
+    }));
     // Sources left after narrowing to the requested topic (#288).
     const topicDocumentCount = new Set(chunkObjects.map((c) => c.documentId)).size;
 
-    const rawChunks = chunkObjects.map((chunk: { content: string }) => chunk.content);
+    const rawChunks = chunkObjects.map((chunk) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
 
+    // Source titles, so each map task and its notes say which source the findings come from:
+    // packed together, one paper's results ran into the next with nothing between them (#477).
+    const sourceDocs = await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
+      documentIds: [...new Set(chunkObjects.map((c) => c.documentId))] as Id<"documents">[],
+    });
+    const sourceTitles = new Map(sourceDocs.map((d) => [d._id as string, d.fileName]));
+    const packBySource = (pack: (contents: string[]) => string[]) =>
+      packChunksBySource(chunkObjects, sourceTitles, (contents) =>
+        pack(validateChunks(contents))
+      ).map((task) => labelWithSource(task.source, task.text));
+
     const validatedChunks = validateChunks(rawChunks);
-    const mapPlan = planStudioJobMapPhase({
+    const plan = planStudioJobMapPhase({
       documentCount: topicDocumentCount,
       chunks: validatedChunks,
       estimateTokens: countTokens,
-      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+      pack: () => [],
     });
+    const mapPlan =
+      plan.mode === "single_pass"
+        ? {
+            ...plan,
+            skipMapContent: packBySource((contents) => [contents.join("\n\n")]).join("\n\n---\n\n"),
+          }
+        : {
+            ...plan,
+            mapChunks: packBySource((contents) =>
+              packChunks(contents, CONFIG.MAP_CHUNK_SIZE_TOKENS)
+            ),
+          };
 
     console.log(
       `[ReportJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
@@ -334,9 +367,12 @@ IMPORTANT: Respond with a JSON object containing:
     const elapsed = Date.now() - startTime;
     console.log(`[ReportJob] ${chunkId} LLM completed in ${elapsed}ms`);
 
+    // Notes keep the source line their task started with, so the reduce knows whose findings
+    // each set of notes holds (#477).
+    const sourceLine = chunk.match(/^SOURCE: .+/)?.[0];
     const result = {
       topics: mapOutput.topics,
-      summary: mapOutput.summary,
+      summary: sourceLine ? `${sourceLine}\n\n${mapOutput.summary}` : mapOutput.summary,
       processingTimeMs: elapsed,
       ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
