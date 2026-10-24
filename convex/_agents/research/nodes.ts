@@ -283,10 +283,16 @@ export async function retrieverNode(
     const allChunks: EvidenceEntry[] = [];
 
     // ── Notebook retrieval ──
-    if (sq.sourceChannels.includes("notebook")) {
+    // First pass only: notebook search is deterministic, so a gap pass would get the same chunks.
+    if (sq.sourceChannels.includes("notebook") && iteration === 0) {
       await deps.onProgress("retrieving_notebook", sq.id, 0);
 
-      for (const searchQuery of sq.searchQueries) {
+      // The sub-question goes first: notebook search and its relevance floor are tuned on natural
+      // questions, and the planner's keyword queries (written for web and paper indexes) rerank
+      // below that floor, leaving one chunk per sub-question (#558). The keyword queries still run,
+      // so a query the user edited at plan approval reaches the notebook.
+      const searchQueries = [...new Set([sq.question, ...sq.searchQueries])];
+      for (const searchQuery of searchQueries) {
         try {
           const results = await deps.runHybridSearch(searchQuery, state.documentIds);
           for (const chunk of results.slice(0, maxResultsPerChannel)) {
@@ -425,25 +431,34 @@ export async function retrieverNode(
         let discoveredPapers: DiscoveredResearchSource[] = [];
 
         try {
+          // A wider pool when papers are screened: paper indexes match loosely, and the screen
+          // drops most of a small pool, so the sub-question would keep no papers at all.
           discoveredPapers = await deps.discoverSources(
             academicQuery,
             ["academic"],
-            externalMaxResults
+            deps.isPaperOnTopic ? EXTERNAL_RESULTS_HARD_CAP : externalMaxResults
           );
         } catch (_err) {
           retrieverLog.error("academic_discovery_failed", _err, { query: academicQuery });
         }
 
-        // Sort by score and take top results
-        discoveredPapers.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-        let topPapers = discoveredPapers.slice(0, externalMaxResults);
+        // Discovery returns papers best first. Screen them a batch at a time, stopping once enough
+        // on-topic papers are kept, then take the top results.
+        let topPapers = discoveredPapers;
         if (deps.isPaperOnTopic && topPapers.length > 0) {
-          topPapers = await dropOffTopicPapers(
-            topPapers,
-            state.query,
-            rememberTopicVerdicts(deps.isPaperOnTopic)
-          );
+          const screen = rememberTopicVerdicts(deps.isPaperOnTopic);
+          const kept: DiscoveredResearchSource[] = [];
+          for (
+            let start = 0;
+            start < discoveredPapers.length && kept.length < externalMaxResults;
+            start += externalMaxResults
+          ) {
+            const batch = discoveredPapers.slice(start, start + externalMaxResults);
+            kept.push(...(await dropOffTopicPapers(batch, state.query, screen)));
+          }
+          topPapers = kept;
         }
+        topPapers = topPapers.slice(0, externalMaxResults);
 
         // Papers are cited from their abstract. No full text: a landing page is mostly publisher
         // chrome, and a PDF's opening text is masthead and affiliations, which is what the evidence

@@ -76,6 +76,54 @@ function academicDeps(overrides: Partial<ResearchNodeDeps> = {}): ResearchNodeDe
   };
 }
 
+describe("retrieval queries", () => {
+  it("searches the notebook with the sub-question first, then the keyword query", async () => {
+    const runHybridSearch = vi.fn(async () => []);
+    const state = academicState();
+    state.subQuestions[0]!.sourceChannels = ["notebook"];
+    await retrieverNode(state, academicDeps({ runHybridSearch }));
+    expect(runHybridSearch.mock.calls).toEqual([
+      ["What spacing gaps work best?", undefined],
+      ["spacing effect retention interval", undefined],
+    ]);
+  });
+
+  it("skips the notebook on a gap pass, which would get the same chunks", async () => {
+    const runHybridSearch = vi.fn(async () => []);
+    const state = { ...academicState(), iteration: 1 };
+    state.subQuestions[0]!.sourceChannels = ["notebook"];
+    await retrieverNode(state, academicDeps({ runHybridSearch }));
+    expect(runHybridSearch).not.toHaveBeenCalled();
+  });
+
+  it("asks for a wider paper pool when papers are screened, then keeps the cap", async () => {
+    const papers = Array.from({ length: 12 }, (_, i) => ({
+      ...spacingPaper,
+      title: `Paper ${i}`,
+      url: `https://example.org/${i}`,
+      rawContent: `Abstract of paper ${i} on spacing.`,
+    }));
+    const discoverSources = vi.fn(async () => papers);
+    const isPaperOnTopic = vi.fn(
+      async (paper: { title: string }) => Number(paper.title.split(" ")[1]) % 2 === 0
+    );
+    const result = await retrieverNode(
+      academicState(),
+      academicDeps({ discoverSources, isPaperOnTopic })
+    );
+    expect(discoverSources).toHaveBeenCalledWith(expect.any(String), ["academic"], 12);
+    // Screened in batches of the cap (5): two batches keep 5 papers, so the last 2 are never screened.
+    expect(isPaperOnTopic).toHaveBeenCalledTimes(10);
+    expect(result.evidence!.map((e) => e.sourceTitle)).toEqual([
+      "Paper 0",
+      "Paper 2",
+      "Paper 4",
+      "Paper 6",
+      "Paper 8",
+    ]);
+  });
+});
+
 describe("academic retrieval", () => {
   it("carries authors, year and identifiers into the evidence", async () => {
     const result = await retrieverNode(academicState(), academicDeps());
