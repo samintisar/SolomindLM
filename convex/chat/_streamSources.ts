@@ -205,9 +205,22 @@ export async function discoverChatExternalSources(
     maxPerChannel
   );
 
-  // Sort by score descending, cap at 5
-  allResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const topResults = allResults.slice(0, 5);
+  // Web scores (Tavily) and paper scores (Voyage rerank) are on different scales, so the top 5 are
+  // taken round-robin across channels, each channel in its own score order.
+  const byChannel = new Map<string, typeof allResults>();
+  for (const result of allResults) {
+    const channel = result.metadata?.sourceApi ? "academic" : result.sourceType;
+    byChannel.set(channel, [...(byChannel.get(channel) ?? []), result]);
+  }
+  const channelResults = [...byChannel.values()].map((results) =>
+    results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+  );
+  const topResults: typeof allResults = [];
+  for (let rank = 0; topResults.length < 5 && channelResults.some((r) => r.length > rank); rank++) {
+    for (const results of channelResults) {
+      if (results[rank] && topResults.length < 5) topResults.push(results[rank]!);
+    }
+  }
 
   const sources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
 

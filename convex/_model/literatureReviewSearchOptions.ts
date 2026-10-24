@@ -21,10 +21,13 @@ export type LiteratureSearchOptions = Infer<typeof literatureSearchOptionsValida
 
 export type AcademicPaperSource = "openalex" | "semantic_scholar" | "pubmed" | "arxiv";
 
-/** Default API order when corpus is "all" (OpenAlex is the stable broad fallback; arXiv last). */
+/**
+ * Default API order when corpus is "all". OpenAlex goes first: it has the most generous rate limit,
+ * so its results arrive even when Semantic Scholar or arXiv is throttled (#586). arXiv is last.
+ */
 export const DEFAULT_ACADEMIC_SOURCES: AcademicPaperSource[] = [
-  "semantic_scholar",
   "openalex",
+  "semantic_scholar",
   "pubmed",
   "arxiv",
 ];
