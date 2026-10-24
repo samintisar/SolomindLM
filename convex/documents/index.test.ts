@@ -9,6 +9,7 @@ import { preloadModules } from "../_testing/preloadModules.helpers";
 import { performNotebookFork } from "../notebooks/_forkNotebook";
 import schema from "../schema";
 import { CHUNK_DELETE_BATCH_SIZE, deleteAllChunksForDocument } from "./internal";
+import { MAX_STORED_MARKDOWN_CHARS } from "./storedMarkdown.helpers";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -457,6 +458,80 @@ describe("documents.getContent", () => {
     expect(content).not.toBeNull();
     expect(content?.content).toBe("# Markdown Content\n\nThis is the text.");
     expect(content?.chunkCount).toBe(0);
+  });
+
+  test("counts chunks from totalChunks, not chunk rows, when markdown is stored", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+
+    const docId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Ingesting Doc",
+        fileType: "file",
+        status: "processing",
+        extractedMarkdown: "Full text.",
+        totalChunks: 5,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      // Ingestion is partway through: one of five chunks inserted.
+      await ctx.db.insert("documentChunks", {
+        documentId: id,
+        userId,
+        notebookId,
+        content: "Chunk text that the viewer must not show.",
+        chunkIndex: 0,
+        createdAt: Date.now(),
+      });
+      return id;
+    });
+
+    const content = await asUser.query(api.documents.index.getContent, { id: docId });
+
+    expect(content?.content).toBe("Full text.");
+    expect(content?.chunkCount).toBe(5);
+  });
+
+  test("legacy fallback stops reading chunks at the stored-markdown cap", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+    const half = Math.ceil(MAX_STORED_MARKDOWN_CHARS / 2);
+
+    const docId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Huge Legacy Doc",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      for (const [chunkIndex, letter] of ["a", "b", "c"].entries()) {
+        await ctx.db.insert("documentChunks", {
+          documentId: id,
+          userId,
+          notebookId,
+          content: letter.repeat(half),
+          chunkIndex,
+          createdAt: Date.now(),
+        });
+      }
+      return id;
+    });
+
+    const content = await asUser.query(api.documents.index.getContent, { id: docId });
+
+    expect(content?.content).toContain("a");
+    expect(content?.content).toContain("b");
+    expect(content?.content).not.toContain("c");
+    expect(content?.chunkCount).toBe(2);
   });
 
   test("stitches chunks as legacy fallback", async () => {

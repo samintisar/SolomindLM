@@ -23,6 +23,7 @@ import { getAuthUserId } from "../auth";
 import { ingestionDelayMs } from "./ingestionDelay.helpers";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
+import { MAX_STORED_MARKDOWN_CHARS } from "./storedMarkdown.helpers";
 
 /**
  * Get a presigned URL for uploading a file to Convex Storage
@@ -233,33 +234,42 @@ export const getContent = query({
       return null;
     }
 
-    const chunks = await ctx.db
-      .query("documentChunks")
-      .withIndex("by_document", (q) => q.eq("documentId", args.id))
-      .collect();
-
-    const sortedChunks = chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
-
+    // A live query: chunk rows carry ~13 KB embeddings and ingestion inserts them one at a time, so
+    // reading them here re-reads every chunk on each insert (#599). Stored markdown needs none.
     const stored = document.extractedMarkdown?.trim();
     if (stored) {
       return {
         documentId: args.id,
         content: stored,
-        chunkCount: sortedChunks.length,
+        chunkCount: document.totalChunks ?? 0,
       };
     }
 
-    if (sortedChunks.length === 0) {
+    // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view. Read lazily and stop
+    // at the stored-markdown cap so a very large document doesn't read every row.
+    const chunks: Array<{ chunkIndex: number; content: string }> = [];
+    let chars = 0;
+    for await (const chunk of ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", args.id))) {
+      chunks.push({ chunkIndex: chunk.chunkIndex, content: chunk.content });
+      chars += chunk.content.length;
+      if (chars >= MAX_STORED_MARKDOWN_CHARS) break;
+    }
+
+    if (chunks.length === 0) {
       return null;
     }
 
-    // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view
-    const fullContent = sortedChunks.map((chunk) => chunk.content).join("\n");
+    const fullContent = chunks
+      .sort((a, b) => a.chunkIndex - b.chunkIndex)
+      .map((chunk) => chunk.content)
+      .join("\n");
 
     return {
       documentId: args.id,
       content: fullContent,
-      chunkCount: sortedChunks.length,
+      chunkCount: document.totalChunks ?? chunks.length,
     };
   },
 });
