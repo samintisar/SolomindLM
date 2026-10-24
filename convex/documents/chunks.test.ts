@@ -1,11 +1,12 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
 import { CHUNK_PAGE_SIZE } from "./chunks";
+import { MAX_STORED_MARKDOWN_CHARS, toStoredMarkdown } from "./storedMarkdown.helpers";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -52,6 +53,11 @@ async function setup() {
 }
 
 describe("chunk text for Studio jobs", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
   test("lists a document's chunks in order, without embeddings", async () => {
     const { t, a, chunk } = await setup();
     await chunk(a, 0, [1, 0]);
@@ -67,17 +73,34 @@ describe("chunk text for Studio jobs", () => {
     ]);
   });
 
-  test("scores each chunk against a topic; chunks without a matching embedding are skipped", async () => {
-    const { t, a, chunk } = await setup();
+  test("fetchChunks with a topic drops the source that clearly doesn't match it", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "test-key");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ index: 0, embedding: [1, 0] }] }))
+    );
+    const { t, a, b, chunk } = await setup();
     await chunk(a, 0, [1, 0]);
-    await chunk(a, 1, [0, 1]);
-    await chunk(a, 2, []);
-    const { page } = await t.query(internal.documents.chunks.chunkTopicSimilarityPage, {
-      documentId: a,
-      topicEmbedding: [1, 0],
-      cursor: null,
+    await chunk(b, 0, [0, 1]);
+    const rows = await t.action(internal.documents.chunks.fetchChunks, {
+      documentIds: [a, b],
+      topic: "the topic",
     });
-    expect(page.map((s) => s.similarity).sort()).toEqual([0, 1]);
+    expect(rows.map((r) => r.documentId)).toEqual([a]);
+  });
+
+  test("getDocumentFullText returns the stored copy, or null text when it is missing or truncated", async () => {
+    const { t, a, b } = await setup();
+    const read = (documentId: Id<"documents">) =>
+      t.query(internal.documents.chunks.getDocumentFullText, { documentId });
+    expect(await read(a)).toEqual({ fileName: "a", text: null });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(a, { extractedMarkdown: "  full text  " });
+      await ctx.db.patch(b, {
+        extractedMarkdown: toStoredMarkdown("x".repeat(MAX_STORED_MARKDOWN_CHARS + 1)),
+      });
+    });
+    expect(await read(a)).toEqual({ fileName: "a", text: "full text" });
+    expect(await read(b)).toEqual({ fileName: "b", text: null });
   });
 
   test("fetchChunks reads a source larger than one page, in order", async () => {
