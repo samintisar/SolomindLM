@@ -28,6 +28,7 @@ import type { Doc } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTest";
 import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
+import { getDocumentText } from "../documents/contents";
 import { resetDocumentForReembed } from "../documents/internal";
 
 /** Stored markdown can be ~800 KB per paper; 4 per batch stays well under the read limit. */
@@ -103,7 +104,8 @@ export const scan = internalMutation({
       .paginate({ cursor: args.cursor, numItems: BATCH_SIZE });
     const counts = { ...args.counts };
 
-    for (const doc of result.page) {
+    for (const row of result.page) {
+      const doc = { ...row, extractedMarkdown: await getDocumentText(ctx, row) };
       counts.scanned++;
       const relabel = needsAbstractOnlyRelabel(doc);
       const queue = args.reResolve && shouldQueueReResolve(doc);

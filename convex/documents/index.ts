@@ -20,6 +20,7 @@ import {
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
+import { deleteDocumentText, getDocumentText } from "./contents";
 import { ingestionDelayMs } from "./ingestionDelay.helpers";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
@@ -206,7 +207,7 @@ export const list = query({
 });
 
 /**
- * Get document content for the source viewer (prefers full `extractedMarkdown`, else stitched chunks).
+ * Get document content for the source viewer (prefers the stored text, else stitched chunks).
  */
 export const getContent = query({
   args: { id: v.id("documents") },
@@ -240,7 +241,7 @@ export const getContent = query({
 
     const sortedChunks = chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
 
-    const stored = document.extractedMarkdown?.trim();
+    const stored = (await getDocumentText(ctx, document))?.trim();
     if (stored) {
       return {
         documentId: args.id,
@@ -389,6 +390,7 @@ export const remove = mutation({
       await deleteDocumentFileIfUnused(ctx, document.storageId, [args.id]);
     }
 
+    await deleteDocumentText(ctx, args.id);
     await ctx.db.delete(args.id);
 
     return { message: "Document deleted successfully" };
@@ -421,6 +423,7 @@ export const removeMany = mutation({
         await deleteDocumentFileIfUnused(ctx, document.storageId, [id]);
       }
 
+      await deleteDocumentText(ctx, id);
       await ctx.db.delete(id);
       deleted += 1;
     }
@@ -556,6 +559,20 @@ export const getDocumentInternal = internalQuery({
   },
   handler: async (ctx, args) => {
     return await getReadableDocument(ctx, args.documentId, args.userId);
+  },
+});
+
+/** The document's stored text for a notebook member, or null when unreadable or not stored. */
+export const getDocumentTextInternal = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+    userId: v.id("users"),
+  },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const document = await getReadableDocument(ctx, args.documentId, args.userId);
+    if (!document) return null;
+    return (await getDocumentText(ctx, document)) ?? null;
   },
 });
 

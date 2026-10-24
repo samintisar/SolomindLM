@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
+import { getDocumentText, setDocumentText } from "../documents/contents";
 import schema from "../schema";
 import { SHOWCASE_NOTEBOOKS } from "./manifest";
 import { remapDeep, withoutSystemFields } from "./transferRemap";
@@ -42,6 +43,7 @@ async function setup() {
         updatedAt: now,
       });
     const documentId = await doc("completed");
+    await setDocumentText(ctx, documentId, "Supply meets demand.");
     await doc("failed");
     await ctx.db.insert("documentChunks", {
       documentId,
@@ -88,6 +90,8 @@ describe("showcase transfer", () => {
     });
     expect(rows.notebook).toMatchObject({ _id: notebookId, title: ECON.title });
     expect(rows.documents.map((d) => d._id)).toEqual([documentId]);
+    // The bundle carries each source's text on its row.
+    expect(rows.documents[0].extractedMarkdown).toBe("Supply meets demand.");
     expect(rows.studio.flashcards).toHaveLength(1);
     expect(rows.studio.flashcards[0].cardsData).toEqual([{ front: "Q", back: "A" }]);
     const page = await t.query(internal.showcase.transfer.exportChunksPage, {
@@ -130,13 +134,21 @@ describe("showcase transfer", () => {
       table: "flashcards",
       rows: rows.studio.flashcards.map((r) => remapDeep(withoutSystemFields(r), ids, new Map())),
     });
-    const copied = await t.run(async (ctx) => ({
-      notebook: await ctx.db.get(target.notebookId),
-      deck: await ctx.db
-        .query("flashcards")
-        .withIndex("by_notebook", (q) => q.eq("notebookId", target.notebookId))
-        .first(),
-    }));
+    const copied = await t.run(async (ctx) => {
+      const doc = await ctx.db.get(newDocId as Id<"documents">);
+      return {
+        doc,
+        text: doc ? await getDocumentText(ctx, doc) : undefined,
+        notebook: await ctx.db.get(target.notebookId),
+        deck: await ctx.db
+          .query("flashcards")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", target.notebookId))
+          .first(),
+      };
+    });
+    // The text lands in documentContents, not on the copied row.
+    expect(copied.doc?.extractedMarkdown).toBeUndefined();
+    expect(copied.text).toBe("Supply meets demand.");
     expect(copied.notebook?.title).toBe(ECON.title);
     expect(copied.notebook?.isPublic).toBeFalsy();
     expect(copied.notebook?.chatSettings?.instructionMode).toBe("learningGuide");

@@ -5,6 +5,7 @@ import { internalMutation, internalQuery, type MutationCtx } from "../_generated
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { setDocumentText } from "./contents";
 
 /**
  * Chunks deleted per mutation. Each chunk carries a 1536-dim embedding (~12 KB read), so one
@@ -130,6 +131,7 @@ export async function resetDocumentForReembed(
   }
 
   await deleteAllChunksForDocument(ctx, args.documentId);
+  await setDocumentText(ctx, args.documentId, undefined);
 
   const before = await ctx.db.get(args.documentId);
   await ctx.db.patch(args.documentId, {
@@ -147,7 +149,6 @@ export async function resetDocumentForReembed(
     documentStructure: undefined,
     maxHeadingLevel: undefined,
     metadata: undefined,
-    extractedMarkdown: undefined,
     ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
     updatedAt: Date.now(),
   });
@@ -284,10 +285,8 @@ export const setExtractedMarkdown = internalMutation({
     extractedMarkdown: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      extractedMarkdown: args.extractedMarkdown,
-      updatedAt: Date.now(),
-    });
+    await setDocumentText(ctx, args.documentId, args.extractedMarkdown);
+    await ctx.db.patch(args.documentId, { updatedAt: Date.now() });
   },
 });
 
@@ -457,7 +456,6 @@ export const getDocumentDetails = internalQuery({
       ingestionStatus: doc.ingestionStatus,
       fullTextSource: doc.fullTextSource,
       fullTextPolicy: doc.fullTextPolicy,
-      extractedMarkdown: doc.extractedMarkdown,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,
     };

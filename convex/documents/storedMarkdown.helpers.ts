@@ -1,5 +1,5 @@
 /**
- * The source viewer's copy of a document's extracted text (`documents.extractedMarkdown`). Convex caps a
+ * The source viewer's copy of a document's extracted text (`documentContents.extractedMarkdown`). Convex caps a
  * document field near 1 MB of UTF-8, so very large documents keep only a prefix, followed by a note.
  */
 export const MAX_STORED_MARKDOWN_CHARS = 800_000;

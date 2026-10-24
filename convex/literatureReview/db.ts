@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { getDocumentText } from "../documents/contents";
 import {
   isNotebookPaperDocument,
   NOTEBOOK_PAPER_TEXT_MAX_CHARS,
@@ -779,7 +780,7 @@ export async function loadNotebookPaperDocuments(
       fileUrl: doc.fileUrl,
       paperRecord: doc.paperRecord,
       sourceGuide: doc.sourceGuide,
-      extractedMarkdown: doc.extractedMarkdown?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
+      extractedMarkdown: (await getDocumentText(ctx, doc))?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
     };
     if (isNotebookPaperDocument(candidate)) out.push(candidate);
   }
@@ -815,7 +816,7 @@ export const getNotebookPaperText = internalQuery({
     const doc = await ctx.db.get(args.documentId);
     if (!doc) return "";
     return notebookPaperText({
-      extractedMarkdown: doc.extractedMarkdown?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
+      extractedMarkdown: (await getDocumentText(ctx, doc))?.slice(0, NOTEBOOK_PAPER_TEXT_MAX_CHARS),
       paperRecord: doc.paperRecord,
       fileType: doc.fileType,
       ingestionStatus: doc.ingestionStatus,
