@@ -7,7 +7,7 @@ import {
 describe("resolveAcademicSearchSources", () => {
   it("uses S2 → OpenAlex → PubMed → arXiv by default", () => {
     expect(resolveAcademicSearchSources()).toEqual(DEFAULT_ACADEMIC_SOURCES);
-    expect(DEFAULT_ACADEMIC_SOURCES).toEqual(["semantic_scholar", "openalex", "pubmed", "arxiv"]);
+    expect(DEFAULT_ACADEMIC_SOURCES).toEqual(["openalex", "semantic_scholar", "pubmed", "arxiv"]);
   });
 
   it("filters allowlist while preserving default order", () => {
