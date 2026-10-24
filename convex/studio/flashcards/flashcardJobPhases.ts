@@ -24,7 +24,6 @@ import {
   heuristicDedupeFlashcards,
   isUsableFlashcard,
 } from "../../_agents/flashcard/flashcardHeuristics";
-import { formatFlashcardsAsText } from "../../_agents/flashcard/formatFlashcards";
 import {
   type Flashcard,
   FlashcardArraySchema,
@@ -51,6 +50,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { titleSourceFromItems } from "../_job/titleSource";
 import { fitCardsForRefine, recursiveCollapse, refineFlashcardSelection } from "./collapseReduce";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("FlashcardGraph");
@@ -687,16 +687,20 @@ export async function runFinalizeFlashcardPhase(
     console.log(`[FlashcardJob] Reduce distribution: ${JSON.stringify(topicDistribution)}`);
 
     // Generate title
-    const flashcardsText = formatFlashcardsAsText(finalFlashcards);
     let title = "Flashcards";
     try {
       title = await generateTitleWithinDeadline(
         deadline,
-        flashcardsText.substring(0, 2000),
+        titleSourceFromItems(
+          finalFlashcards.map((card) => card.front),
+          { request: topic }
+        ),
         "FlashcardTitle"
       );
-    } catch (_e) {
-      console.log("[FlashcardJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     // Save results

@@ -63,6 +63,7 @@ import {
   mapChunkRetryDelayMs,
   mapFailureRate,
 } from "../_job/mapFailures";
+import { titleSourceFromItems } from "../_job/titleSource";
 import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
 import { buildTranscriptLines, planSynthesisChunks } from "./synthesisChunks";
 
@@ -743,11 +744,14 @@ export async function runFinalizeAudioOverviewPhase(
     // Generate title
     let title = "Audio Overview";
     try {
+      // One line per source's beats, so the title covers every source (#556).
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: combined.substring(0, 2000),
+        chunk: titleSourceFromItems(allBeats),
       });
-    } catch (_e) {
-      console.log("[AudioJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     // TTS runs in its own action so it gets a full action time budget: script writing plus TTS
