@@ -4,6 +4,7 @@
  * Report generation phase implementations (invoked from thin `job.ts` registrations).
  */
 
+import { withCurrentDate } from "../../_agents/_shared/currentDate";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
@@ -316,7 +317,9 @@ IMPORTANT: Respond with a JSON object containing:
     const mapOutput = await invokeStudioLlm({
       invoke: () =>
         invokeMapStructuredOutput({
-          systemPrompt: withLanguageInstruction(MAP_STRUCTURED_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(
+            withLanguageInstruction(MAP_STRUCTURED_SYSTEM_PROMPT, language)
+          ),
           userPrompt: structuredPrompt,
           model: env.FAST_LLM,
           maxTokens: CONFIG.MAP_MAX_OUTPUT_TOKENS,
@@ -568,7 +571,7 @@ export async function runFinalizeReportPhase(
     let content = await invokeWithinBudget({
       invoke: () =>
         invokeTogetherText({
-          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
           userPrompt: prompt,
           model: reduceModel,
           maxTokens: CONFIG.MAX_OUTPUT_TOKENS,

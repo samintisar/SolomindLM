@@ -2,6 +2,7 @@
 
 import { v } from "convex/values";
 import { extractJsonObjectString, uncachedLlmCall } from "../../_agents/_shared/cachedLlm";
+import { currentDateInstruction } from "../../_agents/_shared/currentDate";
 import { invokeWithRetry } from "../../_agents/_shared/index";
 import { MissingStructuredJsonError } from "../../_agents/_shared/llmErrors";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
@@ -262,7 +263,7 @@ Return JSON: {
               },
               {
                 role: "user",
-                content: `${customPrompt ? `Custom request: ${customPrompt}\n\n` : ""}Source content:\n${sourceText}`,
+                content: `${currentDateInstruction()}\n\n${customPrompt ? `Custom request: ${customPrompt}\n\n` : ""}Source content:\n${sourceText}`,
               },
             ],
             temperature: 0.7,
