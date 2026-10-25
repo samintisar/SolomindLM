@@ -10,11 +10,12 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { type ActionCtx, internalAction, internalQuery } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { internalMutation } from "../functions";
+import { getDocumentText } from "./contents";
 import { isTruncatedStoredMarkdown } from "./storedMarkdown.helpers";
 
 /**
- * Internal: A document's title, and its full text when the stored copy holds all of it. One row
- * read, where stitching chunks reads every chunk with its embedding (~13 KB each). `text` is null
+ * Internal: A document's title, and its full text when the stored copy holds all of it. Two row
+ * reads, where stitching chunks reads every chunk with its embedding (~13 KB each). `text` is null
  * for a legacy document without a stored copy, or one whose copy was truncated.
  */
 export const getDocumentFullText = internalQuery({
@@ -22,7 +23,7 @@ export const getDocumentFullText = internalQuery({
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.documentId);
     if (!doc) return null;
-    const stored = doc.extractedMarkdown?.trim();
+    const stored = (await getDocumentText(ctx, doc))?.trim();
     return {
       fileName: doc.fileName,
       text: stored && !isTruncatedStoredMarkdown(stored) ? stored : null,

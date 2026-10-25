@@ -164,7 +164,7 @@ function practiceItems<R extends Row>(
  */
 export const PURGE_STEPS: readonly PurgeStep[] = [
   {
-    tables: ["documents", "documentChunks"],
+    tables: ["documents", "documentChunks", "documentContents"],
     run: (ctx, userId, budget) =>
       drainWithChildren(
         ctx,
@@ -179,6 +179,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             take: (n) =>
               ctx.db
                 .query("documentChunks")
+                .withIndex("by_document", (q) => q.eq("documentId", doc._id))
+                .take(n),
+          },
+          {
+            take: (n) =>
+              ctx.db
+                .query("documentContents")
                 .withIndex("by_document", (q) => q.eq("documentId", doc._id))
                 .take(n),
           },

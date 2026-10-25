@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { deleteDocumentText } from "../documents/contents";
 import { internalMutation } from "../functions";
 
 /**
@@ -41,6 +42,7 @@ export const deleteE2eNotebooksByEmail = internalMutation({
         .collect();
 
       for (const doc of documents) {
+        await deleteDocumentText(ctx, doc._id);
         await ctx.db.delete(doc._id);
       }
 

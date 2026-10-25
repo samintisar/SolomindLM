@@ -143,7 +143,11 @@ export default defineSchema({
     language: v.optional(v.string()),
     documentStructure: v.optional(v.union(v.literal("flat"), v.literal("hierarchical"))),
     maxHeadingLevel: v.optional(v.number()),
-    /** Full extracted text for UI copy/view (not chunk-overlapped). RAG still uses documentChunks. */
+    /**
+     * Deprecated (#598): the extracted text now lives in `documentContents`, so reading a document
+     * doesn't read its text. Kept until `_migration/moveDocumentText` has emptied it everywhere;
+     * read text with `documents/contents.ts`, never from here.
+     */
     extractedMarkdown: v.optional(v.string()),
     /** Discovery-added research paper metadata + OA resolver fields */
     paperRecord: v.optional(paperRecordValidator),
@@ -175,6 +179,16 @@ export default defineSchema({
     .index("by_fileType", ["fileType"])
     // Documents with storageId set (file uploads)
     .index("by_storage", ["storageId"]),
+
+  /**
+   * A document's full extracted text for the source viewer and copy (not chunk-overlapped; RAG
+   * uses documentChunks), one row per document. Kept off `documents` because Convex bills the
+   * whole row on every read, and lists of sources only need names and statuses (#598).
+   */
+  documentContents: defineTable({
+    documentId: v.id("documents"),
+    extractedMarkdown: v.string(),
+  }).index("by_document", ["documentId"]),
 
   // Vector search for RAG
   documentChunks: defineTable({

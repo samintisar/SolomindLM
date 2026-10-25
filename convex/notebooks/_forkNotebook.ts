@@ -14,6 +14,7 @@ import {
   withoutQuizProgress,
   withoutWrittenQuestionProgress,
 } from "../_model/practiceProgress";
+import { getDocumentText, setDocumentText } from "../documents/contents";
 import { deleteDocumentFileIfUnused } from "../documents/internal";
 import { internalMutation } from "../functions";
 
@@ -29,12 +30,14 @@ export const FORK_CHUNK_BATCH_SIZE = 100;
 const SOURCE_REPROCESS_WAIT_MS = 60_000;
 const MAX_SOURCE_REPROCESS_WAITS = 30;
 
-/** The original's file and the fields its processing writes, as the copy takes them. */
+/**
+ * The original's file and the fields its processing writes, as the copy takes them. Its text is
+ * copied separately (`documentContents`).
+ */
 function processedContent(source: Doc<"documents">) {
   return {
     storageId: source.storageId,
     fullTextSource: source.fullTextSource,
-    extractedMarkdown: source.extractedMarkdown,
     metadata: source.metadata,
     wordCount: source.wordCount,
     estimatedReadingTimeMinutes: source.estimatedReadingTimeMinutes,
@@ -169,6 +172,7 @@ export const copyForkedDocumentContent = internalMutation({
       const content = processedContent(source);
       const previousStorageId = fork.storageId;
       await ctx.db.patch(forkDocumentId, content);
+      await setDocumentText(ctx, forkDocumentId, await getDocumentText(ctx, source));
       // A new upload on the original replaced its file; the copy follows it, so drop the old
       // file unless something else still uses it.
       if (previousStorageId && previousStorageId !== content.storageId) {

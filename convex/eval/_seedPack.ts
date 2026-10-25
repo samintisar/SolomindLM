@@ -9,6 +9,7 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalQuery, type QueryCtx } from "../_generated/server";
 import * as Notebooks from "../_model/notebooks";
+import { deleteDocumentText, getDocumentText } from "../documents/contents";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "../documents/internal";
 import { internalMutation } from "../functions";
 import { EVAL_PACK_FOLDER_NAME } from "./_packFolder";
@@ -230,13 +231,14 @@ export const deletePackDocument = internalMutation({
     if (document.storageId) {
       await deleteDocumentFileIfUnused(ctx, document.storageId, [args.documentId]);
     }
+    await deleteDocumentText(ctx, args.documentId);
     await ctx.db.delete(args.documentId);
     return null;
   },
 });
 
 /**
- * Reading a document reads its whole extractedMarkdown (up to ~800K chars), so
+ * Reading a document's text reads all of it (up to ~800K chars), so
  * getPackSourceText calls this once per document to keep each read small.
  */
 export const packSourceText = internalQuery({
@@ -253,7 +255,7 @@ export const packSourceText = internalQuery({
       await assertPackNotebook(ctx.db, userId, document.notebookId);
       texts.push({
         fileName: document.fileName,
-        text: (document.extractedMarkdown ?? "").slice(0, SOURCE_TEXT_MAX_CHARS),
+        text: ((await getDocumentText(ctx, document)) ?? "").slice(0, SOURCE_TEXT_MAX_CHARS),
       });
     }
     return texts;
