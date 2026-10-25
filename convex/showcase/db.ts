@@ -281,7 +281,9 @@ async function latestResearchPlan(
   let latest: Doc<"researchPlans"> | null = null;
   const conversations = await db
     .query("conversations")
-    .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
+    .withIndex("by_user_notebook_and_updatedAt", (q) =>
+      q.eq("userId", userId).eq("notebookId", notebookId)
+    )
     .order("desc")
     .take(MAX_ROWS);
   for (const conversation of conversations) {
