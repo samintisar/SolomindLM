@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, query } from "../_generated/server";
+import { internalQuery, query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { internalMutation } from "../functions";
 
 // Re-export actions from subscriptions.actions.ts
 export {

@@ -1,7 +1,6 @@
 // convex/freeTools/claimDeck.ts
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { mutation } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
 import {
   countWords,
@@ -16,6 +15,7 @@ import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import * as Notebooks from "../_model/notebooks";
 import { normalizeStudioMarkdownDeep } from "../_shared/modelPlaceholders";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { freeDeckCardValidator } from "./validators";
 
 const MAX_CARDS = Math.max(...FREE_FLASHCARD_CARD_COUNTS);

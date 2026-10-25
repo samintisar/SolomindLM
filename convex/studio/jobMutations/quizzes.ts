@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { normalizeQuizQuestion } from "../../_agents/quiz/optionLabels";
 import type { QuizQuestion } from "../../_agents/quiz/prompts";
-import { internalMutation } from "../../_generated/server";
 import { normalizeStudioMarkdownDeep } from "../../_shared/modelPlaceholders";
+import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 

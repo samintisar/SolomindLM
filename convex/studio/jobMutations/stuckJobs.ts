@@ -1,7 +1,8 @@
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
-import { internalMutation, type MutationCtx } from "../../_generated/server";
+import { type MutationCtx } from "../../_generated/server";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { internalMutation } from "../../functions";
 
 /**
  * Stuck-job watchdog for Studio generation.

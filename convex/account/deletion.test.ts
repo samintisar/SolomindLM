@@ -96,6 +96,7 @@ async function seedUser(t: T, email: string) {
     const fileId = await ctx.storage.store(new Blob([`file-${email}`]));
     const documentId = await add("documents", { userId, notebookId, storageId: fileId });
     for (let i = 0; i < 3; i++) await add("documentChunks", { documentId, userId, notebookId });
+    await add("documentContents", { documentId, extractedMarkdown: "Source text." });
 
     const conversationId = await add("conversations", { userId, notebookId });
     await add("messages", { conversationId });

@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { internalQuery, query } from "../../_generated/server";
 import { checkDailyLimit } from "../../_lib/limits";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as AudioOverviews from "../../_model/audioOverviews";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 
 /**
  * List all audio overviews for a notebook

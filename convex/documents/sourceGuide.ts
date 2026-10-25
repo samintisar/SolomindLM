@@ -118,7 +118,11 @@ async function generateSourceGuideHandler(
   }
 
   // Get content
-  let content = document.extractedMarkdown || "";
+  let content =
+    (await ctx.runQuery(internal.documents.index.getDocumentTextInternal, {
+      documentId: args.documentId,
+      userId,
+    })) || "";
   if (!content) {
     // Fallback: stitch chunks
     const chunks = await ctx.runQuery(internal.documents.index.getDocumentChunksInternal, {

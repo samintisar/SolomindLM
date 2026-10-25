@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { internalMutation } from "../../_generated/server";
 import {
   normalizeStudioMarkdown,
   normalizeStudioMarkdownDeep,
 } from "../../_shared/modelPlaceholders";
+import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 

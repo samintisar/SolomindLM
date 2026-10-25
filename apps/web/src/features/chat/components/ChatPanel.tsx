@@ -82,7 +82,41 @@ const NO_EXTERNAL_SOURCES: ExternalSource[] = [];
  * tracks the composer's rendered height via `useComposerClearance` (fallback until measured).
  */
 const MessageListFooter = () => <div className="composer-clearance shrink-0" aria-hidden />;
-const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
+type MessageListContext = { hasOlderMessages: boolean };
+/**
+ * Shown at the top while older pages remain or are loading (kept through the load so the list
+ * doesn't shift); reaching it loads the next page.
+ */
+const MessageListHeader = ({ context }: { context?: MessageListContext }) =>
+  context?.hasOlderMessages ? (
+    <div className="flex justify-center py-3 text-muted-foreground">
+      <Spinner aria-label="Loading earlier messages" />
+    </div>
+  ) : null;
+const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter, Header: MessageListHeader };
+
+/** Virtuoso's index of the first message; it only ever decreases as older pages are prepended. */
+const FIRST_ITEM_INDEX_BASE = 1_000_000;
+
+/**
+ * `firstItemIndex` for a list that grows at both ends: lowered by the number of messages put in
+ * front of the previous first one, so Virtuoso keeps the viewport still when older pages load.
+ */
+function usePrependedFirstItemIndex(messages: { id: string }[]): number {
+  const state = useRef({ firstId: undefined as string | undefined, index: FIRST_ITEM_INDEX_BASE });
+  const firstId = messages[0]?.id;
+  if (firstId !== state.current.firstId) {
+    const previousAt = state.current.firstId
+      ? messages.findIndex((m) => m.id === state.current.firstId)
+      : -1;
+    state.current = {
+      firstId,
+      // A different thread (or an empty one) starts over.
+      index: previousAt > 0 ? state.current.index - previousAt : FIRST_ITEM_INDEX_BASE,
+    };
+  }
+  return state.current.index;
+}
 
 /** Escape in a thread's rename input cancels only the rename (ConversationList handles it), not the history popover. */
 const keepHistoryOpenOnRenameEscape = (e: KeyboardEvent) => {
@@ -133,6 +167,9 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     messages,
     isChatStreaming: isLoading,
     remoteGenerationBlocksSend,
+    historyComplete = true,
+    loadOlderMessages,
+    loadFullHistory,
     onSendMessage,
     onStopChat,
     onSetFeedback,
@@ -380,11 +417,19 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     };
     onSaveChatOptimistic?.({ notebookId, note: placeholderNote });
     try {
-      const serializedMessages = messages.map((msg) => ({
+      // Only the newest pages are loaded; a saved chat holds the whole thread.
+      // Loaded messages carry display-only fields (follow-ups, a streaming research plan); keep
+      // them, so the note doesn't depend on how far the user had scrolled.
+      const loadedById = new Map(messages.map((m) => [m.id, m]));
+      const toSave =
+        !historyComplete && loadFullHistory
+          ? (await loadFullHistory()).map((m) => loadedById.get(m.id) ?? m)
+          : messages;
+      const serializedMessages = toSave.map((msg) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date ? msg.timestamp.getTime() : msg.timestamp,
       }));
-      await saveChat({ notebookId, messages: serializedMessages, messageCount: messages.length });
+      await saveChat({ notebookId, messages: serializedMessages, messageCount: toSave.length });
     } catch (error) {
       console.error("Failed to save chat:", error);
     } finally {
@@ -685,19 +730,28 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
 
   // --- Scroll to bottom ---
 
+  // Keyed on the newest message, so prepending older pages doesn't jump to the bottom.
+  const lastMessageId = messages.at(-1)?.id;
   useEffect(() => {
-    if (virtuosoRef.current && messages.length > 0) {
+    if (virtuosoRef.current && lastMessageId) {
       setTimeout(() => {
         virtuosoRef.current?.scrollToIndex({
-          index: messages.length - 1,
+          index: "LAST",
           align: "end",
           behavior: "smooth",
         });
       }, 100);
     }
-  }, [messages.length]);
+  }, [lastMessageId]);
 
   const memoizedMessages = useMemo(() => messages, [messages]);
+  const firstItemIndex = usePrependedFirstItemIndex(messages);
+  // Not `hasOlderMessages` alone: that is false while the older page loads.
+  const showOlderSpinner = !historyComplete && messages.length > 0;
+  const messageListContext = useMemo(
+    () => ({ hasOlderMessages: showOlderSpinner }),
+    [showOlderSpinner]
+  );
 
   // Literature review session polling
   const literatureSession = useLiteratureReviewSession(activeLiteratureSessionId);
@@ -878,9 +932,15 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
               />
             ) : (
               <Virtuoso
+                // A new list per thread: `firstItemIndex` only decreases within one list.
+                key={activeConversationId ?? "new"}
                 ref={virtuosoRef}
                 className="h-full min-h-0 w-full min-w-0"
                 data={memoizedMessages}
+                firstItemIndex={firstItemIndex}
+                computeItemKey={(_index, message) => message.id}
+                startReached={loadOlderMessages}
+                context={messageListContext}
                 itemContent={(_index, message) => (
                   <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
                     {message.researchPlan ? (

@@ -108,7 +108,7 @@ describe("googleDrive.ingestFromGoogleDrive", () => {
 
   test("deletes the downloaded file when the upload fails after the pre-check", async () => {
     const actualDocuments = (await modules["./documents/index.ts"]()) as Record<string, unknown>;
-    const { mutation } = await import("./_generated/server");
+    const { mutation } = await import("./functions");
     const t = convexTest(schema, {
       ...modules,
       // Stands in for a limit or access change between the pre-check and the upload.
