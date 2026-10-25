@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { labelWithSource, packChunksBySource } from "./sourcePacking";
+import { joinSmallSourceTasks, labelWithSource, packChunksBySource } from "./sourcePacking";
 
 // Joins everything a pack call receives, so a task's text shows which chunks were packed together.
 const packAll = (chunks: string[]) => [chunks.join(" + ")];
@@ -93,5 +93,17 @@ describe("packChunksBySource", () => {
 describe("labelWithSource", () => {
   it("puts the source name in front of the text", () => {
     expect(labelWithSource("paper-a.pdf", "notes")).toBe("SOURCE: paper-a.pdf\n\nnotes");
+  });
+});
+
+describe("joinSmallSourceTasks", () => {
+  const tokens = (text: string) => text.length;
+
+  it("joins short sources up to the budget, keeping each source's label", () => {
+    const tasks = ["SOURCE: A\n\naa", "SOURCE: B\n\nbb", "SOURCE: C\n\n" + "c".repeat(40)];
+    const joined = joinSmallSourceTasks(tasks, 40, tokens);
+    expect(joined).toHaveLength(2);
+    expect(joined[0]).toBe("SOURCE: A\n\naa\n\n---\n\nSOURCE: B\n\nbb");
+    expect(joined[1]).toBe(tasks[2]);
   });
 });

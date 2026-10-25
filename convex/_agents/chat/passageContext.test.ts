@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { passageTextForModel } from "./passageContext";
+import { markSourceReferences, passageTextForModel } from "./passageContext";
 import type { ReferenceChunk } from "./types";
 
 const passage = (content: string, metadata?: ReferenceChunk["metadata"]): ReferenceChunk => ({
@@ -62,5 +62,14 @@ describe("passageTextForModel", () => {
 
   it("returns the bare passage when there are no previews", () => {
     expect(passageTextForModel(passage("Just this."))).toBe("Just this.");
+  });
+});
+
+describe("markSourceReferences", () => {
+  it("leaves indexes in code alone", () => {
+    const text = "Earlier work found this [6]. Use `layers[2]` or:\n```py\nw = weights[3]\n```";
+    expect(markSourceReferences(text)).toBe(
+      "Earlier work found this (ref. 6). Use `layers[2]` or:\n```py\nw = weights[3]\n```"
+    );
   });
 });
