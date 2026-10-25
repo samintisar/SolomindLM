@@ -14,19 +14,6 @@ export async function getConversation(
   return await ctx.db.get("conversations", conversationId);
 }
 
-export async function getConversationByUserAndNotebook(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-  notebookId: Id<"notebooks">
-): Promise<Doc<"conversations"> | null> {
-  return await ctx.db
-    .query("conversations")
-    .withIndex("by_user_notebook_and_updatedAt", (q) =>
-      q.eq("userId", userId).eq("notebookId", notebookId)
-    )
-    .first();
-}
-
 export type ConversationCreate = {
   userId: Id<"users">;
   notebookId: Id<"notebooks">;

@@ -165,6 +165,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     isChatStreaming: isLoading,
     remoteGenerationBlocksSend,
     hasOlderMessages = false,
+    historyComplete = true,
     loadOlderMessages,
     loadFullHistory,
     onSendMessage,
@@ -415,7 +416,7 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     onSaveChatOptimistic?.({ notebookId, note: placeholderNote });
     try {
       // Only the newest pages are loaded; a saved chat holds the whole thread.
-      const toSave = hasOlderMessages && loadFullHistory ? await loadFullHistory() : messages;
+      const toSave = !historyComplete && loadFullHistory ? await loadFullHistory() : messages;
       const serializedMessages = toSave.map((msg) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date ? msg.timestamp.getTime() : msg.timestamp,

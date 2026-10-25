@@ -125,6 +125,16 @@ describe("chat.messages", () => {
       conversationId,
     });
     expect(state).toEqual({ chatGenerating: true, chatGenerationStartedAt: 123 });
+
+    // The deprecated query still answers clients on the previous bundle: whole thread, oldest first.
+    const legacy = await asUser.query(api.chat.messages.listByNotebook, {
+      notebookId,
+      conversationId,
+    });
+    expect(legacy.messages.map((m) => m.content)).toEqual(
+      Array.from({ length: 60 }, (_, i) => `m${i}`)
+    );
+    expect(legacy.chatGenerating).toBe(true);
   });
 
   test("listPage and generationState return empty for an unauthenticated user", async () => {

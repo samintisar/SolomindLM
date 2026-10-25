@@ -13,6 +13,8 @@ export interface ChatStreamingContextType {
   remoteGenerationBlocksSend: boolean;
   /** The thread has messages older than the loaded pages. */
   hasOlderMessages?: boolean;
+  /** Every page of the thread is loaded, so `messages` is the whole thread. */
+  historyComplete?: boolean;
   /** Loads the next page of older messages. */
   loadOlderMessages?: () => void;
   /** Every message in the thread, oldest first, including pages not loaded yet. */

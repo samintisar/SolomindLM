@@ -60,6 +60,11 @@ const NOTEBOOK_LIST_QUERIES = [
     fn: api.chat.messages.generationState,
     empty: EMPTY_CHAT_STATE,
   },
+  {
+    name: "chat.messages.listByNotebook (deprecated)",
+    fn: api.chat.messages.listByNotebook,
+    empty: { messages: [], ...EMPTY_CHAT_STATE },
+  },
   { name: "notes.userNotes.list", fn: api.notes.userNotes.list, empty: [] },
   { name: "studio.quizzes.index.list", fn: api.studio.quizzes.index.list, empty: [] },
   { name: "studio.mindmaps.index.list", fn: api.studio.mindmaps.index.list, empty: [] },

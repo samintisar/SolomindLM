@@ -11,6 +11,7 @@ import {
 } from "../_generated/server";
 import { assertCanEditConversation, getConversationIfReadable } from "../_lib/conversationAccess";
 import { assertCanReadNotebook, getNotebookAccess } from "../_lib/notebookAccess";
+import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
 import * as ConvModel from "../_model/conversations";
 import { getAuthUserId } from "../auth";
 
@@ -68,6 +69,35 @@ export const generationState = query({
     return {
       chatGenerating: (conversation?.chatGenerationInFlight ?? 0) > 0,
       chatGenerationStartedAt: conversation?.chatGenerationStartedAt ?? null,
+    };
+  },
+});
+
+/**
+ * @deprecated Replaced by `listPage` + `generationState` (#601). Kept for one release so open tabs
+ * and mobile WebViews on the previous web bundle keep working until they reload; remove after.
+ */
+export const listByNotebook = query({
+  args: conversationArgs,
+  returns: v.object({
+    messages: v.array(v.any()),
+    chatGenerating: v.boolean(),
+    chatGenerationStartedAt: v.union(v.null(), v.number()),
+  }),
+  handler: async (ctx, args) => {
+    const conversation = await resolveReadableConversation(ctx, args);
+    if (!conversation) {
+      return { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
+    }
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
+      .order("asc")
+      .take(MAX_MESSAGES_PER_CONVERSATION);
+    return {
+      messages,
+      chatGenerating: (conversation.chatGenerationInFlight ?? 0) > 0,
+      chatGenerationStartedAt: conversation.chatGenerationStartedAt ?? null,
     };
   },
 });

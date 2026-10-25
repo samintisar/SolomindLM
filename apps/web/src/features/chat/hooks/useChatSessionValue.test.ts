@@ -23,6 +23,7 @@ const baseChatStream: ChatStream = {
   remoteChatGenerating: false,
   remoteGenerationBlocksSend: false,
   hasOlderMessages: false,
+  historyComplete: true,
   loadOlderMessages: vi.fn(),
   loadFullHistory: vi.fn(),
   displayNotes: [],

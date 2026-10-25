@@ -172,6 +172,8 @@ export function useChatStream({
   }, [activeConversationId, newestFirst]);
   const chatRemoteGenerating = generation?.chatGenerating ?? false;
   const hasOlderMessages = historyStatus === "CanLoadMore";
+  /** Every page is loaded (not just "nothing to load right now", which also covers "LoadingMore"). */
+  const historyComplete = historyStatus === "Exhausted";
   const loadOlderMessages = useCallback(() => {
     if (historyStatus === "CanLoadMore") loadMore(CHAT_PAGE_SIZE);
   }, [historyStatus, loadMore]);
@@ -1034,6 +1036,7 @@ export function useChatStream({
     remoteChatGenerating: chatRemoteGenerating,
     remoteGenerationBlocksSend,
     hasOlderMessages,
+    historyComplete,
     loadOlderMessages,
     loadFullHistory,
     displayNotes,
