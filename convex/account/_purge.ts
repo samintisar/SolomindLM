@@ -203,7 +203,7 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
         (n) =>
           ctx.db
             .query("conversations")
-            .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
+            .withIndex("by_user_notebook_and_updatedAt", (q) => q.eq("userId", userId))
             .take(n),
         (conversation) => [
           {
