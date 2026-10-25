@@ -15,6 +15,7 @@ import type * as _agents__shared_cachedLlm from "../_agents/_shared/cachedLlm.js
 import type * as _agents__shared_chunk_operations from "../_agents/_shared/chunk_operations.js";
 import type * as _agents__shared_citationExtract from "../_agents/_shared/citationExtract.js";
 import type * as _agents__shared_concurrency from "../_agents/_shared/concurrency.js";
+import type * as _agents__shared_currentDate from "../_agents/_shared/currentDate.js";
 import type * as _agents__shared_index from "../_agents/_shared/index.js";
 import type * as _agents__shared_languageInstruction from "../_agents/_shared/languageInstruction.js";
 import type * as _agents__shared_llmErrors from "../_agents/_shared/llmErrors.js";
@@ -373,6 +374,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/chunk_operations": typeof _agents__shared_chunk_operations;
   "_agents/_shared/citationExtract": typeof _agents__shared_citationExtract;
   "_agents/_shared/concurrency": typeof _agents__shared_concurrency;
+  "_agents/_shared/currentDate": typeof _agents__shared_currentDate;
   "_agents/_shared/index": typeof _agents__shared_index;
   "_agents/_shared/languageInstruction": typeof _agents__shared_languageInstruction;
   "_agents/_shared/llmErrors": typeof _agents__shared_llmErrors;

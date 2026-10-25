@@ -7,6 +7,7 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { withCurrentDate } from "../../_agents/_shared/currentDate";
 import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { EmptyLlmResponseError } from "../../_agents/_shared/llmErrors";
@@ -346,7 +347,7 @@ export async function runProcessAudioMapChunkPhase(
     const output = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
-          systemPrompt: withLanguageInstruction(MAP_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           userPrompt: prompt,
           model: env.FAST_LLM,
           temperature: 0.3,
@@ -655,7 +656,9 @@ export async function runFinalizeAudioOverviewPhase(
         invokeStudioLlm({
           invoke: () =>
             invokeTogetherText({
-              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              systemPrompt: withCurrentDate(
+                withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)
+              ),
               userPrompt:
                 previousFailure === "empty_response"
                   ? reducePrompt + REDUCE_LENGTH_REMINDER
@@ -705,7 +708,9 @@ export async function runFinalizeAudioOverviewPhase(
         return invokeStudioLlm({
           invoke: () =>
             invokeTogetherText({
-              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              systemPrompt: withCurrentDate(
+                withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)
+              ),
               userPrompt: wrapUp
                 ? getWrapUpPrompt({ scriptSoFar, audioType, focus })
                 : getContinuationPrompt({
