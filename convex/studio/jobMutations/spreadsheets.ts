@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { stripModelPlaceholdersDeep } from "../../_shared/modelPlaceholders";
 import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
@@ -15,7 +16,8 @@ export const saveSpreadsheetResults = internalMutation({
 
     const title = args.metadata?.title ?? "Spreadsheet";
     await ctx.db.patch(args.spreadsheetId, {
-      data: args.spreadsheet,
+      // Model placeholders like "[Image of …]" out (#574).
+      data: stripModelPlaceholdersDeep(args.spreadsheet),
       status: "completed",
       updatedAt: Date.now(),
       title,
