@@ -64,21 +64,36 @@ describe("documentIdsInNotebook", () => {
 });
 
 describe("createFetchDocumentFn", () => {
-  it("returns the document's title with its text, so attached sources are named", async () => {
-    const runQuery = vi.fn(async (_fn: unknown, args: Record<string, unknown>) =>
-      "chunkIds" in args || !("documentIds" in args)
-        ? [
-            { chunkIndex: 1, content: "second" },
-            { chunkIndex: 0, content: "first" },
-          ]
-        : [{ _id: "doc-a", fileName: "a.pdf" }]
-    );
+  it("returns the stored full text with the title, without reading chunks", async () => {
+    const runQuery = vi.fn(async () => ({ fileName: "a.pdf", text: "the whole text" }));
+    const ctx = { runQuery } as unknown as ActionCtx;
+
+    await expect(createFetchDocumentFn(ctx)("doc-a")).resolves.toMatchObject({
+      content: "the whole text",
+      title: "a.pdf",
+    });
+    expect(runQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("stitches the chunks' text, page by page, when there is no complete stored copy", async () => {
+    const runQuery = vi.fn(async (_fn: unknown, args: Record<string, unknown>) => {
+      if (!("cursor" in args)) return { fileName: "a.pdf", text: null };
+      return args.cursor === null
+        ? { page: [{ content: "first" }], isDone: false, continueCursor: "c1" }
+        : { page: [{ content: "second" }], isDone: true, continueCursor: "c2" };
+    });
     const ctx = { runQuery } as unknown as ActionCtx;
 
     await expect(createFetchDocumentFn(ctx)("doc-a")).resolves.toMatchObject({
       content: "first\n\nsecond",
       title: "a.pdf",
     });
+  });
+
+  it("returns null for a deleted document", async () => {
+    const ctx = { runQuery: vi.fn(async () => null) } as unknown as ActionCtx;
+
+    await expect(createFetchDocumentFn(ctx)("doc-gone")).resolves.toBeNull();
   });
 });
 

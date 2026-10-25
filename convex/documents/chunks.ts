@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import { withoutReferenceLists } from "../_agents/_shared/referenceSections";
 import {
-  chunkTopicSimilarities,
   documentTopicScores,
   selectTopicDocuments,
+  TOPIC_SOURCE_TOP_K,
 } from "../_agents/_shared/topicSourceFilter";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -14,22 +14,24 @@ import {
   internalQuery,
 } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { getDocumentText } from "./contents";
+import { isTruncatedStoredMarkdown } from "./storedMarkdown.helpers";
 
 /**
- * Internal: List chunks by document
+ * Internal: A document's title, and its full text when the stored copy holds all of it. Two row
+ * reads, where stitching chunks reads every chunk with its embedding (~13 KB each). `text` is null
+ * for a legacy document without a stored copy, or one whose copy was truncated.
  */
-export const listChunksByDocument = internalQuery({
-  args: {
-    documentId: v.id("documents"),
-  },
+export const getDocumentFullText = internalQuery({
+  args: { documentId: v.id("documents") },
   handler: async (ctx, args) => {
-    const chunks = await ctx.db
-      .query("documentChunks")
-      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-      .order("asc")
-      .collect();
-
-    return chunks;
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) return null;
+    const stored = (await getDocumentText(ctx, doc))?.trim();
+    return {
+      fileName: doc.fileName,
+      text: stored && !isTruncatedStoredMarkdown(stored) ? stored : null,
+    };
   },
 });
 
@@ -142,44 +144,26 @@ export const listChunkTexts = internalQuery({
   },
 });
 
-/** Internal: How closely each chunk on one page of a document matches a topic embedding. */
-export const chunkTopicSimilarityPage = internalQuery({
-  args: {
-    documentId: v.id("documents"),
-    topicEmbedding: v.array(v.float64()),
-    cursor: cursorValidator,
-  },
-  handler: async (ctx, args): Promise<Page<{ documentId: string; similarity: number }>> => {
-    const result = await ctx.db
-      .query("documentChunks")
-      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-      .paginate({ cursor: args.cursor, numItems: CHUNK_PAGE_SIZE });
-    return {
-      page: chunkTopicSimilarities(result.page, args.topicEmbedding),
-      isDone: result.isDone,
-      continueCursor: result.continueCursor,
-    };
-  },
-});
-
-/** How closely one document matches a topic embedding; null if none of its chunks has one. */
+/**
+ * How closely one document matches a topic embedding; null if none of its chunks is indexed. The
+ * vector index returns the best chunks' cosine scores without reading any chunk row.
+ */
 async function documentTopicScore(
   ctx: ActionCtx,
   documentId: Id<"documents">,
   topicEmbedding: number[]
 ): Promise<number | null> {
-  const similarities = await readAllPages((cursor) =>
-    ctx.runQuery(internal.documents.chunks.chunkTopicSimilarityPage, {
-      documentId,
-      topicEmbedding,
-      cursor,
-    })
-  );
+  const hits = await ctx.vectorSearch("documentChunks", "by_embedding", {
+    vector: topicEmbedding,
+    limit: TOPIC_SOURCE_TOP_K,
+    filter: (q) => q.eq("documentId", documentId),
+  });
+  const similarities = hits.map((hit) => ({ documentId, similarity: hit._score }));
   return documentTopicScores(similarities).get(documentId) ?? null;
 }
 
 /** One document's chunks in order, without their embeddings. */
-async function documentChunkTexts(
+export async function documentChunkTexts(
   ctx: ActionCtx,
   documentId: Id<"documents">
 ): Promise<ChunkText[]> {
@@ -189,9 +173,9 @@ async function documentChunkTexts(
 }
 
 /**
- * The sources that match `topic` (#288). Each source is scored in its own query, so the
- * embeddings never sit in this action's memory together (64 MB). Best-effort: if the topic cannot
- * be embedded, every source stays.
+ * The sources that match `topic` (#288). Each source is scored by its own vector search, which
+ * reads no chunk rows. Best-effort: if the topic cannot be embedded or a search fails, every
+ * source stays.
  */
 async function documentsForTopic(
   ctx: ActionCtx,
@@ -211,10 +195,17 @@ async function documentsForTopic(
     });
     return documentIds;
   }
-  // Each score is one number, so the sources can be scored in parallel.
-  const documentScores = await Promise.all(
-    documentIds.map((documentId) => documentTopicScore(ctx, documentId, topicEmbedding))
-  );
+  let documentScores: Array<number | null>;
+  try {
+    documentScores = await Promise.all(
+      documentIds.map((documentId) => documentTopicScore(ctx, documentId, topicEmbedding))
+    );
+  } catch (error) {
+    logger.warn("Topic vector search failed; keeping every source", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return documentIds;
+  }
   const scores = new Map<string, number>();
   documentIds.forEach((documentId, i) => {
     const score = documentScores[i];
