@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "../../_generated/server";
+import { stripModelPlaceholdersDeep } from "../../_shared/modelPlaceholders";
+import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
@@ -24,7 +25,8 @@ export const saveMindMapResults = internalMutation({
 
     const title = args.metadata?.title ?? "Mind Map";
     await ctx.db.patch(args.mindmapId, {
-      data: args.mindmap,
+      // Model placeholders like "[Image of …]" out (#574).
+      data: stripModelPlaceholdersDeep(args.mindmap),
       status: "completed",
       updatedAt: Date.now(),
       title,

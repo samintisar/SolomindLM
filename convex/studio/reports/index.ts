@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Doc } from "../../_generated/dataModel";
-import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { internalQuery, query } from "../../_generated/server";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
@@ -8,6 +8,7 @@ import {
 } from "../../_lib/notebookAccess";
 import * as Reports from "../../_model/reports";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 
 function toReportDTO(report: Doc<"reports">) {
   return {

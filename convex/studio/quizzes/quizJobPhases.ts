@@ -64,6 +64,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { titleSourceFromItems } from "../_job/titleSource";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("QuizGraph");
 
@@ -1016,13 +1017,12 @@ export async function runFinalizeQuizPhase(
     // Generate title
     let title = "Quiz";
     try {
-      const titleContent = finalQuestions
-        .map((q) => q.question)
-        .join(" ")
-        .substring(0, 2000);
+      const titleContent = titleSourceFromItems(finalQuestions.map((q) => q.question));
       title = await generateTitleWithinDeadline(deadline, titleContent, "QuizTitle");
-    } catch (_e) {
-      console.log("[QuizJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     // Save results

@@ -18,6 +18,7 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
+import { formatCodeInText } from "../../_agents/written_questions/codeFormatting";
 import {
   appendUniqueWrittenQuestions,
   applyQuestionChecks,
@@ -66,6 +67,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { titleSourceFromItems } from "../_job/titleSource";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("WrittenQuestionsGraph");
 
@@ -865,13 +867,12 @@ export async function runFinalizeWrittenQuestionsPhase(
     let title = "Written Questions";
     if (finalQuestions.length > 0) {
       try {
-        const titleContent = finalQuestions
-          .map((q) => q.question)
-          .join(" ")
-          .substring(0, 2000);
+        const titleContent = titleSourceFromItems(finalQuestions.map((q) => q.question));
         title = await generateTitleWithinDeadline(deadline, titleContent, "WrittenQuestionsTitle");
-      } catch (_e) {
-        console.log("[WrittenQuestionsJob] Title generation failed, using default");
+      } catch (e) {
+        logger.warn("Title generation failed, keeping the default title", {
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     }
 
@@ -880,7 +881,12 @@ export async function runFinalizeWrittenQuestionsPhase(
       internal.studio.jobMutations.writtenQuestions.saveWrittenQuestionsResults,
       {
         writtenQuestionId,
-        questions: finalQuestions,
+        // Unwrap $ around code and fence unfenced code before the math normalization (#573).
+        questions: finalQuestions.map((q) => ({
+          ...q,
+          question: formatCodeInText(q.question),
+          modelAnswer: q.modelAnswer ? formatCodeInText(q.modelAnswer) : q.modelAnswer,
+        })),
         metadata: withStudioTelemetryMetadata(
           {
             title,

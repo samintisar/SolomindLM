@@ -4,6 +4,7 @@
  * Report generation phase implementations (invoked from thin `job.ts` registrations).
  */
 
+import { withCurrentDate } from "../../_agents/_shared/currentDate";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
@@ -49,6 +50,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { markdownTitleItems, titleSourceFromItems } from "../_job/titleSource";
 import { isFailedMapResult } from "./mapResultUtils.js";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("ReportGraph");
@@ -357,7 +359,9 @@ IMPORTANT: Respond with a JSON object containing:
     const mapOutput = await invokeStudioLlm({
       invoke: () =>
         invokeMapStructuredOutput({
-          systemPrompt: withLanguageInstruction(MAP_STRUCTURED_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(
+            withLanguageInstruction(MAP_STRUCTURED_SYSTEM_PROMPT, language)
+          ),
           userPrompt: structuredPrompt,
           model: env.FAST_LLM,
           maxTokens: CONFIG.MAP_MAX_OUTPUT_TOKENS,
@@ -615,7 +619,7 @@ export async function runFinalizeReportPhase(
     let content = await invokeWithinBudget({
       invoke: () =>
         invokeTogetherText({
-          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
           userPrompt: prompt,
           model: reduceModel,
           maxTokens: CONFIG.MAX_OUTPUT_TOKENS,
@@ -647,11 +651,13 @@ export async function runFinalizeReportPhase(
     try {
       title = await generateTitleWithinDeadline(
         deadline,
-        combinedContent.substring(0, 2000),
+        titleSourceFromItems(markdownTitleItems(content)),
         "ReportTitle"
       );
-    } catch {
-      console.log("[ReportJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     await ctx.runMutation(internal.studio.jobMutations.reports.saveReportResults, {

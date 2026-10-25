@@ -59,7 +59,7 @@ async function userHasAny(
 async function userHasAnyConversation(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
   const first = await ctx.db
     .query("conversations")
-    .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
+    .withIndex("by_user_notebook_and_updatedAt", (q) => q.eq("userId", userId))
     .first();
   return first !== null;
 }

@@ -6,6 +6,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { withCurrentDate } from "../../_agents/_shared/currentDate";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
@@ -789,7 +790,7 @@ export async function writeSpreadsheetTable(
     const rawContent = await invokeWithinBudget({
       invoke: () =>
         invokeTogetherText({
-          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
           userPrompt,
           model: env.SPREADSHEET_LLM,
           maxTokens: 32_000,

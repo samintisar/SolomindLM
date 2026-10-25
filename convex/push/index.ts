@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 
 /**
  * Upsert the caller's Expo push token for mobile notifications.

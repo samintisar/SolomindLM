@@ -26,9 +26,10 @@ export async function generateTitleFromChunk(chunk: string): Promise<string> {
     throw new Error("TOGETHER_AI_API_KEY environment variable is not set");
   }
 
-  const truncatedContent = chunk.length > 500 ? chunk.substring(0, 500) + "..." : chunk;
+  // Studio callers send a sample spread across the whole item (`studio/_job/titleSource.ts`).
+  const truncatedContent = chunk.length > 1500 ? chunk.substring(0, 1500) + "..." : chunk;
 
-  const prompt = `Generate a single, concise title (max 10 words) for the following content. Output ONLY the title with no preamble, no list, no introduction, and no quotation marks.
+  const prompt = `Generate a single, concise title (max 10 words) for the following content. The title must describe the content as a whole, not one part of it. Output ONLY the title with no preamble, no list, no introduction, and no quotation marks.
 
 Content:
 ${truncatedContent}
@@ -55,7 +56,9 @@ Title:`;
       reasoningEnabled: false,
       toolChoice: "none",
     });
-    return finalizeTitle(response.content);
+    const title = finalizeTitle(response.content);
+    if (!title) throw new Error(`Title model ${model} returned no title`);
+    return title;
   }
 
   try {

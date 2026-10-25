@@ -7,6 +7,7 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { withCurrentDate } from "../../_agents/_shared/currentDate";
 import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { EmptyLlmResponseError } from "../../_agents/_shared/llmErrors";
@@ -63,6 +64,7 @@ import {
   mapChunkRetryDelayMs,
   mapFailureRate,
 } from "../_job/mapFailures";
+import { titleSourceFromItems } from "../_job/titleSource";
 import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
 import { buildTranscriptLines, planSynthesisChunks } from "./synthesisChunks";
 
@@ -346,7 +348,7 @@ export async function runProcessAudioMapChunkPhase(
     const output = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
-          systemPrompt: withLanguageInstruction(MAP_SYSTEM_PROMPT, language),
+          systemPrompt: withCurrentDate(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           userPrompt: prompt,
           model: env.FAST_LLM,
           temperature: 0.3,
@@ -655,7 +657,9 @@ export async function runFinalizeAudioOverviewPhase(
         invokeStudioLlm({
           invoke: () =>
             invokeTogetherText({
-              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              systemPrompt: withCurrentDate(
+                withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)
+              ),
               userPrompt:
                 previousFailure === "empty_response"
                   ? reducePrompt + REDUCE_LENGTH_REMINDER
@@ -705,7 +709,9 @@ export async function runFinalizeAudioOverviewPhase(
         return invokeStudioLlm({
           invoke: () =>
             invokeTogetherText({
-              systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+              systemPrompt: withCurrentDate(
+                withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)
+              ),
               userPrompt: wrapUp
                 ? getWrapUpPrompt({ scriptSoFar, audioType, focus })
                 : getContinuationPrompt({
@@ -743,11 +749,14 @@ export async function runFinalizeAudioOverviewPhase(
     // Generate title
     let title = "Audio Overview";
     try {
+      // One line per source's beats, so the title covers every source (#556).
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-        chunk: combined.substring(0, 2000),
+        chunk: titleSourceFromItems(allBeats),
       });
-    } catch (_e) {
-      console.log("[AudioJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     // TTS runs in its own action so it gets a full action time budget: script writing plus TTS
