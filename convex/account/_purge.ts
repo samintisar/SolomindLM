@@ -365,7 +365,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
   },
   {
     // Viewers' practice progress on the user's public notebooks goes with the notebooks.
-    tables: ["notebooks", "notebookShareLinks", "notebookMembers", "studioProgress"],
+    tables: [
+      "notebooks",
+      "notebookShareLinks",
+      "notebookMembers",
+      "studioProgress",
+      "studioItemIndexes",
+    ],
     run: (ctx, userId, budget) =>
       drainWithChildren(
         ctx,
@@ -394,6 +400,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             take: (n) =>
               ctx.db
                 .query("studioProgress")
+                .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
+                .take(n),
+          },
+          {
+            take: (n) =>
+              ctx.db
+                .query("studioItemIndexes")
                 .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
                 .take(n),
           },

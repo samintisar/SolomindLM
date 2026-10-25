@@ -415,6 +415,15 @@ export default defineSchema({
     // Keeping one item's row in sync.
     .index("by_item", ["itemId"]),
 
+  // Whether a notebook's `studioItems` rows are complete. "indexing" while the outputs it had
+  // before its first indexed write are still being indexed; the Studio list reads `studioItems`
+  // only once it is "done" (convex/_model/studioItems.ts).
+  studioItemIndexes: defineTable({
+    notebookId: v.id("notebooks"),
+    status: v.union(v.literal("indexing"), v.literal("done")),
+    updatedAt: v.number(),
+  }).index("by_notebook", ["notebookId"]),
+
   // Chat
   conversations: defineTable({
     userId: v.id("users"),

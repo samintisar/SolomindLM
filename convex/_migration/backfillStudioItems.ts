@@ -1,17 +1,18 @@
 /**
  * Migration: index the studio outputs and notes of notebooks created before `studioItems` (#600).
  * Until a notebook is indexed, the Studio list reads its output tables on every run, as before;
- * the first write to an output in it indexes it too.
+ * the first write to an output in it starts indexing it too (`startIndexing`).
  *
  *   npx convex run _migration/backfillStudioItems:start
  *
- * Notebooks are walked a page at a time, and each one is indexed in its own mutation so a notebook
- * with very large outputs can't stop the walk. Indexed notebooks are skipped, so it is safe to rerun.
+ * Notebooks are walked a page at a time. Each one is indexed by its own chain of `indexPage`
+ * mutations, a few outputs per mutation, so large outputs stay inside a mutation's read limits.
+ * Indexed notebooks are skipped and unfinished ones restarted, so it is safe to rerun.
  */
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { indexNotebook, notebookHasStudioItems } from "../_model/studioItems";
+import { indexNotebookPage, isNotebookIndexed, startIndexing } from "../_model/studioItems";
 import { internalMutation } from "../functions";
 
 const NOTEBOOK_PAGE_SIZE = 50;
@@ -32,11 +33,7 @@ export const scanNotebooks = internalMutation({
       .query("notebooks")
       .paginate({ cursor, numItems: NOTEBOOK_PAGE_SIZE });
     for (const notebook of result.page) {
-      if (!(await notebookHasStudioItems(ctx, notebook._id))) {
-        await ctx.scheduler.runAfter(0, internal._migration.backfillStudioItems.indexOne, {
-          notebookId: notebook._id,
-        });
-      }
+      if (!(await isNotebookIndexed(ctx, notebook._id))) await startIndexing(ctx, notebook._id);
     }
     if (!result.isDone) {
       await ctx.scheduler.runAfter(0, internal._migration.backfillStudioItems.scanNotebooks, {
@@ -46,10 +43,23 @@ export const scanNotebooks = internalMutation({
   },
 });
 
-export const indexOne = internalMutation({
-  args: { notebookId: v.id("notebooks") },
-  handler: async (ctx, { notebookId }) => {
-    if (await notebookHasStudioItems(ctx, notebookId)) return;
-    await indexNotebook(ctx, notebookId);
+/** One page of a notebook's outputs; schedules the next page until the notebook is done. */
+export const indexPage = internalMutation({
+  args: {
+    notebookId: v.id("notebooks"),
+    tableIndex: v.number(),
+    after: v.union(v.number(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { notebookId, tableIndex, after }) => {
+    if (await isNotebookIndexed(ctx, notebookId)) return null;
+    const next = await indexNotebookPage(ctx, notebookId, { tableIndex, after });
+    if (next) {
+      await ctx.scheduler.runAfter(0, internal._migration.backfillStudioItems.indexPage, {
+        notebookId,
+        ...next,
+      });
+    }
+    return null;
   },
 });

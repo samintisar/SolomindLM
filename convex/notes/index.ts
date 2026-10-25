@@ -6,6 +6,7 @@ import * as NotesModel from "../_model/notes";
 import { forViewer } from "../_model/practiceProgress";
 import {
   buildStudioListRow,
+  isNotebookIndexed,
   STUDIO_ITEM_TABLES,
   type StudioItemTable,
 } from "../_model/studioItems";
@@ -20,7 +21,7 @@ type ListRow = Record<string, unknown> & { _type: string; _id: string; updatedAt
 /**
  * Every studio output and note in a notebook, newest first, without heavy payloads (full content
  * loads via `get`). Rows come from `studioItems` (#600), so a running job's patches re-read small
- * rows, not every output. A notebook not yet indexed is listed from the output tables.
+ * rows, not every output. A notebook not fully indexed yet is listed from the output tables.
  */
 export const list = query({
   args: {
@@ -40,22 +41,21 @@ export const list = query({
     }
 
     const wanted = (table: StudioItemTable) => !args.types || args.types.includes(table);
-    const indexed = await ctx.db
-      .query("studioItems")
-      .withIndex("by_notebook_and_updatedAt", (q) => q.eq("notebookId", args.notebookId))
-      .order("desc")
-      .take(STUDIO_LIST_LIMIT);
-
-    const rows: ListRow[] =
-      indexed.length > 0
-        ? indexed
-            .filter(
-              (item) =>
-                wanted(item.itemType) &&
-                (item.privateToUserId === undefined || item.privateToUserId === userId)
-            )
-            .map((item) => item.row as ListRow)
-        : await listFromOutputTables(ctx, args.notebookId, userId, wanted);
+    const rows: ListRow[] = (await isNotebookIndexed(ctx, args.notebookId))
+      ? (
+          await ctx.db
+            .query("studioItems")
+            .withIndex("by_notebook_and_updatedAt", (q) => q.eq("notebookId", args.notebookId))
+            .order("desc")
+            .take(STUDIO_LIST_LIMIT)
+        )
+          .filter(
+            (item) =>
+              wanted(item.itemType) &&
+              (item.privateToUserId === undefined || item.privateToUserId === userId)
+          )
+          .map((item) => item.row as ListRow)
+      : await listFromOutputTables(ctx, args.notebookId, userId, wanted);
 
     // Practice progress on a shared row is the owner's; a viewer sees their own instead.
     if (access !== "viewer") return rows;
@@ -64,7 +64,7 @@ export const list = query({
   },
 });
 
-/** The list for a notebook without `studioItems` rows, read from the output tables. */
+/** The list for a notebook not fully indexed yet, read from the output tables. */
 async function listFromOutputTables(
   ctx: QueryCtx,
   notebookId: Id<"notebooks">,
