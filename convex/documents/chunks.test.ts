@@ -93,12 +93,15 @@ describe("chunk text for Studio jobs", () => {
     const read = (documentId: Id<"documents">) =>
       t.query(internal.documents.chunks.getDocumentFullText, { documentId });
     expect(await read(a)).toEqual({ fileName: "a", text: null });
-    await t.run(async (ctx) => {
-      await ctx.db.patch(a, { extractedMarkdown: "  full text  " });
-      await ctx.db.patch(b, {
-        extractedMarkdown: toStoredMarkdown("x".repeat(MAX_STORED_MARKDOWN_CHARS + 1)),
+    // Stored the way ingestion stores it, so the test fails if the text moves elsewhere and this
+    // query still reads the old place (it would quietly fall back to reading every chunk).
+    const store = (documentId: Id<"documents">, extractedMarkdown: string) =>
+      t.mutation(internal.documents.internal.setExtractedMarkdown, {
+        documentId,
+        extractedMarkdown,
       });
-    });
+    await store(a, "  full text  ");
+    await store(b, toStoredMarkdown("x".repeat(MAX_STORED_MARKDOWN_CHARS + 1)));
     expect(await read(a)).toEqual({ fileName: "a", text: "full text" });
     expect(await read(b)).toEqual({ fileName: "b", text: null });
   });
