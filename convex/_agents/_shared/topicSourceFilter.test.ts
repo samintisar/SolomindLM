@@ -1,36 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  chunkTopicSimilarities,
-  cosineSimilarity,
-  documentTopicScores,
-  selectTopicDocuments,
-  TOPIC_SOURCE_GAP,
-} from "./topicSourceFilter";
-
-describe("cosineSimilarity", () => {
-  it("is 1 for the same direction and 0 for orthogonal vectors", () => {
-    expect(cosineSimilarity([1, 2, 3], [2, 4, 6])).toBeCloseTo(1);
-    expect(cosineSimilarity([1, 0], [0, 1])).toBeCloseTo(0);
-  });
-
-  it("is 0 for a zero vector instead of NaN", () => {
-    expect(cosineSimilarity([0, 0], [1, 1])).toBe(0);
-  });
-});
-
-describe("chunkTopicSimilarities", () => {
-  it("scores chunks with a matching embedding size and skips the rest", () => {
-    const result = chunkTopicSimilarities(
-      [
-        { documentId: "new", embedding: [1, 0] },
-        { documentId: "legacy", embedding: [1, 0, 0] },
-        { documentId: "none", embedding: undefined },
-      ],
-      [1, 0]
-    );
-    expect(result).toEqual([{ documentId: "new", similarity: 1 }]);
-  });
-});
+import { documentTopicScores, selectTopicDocuments, TOPIC_SOURCE_GAP } from "./topicSourceFilter";
 
 describe("documentTopicScores", () => {
   it("scores each document by the mean of its best-matching chunks", () => {

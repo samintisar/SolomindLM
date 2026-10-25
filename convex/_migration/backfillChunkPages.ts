@@ -1,7 +1,7 @@
 /**
  * Migration: set `documentChunks.pageNumber` on chunks stored before the chunker read OCR page labels.
  *
- * For each document whose `extractedMarkdown` has `**Page N**` labels, every chunk's text is found in the
+ * For each document whose stored text (`documents/contents.ts`) has `**Page N**` labels, every chunk's text is found in the
  * markdown and given the page of the nearest label at or before it. Only chunks without a page are filled, so a
  * page the chunker wrote is never changed. Chunk text and embeddings are untouched; a chunk that can't be
  * found, or whose text repeats on different pages, keeps no page. In a document whose stored copy was
@@ -15,9 +15,10 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
 import { chunkPage, hasPageLabels, pageAtOffset } from "../_services/processing/pageLabels";
+import { getDocumentText } from "../documents/contents";
 import { isTruncatedStoredMarkdown } from "../documents/storedMarkdown.helpers";
+import { internalMutation } from "../functions";
 
 /** Chunk rows carry a 1536-float embedding (~13 KB), so 200 rows stay far below the per-function read limit. */
 const CHUNK_BATCH_SIZE = 200;
@@ -38,8 +39,9 @@ export const scanDocuments = internalMutation({
     const result = await ctx.db.query("documents").paginate({ cursor, numItems: 1 });
     const nextCursor = result.isDone ? null : result.continueCursor;
     const doc = result.page[0];
+    const markdown = doc && (await getDocumentText(ctx, doc));
 
-    if (doc?.extractedMarkdown && hasPageLabels(doc.extractedMarkdown)) {
+    if (doc && markdown && hasPageLabels(markdown)) {
       await ctx.scheduler.runAfter(
         0,
         internal._migration.backfillChunkPages.backfillDocumentChunks,
@@ -63,7 +65,8 @@ export const backfillDocumentChunks = internalMutation({
     documentCursor: v.union(v.string(), v.null()),
   },
   handler: async (ctx, { documentId, chunkCursor, documentCursor }) => {
-    const markdown = (await ctx.db.get(documentId))?.extractedMarkdown;
+    const doc = await ctx.db.get(documentId);
+    const markdown = doc ? await getDocumentText(ctx, doc) : undefined;
     if (markdown) {
       const lookup = pageAtOffset(markdown);
       const truncated = isTruncatedStoredMarkdown(markdown);
