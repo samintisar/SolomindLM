@@ -75,3 +75,24 @@ describe("formatCodeInText: markdown", () => {
     expect(formatCodeInText(text)).toBe(text);
   });
 });
+
+describe("formatCodeInText: math that looks like code", () => {
+  it("keeps equations between capitalised names and primes as math", () => {
+    expect(isCodeSpan("MR = MC")).toBe(false);
+    expect(isCodeSpan("TC = FC + VC")).toBe(false);
+    expect(isCodeSpan("f'(x) = 2x")).toBe(false);
+    expect(isCodeSpan("f'(x) + g'(x)")).toBe(false);
+    const text = "Profit peaks where $MR = MC$, and $f'(x) = 0$ there.";
+    expect(formatCodeInText(text)).toBe(text);
+  });
+
+  it("doesn't fence consecutive equation lines", () => {
+    const text = "TC = FC + VC\nMC = dTC/dQ";
+    expect(formatCodeInText(text)).toBe(text);
+  });
+
+  it("still treats string literals and keyword arguments as code", () => {
+    expect(isCodeSpan("pd.read_csv('data.csv')")).toBe(true);
+    expect(isCodeSpan("dim=1")).toBe(true);
+  });
+});

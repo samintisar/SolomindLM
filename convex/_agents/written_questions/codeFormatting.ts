@@ -14,15 +14,18 @@ const INLINE_DOLLAR_SPAN = /(?<![\\$])\$(?!\$)([^$\n]+?)(?<!\\)\$(?!\$)/g;
 
 /**
  * Whether a `$…$` span holds code rather than math: no LaTeX, and a quote, a format field, a
- * multi-letter identifier with an underscore (`loss_fn`, not `x_i`), or a keyword argument.
+ * multi-letter identifier with an underscore (`loss_fn`, not `x_i`), or a keyword argument
+ * written the way code writes it (`start_dim=1`: lowercase, no spaces). Primes (`f'(x)`) and
+ * equations between capitalised names (`MR = MC`) stay math.
  */
 export function isCodeSpan(content: string): boolean {
   if (/\\[A-Za-z]/.test(content)) return false;
   return (
-    /["']/.test(content) ||
+    /"[^"\n]*"/.test(content) ||
+    /(?:^|[\s([,=])'[^'\n]*'/.test(content) ||
     /\{[A-Za-z_]\w*:[^}]*\}/.test(content) ||
     /\b[A-Za-z]{2,}\w*_\w+/.test(content) ||
-    /\b[A-Za-z_]{2,}\w*\s*=\s*[-\w"'[(]/.test(content)
+    /\b[a-z_][a-z0-9_]+=[-\w"'[(]/.test(content)
   );
 }
 
@@ -34,7 +37,7 @@ function unwrapCodeDollars(text: string): string {
 
 /** Lines that are code on their own (Python-like and C-like statements). */
 const CODE_LINE =
-  /^\s*(?:def |class |import |from [\w.]+ import |for .+ in .+:\s*$|while .+:\s*$|if .+:\s*$|elif .+:\s*$|else:\s*$|try:\s*$|except\b.*:\s*$|finally:\s*$|with .+:\s*$|return\b|yield\b|raise\b|print\(|@\w+|[A-Za-z_][\w.[\]'"]*\s*(?:[+\-*/]?=)\s*[^=\s].*$|[A-Za-z_][\w.]*\(.*\)\s*;?\s*$|\/\/\s|[}\])]\s*;?\s*$)/;
+  /^\s*(?:def |class |import |from [\w.]+ import |for .+ in .+:\s*$|while .+:\s*$|if .+:\s*$|elif .+:\s*$|else:\s*$|try:\s*$|except\b.*:\s*$|finally:\s*$|with .+:\s*$|return\b|yield\b|raise\b|print\(|@\w+|[a-z_][\w.[\]'"]*\s*(?:[+\-*/]?=)\s*[^=\s].*$|[A-Za-z_][\w.]*\(.*\)\s*;?\s*$|\/\/\s|[}\])]\s*;?\s*$)/;
 
 /** Prose that starts like an assignment but reads as a sentence ("x = 5 means …"). */
 function isProseLine(line: string): boolean {
