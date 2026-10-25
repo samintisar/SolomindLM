@@ -108,3 +108,32 @@ describe("parseDesignFigures", () => {
     ]);
   });
 });
+
+describe("verifyFigures: direction", () => {
+  const source = "Manufacturing employment fell 4% in 2025, while services employment rose 6%.";
+
+  it("drops a growth figure the source reports as a fall", () => {
+    const { dropped } = verifyFigures(
+      [{ value: "+4%", label: "manufacturing employment", period: "2025" }],
+      source
+    );
+    expect(dropped.map((d) => d.reason)).toEqual(["number_not_in_sources"]);
+  });
+
+  it("keeps a negative figure the source reports as a fall", () => {
+    const { kept } = verifyFigures(
+      [{ value: "-4%", label: "manufacturing employment", period: "2025" }],
+      source
+    );
+    expect(kept).toHaveLength(1);
+  });
+
+  it("drops a negative figure the source reports as a rise", () => {
+    const { dropped } = verifyFigures([{ value: "-6%", label: "services employment" }], source);
+    expect(dropped).toHaveLength(1);
+  });
+
+  it("reads a year range as a range, not a negative year", () => {
+    expect(findNumbers("2016-2025").map((n) => n.sign)).toEqual([0, 0]);
+  });
+});

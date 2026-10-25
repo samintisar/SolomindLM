@@ -22,6 +22,8 @@ interface NumberMention {
   /** Significant digits as written, for matching a rounded figure ("$104K" vs 104,350). */
   digits: number;
   isYear: boolean;
+  /** -1 for "-4%" or "−4%", 1 for "+4%", 0 when the number has no sign. */
+  sign: -1 | 0 | 1;
   index: number;
   end: number;
 }
@@ -91,15 +93,35 @@ export function findNumbers(text: string): NumberMention[] {
     const value = Number(`${integer.replace(/,/g, "")}${fraction ? `.${fraction}` : ""}`) * scale;
     const isYear =
       scale === 1 && !fraction && !integer.includes(",") && value >= 1900 && value <= 2100;
+    // A sign right before the number, with no word or digit before it ("2016-2025" is a range).
+    const before = text.slice(Math.max(0, index - 2), index);
+    const sign = /(?:^|[^\w])[-−]$/.test(before) ? -1 : /(?:^|[^\w])\+$/.test(before) ? 1 : 0;
     mentions.push({
       value,
       digits: significantDigits(integer, fraction),
       isYear,
+      sign,
       index,
       end: index + m[0].length,
     });
   }
   return mentions;
+}
+
+/** Words that make an unsigned source number a fall ("fell 4%", "a 4% decline"). */
+const DECLINE_WORDS =
+  /\b(?:fell|fall|falls|fallen|declin\w*|decreas\w*|drop\w*|down|lower|loss|losses|shrank|shrink\w*|reduc\w*|negative)\b/i;
+
+/**
+ * Whether a figure's sign agrees with the source: "-4%" needs a negative or falling number in the
+ * source, and "+4%" must not match one. A figure without a sign matches either.
+ */
+function sameDirection(written: NumberMention, source: NumberMention, text: string): boolean {
+  if (written.sign === 0) return true;
+  // The words just around the number: wider, it picks up a neighbouring figure's verb.
+  const nearby = text.slice(Math.max(0, source.index - 25), source.end + 15);
+  const falling = source.sign === -1 || (source.sign === 0 && DECLINE_WORDS.test(nearby));
+  return written.sign === -1 ? falling : !falling;
 }
 
 function roundTo(value: number, digits: number): number {
@@ -162,7 +184,7 @@ export function verifyFigures(
     let reason: DroppedFigure["reason"] | null = null;
     for (const written of values) {
       const contexts = sourceNumbers
-        .filter((n) => sameNumber(written, n.value))
+        .filter((n) => sameNumber(written, n.value) && sameDirection(written, n, sourceText))
         .map((n) => sourceText.slice(Math.max(0, n.index - CONTEXT_CHARS), n.end + CONTEXT_CHARS));
       if (contexts.length === 0) {
         reason = "number_not_in_sources";
