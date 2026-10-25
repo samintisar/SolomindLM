@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stripModelPlaceholders } from "./modelPlaceholders";
+import { stripModelPlaceholders, stripModelPlaceholdersDeep } from "./modelPlaceholders";
 
 describe("stripModelPlaceholders", () => {
   it("removes picture placeholders the model wrote for itself", () => {
@@ -32,5 +32,16 @@ describe("stripModelPlaceholders", () => {
   it("leaves code alone", () => {
     const text = "Use `arr[text]` here.\n\n```py\nprint(d['[Image of x]'])\n```";
     expect(stripModelPlaceholders(text)).toBe(text);
+  });
+});
+
+describe("stripModelPlaceholdersDeep", () => {
+  it("cleans every string in nested data", () => {
+    expect(
+      stripModelPlaceholdersDeep({
+        topic: "Supply [Image of curve]",
+        children: [{ topic: "Tax [text]", id: 3 }],
+      })
+    ).toEqual({ topic: "Supply", children: [{ topic: "Tax", id: 3 }] });
   });
 });

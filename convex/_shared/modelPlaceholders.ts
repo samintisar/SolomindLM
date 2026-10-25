@@ -5,7 +5,7 @@
  * code are left alone.
  */
 
-import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from "./mathMarkdown";
+import { normalizeMathMarkdown } from "./mathMarkdown";
 
 /** Placeholders for a picture the model wanted shown: "[Image of …]", "[Figure: …]". */
 const VISUAL_PLACEHOLDER =
@@ -43,15 +43,24 @@ export function normalizeStudioMarkdown(content: string): string {
 
 /** `normalizeStudioMarkdown` on every string inside a value (cards, questions, sections). */
 export function normalizeStudioMarkdownDeep<T>(value: T): T {
-  return normalizeMathMarkdownDeep(stripModelPlaceholdersDeep(value));
+  return mapStrings(value, normalizeStudioMarkdown);
 }
 
-function stripModelPlaceholdersDeep<T>(value: T): T {
-  if (typeof value === "string") return stripModelPlaceholders(value) as T;
-  if (Array.isArray(value)) return value.map((item) => stripModelPlaceholdersDeep(item)) as T;
+/**
+ * `stripModelPlaceholders` on every string inside a value, for Studio data that isn't Markdown
+ * (mind map nodes, spreadsheet tables).
+ */
+export function stripModelPlaceholdersDeep<T>(value: T): T {
+  return mapStrings(value, stripModelPlaceholders);
+}
+
+/** One walk over a value, applying `fn` to each string. */
+function mapStrings<T>(value: T, fn: (text: string) => string): T {
+  if (typeof value === "string") return fn(value) as T;
+  if (Array.isArray(value)) return value.map((item) => mapStrings(item, fn)) as T;
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, child]) => [key, stripModelPlaceholdersDeep(child)])
+      Object.entries(value).map(([key, child]) => [key, mapStrings(child, fn)])
     ) as T;
   }
   return value;
