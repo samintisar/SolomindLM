@@ -132,6 +132,7 @@ import type * as _lib_textTitle from "../_lib/textTitle.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
 import type * as _migration_backfillChunkPages from "../_migration/backfillChunkPages.js";
 import type * as _migration_backfillPaperFullText from "../_migration/backfillPaperFullText.js";
+import type * as _migration_moveDocumentText from "../_migration/moveDocumentText.js";
 import type * as _migration_removeSlidePrompts from "../_migration/removeSlidePrompts.js";
 import type * as _model_audioOverviews from "../_model/audioOverviews.js";
 import type * as _model_conversations from "../_model/conversations.js";
@@ -206,6 +207,7 @@ import type * as chat_voiceTranscriptionAccess from "../chat/voiceTranscriptionA
 import type * as crons from "../crons.js";
 import type * as documents_bulkUpload from "../documents/bulkUpload.js";
 import type * as documents_chunks from "../documents/chunks.js";
+import type * as documents_contents from "../documents/contents.js";
 import type * as documents_embeddingJob from "../documents/embeddingJob.js";
 import type * as documents_getExistingPapers from "../documents/getExistingPapers.js";
 import type * as documents_index from "../documents/index.js";
@@ -480,6 +482,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;
   "_migration/backfillChunkPages": typeof _migration_backfillChunkPages;
   "_migration/backfillPaperFullText": typeof _migration_backfillPaperFullText;
+  "_migration/moveDocumentText": typeof _migration_moveDocumentText;
   "_migration/removeSlidePrompts": typeof _migration_removeSlidePrompts;
   "_model/audioOverviews": typeof _model_audioOverviews;
   "_model/conversations": typeof _model_conversations;
@@ -554,6 +557,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   "documents/bulkUpload": typeof documents_bulkUpload;
   "documents/chunks": typeof documents_chunks;
+  "documents/contents": typeof documents_contents;
   "documents/embeddingJob": typeof documents_embeddingJob;
   "documents/getExistingPapers": typeof documents_getExistingPapers;
   "documents/index": typeof documents_index;

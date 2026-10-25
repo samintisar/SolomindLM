@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import { preloadModules } from "../_testing/preloadModules.helpers";
+import { getDocumentText, setDocumentText } from "../documents/contents";
 import schema from "../schema";
 import { FORK_CHUNK_BATCH_SIZE, performNotebookFork } from "./_forkNotebook";
 
@@ -39,7 +40,6 @@ describe("performNotebookFork sources", () => {
         fileType: "paper_record",
         status: "completed",
         totalChunks: chunkCount,
-        extractedMarkdown: MARKDOWN,
         paperRecord: {
           abstract: "An abstract.",
           authors: ["A. Author"],
@@ -53,6 +53,7 @@ describe("performNotebookFork sources", () => {
         createdAt: now,
         updatedAt: now,
       });
+      await setDocumentText(ctx, docId, MARKDOWN);
       for (let i = 0; i < chunkCount; i++) {
         await ctx.db.insert("documentChunks", {
           documentId: docId,
@@ -92,7 +93,8 @@ describe("performNotebookFork sources", () => {
             .withIndex("by_document", (q) => q.eq("documentId", doc._id))
             .collect()
         : [];
-      return { doc, chunks };
+      const text = doc ? await getDocumentText(ctx, doc) : undefined;
+      return { doc, chunks, text };
     });
   }
 
@@ -102,9 +104,9 @@ describe("performNotebookFork sources", () => {
 
     const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
 
-    const { doc, chunks } = await forkedSource(t, forkId);
+    const { doc, chunks, text } = await forkedSource(t, forkId);
     expect(doc.status).toBe("processing");
-    expect(doc.extractedMarkdown).toBeUndefined();
+    expect(text).toBeUndefined();
     expect(chunks).toHaveLength(0);
   });
 
@@ -116,10 +118,11 @@ describe("performNotebookFork sources", () => {
     const forkId = await t.run((ctx) => performNotebookFork(ctx, notebookId, forkerId));
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    const { doc, chunks } = await forkedSource(t, forkId);
+    const { doc, chunks, text } = await forkedSource(t, forkId);
     expect(doc._id).not.toBe(docId);
     expect(doc.status).toBe("completed");
-    expect(doc.extractedMarkdown).toBe(MARKDOWN);
+    expect(text).toBe(MARKDOWN);
+    expect(doc.extractedMarkdown).toBeUndefined();
     expect(chunks).toHaveLength(chunkCount);
     expect(new Set(chunks.map((c) => c.chunkIndex)).size).toBe(chunkCount);
     expect(chunks.every((c) => c.userId === forkerId && c.notebookId === forkId)).toBe(true);
@@ -214,9 +217,9 @@ describe("performNotebookFork sources", () => {
     await t.run((ctx) => ctx.db.delete(forkId));
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    const { doc, chunks } = await forkedSource(t, forkId);
+    const { chunks, text } = await forkedSource(t, forkId);
     expect(chunks).toHaveLength(0);
-    expect(doc.extractedMarkdown).toBeUndefined();
+    expect(text).toBeUndefined();
   });
 
   /** Runs only the copy steps already due, so a test can change the original between batches. */
@@ -251,9 +254,9 @@ describe("performNotebookFork sources", () => {
           createdAt: Date.now(),
         });
       }
+      await setDocumentText(ctx, docId, "# New text");
       await ctx.db.patch(docId, {
         status,
-        extractedMarkdown: "# New text",
         totalChunks: chunkCount,
         updatedAt: doc.updatedAt + 1,
       });
@@ -270,9 +273,9 @@ describe("performNotebookFork sources", () => {
     await reprocessOriginal(t, docId, 30, "completed");
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    const { doc, chunks } = await forkedSource(t, forkId);
+    const { doc, chunks, text } = await forkedSource(t, forkId);
     expect(doc.status).toBe("completed");
-    expect(doc.extractedMarkdown).toBe("# New text");
+    expect(text).toBe("# New text");
     expect(doc.totalChunks).toBe(30);
     expect(chunks.map((c) => c.content).sort()).toEqual(
       Array.from({ length: 30 }, (_, i) => `new chunk ${i}`).sort()
@@ -317,9 +320,9 @@ describe("performNotebookFork sources", () => {
     await t.run((ctx) => ctx.db.patch(docId, { status: "completed" }));
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    const { doc, chunks } = await forkedSource(t, forkId);
+    const { doc, chunks, text } = await forkedSource(t, forkId);
     expect(doc.status).toBe("completed");
-    expect(doc.extractedMarkdown).toBe("# New text");
+    expect(text).toBe("# New text");
     expect(chunks.map((c) => c.content).sort()).toEqual(
       Array.from({ length: 20 }, (_, i) => `new chunk ${i}`).sort()
     );
