@@ -7,10 +7,8 @@ import { components, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   internalAction,
-  internalMutation,
   internalQuery,
   type MutationCtx,
-  mutation,
   type QueryCtx,
   query,
 } from "../_generated/server";
@@ -23,6 +21,7 @@ import {
 } from "../_lib/limits";
 import { assertCanEditNotebook, getNotebookAccess } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 import { scheduleResearchRunCompletionPush } from "../push/notify";
 import { normalizeResearchTitle } from "./titles";
 

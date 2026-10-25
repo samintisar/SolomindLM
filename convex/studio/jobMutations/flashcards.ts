@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "../../_generated/server";
-import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { normalizeStudioMarkdownDeep } from "../../_shared/modelPlaceholders";
+import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
@@ -14,7 +14,7 @@ export const saveFlashcardResults = internalMutation({
     const flashcard = await ctx.db.get(args.flashcardId);
     if (!flashcard) return null;
 
-    const normalizedFlashcards = normalizeMathMarkdownDeep(args.flashcards);
+    const normalizedFlashcards = normalizeStudioMarkdownDeep(args.flashcards);
     const title = args.metadata?.title ?? "Flashcards";
 
     await ctx.db.patch(args.flashcardId, {

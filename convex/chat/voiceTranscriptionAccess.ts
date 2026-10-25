@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
 import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { internalMutation } from "../functions";
 
 /**
  * For chat voice transcription action: assert the user may read the notebook

@@ -24,6 +24,7 @@ import {
   callOpenAIImageGeneration,
   describeImageGenerationError,
 } from "../../_services/ai/openaiImages";
+import { buildCheckedImagePrompt, parseDesignFigures, verifyFigures } from "./figureCheck";
 
 /**
  * Robust JSON parser for LLM responses.
@@ -245,6 +246,12 @@ DESIGN RULES:
 - Use the visual style to determine colors, textures, and aesthetic
 - Each item from the source must have a visual representation (icon, diagram element, or illustration)
 - VALIDATION: Before returning, count the items in your design. Ensure the count matches the source exactly.
+- When the request names the subjects to cover, cover exactly those subjects.
+
+FIGURES:
+- Use only numbers that appear in the source content. Never estimate, round up, extrapolate or invent a number.
+- List every number the infographic shows in "figures": the value as the source writes it, a label in the source's own wording for what it measures, and the period or date the source gives for it.
+- Show each figure with its period. Never move a figure to another year or relabel what it measures.
 
 Return JSON: {
   "title": "string (compelling title)",
@@ -258,7 +265,14 @@ Return JSON: {
     }
   ],
   "color_scheme": "string (based on visual style)",
-  "image_prompt": "string (detailed prompt for image generation model)"
+  "figures": [
+    {
+      "value": "string (the number exactly as the source writes it)",
+      "label": "string (what it measures, in the source's words)",
+      "period": "string (the year or date range the source gives, or empty)"
+    }
+  ],
+  "image_prompt": "string (detailed prompt for image generation model; its numbers come only from figures)"
 }`,
               },
               {
@@ -318,12 +332,24 @@ Return JSON: {
         sections: design.sections?.length || 0,
       });
 
-      // Use the LLM-generated image prompt
+      // The image model draws whatever numbers the prompt has, so every figure is checked against
+      // the sources first and the prompt keeps only checked ones (#572).
       logger.phaseStart("prompt_generation");
-      const imagePrompt =
-        design.image_prompt ||
-        `Professional infographic: ${design.title}. ${design.visual_metaphor}. Clean layout. ${styleInstruction}`;
-      logger.phaseComplete("prompt_generation", { title: design.title || "(generated)" });
+      const figureCheck = verifyFigures(parseDesignFigures(design.figures), sourceText);
+      const checkedPrompt = buildCheckedImagePrompt(String(design.image_prompt), figureCheck.kept);
+      const imagePrompt = checkedPrompt.prompt;
+      logger.phaseComplete("prompt_generation", {
+        title: design.title || "(generated)",
+        figuresKept: figureCheck.kept.length,
+        figuresDropped: figureCheck.dropped.length,
+        sentencesRemoved: checkedPrompt.removedSentences.length,
+      });
+      if (figureCheck.dropped.length > 0 || checkedPrompt.removedSentences.length > 0) {
+        logger.warn("Dropped figures not found in the sources", {
+          dropped: figureCheck.dropped.map((d) => ({ value: d.figure.value, reason: d.reason })),
+          removedSentences: checkedPrompt.removedSentences,
+        });
+      }
 
       // Generate image via OpenAI (GPT image models return base64 PNG)
       const size = getImageSize(orientation);
@@ -379,6 +405,10 @@ Return JSON: {
               orientation,
               visualStyle,
               detailLevel,
+              figureCheck: {
+                kept: figureCheck.kept,
+                dropped: figureCheck.dropped,
+              },
             },
             aggregateStudioJobTelemetry({
               mapResults: [

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../functions";
 
 /**
  * Create a flashcard deck with sample cards for E2E testing.

@@ -5,7 +5,8 @@
  */
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { internalMutation, type MutationCtx } from "../_generated/server";
+import { type MutationCtx } from "../_generated/server";
+import { internalMutation } from "../functions";
 import { ownerByEmail } from "./db";
 import { SHOWCASE_PROMPTS, type ShowcasePrompt } from "./promptPacks";
 
