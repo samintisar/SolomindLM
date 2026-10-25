@@ -309,6 +309,7 @@ import type * as studio__job_invokeStudioLlm from "../studio/_job/invokeStudioLl
 import type * as studio__job_jobDeadline from "../studio/_job/jobDeadline.js";
 import type * as studio__job_mapFailures from "../studio/_job/mapFailures.js";
 import type * as studio__job_studioChunks from "../studio/_job/studioChunks.js";
+import type * as studio__job_titleSource from "../studio/_job/titleSource.js";
 import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhases.js";
 import type * as studio_audio_index from "../studio/audio/index.js";
 import type * as studio_audio_job from "../studio/audio/job.js";
@@ -668,6 +669,7 @@ declare const fullApi: ApiFromModules<{
   "studio/_job/jobDeadline": typeof studio__job_jobDeadline;
   "studio/_job/mapFailures": typeof studio__job_mapFailures;
   "studio/_job/studioChunks": typeof studio__job_studioChunks;
+  "studio/_job/titleSource": typeof studio__job_titleSource;
   "studio/audio/audioJobPhases": typeof studio_audio_audioJobPhases;
   "studio/audio/index": typeof studio_audio_index;
   "studio/audio/job": typeof studio_audio_job;

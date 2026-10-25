@@ -67,6 +67,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { titleSourceFromItems } from "../_job/titleSource";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("WrittenQuestionsGraph");
 
@@ -866,13 +867,12 @@ export async function runFinalizeWrittenQuestionsPhase(
     let title = "Written Questions";
     if (finalQuestions.length > 0) {
       try {
-        const titleContent = finalQuestions
-          .map((q) => q.question)
-          .join(" ")
-          .substring(0, 2000);
+        const titleContent = titleSourceFromItems(finalQuestions.map((q) => q.question));
         title = await generateTitleWithinDeadline(deadline, titleContent, "WrittenQuestionsTitle");
-      } catch (_e) {
-        console.log("[WrittenQuestionsJob] Title generation failed, using default");
+      } catch (e) {
+        logger.warn("Title generation failed, keeping the default title", {
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     }
 

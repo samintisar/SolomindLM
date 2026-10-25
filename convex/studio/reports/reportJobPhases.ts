@@ -44,6 +44,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { markdownTitleItems, titleSourceFromItems } from "../_job/titleSource";
 import { isFailedMapResult } from "./mapResultUtils.js";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("ReportGraph");
@@ -603,11 +604,13 @@ export async function runFinalizeReportPhase(
     try {
       title = await generateTitleWithinDeadline(
         deadline,
-        combinedContent.substring(0, 2000),
+        titleSourceFromItems(markdownTitleItems(content)),
         "ReportTitle"
       );
-    } catch {
-      console.log("[ReportJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     await ctx.runMutation(internal.studio.jobMutations.reports.saveReportResults, {

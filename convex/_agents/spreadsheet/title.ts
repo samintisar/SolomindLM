@@ -1,6 +1,6 @@
 import { parseCsv } from "../../_shared/csv.helpers.js";
 
-/** `generateTitleFromChunk` reads only the first 500 characters. */
+/** Kept short so the request and rows fit alongside the columns. */
 const TITLE_SOURCE_LIMIT = 500;
 /** Each part is capped so no one of them crowds the others out of what the title model reads. */
 const COLUMNS_LIMIT = 140;
