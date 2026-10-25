@@ -7,9 +7,14 @@ export const MAX_STORED_MARKDOWN_CHARS = 800_000;
 const TRUNCATION_NOTE =
   "\n\n---\n\n**Note:** Display copy was truncated for a very large document. Use **Original PDF** to view the full file.";
 
+/** `prefix` marked as only the start of a longer document. */
+export function withTruncationNote(prefix: string): string {
+  return prefix + TRUNCATION_NOTE;
+}
+
 export function toStoredMarkdown(text: string): string {
   return text.length > MAX_STORED_MARKDOWN_CHARS
-    ? text.slice(0, MAX_STORED_MARKDOWN_CHARS) + TRUNCATION_NOTE
+    ? withTruncationNote(text.slice(0, MAX_STORED_MARKDOWN_CHARS))
     : text;
 }
 
