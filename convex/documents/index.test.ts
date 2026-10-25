@@ -565,6 +565,79 @@ describe("documents.getContent", () => {
     expect(content?.content).toBe(withTruncationNote(shown));
   });
 
+  test("shows text stored through setExtractedMarkdown without the chunk fallback", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+
+    const docId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Ingested Doc",
+        fileType: "file",
+        status: "processing",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("documentChunks", {
+        documentId: id,
+        userId,
+        notebookId,
+        content: "Chunk text that the viewer must not show.",
+        chunkIndex: 0,
+        createdAt: Date.now(),
+      });
+      return id;
+    });
+    await t.mutation(internal.documents.internal.setExtractedMarkdown, {
+      documentId: docId,
+      extractedMarkdown: "Stored text.",
+    });
+
+    const content = await asUser.query(api.documents.index.getContent, { id: docId });
+
+    expect(content).toEqual({ documentId: docId, content: "Stored text." });
+  });
+
+  test("legacy fallback past a page keeps the first rows stored, shown in chunkIndex order", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const asUser = withAuth(t, userId);
+    const total = CHUNK_PAGE_SIZE + 1;
+
+    const docId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("documents", {
+        userId,
+        notebookId,
+        fileName: "Reversed Legacy Doc",
+        fileType: "file",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      // Stored last chunk first, so the page read misses chunk 0 (the documented limitation).
+      for (let chunkIndex = total - 1; chunkIndex >= 0; chunkIndex--) {
+        await ctx.db.insert("documentChunks", {
+          documentId: id,
+          userId,
+          notebookId,
+          content: `c${chunkIndex}`,
+          chunkIndex,
+          createdAt: Date.now(),
+        });
+      }
+      return id;
+    });
+
+    const content = await asUser.query(api.documents.index.getContent, { id: docId });
+    const shown = Array.from({ length: CHUNK_PAGE_SIZE }, (_, i) => `c${i + 1}`).join("\n");
+
+    expect(content?.content).toBe(withTruncationNote(shown));
+  });
+
   test("legacy fallback orders chunks by chunkIndex, not by when they were stored", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);

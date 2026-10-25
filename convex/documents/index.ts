@@ -243,7 +243,9 @@ export const getContent = query({
 
     // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view. Read lazily and stop
     // after a page of rows (each row's embedding counts against the read limit, however short its
-    // text) or at the stored-markdown cap, whichever comes first.
+    // text) or at the stored-markdown cap, whichever comes first. `by_document` is in storage order,
+    // so the kept rows are a chunkIndex prefix only when chunks were stored in order, as ingestion
+    // and forks do; rows stored out of order would show with gaps.
     const chunks: Array<{ chunkIndex: number; content: string }> = [];
     let chars = 0;
     let truncated = false;
