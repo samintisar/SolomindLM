@@ -16,34 +16,6 @@ export const TOPIC_SOURCE_TOP_K = 3;
  */
 export const TOPIC_SOURCE_GAP = 0.085;
 
-export function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-/**
- * Similarity of each chunk to the topic. Chunks without an embedding, or embedded with a model of
- * a different size (e.g. before a model change), are skipped; a source with no scored chunks stays.
- */
-export function chunkTopicSimilarities(
-  chunks: Array<{ documentId: string; embedding?: number[] }>,
-  topicEmbedding: number[]
-): Array<{ documentId: string; similarity: number }> {
-  return chunks.flatMap((c) =>
-    c.embedding?.length === topicEmbedding.length
-      ? [{ documentId: c.documentId, similarity: cosineSimilarity(topicEmbedding, c.embedding) }]
-      : []
-  );
-}
-
 /** Each document's score: the mean similarity of its `topK` best-matching chunks. */
 export function documentTopicScores(
   chunks: Array<{ documentId: string; similarity: number }>,
