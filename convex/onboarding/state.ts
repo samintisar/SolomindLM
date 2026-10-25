@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 
 const onboardingRowValidator = v.object({
   _id: v.id("userOnboarding"),

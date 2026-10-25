@@ -10,10 +10,10 @@
  * [studioEvalAction.ts](./studioEvalAction.ts).
  */
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
 import * as AudioOverviews from "../_model/audioOverviews";
 import * as Infographics from "../_model/infographics";
 import * as Mindmaps from "../_model/mindmaps";
+import { internalMutation } from "../functions";
 
 export const createMindmapInternal = internalMutation({
   args: {

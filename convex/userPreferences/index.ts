@@ -1,7 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { VALID_LANGUAGE_CODES } from "../_agents/_shared/languageInstruction";
-import { internalQuery, mutation, query } from "../_generated/server";
+import { internalQuery, query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 
 export const getMyPreferences = query({
   args: {},

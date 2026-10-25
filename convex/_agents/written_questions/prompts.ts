@@ -7,7 +7,10 @@
  */
 
 import { z } from "zod";
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
+import {
+  MARKDOWN_CODE_NOTATION,
+  MARKDOWN_MATH_NOTATION_FOR_APP,
+} from "../_shared/markdownMathPrompt.js";
 
 // ============================================================
 // SCHEMAS
@@ -115,6 +118,8 @@ export const getMapPrompt = (params: {
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}
 
+${MARKDOWN_CODE_NOTATION}
+
 Generate exactly ${questionsPerChunk} questions based **exclusively** on the text provided below.
 
 **Configuration:**
@@ -158,6 +163,8 @@ Generate exactly ${need} distinct ${questionType.toUpperCase()} questions (diffi
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}
 
+${MARKDOWN_CODE_NOTATION}
+
 **Input Text:**
 ${chunk}`;
 };
@@ -185,6 +192,8 @@ ${avoidList}
 Return ONLY the ${need} new items in "questions" (same JSON shape as before).
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}
+
+${MARKDOWN_CODE_NOTATION}
 
 **Input Text (same excerpt):**
 ${chunk}`;

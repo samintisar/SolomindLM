@@ -164,7 +164,7 @@ function practiceItems<R extends Row>(
  */
 export const PURGE_STEPS: readonly PurgeStep[] = [
   {
-    tables: ["documents", "documentChunks"],
+    tables: ["documents", "documentChunks", "documentContents"],
     run: (ctx, userId, budget) =>
       drainWithChildren(
         ctx,
@@ -179,6 +179,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             take: (n) =>
               ctx.db
                 .query("documentChunks")
+                .withIndex("by_document", (q) => q.eq("documentId", doc._id))
+                .take(n),
+          },
+          {
+            take: (n) =>
+              ctx.db
+                .query("documentContents")
                 .withIndex("by_document", (q) => q.eq("documentId", doc._id))
                 .take(n),
           },
@@ -203,7 +210,7 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
         (n) =>
           ctx.db
             .query("conversations")
-            .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
+            .withIndex("by_user_notebook_and_updatedAt", (q) => q.eq("userId", userId))
             .take(n),
         (conversation) => [
           {
@@ -365,7 +372,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
   },
   {
     // Viewers' practice progress on the user's public notebooks goes with the notebooks.
-    tables: ["notebooks", "notebookShareLinks", "notebookMembers", "studioProgress"],
+    tables: [
+      "notebooks",
+      "notebookShareLinks",
+      "notebookMembers",
+      "studioProgress",
+      "studioItemIndexes",
+    ],
     run: (ctx, userId, budget) =>
       drainWithChildren(
         ctx,
@@ -394,6 +407,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             take: (n) =>
               ctx.db
                 .query("studioProgress")
+                .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
+                .take(n),
+          },
+          {
+            take: (n) =>
+              ctx.db
+                .query("studioItemIndexes")
                 .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
                 .take(n),
           },

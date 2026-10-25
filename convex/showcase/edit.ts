@@ -4,7 +4,7 @@
  * the arguments stay small even when the item is large. Owner's items only.
  */
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../functions";
 import { ownerByEmail } from "./db";
 import { STUDIO_TABLES } from "./transfer";
 

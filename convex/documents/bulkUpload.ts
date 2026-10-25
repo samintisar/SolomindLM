@@ -1,10 +1,10 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { mutation } from "../_generated/server";
 import { checkSourceLimit } from "../_lib/limits";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { deriveFulltextStatus, primaryLinkUrlForPaper } from "./paperRecord";
 
 const MAX_PAPERS = 100;

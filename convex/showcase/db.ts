@@ -7,12 +7,7 @@ import { v } from "convex/values";
 import { SPREADSHEET_PRESET_REQUESTS } from "../_agents/spreadsheet/presetRequests";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import {
-  internalMutation,
-  internalQuery,
-  type MutationCtx,
-  type QueryCtx,
-} from "../_generated/server";
+import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import * as AudioOverviews from "../_model/audioOverviews";
 import * as Flashcards from "../_model/flashcards";
@@ -34,6 +29,7 @@ import {
   paperRecordValidator,
   primaryLinkUrlForPaper,
 } from "../documents/paperRecord";
+import { internalMutation } from "../functions";
 import { approveResearchPlanAndResume, startDeepResearchRun } from "../research/index";
 import {
   confirmLiteratureReviewColumnsForSession,
@@ -285,7 +281,9 @@ async function latestResearchPlan(
   let latest: Doc<"researchPlans"> | null = null;
   const conversations = await db
     .query("conversations")
-    .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
+    .withIndex("by_user_notebook_and_updatedAt", (q) =>
+      q.eq("userId", userId).eq("notebookId", notebookId)
+    )
     .order("desc")
     .take(MAX_ROWS);
   for (const conversation of conversations) {

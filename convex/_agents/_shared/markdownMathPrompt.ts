@@ -15,3 +15,9 @@ export const MARKDOWN_MATH_RULES_BULLETS = `- The expressions below (a, b, x, f,
 - **GFM pipe tables (| col | col |):** Every ASCII | starts a new column, even inside $...$ or $$...$$, which splits formulas and breaks rendering (e.g. $P(a|b)$ becomes two cells). **Never** use a raw | for math vertical bars in table cells. Use LaTeX instead: e.g. $P(a\\mid b)$ or $\\lvert x \\rvert$. For a dense grid of equations, prefer one $$...$$ per line, a bullet list, or a table in HTML; avoid pipe tables when any cell would need |.`;
 
 export const MARKDOWN_MATH_NOTATION_FOR_APP = `**Math notation (Markdown with KaTeX — required for correct rendering in the app):**\n${MARKDOWN_MATH_RULES_BULLETS}`;
+
+/** Code formatting, for prompts whose sources may include code (#573). */
+export const MARKDOWN_CODE_NOTATION = `**Code notation:**
+- Put code of more than one line in a fenced block with its language, e.g. \`\`\`python … \`\`\`. Put short code (an identifier, a call, a file name) in single backticks.
+- Never use $ math delimiters on or inside code: identifiers, arguments, strings and format fields are code, not math.
+- Show each piece of code once.`;
