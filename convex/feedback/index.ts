@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { type MutationCtx, mutation, query } from "../_generated/server";
+import { type MutationCtx, query } from "../_generated/server";
 import { assertFeedbackAdmin, isFeedbackAdminEmail } from "../_lib/feedbackAdmin";
 import { rateLimiter } from "../_lib/rateLimits";
 import { toAdminFeedbackRow } from "../_model/feedback";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 
 const MAX_TEXT = 5000;
 

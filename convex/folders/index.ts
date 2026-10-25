@@ -1,9 +1,10 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { mutation, query } from "../_generated/server";
+import { query } from "../_generated/server";
 import { MAX_DOCS_TO_COUNT } from "../_lib/queryCaps";
 import * as Folders from "../_model/folders";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 
 /** Shape folder + notebook count for API response */
 function toFolderDTO(

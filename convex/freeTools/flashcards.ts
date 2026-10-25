@@ -16,7 +16,7 @@ import {
   FREE_FLASHCARD_LLM_PHASE,
   FREE_FLASHCARD_LLM_TIMEOUT_MS,
 } from "../_lib/freeToolBounds";
-import { normalizeMathMarkdownDeep } from "../_shared/mathMarkdown";
+import { normalizeStudioMarkdownDeep } from "../_shared/modelPlaceholders";
 import { buildFreeDeck, cardsToRequest } from "./deck";
 import { freeDeckCardValidator } from "./validators";
 
@@ -50,7 +50,7 @@ export const generate = internalAction({
       FREE_FLASHCARD_LLM_PHASE
     );
 
-    const cards = normalizeMathMarkdownDeep(buildFreeDeck(response.flashcards, cardCount));
+    const cards = normalizeStudioMarkdownDeep(buildFreeDeck(response.flashcards, cardCount));
     if (cards.length === 0) throw new Error("no_usable_cards");
     return {
       title: deriveDeckTitle(text),

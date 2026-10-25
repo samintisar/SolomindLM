@@ -1,8 +1,9 @@
 import { type Infer, v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { internalMutation, type MutationCtx } from "../../_generated/server";
+import { type MutationCtx } from "../../_generated/server";
 import { consumeDailyLimit } from "../../_lib/limits";
-import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
+import { normalizeStudioMarkdown } from "../../_shared/modelPlaceholders";
+import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
@@ -20,7 +21,7 @@ export const saveAudioOverviewResults = internalMutation({
     const audioOverview = await ctx.db.get(args.audioOverviewId);
     if (!audioOverview) return null;
 
-    const normalizedTranscript = normalizeMathMarkdown(args.transcript);
+    const normalizedTranscript = normalizeStudioMarkdown(args.transcript);
     const title = args.metadata?.title ?? "Audio Overview";
     // The script handed to synthesis is now in `transcript`, and the chunk MP3s are joined.
     const {

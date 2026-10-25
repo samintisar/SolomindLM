@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation, internalQuery, mutation, query } from "../_generated/server";
+import { internalQuery, query } from "../_generated/server";
 import { assertCanEditConversation, assertCanReadConversation } from "../_lib/conversationAccess";
 import { getNotebookAccess } from "../_lib/notebookAccess";
 import * as ConvModel from "../_model/conversations";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 
 /**
  * Get or create a conversation for a notebook

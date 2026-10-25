@@ -294,12 +294,7 @@ INSTRUCTIONS:
 1. **SCENARIO-BASED:** ${settings.questionStyle} Frame it with a hypothetical scenario only when the difficulty level calls for one, and keep the question within the Question Length limit; the reader should spend their time on the answer, not on the setup.
 2. **DISTRACTORS:** Use the CONTEXT to find ${candidate.difficulty === "easy" ? "obviously incorrect" : candidate.difficulty === "medium" ? "plausible but wrong" : "subtle and nuanced"} options. ${settings.distractorQuality}
 3. **EXACTLY FOUR OPTIONS:** The options array must have length 4. Each option is plain text (or code in backticks) with no A./B./C./D. or 1) 2) prefixes.
-4. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like
-[Image of linear regression plot]
- or
-[Image of mitosis stages]
- in the explanation. Only do this if it aids understanding.
-5. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. Name options by their content, not by letter or position (options are shuffled after generation). BE CONCISE - 1-2 sentences maximum.
+4. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. Name options by their content, not by letter or position (options are shuffled after generation). BE CONCISE - 1-2 sentences maximum.
 
 Output full JSON.`;
 };
