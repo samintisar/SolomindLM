@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import { type Doc, Id } from "@convex/_generated/dataModel";
 import type { DocumentSummary } from "@convex/documents/listSummary";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   mergePendingStudioNotes,
@@ -49,11 +49,80 @@ interface UseChatStreamProps {
 }
 
 const SKEW_MS = 120_000;
+/** Messages per page of chat history. */
+const CHAT_PAGE_SIZE = 50;
+/** Page size when reading a whole thread at once (saving it as a note). */
+const FULL_HISTORY_PAGE_SIZE = 200;
 /**
  * Upper bound on how long buffered tokens wait when no animation frame arrives: a background
  * tab pauses `requestAnimationFrame`, but the content must keep accumulating.
  */
 const TOKEN_FLUSH_FALLBACK_MS = 50;
+
+/** A stored chat message as the chat UI shows it (streaming-only fields aside). */
+function toChatMessage(msg: Doc<"messages">): Message {
+  const meta = (
+    msg as Doc<"messages"> & {
+      metadata?: {
+        agentTrace?: ChatAgentTrace;
+        researchPlanId?: string;
+        isResearchPlan?: boolean;
+        externalSources?: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+          sourceType: string;
+          score?: number;
+        }>;
+        isLiteratureReview?: boolean;
+        isResearchResult?: boolean;
+        researchRunId?: string;
+        sessionId?: string;
+        status?: string;
+        query?: string;
+        tableId?: string;
+        reportId?: string;
+        suggestedColumns?: Array<{
+          id: string;
+          name: string;
+          instructions?: string;
+          isVisible: boolean;
+        }>;
+        error?: string;
+      };
+    }
+  ).metadata;
+  return {
+    id: msg._id,
+    role: msg.role as "user" | "assistant",
+    content: msg.content as string,
+    timestamp: new Date(msg.createdAt as number),
+    references: msg.references as Message["references"],
+    feedback: msg.feedback as Message["feedback"],
+    agentTrace: meta?.agentTrace,
+    externalSources: meta?.externalSources,
+    researchPlan:
+      meta?.isResearchPlan && meta?.researchPlanId
+        ? { planId: meta.researchPlanId, subQuestions: [], sourcePolicy: {} }
+        : undefined,
+    literatureReview:
+      meta?.isLiteratureReview && meta?.sessionId
+        ? {
+            sessionId: meta.sessionId,
+            status: meta.status ?? "planning",
+            query: meta.query ?? "",
+            tableId: meta.tableId,
+            reportId: meta.reportId,
+            suggestedColumns: meta.suggestedColumns,
+            error: meta.error,
+          }
+        : undefined,
+    deepResearch:
+      meta?.isResearchResult && meta?.researchRunId
+        ? { researchRunId: String(meta.researchRunId) }
+        : undefined,
+  };
+}
 
 export function useChatStream({
   activeNotebookId,
@@ -77,21 +146,56 @@ export function useChatStream({
     );
   }, []);
 
-  const chatBundle = useQuery(
-    api.chat.messages.listByNotebook,
-    activeNotebookId && activeNotebookId !== "new" && activeConversationId
-      ? {
-          notebookId: activeNotebookId as Id<"notebooks">,
-          conversationId: activeConversationId as Id<"conversations">,
-        }
-      : "skip"
+  const chatArgs = useMemo(
+    () =>
+      activeNotebookId && activeNotebookId !== "new" && activeConversationId
+        ? {
+            notebookId: activeNotebookId as Id<"notebooks">,
+            conversationId: activeConversationId as Id<"conversations">,
+          }
+        : ("skip" as const),
+    [activeNotebookId, activeConversationId]
   );
+  // Newest page first (#601); older pages load as the user scrolls up.
+  const {
+    results: newestFirst,
+    status: historyStatus,
+    loadMore,
+  } = usePaginatedQuery(api.chat.messages.listPage, chatArgs, {
+    initialNumItems: CHAT_PAGE_SIZE,
+  });
+  const generation = useQuery(api.chat.messages.generationState, chatArgs);
 
   const messages = useMemo(() => {
     if (!activeConversationId) return [];
-    return chatBundle?.messages ?? [];
-  }, [activeConversationId, chatBundle?.messages]);
-  const chatRemoteGenerating = chatBundle?.chatGenerating ?? false;
+    return [...newestFirst].reverse();
+  }, [activeConversationId, newestFirst]);
+  const chatRemoteGenerating = generation?.chatGenerating ?? false;
+  const hasOlderMessages = historyStatus === "CanLoadMore";
+  /** Every page is loaded (not just "nothing to load right now", which also covers "LoadingMore"). */
+  const historyComplete = historyStatus === "Exhausted";
+  const loadOlderMessages = useCallback(() => {
+    if (historyStatus === "CanLoadMore") loadMore(CHAT_PAGE_SIZE);
+  }, [historyStatus, loadMore]);
+
+  const convex = useConvex();
+  /** Every message in the thread, oldest first: the loaded pages plus any older ones not yet loaded. */
+  const loadFullHistory = useCallback(async (): Promise<Message[]> => {
+    if (chatArgs === "skip") return [];
+    const all: Doc<"messages">[] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const result: { page: Doc<"messages">[]; isDone: boolean; continueCursor: string } =
+        await convex.query(api.chat.messages.listPage, {
+          ...chatArgs,
+          paginationOpts: { numItems: FULL_HISTORY_PAGE_SIZE, cursor },
+        });
+      all.push(...result.page);
+      if (result.isDone) break;
+      cursor = result.continueCursor;
+    }
+    return all.reverse().map(toChatMessage);
+  }, [convex, chatArgs]);
 
   /** True when server reports an in-flight generation and the DB still expects a reply (last row is not assistant). */
   const remoteGenerationBlocksSend = useMemo(
@@ -289,8 +393,8 @@ export function useChatStream({
   // when a stream crashes or is interrupted.
   const STALE_GENERATION_MS = 5 * 60 * 1000; // 5 minutes
   useEffect(() => {
-    if (!isChatStreaming && chatRemoteGenerating && chatBundle?.chatGenerationStartedAt) {
-      const startedAt = chatBundle.chatGenerationStartedAt;
+    if (!isChatStreaming && chatRemoteGenerating && generation?.chatGenerationStartedAt) {
+      const startedAt = generation.chatGenerationStartedAt;
       const now = Date.now();
       const age = now - startedAt;
 
@@ -313,7 +417,7 @@ export function useChatStream({
   }, [
     isChatStreaming,
     chatRemoteGenerating,
-    chatBundle?.chatGenerationStartedAt,
+    generation?.chatGenerationStartedAt,
     messages,
     activeNotebookId,
     releaseChatGenerationMutation,
@@ -613,45 +717,9 @@ export function useChatStream({
 
   const chatDisplayMessages = useMemo((): Message[] => {
     const list: Message[] = messages.map((msg: Doc<"messages">, index: number) => {
-      const meta = (
-        msg as Doc<"messages"> & {
-          metadata?: {
-            agentTrace?: ChatAgentTrace;
-            researchPlanId?: string;
-            isResearchPlan?: boolean;
-            externalSources?: Array<{
-              title: string;
-              url: string;
-              snippet: string;
-              sourceType: string;
-              score?: number;
-            }>;
-            isLiteratureReview?: boolean;
-            isResearchResult?: boolean;
-            researchRunId?: string;
-            sessionId?: string;
-            status?: string;
-            query?: string;
-            tableId?: string;
-            reportId?: string;
-            suggestedColumns?: Array<{
-              id: string;
-              name: string;
-              instructions?: string;
-              isVisible: boolean;
-            }>;
-            error?: string;
-          };
-        }
-      ).metadata;
-      const trace = meta?.agentTrace;
+      const message = toChatMessage(msg);
       return {
-        id: msg._id,
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-        timestamp: new Date(msg.createdAt as number),
-        references: msg.references,
-        feedback: (msg as any).feedback as "up" | "down" | undefined,
+        ...message,
         followUps:
           !streamingContent &&
           msg.role === "assistant" &&
@@ -659,32 +727,10 @@ export function useChatStream({
           lastAssistantFollowUps
             ? lastAssistantFollowUps
             : undefined,
-        agentTrace: trace,
-        externalSources: meta?.externalSources,
         researchPlan:
-          meta?.isResearchPlan && meta?.researchPlanId
-            ? (streamingResearchPlan ?? {
-                planId: meta.researchPlanId,
-                subQuestions: [],
-                sourcePolicy: {},
-              })
-            : undefined,
-        literatureReview:
-          meta?.isLiteratureReview && meta?.sessionId
-            ? {
-                sessionId: meta.sessionId,
-                status: meta.status ?? "planning",
-                query: meta.query ?? "",
-                tableId: meta.tableId,
-                reportId: meta.reportId,
-                suggestedColumns: meta.suggestedColumns,
-                error: meta.error,
-              }
-            : undefined,
-        deepResearch:
-          meta?.isResearchResult && meta?.researchRunId
-            ? { researchRunId: String(meta.researchRunId) }
-            : undefined,
+          message.researchPlan && streamingResearchPlan
+            ? streamingResearchPlan
+            : message.researchPlan,
       };
     });
     const t0 = streamStartedAtRef.current;
@@ -989,6 +1035,10 @@ export function useChatStream({
     isChatStreaming,
     remoteChatGenerating: chatRemoteGenerating,
     remoteGenerationBlocksSend,
+    hasOlderMessages,
+    historyComplete,
+    loadOlderMessages,
+    loadFullHistory,
     displayNotes,
     addPendingStudioNote: stableAddPendingStudioNote,
     updatePendingStudioNote,
