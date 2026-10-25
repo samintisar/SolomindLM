@@ -1,8 +1,9 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { mutation, query } from "../../_generated/server";
+import { query } from "../../_generated/server";
 import { assertCanEditNotebook } from "../../_lib/notebookAccess";
 import { getAuthUserId } from "../../auth";
+import { mutation } from "../../functions";
 import {
   PROMPT_DESCRIPTION_MAX_LENGTH,
   PROMPT_REPORT_AUTO_HIDE_THRESHOLD,

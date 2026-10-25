@@ -7,7 +7,7 @@
  */
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
 import {
   getChatLinkedLiteratureArtifactIds,
   isChatLiteratureReport,
@@ -19,6 +19,8 @@ import {
   withoutQuizProgress,
   withoutWrittenQuestionProgress,
 } from "../_model/practiceProgress";
+import { deleteDocumentText, getDocumentText, setDocumentText } from "../documents/contents";
+import { internalMutation } from "../functions";
 import { ownerByEmail } from "./db";
 import { SHOWCASE_FOLDER_NAME, SHOWCASE_NOTEBOOKS } from "./manifest";
 
@@ -100,12 +102,15 @@ export const exportNotebookRows = internalQuery({
     if (!notebook) throw new Error(`"${spec.title}" isn't in ${args.ownerEmail}'s Showcase folder`);
     const notebookId = notebook._id;
 
-    const documents = (
-      await ctx.db
-        .query("documents")
-        .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
-        .take(MAX_ROWS)
-    ).filter((d) => d.status === "completed");
+    const documents: Doc<"documents">[] = [];
+    for (const d of await ctx.db
+      .query("documents")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+      .take(MAX_ROWS)) {
+      if (d.status !== "completed") continue;
+      // The bundle carries the text on the row; `insertRows` moves it to `documentContents`.
+      documents.push({ ...d, extractedMarkdown: await getDocumentText(ctx, d) });
+    }
 
     const studio: Record<string, Doc<StudioTable>[]> = {};
     for (const table of STUDIO_TABLES) {
@@ -255,6 +260,7 @@ export const abortImport = internalMutation({
       const row = (await ctx.db.get(id as Id<typeof args.table>)) as Record<string, unknown> | null;
       if (!row) continue;
       if (args.table !== "citations" && row.notebookId !== args.notebookId) continue;
+      if (args.table === "documents") await deleteDocumentText(ctx, id as Id<"documents">);
       await ctx.db.delete(id as Id<typeof args.table>);
       if (args.table === "documents") {
         await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, -1);
@@ -284,6 +290,16 @@ export const insertRows = internalMutation({
         if (row.notebookId !== args.notebookId || row.userId !== notebook.userId) {
           throw new Error(`A ${args.table} row doesn't belong to the target notebook`);
         }
+      }
+      if (args.table === "documents") {
+        // Bundles carry a source's text on its row (`exportNotebookRows`).
+        const { extractedMarkdown, ...fields } = row;
+        const id = await ctx.db.insert("documents", fields as never);
+        if (typeof extractedMarkdown === "string") {
+          await setDocumentText(ctx, id, extractedMarkdown);
+        }
+        ids.push(id);
+        continue;
       }
       ids.push(await ctx.db.insert(args.table, row as never));
     }

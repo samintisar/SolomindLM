@@ -78,7 +78,7 @@ describe("by_notebook_and_isPrivate index", () => {
     const shared = await t.run((ctx) =>
       ctx.db
         .query("conversations")
-        .withIndex("by_notebook_and_isPrivate", (q) =>
+        .withIndex("by_notebook_and_isPrivate_and_updatedAt", (q) =>
           q.eq("notebookId", notebookId).eq("isPrivate", undefined)
         )
         .collect()
@@ -150,6 +150,36 @@ describe("getPrimaryVisibleConversation", () => {
       getPrimaryVisibleConversation(ctx, notebookId, { userId: viewer, access: "viewer" })
     );
     expect(forViewer?._id).toBe(viewerConv);
+  });
+
+  test("considers the requester's own private threads and shared ones marked isPrivate: false", async () => {
+    const { t, owner, editor, notebookId } = await setup();
+    const now = Date.now();
+    const { explicitShared, editorPrivate } = await t.run(async (ctx) => ({
+      explicitShared: await ctx.db.insert("conversations", {
+        userId: owner,
+        notebookId,
+        isPrivate: false,
+        createdAt: now,
+        updatedAt: now + 100,
+      }),
+      editorPrivate: await ctx.db.insert("conversations", {
+        userId: editor,
+        notebookId,
+        isPrivate: true,
+        createdAt: now,
+        updatedAt: now + 200,
+      }),
+    }));
+
+    const forOwner = await t.run((ctx) =>
+      getPrimaryVisibleConversation(ctx, notebookId, { userId: owner, access: "owner" })
+    );
+    expect(forOwner?._id).toBe(explicitShared);
+    const forEditor = await t.run((ctx) =>
+      getPrimaryVisibleConversation(ctx, notebookId, { userId: editor, access: "editor" })
+    );
+    expect(forEditor?._id).toBe(editorPrivate);
   });
 
   test("returns null when the requester has no visible thread", async () => {

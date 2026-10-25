@@ -3,10 +3,8 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   internalAction,
-  internalMutation,
   internalQuery,
   type MutationCtx,
-  mutation,
   type QueryCtx,
   query,
 } from "../_generated/server";
@@ -21,9 +19,13 @@ import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_li
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
+import { CHUNK_PAGE_SIZE } from "./chunks";
+import { deleteDocumentText, getDocumentText } from "./contents";
 import { ingestionDelayMs } from "./ingestionDelay.helpers";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "./internal";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
+import { MAX_STORED_MARKDOWN_CHARS, withTruncationNote } from "./storedMarkdown.helpers";
 
 /**
  * Get a presigned URL for uploading a file to Convex Storage
@@ -208,7 +210,7 @@ export const list = query({
 });
 
 /**
- * Get document content for the source viewer (prefers full `extractedMarkdown`, else stitched chunks).
+ * Get document content for the source viewer (prefers the stored text, else stitched chunks).
  */
 export const getContent = query({
   args: { id: v.id("documents") },
@@ -217,7 +219,6 @@ export const getContent = query({
     v.object({
       documentId: v.id("documents"),
       content: v.string(),
-      chunkCount: v.number(),
     })
   ),
   handler: async (ctx, args) => {
@@ -235,33 +236,44 @@ export const getContent = query({
       return null;
     }
 
-    const chunks = await ctx.db
-      .query("documentChunks")
-      .withIndex("by_document", (q) => q.eq("documentId", args.id))
-      .collect();
-
-    const sortedChunks = chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
-
-    const stored = document.extractedMarkdown?.trim();
+    // A live query: chunk rows carry ~13 KB embeddings and ingestion inserts them one at a time, so
+    // reading them here re-reads every chunk on each insert (#599). Stored markdown needs none.
+    const stored = (await getDocumentText(ctx, document))?.trim();
     if (stored) {
-      return {
-        documentId: args.id,
-        content: stored,
-        chunkCount: sortedChunks.length,
-      };
+      return { documentId: args.id, content: stored };
     }
 
-    if (sortedChunks.length === 0) {
+    // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view. Read lazily and stop
+    // after a page of rows (each row's embedding counts against the read limit, however short its
+    // text) or at the stored-markdown cap, whichever comes first. `by_document` is in storage order,
+    // so the kept rows are a chunkIndex prefix only when chunks were stored in order, as ingestion
+    // and forks do; rows stored out of order would show with gaps.
+    const chunks: Array<{ chunkIndex: number; content: string }> = [];
+    let chars = 0;
+    let truncated = false;
+    for await (const chunk of ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", args.id))) {
+      if (chunks.length >= CHUNK_PAGE_SIZE || chars >= MAX_STORED_MARKDOWN_CHARS) {
+        truncated = true;
+        break;
+      }
+      chunks.push({ chunkIndex: chunk.chunkIndex, content: chunk.content });
+      chars += chunk.content.length;
+    }
+
+    if (chunks.length === 0) {
       return null;
     }
 
-    // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view
-    const fullContent = sortedChunks.map((chunk) => chunk.content).join("\n");
+    const fullContent = chunks
+      .sort((a, b) => a.chunkIndex - b.chunkIndex)
+      .map((chunk) => chunk.content)
+      .join("\n");
 
     return {
       documentId: args.id,
-      content: fullContent,
-      chunkCount: sortedChunks.length,
+      content: truncated ? withTruncationNote(fullContent) : fullContent,
     };
   },
 });
@@ -391,6 +403,7 @@ export const remove = mutation({
       await deleteDocumentFileIfUnused(ctx, document.storageId, [args.id]);
     }
 
+    await deleteDocumentText(ctx, args.id);
     await ctx.db.delete(args.id);
     await Notebooks.adjustNotebookSourceCount(ctx, document.notebookId, -1);
 
@@ -424,6 +437,7 @@ export const removeMany = mutation({
         await deleteDocumentFileIfUnused(ctx, document.storageId, [id]);
       }
 
+      await deleteDocumentText(ctx, id);
       await ctx.db.delete(id);
       await Notebooks.adjustNotebookSourceCount(ctx, document.notebookId, -1);
       deleted += 1;
@@ -561,6 +575,20 @@ export const getDocumentInternal = internalQuery({
   },
   handler: async (ctx, args) => {
     return await getReadableDocument(ctx, args.documentId, args.userId);
+  },
+});
+
+/** The document's stored text for a notebook member, or null when unreadable or not stored. */
+export const getDocumentTextInternal = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+    userId: v.id("users"),
+  },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const document = await getReadableDocument(ctx, args.documentId, args.userId);
+    if (!document) return null;
+    return (await getDocumentText(ctx, document)) ?? null;
   },
 });
 

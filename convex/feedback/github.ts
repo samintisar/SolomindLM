@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
-import { action, internalMutation } from "../_generated/server";
+import { action } from "../_generated/server";
 import { ExternalServiceError } from "../_lib/errors";
 import { assertFeedbackAdmin } from "../_lib/feedbackAdmin";
 import {
@@ -12,6 +12,7 @@ import {
   feedbackIssueTitle,
 } from "../_model/feedback";
 import { getAuthUserId } from "../auth";
+import { internalMutation } from "../functions";
 
 /** How long a claimed-but-unfinished sync blocks a retry before it's considered dead. */
 const SYNC_LOCK_MS = 2 * 60_000;

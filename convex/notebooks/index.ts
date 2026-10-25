@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { internalQuery, mutation, query } from "../_generated/server";
+import { internalQuery, query } from "../_generated/server";
 import { checkNotebookLimit } from "../_lib/limits";
 import { getNotebookAccess, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { deletePracticeProgress } from "../studio/practice";
 
 /** Shape notebook + source count for API response */

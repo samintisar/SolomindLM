@@ -7,7 +7,7 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
-import { internalMutation, type MutationCtx, mutation } from "../_generated/server";
+import { type MutationCtx } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
 import { toConvexError } from "../_lib/serviceErrors";
 import {
@@ -22,6 +22,7 @@ import {
   saveViewerProgress,
 } from "../_model/studioProgress";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 
 /** Progress rows deleted per transaction when an item or notebook is deleted. */
 const PROGRESS_DELETE_BATCH = 500;

@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
-import { mutation } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { nextStepId } from "./constants";
 
 const stepIdValidator = v.union(
