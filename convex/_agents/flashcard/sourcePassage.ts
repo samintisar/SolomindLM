@@ -7,8 +7,11 @@
 
 export type PassageCard = { front: string; back: string; sourcePassage?: string };
 
-/** Longest passage kept per card; a merged card can get two. */
-export const MAX_PASSAGE_CHARS = 800;
+/**
+ * Longest passage kept per card; a merged card can get two. Map results, passages included, are
+ * stored on the flashcard row until finalize, so this stays small against its 1 MB limit.
+ */
+export const MAX_PASSAGE_CHARS = 500;
 
 /** Word overlap above which a rewritten card counts as the same card. */
 const SAME_CARD_SIMILARITY = 0.5;
@@ -143,4 +146,14 @@ export function attachPassages<T extends PassageCard>(cards: T[], pool: PassageC
         : [first.passage, second.passage];
     return { ...card, sourcePassage: passages.join("\n\n") };
   });
+}
+
+/**
+ * Whether two cards test the same thing (the word overlap a reworded card keeps), so a backfill
+ * doesn't bring back the original of a card refine already rewrote.
+ */
+export function isSameCard(a: PassageCard, b: PassageCard): boolean {
+  return (
+    similarity(stems(`${a.front} ${a.back}`), stems(`${b.front} ${b.back}`)) >= SAME_CARD_SIMILARITY
+  );
 }

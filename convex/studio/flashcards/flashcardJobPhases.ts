@@ -40,7 +40,7 @@ import {
   getMapPrompt,
   MAP_SYSTEM_PROMPT,
 } from "../../_agents/flashcard/prompts";
-import { attachPassages, passageForCard } from "../../_agents/flashcard/sourcePassage";
+import { attachPassages, isSameCard, passageForCard } from "../../_agents/flashcard/sourcePassage";
 import { createStructuredLLM } from "../../_agents/flashcard/structuredLlm";
 import { cleanBackText, cleanFrontText } from "../../_agents/flashcard/textCleanup";
 import { internal } from "../../_generated/api";
@@ -85,8 +85,6 @@ const CONFIG = {
 
 /** A card with the source passage it was written from (#219); the passage is not saved. */
 type CardWithPassage = Flashcard & { sourcePassage?: string };
-
-const cardKey = (card: Flashcard) => `${card.front}\n---\n${card.back}`;
 
 export type FlashcardGenerationPhaseArgs = {
   flashcardId: Id<"flashcards">;
@@ -773,6 +771,7 @@ export async function runFinalizeFlashcardPhase(
         return false;
       });
 
+    const checkedCards = finalFlashcards;
     const verifyStatuses = await checkCards(finalFlashcards);
     finalFlashcards = keepVerified(finalFlashcards, verifyStatuses);
 
@@ -780,8 +779,11 @@ export async function runFinalizeFlashcardPhase(
     let backfilledCount = 0;
     const deficit = cardCount - finalFlashcards.length;
     if (deficit > 0) {
-      const chosen = new Set(finalFlashcards.map(cardKey));
-      const pool = dedupedFlashcards.filter((card) => !chosen.has(cardKey(card)));
+      // Refine rewrites cards, so match by content, not text: neither the original of a kept card
+      // nor of one that just failed should come back.
+      const pool = dedupedFlashcards.filter(
+        (card) => !checkedCards.some((checked) => isSameCard(card, checked))
+      );
       if (pool.length > 0 && deadline.remainingMs() >= CONFIG.BACKFILL_MIN_REMAINING_MS) {
         const refill = pickSpread(pool, Math.ceil(deficit * CONFIG.BACKFILL_BUFFER_MULTIPLIER));
         const refillStatuses = await checkCards(refill);

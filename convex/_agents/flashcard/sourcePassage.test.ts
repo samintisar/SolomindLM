@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attachPassages, passageForCard } from "./sourcePassage";
+import { attachPassages, isSameCard, passageForCard } from "./sourcePassage";
 
 const CHUNK = [
   "Cells are the basic unit of life.",
@@ -52,5 +52,17 @@ describe("attachPassages", () => {
   it("leaves a card that matches nothing without a passage", () => {
     const [card] = attachPassages([{ front: "Capital of France?", back: "Paris" }], pool);
     expect(card.sourcePassage).toBeUndefined();
+  });
+});
+
+describe("isSameCard", () => {
+  it("matches a reworded card and not a different one", () => {
+    const card = { front: "What do mitochondria produce?", back: "Most of the cell's ATP" };
+    expect(
+      isSameCard(card, { front: "Mitochondria produce what?", back: "The cell's ATP, mostly" })
+    ).toBe(true);
+    expect(isSameCard(card, { front: "What do ribosomes assemble?", back: "Proteins" })).toBe(
+      false
+    );
   });
 });
