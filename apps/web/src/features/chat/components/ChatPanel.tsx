@@ -83,7 +83,10 @@ const NO_EXTERNAL_SOURCES: ExternalSource[] = [];
  */
 const MessageListFooter = () => <div className="composer-clearance shrink-0" aria-hidden />;
 type MessageListContext = { hasOlderMessages: boolean };
-/** Shown at the top while older pages remain; reaching it loads the next page. */
+/**
+ * Shown at the top while older pages remain or are loading (kept through the load so the list
+ * doesn't shift); reaching it loads the next page.
+ */
 const MessageListHeader = ({ context }: { context?: MessageListContext }) =>
   context?.hasOlderMessages ? (
     <div className="flex justify-center py-3 text-muted-foreground">
@@ -164,7 +167,6 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     messages,
     isChatStreaming: isLoading,
     remoteGenerationBlocksSend,
-    hasOlderMessages = false,
     historyComplete = true,
     loadOlderMessages,
     loadFullHistory,
@@ -416,7 +418,13 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
     onSaveChatOptimistic?.({ notebookId, note: placeholderNote });
     try {
       // Only the newest pages are loaded; a saved chat holds the whole thread.
-      const toSave = !historyComplete && loadFullHistory ? await loadFullHistory() : messages;
+      // Loaded messages carry display-only fields (follow-ups, a streaming research plan); keep
+      // them, so the note doesn't depend on how far the user had scrolled.
+      const loadedById = new Map(messages.map((m) => [m.id, m]));
+      const toSave =
+        !historyComplete && loadFullHistory
+          ? (await loadFullHistory()).map((m) => loadedById.get(m.id) ?? m)
+          : messages;
       const serializedMessages = toSave.map((msg) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date ? msg.timestamp.getTime() : msg.timestamp,
@@ -738,7 +746,12 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
 
   const memoizedMessages = useMemo(() => messages, [messages]);
   const firstItemIndex = usePrependedFirstItemIndex(messages);
-  const messageListContext = useMemo(() => ({ hasOlderMessages }), [hasOlderMessages]);
+  // Not `hasOlderMessages` alone: that is false while the older page loads.
+  const showOlderSpinner = !historyComplete && messages.length > 0;
+  const messageListContext = useMemo(
+    () => ({ hasOlderMessages: showOlderSpinner }),
+    [showOlderSpinner]
+  );
 
   // Literature review session polling
   const literatureSession = useLiteratureReviewSession(activeLiteratureSessionId);
@@ -919,6 +932,8 @@ const ChatPanelContent: React.FC<ChatPanelProps> = ({
               />
             ) : (
               <Virtuoso
+                // A new list per thread: `firstItemIndex` only decreases within one list.
+                key={activeConversationId ?? "new"}
                 ref={virtuosoRef}
                 className="h-full min-h-0 w-full min-w-0"
                 data={memoizedMessages}
