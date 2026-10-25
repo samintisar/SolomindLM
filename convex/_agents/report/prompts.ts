@@ -26,7 +26,7 @@ ${MARKDOWN_MATH_NOTATION_FOR_APP}`;
  * how each study was done, and worded associations as causes. General, for any kind of source.
  */
 const ATTRIBUTION_RULES = `WHO FOUND WHAT:
-- Each source's text and notes start with "SOURCE: <title>". Keep every finding with the source it came from, and never move a figure from one source to another.
+- Each source's text and notes start with "SOURCE: <title>". Keep every finding with the source it came from, and never move a figure from one source to another. When you condense or merge notes, keep each finding's source named next to it.
 - A sentence marked with a source's own reference, such as "(ref. 6)", "(refs. 2-4)" or "(Smith et al., 2019)", reports work that source cites. Credit it to the cited work ("a review cited by <source> found ..."), never to the source itself.
 - When a source says how its study was done (for example a randomized trial, cohort study, cross-sectional survey, systematic review or meta-analysis), name that design with its findings.
 - Keep findings from observational studies worded as associations, not as causes.`;

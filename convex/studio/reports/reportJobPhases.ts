@@ -24,7 +24,11 @@ import {
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/report/prompts";
 import { invokeMapStructuredOutput } from "../../_agents/report/structuredLlm";
-import { labelWithSource, packChunksBySource } from "../../_agents/spreadsheet/sourcePacking";
+import {
+  joinSmallSourceTasks,
+  labelWithSource,
+  packChunksBySource,
+} from "../../_agents/spreadsheet/sourcePacking";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -180,8 +184,12 @@ export async function runReportGenerationPhase(
           }
         : {
             ...plan,
-            mapChunks: packBySource((contents) =>
-              packChunks(contents, CONFIG.MAP_CHUNK_SIZE_TOKENS)
+            // Short sources share a task (each keeps its label), so many small sources don't
+            // each cost a map call.
+            mapChunks: joinSmallSourceTasks(
+              packBySource((contents) => packChunks(contents, CONFIG.MAP_CHUNK_SIZE_TOKENS)),
+              CONFIG.MAP_CHUNK_SIZE_TOKENS,
+              countTokens
             ),
           };
 
@@ -367,12 +375,15 @@ IMPORTANT: Respond with a JSON object containing:
     const elapsed = Date.now() - startTime;
     console.log(`[ReportJob] ${chunkId} LLM completed in ${elapsed}ms`);
 
-    // Notes keep the source line their task started with, so the reduce knows whose findings
-    // each set of notes holds (#477).
-    const sourceLine = chunk.match(/^SOURCE: .+/)?.[0];
+    // Notes keep the source lines of their task, so the reduce knows whose findings each set of
+    // notes holds (#477). A task can hold several short sources.
+    const sourceLines = chunk.match(/^SOURCE: .+$/gm) ?? [];
     const result = {
       topics: mapOutput.topics,
-      summary: sourceLine ? `${sourceLine}\n\n${mapOutput.summary}` : mapOutput.summary,
+      summary:
+        sourceLines.length > 0
+          ? `${sourceLines.join("\n")}\n\n${mapOutput.summary}`
+          : mapOutput.summary,
       processingTimeMs: elapsed,
       ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };

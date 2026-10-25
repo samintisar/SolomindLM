@@ -60,3 +60,30 @@ export function packChunksBySource(
 export function labelWithSource(source: string, text: string): string {
   return `SOURCE: ${source}\n\n${text}`;
 }
+
+/**
+ * Joins consecutive labelled tasks while they fit in `maxTokens`, so many short sources don't each
+ * cost a map call. Every source keeps its own "SOURCE:" line inside the joined task.
+ */
+export function joinSmallSourceTasks(
+  tasks: string[],
+  maxTokens: number,
+  estimateTokens: (text: string) => number
+): string[] {
+  const joined: string[] = [];
+  let current = "";
+  let currentTokens = 0;
+  for (const task of tasks) {
+    const tokens = estimateTokens(task);
+    if (current && currentTokens + tokens <= maxTokens) {
+      current = `${current}\n\n---\n\n${task}`;
+      currentTokens += tokens;
+      continue;
+    }
+    if (current) joined.push(current);
+    current = task;
+    currentTokens = tokens;
+  }
+  if (current) joined.push(current);
+  return joined;
+}
