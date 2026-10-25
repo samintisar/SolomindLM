@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
+import { internalMutation } from "../functions";
 import { PURGE_BATCH_SIZE, PURGE_STEPS } from "./_purge";
 
 /**

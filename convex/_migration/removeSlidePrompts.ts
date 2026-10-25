@@ -12,7 +12,8 @@
  * and redeploy.
  */
 
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
+import { internalMutation } from "../functions";
 
 export const countSlidePrompts = internalQuery({
   args: {},

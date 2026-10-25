@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { action, internalMutation, mutation, query } from "../_generated/server";
+import { action, query } from "../_generated/server";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
@@ -8,6 +8,7 @@ import {
 } from "../_lib/notebookAccess";
 import * as Notes from "../_model/notes";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 
 /**
  * Convert chat messages to clean markdown format

@@ -5,7 +5,7 @@ import { workflow } from "../../_agents/literature_review/LiteratureReviewGraph.
 import { components, internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
-import { internalMutation, mutation, query } from "../../_generated/server";
+import { query } from "../../_generated/server";
 import { getConversationIfReadable } from "../../_lib/conversationAccess";
 import {
   assertConcurrentRunCapacity,
@@ -30,6 +30,7 @@ import {
   literatureSearchOptionsValidator,
 } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 import { loadNotebookPaperDocuments } from "../../literatureReview/db";
 import { type PaperScope, resolvePaperScope } from "../../literatureReview/notebookPapers";
 import { criterionAssessmentValidator } from "../../literatureReview/screeningCriteria";

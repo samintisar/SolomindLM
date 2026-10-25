@@ -5,13 +5,14 @@
 
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, type MutationCtx, mutation } from "../_generated/server";
+import { type MutationCtx } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import { rateLimiter } from "../_lib/rateLimits";
 import { toConvexError } from "../_lib/serviceErrors";
 import { MAX_PDF_BYTES } from "../_services/extraction/openAccess/fetchOaCandidate";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 import { resetDocumentForReembed } from "./internal";
 import {
   fullTextSourceValidator,

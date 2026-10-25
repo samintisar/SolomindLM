@@ -8,10 +8,13 @@ const h = vi.hoisted(() => ({
   sendCallbacks: null as SendMessageCallbacks | null,
   researchCallbacks: null as SendMessageCallbacks | null,
   mutation: () => Promise.resolve(null),
+  noMessages: { results: [], status: "Exhausted", loadMore: () => {} },
 }));
 
 vi.mock("convex/react", () => ({
-  useQuery: () => ({ messages: [], chatGenerating: false }),
+  useQuery: () => ({ chatGenerating: false, chatGenerationStartedAt: null }),
+  usePaginatedQuery: () => h.noMessages,
+  useConvex: () => ({ query: () => Promise.resolve({ page: [], isDone: true }) }),
   useMutation: () => h.mutation,
 }));
 

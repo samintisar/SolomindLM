@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { internalQuery, query } from "../../_generated/server";
 import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import { toConvexError } from "../../_lib/serviceErrors";
 import * as Spreadsheets from "../../_model/spreadsheets";
 import { parseCsvDetailed } from "../../_shared/csv.helpers";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 
 /** Largest CSV, in UTF-8 bytes, that `update` will store. */
 export const SPREADSHEET_MAX_BYTES = 512 * 1024;

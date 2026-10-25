@@ -1,24 +1,32 @@
 import { v } from "convex/values";
-import type { TableNames } from "../_generated/dataModel";
-import { query } from "../_generated/server";
+import type { Doc, Id, TableNames } from "../_generated/dataModel";
+import { type QueryCtx, query } from "../_generated/server";
 import { assertCanReadNotebook, type NotebookAccessRole } from "../_lib/notebookAccess";
 import * as NotesModel from "../_model/notes";
 import { forViewer } from "../_model/practiceProgress";
+import {
+  buildStudioListRow,
+  isNotebookIndexed,
+  STUDIO_ITEM_TABLES,
+  type StudioItemTable,
+} from "../_model/studioItems";
 import { listViewerProgressByItem, viewerPracticeRow } from "../_model/studioProgress";
 import { getAuthUserId } from "../auth";
-import { summarizeListRow } from "./listSummary";
+
+/** Most rows the Studio panel list returns; the newest come first. */
+const STUDIO_LIST_LIMIT = 500;
+
+type ListRow = Record<string, unknown> & { _type: string; _id: string; updatedAt: number };
 
 /**
- * Unified query to fetch all note types for a notebook in a single request.
- * This replaces 8 separate queries with 1, reducing WebSocket subscriptions
- * and providing a unified loading state.
- *
- * @returns Array of all notes with a `type` discriminator field
+ * Every studio output and note in a notebook, newest first, without heavy payloads (full content
+ * loads via `get`). Rows come from `studioItems` (#600), so a running job's patches re-read small
+ * rows, not every output. A notebook not fully indexed yet is listed from the output tables.
  */
 export const list = query({
   args: {
     notebookId: v.id("notebooks"),
-    // Optional: Filter by specific types to reduce payload
+    // Optional: Filter by table name (e.g. "reports", "notes")
     types: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
@@ -32,135 +40,55 @@ export const list = query({
       return [];
     }
 
-    const _types = args.types ?? [
-      "reports",
-      "flashcards",
-      "quizzes",
-      "mindmaps",
-      "audioOverviews",
-      "infographics",
-      "spreadsheets",
-      "writtenQuestions",
-      "notes",
-    ];
-
-    const queries: Promise<any[]>[] = [];
-
-    if (!args.types || args.types.includes("reports")) {
-      queries.push(
-        ctx.db
-          .query("reports")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "report" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("flashcards")) {
-      queries.push(
-        ctx.db
-          .query("flashcards")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "flashcard" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("quizzes")) {
-      queries.push(
-        ctx.db
-          .query("quizzes")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "quiz" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("mindmaps")) {
-      queries.push(
-        ctx.db
-          .query("mindmaps")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "mindmap" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("audioOverviews")) {
-      queries.push(
-        ctx.db
-          .query("audioOverviews")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "audioOverview" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("infographics")) {
-      queries.push(
-        ctx.db
-          .query("infographics")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "infographic" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("spreadsheets")) {
-      queries.push(
-        ctx.db
-          .query("spreadsheets")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "spreadsheet" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("writtenQuestions")) {
-      queries.push(
-        ctx.db
-          .query("writtenQuestions")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .order("desc")
-          .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "writtenQuestions" as const })))
-      );
-    }
-
-    if (!args.types || args.types.includes("notes")) {
-      queries.push(
-        NotesModel.listByNotebookShared(ctx, args.notebookId, userId).then((items) =>
-          items.map((item) => ({ ...item, _type: "note" as const }))
+    const wanted = (table: StudioItemTable) => !args.types || args.types.includes(table);
+    const rows: ListRow[] = (await isNotebookIndexed(ctx, args.notebookId))
+      ? (
+          await ctx.db
+            .query("studioItems")
+            .withIndex("by_notebook_and_updatedAt", (q) => q.eq("notebookId", args.notebookId))
+            .order("desc")
+            .take(STUDIO_LIST_LIMIT)
         )
-      );
-    }
+          .filter(
+            (item) =>
+              wanted(item.itemType) &&
+              (item.privateToUserId === undefined || item.privateToUserId === userId)
+          )
+          .map((item) => item.row as ListRow)
+      : await listFromOutputTables(ctx, args.notebookId, userId, wanted);
 
-    const results = await Promise.all(queries);
     // Practice progress on a shared row is the owner's; a viewer sees their own instead.
-    const viewerProgress =
-      access === "viewer" ? await listViewerProgressByItem(ctx, userId, args.notebookId) : null;
-    const allNotes = results
-      .flat()
-      .map((item: Record<string, unknown> & { _type: string }) =>
-        summarizeListRow(
-          viewerProgress
-            ? forViewer(item._type, item, viewerProgress.get(item._id as string))
-            : item
-        )
-      ) as Array<Record<string, unknown> & { updatedAt: number }>;
-
-    allNotes.sort((a, b) => b.updatedAt - a.updatedAt);
-
-    return allNotes;
+    if (access !== "viewer") return rows;
+    const viewerProgress = await listViewerProgressByItem(ctx, userId, args.notebookId);
+    return rows.map((row) => forViewer(row._type, row, viewerProgress.get(row._id)));
   },
 });
+
+/** The list for a notebook not fully indexed yet, read from the output tables. */
+async function listFromOutputTables(
+  ctx: QueryCtx,
+  notebookId: Id<"notebooks">,
+  userId: Id<"users">,
+  wanted: (table: StudioItemTable) => boolean
+): Promise<ListRow[]> {
+  const results = await Promise.all(
+    STUDIO_ITEM_TABLES.filter(wanted).map(async (table) => {
+      const docs: Doc<StudioItemTable>[] =
+        table === "notes"
+          ? await NotesModel.listByNotebookShared(ctx, notebookId, userId)
+          : await ctx.db
+              .query(table)
+              .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+              .order("desc")
+              .take(STUDIO_LIST_LIMIT);
+      return docs.map((doc) => buildStudioListRow(table, doc) as ListRow);
+    })
+  );
+  return results
+    .flat()
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, STUDIO_LIST_LIMIT);
+}
 
 /**
  * Get a single note by type and ID
