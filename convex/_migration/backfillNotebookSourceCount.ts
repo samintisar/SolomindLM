@@ -12,7 +12,7 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../functions";
 
 /** Small enough that 10 documents with full extracted text stay under the per-function read limit. */
 const DOCUMENT_BATCH_SIZE = 10;
