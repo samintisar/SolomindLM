@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation } from "../_generated/server";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import { createCitationEngine, generateCitationKey } from "../_utils/CitationEngine";
+import { internalMutation } from "../functions";
 import {
   applyNumericCitations,
   buildFallbackSections,

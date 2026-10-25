@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { internalQuery, query } from "../../_generated/server";
 import { checkDailyLimit } from "../../_lib/limits";
 import {
   assertCanEditNotebook,
@@ -9,6 +9,7 @@ import {
 } from "../../_lib/notebookAccess";
 import * as Infographics from "../../_model/infographics";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 
 // List, get, create, update, remove use model functions
 export const list = query({

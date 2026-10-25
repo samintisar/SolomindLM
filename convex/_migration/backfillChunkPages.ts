@@ -15,10 +15,10 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
 import { chunkPage, hasPageLabels, pageAtOffset } from "../_services/processing/pageLabels";
 import { getDocumentText } from "../documents/contents";
 import { isTruncatedStoredMarkdown } from "../documents/storedMarkdown.helpers";
+import { internalMutation } from "../functions";
 
 /** Chunk rows carry a 1536-float embedding (~13 KB), so 200 rows stay far below the per-function read limit. */
 const CHUNK_BATCH_SIZE = 200;

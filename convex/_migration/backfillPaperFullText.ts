@@ -25,11 +25,12 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalQuery } from "../_generated/server";
 import { isFullTextLength } from "../_services/extraction/openAccess/fullTextTest";
 import { resolveOpenAccessCandidates } from "../_services/extraction/openAccess/OpenAccessResolver";
 import { getDocumentText } from "../documents/contents";
 import { resetDocumentForReembed } from "../documents/internal";
+import { internalMutation } from "../functions";
 
 /** Stored markdown can be ~800 KB per paper; 4 per batch stays well under the read limit. */
 const BATCH_SIZE = 4;

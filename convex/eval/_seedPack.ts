@@ -7,10 +7,11 @@
 import { type Infer, v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { internalQuery, type QueryCtx } from "../_generated/server";
 import * as Notebooks from "../_model/notebooks";
 import { deleteDocumentText, getDocumentText } from "../documents/contents";
 import { deleteAllChunksForDocument, deleteDocumentFileIfUnused } from "../documents/internal";
+import { internalMutation } from "../functions";
 import { EVAL_PACK_FOLDER_NAME } from "./_packFolder";
 
 export { EVAL_PACK_FOLDER_NAME };

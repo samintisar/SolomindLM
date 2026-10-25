@@ -15,7 +15,7 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../functions";
 
 /** Stored text can be ~800 KB per document and is read once and written once: 8 stay well under the limits. */
 const MOVE_TEXT_BATCH_SIZE = 8;

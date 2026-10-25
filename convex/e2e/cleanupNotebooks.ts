@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation } from "../_generated/server";
 import { deleteDocumentText } from "../documents/contents";
+import { internalMutation } from "../functions";
 
 /**
  * Delete all notebooks with titles starting with "e2e-" for a given user email.

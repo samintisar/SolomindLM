@@ -3,10 +3,8 @@ import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   internalAction,
-  internalMutation,
   internalQuery,
   type MutationCtx,
-  mutation,
   type QueryCtx,
   query,
 } from "../_generated/server";
@@ -20,6 +18,7 @@ import {
 import { MAX_DOCUMENTS_PER_NOTEBOOK_LIST, MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 import { CHUNK_PAGE_SIZE } from "./chunks";
 import { deleteDocumentText, getDocumentText } from "./contents";
 import { ingestionDelayMs } from "./ingestionDelay.helpers";

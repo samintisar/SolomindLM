@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { internalQuery, query } from "../../_generated/server";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
 import { withWrittenAnswer, withWrittenDraft } from "../../_model/practiceProgress";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../_model/studioProgress";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 import { deletePracticeProgress } from "../practice";
 
 export const list = query({

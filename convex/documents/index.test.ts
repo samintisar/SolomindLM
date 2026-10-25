@@ -26,7 +26,8 @@ const MOCK_SOURCE_GUIDE = {
 // Helper to create modules with mocked rate limits + deterministic source guide LLM
 async function createModulesWithMockedLimits() {
   const actualLimits = (await modules["./_lib/limits.ts"]()) as Record<string, unknown>;
-  const { action, internalMutation } = await import("../_generated/server");
+  const { action } = await import("../_generated/server");
+  const { internalMutation } = await import("../functions");
   const { v } = await import("convex/values");
   const { internal } = await import("../_generated/api");
   const { getAuthUserId } = await import("../auth");

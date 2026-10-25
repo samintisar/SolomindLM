@@ -2,18 +2,13 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import {
-  internalAction,
-  internalMutation,
-  mutation,
-  type QueryCtx,
-  query,
-} from "../_generated/server";
+import { internalAction, type QueryCtx, query } from "../_generated/server";
 import { assertCanEditConversation, getConversationIfReadable } from "../_lib/conversationAccess";
 import { assertCanReadNotebook, getNotebookAccess } from "../_lib/notebookAccess";
 import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
 import * as ConvModel from "../_model/conversations";
 import { getAuthUserId } from "../auth";
+import { internalMutation, mutation } from "../functions";
 
 const conversationArgs = {
   notebookId: v.id("notebooks"),

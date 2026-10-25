@@ -1,8 +1,8 @@
 // convex/freeTools/rateLimit.ts
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { rateLimiter } from "../_lib/rateLimits";
+import { internalMutation } from "../functions";
 
 const reserveResult = v.union(
   v.object({ ok: v.literal(true) }),
