@@ -15,10 +15,10 @@
     "build:dev:android": "bun x eas-cli build --profile development --platform android"
   },
   "dependencies": {
-    "@convex-dev/auth": "0.0.95",
+    "@convex-dev/auth": "0.0.96",
     "@react-navigation/native": "^7.1.8",
     "@sentry/react-native": "~7.11.0",
-    "convex": "1.45.0",
+    "convex": "1.48.0",
     "expo": "~55.0.31",
     "expo-asset": "~55.0.20",
     "expo-audio": "~55.0.18",
