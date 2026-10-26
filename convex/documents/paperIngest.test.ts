@@ -253,6 +253,20 @@ describe("ingestPaper", () => {
     expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
   });
 
+  // #591: a spending cap can last days; the paper stays usable and "Find full text" retries it.
+  it("saves the paper abstract-only when OCR is refused for billing (402)", async () => {
+    const deps = makeDeps({
+      resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+      fetchCandidate: vi.fn().mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "x" }),
+      ocrStoredPdf: vi
+        .fn()
+        .mockRejectedValue(new ExternalServiceError("mistral", "Mistral 402", { statusCode: 402 })),
+    });
+    const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+    expect(deps.detachPdf).toHaveBeenCalledWith("storage_new");
+    expect(out.outcome).toBe("abstract_only");
+  });
+
   describe("a stored PDF", () => {
     it("rethrows a timed-out OCR of the stored PDF", async () => {
       const deps = makeDeps({

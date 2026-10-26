@@ -309,14 +309,20 @@ export function buildOcrRequestBody(
 
 /**
  * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
- * request that worked before them, with its old 60s timeout and 3 attempts. Capping the annotated call at 2
- * attempts keeps the worst case (every attempt a slow 5xx) at 2 × 90s + 3 × 60s = 360s, plus at most ~5s of
- * retry backoff (1s and 2s delays, ±25% jitter). That leaves ~235s of the embedding job's 600s action limit for a
- * web scrape before OCR (links that serve a PDF, `urlSource`) or after it (`AcademicLoaderService`'s fallback),
- * then chunking and embedding. Each attempt's timeout covers reading the body too, so these bounds hold.
+ * request that worked before them, with its old 60s timeout and 3 attempts. The annotated call is retried once,
+ * only after a failure within its first 30s (a rate limit, a quick 5xx), so the worst case (a 5xx at 30s, a slow
+ * 5xx, then every plain attempt slow) stays at 30s + 150s + 3 × 60s = 360s, plus at most ~5s of retry backoff
+ * (1s and 2s delays, ±25% jitter). That leaves ~235s of the embedding
+ * job's 600s action limit for a web scrape before OCR (links that serve a PDF, `urlSource`) or after it
+ * (`AcademicLoaderService`'s fallback), then chunking and embedding. Each attempt's timeout covers reading the
+ * body too, so these bounds hold.
+ *
+ * A timed-out request is not sent again: Mistral keeps working on a request we stop waiting for and bills its
+ * pages, so a retry would pay for the same document twice (#591).
  */
-const ANNOTATED_TIMEOUT_MS = 90_000;
+const ANNOTATED_TIMEOUT_MS = 150_000;
 const ANNOTATED_MAX_ATTEMPTS = 2;
+const ANNOTATED_RETRY_WINDOW_MS = 30_000;
 const PLAIN_TIMEOUT_MS = 60_000;
 
 export const NOTHING_READABLE_MESSAGE =
@@ -329,16 +335,19 @@ export class MistralOcrTimeoutError extends Error {
   }
 }
 
-/** Rejections the plain request would get too: bad key, no access, unfetchable URL, file too large, rate limit. */
-const STATUSES_PLAIN_OCR_SHARES = [401, 403, 404, 413, 429];
+/**
+ * Rejections the plain request would get too: bad key, billing (spending limit reached), no access,
+ * unfetchable URL, file too large, rate limit.
+ */
+const STATUSES_PLAIN_OCR_SHARES = [401, 402, 403, 404, 413, 429];
 
 /**
- * Whether a failed annotated request should be retried as plain OCR: a timeout, a server error that outlasted
- * `invokeWithHttpRetry` (the annotation pass can fail where plain OCR works), or a rejection the annotations
- * may have caused.
+ * Whether a failed annotated request should be retried as plain OCR: a server error (the annotation pass can
+ * fail where plain OCR works), or a rejection the annotations may have caused. Not a timeout: Mistral still
+ * finishes and bills the timed-out request, so resending the document would pay for it twice (#591).
  */
 export function shouldRetryWithoutAnnotations(error: unknown): boolean {
-  if (error instanceof MistralOcrTimeoutError) return true;
+  if (error instanceof MistralOcrTimeoutError) return false;
   if (!(error instanceof ExternalServiceError) || error.statusCode === undefined) return false;
   const status = error.statusCode;
   if (status >= 500) return true;
@@ -348,15 +357,21 @@ export function shouldRetryWithoutAnnotations(error: unknown): boolean {
 export class MistralOCRService {
   private apiKey: string;
   private baseUrl = "https://api.mistral.ai/v1";
+  private annotations: boolean;
 
-  constructor(apiKey: string) {
+  /**
+   * `annotations: false` sends only the plain request, for a document whose annotated request
+   * already timed out once (and was billed): a retry goes straight to the faster plain OCR.
+   */
+  constructor(apiKey: string, options: { annotations?: boolean } = {}) {
     this.apiKey = apiKey;
+    this.annotations = options.annotations ?? true;
   }
 
   private async callOcrEndpoint(
     body: Record<string, unknown>,
     timeoutMs: number,
-    maxAttempts?: number
+    retry?: { maxAttempts: number; deadline: number }
   ): Promise<MistralOcrResponse> {
     const logger = createServiceLogger("mistral", "ocr");
 
@@ -407,7 +422,7 @@ export class MistralOCRService {
         }
       },
       "mistral_ocr",
-      maxAttempts ? { maxAttempts } : undefined
+      retry
     );
   }
 
@@ -422,12 +437,14 @@ export class MistralOCRService {
 
     let data: MistralOcrResponse;
     try {
+      // Plain-only gets the annotated request's time budget: it is the document that ran long.
       data = await this.callOcrEndpoint(
-        buildOcrRequestBody(url, kind, true),
+        buildOcrRequestBody(url, this.annotations ? kind : "document", this.annotations),
         ANNOTATED_TIMEOUT_MS,
-        ANNOTATED_MAX_ATTEMPTS
+        { maxAttempts: ANNOTATED_MAX_ATTEMPTS, deadline: Date.now() + ANNOTATED_RETRY_WINDOW_MS }
       );
     } catch (error) {
+      if (!this.annotations) throw error;
       if (!shouldRetryWithoutAnnotations(error)) throw error;
       logger.warn("OCR with figure annotations failed; retrying without annotations", {
         kind,
