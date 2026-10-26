@@ -460,6 +460,7 @@ export const getDocumentDetails = internalQuery({
       fullTextPolicy: doc.fullTextPolicy,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,
+      fileSize: doc.fileSize,
       ocrTimedOut: doc.metadata?.ocrTimedOut === true,
     };
   },

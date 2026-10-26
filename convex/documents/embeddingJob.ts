@@ -35,6 +35,12 @@ import { toStoredMarkdown } from "./storedMarkdown.helpers";
 // File extensions that require OCR processing
 const OCR_FILE_EXTENSIONS = [...IMAGE_FILE_EXTENSIONS, ".pdf", ".pptx", ".docx"];
 
+/**
+ * Above this size a file is OCR'd without figure descriptions: the annotated request adds a vision
+ * pass per figure and a large scan can run past its timeout, which Mistral still bills (#591).
+ */
+const ANNOTATED_OCR_MAX_FILE_BYTES = 20 * 1024 * 1024;
+
 const AUDIO_FILE_EXTENSIONS = [".wav", ".mp3", ".m4a", ".webm", ".flac"];
 
 /**
@@ -144,8 +150,12 @@ export const docEmbedding = internalAction({
       logger.phaseStart("extraction");
       currentPhase = "extraction";
 
+      // Plain OCR, without figure descriptions, after a billed timeout (a retry) and for files large
+      // enough that the annotated request is likely to run past its timeout: a failed upload has no
+      // retry, so a re-upload would otherwise be billed for the same timeout again (#591).
       const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "", {
-        annotations: !docDetails.ocrTimedOut,
+        annotations:
+          !docDetails.ocrTimedOut && (docDetails.fileSize ?? 0) <= ANNOTATED_OCR_MAX_FILE_BYTES,
       });
 
       if (docDetails.fileType === "youtube") {
@@ -447,6 +457,14 @@ export const docEmbedding = internalAction({
       });
 
       // Store document-level metadata
+      if (docDetails.ocrTimedOut) {
+        // The plain-only run worked; later reprocesses (a new PDF, a fork) get annotations again.
+        // `{}`, not undefined: function arguments drop undefined fields.
+        await ctx.runMutation(internal.documents.internal.patch, {
+          documentId,
+          patch: { metadata: {} },
+        });
+      }
       await ctx.runMutation(internal.documents.internal.updateMetadata, {
         documentId,
         metadata: {
