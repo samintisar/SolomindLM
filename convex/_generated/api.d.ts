@@ -15,6 +15,7 @@ import type * as _agents__shared_cachedLlm from "../_agents/_shared/cachedLlm.js
 import type * as _agents__shared_chunk_operations from "../_agents/_shared/chunk_operations.js";
 import type * as _agents__shared_citationExtract from "../_agents/_shared/citationExtract.js";
 import type * as _agents__shared_concurrency from "../_agents/_shared/concurrency.js";
+import type * as _agents__shared_currentDate from "../_agents/_shared/currentDate.js";
 import type * as _agents__shared_index from "../_agents/_shared/index.js";
 import type * as _agents__shared_languageInstruction from "../_agents/_shared/languageInstruction.js";
 import type * as _agents__shared_llmErrors from "../_agents/_shared/llmErrors.js";
@@ -62,11 +63,13 @@ import type * as _agents_chat_streamSlice from "../_agents/chat/streamSlice.js";
 import type * as _agents_chat_types from "../_agents/chat/types.js";
 import type * as _agents_chat_vector_search from "../_agents/chat/vector_search.js";
 import type * as _agents_chat_withTimeout from "../_agents/chat/withTimeout.js";
+import type * as _agents_flashcard_answerVerification from "../_agents/flashcard/answerVerification.js";
 import type * as _agents_flashcard_config from "../_agents/flashcard/config.js";
 import type * as _agents_flashcard_flashcardDefects from "../_agents/flashcard/flashcardDefects.js";
 import type * as _agents_flashcard_flashcardHeuristics from "../_agents/flashcard/flashcardHeuristics.js";
 import type * as _agents_flashcard_formatFlashcards from "../_agents/flashcard/formatFlashcards.js";
 import type * as _agents_flashcard_prompts from "../_agents/flashcard/prompts.js";
+import type * as _agents_flashcard_sourcePassage from "../_agents/flashcard/sourcePassage.js";
 import type * as _agents_flashcard_structuredLlm from "../_agents/flashcard/structuredLlm.js";
 import type * as _agents_flashcard_textCleanup from "../_agents/flashcard/textCleanup.js";
 import type * as _agents_literature_review_LiteratureReviewGraph from "../_agents/literature_review/LiteratureReviewGraph.js";
@@ -98,6 +101,7 @@ import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompt
 import type * as _agents_spreadsheet_rowPlan from "../_agents/spreadsheet/rowPlan.js";
 import type * as _agents_spreadsheet_sourcePacking from "../_agents/spreadsheet/sourcePacking.js";
 import type * as _agents_spreadsheet_title from "../_agents/spreadsheet/title.js";
+import type * as _agents_written_questions_codeFormatting from "../_agents/written_questions/codeFormatting.js";
 import type * as _agents_written_questions_config from "../_agents/written_questions/config.js";
 import type * as _agents_written_questions_postprocess from "../_agents/written_questions/postprocess.js";
 import type * as _agents_written_questions_prompts from "../_agents/written_questions/prompts.js";
@@ -185,6 +189,7 @@ import type * as _services_search_AcademicSearchService from "../_services/searc
 import type * as _services_search_DiscoveryService from "../_services/search/DiscoveryService.js";
 import type * as _services_search_TavilySearchService from "../_services/search/TavilySearchService.js";
 import type * as _shared_mathMarkdown from "../_shared/mathMarkdown.js";
+import type * as _shared_modelPlaceholders from "../_shared/modelPlaceholders.js";
 import type * as _utils_CitationEngine from "../_utils/CitationEngine.js";
 import type * as account__purge from "../account/_purge.js";
 import type * as account_actions from "../account/actions.js";
@@ -305,6 +310,7 @@ import type * as studio__job_invokeStudioLlm from "../studio/_job/invokeStudioLl
 import type * as studio__job_jobDeadline from "../studio/_job/jobDeadline.js";
 import type * as studio__job_mapFailures from "../studio/_job/mapFailures.js";
 import type * as studio__job_studioChunks from "../studio/_job/studioChunks.js";
+import type * as studio__job_titleSource from "../studio/_job/titleSource.js";
 import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhases.js";
 import type * as studio_audio_index from "../studio/audio/index.js";
 import type * as studio_audio_job from "../studio/audio/job.js";
@@ -313,6 +319,7 @@ import type * as studio_flashcards_collapseReduce from "../studio/flashcards/col
 import type * as studio_flashcards_flashcardJobPhases from "../studio/flashcards/flashcardJobPhases.js";
 import type * as studio_flashcards_index from "../studio/flashcards/index.js";
 import type * as studio_flashcards_job from "../studio/flashcards/job.js";
+import type * as studio_infographic_figureCheck from "../studio/infographic/figureCheck.js";
 import type * as studio_infographic_generate from "../studio/infographic/generate.js";
 import type * as studio_infographic_index from "../studio/infographic/index.js";
 import type * as studio_jobMutations_audio from "../studio/jobMutations/audio.js";
@@ -369,6 +376,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/chunk_operations": typeof _agents__shared_chunk_operations;
   "_agents/_shared/citationExtract": typeof _agents__shared_citationExtract;
   "_agents/_shared/concurrency": typeof _agents__shared_concurrency;
+  "_agents/_shared/currentDate": typeof _agents__shared_currentDate;
   "_agents/_shared/index": typeof _agents__shared_index;
   "_agents/_shared/languageInstruction": typeof _agents__shared_languageInstruction;
   "_agents/_shared/llmErrors": typeof _agents__shared_llmErrors;
@@ -416,11 +424,13 @@ declare const fullApi: ApiFromModules<{
   "_agents/chat/types": typeof _agents_chat_types;
   "_agents/chat/vector_search": typeof _agents_chat_vector_search;
   "_agents/chat/withTimeout": typeof _agents_chat_withTimeout;
+  "_agents/flashcard/answerVerification": typeof _agents_flashcard_answerVerification;
   "_agents/flashcard/config": typeof _agents_flashcard_config;
   "_agents/flashcard/flashcardDefects": typeof _agents_flashcard_flashcardDefects;
   "_agents/flashcard/flashcardHeuristics": typeof _agents_flashcard_flashcardHeuristics;
   "_agents/flashcard/formatFlashcards": typeof _agents_flashcard_formatFlashcards;
   "_agents/flashcard/prompts": typeof _agents_flashcard_prompts;
+  "_agents/flashcard/sourcePassage": typeof _agents_flashcard_sourcePassage;
   "_agents/flashcard/structuredLlm": typeof _agents_flashcard_structuredLlm;
   "_agents/flashcard/textCleanup": typeof _agents_flashcard_textCleanup;
   "_agents/literature_review/LiteratureReviewGraph": typeof _agents_literature_review_LiteratureReviewGraph;
@@ -452,6 +462,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/spreadsheet/rowPlan": typeof _agents_spreadsheet_rowPlan;
   "_agents/spreadsheet/sourcePacking": typeof _agents_spreadsheet_sourcePacking;
   "_agents/spreadsheet/title": typeof _agents_spreadsheet_title;
+  "_agents/written_questions/codeFormatting": typeof _agents_written_questions_codeFormatting;
   "_agents/written_questions/config": typeof _agents_written_questions_config;
   "_agents/written_questions/postprocess": typeof _agents_written_questions_postprocess;
   "_agents/written_questions/prompts": typeof _agents_written_questions_prompts;
@@ -539,6 +550,7 @@ declare const fullApi: ApiFromModules<{
   "_services/search/DiscoveryService": typeof _services_search_DiscoveryService;
   "_services/search/TavilySearchService": typeof _services_search_TavilySearchService;
   "_shared/mathMarkdown": typeof _shared_mathMarkdown;
+  "_shared/modelPlaceholders": typeof _shared_modelPlaceholders;
   "_utils/CitationEngine": typeof _utils_CitationEngine;
   "account/_purge": typeof account__purge;
   "account/actions": typeof account_actions;
@@ -659,6 +671,7 @@ declare const fullApi: ApiFromModules<{
   "studio/_job/jobDeadline": typeof studio__job_jobDeadline;
   "studio/_job/mapFailures": typeof studio__job_mapFailures;
   "studio/_job/studioChunks": typeof studio__job_studioChunks;
+  "studio/_job/titleSource": typeof studio__job_titleSource;
   "studio/audio/audioJobPhases": typeof studio_audio_audioJobPhases;
   "studio/audio/index": typeof studio_audio_index;
   "studio/audio/job": typeof studio_audio_job;
@@ -667,6 +680,7 @@ declare const fullApi: ApiFromModules<{
   "studio/flashcards/flashcardJobPhases": typeof studio_flashcards_flashcardJobPhases;
   "studio/flashcards/index": typeof studio_flashcards_index;
   "studio/flashcards/job": typeof studio_flashcards_job;
+  "studio/infographic/figureCheck": typeof studio_infographic_figureCheck;
   "studio/infographic/generate": typeof studio_infographic_generate;
   "studio/infographic/index": typeof studio_infographic_index;
   "studio/jobMutations/audio": typeof studio_jobMutations_audio;

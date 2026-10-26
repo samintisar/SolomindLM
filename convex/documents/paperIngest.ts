@@ -101,7 +101,11 @@ type FullTextResult = Extract<PaperIngestResult, { outcome: "full_text" }>;
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** OCR failures worth retrying later: HTTP 429/5xx, network errors and timeouts. */
+/**
+ * OCR failures worth retrying later: HTTP 429/5xx, network errors and timeouts. A 402 (the OCR
+ * account's spending limit is reached) is not one: the cap can last days, so the paper is saved
+ * abstract-only, still usable, and "Find full text" re-ingests it once OCR works again (#591).
+ */
 function isTransientOcrError(error: Error): boolean {
   return (
     isHttpAwareRetryableError(error) ||

@@ -149,7 +149,8 @@ export async function resetDocumentForReembed(
     language: undefined,
     documentStructure: undefined,
     maxHeadingLevel: undefined,
-    metadata: undefined,
+    // A retry after an OCR timeout skips the annotated request that ran long (and was billed).
+    metadata: before?.metadata?.ocrTimedOut === true ? { ocrTimedOut: true } : undefined,
     ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
     updatedAt: Date.now(),
   });
@@ -459,6 +460,8 @@ export const getDocumentDetails = internalQuery({
       fullTextPolicy: doc.fullTextPolicy,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,
+      fileSize: doc.fileSize,
+      ocrTimedOut: doc.metadata?.ocrTimedOut === true,
     };
   },
 });

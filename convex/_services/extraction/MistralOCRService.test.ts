@@ -325,15 +325,19 @@ describe("shouldRetryWithoutAnnotations", () => {
   const http = (status: number) =>
     new ExternalServiceError("mistral", `mistral HTTP ${status}`, { statusCode: status });
 
-  it("falls back on a rejected request, a server error or a timeout", () => {
+  it("falls back on a rejected request or a server error", () => {
     expect(shouldRetryWithoutAnnotations(http(400))).toBe(true);
     expect(shouldRetryWithoutAnnotations(http(422))).toBe(true);
     expect(shouldRetryWithoutAnnotations(http(503))).toBe(true);
-    expect(shouldRetryWithoutAnnotations(new MistralOcrTimeoutError())).toBe(true);
+  });
+
+  // #591: Mistral bills a request we stopped waiting for, so resending would pay for the pages twice.
+  it("does not resend the document after a timeout", () => {
+    expect(shouldRetryWithoutAnnotations(new MistralOcrTimeoutError())).toBe(false);
   });
 
   it("does not fall back on errors plain OCR would get too, or unknown errors", () => {
-    for (const status of [401, 403, 404, 413, 429]) {
+    for (const status of [401, 402, 403, 404, 413, 429]) {
       expect(shouldRetryWithoutAnnotations(http(status))).toBe(false);
     }
     expect(shouldRetryWithoutAnnotations(new Error("boom"))).toBe(false);
@@ -437,35 +441,59 @@ describe("MistralOCRService.processDocument", () => {
               )
             ),
         });
-      const fetchMock = vi
-        .fn()
-        .mockImplementationOnce(stalledBody)
-        .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+      const fetchMock = vi.fn().mockImplementationOnce(stalledBody);
       vi.stubGlobal("fetch", fetchMock);
 
-      const pending = new MistralOCRService("key").processDocument("https://x/a.pdf");
-      await vi.advanceTimersByTimeAsync(90_000);
+      const pending = new MistralOCRService("key")
+        .processDocument("https://x/a.pdf")
+        .catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(150_000);
 
-      await expect(pending).resolves.toBe("**Page 1**\n\ntext");
-      expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+      expect(await pending).toBeInstanceOf(MistralOcrTimeoutError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("retries once without annotations when the annotated request times out", async () => {
+  // #591: Mistral still bills a request we stopped waiting for, so the document is not sent again.
+  it("does not resend the document when the annotated request times out", async () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(
         Object.assign(new Error("The operation was aborted"), { name: "AbortError" })
-      )
-      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+      );
     vi.stubGlobal("fetch", fetchMock);
 
-    const md = await new MistralOCRService("key").processDocument("https://x/a.pdf");
+    await expect(new MistralOCRService("key").processDocument("https://x/a.pdf")).rejects.toThrow(
+      MistralOcrTimeoutError
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // #591: a retry after a timeout goes straight to plain OCR instead of the request that ran long.
+  it("sends only the plain request when annotations are off", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const md = await new MistralOCRService("key", { annotations: false }).processDocument(
+      "https://x/a.png",
+      { kind: "image" }
+    );
 
     expect(md).toBe("**Page 1**\n\ntext");
-    expect(sentBody(fetchMock, 1)).not.toHaveProperty("bbox_annotation_format");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sentBody(fetchMock, 0)).not.toHaveProperty("bbox_annotation_format");
+  });
+
+  it("does not retry a billing rejection", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => rejected(402));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      new MistralOCRService("key").processDocument("https://x/a.pdf")
+    ).rejects.toBeInstanceOf(ExternalServiceError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   describe("with retries", () => {
