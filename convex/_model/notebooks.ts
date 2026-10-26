@@ -1,5 +1,7 @@
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Triggers } from "convex-helpers/server/triggers";
+import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 
 /**
  * Database operations for notebooks.
@@ -52,19 +54,44 @@ export async function getNotebookSourceCount(
 }
 
 /**
- * Keeps the stored source count in step after documents are added (`delta` > 0) or deleted.
- * Call it in the same mutation as the insert or delete. A notebook without a stored count is
- * left for the backfill, since it is counted on read.
+ * Moves the stored source count by `delta`. A notebook without a stored count is left for the
+ * backfill, since it is counted on read.
  */
-export async function adjustNotebookSourceCount(
+async function adjustNotebookSourceCount(
   ctx: MutationCtx,
   notebookId: Id<"notebooks">,
   delta: number
 ): Promise<void> {
   const notebook = await ctx.db.get("notebooks", notebookId);
   if (!notebook || notebook.sourceCount === undefined) return;
+  const next = notebook.sourceCount + delta;
+  if (next < 0) {
+    // A write path changed documents without the count following; recount rather than hide it.
+    createServiceLogger("notebooks", "source_count").warn(
+      "Source count went negative; recounting",
+      {
+        notebookId,
+        stored: notebook.sourceCount,
+        delta,
+      }
+    );
+  }
   await ctx.db.patch("notebooks", notebookId, {
-    sourceCount: Math.max(0, notebook.sourceCount + delta),
+    sourceCount: next < 0 ? await getDocumentCountByNotebook(ctx, notebookId) : next,
+  });
+}
+
+/**
+ * Keeps `notebooks.sourceCount` in step with every document insert, delete and move, through the
+ * triggers in `convex/functions.ts` (#589).
+ */
+export function registerNotebookSourceCountTriggers(triggers: Triggers<DataModel>) {
+  triggers.register("documents", async (ctx, change) => {
+    const before = change.oldDoc?.notebookId;
+    const after = change.newDoc?.notebookId;
+    if (before === after) return;
+    if (before) await adjustNotebookSourceCount(ctx, before, -1);
+    if (after) await adjustNotebookSourceCount(ctx, after, 1);
   });
 }
 

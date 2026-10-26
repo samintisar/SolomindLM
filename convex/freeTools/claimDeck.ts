@@ -78,7 +78,6 @@ export const claimDeck = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    await Notebooks.adjustNotebookSourceCount(ctx, notebookId, 1);
     await ctx.scheduler.runAfter(0, internal.documents.embeddingJob.docEmbedding, {
       documentId,
       userId,

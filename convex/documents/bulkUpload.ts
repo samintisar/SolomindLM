@@ -3,7 +3,6 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { checkSourceLimit } from "../_lib/limits";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
-import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
 import { mutation } from "../functions";
 import { deriveFulltextStatus, primaryLinkUrlForPaper } from "./paperRecord";
@@ -120,7 +119,6 @@ export const bulkUpload = mutation({
           createdAt: now,
           updatedAt: now,
         });
-        await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, 1);
 
         documentIds.push(documentId);
         imported++;

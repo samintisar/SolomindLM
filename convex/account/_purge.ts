@@ -2,7 +2,6 @@ import { PersistentTextStreaming, type StreamId } from "@convex-dev/persistent-t
 import { components } from "../_generated/api";
 import type { Doc, Id, TableNames } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { adjustNotebookSourceCount } from "../_model/notebooks";
 import { isDocumentFileUsedElsewhere } from "../documents/internal";
 import { deleteSynthesisChunkFiles } from "../studio/jobMutations/audio";
 
@@ -166,8 +165,20 @@ function practiceItems<R extends Row>(
 export const PURGE_STEPS: readonly PurgeStep[] = [
   {
     tables: ["documents", "documentChunks", "documentContents"],
-    run: (ctx, userId, budget) =>
-      drainWithChildren(
+    run: async (ctx, userId, budget) => {
+      // The user's notebooks go in a later step. Without a stored count, the documents trigger
+      // leaves them alone instead of patching one per deleted source (#589); notebooks shared
+      // with the user keep theirs.
+      const owned = await ctx.db
+        .query("notebooks")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      for (const notebook of owned) {
+        if (notebook.sourceCount !== undefined) {
+          await ctx.db.patch("notebooks", notebook._id, { sourceCount: undefined });
+        }
+      }
+      return drainWithChildren(
         ctx,
         budget,
         (n) =>
@@ -192,8 +203,6 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
           },
         ],
         async (doc) => {
-          // An editor's documents can sit in someone else's notebook, which keeps its count.
-          await adjustNotebookSourceCount(ctx, doc.notebookId, -1);
           // Forks share the source's file; keep it while another document still uses it.
           if (
             doc.storageId &&
@@ -202,7 +211,8 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
             await deleteStoredFile(ctx, doc.storageId);
           }
         }
-      ),
+      );
+    },
   },
   {
     tables: ["conversations", "messages"],

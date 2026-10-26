@@ -262,9 +262,6 @@ export const abortImport = internalMutation({
       if (args.table !== "citations" && row.notebookId !== args.notebookId) continue;
       if (args.table === "documents") await deleteDocumentText(ctx, id as Id<"documents">);
       await ctx.db.delete(id as Id<typeof args.table>);
-      if (args.table === "documents") {
-        await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, -1);
-      }
     }
     return null;
   },
@@ -302,9 +299,6 @@ export const insertRows = internalMutation({
         continue;
       }
       ids.push(await ctx.db.insert(args.table, row as never));
-    }
-    if (args.table === "documents") {
-      await Notebooks.adjustNotebookSourceCount(ctx, args.notebookId, ids.length);
     }
     return ids;
   },

@@ -13,10 +13,12 @@ import {
   // biome-ignore lint/style/noRestrictedImports: the trigger-wrapped builders are defined here
   mutation as rawMutation,
 } from "./_generated/server";
+import { registerNotebookSourceCountTriggers } from "./_model/notebooks";
 import { registerStudioItemTriggers } from "./_model/studioItems";
 
 const triggers = new Triggers<DataModel>();
 registerStudioItemTriggers(triggers);
+registerNotebookSourceCountTriggers(triggers);
 
 export const mutation = customMutation(rawMutation, customCtx(triggers.wrapDB));
 export const internalMutation = customMutation(rawInternalMutation, customCtx(triggers.wrapDB));
