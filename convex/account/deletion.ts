@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalQuery } from "../_generated/server";
 import { internalMutation } from "../functions";
-import { PURGE_BATCH_SIZE, PURGE_STEPS } from "./_purge";
+import { clearOwnedNotebookSourceCounts, PURGE_BATCH_SIZE, PURGE_STEPS } from "./_purge";
 
 /**
  * Convex Auth access tokens live for an hour and keep working after their session is
@@ -80,6 +80,7 @@ export const deleteUserIdentity = internalMutation({
     }
 
     await ctx.db.delete(userId);
+    await clearOwnedNotebookSourceCounts(ctx, userId);
     await ctx.scheduler.runAfter(0, internal.account.deletion.purgeUserData, { userId, step: 0 });
     await ctx.scheduler.runAfter(
       STALE_TOKEN_SWEEP_DELAY_MS,

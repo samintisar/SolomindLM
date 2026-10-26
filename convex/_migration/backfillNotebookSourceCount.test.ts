@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe("backfillNotebookSourceCount", () => {
-  test("counts each notebook's documents across pages and keeps stored counts", async () => {
+  test("counts each notebook's documents and keeps stored counts unless forced", async () => {
     const t = convexTest(schema, modules);
 
     const ids = await t.run(async (ctx) => {
@@ -58,5 +58,10 @@ describe("backfillNotebookSourceCount", () => {
       counted: (await ctx.db.get(ids.counted))?.sourceCount,
     }));
     expect(counts).toEqual({ many: 23, empty: 0, counted: 7 });
+
+    // `force` repairs a count that drifted through writes that skip the triggers.
+    await t.mutation(internal._migration.backfillNotebookSourceCount.start, { force: true });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect((await t.run((ctx) => ctx.db.get(ids.counted)))?.sourceCount).toBe(2);
   });
 });
