@@ -1,11 +1,12 @@
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { query } from "../_generated/server";
 import { checkNotebookLimit } from "../_lib/limits";
 import { assertNotebookOwner, getNotebookMember } from "../_lib/notebookAccess";
 import { rateLimiter } from "../_lib/rateLimits";
 import { generateShareToken, hashShareToken } from "../_lib/shareToken";
 import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { performNotebookFork } from "./_forkNotebook";
 
 async function findActiveShareByTokenHash(ctx: { db: any }, tokenHash: string) {

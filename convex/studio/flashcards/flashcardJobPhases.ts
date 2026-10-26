@@ -18,13 +18,20 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
+import {
+  type CardVerification,
+  countCardVerification,
+  FLASHCARD_VERIFY_SYSTEM_PROMPT,
+  type FlashcardVerificationResponse,
+  FlashcardVerificationSchema,
+  verifyFlashcards,
+} from "../../_agents/flashcard/answerVerification";
 import { FLASHCARD_CONFIG } from "../../_agents/flashcard/config";
 import {
   groupFlashcardsByTopic,
   heuristicDedupeFlashcards,
   isUsableFlashcard,
 } from "../../_agents/flashcard/flashcardHeuristics";
-import { formatFlashcardsAsText } from "../../_agents/flashcard/formatFlashcards";
 import {
   type Flashcard,
   FlashcardArraySchema,
@@ -32,6 +39,7 @@ import {
   getMapPrompt,
   MAP_SYSTEM_PROMPT,
 } from "../../_agents/flashcard/prompts";
+import { attachPassages, isSameCard, passageForCard } from "../../_agents/flashcard/sourcePassage";
 import { createStructuredLLM } from "../../_agents/flashcard/structuredLlm";
 import { cleanBackText, cleanFrontText } from "../../_agents/flashcard/textCleanup";
 import { internal } from "../../_generated/api";
@@ -51,6 +59,7 @@ import {
   mapFailureRate,
 } from "../_job/mapFailures";
 import { createStudioChunkHelpers } from "../_job/studioChunks";
+import { titleSourceFromItems } from "../_job/titleSource";
 import { fitCardsForRefine, recursiveCollapse, refineFlashcardSelection } from "./collapseReduce";
 
 const { packChunks, validateChunks } = createStudioChunkHelpers("FlashcardGraph");
@@ -67,7 +76,15 @@ const CONFIG = {
   MIN_CARDS_PER_CHUNK: 2,
   BUFFER_MULTIPLIER: 1.5,
   MAX_CARDS_PER_CHUNK: 30,
+  VERIFY_TIMEOUT_MS: 120_000, // per verification batch
+  VERIFY_MAX_TOKENS: 16_000, // DeepSeek reasoning shares this budget
+  MIN_VERIFY_CALL_MS: 20_000, // below this, cards stay unchecked
+  BACKFILL_MIN_REMAINING_MS: 160_000, // verify (120s) + save (30s)
+  BACKFILL_BUFFER_MULTIPLIER: 1.5,
 } as const;
+
+/** A card with the source passage it was written from (#219); the passage is not saved. */
+type CardWithPassage = Flashcard & { sourcePassage?: string };
 
 export type FlashcardGenerationPhaseArgs = {
   flashcardId: Id<"flashcards">;
@@ -372,11 +389,15 @@ export async function runProcessFlashcardMapChunkPhase(
 
     // Clean flashcard text
     const flashcards = (response as FlashcardResponse).flashcards;
-    const cleanedFlashcards = flashcards.map((card: Flashcard) => ({
-      front: cleanFrontText(card.front),
-      back: cleanBackText(card.back),
-      topic: card.topic,
-    }));
+    const cleanedFlashcards = flashcards.map((card: Flashcard) => {
+      const cleaned = {
+        front: cleanFrontText(card.front),
+        back: cleanBackText(card.back),
+        topic: card.topic,
+      };
+      // Kept so the finalize phase can check the card against the text it came from (#219).
+      return { ...cleaned, sourcePassage: passageForCard(cleaned, chunk) };
+    });
 
     // Store result
     const result = {
@@ -560,8 +581,8 @@ export async function runFinalizeFlashcardPhase(
     const mapResults = (flashcard.metadata?.mapResults as Record<string, string>) || {};
 
     // Separate successful and failed results
-    const mapFlashcardGroups: Flashcard[][] = [];
-    const allFlashcards: Flashcard[] = [];
+    const mapFlashcardGroups: CardWithPassage[][] = [];
+    const allFlashcards: CardWithPassage[] = [];
     const failedCount = { count: 0 };
 
     for (const [_idx, resultJson] of Object.entries(mapResults)) {
@@ -621,7 +642,11 @@ export async function runFinalizeFlashcardPhase(
       language
     );
 
-    const collapsedFlashcards = collapsedOutputs.flat().filter(isUsableFlashcard);
+    // Collapse rewrites cards; give them back the passages of the map cards they came from.
+    const collapsedFlashcards = attachPassages(
+      collapsedOutputs.flat().filter(isUsableFlashcard) as CardWithPassage[],
+      allFlashcards
+    );
 
     if (collapsedFlashcards.length === 0) {
       throw new Error("No valid flashcards remained after collapse");
@@ -633,7 +658,7 @@ export async function runFinalizeFlashcardPhase(
       dedupedFlashcards.length <= nearTargetUpperBound &&
       (dedupedFlashcards.length <= cardCount || duplicatesRemoved <= 1);
 
-    let finalFlashcards: Flashcard[];
+    let finalFlashcards: CardWithPassage[];
     if (shouldSkipSmartSelection) {
       finalFlashcards = dedupedFlashcards.slice(0, cardCount);
       console.log(
@@ -676,6 +701,121 @@ export async function runFinalizeFlashcardPhase(
       if (finalFlashcards.length === 0) {
         finalFlashcards = pickSpread(dedupedFlashcards, cardCount);
       }
+      finalFlashcards = attachPassages(finalFlashcards, [...dedupedFlashcards, ...allFlashcards]);
+    }
+
+    // Check each back against its source passage; drop failures and refill from the deduped
+    // cards selection didn't pick while there is time (#219).
+    await ctx.runMutation(internal.studio.jobMutations.flashcards.updateFlashcardStatus, {
+      flashcardId,
+      status: "generating",
+      metadata: {
+        phase: "verifying",
+        progress: 85,
+        currentStep: "Checking answers against your sources...",
+      },
+    });
+
+    const structuredVerifyLLM = createStructuredLLM(FlashcardVerificationSchema, {
+      schemaName: "flashcard_answer_verification",
+      model: env.SMART_LLM,
+      reasoningEnabled: true,
+      temperature: 0,
+      maxTokens: CONFIG.VERIFY_MAX_TOKENS,
+      onUsage: (usage) => {
+        reduceUsage = addTokenUsage(reduceUsage, usage);
+      },
+    });
+
+    const checkCards = (cards: CardWithPassage[]) =>
+      verifyFlashcards(
+        cards.map((card) => ({ front: card.front, back: card.back, passage: card.sourcePassage })),
+        {
+          judge: async (prompt) => {
+            const timeoutMs = deadline.stepTimeoutMs(
+              CONFIG.VERIFY_TIMEOUT_MS,
+              STUDIO_SAVE_RESERVE_MS
+            );
+            if (timeoutMs < CONFIG.MIN_VERIFY_CALL_MS) {
+              throw new Error("No time left in the finalize budget to check flashcards");
+            }
+            return (await invokeStudioLlm({
+              invoke: () =>
+                structuredVerifyLLM.invoke([
+                  new SystemMessage(FLASHCARD_VERIFY_SYSTEM_PROMPT),
+                  new HumanMessage(prompt),
+                ]),
+              timeoutMs,
+              phaseLabel: "FlashcardVerify",
+              retry: { maxAttempts: 1 },
+            })) as unknown as FlashcardVerificationResponse;
+          },
+          onBatchError: (error, batchIndex) => {
+            logger.phaseError("verify_flashcards", error, {
+              batchIndex,
+              outcome: "cards kept unverified",
+            });
+          },
+        }
+      );
+
+    const keepVerified = (cards: CardWithPassage[], statuses: CardVerification[]) =>
+      cards.filter((card, i) => {
+        const verdict = statuses[i];
+        if (verdict.status !== "failed") return true;
+        logger.info(`Dropped flashcard that failed the answer check: ${verdict.reason}`, {
+          phase: "verify_flashcards",
+          front: card.front.substring(0, 120),
+          reason: verdict.reason,
+        });
+        return false;
+      });
+
+    const checkedCards = finalFlashcards;
+    const verifyStatuses = await checkCards(finalFlashcards);
+    finalFlashcards = keepVerified(finalFlashcards, verifyStatuses);
+
+    let backfillStatuses: CardVerification[] = [];
+    let backfilledCount = 0;
+    const deficit = cardCount - finalFlashcards.length;
+    if (deficit > 0) {
+      // Refine rewrites cards, so match by content, not text: neither the original of a kept card
+      // nor of one that just failed should come back.
+      const pool = dedupedFlashcards.filter(
+        (card) => !checkedCards.some((checked) => isSameCard(card, checked))
+      );
+      if (pool.length > 0 && deadline.remainingMs() >= CONFIG.BACKFILL_MIN_REMAINING_MS) {
+        const refill = pickSpread(pool, Math.ceil(deficit * CONFIG.BACKFILL_BUFFER_MULTIPLIER));
+        const refillStatuses = await checkCards(refill);
+        // Use refill cards in order until the deficit is filled; only those looked at count.
+        let used = 0;
+        let usable = 0;
+        while (used < refill.length && usable < deficit) {
+          if (refillStatuses[used].status !== "failed") usable++;
+          used++;
+        }
+        backfillStatuses = refillStatuses.slice(0, used);
+        const refillKept = keepVerified(refill.slice(0, used), backfillStatuses);
+        backfilledCount = refillKept.length;
+        finalFlashcards.push(...refillKept);
+      } else {
+        logger.info(`Not backfilling ${deficit} flashcards`, {
+          phase: "verify_backfill_skipped",
+          poolSize: pool.length,
+          remainingMs: deadline.remainingMs(),
+        });
+      }
+    }
+
+    const verification = countCardVerification([...verifyStatuses, ...backfillStatuses]);
+    logger.info("Flashcard answer check complete", {
+      phase: "verify_flashcards_complete",
+      ...verification,
+      backfilled: backfilledCount,
+      finalCount: finalFlashcards.length,
+    });
+    if (finalFlashcards.length === 0) {
+      throw new Error("Every flashcard failed the check against its source");
     }
 
     const elapsed = Date.now() - startTime;
@@ -687,22 +827,26 @@ export async function runFinalizeFlashcardPhase(
     console.log(`[FlashcardJob] Reduce distribution: ${JSON.stringify(topicDistribution)}`);
 
     // Generate title
-    const flashcardsText = formatFlashcardsAsText(finalFlashcards);
     let title = "Flashcards";
     try {
       title = await generateTitleWithinDeadline(
         deadline,
-        flashcardsText.substring(0, 2000),
+        titleSourceFromItems(
+          finalFlashcards.map((card) => card.front),
+          { request: topic }
+        ),
         "FlashcardTitle"
       );
-    } catch (_e) {
-      console.log("[FlashcardJob] Title generation failed, using default");
+    } catch (e) {
+      logger.warn("Title generation failed, keeping the default title", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
 
     // Save results
     await ctx.runMutation(internal.studio.jobMutations.flashcards.saveFlashcardResults, {
       flashcardId,
-      flashcards: finalFlashcards,
+      flashcards: finalFlashcards.map(({ sourcePassage: _passage, ...card }) => card),
       metadata: withStudioTelemetryMetadata(
         {
           title,
@@ -712,6 +856,7 @@ export async function runFinalizeFlashcardPhase(
           completedAt: Date.now(),
           mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
           mapFailedCount: failedCount.count,
+          answerVerification: { ...verification, backfilled: backfilledCount },
         },
         aggregateStudioJobTelemetry({
           mapResults: Object.values(mapResults),

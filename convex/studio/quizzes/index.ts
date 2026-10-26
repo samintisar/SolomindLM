@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
+import { internalQuery, query } from "../../_generated/server";
 import { InputValidationError } from "../../_lib/errors";
 import { assertCanEditNotebook, getNotebookAccess } from "../../_lib/notebookAccess";
 import { toConvexError } from "../../_lib/serviceErrors";
@@ -12,6 +12,7 @@ import {
   viewerPracticeRows,
 } from "../../_model/studioProgress";
 import { getAuthUserId } from "../../auth";
+import { internalMutation, mutation } from "../../functions";
 import { deletePracticeProgress } from "../practice";
 
 /**

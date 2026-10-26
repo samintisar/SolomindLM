@@ -219,6 +219,27 @@
       }
     },
     {
+      "includes": ["convex/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/_generated/server"],
+                    "importNamePattern": "(mutation|internalMutation)",
+                    "message": "Import mutation builders from convex/functions.ts so database triggers run."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["apps/mobile/**"],
       "linter": {
         "rules": {

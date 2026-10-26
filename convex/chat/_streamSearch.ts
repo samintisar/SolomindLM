@@ -12,6 +12,7 @@ import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 import { EmbeddingService } from "../_services/ai/embeddingClient";
+import { documentChunkTexts } from "../documents/chunks";
 
 type DocumentChunkDoc = Doc<"documentChunks">;
 type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
@@ -197,27 +198,16 @@ export function createFetchDocumentFn(
   ctx: ActionCtx
 ): NonNullable<ChatAgentOptions["fetchDocumentFn"]> {
   return async (documentId: string) => {
-    const [chunks, [doc]] = await Promise.all([
-      ctx.runQuery(internal.documents.chunks.listChunksByDocument, {
-        documentId: documentId as Id<"documents">,
-      }),
-      ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
-        documentIds: [documentId as Id<"documents">],
-      }),
-    ]);
-    if (!chunks || chunks.length === 0) return null;
-
-    const sortedChunks = chunks.sort(
-      (a: { chunkIndex: number }, b: { chunkIndex: number }) => a.chunkIndex - b.chunkIndex
-    );
-    const content = sortedChunks.map((c: { content: string }) => c.content).join("\n\n");
-
-    return {
-      documentId: documentId as Id<"documents">,
-      content,
-      chunkCount: chunks.length,
-      title: doc?.fileName,
-    };
+    const id = documentId as Id<"documents">;
+    const doc = await ctx.runQuery(internal.documents.chunks.getDocumentFullText, {
+      documentId: id,
+    });
+    if (!doc) return null;
+    // Without a complete stored copy, stitch the chunks' text (paged, embeddings left out).
+    const content =
+      doc.text ?? (await documentChunkTexts(ctx, id)).map((c) => c.content).join("\n\n");
+    if (!content) return null;
+    return { documentId: id, content, title: doc.fileName };
   };
 }
 

@@ -1,7 +1,6 @@
 // convex/freeTools/claimDeck.ts
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { mutation } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
 import {
   countWords,
@@ -14,8 +13,9 @@ import { checkNotebookLimit } from "../_lib/limits";
 import { toConvexError } from "../_lib/serviceErrors";
 import { TEXT_TITLE_MAX_LENGTH } from "../_lib/textTitle";
 import * as Notebooks from "../_model/notebooks";
-import { normalizeMathMarkdownDeep } from "../_shared/mathMarkdown";
+import { normalizeStudioMarkdownDeep } from "../_shared/modelPlaceholders";
 import { getAuthUserId } from "../auth";
+import { mutation } from "../functions";
 import { freeDeckCardValidator } from "./validators";
 
 const MAX_CARDS = Math.max(...FREE_FLASHCARD_CARD_COUNTS);
@@ -84,7 +84,7 @@ export const claimDeck = mutation({
       notebookId,
     });
 
-    const cards = normalizeMathMarkdownDeep(args.cards);
+    const cards = normalizeStudioMarkdownDeep(args.cards);
     const flashcardId = await ctx.db.insert("flashcards", {
       userId,
       notebookId,

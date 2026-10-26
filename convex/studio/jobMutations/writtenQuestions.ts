@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "../../_generated/server";
-import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { normalizeStudioMarkdownDeep } from "../../_shared/modelPlaceholders";
+import { internalMutation } from "../../functions";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
@@ -14,7 +14,7 @@ export const saveWrittenQuestionsResults = internalMutation({
     const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
     if (!writtenQuestion) return null;
 
-    const normalizedQuestions = normalizeMathMarkdownDeep(args.questions);
+    const normalizedQuestions = normalizeStudioMarkdownDeep(args.questions);
     const title = args.metadata?.title ?? "Written Questions";
 
     await ctx.db.patch(args.writtenQuestionId, {
