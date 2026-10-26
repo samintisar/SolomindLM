@@ -16,6 +16,7 @@ import { AudioTranscriptionService } from "../_services/extraction/AudioTranscri
 import {
   IMAGE_FILE_EXTENSIONS,
   MistralOCRService,
+  MistralOcrTimeoutError,
   ocrInputKindForFile,
 } from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
@@ -143,7 +144,9 @@ export const docEmbedding = internalAction({
       logger.phaseStart("extraction");
       currentPhase = "extraction";
 
-      const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
+      const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "", {
+        annotations: !docDetails.ocrTimedOut,
+      });
 
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
@@ -568,6 +571,8 @@ export const docEmbedding = internalAction({
             errorPhase: currentPhase,
             errorType: errorMeta.type,
             retryable: errorMeta.retryable,
+            // Read on retry: the next run skips the annotated request that ran long (#591).
+            ocrTimedOut: error instanceof MistralOcrTimeoutError,
             failedAt: Date.now(),
             stack: errorMeta.stackTrace,
           },

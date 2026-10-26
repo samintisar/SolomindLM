@@ -240,8 +240,6 @@ describe("ingestPaper", () => {
   it.each([
     ["a 503", new ExternalServiceError("mistral", "Mistral 503", { statusCode: 503 })],
     ["a timeout", new Error("Mistral OCR request timed out")],
-    // #591: a spending-limit rejection must not store the paper as abstract only for good.
-    ["a 402", new ExternalServiceError("mistral", "Mistral 402", { statusCode: 402 })],
   ])("rethrows %s on an open-access PDF's OCR after deleting it", async (_label, error) => {
     const deps = makeDeps({
       resolveCandidates: vi
@@ -253,6 +251,20 @@ describe("ingestPaper", () => {
     await expect(ingestPaper(input(), deps, logger)).rejects.toThrow(error.message);
     expect(deps.detachPdf).toHaveBeenCalledWith("storage_new");
     expect(deps.fetchCandidate).toHaveBeenCalledTimes(1);
+  });
+
+  // #591: a spending cap can last days; the paper stays usable and "Find full text" retries it.
+  it("saves the paper abstract-only when OCR is refused for billing (402)", async () => {
+    const deps = makeDeps({
+      resolveCandidates: vi.fn().mockResolvedValue([candidate()]),
+      fetchCandidate: vi.fn().mockResolvedValue({ type: "pdf", bytes: pdfBytes, finalUrl: "x" }),
+      ocrStoredPdf: vi
+        .fn()
+        .mockRejectedValue(new ExternalServiceError("mistral", "Mistral 402", { statusCode: 402 })),
+    });
+    const out = await ingestPaper(input({ fileUrl: undefined }), deps, logger);
+    expect(deps.detachPdf).toHaveBeenCalledWith("storage_new");
+    expect(out.outcome).toBe("abstract_only");
   });
 
   describe("a stored PDF", () => {

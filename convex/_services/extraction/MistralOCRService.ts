@@ -357,9 +357,15 @@ export function shouldRetryWithoutAnnotations(error: unknown): boolean {
 export class MistralOCRService {
   private apiKey: string;
   private baseUrl = "https://api.mistral.ai/v1";
+  private annotations: boolean;
 
-  constructor(apiKey: string) {
+  /**
+   * `annotations: false` sends only the plain request, for a document whose annotated request
+   * already timed out once (and was billed): a retry goes straight to the faster plain OCR.
+   */
+  constructor(apiKey: string, options: { annotations?: boolean } = {}) {
     this.apiKey = apiKey;
+    this.annotations = options.annotations ?? true;
   }
 
   private async callOcrEndpoint(
@@ -431,12 +437,14 @@ export class MistralOCRService {
 
     let data: MistralOcrResponse;
     try {
+      // Plain-only gets the annotated request's time budget: it is the document that ran long.
       data = await this.callOcrEndpoint(
-        buildOcrRequestBody(url, kind, true),
+        buildOcrRequestBody(url, this.annotations ? kind : "document", this.annotations),
         ANNOTATED_TIMEOUT_MS,
         { maxAttempts: ANNOTATED_MAX_ATTEMPTS, deadline: Date.now() + ANNOTATED_RETRY_WINDOW_MS }
       );
     } catch (error) {
+      if (!this.annotations) throw error;
       if (!shouldRetryWithoutAnnotations(error)) throw error;
       logger.warn("OCR with figure annotations failed; retrying without annotations", {
         kind,

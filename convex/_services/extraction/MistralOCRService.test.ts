@@ -471,6 +471,21 @@ describe("MistralOCRService.processDocument", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  // #591: a retry after a timeout goes straight to plain OCR instead of the request that ran long.
+  it("sends only the plain request when annotations are off", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const md = await new MistralOCRService("key", { annotations: false }).processDocument(
+      "https://x/a.png",
+      { kind: "image" }
+    );
+
+    expect(md).toBe("**Page 1**\n\ntext");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sentBody(fetchMock, 0)).not.toHaveProperty("bbox_annotation_format");
+  });
+
   it("does not retry a billing rejection", async () => {
     const fetchMock = vi.fn().mockImplementation(async () => rejected(402));
     vi.stubGlobal("fetch", fetchMock);

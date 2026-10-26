@@ -146,7 +146,8 @@ export async function resetDocumentForReembed(
     language: undefined,
     documentStructure: undefined,
     maxHeadingLevel: undefined,
-    metadata: undefined,
+    // A retry after an OCR timeout skips the annotated request that ran long (and was billed).
+    metadata: before?.metadata?.ocrTimedOut === true ? { ocrTimedOut: true } : undefined,
     extractedMarkdown: undefined,
     ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
     updatedAt: Date.now(),
@@ -460,6 +461,7 @@ export const getDocumentDetails = internalQuery({
       extractedMarkdown: doc.extractedMarkdown,
       notebookId: doc.notebookId,
       sourceGuide: doc.sourceGuide,
+      ocrTimedOut: doc.metadata?.ocrTimedOut === true,
     };
   },
 });
