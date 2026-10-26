@@ -20,6 +20,11 @@ export default defineSchema({
     title: v.string(),
     coverColor: v.optional(v.string()),
     icon: v.optional(v.string()),
+    /**
+     * Number of documents, kept in step with every document insert and delete so list reads don't
+     * count them (#589). Absent on notebooks the backfill hasn't reached: counted on read.
+     */
+    sourceCount: v.optional(v.number()),
     /** Admin-curated: shows on the Public tab's Featured shelf. Only honoured while `isPublic`. */
     isFeatured: v.optional(v.boolean()),
     /** Visible to every signed-in user (read, private chat, fork). */

@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import { query } from "../_generated/server";
-import { MAX_DOCS_TO_COUNT } from "../_lib/queryCaps";
 import * as Folders from "../_model/folders";
+import * as Notebooks from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
 import { mutation } from "../functions";
 
@@ -83,12 +83,7 @@ export const getNotebooks = query({
     // Get source counts for each notebook
     const notebooksWithCounts = await Promise.all(
       notebooks.map(async (notebook) => {
-        const docBatch = await ctx.db
-          .query("documents")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
-          .take(MAX_DOCS_TO_COUNT + 1);
-        const sourceCount =
-          docBatch.length > MAX_DOCS_TO_COUNT ? MAX_DOCS_TO_COUNT : docBatch.length;
+        const sourceCount = await Notebooks.getNotebookSourceCount(ctx, notebook);
 
         return {
           id: notebook._id,

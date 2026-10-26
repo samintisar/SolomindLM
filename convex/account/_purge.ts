@@ -159,6 +159,26 @@ function practiceItems<R extends Row>(
 }
 
 /**
+ * Run once before the purge. The user's notebooks are deleted after their documents; without a
+ * stored count, the documents trigger leaves them alone instead of patching one per deleted
+ * source (#589). Notebooks shared with the user keep theirs.
+ */
+export async function clearOwnedNotebookSourceCounts(
+  ctx: MutationCtx,
+  userId: Id<"users">
+): Promise<void> {
+  const owned = await ctx.db
+    .query("notebooks")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  for (const notebook of owned) {
+    if (notebook.sourceCount !== undefined) {
+      await ctx.db.patch("notebooks", notebook._id, { sourceCount: undefined });
+    }
+  }
+}
+
+/**
  * Everything a user owns, in deletion order. Notebook deletion doesn't cascade today,
  * so content is found by owner rather than through notebooks.
  */

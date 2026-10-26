@@ -348,6 +348,8 @@ export async function performNotebookFork(
       sourceUpdatedAt: d.updatedAt,
     });
   }
+  // Set once here: while the notebook has no count, the documents trigger leaves it alone (#589).
+  await ctx.db.patch("notebooks", newNotebookId, { sourceCount: docs.length });
 
   const reports = await ctx.db
     .query("reports")

@@ -76,8 +76,10 @@ export async function checkSourceLimit(
   const isPro = await isProUser(ctx, userId);
   const limit = isPro ? 200 : 20;
 
+  // The stored count spares reading every document row (#589); older notebooks are counted.
   const count =
     existingCount ??
+    (await ctx.db.get("notebooks", notebookId as Id<"notebooks">))?.sourceCount ??
     (
       await ctx.db
         .query("documents")
