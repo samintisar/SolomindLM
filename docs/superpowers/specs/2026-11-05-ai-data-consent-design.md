@@ -70,9 +70,9 @@ SolomindLM sends some of your content to these services:"
 
 | Provider | Data sent | Purpose |
 | --- | --- | --- |
-| Together AI | Your questions, excerpts from your sources, voice recordings | Write answers, notes, quizzes, audio and grading |
-| OpenAI | Source text; infographic prompts | Index sources for search; draw infographics |
-| Voyage AI | Passages from your sources | Rank the most relevant passages |
+| Together AI | Your questions, your sources, and audio you upload or record | To write answers, notes, quizzes, audio and grading |
+| OpenAI | Your questions, source text and infographic prompts | To index and search your sources and draw infographics |
+| Voyage AI | Your questions and passages from your sources | To rank the most relevant passages |
 | Mistral | PDFs and images you upload | Read their text |
 | Tavily | Search terms | Find web sources |
 | Supadata | Links you add | Fetch web pages and video transcripts |

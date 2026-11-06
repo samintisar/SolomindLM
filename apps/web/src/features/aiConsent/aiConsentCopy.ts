@@ -16,17 +16,17 @@ export interface AiProviderDisclosure {
 export const AI_PROVIDERS: readonly AiProviderDisclosure[] = [
   {
     name: "Together AI",
-    data: "Your questions, excerpts from your sources and voice recordings",
+    data: "Your questions, your sources, and audio you upload or record",
     purpose: "to write answers, notes, quizzes, audio and grading",
   },
   {
     name: "OpenAI",
-    data: "Source text and infographic prompts",
-    purpose: "to index your sources for search and draw infographics",
+    data: "Your questions, source text and infographic prompts",
+    purpose: "to index and search your sources and draw infographics",
   },
   {
     name: "Voyage AI",
-    data: "Passages from your sources",
+    data: "Your questions and passages from your sources",
     purpose: "to rank the most relevant passages",
   },
   {
