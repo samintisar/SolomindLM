@@ -57,6 +57,12 @@ handling stays with the existing auth flow).
 a signed-in user, so a consenting user never sees the consent screen flash, and a non-consenting user
 never sees the app flash.
 
+**Native upload button.** On `/notebook/:id` entry paths (deep links, push taps) the native shell draws its
+own upload button over the WebView, which uploads straight to Convex. The web app reports its consent
+state over the bridge (`{ type: "shell-web:ai-consent", granted }`: `true` when granted, `false` for
+needs-consent or declined, and `false` again when the gate unmounts, e.g. on sign-out). The native shell
+shows the button only after a `true` report; it starts hidden. This part ships with the next native build.
+
 ### Consent screen copy
 
 Title: "How SolomindLM uses AI". Lead: "To answer your questions and build study materials,
