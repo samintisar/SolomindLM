@@ -20,6 +20,7 @@ import {
   MistralOcrTimeoutError,
   type OcrInputKind,
   OcrNothingReadableError,
+  OFFICE_FILE_EXTENSIONS,
   ocrInputKindForFile,
 } from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
@@ -36,7 +37,7 @@ import { fulltextStatusAfterIngest, ingestPaper } from "./paperIngest";
 import { toStoredMarkdown } from "./storedMarkdown.helpers";
 
 // File extensions that require OCR processing
-const OCR_FILE_EXTENSIONS = [...IMAGE_FILE_EXTENSIONS, ".pdf", ".pptx", ".docx"];
+const OCR_FILE_EXTENSIONS = [...IMAGE_FILE_EXTENSIONS, ".pdf", ...OFFICE_FILE_EXTENSIONS];
 
 /**
  * Above this size a file is OCR'd without figure descriptions: the annotated request adds a vision

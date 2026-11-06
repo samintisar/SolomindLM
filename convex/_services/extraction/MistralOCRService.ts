@@ -252,12 +252,27 @@ const OCR_MODEL = "mistral-ocr-latest";
 /** File extensions OCR reads as a single image rather than a paged document. */
 export const IMAGE_FILE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".avif"];
 
-export type OcrInputKind = "image" | "document";
+/**
+ * Word and PowerPoint files: paged documents Mistral converts, with their own request rules.
+ * `embeddingJob`'s OCR extension list is built from this one, so the two can't drift.
+ */
+export const OFFICE_FILE_EXTENSIONS = [".docx", ".pptx"];
+
+/**
+ * Images an annotated office request may return. Mistral returns office images only as base64, so
+ * this bounds the response (and its read time inside the timeout) for image-heavy decks; figures
+ * past it are not described.
+ */
+export const OFFICE_ANNOTATED_IMAGE_LIMIT = 30;
+
+/** "office" is a document (`document_url`, page range) that can't take `include_image_base64: false`. */
+export type OcrInputKind = "image" | "document" | "office";
 
 /** Storage URLs carry no extension, so callers decide the input kind from the file name. */
 export function ocrInputKindForFile(fileName: string): OcrInputKind {
   const ext = fileName.toLowerCase().slice(fileName.lastIndexOf("."));
-  return IMAGE_FILE_EXTENSIONS.includes(ext) ? "image" : "document";
+  if (IMAGE_FILE_EXTENSIONS.includes(ext)) return "image";
+  return OFFICE_FILE_EXTENSIONS.includes(ext) ? "office" : "document";
 }
 
 /** Schema for a figure description; its field descriptions steer the annotating model for any source. */
@@ -308,11 +323,16 @@ export function buildOcrRequestBody(
         ? { type: "image_url", image_url: url }
         : { type: "document_url", document_url: url },
     table_format: "markdown",
-    include_image_base64: false,
   };
+  // For .docx/.pptx Mistral rejects `false` ("extracted images can only be returned in base64",
+  // HTTP 400 code 3051), so those leave it out and get images back as base64, which
+  // `markdownFromMistralOcrResponse` ignores. `image_limit` bounds that: a few for figure
+  // descriptions, none when nothing describes them.
+  if (kind === "office") body.image_limit = annotate ? OFFICE_ANNOTATED_IMAGE_LIMIT : 0;
+  else body.include_image_base64 = false;
   // No document_annotation_format: it restates the OCR text and invents content for photos.
   if (annotate) body.bbox_annotation_format = FIGURE_ANNOTATION_FORMAT;
-  if (maxPages !== undefined && kind === "document") body.pages = ocrPageRange(maxPages);
+  if (maxPages !== undefined && kind !== "image") body.pages = ocrPageRange(maxPages);
   return body;
 }
 
@@ -325,6 +345,16 @@ export function isPageRangeRejection(error: unknown): boolean {
   if (!(error instanceof ExternalServiceError)) return false;
   if (error.statusCode !== 400 && error.statusCode !== 422) return false;
   return /\bpages?\b/i.test(error.message);
+}
+
+/**
+ * Whether Mistral refused `include_image_base64: false` for this file type (HTTP 400 code 3051,
+ * "extracted images can only be returned in base64"). Office files never send it; this catches any
+ * other format Mistral applies the rule to, so the request is resent without the flag.
+ */
+export function isImageBase64Rejection(error: unknown): boolean {
+  if (!(error instanceof ExternalServiceError) || error.statusCode !== 400) return false;
+  return /"code":\s*"3051"|can only be returned in base64/i.test(error.message);
 }
 
 export type OcrReadResult = { markdown: string; pagesRead: number };
@@ -468,7 +498,11 @@ export class MistralOCRService {
     return (await this.readDocument(url, options)).markdown;
   }
 
-  /** Sends `body`; when Mistral rejects its page range (a document shorter than the cap), resends it whole. */
+  /**
+   * Sends `body`, resending it once with the part Mistral rejected removed: the page range (a
+   * document shorter than the cap), or `include_image_base64: false` (a file type whose images only
+   * come as base64; images are then limited to what annotations need). A 400 is not billed.
+   */
   private async callWithPageCap(
     body: Record<string, unknown>,
     timeoutMs: number,
@@ -477,6 +511,11 @@ export class MistralOCRService {
     try {
       return await this.callOcrEndpoint(body, timeoutMs, retry);
     } catch (error) {
+      if (body.include_image_base64 !== undefined && isImageBase64Rejection(error)) {
+        const { include_image_base64: _flag, ...rest } = body;
+        const imageLimit = rest.bbox_annotation_format ? OFFICE_ANNOTATED_IMAGE_LIMIT : 0;
+        return this.callWithPageCap({ ...rest, image_limit: imageLimit }, timeoutMs, retry);
+      }
       if (body.pages === undefined || !isPageRangeRejection(error)) throw error;
       const { pages: _pages, ...uncapped } = body;
       return this.callOcrEndpoint(uncapped, timeoutMs, retry);
@@ -493,14 +532,17 @@ export class MistralOCRService {
   ): Promise<OcrReadResult> {
     const kind = options.kind ?? "document";
     // An image is one page; it is sent as a document on the plain paths, but never with a range.
-    const maxPages = kind === "document" ? options.maxPages : undefined;
+    const maxPages = kind === "image" ? undefined : options.maxPages;
+    // The plain request sends images as documents; a Word or PowerPoint file stays "office" so its
+    // request stays valid. Don't fold "office" into "document" here: that request gets a 400.
+    const plainKind: OcrInputKind = kind === "office" ? "office" : "document";
     const logger = createServiceLogger("mistral", "ocr");
 
     let data: MistralOcrResponse;
     try {
       // Plain-only gets the annotated request's time budget: it is the document that ran long.
       data = await this.callWithPageCap(
-        buildOcrRequestBody(url, this.annotations ? kind : "document", this.annotations, maxPages),
+        buildOcrRequestBody(url, this.annotations ? kind : plainKind, this.annotations, maxPages),
         ANNOTATED_TIMEOUT_MS,
         { maxAttempts: ANNOTATED_MAX_ATTEMPTS, deadline: Date.now() + ANNOTATED_RETRY_WINDOW_MS }
       );
@@ -511,9 +553,10 @@ export class MistralOCRService {
         kind,
         error: error instanceof Error ? error.message : String(error),
       });
-      // Exactly the request that worked before annotations, images included (they were sent as documents).
+      // The pre-annotation request: images go as documents. Word and PowerPoint files stay "office",
+      // since the pre-annotation request never worked for them (it sent include_image_base64: false).
       data = await this.callWithPageCap(
-        buildOcrRequestBody(url, "document", false, maxPages),
+        buildOcrRequestBody(url, plainKind, false, maxPages),
         PLAIN_TIMEOUT_MS
       );
     }
