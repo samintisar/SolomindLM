@@ -1,9 +1,13 @@
 import { act, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { loadAppShell } from "./loadAppShell";
 import { RootRoutes } from "./RootRoutes";
 
+vi.mock("@/features/aiConsent/AiConsentGate", () => ({
+  AiConsentGate: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
 vi.mock("./useRootRedirects", () => ({ useRootRedirects: () => {} }));
 vi.mock("./isPublicPath", () => ({
   isPublicPath: (path: string) => path === "/" || path === "/faq",

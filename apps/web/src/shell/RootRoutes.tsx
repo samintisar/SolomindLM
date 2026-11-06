@@ -1,6 +1,7 @@
 import { lazy, Suspense, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Spinner } from "@/shared/components/ui/spinner";
+import { AiConsentGate } from "@/features/aiConsent/AiConsentGate";
+import { AppShellFallback } from "./AppShellFallback";
 import { isPublicPath } from "./isPublicPath";
 import { loadAppShell } from "./loadAppShell";
 import { PublicShell } from "./PublicShell";
@@ -39,16 +40,6 @@ function loadAppShellOrReload() {
 
 const AppShell = lazy(loadAppShellOrReload);
 
-function AppShellFallback() {
-  return (
-    <div className="flex h-screen w-full items-center justify-center bg-background">
-      <span className="text-primary">
-        <Spinner className="size-8" aria-label="Loading" />
-      </span>
-    </div>
-  );
-}
-
 /** Public routes render in a light shell; everything else loads the app shell on demand. */
 export function RootRoutes() {
   useRootRedirects();
@@ -63,8 +54,10 @@ export function RootRoutes() {
 
   if (isPublic) return <PublicShell animateOnMount={shellSwapped.current} />;
   return (
-    <Suspense fallback={<AppShellFallback />}>
-      <AppShell animateOnMount={shellSwapped.current} />
-    </Suspense>
+    <AiConsentGate>
+      <Suspense fallback={<AppShellFallback />}>
+        <AppShell animateOnMount={shellSwapped.current} />
+      </Suspense>
+    </AiConsentGate>
   );
 }
