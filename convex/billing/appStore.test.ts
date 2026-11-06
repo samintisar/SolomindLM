@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
@@ -464,17 +465,51 @@ describe("getPlan", () => {
   });
 });
 
+describe("getPlan with both sources", () => {
+  test("Stripe wins when the user also has an entitled App Store row", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId);
+    const now = Date.now();
+    await t.run(async (ctx) =>
+      ctx.db.insert("stripeSubscriptions", {
+        userId,
+        stripeSubscriptionId: "sub_both",
+        stripeCustomerId: "cus_both",
+        stripePriceId: "price_both",
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: now + 30 * 24 * 60 * 60 * 1000,
+        cancelAtPeriodEnd: false,
+        interval: "month",
+        amount: 1500,
+        currency: "usd",
+        createdAt: now,
+        updatedAt: now,
+      })
+    );
+    expect(await asUser(t, userId).query(api.billing.index.getPlan, {})).toMatchObject({
+      tier: "pro",
+      source: "stripe",
+    });
+  });
+});
+
 describe("createCheckoutSession", () => {
   test("refuses users who already have Pro from the App Store", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     await seedAppStoreSubscription(t, userId);
-    await expect(
-      asUser(t, userId).action(api.billing.index.createCheckoutSession, {
+    const error = await asUser(t, userId)
+      .action(api.billing.index.createCheckoutSession, {
         interval: "month",
         successUrl: "https://example.com/ok",
         cancelUrl: "https://example.com/cancel",
       })
-    ).rejects.toThrow(/App Store/);
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConvexError);
+    expect(JSON.stringify((error as ConvexError<unknown>).data)).toMatch(
+      /already have Pro through the App Store/
+    );
   });
 });

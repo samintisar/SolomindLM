@@ -6,6 +6,8 @@ import Stripe from "stripe";
 import { components, internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import { ActionCtx, action } from "../_generated/server";
+import { InputValidationError } from "../_lib/errors";
+import { toConvexError } from "../_lib/serviceErrors";
 import { getAuthUserId } from "../auth";
 
 // Initialize Stripe client
@@ -71,8 +73,11 @@ export const createCheckoutSession = action({
 
     // Someone who pays through Apple must not start a second, Stripe subscription.
     if (await ctx.runQuery(internal.billing.index.hasAppStoreProInternal, { userId })) {
-      throw new Error(
-        "You already have Pro through the App Store. Manage it in your iPhone's Settings."
+      throw toConvexError(
+        new InputValidationError(
+          "You already have Pro through the App Store. Manage it in your iPhone's Settings.",
+          { field: "interval" }
+        )
       );
     }
 
