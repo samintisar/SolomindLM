@@ -10,6 +10,7 @@ import {
   RAG_CHUNK_OVERLAP_TOKENS,
   RAG_CHUNK_SIZE_TOKENS,
 } from "../_lib/embeddingConfig";
+import { OcrQuotaExceededError, ocrPageCapNotice } from "../_lib/ocrPageLimits";
 import { sourceFailureMessage } from "../_lib/sourceFailure";
 import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
@@ -17,6 +18,9 @@ import {
   IMAGE_FILE_EXTENSIONS,
   MistralOCRService,
   MistralOcrTimeoutError,
+  type OcrInputKind,
+  OcrNothingReadableError,
+  OFFICE_FILE_EXTENSIONS,
   ocrInputKindForFile,
 } from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
@@ -33,7 +37,7 @@ import { fulltextStatusAfterIngest, ingestPaper } from "./paperIngest";
 import { toStoredMarkdown } from "./storedMarkdown.helpers";
 
 // File extensions that require OCR processing
-const OCR_FILE_EXTENSIONS = [...IMAGE_FILE_EXTENSIONS, ".pdf", ".pptx", ".docx"];
+const OCR_FILE_EXTENSIONS = [...IMAGE_FILE_EXTENSIONS, ".pdf", ...OFFICE_FILE_EXTENSIONS];
 
 /**
  * Above this size a file is OCR'd without figure descriptions: the annotated request adds a vision
@@ -145,6 +149,8 @@ export const docEmbedding = internalAction({
 
       let extractedText = "";
       let extractedTitle: string | undefined;
+      /** Whether a paper's saved text is OCR of a PDF (not a web page or the abstract). */
+      let paperTextFromPdf = false;
 
       // Phase: Extraction
       logger.phaseStart("extraction");
@@ -157,6 +163,64 @@ export const docEmbedding = internalAction({
         annotations:
           !docDetails.ocrTimedOut && (docDetails.fileSize ?? 0) <= ANNOTATED_OCR_MAX_FILE_BYTES,
       });
+
+      // Every OCR call reads at most the pages the uploader's plan grants (`_lib/ocrPageLimits.ts`):
+      // reserved first so parallel uploads can't overspend the month, unread pages handed back after.
+      // The eval pack and the showcase seed are staff fixtures, read whole and outside any plan.
+      const ocrUncapped =
+        docDetails.evalSourceSha256 !== undefined ||
+        docDetails.fullTextPolicy === "open_license_only";
+      // Set by each OCR call, so it describes the last one: the text a paper ingest kept, since it
+      // returns on the first candidate it accepts.
+      let ocrNotice: string | undefined;
+      const ocrWithPageCap = async (
+        url: string,
+        options: { kind?: OcrInputKind } = {}
+      ): Promise<string> => {
+        ocrNotice = undefined;
+        if (ocrUncapped) return mistralOCR.processDocument(url, options);
+        const quota = await ctx.runMutation(internal.documents.ocrQuota.reserveOcrPages, {
+          userId: userId as Id<"users">,
+        });
+        if (quota.granted === 0) throw new OcrQuotaExceededError(quota.limits, quota.isPro);
+        let pagesRead = 0;
+        try {
+          const result = await mistralOCR.readDocument(url, {
+            ...options,
+            maxPages: quota.granted,
+          });
+          pagesRead = Math.min(result.pagesRead, quota.granted);
+          ocrNotice = ocrPageCapNotice({
+            pagesRead,
+            granted: quota.granted,
+            limits: quota.limits,
+            isPro: quota.isPro,
+          });
+          return result.markdown;
+        } catch (error) {
+          // Pages Mistral billed stay spent: a request we stopped waiting for (#591), or a
+          // response with nothing readable in it.
+          if (error instanceof MistralOcrTimeoutError) pagesRead = quota.granted;
+          else if (error instanceof OcrNothingReadableError) {
+            pagesRead = Math.min(error.pagesRead, quota.granted);
+          }
+          throw error;
+        } finally {
+          // A failed hand-back only overcounts this user's month; it must not fail the source.
+          await ctx
+            .runMutation(internal.documents.ocrQuota.releaseOcrPages, {
+              userId: userId as Id<"users">,
+              month: quota.month,
+              pages: quota.granted - pagesRead,
+            })
+            .catch((e) =>
+              logger.warn("Could not hand back unread OCR pages", {
+                pages: quota.granted - pagesRead,
+                error: e instanceof Error ? e.message : String(e),
+              })
+            );
+        }
+      };
 
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
@@ -220,7 +284,7 @@ export const docEmbedding = internalAction({
             throw new Error("Could not get file URL for document: " + documentId);
           }
 
-          extractedText = await mistralOCR.processDocument(fileUrl, {
+          extractedText = await ocrWithPageCap(fileUrl, {
             kind: ocrInputKindForFile(docDetails.fileName),
           });
           logger.phaseComplete("extraction", {
@@ -257,7 +321,7 @@ export const docEmbedding = internalAction({
         const page = await extractUrlSource(rawUrl, {
           scrape: (url) =>
             ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url }),
-          ocrPdf: (url) => mistralOCR.processDocument(url),
+          ocrPdf: (url) => ocrWithPageCap(url),
         });
         extractedText = page.content;
         if (page.title?.trim()) extractedTitle = page.title.trim();
@@ -317,7 +381,7 @@ export const docEmbedding = internalAction({
             ocrStoredPdf: async (storageId) => {
               const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
               if (!url) throw new Error("Stored PDF not found");
-              return mistralOCR.processDocument(url);
+              return ocrWithPageCap(url);
             },
             scrape: (url) =>
               ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url }),
@@ -327,6 +391,10 @@ export const docEmbedding = internalAction({
         );
 
         extractedText = result.content;
+        paperTextFromPdf =
+          result.outcome === "full_text" &&
+          (result.fullTextSource.method === "oa_pdf" ||
+            result.fullTextSource.method === "uploaded_pdf");
         if (result.outcome === "full_text" && result.title?.trim()) {
           extractedTitle = result.title.trim();
         }
@@ -457,12 +525,23 @@ export const docEmbedding = internalAction({
       });
 
       // Store document-level metadata
-      if (docDetails.ocrTimedOut) {
+      // A paper saved abstract-only or from a web page didn't use OCR text, so it gets no notice.
+      if (docDetails.fileType === "paper_record" && !paperTextFromPdf) ocrNotice = undefined;
+      if (docDetails.ocrTimedOut || ocrNotice) {
         // The plain-only run worked; later reprocesses (a new PDF, a fork) get annotations again.
-        // `{}`, not undefined: function arguments drop undefined fields.
+        // `{}`, not undefined: function arguments drop undefined fields. `ocrNotice` tells the
+        // user OCR stopped at their page cap (shown in the source viewer). The eval seeder's
+        // hash is kept: it is how a later seed run recognises this source.
         await ctx.runMutation(internal.documents.internal.patch, {
           documentId,
-          patch: { metadata: {} },
+          patch: {
+            metadata: {
+              ...(docDetails.evalSourceSha256
+                ? { evalSourceSha256: docDetails.evalSourceSha256 }
+                : {}),
+              ...(ocrNotice ? { ocrNotice } : {}),
+            },
+          },
         });
       }
       await ctx.runMutation(internal.documents.internal.updateMetadata, {

@@ -6,10 +6,13 @@ import {
   figureBlock,
   hasOcrContent,
   inlineOcrFigures,
+  isPageRangeRejection,
   MistralOCRService,
   MistralOcrTimeoutError,
   markdownFromMistralOcrResponse,
   NOTHING_READABLE_MESSAGE,
+  OcrNothingReadableError,
+  OFFICE_ANNOTATED_IMAGE_LIMIT,
   ocrInputKindForFile,
   parseFigureAnnotation,
   shouldRetryWithoutAnnotations,
@@ -291,8 +294,12 @@ describe("ocrInputKindForFile", () => {
       expect(ocrInputKindForFile(name)).toBe("image");
   });
 
+  it("treats Word and PowerPoint files as office files, case-insensitively", () => {
+    for (const name of ["a.pptx", "b.DOCX"]) expect(ocrInputKindForFile(name)).toBe("office");
+  });
+
   it("treats everything else as a document", () => {
-    for (const name of ["a.pdf", "b.pptx", "c.docx", "no-extension"]) {
+    for (const name of ["a.pdf", "no-extension"]) {
       expect(ocrInputKindForFile(name)).toBe("document");
     }
   });
@@ -318,6 +325,61 @@ describe("buildOcrRequestBody", () => {
   it("leaves out annotation formats for the plain fallback request", () => {
     const body = buildOcrRequestBody("https://x/storage/abc", "image", false);
     expect(body).not.toHaveProperty("bbox_annotation_format");
+  });
+
+  // Office responses carry every image as base64, so the image count is bounded: enough to describe
+  // figures on the annotated request, none on the plain one (it has no use for them).
+  it("bounds the images a Word or PowerPoint response carries", () => {
+    const annotated = buildOcrRequestBody("https://x/deck", "office", true);
+    const plain = buildOcrRequestBody("https://x/deck", "office", false);
+    expect(annotated.image_limit).toBe(OFFICE_ANNOTATED_IMAGE_LIMIT);
+    expect(plain.image_limit).toBe(0);
+    expect(buildOcrRequestBody("https://x/a.pdf", "document", true)).not.toHaveProperty(
+      "image_limit"
+    );
+  });
+
+  // Mistral rejects `include_image_base64: false` for .docx/.pptx (HTTP 400, code 3051):
+  // "extracted images can only be returned in base64".
+  it("leaves include_image_base64 out for Word and PowerPoint files", () => {
+    for (const annotate of [true, false]) {
+      const body = buildOcrRequestBody("https://x/storage/abc", "office", annotate, 30);
+      expect(body).not.toHaveProperty("include_image_base64");
+      expect(body.document).toEqual({
+        type: "document_url",
+        document_url: "https://x/storage/abc",
+      });
+      expect(body.pages).toBe("0-29");
+    }
+    expect(buildOcrRequestBody("https://x/a.pdf", "document", true).include_image_base64).toBe(
+      false
+    );
+  });
+
+  it("asks a document for its first maxPages pages only", () => {
+    const body = buildOcrRequestBody("https://x/a.pdf", "document", true, 30);
+    expect(body.pages).toBe("0-29");
+  });
+
+  it("sends no page range without a cap, or for a single image", () => {
+    expect(buildOcrRequestBody("https://x/a.pdf", "document", true)).not.toHaveProperty("pages");
+    expect(buildOcrRequestBody("https://x/img", "image", true, 30)).not.toHaveProperty("pages");
+  });
+});
+
+describe("isPageRangeRejection", () => {
+  const http = (status: number, body: string) =>
+    new ExternalServiceError("mistral", `mistral HTTP ${status}: ${body}`, { statusCode: status });
+
+  it("is true for a 400 or 422 about the requested pages", () => {
+    expect(isPageRangeRejection(http(400, "Page index 12 out of range"))).toBe(true);
+    expect(isPageRangeRejection(http(422, '{"loc":["body","pages"]}'))).toBe(true);
+  });
+
+  it("is false for other rejections, billing errors and timeouts", () => {
+    expect(isPageRangeRejection(http(400, "Invalid document_url"))).toBe(false);
+    expect(isPageRangeRejection(http(402, "monthly spending limit"))).toBe(false);
+    expect(isPageRangeRejection(new MistralOcrTimeoutError())).toBe(false);
   });
 });
 
@@ -377,6 +439,159 @@ describe("MistralOCRService.processDocument", () => {
 
     expect(md).toBe(`**Page 1**\n\n${figureBlock(CHART)}`);
     expect(sentBody(fetchMock, 0)).toHaveProperty("bbox_annotation_format");
+  });
+
+  it("sends the page cap and reports the pages Mistral read", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      ok({
+        pages: [{ markdown: "one" }, { markdown: "two" }],
+        usage_info: { pages_processed: 2 },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new MistralOCRService("key").readDocument("https://x/a.pdf", {
+      maxPages: 30,
+    });
+
+    expect(result.pagesRead).toBe(2);
+    expect(result.markdown).toContain("one");
+    expect(sentBody(fetchMock, 0).pages).toBe("0-29");
+  });
+
+  it("counts returned pages when usage_info is missing", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "only" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new MistralOCRService("key").readDocument("https://x/a.pdf");
+
+    expect(result.pagesRead).toBe(1);
+  });
+
+  // A document shorter than the cap is the only one Mistral can reject the range for, so it is
+  // safe to read it whole.
+  it("resends without the page range when Mistral rejects the range", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("Page index 29 is out of range", { status: 400 }))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "short" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new MistralOCRService("key").readDocument("https://x/a.pdf", {
+      maxPages: 30,
+    });
+
+    expect(result.markdown).toContain("short");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("pages");
+    expect(sentBody(fetchMock, 1)).toHaveProperty("bbox_annotation_format");
+  });
+
+  it("keeps the page cap on the plain fallback request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/a.pdf", { maxPages: 30 });
+
+    const last = sentBody(fetchMock, fetchMock.mock.calls.length - 1);
+    expect(last).not.toHaveProperty("bbox_annotation_format");
+    expect(last.pages).toBe("0-29");
+  });
+
+  it("sends no page range when an image falls back to the plain document request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(400))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/abc", {
+      kind: "image",
+      maxPages: 30,
+    });
+
+    expect(sentBody(fetchMock, 1).document.type).toBe("document_url");
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("pages");
+  });
+
+  it("reports the billed pages when OCR finds nothing readable", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        ok({ pages: [{ markdown: "" }, { markdown: " " }], usage_info: { pages_processed: 2 } })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const err = await new MistralOCRService("key")
+      .readDocument("https://x/a.pdf", { maxPages: 30 })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(OcrNothingReadableError);
+    expect((err as OcrNothingReadableError).pagesRead).toBe(2);
+  });
+
+  it("sends a valid office request when annotations are off (large files, retry after a timeout)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "slide text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key", { annotations: false }).readDocument(
+      "https://x/storage/deck",
+      { kind: "office", maxPages: 30 }
+    );
+
+    const body = sentBody(fetchMock, 0);
+    expect(body).not.toHaveProperty("include_image_base64");
+    expect(body).not.toHaveProperty("bbox_annotation_format");
+    expect(body.image_limit).toBe(0);
+    expect(body.pages).toBe("0-29");
+  });
+
+  // Any other format Mistral applies the same rule to gets through without a code change.
+  it("resends without include_image_base64 when Mistral says images can only come as base64", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            message:
+              "For .odt files, extracted images can only be returned in base64. If you don't want images, try setting `image_limit=0` instead.",
+            code: "3051",
+          }),
+          { status: 400 }
+        )
+      )
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/file", { maxPages: 30 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("include_image_base64");
+    expect(sentBody(fetchMock, 1)).toHaveProperty("bbox_annotation_format");
+    expect(sentBody(fetchMock, 1).pages).toBe("0-29");
+  });
+
+  it("keeps a Word or PowerPoint file's request valid on the plain fallback", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "slide text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/deck", {
+      kind: "office",
+      maxPages: 30,
+    });
+
+    const last = sentBody(fetchMock, fetchMock.mock.calls.length - 1);
+    expect(last).not.toHaveProperty("bbox_annotation_format");
+    expect(last).not.toHaveProperty("include_image_base64");
+    expect(last.pages).toBe("0-29");
   });
 
   it("sends image uploads as image_url", async () => {

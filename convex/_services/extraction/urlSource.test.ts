@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { OCR_PAGE_LIMITS, OcrQuotaExceededError } from "../../_lib/ocrPageLimits";
 import { UserFacingSourceError } from "../../_lib/sourceFailure";
 import { extractUrlSource, pdfUrlForLink } from "./urlSource";
 
@@ -97,6 +98,17 @@ describe("extractUrlSource", () => {
     expect(err).toBeInstanceOf(UserFacingSourceError);
     expect(err.userMessage).toMatch(/couldn't read the PDF/i);
     expect(err.message).toContain("429");
+  });
+
+  it("passes the monthly OCR quota message through instead of calling the PDF unreadable", async () => {
+    const quota = new OcrQuotaExceededError(OCR_PAGE_LIMITS.free, false);
+    const d = deps({
+      ocrPdf: vi.fn(async () => {
+        throw quota;
+      }),
+    });
+
+    await expect(extractUrlSource("https://example.org/a.pdf", d)).rejects.toBe(quota);
   });
 
   it("treats an empty OCR result as unreadable", async () => {

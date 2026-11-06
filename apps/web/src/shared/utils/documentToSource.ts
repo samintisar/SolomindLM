@@ -10,6 +10,16 @@ function failureReasonOf(doc: {
   return typeof reason === "string" && reason.trim() ? reason.trim() : undefined;
 }
 
+/** The stored note that OCR stopped at the user's page cap, on a processed document. */
+function processingNoticeOf(doc: {
+  status?: string;
+  metadata?: { ocrNotice?: unknown } | null;
+}): string | undefined {
+  if (doc.status !== "completed") return undefined;
+  const notice = doc.metadata?.ocrNotice;
+  return typeof notice === "string" && notice.trim() ? notice.trim() : undefined;
+}
+
 // Transform Convex Document type to Source UI type
 export function documentToSource(doc: any): Source {
   let type: Source["type"] = "PDF";
@@ -25,6 +35,7 @@ export function documentToSource(doc: any): Source {
       content: "",
       status: doc.status,
       failureReason: failureReasonOf(doc),
+      processingNotice: processingNoticeOf(doc),
       url: doc.fileUrl as string | undefined,
       paper: pr
         ? {
@@ -141,6 +152,7 @@ export function documentToSource(doc: any): Source {
     content: "",
     status: doc.status,
     failureReason: failureReasonOf(doc),
+    processingNotice: processingNoticeOf(doc),
     url,
     remoteRefreshKind,
     sourceGuide: doc.sourceGuide,
