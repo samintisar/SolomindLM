@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent } from "@/shared/components/ui/card";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-import { canOfferPurchases } from "@/utils/platformDetection";
+import { purchaseChannel } from "@/utils/platformDetection";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "../planFeatures";
 import {
   formatUsd,
@@ -17,6 +17,7 @@ import {
   useCreatePortalSession,
   useSubscriptionStatus,
 } from "../services/subscriptionApi";
+import { AppStorePlans } from "./AppStorePlans";
 import { PlanCard } from "./PlanCard";
 
 interface BillingPageProps {
@@ -29,7 +30,10 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
   const createCheckout = useCreateCheckout();
   const createPortalSession = useCreatePortalSession();
   const cancelSubscription = useCancelSubscription();
-  const purchasable = canOfferPurchases();
+  const channel = purchaseChannel();
+  const purchasable = channel !== "none";
+  const billedByApple = status?.source === "app_store";
+  const appleRenewalFailed = billedByApple && status?.status === "past_due";
 
   const handleUpgrade = async (interval: "month" | "year") => {
     try {
@@ -111,15 +115,29 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                       <h2 className="text-2xl font-display font-bold mb-1 text-foreground">
                         Pro Plan
                       </h2>
-                      <p className="text-muted-foreground mb-1">
-                        {status.interval === "month" ? "Monthly" : "Yearly"} billing
-                      </p>
-                      {status.currentPeriodEnd && (
-                        <p className="text-sm text-muted-foreground">
-                          {status.cancelAtPeriodEnd ? "Access until " : "Renews on "}
-                          {new Date(status.currentPeriodEnd).toLocaleDateString(undefined, {
-                            dateStyle: "long",
-                          })}
+                      {status.interval && (
+                        <p className="text-muted-foreground mb-1">
+                          {status.interval === "month" ? "Monthly" : "Yearly"} billing
+                        </p>
+                      )}
+                      {appleRenewalFailed ? (
+                        <p className="text-sm text-warning-muted-foreground font-medium">
+                          Apple couldn't renew your subscription. Update your payment method in
+                          Settings.
+                        </p>
+                      ) : (
+                        status.currentPeriodEnd && (
+                          <p className="text-sm text-muted-foreground">
+                            {status.cancelAtPeriodEnd ? "Access until " : "Renews on "}
+                            {new Date(status.currentPeriodEnd).toLocaleDateString(undefined, {
+                              dateStyle: "long",
+                            })}
+                          </p>
+                        )
+                      )}
+                      {billedByApple && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Billed by Apple. Manage it in your iPhone's Settings.
                         </p>
                       )}
                       {status.cancelAtPeriodEnd && (
@@ -129,7 +147,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                       )}
                     </div>
                     <div className="text-right">
-                      {purchasable && (
+                      {channel === "stripe" && !billedByApple && (
                         <>
                           <div className="text-sm text-muted-foreground mb-2">Current Price</div>
                           <p className="text-3xl font-display font-bold mb-3">
@@ -147,7 +165,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                       </div>
                     </div>
                   </div>
-                  {!status.cancelAtPeriodEnd && (
+                  {!status.cancelAtPeriodEnd && !billedByApple && (
                     <Button variant="outline" onClick={handleCancel} className="mt-6">
                       Cancel Subscription
                     </Button>
@@ -156,8 +174,10 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
               </Card>
             )}
 
-            {/* Native app: plan summary only — no prices or checkout (see canOfferPurchases) */}
-            {!purchasable && !status?.hasSubscription && (
+            {channel === "app_store" && <AppStorePlans status={status} />}
+
+            {/* Native app without in-app purchase: plan summary only — no prices or checkout */}
+            {channel === "none" && !status?.hasSubscription && (
               <Card className="mx-auto mb-12 max-w-md">
                 <CardContent>
                   <h2 className="text-2xl font-display font-bold mb-1 text-foreground">
@@ -180,7 +200,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
             )}
 
             {/* Pricing Cards Grid */}
-            {purchasable && (
+            {channel === "stripe" && !billedByApple && (
               <div className="mb-12 grid gap-8 lg:grid-cols-3">
                 <PlanCard
                   title="Free"

@@ -30,7 +30,7 @@ interface DeleteAccountDialogProps {
 export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogProps) {
   const deleteAccount = useAction(api.account.actions.deleteAccount);
   const { signOut } = useAuth();
-  const { hasSubscription } = useSubscriptionStatus();
+  const { hasSubscription, source } = useSubscriptionStatus();
   const { showError } = useServiceErrorToast();
   const navigate = useNavigate();
   const [confirmation, setConfirmation] = useState("");
@@ -68,7 +68,11 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           <AlertDialogDescription>
             This permanently deletes your account and everything in it: notebooks, sources, chats,
             notes, and generated content. It can't be undone.
-            {hasSubscription ? " Your subscription will be cancelled immediately." : null}
+            {source === "app_store"
+              ? " Apple keeps billing your App Store subscription until you cancel it in your iPhone's Settings."
+              : hasSubscription
+                ? " Your subscription will be cancelled immediately."
+                : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col gap-2">

@@ -1,13 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-let mockIsNativeShell = false;
+let mockChannel: "stripe" | "app_store" | "none" = "stripe";
 let mockStatus: Record<string, unknown> = { hasSubscription: false };
 
 vi.mock("@/utils/platformDetection", () => ({
-  canOfferPurchases: () => !mockIsNativeShell,
-  purchaseChannel: () => (mockIsNativeShell ? "none" : "stripe"),
-  shellSupportsIap: () => false,
+  purchaseChannel: () => mockChannel,
+  canOfferPurchases: () => mockChannel !== "none",
+}));
+
+vi.mock("./AppStorePlans", () => ({
+  AppStorePlans: () => <div data-testid="app-store-plans" />,
 }));
 
 vi.mock("../services/subscriptionApi", () => ({
@@ -33,7 +36,7 @@ const subscriber = {
 
 describe("BillingPage", () => {
   beforeEach(() => {
-    mockIsNativeShell = false;
+    mockChannel = "stripe";
     mockStatus = { hasSubscription: false };
   });
 
@@ -45,7 +48,7 @@ describe("BillingPage", () => {
   });
 
   it("shows only the free plan summary in the native app", () => {
-    mockIsNativeShell = true;
+    mockChannel = "none";
     render(<BillingPage onBack={() => {}} />);
 
     expect(screen.getByRole("heading", { name: "Your Plan" })).toBeInTheDocument();
@@ -55,7 +58,7 @@ describe("BillingPage", () => {
   });
 
   it("lets a subscriber cancel but not switch plans in the native app", () => {
-    mockIsNativeShell = true;
+    mockChannel = "none";
     mockStatus = subscriber;
     render(<BillingPage onBack={() => {}} />);
 
@@ -63,5 +66,49 @@ describe("BillingPage", () => {
     expect(screen.queryByRole("button", { name: /Switch to/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Free Plan" })).not.toBeInTheDocument();
     expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
+  });
+
+  it("shows App Store plans in a build with in-app purchase", () => {
+    mockChannel = "app_store";
+    render(<BillingPage onBack={() => {}} />);
+    expect(screen.getByTestId("app-store-plans")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Get Started" })).not.toBeInTheDocument();
+  });
+
+  it("on the web, an App Store subscriber sees Apple billing and no Stripe actions", () => {
+    mockStatus = { ...subscriber, source: "app_store" };
+    render(<BillingPage onBack={() => {}} />);
+    expect(
+      screen.getByText("Billed by Apple. Manage it in your iPhone's Settings.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel Subscription" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Switch to/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Current Price")).not.toBeInTheDocument();
+  });
+
+  it("tells an App Store subscriber in grace that Apple couldn't renew", () => {
+    mockStatus = {
+      ...subscriber,
+      source: "app_store",
+      status: "past_due",
+      currentPeriodEnd: "2026-12-01T00:00:00.000Z",
+    };
+    render(<BillingPage onBack={() => {}} />);
+    expect(
+      screen.getByText(
+        "Apple couldn't renew your subscription. Update your payment method in Settings."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Renews on/)).not.toBeInTheDocument();
+  });
+
+  it("keeps showing the renewal date for a healthy App Store subscription", () => {
+    mockStatus = {
+      ...subscriber,
+      source: "app_store",
+      currentPeriodEnd: "2026-12-01T00:00:00.000Z",
+    };
+    render(<BillingPage onBack={() => {}} />);
+    expect(screen.getByText(/Renews on/)).toBeInTheDocument();
   });
 });

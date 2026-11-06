@@ -11,6 +11,7 @@ export function useIapProducts(): { state: ProductsState; retry: () => void } {
   const [state, setState] = useState<ProductsState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` re-runs the load on retry
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });

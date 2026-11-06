@@ -5,7 +5,7 @@
 
 import { useCallback } from "react";
 import { useCreateCheckout } from "@/features/billing/services/subscriptionApi";
-import { canOfferPurchases } from "@/utils/platformDetection";
+import { canOfferPurchases, purchaseChannel } from "@/utils/platformDetection";
 import { useToast } from "../contexts/useToast";
 import {
   getLimitErrorMessage,
@@ -14,6 +14,16 @@ import {
   type ParsedLimitError,
   parseLimitError,
 } from "../utils/errorParser";
+
+/**
+ * Client-side navigation to /billing without a router hook: callers include non-component code
+ * paths and tests outside a Router. BrowserRouter listens for popstate, so this swaps the route
+ * without a reload (a reload would re-authenticate the shell's WebView).
+ */
+function openBillingPage() {
+  window.history.pushState(null, "", "/billing");
+  window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+}
 
 /**
  * Options for handleLimitError
@@ -25,7 +35,7 @@ export interface HandleLimitErrorOptions {
   upgradeMessage?: string;
   /** Whether to show the upgrade button (default: true) */
   showUpgradeButton?: boolean;
-  /** Callback when upgrade button is clicked (default: opens Stripe checkout) */
+  /** Callback when upgrade button is clicked (default: Stripe checkout, or the Billing page in the iOS app) */
   onUpgrade?: () => void;
 }
 
@@ -68,8 +78,13 @@ export function useLimitErrorToast() {
       const message = errorMessage || getLimitErrorMessage(parsedError);
       const upgradeText = purchasable ? upgradeMessage || getUpgradeMessage(parsedError) : "";
 
-      // Default upgrade handler: open Stripe checkout
+      // Default upgrade handler: Stripe checkout on the web. The iOS app sells through the App Store,
+      // so it opens the Billing page, where the in-app purchase plans live.
       const defaultOnUpgrade = async () => {
+        if (purchaseChannel() === "app_store") {
+          openBillingPage();
+          return;
+        }
         try {
           const successUrl = `${window.location.origin}/billing?success=true`;
           const cancelUrl = `${window.location.origin}/billing?canceled=true`;

@@ -10,6 +10,8 @@ interface PlanCardProps {
   /** The amount, e.g. "$7.50"; rendered before a muted "/month". */
   price: string;
   priceNote?: string;
+  /** Muted unit after the price; defaults to "/month". */
+  periodLabel?: string;
   action: ReactNode;
   featuresLabel: string;
   features: readonly string[];
@@ -25,6 +27,7 @@ export function PlanCard({
   subtitle,
   price,
   priceNote,
+  periodLabel = "/month",
   action,
   featuresLabel,
   features,
@@ -49,7 +52,7 @@ export function PlanCard({
             <div className="flex items-baseline gap-2">
               <p className="font-display text-5xl font-bold text-foreground">
                 {price}
-                <span className="text-lg font-normal text-muted-foreground">/month</span>
+                <span className="text-lg font-normal text-muted-foreground">{periodLabel}</span>
               </p>
               {priceNote && <p className="text-sm text-muted-foreground">{priceNote}</p>}
             </div>
