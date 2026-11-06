@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeAll, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { ToastContext, type ToastContextValue } from "@/shared/contexts/useToast";
 import { FeedbackProvider } from "../../feedback/FeedbackContext";
 import { AvatarDropdown } from "./AvatarDropdown";
@@ -11,6 +11,10 @@ vi.mock("convex/react", () => ({
   useQuery: vi.fn(() => undefined),
   useMutation: vi.fn(),
   useAction: vi.fn(),
+}));
+
+vi.mock("@/features/aiConsent/AiDataSharingDialog", () => ({
+  AiDataSharingDialog: () => <div data-testid="ai-data-sharing-dialog" />,
 }));
 
 vi.mock("./LanguageSelector", () => ({
@@ -164,5 +168,28 @@ describe("AvatarDropdown onboarding actions", () => {
         name: /show getting-started checklist/i,
       })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("AI data sharing item", () => {
+  afterEach(() => {
+    delete window.__IS_NATIVE_SHELL__;
+  });
+
+  test("is shown in the mobile shell and opens the dialog", async () => {
+    window.__IS_NATIVE_SHELL__ = true;
+    const user = userEvent.setup();
+    renderMenu();
+    await openMenu(user);
+    await user.click(await screen.findByRole("menuitem", { name: /AI data sharing/ }));
+    expect(await screen.findByTestId("ai-data-sharing-dialog")).toBeInTheDocument();
+  });
+
+  test("is hidden on the web", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await openMenu(user);
+    await screen.findByRole("menuitem", { name: /Logout/ });
+    expect(screen.queryByRole("menuitem", { name: /AI data sharing/ })).not.toBeInTheDocument();
   });
 });

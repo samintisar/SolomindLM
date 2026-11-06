@@ -125,17 +125,17 @@ export const PrivacyPolicy: React.FC = () => {
           </li>
           <li>
             <span className="text-foreground">Together AI</span> — large language model inference
-            for chat and generation flows; text-to-speech for audio overviews; and speech-to-text
-            for uploaded audio and voice input in chat (via hosted models on Together&apos;s
-            platform).
+            for chat and generation flows, which receives your questions and the text of your
+            sources; text-to-speech for audio overviews; and speech-to-text for uploaded audio and
+            voice input in chat (via hosted models on Together&apos;s platform).
           </li>
           <li>
             <span className="text-foreground">OpenAI</span> — text embeddings of your sources and
             questions for search and retrieval, and image generation for infographics.
           </li>
           <li>
-            <span className="text-foreground">Voyage AI</span> — reranking retrieved passages for
-            relevance in search and chat.
+            <span className="text-foreground">Voyage AI</span> — reranking retrieved passages
+            against your question for relevance in search and chat.
           </li>
           <li>
             <span className="text-foreground">Mistral</span> — optical character recognition (OCR)

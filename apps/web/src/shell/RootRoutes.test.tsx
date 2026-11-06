@@ -1,9 +1,16 @@
 import { act, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { loadAppShell } from "./loadAppShell";
 import { RootRoutes } from "./RootRoutes";
 
+// A marker wrapper so tests can pin where the consent gate sits.
+vi.mock("@/features/aiConsent/AiConsentGate", () => ({
+  AiConsentGate: ({ children }: { children: ReactNode }) => (
+    <div data-testid="ai-consent-gate">{children}</div>
+  ),
+}));
 vi.mock("./useRootRedirects", () => ({ useRootRedirects: () => {} }));
 vi.mock("./isPublicPath", () => ({
   isPublicPath: (path: string) => path === "/" || path === "/faq",
@@ -52,6 +59,16 @@ describe("RootRoutes", () => {
   test("loads the app shell for app paths, unfaded on first load", async () => {
     renderAt("/home");
     expect(await screen.findByTestId("app-shell")).toHaveAttribute("data-animate", "false");
+  });
+
+  test("wraps the app shell, and only the app shell, in the AI consent gate", async () => {
+    renderAt("/home");
+    const appShell = await screen.findByTestId("app-shell");
+    expect(screen.getByTestId("ai-consent-gate")).toContainElement(appShell);
+
+    act(() => navigate("/faq"));
+    expect(screen.getByTestId("public-shell")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-consent-gate")).toBeNull();
   });
 
   test("fades the app shell in when the visitor crosses over from a public page", async () => {

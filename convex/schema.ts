@@ -84,6 +84,12 @@ export default defineSchema({
   userPreferences: defineTable({
     userId: v.id("users"),
     outputLanguage: v.optional(v.string()),
+    /** AI data-sharing consent text version the user allowed in the mobile app; absent = not allowed. */
+    aiConsentVersion: v.optional(v.number()),
+    /** Time of the latest AI consent grant or decline. */
+    aiConsentAt: v.optional(v.number()),
+    /** Set by "Not now" or Turn off; cleared by a grant. */
+    aiConsentDeclinedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 

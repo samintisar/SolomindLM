@@ -4,13 +4,14 @@ import {
   LogOut,
   MessageSquarePlus,
   Moon,
+  ShieldCheck,
   Sun,
   Trash2,
   User as UserIcon,
   Wrench,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
@@ -24,11 +25,21 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { importOrReloadOnce } from "@/shared/utils/importOrReloadOnce";
+import { isNativeShell } from "@/utils/platformDetection";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import { LanguageSelector } from "./LanguageSelector";
+
+// Mobile-shell only; keep it out of the chunk every web page loads.
+const AiDataSharingDialog = lazy(() =>
+  importOrReloadOnce(
+    () => import("@/features/aiConsent/AiDataSharingDialog"),
+    "ai-data-sharing-dialog-reloaded"
+  ).then((m) => ({ default: m.AiDataSharingDialog }))
+);
 
 interface AvatarDropdownProps {
   user: User | null;
@@ -67,10 +78,11 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? "Signed in" : null);
   const initial = isAuthenticated ? userInitial(user) : null;
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [aiSharingOpen, setAiSharingOpen] = useState(false);
 
   return (
     <>
-      {/* modal={false}: "Delete account" opens a dialog; a modal menu would leave pointer-events stuck on body. */}
+      {/* modal={false}: "Delete account" and "AI data sharing" open dialogs; a modal menu would leave pointer-events stuck on body. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="avatar" aria-label="Account menu">
@@ -98,6 +110,12 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
               {theme === "light" ? "Dark mode" : "Light mode"}
             </DropdownMenuItem>
             <LanguageSelector isAuthenticated={isAuthenticated} />
+            {isAuthenticated && isNativeShell() ? (
+              <DropdownMenuItem onSelect={() => setAiSharingOpen(true)}>
+                <ShieldCheck />
+                AI data sharing
+              </DropdownMenuItem>
+            ) : null}
             {isAuthenticated && showChecklistDismissed && onShowChecklist ? (
               <DropdownMenuItem onSelect={onShowChecklist}>
                 <ListChecks />
@@ -142,6 +160,11 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
       {/* Mounted only while open so the menu doesn't subscribe to billing status. */}
       {isAuthenticated && deleteAccountOpen ? (
         <DeleteAccountDialog open onOpenChange={setDeleteAccountOpen} />
+      ) : null}
+      {isAuthenticated && aiSharingOpen ? (
+        <Suspense fallback={null}>
+          <AiDataSharingDialog open onOpenChange={setAiSharingOpen} />
+        </Suspense>
       ) : null}
     </>
   );
