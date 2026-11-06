@@ -24,7 +24,11 @@ import {
   rateLimiter,
 } from "./rateLimits";
 
-/** True when the user has an active Stripe subscription or an entitled App Store subscription. */
+/**
+ * True when the user has an active Stripe subscription or an entitled App Store subscription.
+ * Reads the wall clock: public queries should call `findEntitledAppStoreSubscription(ctx, userId, now)`
+ * instead and accept that the result only refreshes when data changes (the 1-day leeway bounds the staleness).
+ */
 export async function isProUser(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
   const subscription = await ctx.db
     .query("stripeSubscriptions")
@@ -43,6 +47,7 @@ export async function findEntitledAppStoreSubscription(
   const rows = await ctx.db
     .query("appStoreSubscriptions")
     .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
     .take(10);
   return rows.find((row) => isAppStoreEntitled(row, now)) ?? null;
 }
