@@ -12,11 +12,13 @@ vi.mock("@/features/auth/components/DeleteAccountDialog", () => ({
   DeleteAccountDialog: () => <div data-testid="delete-account-dialog" />,
 }));
 
+const toastError = vi.fn(() => "t");
+
 function makeToast(): ToastContextValue {
   return {
     toast: vi.fn(() => "t"),
     success: vi.fn(() => "t"),
-    error: vi.fn(() => "t"),
+    error: toastError,
     info: vi.fn(() => "t"),
     loading: vi.fn(() => "t"),
     dismiss: vi.fn(),
@@ -29,7 +31,6 @@ function renderScreen(onReview = vi.fn()) {
       <ToastContext.Provider value={makeToast()}>
         <Routes>
           <Route path="/home" element={<AiFeaturesOffScreen onReview={onReview} />} />
-          <Route path="/sign-in" element={<div data-testid="sign-in" />} />
         </Routes>
       </ToastContext.Provider>
     </MemoryRouter>
@@ -40,6 +41,7 @@ function renderScreen(onReview = vi.fn()) {
 describe("AiFeaturesOffScreen", () => {
   beforeEach(() => {
     signOut.mockReset().mockResolvedValue(undefined);
+    toastError.mockClear();
   });
 
   test("Review and allow returns to the consent screen", async () => {
@@ -48,11 +50,27 @@ describe("AiFeaturesOffScreen", () => {
     expect(onReview).toHaveBeenCalled();
   });
 
-  test("Sign out signs out and goes to sign-in", async () => {
+  test("Sign out calls signOut", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(signOut).toHaveBeenCalled();
-    await waitFor(() => expect(screen.getByTestId("sign-in")).toBeInTheDocument());
+  });
+
+  test("disables the actions while sign-out is pending", async () => {
+    signOut.mockReturnValue(new Promise(() => {}));
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    for (const name of ["Review and allow", "Sign out", "Delete account"]) {
+      expect(screen.getByRole("button", { name })).toBeDisabled();
+    }
+  });
+
+  test("a failed sign-out shows an error toast and re-enables the actions", async () => {
+    signOut.mockRejectedValue(new Error("boom"));
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
   });
 
   test("Delete account opens the existing dialog", async () => {

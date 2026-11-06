@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { DeleteAccountDialog } from "@/features/auth/components/DeleteAccountDialog";
 import { useAuth } from "@/features/auth/useAuth";
 import { Button } from "@/shared/components/ui/button";
@@ -13,16 +13,17 @@ interface AiFeaturesOffScreenProps {
 /** Shown in the mobile shell after "Not now" or Turn off: the app stays locked until the user allows. */
 export function AiFeaturesOffScreen({ onReview }: AiFeaturesOffScreenProps) {
   const { signOut } = useAuth();
-  const navigate = useNavigate();
   const { showError } = useServiceErrorToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
+      // signOut navigates to /sign-in, which unmounts this screen.
       await signOut();
-      // The gate hides AppShell, which normally does this redirect.
-      navigate("/sign-in", { replace: true });
     } catch (err) {
+      setSigningOut(false);
       showError(err);
     }
   };
@@ -38,10 +39,10 @@ export function AiFeaturesOffScreen({ onReview }: AiFeaturesOffScreenProps) {
           </p>
         </div>
         <div className="flex flex-col gap-2">
-          <Button size="lg" onClick={onReview}>
+          <Button size="lg" onClick={onReview} disabled={signingOut}>
             Review and allow
           </Button>
-          <Button size="lg" variant="secondary" onClick={handleSignOut}>
+          <Button size="lg" variant="secondary" onClick={handleSignOut} disabled={signingOut}>
             Sign out
           </Button>
         </div>
@@ -49,7 +50,12 @@ export function AiFeaturesOffScreen({ onReview }: AiFeaturesOffScreenProps) {
           <Button variant="ghost" size="sm" asChild>
             <Link to="/privacy">Privacy policy</Link>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
+          <Button
+            variant="ghost-destructive"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            disabled={signingOut}
+          >
             Delete account
           </Button>
         </div>
