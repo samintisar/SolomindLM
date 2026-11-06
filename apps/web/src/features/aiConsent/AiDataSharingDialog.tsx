@@ -1,15 +1,16 @@
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
 import { useState } from "react";
-import { Button } from "@/shared/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
+import { Button } from "@/shared/components/ui/button";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { AI_PROVIDERS } from "./aiConsentCopy";
 
@@ -37,32 +38,37 @@ export function AiDataSharingDialog({ open, onOpenChange }: AiDataSharingDialogP
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>AI data sharing</DialogTitle>
-          <DialogDescription>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!turningOff) onOpenChange(next);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>AI data sharing</AlertDialogTitle>
+          <AlertDialogDescription>
             You allowed SolomindLM to send your content to these services. Turning this off locks
             the app until you allow it again.
-          </DialogDescription>
-        </DialogHeader>
-        <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <ul className="flex flex-col gap-3">
           {AI_PROVIDERS.map((provider) => (
-            <li key={provider.name}>
-              <span className="text-foreground">{provider.name}</span>:{" "}
-              {provider.data.toLowerCase()}
+            <li key={provider.name} className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">{provider.name}</span>
+              <span className="text-sm text-muted-foreground">
+                {provider.data}, {provider.purpose}.
+              </span>
             </li>
           ))}
         </ul>
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={turningOff}>
-            Keep on
-          </Button>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={turningOff}>Keep on</AlertDialogCancel>
           <Button variant="destructive" onClick={handleTurnOff} disabled={turningOff}>
             Turn off
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

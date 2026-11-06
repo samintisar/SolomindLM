@@ -4,7 +4,7 @@ import {
   LogOut,
   MessageSquarePlus,
   Moon,
-  Sparkles,
+  ShieldCheck,
   Sun,
   Trash2,
   User as UserIcon,
@@ -74,7 +74,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
 
   return (
     <>
-      {/* modal={false}: "Delete account" opens a dialog; a modal menu would leave pointer-events stuck on body. */}
+      {/* modal={false}: "Delete account" and "AI data sharing" open dialogs; a modal menu would leave pointer-events stuck on body. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="avatar" aria-label="Account menu">
@@ -104,7 +104,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
             <LanguageSelector isAuthenticated={isAuthenticated} />
             {isAuthenticated && isNativeShell() ? (
               <DropdownMenuItem onSelect={() => setAiSharingOpen(true)}>
-                <Sparkles />
+                <ShieldCheck />
                 AI data sharing
               </DropdownMenuItem>
             ) : null}

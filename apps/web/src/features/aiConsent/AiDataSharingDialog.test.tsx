@@ -56,4 +56,19 @@ describe("AiDataSharingDialog", () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
+
+  test("Keep on closes without calling decline", async () => {
+    const { onOpenChange } = renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Keep on" }));
+    expect(decline).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  test("both buttons are disabled while Turn off is pending", async () => {
+    decline.mockReturnValueOnce(new Promise(() => {}));
+    renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Turn off" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Turn off" })).toBeDisabled());
+    expect(screen.getByRole("button", { name: "Keep on" })).toBeDisabled();
+  });
 });
