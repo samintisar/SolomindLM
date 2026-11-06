@@ -89,3 +89,113 @@ describe("getMyPreferences", () => {
     expect(result?.outputLanguage).toBe("ko");
   });
 });
+
+async function getRow(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
+  return t.run(async (ctx) =>
+    ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique()
+  );
+}
+
+describe("getMyAiConsent", () => {
+  test("reports signed out when there is no identity", async () => {
+    const t = convexTest(schema, modules);
+    const result = await t.query(api.userPreferences.index.getMyAiConsent, {});
+    expect(result).toEqual({ signedIn: false });
+  });
+
+  test("reports no answer when the user has no preferences row", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const result = await withAuth(t, userId).query(api.userPreferences.index.getMyAiConsent, {});
+    expect(result).toEqual({ signedIn: true, version: null, declined: false });
+  });
+});
+
+describe("grantAiConsent", () => {
+  test("stores the version and time", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const asUser = withAuth(t, userId);
+    await asUser.mutation(api.userPreferences.index.grantAiConsent, { version: 1 });
+    expect(await asUser.query(api.userPreferences.index.getMyAiConsent, {})).toEqual({
+      signedIn: true,
+      version: 1,
+      declined: false,
+    });
+    const row = await getRow(t, userId);
+    expect(typeof row?.aiConsentAt).toBe("number");
+  });
+
+  test("clears an earlier decline", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const asUser = withAuth(t, userId);
+    await asUser.mutation(api.userPreferences.index.declineAiConsent, {});
+    await asUser.mutation(api.userPreferences.index.grantAiConsent, { version: 1 });
+    const row = await getRow(t, userId);
+    expect(row?.aiConsentDeclinedAt).toBeUndefined();
+    expect(row?.aiConsentVersion).toBe(1);
+  });
+
+  test("keeps the output language", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const asUser = withAuth(t, userId);
+    await asUser.mutation(api.userPreferences.index.setOutputLanguage, { outputLanguage: "es" });
+    await asUser.mutation(api.userPreferences.index.grantAiConsent, { version: 1 });
+    const row = await getRow(t, userId);
+    expect(row?.outputLanguage).toBe("es");
+  });
+
+  test.each([0, -1, 1.5])("rejects version %s", async (version) => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await expect(
+      withAuth(t, userId).mutation(api.userPreferences.index.grantAiConsent, { version })
+    ).rejects.toThrow();
+  });
+
+  test("rejects when unauthenticated", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.userPreferences.index.grantAiConsent, { version: 1 })
+    ).rejects.toThrow();
+  });
+
+  test("only changes the caller's row", async () => {
+    const t = convexTest(schema, modules);
+    const alice = await seedUser(t);
+    const bob = await seedUser(t);
+    await withAuth(t, alice).mutation(api.userPreferences.index.grantAiConsent, { version: 1 });
+    expect(await withAuth(t, bob).query(api.userPreferences.index.getMyAiConsent, {})).toEqual({
+      signedIn: true,
+      version: null,
+      declined: false,
+    });
+  });
+});
+
+describe("declineAiConsent", () => {
+  test("clears a grant and records the decline", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const asUser = withAuth(t, userId);
+    await asUser.mutation(api.userPreferences.index.grantAiConsent, { version: 1 });
+    await asUser.mutation(api.userPreferences.index.declineAiConsent, {});
+    expect(await asUser.query(api.userPreferences.index.getMyAiConsent, {})).toEqual({
+      signedIn: true,
+      version: null,
+      declined: true,
+    });
+    const row = await getRow(t, userId);
+    expect(typeof row?.aiConsentDeclinedAt).toBe("number");
+  });
+
+  test("rejects when unauthenticated", async () => {
+    const t = convexTest(schema, modules);
+    await expect(t.mutation(api.userPreferences.index.declineAiConsent, {})).rejects.toThrow();
+  });
+});
