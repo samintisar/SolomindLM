@@ -11,6 +11,7 @@ import {
   MistralOcrTimeoutError,
   markdownFromMistralOcrResponse,
   NOTHING_READABLE_MESSAGE,
+  OcrNothingReadableError,
   ocrInputKindForFile,
   parseFigureAnnotation,
   shouldRetryWithoutAnnotations,
@@ -465,6 +466,38 @@ describe("MistralOCRService.processDocument", () => {
     const last = sentBody(fetchMock, fetchMock.mock.calls.length - 1);
     expect(last).not.toHaveProperty("bbox_annotation_format");
     expect(last.pages).toBe("0-29");
+  });
+
+  it("sends no page range when an image falls back to the plain document request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(400))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/abc", {
+      kind: "image",
+      maxPages: 30,
+    });
+
+    expect(sentBody(fetchMock, 1).document.type).toBe("document_url");
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("pages");
+  });
+
+  it("reports the billed pages when OCR finds nothing readable", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        ok({ pages: [{ markdown: "" }, { markdown: " " }], usage_info: { pages_processed: 2 } })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const err = await new MistralOCRService("key")
+      .readDocument("https://x/a.pdf", { maxPages: 30 })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(OcrNothingReadableError);
+    expect((err as OcrNothingReadableError).pagesRead).toBe(2);
   });
 
   it("sends image uploads as image_url", async () => {

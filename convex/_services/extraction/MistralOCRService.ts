@@ -329,6 +329,17 @@ export function isPageRangeRejection(error: unknown): boolean {
 
 export type OcrReadResult = { markdown: string; pagesRead: number };
 
+/** OCR found nothing to read. Mistral still read and billed `pagesRead` pages. */
+export class OcrNothingReadableError extends UserFacingSourceError {
+  readonly pagesRead: number;
+
+  constructor(pagesRead: number) {
+    super(NOTHING_READABLE_MESSAGE, "Mistral OCR returned no text or figure descriptions");
+    this.name = "OcrNothingReadableError";
+    this.pagesRead = pagesRead;
+  }
+}
+
 /**
  * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
  * request that worked before them, with its old 60s timeout and 3 attempts. The annotated call is retried once,
@@ -481,7 +492,8 @@ export class MistralOCRService {
     options: { kind?: OcrInputKind; maxPages?: number } = {}
   ): Promise<OcrReadResult> {
     const kind = options.kind ?? "document";
-    const { maxPages } = options;
+    // An image is one page; it is sent as a document on the plain paths, but never with a range.
+    const maxPages = kind === "document" ? options.maxPages : undefined;
     const logger = createServiceLogger("mistral", "ocr");
 
     let data: MistralOcrResponse;
@@ -512,12 +524,7 @@ export class MistralOCRService {
         logger.warn("Skipped a malformed figure annotation", { imageId }),
       cleanText: stripMistralOcrMedia,
     });
-    if (!hasOcrContent(markdown)) {
-      throw new UserFacingSourceError(
-        NOTHING_READABLE_MESSAGE,
-        "Mistral OCR returned no text or figure descriptions"
-      );
-    }
+    if (!hasOcrContent(markdown)) throw new OcrNothingReadableError(pagesRead);
     return { markdown, pagesRead };
   }
 }

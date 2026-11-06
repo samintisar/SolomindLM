@@ -17,6 +17,7 @@
  */
 
 import { isHttpAwareRetryableError } from "../_agents/_shared/retry";
+import { OcrQuotaExceededError } from "../_lib/ocrPageLimits";
 import type { FetchedCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
 import {
   isFullTextLength,
@@ -107,6 +108,9 @@ const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e)
  * abstract-only, still usable, and "Find full text" re-ingests it once OCR works again (#591).
  */
 function isTransientOcrError(error: Error): boolean {
+  // Out of OCR pages for the month: fail the source with that message rather than saving it
+  // abstract-only with no explanation; Refresh re-ingests it once the month resets.
+  if (error instanceof OcrQuotaExceededError) return true;
   return (
     isHttpAwareRetryableError(error) ||
     error.name === "AbortError" ||

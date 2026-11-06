@@ -1,3 +1,4 @@
+import { OcrQuotaExceededError } from "../../_lib/ocrPageLimits";
 import { UserFacingSourceError } from "../../_lib/sourceFailure";
 
 /**
@@ -73,6 +74,8 @@ async function readPdf(pdfUrl: string, deps: UrlSourceDeps): Promise<UrlSourceTe
   try {
     content = await deps.ocrPdf(pdfUrl);
   } catch (error) {
+    // The PDF is fine; the user is out of OCR pages, and the message says so.
+    if (error instanceof OcrQuotaExceededError) throw error;
     throw new UserFacingSourceError(
       PDF_UNREADABLE_MESSAGE,
       `PDF OCR failed for ${pdfUrl}: ${error instanceof Error ? error.message : String(error)}`,

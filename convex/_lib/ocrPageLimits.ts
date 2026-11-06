@@ -5,6 +5,8 @@
  * can cost in a month.
  */
 
+import { UserFacingSourceError } from "./sourceFailure";
+
 export type OcrPageLimits = { perFile: number; perMonth: number };
 
 export const OCR_PAGE_LIMITS = {
@@ -62,4 +64,15 @@ export function ocrPageCapNotice({
 /** Why a file that needs OCR could not be read once the month's pages are used up. */
 export function ocrQuotaExhaustedMessage(limits: OcrPageLimits, isPro: boolean): string {
   return `You've used your ${limits.perMonth} pages of PDF, slide, and image reading for this month. It resets next month.${isPro ? "" : ` Upgrade to Pro for ${OCR_PAGE_LIMITS.pro.perMonth} pages a month.`}`;
+}
+
+/**
+ * The month's OCR pages are used up. Its own class so callers that wrap or swallow OCR failures
+ * (PDF links, paper ingest) pass it through and the user sees why.
+ */
+export class OcrQuotaExceededError extends UserFacingSourceError {
+  constructor(limits: OcrPageLimits, isPro: boolean) {
+    super(ocrQuotaExhaustedMessage(limits, isPro), "Monthly OCR page allowance used up");
+    this.name = "OcrQuotaExceededError";
+  }
 }

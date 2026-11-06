@@ -23,8 +23,7 @@ export const reserveOcrPages = internalMutation({
     granted: v.number(),
     month: v.string(),
     isPro: v.boolean(),
-    perFile: v.number(),
-    perMonth: v.number(),
+    limits: v.object({ perFile: v.number(), perMonth: v.number() }),
   }),
   handler: async (ctx, { userId }) => {
     const isPro = await isProUser(ctx, userId);
@@ -36,7 +35,12 @@ export const reserveOcrPages = internalMutation({
       if (row) await ctx.db.patch("ocrUsage", row._id, { pages: row.pages + granted });
       else await ctx.db.insert("ocrUsage", { userId, month, pages: granted });
     }
-    return { granted, month, isPro, ...limits };
+    return {
+      granted,
+      month,
+      isPro,
+      limits: { perFile: limits.perFile, perMonth: limits.perMonth },
+    };
   },
 });
 

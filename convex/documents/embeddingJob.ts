@@ -10,8 +10,8 @@ import {
   RAG_CHUNK_OVERLAP_TOKENS,
   RAG_CHUNK_SIZE_TOKENS,
 } from "../_lib/embeddingConfig";
-import { ocrPageCapNotice, ocrQuotaExhaustedMessage } from "../_lib/ocrPageLimits";
-import { sourceFailureMessage, UserFacingSourceError } from "../_lib/sourceFailure";
+import { OcrQuotaExceededError, ocrPageCapNotice } from "../_lib/ocrPageLimits";
+import { sourceFailureMessage } from "../_lib/sourceFailure";
 import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
 import {
@@ -19,6 +19,7 @@ import {
   MistralOCRService,
   MistralOcrTimeoutError,
   type OcrInputKind,
+  OcrNothingReadableError,
   ocrInputKindForFile,
 } from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
@@ -147,6 +148,8 @@ export const docEmbedding = internalAction({
 
       let extractedText = "";
       let extractedTitle: string | undefined;
+      /** Whether a paper's saved text is OCR of a PDF (not a web page or the abstract). */
+      let paperTextFromPdf = false;
 
       // Phase: Extraction
       logger.phaseStart("extraction");
@@ -162,21 +165,23 @@ export const docEmbedding = internalAction({
 
       // Every OCR call reads at most the pages the uploader's plan grants (`_lib/ocrPageLimits.ts`):
       // reserved first so parallel uploads can't overspend the month, unread pages handed back after.
+      // The eval pack and the showcase seed are staff fixtures, read whole and outside any plan.
+      const ocrUncapped =
+        docDetails.evalSourceSha256 !== undefined ||
+        docDetails.fullTextPolicy === "open_license_only";
+      // Set by each OCR call, so it describes the last one: the text a paper ingest kept, since it
+      // returns on the first candidate it accepts.
       let ocrNotice: string | undefined;
       const ocrWithPageCap = async (
         url: string,
         options: { kind?: OcrInputKind } = {}
       ): Promise<string> => {
+        ocrNotice = undefined;
+        if (ocrUncapped) return mistralOCR.processDocument(url, options);
         const quota = await ctx.runMutation(internal.documents.ocrQuota.reserveOcrPages, {
           userId: userId as Id<"users">,
         });
-        const limits = { perFile: quota.perFile, perMonth: quota.perMonth };
-        if (quota.granted === 0) {
-          throw new UserFacingSourceError(
-            ocrQuotaExhaustedMessage(limits, quota.isPro),
-            "Monthly OCR page allowance used up"
-          );
-        }
+        if (quota.granted === 0) throw new OcrQuotaExceededError(quota.limits, quota.isPro);
         let pagesRead = 0;
         try {
           const result = await mistralOCR.readDocument(url, {
@@ -184,24 +189,35 @@ export const docEmbedding = internalAction({
             maxPages: quota.granted,
           });
           pagesRead = Math.min(result.pagesRead, quota.granted);
-          ocrNotice =
-            ocrPageCapNotice({
-              pagesRead,
-              granted: quota.granted,
-              limits,
-              isPro: quota.isPro,
-            }) ?? ocrNotice;
+          ocrNotice = ocrPageCapNotice({
+            pagesRead,
+            granted: quota.granted,
+            limits: quota.limits,
+            isPro: quota.isPro,
+          });
           return result.markdown;
         } catch (error) {
-          // Mistral bills a request we stopped waiting for (#591), so its pages stay spent.
+          // Pages Mistral billed stay spent: a request we stopped waiting for (#591), or a
+          // response with nothing readable in it.
           if (error instanceof MistralOcrTimeoutError) pagesRead = quota.granted;
+          else if (error instanceof OcrNothingReadableError) {
+            pagesRead = Math.min(error.pagesRead, quota.granted);
+          }
           throw error;
         } finally {
-          await ctx.runMutation(internal.documents.ocrQuota.releaseOcrPages, {
-            userId: userId as Id<"users">,
-            month: quota.month,
-            pages: quota.granted - pagesRead,
-          });
+          // A failed hand-back only overcounts this user's month; it must not fail the source.
+          await ctx
+            .runMutation(internal.documents.ocrQuota.releaseOcrPages, {
+              userId: userId as Id<"users">,
+              month: quota.month,
+              pages: quota.granted - pagesRead,
+            })
+            .catch((e) =>
+              logger.warn("Could not hand back unread OCR pages", {
+                pages: quota.granted - pagesRead,
+                error: e instanceof Error ? e.message : String(e),
+              })
+            );
         }
       };
 
@@ -374,6 +390,10 @@ export const docEmbedding = internalAction({
         );
 
         extractedText = result.content;
+        paperTextFromPdf =
+          result.outcome === "full_text" &&
+          (result.fullTextSource.method === "oa_pdf" ||
+            result.fullTextSource.method === "uploaded_pdf");
         if (result.outcome === "full_text" && result.title?.trim()) {
           extractedTitle = result.title.trim();
         }
@@ -504,13 +524,23 @@ export const docEmbedding = internalAction({
       });
 
       // Store document-level metadata
+      // A paper saved abstract-only or from a web page didn't use OCR text, so it gets no notice.
+      if (docDetails.fileType === "paper_record" && !paperTextFromPdf) ocrNotice = undefined;
       if (docDetails.ocrTimedOut || ocrNotice) {
         // The plain-only run worked; later reprocesses (a new PDF, a fork) get annotations again.
         // `{}`, not undefined: function arguments drop undefined fields. `ocrNotice` tells the
-        // user OCR stopped at their page cap (shown in the source viewer).
+        // user OCR stopped at their page cap (shown in the source viewer). The eval seeder's
+        // hash is kept: it is how a later seed run recognises this source.
         await ctx.runMutation(internal.documents.internal.patch, {
           documentId,
-          patch: { metadata: ocrNotice ? { ocrNotice } : {} },
+          patch: {
+            metadata: {
+              ...(docDetails.evalSourceSha256
+                ? { evalSourceSha256: docDetails.evalSourceSha256 }
+                : {}),
+              ...(ocrNotice ? { ocrNotice } : {}),
+            },
+          },
         });
       }
       await ctx.runMutation(internal.documents.internal.updateMetadata, {
