@@ -3,13 +3,7 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-} from "@/shared/components/ui/item";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/shared/components/ui/item";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { AI_CONSENT_VERSION, AI_PROVIDERS } from "./aiConsentCopy";
 
@@ -49,7 +43,7 @@ export function AiConsentScreen({ onDeclined }: AiConsentScreenProps) {
   };
 
   return (
-    <main className="flex min-h-dvh w-full justify-center overflow-y-auto bg-background px-4 py-8">
+    <main className="flex min-h-dvh w-full justify-center bg-background px-4 py-8">
       <div className="flex w-full max-w-md flex-col gap-5">
         <h1 className="font-display text-2xl text-foreground">How SolomindLM uses AI</h1>
         <p className="text-muted-foreground">
@@ -61,9 +55,9 @@ export function AiConsentScreen({ onDeclined }: AiConsentScreenProps) {
             <Item key={provider.name}>
               <ItemContent>
                 <ItemTitle>{provider.name}</ItemTitle>
-                <ItemDescription>
+                <p className="text-sm text-muted-foreground">
                   {provider.data}, {provider.purpose}.
-                </ItemDescription>
+                </p>
               </ItemContent>
             </Item>
           ))}

@@ -53,6 +53,31 @@ describe("AiConsentScreen", () => {
     }
   });
 
+  test("shows each disclosure in full, never clamped", () => {
+    renderScreen();
+    for (const provider of AI_PROVIDERS) {
+      const text = screen.getByText(`${provider.data}, ${provider.purpose}.`);
+      expect(text.className).not.toContain("line-clamp");
+    }
+  });
+
+  test("both buttons are disabled while a grant is pending", async () => {
+    grant.mockReturnValueOnce(new Promise(() => {}));
+    renderScreen();
+    await userEvent.click(screen.getByRole("button", { name: "Allow and continue" }));
+    expect(screen.getByRole("button", { name: "Allow and continue" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Not now" })).toBeDisabled();
+  });
+
+  test("a failed decline shows an error and does not report declined", async () => {
+    decline.mockRejectedValueOnce(new Error("offline"));
+    const onDeclined = vi.fn();
+    const toast = renderScreen({ onDeclined });
+    await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onDeclined).not.toHaveBeenCalled();
+  });
+
   test("Allow grants the current version", async () => {
     renderScreen();
     await userEvent.click(screen.getByRole("button", { name: "Allow and continue" }));
