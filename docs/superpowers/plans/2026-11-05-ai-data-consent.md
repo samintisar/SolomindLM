@@ -1251,6 +1251,45 @@ git commit -m "feat(consent): gate the mobile app behind AI data-sharing consent
 
 ---
 
+### Task 6b: Hide the native upload button until consent
+
+Found in Task 6 review: `apps/mobile/app/index.tsx` renders the native `FileUploadButton` above the WebView on
+`/notebook/:id` entry paths (deep links, push taps). It calls `api.documents.index.upload`, which schedules
+OCR/embedding, so an unconsented user could send content to providers while the web gate is showing. Fix: the
+web app reports its consent state over the existing bridge; the native shell shows the button only after a
+`granted` report. Default is hidden. (Ships with the next native build.)
+
+**Files:**
+- Create: `apps/web/src/features/aiConsent/useReportAiConsentToShell.ts` (+ `.test.tsx`)
+- Modify: `apps/web/src/features/aiConsent/AiConsentGate.tsx` (call the hook), `AiConsentGate.test.tsx` (mock it; add the reset-after-review test)
+- Create: `apps/mobile/src/components/web/parseShellWebMessage.ts` (+ `.test.ts`)
+- Modify: `apps/mobile/src/components/web/WebViewScreen.tsx`, `apps/mobile/app/index.tsx`
+
+- [ ] **Step 1: Web hook (TDD).** `useReportAiConsentToShell(state: AiConsentState)`: in an effect keyed on the
+  derived value, when `state` is `granted` post `{"type":"shell-web:ai-consent","granted":true}`, when
+  `needsConsent` or `declined` post `granted:false`, otherwise post nothing. Post via
+  `getNativeWebViewBridge()?.postMessage(JSON.stringify(...))` (same as `ThemeContext.tsx`). Only re-post when
+  the boolean changes. Tests: mock `@/utils/platformDetection`'s `getNativeWebViewBridge` to return
+  `{ postMessage: vi.fn() }`; assert payloads for each state, nothing for `loading`/`notApplicable`, and no
+  duplicate post on a rerender with the same state.
+- [ ] **Step 2: Call it in `AiConsentGate`** (`useReportAiConsentToShell(state)` right after
+  `useAiConsentState()`). In `AiConsentGate.test.tsx` mock the hook to a no-op, and add the test: render
+  `declined` → click off-screen (reviewing) → rerender `granted` (app) → rerender `declined` → expect
+  `off-screen`.
+- [ ] **Step 3: Native parser (TDD).** `parseShellWebMessage(raw: string)` returns
+  `{ kind: "theme"; theme: "light" | "dark" } | { kind: "aiConsent"; granted: boolean } | null` (null for
+  non-JSON, unknown types, or malformed fields). Tests cover each case.
+- [ ] **Step 4: Wire native.** `WebViewScreen`: new optional prop `onAiConsentChange?: (granted: boolean) => void`;
+  replace the inline theme parse with `parseShellWebMessage`, calling `onThemeChange` / `onAiConsentChange`, and
+  pass anything else (null) to the auth bridge as today. `index.tsx`: `const [aiConsentGranted,
+  setAiConsentGranted] = useState(false)`; pass `onAiConsentChange={setAiConsentGranted}`; render
+  `FileUploadButton` only when `notebookIdForUpload && aiConsentGranted`.
+- [ ] **Step 5: Verify and commit.** `bun run --cwd apps/web test -- src/features/aiConsent`,
+  `bun run test:mobile`, `bun run typecheck:web`, `bun run typecheck:mobile`, `bun run lint`. Commit:
+  `fix(consent): hide the native upload button until the web app reports AI consent`.
+
+---
+
 ### Task 7: "AI data sharing" in the avatar menu
 
 **Files:**
