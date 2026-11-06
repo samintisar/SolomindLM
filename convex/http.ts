@@ -123,6 +123,41 @@ http.route({
 });
 
 // ============================================================
+// App Store Server Notifications V2 (Forward to Node Action)
+// ============================================================
+
+http.route({
+  path: "/appstore/notifications",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const respond = (status: number, body: Record<string, unknown>) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    let signedPayload: unknown;
+    try {
+      signedPayload = ((await request.json()) as { signedPayload?: unknown }).signedPayload;
+    } catch {
+      signedPayload = undefined;
+    }
+    if (typeof signedPayload !== "string") return respond(400, { error: "Missing signedPayload" });
+
+    try {
+      const { result } = await ctx.runAction(internal.billing.appStoreNode.handleNotification, {
+        signedPayload,
+      });
+      // Unverifiable payloads get 400; processing failures get 500 so Apple retries.
+      return respond(result === "invalid" ? 400 : 200, { result });
+    } catch (error) {
+      console.error("[App Store notification] Error:", error);
+      return respond(500, { error: "Notification processing failed" });
+    }
+  }),
+});
+
+// ============================================================
 // Health Check Endpoint
 // ============================================================
 
