@@ -10,13 +10,15 @@ import {
   RAG_CHUNK_OVERLAP_TOKENS,
   RAG_CHUNK_SIZE_TOKENS,
 } from "../_lib/embeddingConfig";
-import { sourceFailureMessage } from "../_lib/sourceFailure";
+import { ocrPageCapNotice, ocrQuotaExhaustedMessage } from "../_lib/ocrPageLimits";
+import { sourceFailureMessage, UserFacingSourceError } from "../_lib/sourceFailure";
 import { PASTED_TEXT_TITLE, textTitleSource, userTitleForText } from "../_lib/textTitle";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
 import {
   IMAGE_FILE_EXTENSIONS,
   MistralOCRService,
   MistralOcrTimeoutError,
+  type OcrInputKind,
   ocrInputKindForFile,
 } from "../_services/extraction/MistralOCRService";
 import { fetchOaCandidate } from "../_services/extraction/openAccess/fetchOaCandidate";
@@ -158,6 +160,51 @@ export const docEmbedding = internalAction({
           !docDetails.ocrTimedOut && (docDetails.fileSize ?? 0) <= ANNOTATED_OCR_MAX_FILE_BYTES,
       });
 
+      // Every OCR call reads at most the pages the uploader's plan grants (`_lib/ocrPageLimits.ts`):
+      // reserved first so parallel uploads can't overspend the month, unread pages handed back after.
+      let ocrNotice: string | undefined;
+      const ocrWithPageCap = async (
+        url: string,
+        options: { kind?: OcrInputKind } = {}
+      ): Promise<string> => {
+        const quota = await ctx.runMutation(internal.documents.ocrQuota.reserveOcrPages, {
+          userId: userId as Id<"users">,
+        });
+        const limits = { perFile: quota.perFile, perMonth: quota.perMonth };
+        if (quota.granted === 0) {
+          throw new UserFacingSourceError(
+            ocrQuotaExhaustedMessage(limits, quota.isPro),
+            "Monthly OCR page allowance used up"
+          );
+        }
+        let pagesRead = 0;
+        try {
+          const result = await mistralOCR.readDocument(url, {
+            ...options,
+            maxPages: quota.granted,
+          });
+          pagesRead = Math.min(result.pagesRead, quota.granted);
+          ocrNotice =
+            ocrPageCapNotice({
+              pagesRead,
+              granted: quota.granted,
+              limits,
+              isPro: quota.isPro,
+            }) ?? ocrNotice;
+          return result.markdown;
+        } catch (error) {
+          // Mistral bills a request we stopped waiting for (#591), so its pages stay spent.
+          if (error instanceof MistralOcrTimeoutError) pagesRead = quota.granted;
+          throw error;
+        } finally {
+          await ctx.runMutation(internal.documents.ocrQuota.releaseOcrPages, {
+            userId: userId as Id<"users">,
+            month: quota.month,
+            pages: quota.granted - pagesRead,
+          });
+        }
+      };
+
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
         const meta = await ctx.runAction(
@@ -220,7 +267,7 @@ export const docEmbedding = internalAction({
             throw new Error("Could not get file URL for document: " + documentId);
           }
 
-          extractedText = await mistralOCR.processDocument(fileUrl, {
+          extractedText = await ocrWithPageCap(fileUrl, {
             kind: ocrInputKindForFile(docDetails.fileName),
           });
           logger.phaseComplete("extraction", {
@@ -257,7 +304,7 @@ export const docEmbedding = internalAction({
         const page = await extractUrlSource(rawUrl, {
           scrape: (url) =>
             ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url }),
-          ocrPdf: (url) => mistralOCR.processDocument(url),
+          ocrPdf: (url) => ocrWithPageCap(url),
         });
         extractedText = page.content;
         if (page.title?.trim()) extractedTitle = page.title.trim();
@@ -317,7 +364,7 @@ export const docEmbedding = internalAction({
             ocrStoredPdf: async (storageId) => {
               const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
               if (!url) throw new Error("Stored PDF not found");
-              return mistralOCR.processDocument(url);
+              return ocrWithPageCap(url);
             },
             scrape: (url) =>
               ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url }),
@@ -457,12 +504,13 @@ export const docEmbedding = internalAction({
       });
 
       // Store document-level metadata
-      if (docDetails.ocrTimedOut) {
+      if (docDetails.ocrTimedOut || ocrNotice) {
         // The plain-only run worked; later reprocesses (a new PDF, a fork) get annotations again.
-        // `{}`, not undefined: function arguments drop undefined fields.
+        // `{}`, not undefined: function arguments drop undefined fields. `ocrNotice` tells the
+        // user OCR stopped at their page cap (shown in the source viewer).
         await ctx.runMutation(internal.documents.internal.patch, {
           documentId,
-          patch: { metadata: {} },
+          patch: { metadata: ocrNotice ? { ocrNotice } : {} },
         });
       }
       await ctx.runMutation(internal.documents.internal.updateMetadata, {

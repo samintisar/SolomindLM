@@ -1107,6 +1107,17 @@ export default defineSchema({
     lastRequestAt: v.number(),
   }),
 
+  /**
+   * OCR pages each user was granted per UTC month (`_lib/ocrPageLimits.ts`), one row per user and
+   * month. Pages are reserved before an OCR call and the unread part handed back after it.
+   */
+  ocrUsage: defineTable({
+    userId: v.id("users"),
+    /** "2026-11" */
+    month: v.string(),
+    pages: v.number(),
+  }).index("by_user_and_month", ["userId", "month"]),
+
   // In-app user feedback (bug reports + feature requests). Source of truth;
   // optionally mirrored to GitHub Issues by staff from /admin/feedback.
   feedback: defineTable({

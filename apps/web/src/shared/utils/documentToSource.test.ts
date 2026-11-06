@@ -34,6 +34,28 @@ describe("documentToSource failureReason", () => {
     expect(source.failureReason).toBe("Something went wrong while processing this source.");
   });
 
+  it("carries the page-cap notice of a processed document", () => {
+    const source = documentToSource({
+      ...base,
+      fileName: "Textbook.pdf",
+      fileType: "file",
+      status: "completed",
+      metadata: { ocrNotice: "Only the first 30 pages of this file were read." },
+    });
+    expect(source.processingNotice).toBe("Only the first 30 pages of this file were read.");
+  });
+
+  it("shows no page-cap notice on a failed document", () => {
+    const source = documentToSource({
+      ...base,
+      fileName: "Textbook.pdf",
+      fileType: "file",
+      status: "failed",
+      metadata: { ocrNotice: "stale" },
+    });
+    expect(source.processingNotice).toBeUndefined();
+  });
+
   it("carries a paper's full-text source", () => {
     const source = documentToSource({
       _id: "d1",

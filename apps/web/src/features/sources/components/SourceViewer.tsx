@@ -1,4 +1,4 @@
-import { BookOpenText, ChevronDown, FileText, FileType, Tags, XCircle } from "lucide-react";
+import { BookOpenText, ChevronDown, FileText, FileType, Info, Tags, XCircle } from "lucide-react";
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { MarkdownRendererProps } from "@/shared/components/MarkdownRenderer.utils";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -293,6 +293,14 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             {source.failureReason ??
               "There was an error while processing this document. Please try uploading it again."}
           </AlertDescription>
+        </Alert>
+      )}
+
+      {source.processingNotice && (
+        <Alert>
+          <Info aria-hidden />
+          <AlertTitle>Part of this file was read</AlertTitle>
+          <AlertDescription>{source.processingNotice}</AlertDescription>
         </Alert>
       )}
 

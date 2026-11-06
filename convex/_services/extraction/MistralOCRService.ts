@@ -3,6 +3,7 @@
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { createExternalServiceErrorFromResponse, ExternalServiceError } from "../../_lib/errors";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { ocrPageRange } from "../../_lib/ocrPageLimits";
 import { UserFacingSourceError } from "../../_lib/sourceFailure";
 import { PAGE_LABEL_LINES } from "../processing/pageLabels";
 
@@ -138,6 +139,8 @@ export type MistralOcrResponse = {
   pages?: Array<{ markdown?: string; tables?: MistralOcrTable[]; images?: MistralOcrImage[] }>;
   markdown?: string;
   text?: string;
+  /** The pages Mistral read and billed. */
+  usage_info?: { pages_processed?: number };
 };
 
 /**
@@ -288,10 +291,15 @@ const FIGURE_ANNOTATION_FORMAT = {
   },
 };
 
+/**
+ * `maxPages` caps a document to its first pages (Mistral bills only the pages it reads); an image
+ * is one page, so it gets no range.
+ */
 export function buildOcrRequestBody(
   url: string,
   kind: OcrInputKind,
-  annotate: boolean
+  annotate: boolean,
+  maxPages?: number
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model: OCR_MODEL,
@@ -304,8 +312,22 @@ export function buildOcrRequestBody(
   };
   // No document_annotation_format: it restates the OCR text and invents content for photos.
   if (annotate) body.bbox_annotation_format = FIGURE_ANNOTATION_FORMAT;
+  if (maxPages !== undefined && kind === "document") body.pages = ocrPageRange(maxPages);
   return body;
 }
+
+/**
+ * Whether Mistral rejected the `pages` range itself, which it can only do for a document shorter
+ * than the range: such a document is under the cap, so it is resent without one. Matched on the
+ * error text, and only for 400/422, so a billing or URL error never drops the cap.
+ */
+export function isPageRangeRejection(error: unknown): boolean {
+  if (!(error instanceof ExternalServiceError)) return false;
+  if (error.statusCode !== 400 && error.statusCode !== 422) return false;
+  return /\bpages?\b/i.test(error.message);
+}
+
+export type OcrReadResult = { markdown: string; pagesRead: number };
 
 /**
  * Annotations add a vision pass per figure (13s for a 24-page paper with 22 figures); the plain fallback is the
@@ -432,14 +454,41 @@ export class MistralOCRService {
    * has no text and no describable images.
    */
   async processDocument(url: string, options: { kind?: OcrInputKind } = {}): Promise<string> {
+    return (await this.readDocument(url, options)).markdown;
+  }
+
+  /** Sends `body`; when Mistral rejects its page range (a document shorter than the cap), resends it whole. */
+  private async callWithPageCap(
+    body: Record<string, unknown>,
+    timeoutMs: number,
+    retry?: { maxAttempts: number; deadline: number }
+  ): Promise<MistralOcrResponse> {
+    try {
+      return await this.callOcrEndpoint(body, timeoutMs, retry);
+    } catch (error) {
+      if (body.pages === undefined || !isPageRangeRejection(error)) throw error;
+      const { pages: _pages, ...uncapped } = body;
+      return this.callOcrEndpoint(uncapped, timeoutMs, retry);
+    }
+  }
+
+  /**
+   * `processDocument` plus the number of pages Mistral read (and billed). `maxPages` reads only a
+   * document's first pages.
+   */
+  async readDocument(
+    url: string,
+    options: { kind?: OcrInputKind; maxPages?: number } = {}
+  ): Promise<OcrReadResult> {
     const kind = options.kind ?? "document";
+    const { maxPages } = options;
     const logger = createServiceLogger("mistral", "ocr");
 
     let data: MistralOcrResponse;
     try {
       // Plain-only gets the annotated request's time budget: it is the document that ran long.
-      data = await this.callOcrEndpoint(
-        buildOcrRequestBody(url, this.annotations ? kind : "document", this.annotations),
+      data = await this.callWithPageCap(
+        buildOcrRequestBody(url, this.annotations ? kind : "document", this.annotations, maxPages),
         ANNOTATED_TIMEOUT_MS,
         { maxAttempts: ANNOTATED_MAX_ATTEMPTS, deadline: Date.now() + ANNOTATED_RETRY_WINDOW_MS }
       );
@@ -451,12 +500,13 @@ export class MistralOCRService {
         error: error instanceof Error ? error.message : String(error),
       });
       // Exactly the request that worked before annotations, images included (they were sent as documents).
-      data = await this.callOcrEndpoint(
-        buildOcrRequestBody(url, "document", false),
+      data = await this.callWithPageCap(
+        buildOcrRequestBody(url, "document", false, maxPages),
         PLAIN_TIMEOUT_MS
       );
     }
 
+    const pagesRead = data.usage_info?.pages_processed ?? data.pages?.length ?? 0;
     const markdown = markdownFromMistralOcrResponse(data, {
       onMalformedAnnotation: (imageId) =>
         logger.warn("Skipped a malformed figure annotation", { imageId }),
@@ -468,6 +518,6 @@ export class MistralOCRService {
         "Mistral OCR returned no text or figure descriptions"
       );
     }
-    return markdown;
+    return { markdown, pagesRead };
   }
 }
