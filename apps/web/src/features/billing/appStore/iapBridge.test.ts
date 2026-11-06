@@ -80,4 +80,27 @@ describe("iapBridge", () => {
     await expect(loadIapProducts()).rejects.toThrow(/isn't available/);
     expect(posted).toHaveLength(0);
   });
+
+  it("rejects when a reply for this request is malformed", async () => {
+    const promise = loadIapProducts();
+    respond({ requestId: posted[0].requestId, ok: "maybe" });
+    await expect(promise).rejects.toThrow(/unexpected response/i);
+  });
+
+  it("ignores a second reply after the request settled", async () => {
+    const promise = restoreIapPurchases();
+    const requestId = posted[0].requestId;
+    respond({ requestId, ok: true, result: { restored: 1 } });
+    respond({ requestId, ok: false, error: "late" });
+    await expect(promise).resolves.toBe(1);
+  });
+
+  it("rejects when the shell bridge throws on post", async () => {
+    window.ReactNativeWebView = {
+      postMessage: () => {
+        throw new Error("webview gone");
+      },
+    };
+    await expect(loadIapProducts()).rejects.toThrow(/couldn't reach the app/i);
+  });
 });

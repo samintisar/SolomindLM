@@ -3,7 +3,8 @@
  * Combines error parsing with toast notifications and Stripe checkout flow.
  */
 
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCreateCheckout } from "@/features/billing/services/subscriptionApi";
 import { canOfferPurchases, purchaseChannel } from "@/utils/platformDetection";
 import { useToast } from "../contexts/useToast";
@@ -14,16 +15,6 @@ import {
   type ParsedLimitError,
   parseLimitError,
 } from "../utils/errorParser";
-
-/**
- * Client-side navigation to /billing without a router hook: callers include non-component code
- * paths and tests outside a Router. BrowserRouter listens for popstate, so this swaps the route
- * without a reload (a reload would re-authenticate the shell's WebView).
- */
-function openBillingPage() {
-  window.history.pushState(null, "", "/billing");
-  window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-}
 
 /**
  * Options for handleLimitError
@@ -55,6 +46,13 @@ export interface HandleLimitErrorResult {
 export function useLimitErrorToast() {
   const { error: showError } = useToast();
   const createCheckout = useCreateCheckout();
+  // Under <BrowserRouter> navigate is rebuilt on every pathname change. Read it through a ref so
+  // handleLimitError keeps a stable identity across navigations.
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  useLayoutEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   /**
    * Handle an error and show appropriate toast with upgrade CTA if it's a limit error
@@ -82,7 +80,7 @@ export function useLimitErrorToast() {
       // so it opens the Billing page, where the in-app purchase plans live.
       const defaultOnUpgrade = async () => {
         if (purchaseChannel() === "app_store") {
-          openBillingPage();
+          navigateRef.current("/billing");
           return;
         }
         try {

@@ -36,6 +36,14 @@ function isIapResponse(value: unknown): value is IapResponse {
   );
 }
 
+function hasRequestId(value: unknown, requestId: string): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as Record<string, unknown>).requestId === requestId
+  );
+}
+
 function isIapProduct(value: unknown): value is IapProduct {
   if (typeof value !== "object" || value === null) return false;
   const p = value as Record<string, unknown>;
@@ -70,9 +78,11 @@ function request(
     }, timeoutMs);
     const onResponse = (event: Event) => {
       const detail = (event as CustomEvent<unknown>).detail;
-      if (!isIapResponse(detail) || detail.requestId !== requestId) return;
+      if (!hasRequestId(detail, requestId)) return;
+      // Any reply carrying our id ends the request; a malformed one must not leave it hanging.
       cleanup();
-      if (detail.ok) resolve(detail.result);
+      if (!isIapResponse(detail)) reject(new Error("The App Store sent an unexpected response."));
+      else if (detail.ok) resolve(detail.result);
       else reject(new Error(detail.error));
     };
     const cleanup = () => {
@@ -80,7 +90,12 @@ function request(
       window.removeEventListener(IAP_RESPONSE_EVENT, onResponse);
     };
     window.addEventListener(IAP_RESPONSE_EVENT, onResponse);
-    bridge.postMessage(JSON.stringify({ type: "shell-web:iap", requestId, action, ...extra }));
+    try {
+      bridge.postMessage(JSON.stringify({ type: "shell-web:iap", requestId, action, ...extra }));
+    } catch {
+      cleanup();
+      reject(new Error("Couldn't reach the app. Try again."));
+    }
   });
 }
 

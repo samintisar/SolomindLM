@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockShowError = vi.fn();
@@ -22,17 +24,32 @@ vi.mock("@/utils/platformDetection", () => ({
 
 const { useLimitErrorToast } = await import("./useLimitErrorToast");
 
+let currentPath = "/";
+function LocationProbe() {
+  currentPath = useLocation().pathname;
+  return null;
+}
+function Wrapper({ children }: { children: ReactNode }) {
+  return (
+    <MemoryRouter initialEntries={["/"]}>
+      <LocationProbe />
+      {children}
+    </MemoryRouter>
+  );
+}
+const renderLimitHook = () => renderHook(() => useLimitErrorToast(), { wrapper: Wrapper });
+
 const dailyLimitError = new Error("Daily quiz limit reached (2/2). Upgrade for higher limits.");
 
 describe("useLimitErrorToast", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockChannel = "stripe";
-    window.history.replaceState(null, "", "/");
+    currentPath = "/";
   });
 
   it("offers an Upgrade to Pro action on the web", async () => {
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderLimitHook();
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError);
@@ -45,7 +62,7 @@ describe("useLimitErrorToast", () => {
 
   it("shows no upgrade copy or action inside the native app", async () => {
     mockChannel = "none";
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderLimitHook();
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError);
@@ -58,7 +75,7 @@ describe("useLimitErrorToast", () => {
 
   it("drops a caller's upgrade message inside the native app", async () => {
     mockChannel = "none";
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderLimitHook();
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError, {
@@ -71,7 +88,7 @@ describe("useLimitErrorToast", () => {
 
   it("opens Stripe checkout from the upgrade action on the web", async () => {
     mockCreateCheckout.mockResolvedValue({ url: "about:blank#checkout" });
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderLimitHook();
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError);
@@ -89,9 +106,7 @@ describe("useLimitErrorToast", () => {
 
   it("sends App Store builds to the Billing page, never to Stripe", async () => {
     mockChannel = "app_store";
-    const onPopState = vi.fn();
-    window.addEventListener("popstate", onPopState);
-    const { result } = renderHook(() => useLimitErrorToast());
+    const { result } = renderLimitHook();
 
     await act(async () => {
       await result.current.handleLimitError(dailyLimitError);
@@ -101,10 +116,8 @@ describe("useLimitErrorToast", () => {
     await act(async () => {
       await options.action.onClick();
     });
-    window.removeEventListener("popstate", onPopState);
 
     expect(mockCreateCheckout).not.toHaveBeenCalled();
-    expect(window.location.pathname).toBe("/billing");
-    expect(onPopState).toHaveBeenCalled();
+    expect(currentPath).toBe("/billing");
   });
 });

@@ -106,4 +106,58 @@ describe("AppStorePlans", () => {
     fireEvent.click(screen.getByRole("button", { name: "Manage subscription" }));
     expect(manage).toHaveBeenCalled();
   });
+
+  it("offers no purchase while the plan is still loading", () => {
+    renderPlans({ hasSubscription: false, source: null, isLoading: true });
+    expect(screen.getByRole("status")).toHaveTextContent("Loading plans");
+    expect(screen.queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore purchases" })).not.toBeInTheDocument();
+  });
+
+  it("titles the plans and puts the renewal terms above the cards", () => {
+    renderPlans();
+    const heading = screen.getByRole("heading", { name: "Pro Yearly" });
+    expect(screen.getByRole("heading", { name: "Pro Monthly" })).toBeInTheDocument();
+    const terms = screen.getByText(/Payment is charged to your Apple ID/);
+    expect(terms.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("disables every button and marks the clicked one busy during a purchase", async () => {
+    let finish: (v: { status: string }) => void = () => {};
+    purchase.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    renderPlans();
+    const [yearlyButton, monthlyButton] = screen.getAllByRole("button", { name: "Subscribe" });
+    fireEvent.click(yearlyButton);
+    await waitFor(() => expect(yearlyButton).toHaveAttribute("aria-busy", "true"));
+    expect(monthlyButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Restore purchases" })).toBeDisabled();
+    finish({ status: "cancelled" });
+    await waitFor(() => expect(monthlyButton).toBeEnabled());
+  });
+
+  it("reports purchased, cancelled and error outcomes", async () => {
+    renderPlans();
+    const subscribe = () => screen.getAllByRole("button", { name: "Subscribe" })[0];
+
+    purchase.mockResolvedValueOnce({ status: "purchased" });
+    fireEvent.click(subscribe());
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("You're on Pro"));
+
+    purchase.mockResolvedValueOnce({ status: "cancelled" });
+    await waitFor(() => expect(subscribe()).toBeEnabled());
+    fireEvent.click(subscribe());
+    await waitFor(() => expect(purchase).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(subscribe()).toBeEnabled());
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+
+    purchase.mockResolvedValueOnce({ status: "error", message: "Card declined" });
+    fireEvent.click(subscribe());
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Card declined"));
+
+    purchase.mockRejectedValueOnce(new Error("Store unavailable"));
+    await waitFor(() => expect(subscribe()).toBeEnabled());
+    fireEvent.click(subscribe());
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Store unavailable"));
+  });
 });

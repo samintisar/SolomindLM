@@ -111,4 +111,27 @@ describe("BillingPage", () => {
     render(<BillingPage onBack={() => {}} />);
     expect(screen.getByText(/Renews on/)).toBeInTheDocument();
   });
+
+  it("shows a Payment issue badge, not a green check, when past due", () => {
+    mockStatus = { ...subscriber, status: "past_due" };
+    render(<BillingPage onBack={() => {}} />);
+    expect(screen.getByText("Payment issue")).toBeInTheDocument();
+    expect(screen.queryByText(/past_due/)).not.toBeInTheDocument();
+  });
+
+  it("in the App Store build, a Stripe subscriber gets no Stripe pricing grid", () => {
+    mockChannel = "app_store";
+    mockStatus = { ...subscriber, source: "stripe" };
+    render(<BillingPage onBack={() => {}} />);
+    expect(screen.getByTestId("app-store-plans")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Switch to/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("$7.50")).not.toBeInTheDocument();
+  });
+
+  it("on the web, a Stripe subscriber still sees the Stripe plan grid", () => {
+    mockStatus = { ...subscriber, source: "stripe" };
+    render(<BillingPage onBack={() => {}} />);
+    expect(screen.getByRole("button", { name: "Switch to Yearly" })).toBeInTheDocument();
+    expect(screen.queryByTestId("app-store-plans")).not.toBeInTheDocument();
+  });
 });

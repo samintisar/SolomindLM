@@ -159,9 +159,15 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                         </>
                       )}
                       <div className="text-sm">
-                        <p className="inline-block rounded-md bg-success/10 px-2 py-0.5 font-medium capitalize text-success">
-                          ✓ {status.status}
-                        </p>
+                        {status.status === "past_due" ? (
+                          <p className="inline-block rounded-md bg-warning-muted px-2 py-0.5 font-medium text-warning-muted-foreground">
+                            Payment issue
+                          </p>
+                        ) : (
+                          <p className="inline-block rounded-md bg-success/10 px-2 py-0.5 font-medium capitalize text-success">
+                            ✓ {status.status}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
