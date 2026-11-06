@@ -473,6 +473,21 @@ describe("getPlan", () => {
       appStore: { productId: APP_STORE_PRODUCTS.yearly, autoRenews: true },
     });
   });
+
+  test("exposes the grace deadline", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const grace = Date.now() + 5 * DAY;
+    await seedAppStoreSubscription(t, userId, {
+      status: "grace",
+      expiresAt: Date.now() - DAY,
+      gracePeriodExpiresAt: grace,
+    });
+    expect(await asUser(t, userId).query(api.billing.index.getPlan, {})).toMatchObject({
+      tier: "pro",
+      appStore: { status: "grace", gracePeriodExpiresAt: grace },
+    });
+  });
 });
 
 describe("getPlan with both sources", () => {

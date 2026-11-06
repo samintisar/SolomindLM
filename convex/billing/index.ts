@@ -60,6 +60,7 @@ export const getPlan = query({
             productId: appStore.productId,
             status: appStore.status,
             expiresAt: appStore.expiresAt,
+            gracePeriodExpiresAt: appStore.gracePeriodExpiresAt,
             autoRenews: appStore.autoRenews,
             environment: appStore.environment,
           }

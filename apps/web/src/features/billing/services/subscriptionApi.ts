@@ -25,18 +25,18 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
   // Memoized so consumers (and context values built from this) keep identity between renders.
   return useMemo((): SubscriptionStatusResponse => {
     if (plan?.source === "app_store" && plan.appStore) {
-      const { productId, expiresAt, autoRenews } = plan.appStore;
+      const { productId, status, expiresAt, gracePeriodExpiresAt, autoRenews } = plan.appStore;
       return {
         hasSubscription: true,
         isLoading: false,
         source: "app_store",
-        status: "active",
+        status: status === "grace" ? "past_due" : "active",
         plan: "premium",
         notebookLimit: 200,
         sourceLimit: 200,
-        currentPeriodEnd: new Date(expiresAt).toISOString(),
+        currentPeriodEnd: new Date(Math.max(expiresAt, gracePeriodExpiresAt ?? 0)).toISOString(),
         cancelAtPeriodEnd: !autoRenews,
-        interval: isAppStoreProductId(productId) ? appStoreProductPeriod(productId) : "month",
+        interval: isAppStoreProductId(productId) ? appStoreProductPeriod(productId) : undefined,
         appStoreProductId: productId,
       };
     }

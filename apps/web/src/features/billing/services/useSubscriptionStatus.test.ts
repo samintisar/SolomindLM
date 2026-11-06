@@ -82,6 +82,50 @@ describe("useSubscriptionStatus", () => {
       interval: "year",
       cancelAtPeriodEnd: true,
       currentPeriodEnd: "2027-01-01T00:00:00.000Z",
+      status: "active",
+      plan: "premium",
+      notebookLimit: 200,
+      sourceLimit: 200,
+      appStoreProductId: "com.solomindlm.app.pro.yearly",
     });
+  });
+
+  it("maps a grace-period App Store plan to past_due until the grace deadline", () => {
+    mockUseQuery.mockReturnValue({
+      tier: "pro",
+      source: "app_store",
+      stripe: null,
+      appStore: {
+        productId: "com.solomindlm.app.pro.monthly",
+        status: "grace",
+        expiresAt: Date.UTC(2027, 0, 1),
+        gracePeriodExpiresAt: Date.UTC(2027, 0, 17),
+        autoRenews: true,
+        environment: "Sandbox",
+      },
+    });
+    const { result } = renderHook(() => useSubscriptionStatus());
+    expect(result.current).toMatchObject({
+      hasSubscription: true,
+      status: "past_due",
+      currentPeriodEnd: "2027-01-17T00:00:00.000Z",
+    });
+  });
+
+  it("leaves the interval undefined for an unknown App Store product", () => {
+    mockUseQuery.mockReturnValue({
+      tier: "pro",
+      source: "app_store",
+      stripe: null,
+      appStore: {
+        productId: "com.solomindlm.app.pro.mystery",
+        status: "active",
+        expiresAt: Date.UTC(2027, 0, 1),
+        autoRenews: true,
+        environment: "Sandbox",
+      },
+    });
+    const { result } = renderHook(() => useSubscriptionStatus());
+    expect(result.current.interval).toBeUndefined();
   });
 });
