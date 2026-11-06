@@ -90,6 +90,10 @@ export const PrivacyPolicy: React.FC = () => {
               full card numbers on our servers.
             </li>
             <li>
+              In the iOS app, subscriptions are processed by Apple. We receive transaction details
+              (product, dates, and status) but never your payment details.
+            </li>
+            <li>
               In the mobile app: a push notification token if you allow notifications, and crash,
               error, and performance reports (device model, operating system, app version, and
               diagnostic details; these reports are not tied to your name or email).

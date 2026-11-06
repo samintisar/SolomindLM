@@ -1,6 +1,6 @@
 # iOS in-app purchase for Pro
 
-**Status:** Approved design, not yet implemented.
+**Status:** Approved; implemented on branch feature/ios-iap.
 **Why:** App Review rejected iOS 1.0 under guideline 3.1.1: the app unlocks Pro bought on the web
 (Stripe) but offers no in-app purchase. The fix is to sell Pro through Apple in-app purchase (IAP)
 inside the iOS app, synced to the same Pro entitlement Stripe grants.
@@ -65,6 +65,7 @@ appStoreSubscriptions: defineTable({
     v.literal("revoked")
   ),
   expiresAt: v.number(),
+  gracePeriodExpiresAt: v.optional(v.number()), // from renewal info
   autoRenews: v.boolean(),
   autoRenewProductId: v.optional(v.string()),
   createdAt: v.number(),
@@ -90,44 +91,59 @@ New tables only, so no migration is needed.
 A user is Pro if `isProUser` finds either:
 
 - a `stripeSubscriptions` row with status `active` (unchanged), or
-- an `appStoreSubscriptions` row with status `active` or `grace` and `expiresAt` later than
-  now minus one day. The day of leeway covers a renewal notification that arrives late; the
-  `expiresAt` check covers an `EXPIRED` notification that never arrives.
+- an `appStoreSubscriptions` row with status `active` or `grace` whose access deadline, the later
+  of `expiresAt` and `gracePeriodExpiresAt`, is later than now minus one day. During Billing Grace
+  Period `expiresAt` is already past, so the grace deadline is what keeps access. The day of
+  leeway covers a renewal notification that arrives late; the deadline check covers an `EXPIRED`
+  notification that never arrives.
 
 `billing.getPlan` returns `{ tier: "free" | "pro", source: "stripe" | "app_store" | null,
-renewsAt, cancelAtPeriodEnd, productId? }`. The Billing page, the Header and the feedback
+renewsAt, cancelAtPeriodEnd, productId?, gracePeriodExpiresAt? }`. The Billing page, the Header and the feedback
 `planTier` read it instead of reading `stripeSubscriptions` directly.
 
 ### Sandbox
 
 App Review and TestFlight buy in the Sandbox environment against the production app, so production
-Convex accepts Sandbox transactions: verify as Production first, and on `INVALID_ENVIRONMENT` verify
-as Sandbox. Each row records its environment. TestFlight testers can get Pro without paying; that is
+Convex accepts Sandbox transactions. The verifier reads the `environment` claim from the signed
+payload itself (top level, else `data`, `summary` or `appData`) and picks the Production or Sandbox
+verifier from it. Apple omits `appAppleId` from Sandbox notifications, so trying Production first
+would reject them. The claim is unverified, but the library re-checks the environment after the
+signature, so a forged claim only makes verification fail. Each row records its environment. TestFlight testers can get Pro without paying; that is
 accepted.
 
 ## Bridge protocol
 
 Uses the request/response pattern `nativeShellAuth.ts` already uses: the page posts a JSON request
-with an `id` through `window.ReactNativeWebView.postMessage`; native answers by injecting a script
-that dispatches a `CustomEvent` carrying the same `id`. The web client times out after 60 s for
-purchase (the Apple sheet stays open while the user decides) and 15 s otherwise.
+with a `requestId` through `window.ReactNativeWebView.postMessage`; native answers by injecting a
+script that dispatches a `CustomEvent` carrying the same id. There is one message type,
+`shell-web:iap`, with an `action` field (`products`, `purchase`, `restore`, `manage`). Native
+accepts these messages only from the app's own web origin. The purchase request times out after
+5 minutes, not 60 s: the Apple sheet can stay up while the user signs in to a Sandbox account or
+confirms with Face ID. The reactive `getPlan` query shows Pro even if the reply is lost.
 
-**Capability flag.** New native builds inject `window.__SHELL_CAPABILITIES__ = { iap: true }` before
+**Capability flag.** New iOS builds inject `window.__SHELL_CAPABILITIES__ = { iap: true }` before
 content loads. The web shows IAP UI only when it is present. The current 1.0 build and the Android
 shell keep today's behaviour (plan summary, no purchase UI).
 
-| Request | Native action | Response |
+| `action` | Native action | Response |
 | --- | --- | --- |
-| `shell-web:iap-products` | `fetchProducts` for both IDs | `{ products: [{ id, displayPrice, period }] }` or `{ error }` |
-| `shell-web:iap-purchase { productId }` | Get account token from Convex, `requestPurchase` with `appAccountToken`, send the signed transaction to `syncTransaction`, then `finishTransaction` | `{ status: "purchased" \| "cancelled" \| "pending" \| "error", message? }` |
-| `shell-web:iap-restore` | `getAvailablePurchases`, sync each | `{ restored: number }` or `{ error }` |
-| `shell-web:iap-manage` | `deepLinkToSubscriptions` | none |
+| `products` | `fetchProducts` for both IDs | `{ products: [{ id, displayPrice, period }] }` or `{ error }` |
+| `purchase` (+ `productId`) | Get account token from Convex, `requestPurchase` with `appAccountToken`, send the signed transaction to `syncTransaction`, then `finishTransaction` | `{ status: "purchased" \| "cancelled" \| "pending" \| "error", message? }` |
+| `restore` | Ask the App Store to sync, then `getAvailablePurchases`, sync each | `{ restored: number }` or `{ error }` |
+| `manage` | `deepLinkToSubscriptions` | none |
 
 Rules:
 
 - `finishTransaction` runs only after `syncTransaction` succeeds. If the app dies in between, StoreKit
   redelivers the transaction on the next launch and it is synced then.
-- On every launch (once signed in), native re-syncs current entitlements quietly.
+- On every launch (once signed in), native re-syncs current entitlements quietly. This never shows
+  an App Store prompt.
+- One purchase runs at a time, with a 5-minute native timeout. The result comes from
+  `requestPurchase`'s return value; the purchase listener and that call dedupe by transaction id so
+  a transaction is synced once.
+- Ask to Buy surfaces from expo-iap as a `DeferredPayment` error and maps to `pending`.
+- Explicit Restore first asks the App Store to sync, then syncs available purchases. If the store sync
+  fails it still syncs what StoreKit already has.
 - The page does not depend on the response to show Pro: `billing.getPlan` is reactive and flips when
   Convex records the subscription.
 - User-facing results: cancelled → nothing; pending (Ask to Buy) → "Waiting for approval"; error →
@@ -139,9 +155,10 @@ Rules:
 
 Authenticated Node action.
 
-1. Verify the JWS with `SignedDataVerifier` (Apple root certificate checked into the repo,
-   `enableOnlineChecks: true`, bundle ID `com.solomindlm.app`, app Apple ID from env), Production then
-   Sandbox.
+1. Reject a payload over 64k characters, and rate limit to 60 calls per hour per user. Verify the JWS
+   with `SignedDataVerifier` (Apple root certificate checked into the repo,
+   `enableOnlineChecks: true`, bundle ID and app Apple ID constants in
+   `convex/billing/appStoreProducts.ts`), using the environment the payload claims.
 2. Reject product IDs other than the two above.
 3. Look up the caller's token. The transaction's `appAccountToken` must equal it.
    - If it equals another existing user's token → reject with
@@ -150,7 +167,16 @@ Authenticated Node action.
 4. Upsert `appStoreSubscriptions` by `originalTransactionId`; status from `expiresDate` and
    `revocationDate` (`revoked` if revoked, `expired` if past expiry, else `active`).
 
-Errors use `InputValidationError` / `ExternalServiceError` mapped by `toConvexError`.
+Row rules, shared by this path and notifications:
+
+- Data about an older period (`expiresAt` below the stored value) never changes a row.
+- A client-sent transaction without a revocation cannot undo a revocation unless it is for a later
+  period. Only a notification can.
+- A lapsed (not entitled) row moves to the account whose token is on a new transaction, because Apple
+  keeps one `originalTransactionId` per Apple ID across resubscribes. An entitled row keeps its owner.
+
+Errors use `InputValidationError` / `ExternalServiceError` mapped by `toConvexError`. Calls are
+logged with `serviceLogger`.
 
 ### `billing.appStore.getAccountToken()`
 
@@ -158,7 +184,11 @@ Authenticated mutation: returns the caller's token, creating it on first call.
 
 ### `POST /appstore/notifications` (`convex/http.ts`)
 
-1. `verifyAndDecodeNotification(signedPayload)` (Production, then Sandbox). Invalid → `400`, no retry.
+1. Reject bodies over 64 KiB (`413`) and anything that is not JWS-shaped (three base64url parts)
+   before starting a Node action. Then `verifyAndDecodeNotification(signedPayload)`, using the
+   payload's environment claim. A signature or payload that fails verification → `400`, no retry. A
+   transient OCSP or network failure (`RETRYABLE_VERIFICATION_FAILURE`) throws
+   `ExternalServiceError` → `500`, so Apple retries.
 2. Claim the event by `notificationUUID` (same pattern as `claimWebhookEvent`); already processed → `200`.
 3. Decode `signedTransactionInfo` and `signedRenewalInfo`. Find the row by `originalTransactionId`,
    else find the user by `appAccountToken`; unknown user → log and `200`.
@@ -175,7 +205,8 @@ Authenticated mutation: returns the caller's token, creating it on first call.
 | `DID_CHANGE_RENEWAL_PREF` | `autoRenewProductId` |
 | anything else | ignored, marked processed |
 
-5. Processing failure → mark failed, `500` so Apple retries.
+5. Applying the state and marking the event processed happen in one mutation. Processing failure →
+   mark failed, `500` so Apple retries.
 
 ### Double billing
 
@@ -192,7 +223,8 @@ Settings.
 
 ### Environment
 
-`APPLE_BUNDLE_ID`, `APPLE_APP_ID` on Convex. No App Store Server API key: v1 never calls Apple's API.
+No new env vars. The bundle ID and app Apple ID are not secret, so they are constants in
+`convex/billing/appStoreProducts.ts`. No App Store Server API key: v1 never calls Apple's API.
 
 ## Web UI
 
@@ -202,25 +234,32 @@ CTAs (limit toasts, Pro badges, Header) reappear in IAP-capable builds and open 
 
 Billing page in an IAP-capable shell:
 
-- Two plan cards with Apple's `displayPrice` and period; yearly savings computed from Apple's prices.
+- Two plan cards, "Pro Yearly" and "Pro Monthly", with Apple's `displayPrice` and period; yearly
+  savings computed from Apple's prices. Purchase buttons stay hidden while the plan loads.
 - Subscribe per card, **Restore purchases**, and **Manage subscription** for App Store subscribers.
-- Near the buttons: "Auto-renews until canceled. Cancel any time in Settings at least 24 hours before
-  renewal." with links to Terms of Use (EULA) and the Privacy Policy (guideline 3.1.2). The same
+- Above the cards: "Payment is charged to your Apple ID at confirmation of purchase." plus the
+  auto-renew terms ("Auto-renews until canceled. Cancel any time in Settings at least 24 hours before
+  renewal.") and links to Terms of Use (EULA) and the Privacy Policy (guideline 3.1.2). The same
   links go in the App Store description.
+- During Apple's grace period the page shows "Payment issue" (`past_due`) with a message instead of
+  "Renews on".
+- The limit-toast "Upgrade" action goes to `/billing` in app builds.
 - Products fail to load → message with Retry.
 
 ## Testing
 
 - **Convex** (`convex-test`): notification → status mapping, `isProUser` across both tables
-  including the `expiresAt` guard, token mismatch and re-link after deletion, duplicate
-  notifications, `createCheckoutSession` refusal with App Store Pro, purge on deletion. Signature
-  verification is tested with fixtures signed by a test certificate chain the verifier is configured
-  to trust.
+  including the access-deadline guard, token mismatch and re-link after deletion, stale and replayed
+  data, duplicate notifications, `createCheckoutSession` refusal with App Store Pro, purge on
+  deletion. The verifier wrapper is mocked.
 - **Web** (vitest): bridge client (ids, timeouts, malformed replies), Billing page states (web, old
   shell, IAP shell, Stripe Pro, App Store Pro), `canOfferPurchases` / `purchaseChannel`.
 - **Mobile** (jest): bridge message parsing and response building.
 - **Manual**: TestFlight with a Sandbox tester: buy, cancel, Ask to Buy, restore on a second device,
   renewal (Sandbox renews fast), refund via Sandbox, notification receipt in Convex logs.
+- **Verification** is not covered by self-signed fixtures. Signature verification sits behind a thin
+  wrapper (`convex/billing/appStoreVerifier.ts`) that the Convex tests mock; it is exercised in
+  Sandbox on TestFlight.
 
 ## Rollout
 
@@ -231,6 +270,12 @@ Billing page in an IAP-capable shell:
 3. New native build (also ships the #619 upload-button gating). Test on TestFlight.
 4. Attach the subscriptions to the resubmitted version, update App Privacy (purchases) and the
    review notes, reply to App Review.
+
+### Release checklist note
+
+Put both products at the same service level in the subscription group (or the yearly one higher).
+Otherwise an immediate upgrade to a shorter product would be ignored by the rule that a row never
+rolls back to an older period.
 
 ## Out of scope
 
