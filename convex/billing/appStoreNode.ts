@@ -4,11 +4,14 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, internalAction } from "../_generated/server";
 import { ExternalServiceError, InputValidationError } from "../_lib/errors";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { rateLimiter } from "../_lib/rateLimits";
 import { toConvexError } from "../_lib/serviceErrors";
 import { getAuthUserId } from "../auth";
 import {
   type AppStoreStatus,
   appStoreStatusValidator,
+  type VerifiedNotification,
   type VerifiedTransaction,
 } from "./appStoreModel";
 import { isAppStoreProductId } from "./appStoreProducts";
@@ -28,6 +31,14 @@ export const syncTransaction = action({
   handler: async (ctx, { signedTransaction }): Promise<{ status: AppStoreStatus }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
+    await rateLimiter.limit(ctx, "appStoreSync", { key: userId, throws: true });
+    if (signedTransaction.length > MAX_SIGNED_TRANSACTION_LENGTH) {
+      throw toConvexError(
+        new InputValidationError("This purchase couldn't be verified.", {
+          field: "signedTransaction",
+        })
+      );
+    }
 
     let transaction: VerifiedTransaction;
     try {
@@ -54,6 +65,8 @@ export const syncTransaction = action({
   },
 });
 
+const MAX_SIGNED_TRANSACTION_LENGTH = 64_000;
+
 type NotificationResult = "invalid" | "duplicate" | "ignored" | "unlinked" | "processed";
 
 /**
@@ -73,25 +86,33 @@ export const handleNotification = internalAction({
     ),
   }),
   handler: async (ctx, { signedPayload }): Promise<{ result: NotificationResult }> => {
-    let notification: Awaited<ReturnType<typeof verifyNotification>>;
+    const log = createServiceLogger("appstore", "notification");
+    let notification: VerifiedNotification;
     try {
       notification = await verifyNotification(signedPayload);
     } catch (error) {
       if (error instanceof AppStoreVerificationError) {
-        console.warn(
-          JSON.stringify({ event: "appstore_notification_invalid", error: error.message })
-        );
+        log.warn("appstore_notification_invalid", { error: error.message });
         return { result: "invalid" as const };
       }
       throw error;
     }
 
     const { notificationUUID, notificationType, subtype, transaction, renewal } = notification;
+    const handled = (result: NotificationResult) => {
+      log.info("appstore_notification_handled", {
+        notificationUUID,
+        notificationType,
+        subtype,
+        result,
+      });
+      return { result };
+    };
     const { status } = await ctx.runMutation(internal.billing.appStore.claimNotification, {
       notificationUUID,
       notificationType,
     });
-    if (status === "processed") return { result: "duplicate" as const };
+    if (status === "processed") return handled("duplicate");
     if (status === "in_flight") {
       throw new Error(`App Store notification ${notificationUUID} already in flight, retry later`);
     }
@@ -101,33 +122,33 @@ export const handleNotification = internalAction({
         await ctx.runMutation(internal.billing.appStore.markNotificationProcessed, {
           notificationUUID,
         });
-        return { result: "ignored" as const };
+        return handled("ignored");
       }
+      // Applies the state and marks the event processed in one mutation.
       const { applied } = await ctx.runMutation(internal.billing.appStore.applyNotification, {
+        notificationUUID,
         notificationType,
         ...(subtype ? { subtype } : {}),
         transaction,
         ...(renewal ? { renewal } : {}),
       });
-      await ctx.runMutation(internal.billing.appStore.markNotificationProcessed, {
-        notificationUUID,
-      });
       if (!applied) {
-        console.warn(
-          JSON.stringify({
-            event: "appstore_notification_unlinked",
-            notificationUUID,
-            notificationType,
-            originalTransactionId: transaction.originalTransactionId,
-          })
-        );
+        log.warn("appstore_notification_unlinked", {
+          notificationUUID,
+          notificationType,
+          originalTransactionId: transaction.originalTransactionId,
+        });
       }
-      return { result: applied ? ("processed" as const) : ("unlinked" as const) };
+      return handled(applied ? "processed" : "unlinked");
     } catch (error) {
-      await ctx.runMutation(internal.billing.appStore.markNotificationFailed, {
-        notificationUUID,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
+      try {
+        await ctx.runMutation(internal.billing.appStore.markNotificationFailed, {
+          notificationUUID,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      } catch (markError) {
+        log.error("appstore_notification_mark_failed", markError, { notificationUUID });
+      }
       throw error;
     }
   },

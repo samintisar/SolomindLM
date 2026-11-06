@@ -12,6 +12,8 @@ import {
   mergeStatus,
   statusFromNotification,
   statusFromTransaction,
+  type VerifiedRenewal,
+  type VerifiedTransaction,
   verifiedRenewalValidator,
   verifiedTransactionValidator,
 } from "./appStoreModel";
@@ -169,18 +171,22 @@ export const claimNotification = internalMutation({
   },
 });
 
+async function markProcessed(ctx: MutationCtx, notificationUUID: string) {
+  const row = await findNotification(ctx, notificationUUID);
+  if (row) {
+    await ctx.db.patch(row._id, {
+      processed: true,
+      processedAt: Date.now(),
+      errorMessage: undefined,
+    });
+  }
+}
+
 export const markNotificationProcessed = internalMutation({
   args: { notificationUUID: v.string() },
   returns: v.null(),
   handler: async (ctx, { notificationUUID }) => {
-    const row = await findNotification(ctx, notificationUUID);
-    if (row) {
-      await ctx.db.patch(row._id, {
-        processed: true,
-        processedAt: Date.now(),
-        errorMessage: undefined,
-      });
-    }
+    await markProcessed(ctx, notificationUUID);
     return null;
   },
 });
@@ -201,61 +207,87 @@ export const markNotificationFailed = internalMutation({
  */
 export const applyNotification = internalMutation({
   args: {
+    notificationUUID: v.string(),
     notificationType: v.string(),
     subtype: v.optional(v.string()),
     transaction: verifiedTransactionValidator,
     renewal: v.optional(verifiedRenewalValidator),
   },
   returns: v.object({ applied: v.boolean() }),
-  handler: async (ctx, { notificationType, subtype, transaction, renewal }) => {
-    const now = Date.now();
-    const existing = await findByOriginalTransaction(ctx, transaction.originalTransactionId);
-    // Stale data (older period) changes nothing, but counts as handled.
-    if (existing && isOlderThan(existing, transaction)) return { applied: true };
-    const tokenOwner = transaction.appAccountToken
-      ? await findTokenOwner(ctx, transaction.appAccountToken)
-      : null;
-    // A lapsed row on a shared Apple ID moves to whoever bought again; an entitled one keeps its owner.
-    const reassign =
-      existing !== null &&
-      tokenOwner !== null &&
-      tokenOwner !== existing.userId &&
-      !isAppStoreEntitled(existing, now);
-    const userId = reassign ? tokenOwner : (existing?.userId ?? tokenOwner);
-    if (!userId) return { applied: false };
-
-    const fromTransaction = statusFromTransaction(transaction, now);
-    const status =
-      statusFromNotification(notificationType, subtype) ??
-      mergeStatus(existing?.status, fromTransaction);
-    const fields = {
-      ...(reassign ? { userId } : {}),
-      latestTransactionId: transaction.transactionId,
-      productId: transaction.productId,
-      environment: transaction.environment,
-      expiresAt: transaction.expiresAt,
-      status,
-      updatedAt: now,
-      ...(renewal
-        ? {
-            autoRenews: renewal.autoRenews,
-            autoRenewProductId: renewal.autoRenewProductId,
-            gracePeriodExpiresAt: renewal.gracePeriodExpiresAt,
-          }
-        : {}),
-    };
-
-    if (existing) {
-      await ctx.db.patch(existing._id, fields);
-    } else {
-      await ctx.db.insert("appStoreSubscriptions", {
-        userId,
-        originalTransactionId: transaction.originalTransactionId,
-        createdAt: now,
-        ...fields,
-        autoRenews: renewal?.autoRenews ?? true,
-      });
-    }
-    return { applied: true };
+  handler: async (ctx, { notificationUUID, notificationType, subtype, transaction, renewal }) => {
+    const result = await applyNotificationState(ctx, {
+      notificationType,
+      subtype,
+      transaction,
+      renewal,
+    });
+    // Same mutation as the state change, so a crash can't leave it applied but unmarked.
+    await markProcessed(ctx, notificationUUID);
+    return result;
   },
 });
+
+async function applyNotificationState(
+  ctx: MutationCtx,
+  {
+    notificationType,
+    subtype,
+    transaction,
+    renewal,
+  }: {
+    notificationType: string;
+    subtype?: string;
+    transaction: VerifiedTransaction;
+    renewal?: VerifiedRenewal;
+  }
+): Promise<{ applied: boolean }> {
+  const now = Date.now();
+  const existing = await findByOriginalTransaction(ctx, transaction.originalTransactionId);
+  // Stale data (older period) changes nothing, but counts as handled.
+  if (existing && isOlderThan(existing, transaction)) return { applied: true };
+  const tokenOwner = transaction.appAccountToken
+    ? await findTokenOwner(ctx, transaction.appAccountToken)
+    : null;
+  // A lapsed row on a shared Apple ID moves to whoever bought again; an entitled one keeps its owner.
+  const reassign =
+    existing !== null &&
+    tokenOwner !== null &&
+    tokenOwner !== existing.userId &&
+    !isAppStoreEntitled(existing, now);
+  const userId = reassign ? tokenOwner : (existing?.userId ?? tokenOwner);
+  if (!userId) return { applied: false };
+
+  const fromTransaction = statusFromTransaction(transaction, now);
+  const status =
+    statusFromNotification(notificationType, subtype) ??
+    mergeStatus(existing?.status, fromTransaction);
+  const fields = {
+    ...(reassign ? { userId } : {}),
+    latestTransactionId: transaction.transactionId,
+    productId: transaction.productId,
+    environment: transaction.environment,
+    expiresAt: transaction.expiresAt,
+    status,
+    updatedAt: now,
+    ...(renewal
+      ? {
+          autoRenews: renewal.autoRenews,
+          autoRenewProductId: renewal.autoRenewProductId,
+          gracePeriodExpiresAt: renewal.gracePeriodExpiresAt,
+        }
+      : {}),
+  };
+
+  if (existing) {
+    await ctx.db.patch(existing._id, fields);
+  } else {
+    await ctx.db.insert("appStoreSubscriptions", {
+      userId,
+      originalTransactionId: transaction.originalTransactionId,
+      createdAt: now,
+      ...fields,
+      autoRenews: renewal?.autoRenews ?? true,
+    });
+  }
+  return { applied: true };
+}

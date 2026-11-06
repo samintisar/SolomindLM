@@ -304,6 +304,7 @@ describe("notifications", () => {
     const expiresAt = Date.now() - DAY;
     await seedAppStoreSubscription(t, userId, { expiresAt });
     const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "DID_FAIL_TO_RENEW",
       subtype: "GRACE_PERIOD",
       transaction: transaction({ expiresAt }),
@@ -320,6 +321,7 @@ describe("notifications", () => {
     const userId = await seedUser(t);
     await seedAppStoreSubscription(t, userId);
     await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "REFUND",
       transaction: transaction({ revokedAt: Date.now() }),
     });
@@ -331,6 +333,7 @@ describe("notifications", () => {
     const userId = await seedUser(t);
     await seedAppStoreSubscription(t, userId);
     await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "DID_CHANGE_RENEWAL_STATUS",
       subtype: "AUTO_RENEW_DISABLED",
       transaction: transaction(),
@@ -345,6 +348,7 @@ describe("notifications", () => {
     const userId = await seedUser(t);
     const token = await asUser(t, userId).mutation(api.billing.appStore.getAccountToken, {});
     const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "SUBSCRIBED",
       subtype: "INITIAL_BUY",
       transaction: transaction({ appAccountToken: token }),
@@ -357,6 +361,7 @@ describe("notifications", () => {
   test("a subscription with no known owner is not applied", async () => {
     const t = convexTest(schema, modules);
     const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "DID_RENEW",
       transaction: transaction(),
     });
@@ -370,6 +375,7 @@ describe("stale and reassigned notifications", () => {
     const userId = await seedUser(t);
     await seedAppStoreSubscription(t, userId, { expiresAt: Date.now() + 30 * DAY });
     const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "DID_FAIL_TO_RENEW",
       transaction: transaction({ expiresAt: Date.now() - DAY }),
     });
@@ -384,6 +390,7 @@ describe("stale and reassigned notifications", () => {
     const userId = await seedUser(t);
     await seedAppStoreSubscription(t, userId, { expiresAt: Date.now() + 60 * DAY });
     await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "REFUND",
       transaction: transaction({ expiresAt: Date.now() + DAY, revokedAt: Date.now() }),
     });
@@ -397,6 +404,7 @@ describe("stale and reassigned notifications", () => {
     const expiresAt = Date.now() + 10 * DAY;
     await seedAppStoreSubscription(t, userId, { status: "revoked", expiresAt });
     await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "REFUND_REVERSED",
       transaction: transaction({ expiresAt }),
     });
@@ -412,6 +420,7 @@ describe("stale and reassigned notifications", () => {
     await seedAppStoreSubscription(t, a, { status: "expired", expiresAt: Date.now() - 10 * DAY });
     const token = await asUser(t, b).mutation(api.billing.appStore.getAccountToken, {});
     const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "SUBSCRIBED",
       subtype: "RESUBSCRIBE",
       transaction: transaction({ appAccountToken: token }),
@@ -428,6 +437,7 @@ describe("stale and reassigned notifications", () => {
     await seedAppStoreSubscription(t, a);
     const token = await asUser(t, b).mutation(api.billing.appStore.getAccountToken, {});
     await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-test",
       notificationType: "DID_RENEW",
       transaction: transaction({ appAccountToken: token, expiresAt: Date.now() + 60 * DAY }),
     });

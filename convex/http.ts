@@ -126,6 +126,9 @@ http.route({
 // App Store Server Notifications V2 (Forward to Node Action)
 // ============================================================
 
+const MAX_APPSTORE_NOTIFICATION_BYTES = 64 * 1024;
+const JWS_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$/;
+
 http.route({
   path: "/appstore/notifications",
   method: "POST",
@@ -136,22 +139,37 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
 
+    const log = createServiceLogger("appstore", "notifications-route");
+    const declaredBytes = Number(request.headers.get("content-length") ?? 0);
+    if (declaredBytes > MAX_APPSTORE_NOTIFICATION_BYTES) {
+      return respond(413, { error: "Payload too large" });
+    }
+    // content-length can be absent or wrong (chunked), so cap the actual body too.
+    const text = await request.text();
+    if (text.length > MAX_APPSTORE_NOTIFICATION_BYTES) {
+      return respond(413, { error: "Payload too large" });
+    }
+
     let signedPayload: unknown;
     try {
-      signedPayload = ((await request.json()) as { signedPayload?: unknown }).signedPayload;
+      signedPayload = (JSON.parse(text) as { signedPayload?: unknown } | null)?.signedPayload;
     } catch {
-      signedPayload = undefined;
+      return respond(400, { error: "Invalid JSON" });
     }
-    if (typeof signedPayload !== "string") return respond(400, { error: "Missing signedPayload" });
+    // Cheap shape check in V8 so junk never starts a Node action: a JWS is three base64url parts.
+    if (typeof signedPayload !== "string" || !JWS_SHAPE.test(signedPayload)) {
+      return respond(400, { error: "Missing or malformed signedPayload" });
+    }
 
     try {
       const { result } = await ctx.runAction(internal.billing.appStoreNode.handleNotification, {
         signedPayload,
       });
-      // Unverifiable payloads get 400; processing failures get 500 so Apple retries.
+      // "invalid" deliberately answers 400: Apple retries, which gives time to fix a config
+      // problem (wrong bundle/app ID, missing root cert). Processing failures answer 500.
       return respond(result === "invalid" ? 400 : 200, { result });
     } catch (error) {
-      console.error("[App Store notification] Error:", error);
+      log.error("appstore_notification_failed", error);
       return respond(500, { error: "Notification processing failed" });
     }
   }),

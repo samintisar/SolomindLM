@@ -1,4 +1,6 @@
 /// <reference types="vite/client" />
+
+import rateLimiterTest, { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -27,7 +29,14 @@ const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => P
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
+preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 preloadModules(modules, ["./billing/appStoreNode.ts", "./billing/appStore.ts"]);
+
+function makeT() {
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  return t;
+}
 
 const DAY = 24 * 60 * 60 * 1000;
 type T = ReturnType<typeof convexTest>;
@@ -56,7 +65,7 @@ beforeEach(() => {
 
 describe("syncTransaction", () => {
   test("verifies and stores the caller's purchase", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const userId = await seedUser(t);
     const token = await asUser(t, userId).mutation(api.billing.appStore.getAccountToken, {});
     verifyTransaction.mockResolvedValue(tx({ appAccountToken: token }));
@@ -69,7 +78,7 @@ describe("syncTransaction", () => {
   });
 
   test("rejects a bad signature", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const userId = await seedUser(t);
     verifyTransaction.mockRejectedValue(new AppStoreVerificationError("bad"));
     await expect(
@@ -78,7 +87,7 @@ describe("syncTransaction", () => {
   });
 
   test("surfaces a transient verification failure as a structured ConvexError", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const userId = await seedUser(t);
     verifyTransaction.mockRejectedValue(
       new ExternalServiceError("app_store", "OCSP unavailable", { retryable: true })
@@ -90,7 +99,7 @@ describe("syncTransaction", () => {
   });
 
   test("rejects products that aren't Pro", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const userId = await seedUser(t);
     verifyTransaction.mockResolvedValue(tx({ productId: "com.other.app.thing" }));
     await expect(
@@ -99,16 +108,99 @@ describe("syncTransaction", () => {
   });
 
   test("rejects signed-out callers", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     await expect(
       t.action(api.billing.appStoreNode.syncTransaction, { signedTransaction: "x" })
     ).rejects.toThrow();
+    expect(verifyTransaction).not.toHaveBeenCalled();
+  });
+
+  test("rejects oversized payloads before verifying", async () => {
+    const t = makeT();
+    const userId = await seedUser(t);
+    const error = await asUser(t, userId)
+      .action(api.billing.appStoreNode.syncTransaction, { signedTransaction: "x".repeat(64_001) })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConvexError);
+    expect(verifyTransaction).not.toHaveBeenCalled();
   });
 });
 
 describe("handleNotification", () => {
+  const eventRow = (t: T, uuid: string) =>
+    t.run((ctx) =>
+      ctx.db
+        .query("appStoreNotificationEvents")
+        .withIndex("by_uuid", (q) => q.eq("notificationUUID", uuid))
+        .unique()
+    );
+
+  test("a non-Pro product is ignored and marked processed", async () => {
+    const t = makeT();
+    verifyNotification.mockResolvedValue({
+      notificationUUID: "n-other",
+      notificationType: "DID_RENEW",
+      environment: "Sandbox",
+      transaction: tx({ productId: "com.other.app.thing" }),
+    });
+    expect(
+      await t.action(internal.billing.appStoreNode.handleNotification, { signedPayload: "p" })
+    ).toEqual({ result: "ignored" });
+    expect((await eventRow(t, "n-other"))?.processed).toBe(true);
+  });
+
+  test("an apply failure records the error, and a redelivery succeeds", async () => {
+    const t = makeT();
+    const userId = await seedUser(t);
+    const token = await asUser(t, userId).mutation(api.billing.appStore.getAccountToken, {});
+    const notification = (transaction: Record<string, unknown>) => ({
+      notificationUUID: "n-fail",
+      notificationType: "DID_RENEW",
+      environment: "Sandbox",
+      transaction,
+    });
+
+    // expiresAt of the wrong type fails argument validation inside the apply step.
+    verifyNotification.mockResolvedValueOnce(
+      notification(tx({ appAccountToken: token, expiresAt: "not-a-number" }))
+    );
+    await expect(
+      t.action(internal.billing.appStoreNode.handleNotification, { signedPayload: "p" })
+    ).rejects.toThrow();
+    const failed = await eventRow(t, "n-fail");
+    expect(failed?.processed).toBe(false);
+    expect(failed?.errorMessage).toBeTruthy();
+
+    verifyNotification.mockResolvedValueOnce(notification(tx({ appAccountToken: token })));
+    expect(
+      await t.action(internal.billing.appStoreNode.handleNotification, { signedPayload: "p" })
+    ).toEqual({ result: "processed" });
+    expect((await eventRow(t, "n-fail"))?.processed).toBe(true);
+  });
+
+  test("a fresh unprocessed claim is reported as in flight", async () => {
+    const t = makeT();
+    await t.run((ctx) =>
+      ctx.db.insert("appStoreNotificationEvents", {
+        notificationUUID: "n-busy",
+        notificationType: "DID_RENEW",
+        processed: false,
+        createdAt: Date.now(),
+      })
+    );
+    verifyNotification.mockResolvedValue({
+      notificationUUID: "n-busy",
+      notificationType: "DID_RENEW",
+      environment: "Sandbox",
+      transaction: tx(),
+    });
+    await expect(
+      t.action(internal.billing.appStoreNode.handleNotification, { signedPayload: "p" })
+    ).rejects.toThrow(/already in flight/);
+  });
+
   test("invalid signatures are reported, not thrown", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     verifyNotification.mockRejectedValue(new AppStoreVerificationError("bad"));
     expect(
       await t.action(internal.billing.appStoreNode.handleNotification, { signedPayload: "x" })
@@ -116,7 +208,7 @@ describe("handleNotification", () => {
   });
 
   test("transient verification failures propagate so Apple retries", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     verifyNotification.mockRejectedValue(
       new ExternalServiceError("app_store", "OCSP unavailable", { retryable: true })
     );
@@ -126,7 +218,7 @@ describe("handleNotification", () => {
   });
 
   test("applies a renewal once and skips the duplicate", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const userId = await seedUser(t);
     const token = await asUser(t, userId).mutation(api.billing.appStore.getAccountToken, {});
     verifyNotification.mockResolvedValue({
@@ -147,7 +239,7 @@ describe("handleNotification", () => {
   });
 
   test("notifications without a transaction are ignored", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     verifyNotification.mockResolvedValue({
       notificationUUID: "n-test",
       notificationType: "TEST",
@@ -159,7 +251,7 @@ describe("handleNotification", () => {
   });
 
   test("an unknown owner is reported as unlinked", async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     verifyNotification.mockResolvedValue({
       notificationUUID: "n-2",
       notificationType: "DID_RENEW",
