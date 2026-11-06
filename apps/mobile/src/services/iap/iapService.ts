@@ -193,8 +193,18 @@ async function syncAvailablePurchases(): Promise<number> {
 /** The user's "Restore purchases": have StoreKit sync with the App Store first, then send what it has. */
 export async function restorePurchases(): Promise<number> {
   await ensureConnection();
-  await restoreStorePurchases();
-  return syncAvailablePurchases();
+  let storeSyncError: unknown;
+  let storeSyncFailed = false;
+  try {
+    await restoreStorePurchases();
+  } catch (error) {
+    storeSyncFailed = true;
+    storeSyncError = error;
+  }
+  // Still send whatever StoreKit already has, even if the App Store sync failed.
+  const restored = await syncAvailablePurchases();
+  if (storeSyncFailed && restored === 0) throw storeSyncError;
+  return restored;
 }
 
 /** Quiet re-sync on launch / sign-in (no App Store prompt); failures are retried next time. */

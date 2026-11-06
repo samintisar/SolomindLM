@@ -151,6 +151,18 @@ describe("restore", () => {
     expect(mockedIap.restorePurchases).toHaveBeenCalledTimes(1);
   });
 
+  it("still syncs available purchases when the store sync fails", async () => {
+    mockedIap.restorePurchases.mockRejectedValue(new Error("store sync failed"));
+    mockedIap.getAvailablePurchases.mockResolvedValue([tx("a")]);
+    await expect(restorePurchases()).resolves.toBe(1);
+  });
+
+  it("rethrows the store sync error when it failed and nothing was restored", async () => {
+    mockedIap.restorePurchases.mockRejectedValue(new Error("store sync failed"));
+    mockedIap.getAvailablePurchases.mockResolvedValue([]);
+    await expect(restorePurchases()).rejects.toThrow("store sync failed");
+  });
+
   it("throws the first error when every purchase failed", async () => {
     mockedIap.getAvailablePurchases.mockResolvedValue([tx("a"), tx("b")]);
     action.mockRejectedValue(new Error("linked to another account"));
