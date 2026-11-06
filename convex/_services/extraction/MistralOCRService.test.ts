@@ -12,6 +12,7 @@ import {
   markdownFromMistralOcrResponse,
   NOTHING_READABLE_MESSAGE,
   OcrNothingReadableError,
+  OFFICE_ANNOTATED_IMAGE_LIMIT,
   ocrInputKindForFile,
   parseFigureAnnotation,
   shouldRetryWithoutAnnotations,
@@ -326,6 +327,18 @@ describe("buildOcrRequestBody", () => {
     expect(body).not.toHaveProperty("bbox_annotation_format");
   });
 
+  // Office responses carry every image as base64, so the image count is bounded: enough to describe
+  // figures on the annotated request, none on the plain one (it has no use for them).
+  it("bounds the images a Word or PowerPoint response carries", () => {
+    const annotated = buildOcrRequestBody("https://x/deck", "office", true);
+    const plain = buildOcrRequestBody("https://x/deck", "office", false);
+    expect(annotated.image_limit).toBe(OFFICE_ANNOTATED_IMAGE_LIMIT);
+    expect(plain.image_limit).toBe(0);
+    expect(buildOcrRequestBody("https://x/a.pdf", "document", true)).not.toHaveProperty(
+      "image_limit"
+    );
+  });
+
   // Mistral rejects `include_image_base64: false` for .docx/.pptx (HTTP 400, code 3051):
   // "extracted images can only be returned in base64".
   it("leaves include_image_base64 out for Word and PowerPoint files", () => {
@@ -519,6 +532,47 @@ describe("MistralOCRService.processDocument", () => {
 
     expect(err).toBeInstanceOf(OcrNothingReadableError);
     expect((err as OcrNothingReadableError).pagesRead).toBe(2);
+  });
+
+  it("sends a valid office request when annotations are off (large files, retry after a timeout)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "slide text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key", { annotations: false }).readDocument(
+      "https://x/storage/deck",
+      { kind: "office", maxPages: 30 }
+    );
+
+    const body = sentBody(fetchMock, 0);
+    expect(body).not.toHaveProperty("include_image_base64");
+    expect(body).not.toHaveProperty("bbox_annotation_format");
+    expect(body.image_limit).toBe(0);
+    expect(body.pages).toBe("0-29");
+  });
+
+  // Any other format Mistral applies the same rule to gets through without a code change.
+  it("resends without include_image_base64 when Mistral says images can only come as base64", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            message:
+              "For .odt files, extracted images can only be returned in base64. If you don't want images, try setting `image_limit=0` instead.",
+            code: "3051",
+          }),
+          { status: 400 }
+        )
+      )
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/file", { maxPages: 30 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("include_image_base64");
+    expect(sentBody(fetchMock, 1)).toHaveProperty("bbox_annotation_format");
+    expect(sentBody(fetchMock, 1).pages).toBe("0-29");
   });
 
   it("keeps a Word or PowerPoint file's request valid on the plain fallback", async () => {
