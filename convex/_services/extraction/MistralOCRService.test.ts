@@ -293,8 +293,12 @@ describe("ocrInputKindForFile", () => {
       expect(ocrInputKindForFile(name)).toBe("image");
   });
 
+  it("treats Word and PowerPoint files as office files, case-insensitively", () => {
+    for (const name of ["a.pptx", "b.DOCX"]) expect(ocrInputKindForFile(name)).toBe("office");
+  });
+
   it("treats everything else as a document", () => {
-    for (const name of ["a.pdf", "b.pptx", "c.docx", "no-extension"]) {
+    for (const name of ["a.pdf", "no-extension"]) {
       expect(ocrInputKindForFile(name)).toBe("document");
     }
   });
@@ -320,6 +324,23 @@ describe("buildOcrRequestBody", () => {
   it("leaves out annotation formats for the plain fallback request", () => {
     const body = buildOcrRequestBody("https://x/storage/abc", "image", false);
     expect(body).not.toHaveProperty("bbox_annotation_format");
+  });
+
+  // Mistral rejects `include_image_base64: false` for .docx/.pptx (HTTP 400, code 3051):
+  // "extracted images can only be returned in base64".
+  it("leaves include_image_base64 out for Word and PowerPoint files", () => {
+    for (const annotate of [true, false]) {
+      const body = buildOcrRequestBody("https://x/storage/abc", "office", annotate, 30);
+      expect(body).not.toHaveProperty("include_image_base64");
+      expect(body.document).toEqual({
+        type: "document_url",
+        document_url: "https://x/storage/abc",
+      });
+      expect(body.pages).toBe("0-29");
+    }
+    expect(buildOcrRequestBody("https://x/a.pdf", "document", true).include_image_base64).toBe(
+      false
+    );
   });
 
   it("asks a document for its first maxPages pages only", () => {
@@ -498,6 +519,25 @@ describe("MistralOCRService.processDocument", () => {
 
     expect(err).toBeInstanceOf(OcrNothingReadableError);
     expect((err as OcrNothingReadableError).pagesRead).toBe(2);
+  });
+
+  it("keeps a Word or PowerPoint file's request valid on the plain fallback", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "slide text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/deck", {
+      kind: "office",
+      maxPages: 30,
+    });
+
+    const last = sentBody(fetchMock, fetchMock.mock.calls.length - 1);
+    expect(last).not.toHaveProperty("bbox_annotation_format");
+    expect(last).not.toHaveProperty("include_image_base64");
+    expect(last.pages).toBe("0-29");
   });
 
   it("sends image uploads as image_url", async () => {
