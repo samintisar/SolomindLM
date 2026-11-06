@@ -29,7 +29,8 @@ export function resolveAiConsentState({
 }: ResolveAiConsentInput): AiConsentState {
   if (!inShell) return "notApplicable";
   if (authLoading) return previous ?? "loading";
-  // Signed out with no prior answer: AppShell redirects to sign-in. With one, treat it as a blip; the gate unmounts on public routes (sign-in), which clears `previous`.
+  // Signed out with no prior answer: AppShell redirects to sign-in. With one, treat it as a blip;
+  // the gate unmounts on public routes (sign-in), which clears `previous`.
   if (!isAuthenticated) return previous ?? "notApplicable";
   if (record === undefined || !record.signedIn) return previous ?? "loading";
   if (record.version === currentVersion) return "granted";
