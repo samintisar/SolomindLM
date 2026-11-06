@@ -6,6 +6,8 @@ let mockStatus: Record<string, unknown> = { hasSubscription: false };
 
 vi.mock("@/utils/platformDetection", () => ({
   canOfferPurchases: () => !mockIsNativeShell,
+  purchaseChannel: () => (mockIsNativeShell ? "none" : "stripe"),
+  shellSupportsIap: () => false,
 }));
 
 vi.mock("../services/subscriptionApi", () => ({

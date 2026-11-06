@@ -16,6 +16,8 @@ vi.mock("@/features/billing/services/subscriptionApi", () => ({
 
 vi.mock("@/utils/platformDetection", () => ({
   canOfferPurchases: () => !mockIsNativeShell,
+  purchaseChannel: () => (mockIsNativeShell ? "none" : "stripe"),
+  shellSupportsIap: () => false,
 }));
 
 const { useLimitErrorToast } = await import("./useLimitErrorToast");

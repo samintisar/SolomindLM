@@ -27,7 +27,7 @@ describe("useUserLimits", () => {
   });
 
   it("resolves to the free tier once the query returns no subscription", () => {
-    mockUseQuery.mockReturnValue(null);
+    mockUseQuery.mockReturnValue({ tier: "free", source: null, stripe: null, appStore: null });
 
     const { result } = renderHook(() => useUserLimits());
 
@@ -38,7 +38,12 @@ describe("useUserLimits", () => {
   });
 
   it("resolves to the Pro tier once the query returns an active subscription", () => {
-    mockUseQuery.mockReturnValue({ status: "active" });
+    mockUseQuery.mockReturnValue({
+      tier: "pro",
+      source: "stripe",
+      stripe: { status: "active" },
+      appStore: null,
+    });
 
     const { result } = renderHook(() => useUserLimits());
 
@@ -46,5 +51,25 @@ describe("useUserLimits", () => {
     expect(result.current.isPremium).toBe(true);
     expect(result.current.sourceLimit).toBe(200);
     expect(result.current.notebookLimit).toBe(200);
+  });
+
+  it("resolves to the Pro tier for an App Store plan", () => {
+    mockUseQuery.mockReturnValue({
+      tier: "pro",
+      source: "app_store",
+      stripe: null,
+      appStore: {
+        productId: "com.solomindlm.app.pro.yearly",
+        status: "active",
+        expiresAt: Date.UTC(2027, 0, 1),
+        autoRenews: true,
+        environment: "Sandbox",
+      },
+    });
+
+    const { result } = renderHook(() => useUserLimits());
+
+    expect(result.current.isPremium).toBe(true);
+    expect(result.current.isLoading).toBe(false);
   });
 });

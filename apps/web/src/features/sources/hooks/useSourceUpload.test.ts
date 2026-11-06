@@ -21,6 +21,8 @@ vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
 
 vi.mock("@/utils/platformDetection", () => ({
   canOfferPurchases: () => !mockIsNativeShell,
+  purchaseChannel: () => (mockIsNativeShell ? "none" : "stripe"),
+  shellSupportsIap: () => false,
 }));
 
 vi.mock("../services/documentsApi", () => ({

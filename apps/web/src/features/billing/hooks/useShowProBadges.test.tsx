@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotebookContext, type NotebookContextType } from "@/features/notebooks/useNotebookContext";
 import { useShowProBadges } from "./useShowProBadges";
 
-const platform = vi.hoisted(() => ({ canOfferPurchases: vi.fn(() => true) }));
+const platform = vi.hoisted(() => ({
+  canOfferPurchases: vi.fn(() => true),
+  purchaseChannel: vi.fn(() => "stripe"),
+  shellSupportsIap: vi.fn(() => false),
+}));
 vi.mock("@/utils/platformDetection", () => platform);
 
 function wrapperFor(hasSubscription: boolean, isLoading = false) {

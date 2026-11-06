@@ -18,11 +18,16 @@ describe("useSubscriptionStatus", () => {
 
   it("keeps the same object across rerenders while the query result is unchanged", () => {
     mockUseQuery.mockReturnValue({
-      status: "active",
-      currentPeriodEnd: Date.UTC(2026, 0, 1),
-      cancelAtPeriodEnd: false,
-      interval: "month",
-      amount: 1000,
+      tier: "pro",
+      source: "stripe",
+      stripe: {
+        status: "active",
+        currentPeriodEnd: Date.UTC(2026, 0, 1),
+        cancelAtPeriodEnd: false,
+        interval: "month",
+        amount: 1000,
+      },
+      appStore: null,
     });
 
     const { result, rerender } = renderHook(() => useSubscriptionStatus());
@@ -34,7 +39,7 @@ describe("useSubscriptionStatus", () => {
   });
 
   it("keeps the same free-tier object across rerenders when there is no subscription", () => {
-    mockUseQuery.mockReturnValue(null);
+    mockUseQuery.mockReturnValue({ tier: "free", source: null, stripe: null, appStore: null });
 
     const { result, rerender } = renderHook(() => useSubscriptionStatus());
     const first = result.current;
@@ -50,10 +55,33 @@ describe("useSubscriptionStatus", () => {
     const first = result.current;
     expect(first.isLoading).toBe(true);
 
-    mockUseQuery.mockReturnValue(null);
+    mockUseQuery.mockReturnValue({ tier: "free", source: null, stripe: null, appStore: null });
     rerender();
 
     expect(result.current).not.toBe(first);
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it("maps an App Store plan", () => {
+    mockUseQuery.mockReturnValue({
+      tier: "pro",
+      source: "app_store",
+      stripe: null,
+      appStore: {
+        productId: "com.solomindlm.app.pro.yearly",
+        status: "active",
+        expiresAt: Date.UTC(2027, 0, 1),
+        autoRenews: false,
+        environment: "Sandbox",
+      },
+    });
+    const { result } = renderHook(() => useSubscriptionStatus());
+    expect(result.current).toMatchObject({
+      hasSubscription: true,
+      source: "app_store",
+      interval: "year",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: "2027-01-01T00:00:00.000Z",
+    });
   });
 });

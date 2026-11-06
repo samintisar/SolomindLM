@@ -1,16 +1,17 @@
 import { api } from "@convex/_generated/api";
+import { appStoreProductPeriod, isAppStoreProductId } from "@convex/billing/appStoreProducts";
 import { useAction, useQuery } from "convex/react";
 import { useCallback, useMemo } from "react";
-import { canOfferPurchases } from "@/utils/platformDetection";
+import { purchaseChannel } from "@/utils/platformDetection";
 import type {
   CheckoutSessionResponse,
   SubscriptionInterval,
   SubscriptionStatusResponse,
 } from "../types";
 
-/** Backstop for canOfferPurchases: no Stripe checkout or portal from the native app. */
+/** Backstop: Stripe checkout and portal only on the web, never inside the native app. */
 function assertPurchasesAllowed() {
-  if (!canOfferPurchases()) {
+  if (purchaseChannel() !== "stripe") {
     throw new Error("Subscriptions can't be purchased or changed in the app.");
   }
 }
@@ -19,14 +20,33 @@ function assertPurchasesAllowed() {
  * Get subscription status for current user
  */
 export function useSubscriptionStatus(): SubscriptionStatusResponse {
-  const subscription = useQuery(api.billing.index.getCurrent);
+  const plan = useQuery(api.billing.index.getPlan);
 
   // Memoized so consumers (and context values built from this) keep identity between renders.
   return useMemo((): SubscriptionStatusResponse => {
+    if (plan?.source === "app_store" && plan.appStore) {
+      const { productId, expiresAt, autoRenews } = plan.appStore;
+      return {
+        hasSubscription: true,
+        isLoading: false,
+        source: "app_store",
+        status: "active",
+        plan: "premium",
+        notebookLimit: 200,
+        sourceLimit: 200,
+        currentPeriodEnd: new Date(expiresAt).toISOString(),
+        cancelAtPeriodEnd: !autoRenews,
+        interval: isAppStoreProductId(productId) ? appStoreProductPeriod(productId) : "month",
+        appStoreProductId: productId,
+      };
+    }
+
+    const subscription = plan?.stripe ?? null;
     if (!subscription) {
       return {
         hasSubscription: false,
-        isLoading: subscription === undefined,
+        isLoading: plan === undefined,
+        source: null,
         plan: "free",
         notebookLimit: 5,
         sourceLimit: 20,
@@ -70,8 +90,9 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
     }
 
     return {
+      source: "stripe",
       hasSubscription: subscription.status === "active",
-      status: subscription.status as any,
+      status: subscription.status as SubscriptionStatusResponse["status"],
       plan: subscription.status === "active" ? "premium" : "free",
       notebookLimit: subscription.status === "active" ? 200 : 5,
       sourceLimit: subscription.status === "active" ? 200 : 20,
@@ -80,7 +101,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
       interval: subscription.interval as SubscriptionInterval,
       amount: subscription.amount,
     };
-  }, [subscription]);
+  }, [plan]);
 }
 
 /**
@@ -139,25 +160,13 @@ export function useCreatePortalSession() {
  * Get limits for current user (convenience hook)
  */
 export function useUserLimits() {
-  const subscription = useQuery(api.billing.index.getCurrent);
-  // `useQuery` is `undefined` until the subscription query resolves. Callers
-  // must not treat the free cap as authoritative during this window (it would
-  // flash "limit reached" at a Pro user); they gate on `isLoading` instead.
-  const isLoading = subscription === undefined;
+  const plan = useQuery(api.billing.index.getPlan);
+  // `undefined` until the query resolves; callers gate on `isLoading` so a Pro user never sees
+  // the free cap flash.
+  const isLoading = plan === undefined;
 
-  if (subscription?.status === "active") {
-    return {
-      notebookLimit: 200,
-      sourceLimit: 200,
-      isPremium: true,
-      isLoading: false,
-    };
+  if (plan?.tier === "pro") {
+    return { notebookLimit: 200, sourceLimit: 200, isPremium: true, isLoading: false };
   }
-
-  return {
-    notebookLimit: 5,
-    sourceLimit: 20,
-    isPremium: false,
-    isLoading,
-  };
+  return { notebookLimit: 5, sourceLimit: 20, isPremium: false, isLoading };
 }
