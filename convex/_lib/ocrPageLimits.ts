@@ -18,9 +18,16 @@ export function ocrPageLimitsFor(isPro: boolean): OcrPageLimits {
   return isPro ? OCR_PAGE_LIMITS.pro : OCR_PAGE_LIMITS.free;
 }
 
-/** Pages one OCR call may read: the per-file cap, or what is left of the month if less. */
-export function ocrPagesToGrant(limits: OcrPageLimits, usedThisMonth: number): number {
-  return Math.max(0, Math.min(limits.perFile, limits.perMonth - usedThisMonth));
+/**
+ * Pages one OCR call may read: the per-file cap, or what is left of the month if less.
+ * `bonusPages` (granted by staff for one month) raises the month's allowance, not the per-file cap.
+ */
+export function ocrPagesToGrant(
+  limits: OcrPageLimits,
+  usedThisMonth: number,
+  bonusPages = 0
+): number {
+  return Math.max(0, Math.min(limits.perFile, limits.perMonth + bonusPages - usedThisMonth));
 }
 
 /** Mistral's `pages` value for the first `count` pages (zero-based, inclusive range). */

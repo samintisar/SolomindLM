@@ -30,7 +30,8 @@ export const reserveOcrPages = internalMutation({
     const limits = ocrPageLimitsFor(isPro);
     const month = ocrMonthKey(Date.now());
     const row = await usageRow(ctx, userId, month);
-    const granted = ocrPagesToGrant(limits, row?.pages ?? 0);
+    const bonusPages = row?.bonusPages ?? 0;
+    const granted = ocrPagesToGrant(limits, row?.pages ?? 0, bonusPages);
     if (granted > 0) {
       if (row) await ctx.db.patch("ocrUsage", row._id, { pages: row.pages + granted });
       else await ctx.db.insert("ocrUsage", { userId, month, pages: granted });
@@ -39,8 +40,46 @@ export const reserveOcrPages = internalMutation({
       granted,
       month,
       isPro,
-      limits: { perFile: limits.perFile, perMonth: limits.perMonth },
+      // The month's allowance as the user has it, bonus included, so messages quote the real number.
+      limits: { perFile: limits.perFile, perMonth: limits.perMonth + bonusPages },
     };
+  },
+});
+
+/**
+ * Staff tool: gives the users with these emails `pages` extra OCR pages for `month` ("2026-11"),
+ * e.g. to re-upload files an outage failed. Sets the bonus rather than adding to it, so running it
+ * twice gives the same result. Run with `npx convex run documents/ocrQuota:grantOcrBonus`.
+ */
+export const grantOcrBonus = internalMutation({
+  args: { emails: v.array(v.string()), month: v.string(), pages: v.number() },
+  returns: v.object({ granted: v.number(), missing: v.array(v.string()) }),
+  handler: async (ctx, { emails, month, pages }) => {
+    if (!/^\d{4}-\d{2}$/.test(month))
+      throw new Error(`month must look like "2026-11", got ${month}`);
+    if (!Number.isInteger(pages) || pages < 0) throw new Error("pages must be a whole number ≥ 0");
+    let granted = 0;
+    const missing: string[] = [];
+    for (const email of emails) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("email", (q) => q.eq("email", email))
+        .first();
+      if (!user) {
+        missing.push(email);
+        continue;
+      }
+      const row = await usageRow(ctx, user._id, month);
+      if (row) {
+        await ctx.db.patch("ocrUsage", row._id, {
+          bonusPages: Math.max(row.bonusPages ?? 0, pages),
+        });
+      } else {
+        await ctx.db.insert("ocrUsage", { userId: user._id, month, pages: 0, bonusPages: pages });
+      }
+      granted++;
+    }
+    return { granted, missing };
   },
 });
 

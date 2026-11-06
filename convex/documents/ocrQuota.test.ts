@@ -87,6 +87,74 @@ describe("reserveOcrPages", () => {
   });
 });
 
+describe("grantOcrBonus", () => {
+  const month = () => ocrMonthKey(Date.now());
+
+  async function seedEmailUser(t: ReturnType<typeof convexTest>, email: string) {
+    return t.run(async (ctx) => ctx.db.insert("users", { name: "Test", email }));
+  }
+
+  test("adds bonus pages to the month's allowance, by email", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedEmailUser(t, "a@example.com");
+    const { perFile, perMonth } = OCR_PAGE_LIMITS.free;
+
+    const result = await t.mutation(internal.documents.ocrQuota.grantOcrBonus, {
+      emails: ["a@example.com", "nobody@example.com"],
+      month: month(),
+      pages: 60,
+    });
+    let total = 0;
+    for (let i = 0; i < Math.ceil((perMonth + 60) / perFile) + 1; i++) {
+      total += (await t.mutation(internal.documents.ocrQuota.reserveOcrPages, { userId })).granted;
+    }
+
+    expect(result).toEqual({ granted: 1, missing: ["nobody@example.com"] });
+    expect(total).toBe(perMonth + 60);
+  });
+
+  test("is safe to run twice: the bonus is set, not added again", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedEmailUser(t, "a@example.com");
+    const args = { emails: ["a@example.com"], month: month(), pages: 60 };
+
+    await t.mutation(internal.documents.ocrQuota.grantOcrBonus, args);
+    await t.mutation(internal.documents.ocrQuota.grantOcrBonus, args);
+
+    const row = await t.run(async (ctx) =>
+      ctx.db
+        .query("ocrUsage")
+        .withIndex("by_user_and_month", (q) => q.eq("userId", userId).eq("month", month()))
+        .unique()
+    );
+    expect(row?.bonusPages).toBe(60);
+  });
+
+  test("handing back pages keeps the bonus", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedEmailUser(t, "a@example.com");
+    await t.mutation(internal.documents.ocrQuota.grantOcrBonus, {
+      emails: ["a@example.com"],
+      month: month(),
+      pages: 60,
+    });
+    const r = await t.mutation(internal.documents.ocrQuota.reserveOcrPages, { userId });
+    await t.mutation(internal.documents.ocrQuota.releaseOcrPages, {
+      userId,
+      month: r.month,
+      pages: r.granted,
+    });
+
+    const row = await t.run(async (ctx) =>
+      ctx.db
+        .query("ocrUsage")
+        .withIndex("by_user_and_month", (q) => q.eq("userId", userId).eq("month", month()))
+        .unique()
+    );
+    expect(row).toMatchObject({ pages: 0, bonusPages: 60 });
+  });
+});
+
 describe("releaseOcrPages", () => {
   test("hands back the pages a call did not read", async () => {
     const t = convexTest(schema, modules);

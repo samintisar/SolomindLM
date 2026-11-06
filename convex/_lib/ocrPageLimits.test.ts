@@ -25,6 +25,13 @@ describe("ocrPagesToGrant", () => {
     expect(ocrPagesToGrant(limits, 140)).toBe(0);
   });
 
+  it("adds bonus pages to the month, but not to the per-file cap", () => {
+    const limits = { perFile: 30, perMonth: 100 };
+    expect(ocrPagesToGrant(limits, 100, 50)).toBe(30);
+    expect(ocrPagesToGrant(limits, 140, 50)).toBe(10);
+    expect(ocrPagesToGrant(limits, 150, 50)).toBe(0);
+  });
+
   it("keeps Free tighter than Pro", () => {
     expect(OCR_PAGE_LIMITS.free.perFile).toBeLessThan(OCR_PAGE_LIMITS.pro.perFile);
     expect(OCR_PAGE_LIMITS.free.perMonth).toBeLessThan(OCR_PAGE_LIMITS.pro.perMonth);
