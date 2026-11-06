@@ -50,14 +50,21 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** A purchase error → the outcome the page shows; `cancelCode` is expo-iap's UserCancelled code. */
-export function purchaseOutcomeFromError(error: unknown, cancelCode: string): PurchaseOutcome {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: unknown }).code === cancelCode
-  ) {
-    return { status: "cancelled" };
-  }
+/** expo-iap error codes the mapper needs, passed in so this file never loads the native module. */
+export interface PurchaseErrorCodes {
+  cancelled: string;
+  /** Ask to Buy and similar: the purchase is waiting on someone else's approval. */
+  pending: readonly string[];
+}
+
+/** A purchase error -> the outcome the page shows. */
+export function purchaseOutcomeFromError(
+  error: unknown,
+  codes: PurchaseErrorCodes
+): PurchaseOutcome {
+  const code =
+    typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+  if (code === codes.cancelled) return { status: "cancelled" };
+  if (typeof code === "string" && codes.pending.includes(code)) return { status: "pending" };
   return { status: "error", message: errorMessage(error) };
 }

@@ -44,7 +44,7 @@ export function WebViewScreen({
   const webViewRef = useRef<WebView>(null);
 
   const onWebViewMessage = useCallback(
-    (raw: string) => {
+    (raw: string, sourceUrl?: string) => {
       const msg = parseShellWebMessage(raw);
       if (msg?.kind === "theme") {
         onThemeChange?.(msg.theme);
@@ -56,6 +56,8 @@ export function WebViewScreen({
       }
       if (msg?.kind === "iap") {
         if (Platform.OS !== "ios") return;
+        // Defense in depth: only our own pages may start purchases.
+        if (!base || !sourceUrl || !shouldLoadUrlInWebView(sourceUrl, base)) return;
         void handleIapRequest(msg).then((response) => {
           webViewRef.current?.injectJavaScript(buildShellIapResponseScript(response));
         });
@@ -63,7 +65,7 @@ export function WebViewScreen({
       }
       onAuthBridgeMessage(raw);
     },
-    [onAuthBridgeMessage, onThemeChange, onAiConsentChange]
+    [onAuthBridgeMessage, onThemeChange, onAiConsentChange, base]
   );
   const [loadError, setLoadError] = useState<WebViewLoadError | null>(null);
   // Bumped to remount the WebView after the OS kills its content/render process.
@@ -151,7 +153,7 @@ export function WebViewScreen({
       domStorageEnabled
       startInLoadingState
       injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
-      onMessage={(event) => onWebViewMessage(event.nativeEvent.data)}
+      onMessage={(event) => onWebViewMessage(event.nativeEvent.data, event.nativeEvent.url)}
       onLoadStart={() => onWebViewLoadStart()}
       onLoadEnd={() => onWebViewLoadEnd()}
       renderLoading={() => (

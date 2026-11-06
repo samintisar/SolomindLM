@@ -9,17 +9,26 @@ import {
   getAvailablePurchases,
   initConnection,
   type Purchase,
-  purchaseErrorListener,
   purchaseUpdatedListener,
   requestPurchase,
+  restorePurchases as restoreStorePurchases,
 } from "expo-iap";
 import {
   type BridgeProduct,
   errorMessage,
+  type PurchaseErrorCodes,
   type PurchaseOutcome,
   purchaseOutcomeFromError,
   toBridgeProducts,
 } from "./iapMappers";
+
+/** Matches the web page's purchase timeout: the Apple sheet can stay up while the user signs in. */
+const PURCHASE_TIMEOUT_MS = 5 * 60 * 1000;
+
+const ERROR_CODES: PurchaseErrorCodes = {
+  cancelled: ErrorCode.UserCancelled,
+  pending: [ErrorCode.DeferredPayment, ErrorCode.Pending],
+};
 
 let connection: Promise<unknown> | null = null;
 function ensureConnection(): Promise<unknown> {
@@ -30,20 +39,27 @@ function ensureConnection(): Promise<unknown> {
   return connection;
 }
 
-/** The purchase the web page is waiting on; StoreKit answers through the listeners. */
-let pending: { productId: string; resolve: (outcome: PurchaseOutcome) => void } | null = null;
-
-function settle(outcome: PurchaseOutcome) {
-  const waiting = pending;
-  pending = null;
-  waiting?.resolve(outcome);
+interface PendingPurchase {
+  productId: string;
+  resolve: (outcome: PurchaseOutcome) => void;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
-/**
- * Send the signed transaction to Convex, then finish it. Finishing only after Convex accepts it
- * means a crash in between leaves the transaction unfinished, and StoreKit redelivers it.
- */
-async function syncAndFinish(purchase: Purchase): Promise<boolean> {
+/** The one purchase the web page is waiting on. Claimed before any await so taps can't overlap. */
+let pending: PendingPurchase | null = null;
+
+/** Answer the page, once, if `slot` is still the current purchase. */
+function settle(slot: PendingPurchase, outcome: PurchaseOutcome) {
+  if (pending !== slot) return;
+  pending = null;
+  if (slot.timer) clearTimeout(slot.timer);
+  slot.resolve(outcome);
+}
+
+/** Transactions already being synced, so the listener and `requestPurchase` don't both send one. */
+const inflight = new Map<string, Promise<boolean>>();
+
+async function sendAndFinish(purchase: Purchase): Promise<boolean> {
   if (!purchase.purchaseToken || !isAppStoreProductId(purchase.productId)) return false;
   await convexClient.action(api.billing.appStoreNode.syncTransaction, {
     signedTransaction: purchase.purchaseToken,
@@ -52,32 +68,55 @@ async function syncAndFinish(purchase: Purchase): Promise<boolean> {
   return true;
 }
 
+/**
+ * Send the signed transaction to Convex, then finish it. Finishing only after Convex accepts it
+ * means a crash in between leaves the transaction unfinished, and StoreKit redelivers it.
+ */
+function syncAndFinish(purchase: Purchase): Promise<boolean> {
+  const existing = inflight.get(purchase.id);
+  if (existing) return existing;
+  const run = sendAndFinish(purchase).finally(() => inflight.delete(purchase.id));
+  inflight.set(purchase.id, run);
+  return run;
+}
+
+async function completePurchase(slot: PendingPurchase, purchase: Purchase) {
+  try {
+    const synced = await syncAndFinish(purchase);
+    settle(
+      slot,
+      synced
+        ? { status: "purchased" }
+        : { status: "error", message: "The purchase couldn't be completed. Try restoring it." }
+    );
+  } catch (error) {
+    settle(slot, { status: "error", message: errorMessage(error) });
+  }
+}
+
 /** Start once at app launch. Handles new purchases and ones StoreKit redelivers. */
 export function startIapListeners(): () => void {
-  void ensureConnection().catch(() => {});
+  void ensureConnection().catch(() => {
+    /* retried on the next request */
+  });
   const updated = purchaseUpdatedListener((purchase) => {
-    void (async () => {
-      const isPendingOne = pending?.productId === purchase.productId;
-      // Ask to Buy: the purchase waits for approval; StoreKit delivers it again once approved.
+    const slot = pending;
+    if (slot && slot.productId === purchase.productId) {
       if (purchase.purchaseState === "pending") {
-        if (isPendingOne) settle({ status: "pending" });
+        settle(slot, { status: "pending" });
         return;
       }
-      try {
-        await syncAndFinish(purchase);
-        if (isPendingOne) settle({ status: "purchased" });
-      } catch (error) {
-        if (isPendingOne) settle({ status: "error", message: errorMessage(error) });
-      }
-    })();
+      void completePurchase(slot, purchase);
+      return;
+    }
+    // Nobody is waiting: a renewal, a redelivery, or an Ask to Buy approved later. Sync quietly;
+    // a failure leaves the transaction unfinished, so StoreKit redelivers it.
+    if (purchase.purchaseState === "pending") return;
+    void syncAndFinish(purchase).catch(() => {
+      /* retried when StoreKit redelivers */
+    });
   });
-  const failed = purchaseErrorListener((error) => {
-    if (pending) settle(purchaseOutcomeFromError(error, ErrorCode.UserCancelled));
-  });
-  return () => {
-    updated.remove();
-    failed.remove();
-  };
+  return () => updated.remove();
 }
 
 export async function loadProducts(): Promise<BridgeProduct[]> {
@@ -88,39 +127,80 @@ export async function loadProducts(): Promise<BridgeProduct[]> {
   );
 }
 
-export async function purchase(productId: string): Promise<PurchaseOutcome> {
-  if (!isAppStoreProductId(productId)) return { status: "error", message: "Unknown plan." };
-  if (pending) return { status: "error", message: "A purchase is already in progress." };
-  await ensureConnection();
-  const appAccountToken = await convexClient.mutation(api.billing.appStore.getAccountToken, {});
-  return new Promise<PurchaseOutcome>((resolve) => {
-    pending = { productId, resolve };
-    requestPurchase({
-      request: { apple: { sku: productId, appAccountToken } },
-      type: "subs",
-    }).catch((error: unknown) => {
-      if (pending?.resolve === resolve) {
-        settle(purchaseOutcomeFromError(error, ErrorCode.UserCancelled));
-      }
-    });
+export function purchase(productId: string): Promise<PurchaseOutcome> {
+  if (!isAppStoreProductId(productId)) {
+    return Promise.resolve({ status: "error", message: "Unknown plan." });
+  }
+  if (pending) {
+    return Promise.resolve({ status: "error", message: "A purchase is already in progress." });
+  }
+  const slot: PendingPurchase = { productId, resolve: () => undefined, timer: null };
+  const outcome = new Promise<PurchaseOutcome>((resolve) => {
+    slot.resolve = resolve;
   });
+  pending = slot;
+  slot.timer = setTimeout(
+    () =>
+      settle(slot, {
+        status: "error",
+        message: "The App Store didn't respond. Try again.",
+      }),
+    PURCHASE_TIMEOUT_MS
+  );
+
+  void (async () => {
+    try {
+      await ensureConnection();
+      const appAccountToken = await convexClient.mutation(api.billing.appStore.getAccountToken, {});
+      const result = await requestPurchase({
+        request: { apple: { sku: productId, appAccountToken } },
+        type: "subs",
+      });
+      // iOS resolves with the purchase; don't depend on the listener alone.
+      const bought = Array.isArray(result) ? result[0] : result;
+      if (bought?.purchaseToken && bought.purchaseState !== "pending") {
+        await completePurchase(slot, bought);
+      } else if (bought?.purchaseState === "pending") {
+        settle(slot, { status: "pending" });
+      }
+      // Otherwise the listener (or the timeout) answers.
+    } catch (error) {
+      settle(slot, purchaseOutcomeFromError(error, ERROR_CODES));
+    }
+  })();
+  return outcome;
 }
 
-/** Sync every current purchase for this Apple ID; returns how many were Pro subscriptions. */
-export async function restorePurchases(): Promise<number> {
+/** Try every current purchase for this Apple ID; throws only if all of them failed. */
+async function syncAvailablePurchases(): Promise<number> {
   await ensureConnection();
   const purchases = await getAvailablePurchases();
   let restored = 0;
+  let failures = 0;
+  let firstError: unknown;
   for (const item of purchases) {
-    if (await syncAndFinish(item)) restored += 1;
+    try {
+      if (await syncAndFinish(item)) restored += 1;
+    } catch (error) {
+      failures += 1;
+      firstError ??= error;
+    }
   }
+  if (failures > 0 && restored === 0) throw firstError;
   return restored;
 }
 
-/** Quiet re-sync on launch / sign-in; failures are retried next time. */
+/** The user's "Restore purchases": have StoreKit sync with the App Store first, then send what it has. */
+export async function restorePurchases(): Promise<number> {
+  await ensureConnection();
+  await restoreStorePurchases();
+  return syncAvailablePurchases();
+}
+
+/** Quiet re-sync on launch / sign-in (no App Store prompt); failures are retried next time. */
 export async function syncCurrentPurchases(): Promise<void> {
   try {
-    await restorePurchases();
+    await syncAvailablePurchases();
   } catch {
     /* not signed in yet, offline, or linked to another account: nothing to show here */
   }

@@ -16,14 +16,24 @@ describe("toBridgeProducts", () => {
   });
 });
 
+const CODES = { cancelled: "user-cancelled", pending: ["deferred-payment", "pending"] };
+
 describe("purchaseOutcomeFromError", () => {
   it("treats user cancellation as cancelled", () => {
-    expect(
-      purchaseOutcomeFromError({ code: "user-cancelled", message: "x" }, "user-cancelled")
-    ).toEqual({ status: "cancelled" });
+    expect(purchaseOutcomeFromError({ code: "user-cancelled", message: "x" }, CODES)).toEqual({
+      status: "cancelled",
+    });
+  });
+  it("treats Ask to Buy (deferred payment) as pending", () => {
+    expect(purchaseOutcomeFromError({ code: "deferred-payment", message: "x" }, CODES)).toEqual({
+      status: "pending",
+    });
+    expect(purchaseOutcomeFromError({ code: "pending", message: "x" }, CODES)).toEqual({
+      status: "pending",
+    });
   });
   it("passes other errors through", () => {
-    expect(purchaseOutcomeFromError(new Error("Network down"), "user-cancelled")).toEqual({
+    expect(purchaseOutcomeFromError(new Error("Network down"), CODES)).toEqual({
       status: "error",
       message: "Network down",
     });

@@ -31,9 +31,6 @@ function getConvexUrl(): string {
 /** Same URL passed to ConvexReactClient — used for @convex-dev/auth storage namespace. */
 export const convexDeploymentUrl = getConvexUrl();
 
-/** True when URL came from env or app config (not the dev placeholder). */
-export const isConvexDeploymentConfigured = readConfiguredConvexUrl() !== null;
-
 export const convexClient = new ConvexReactClient(convexDeploymentUrl, {
   unsavedChangesWarning: false,
 });
