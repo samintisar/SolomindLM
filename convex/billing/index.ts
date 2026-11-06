@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery, query } from "../_generated/server";
+import { findEntitledAppStoreSubscription } from "../_lib/limits";
 import { getAuthUserId } from "../auth";
 import { internalMutation } from "../functions";
 
@@ -30,6 +31,48 @@ export const getCurrent = query({
 
     return subscription;
   },
+});
+
+/**
+ * The caller's plan across billing sources. The Billing page, Header and limits read this instead
+ * of `stripeSubscriptions` so Pro bought in the iOS app counts everywhere.
+ *
+ * Reads `Date.now()` in a reactive query: the result refreshes when the underlying data changes,
+ * and the entitlement's 1-day leeway bounds how stale an expiry boundary can be.
+ */
+export const getPlan = query({
+  args: {},
+  returns: v.union(v.null(), v.any()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const stripe = await ctx.db
+      .query("stripeSubscriptions")
+      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
+      .first();
+    const appStore = await findEntitledAppStoreSubscription(ctx, userId, Date.now());
+    return {
+      tier: stripe || appStore ? ("pro" as const) : ("free" as const),
+      source: stripe ? ("stripe" as const) : appStore ? ("app_store" as const) : null,
+      stripe,
+      appStore: appStore
+        ? {
+            productId: appStore.productId,
+            status: appStore.status,
+            expiresAt: appStore.expiresAt,
+            autoRenews: appStore.autoRenews,
+            environment: appStore.environment,
+          }
+        : null,
+    };
+  },
+});
+
+export const hasAppStoreProInternal = internalQuery({
+  args: { userId: v.id("users") },
+  returns: v.boolean(),
+  handler: async (ctx, { userId }) =>
+    (await findEntitledAppStoreSubscription(ctx, userId, Date.now())) !== null,
 });
 
 // ============ Internal Mutations/Queries ============

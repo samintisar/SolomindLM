@@ -69,6 +69,13 @@ export const createCheckoutSession = action({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("No identity found");
 
+    // Someone who pays through Apple must not start a second, Stripe subscription.
+    if (await ctx.runQuery(internal.billing.index.hasAppStoreProInternal, { userId })) {
+      throw new Error(
+        "You already have Pro through the App Store. Manage it in your iPhone's Settings."
+      );
+    }
+
     // Determine price ID based on interval (check before calling Stripe)
     const rawPriceId =
       args.interval === "month"

@@ -434,3 +434,47 @@ describe("stale and reassigned notifications", () => {
     expect(row?.userId).toBe(a);
   });
 });
+
+describe("getPlan", () => {
+  test("null when signed out", async () => {
+    const t = convexTest(schema, modules);
+    expect(await t.query(api.billing.index.getPlan, {})).toBeNull();
+  });
+
+  test("free with no subscriptions", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    expect(await asUser(t, userId).query(api.billing.index.getPlan, {})).toMatchObject({
+      tier: "free",
+      source: null,
+      stripe: null,
+      appStore: null,
+    });
+  });
+
+  test("pro from the App Store", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId, { productId: APP_STORE_PRODUCTS.yearly });
+    expect(await asUser(t, userId).query(api.billing.index.getPlan, {})).toMatchObject({
+      tier: "pro",
+      source: "app_store",
+      appStore: { productId: APP_STORE_PRODUCTS.yearly, autoRenews: true },
+    });
+  });
+});
+
+describe("createCheckoutSession", () => {
+  test("refuses users who already have Pro from the App Store", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId);
+    await expect(
+      asUser(t, userId).action(api.billing.index.createCheckoutSession, {
+        interval: "month",
+        successUrl: "https://example.com/ok",
+        cancelUrl: "https://example.com/cancel",
+      })
+    ).rejects.toThrow(/App Store/);
+  });
+});
