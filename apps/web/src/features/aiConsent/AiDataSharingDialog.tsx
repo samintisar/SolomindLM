@@ -12,7 +12,7 @@ import {
 } from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
-import { AI_PROVIDERS } from "./aiConsentCopy";
+import { AiProviderList } from "./AiProviderList";
 
 interface AiDataSharingDialogProps {
   open: boolean;
@@ -52,16 +52,7 @@ export function AiDataSharingDialog({ open, onOpenChange }: AiDataSharingDialogP
             the app until you allow it again.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <ul className="flex flex-col gap-3">
-          {AI_PROVIDERS.map((provider) => (
-            <li key={provider.name} className="flex flex-col">
-              <span className="text-sm font-medium text-foreground">{provider.name}</span>
-              <span className="text-sm text-muted-foreground">
-                {provider.data}, {provider.purpose}.
-              </span>
-            </li>
-          ))}
-        </ul>
+        <AiProviderList />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={turningOff}>Keep on</AlertDialogCancel>
           <Button variant="destructive" onClick={handleTurnOff} disabled={turningOff}>

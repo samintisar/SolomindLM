@@ -29,9 +29,11 @@ export function resolveAiConsentState({
 }: ResolveAiConsentInput): AiConsentState {
   if (!inShell) return "notApplicable";
   if (authLoading) return previous ?? "loading";
-  // Signed out with no prior answer: AppShell redirects to sign-in. With one, treat it as a blip;
-  // the gate unmounts on public routes (sign-in), which clears `previous`.
-  if (!isAuthenticated) return previous ?? "notApplicable";
+  // Signed out: let AppShell's own flow handle it (redirect to sign-in). A held consent or off screen
+  // stays up through a blip so the app doesn't flash; a held "granted" becomes notApplicable, which
+  // renders the same app but tells the native shell to hide its upload button if the session ended.
+  if (!isAuthenticated)
+    return previous === "needsConsent" || previous === "declined" ? previous : "notApplicable";
   if (record === undefined || !record.signedIn) return previous ?? "loading";
   if (record.version === currentVersion) return "granted";
   if (record.declined) return "declined";

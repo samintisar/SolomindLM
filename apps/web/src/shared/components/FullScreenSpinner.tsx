@@ -1,7 +1,7 @@
 import { Spinner } from "@/shared/components/ui/spinner";
 
-/** Full-screen spinner while the app shell (or the AI consent check) loads. */
-export function AppShellFallback() {
+/** Full-screen spinner while the app shell or the AI consent check loads. */
+export function FullScreenSpinner() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
       <span className="text-primary">

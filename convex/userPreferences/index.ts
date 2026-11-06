@@ -2,6 +2,8 @@ import { ConvexError, v } from "convex/values";
 import { VALID_LANGUAGE_CODES } from "../_agents/_shared/languageInstruction";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalQuery, type MutationCtx, query } from "../_generated/server";
+import { InputValidationError } from "../_lib/errors";
+import { toConvexError } from "../_lib/serviceErrors";
 import { getAuthUserId } from "../auth";
 import { mutation } from "../functions";
 
@@ -103,7 +105,9 @@ export const grantAiConsent = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError("Unauthenticated");
     if (!Number.isInteger(args.version) || args.version < 1) {
-      throw new ConvexError("Invalid consent version");
+      throw toConvexError(
+        new InputValidationError("Invalid consent version", { field: "version" })
+      );
     }
     await upsertPreferences(ctx, userId, {
       aiConsentVersion: args.version,

@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { importOrReloadOnce } from "@/shared/utils/importOrReloadOnce";
 import { isNativeShell } from "@/utils/platformDetection";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
@@ -34,9 +35,10 @@ import { LanguageSelector } from "./LanguageSelector";
 
 // Mobile-shell only; keep it out of the chunk every web page loads.
 const AiDataSharingDialog = lazy(() =>
-  import("@/features/aiConsent/AiDataSharingDialog").then((m) => ({
-    default: m.AiDataSharingDialog,
-  }))
+  importOrReloadOnce(
+    () => import("@/features/aiConsent/AiDataSharingDialog"),
+    "ai-data-sharing-dialog-reloaded"
+  ).then((m) => ({ default: m.AiDataSharingDialog }))
 );
 
 interface AvatarDropdownProps {

@@ -3,9 +3,9 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
-import { Item, ItemContent, ItemGroup, ItemTitle } from "@/shared/components/ui/item";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
-import { AI_CONSENT_VERSION, AI_PROVIDERS } from "./aiConsentCopy";
+import { AiProviderList } from "./AiProviderList";
+import { AI_CONSENT_VERSION } from "./aiConsentCopy";
 
 interface AiConsentScreenProps {
   /** Called after "Not now" is saved (the gate uses it to leave review mode). */
@@ -50,18 +50,7 @@ export function AiConsentScreen({ onDeclined }: AiConsentScreenProps) {
           To answer your questions and build study materials, SolomindLM sends some of your content
           to these services:
         </p>
-        <ItemGroup variant="grouped">
-          {AI_PROVIDERS.map((provider) => (
-            <Item key={provider.name}>
-              <ItemContent>
-                <ItemTitle>{provider.name}</ItemTitle>
-                <p className="text-sm text-muted-foreground">
-                  {provider.data}, {provider.purpose}.
-                </p>
-              </ItemContent>
-            </Item>
-          ))}
-        </ItemGroup>
+        <AiProviderList />
         <p className="text-sm text-muted-foreground">
           Change this any time in the menu.{" "}
           <Link to="/privacy" className="text-link underline">

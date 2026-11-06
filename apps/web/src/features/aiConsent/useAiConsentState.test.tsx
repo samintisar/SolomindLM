@@ -45,11 +45,13 @@ describe("useAiConsentState", () => {
     const { result, rerender } = renderHook(() => useAiConsentState());
     expect(result.current).toBe("granted");
 
+    // Signed out: the gate still renders the app (notApplicable), but the grant isn't reported.
     auth.isAuthenticated = false;
     mockedUseQuery.mockReturnValue(undefined);
     rerender();
-    expect(result.current).toBe("granted");
+    expect(result.current).toBe("notApplicable");
 
+    // Back to signed in with the query still catching up: the held grant comes back.
     auth.isAuthenticated = true;
     mockedUseQuery.mockReturnValue({ signedIn: false });
     rerender();

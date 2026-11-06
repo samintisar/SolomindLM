@@ -22,8 +22,8 @@ vi.mock("./AiFeaturesOffScreen", () => ({
     </button>
   ),
 }));
-vi.mock("@/shell/AppShellFallback", () => ({
-  AppShellFallback: () => <div data-testid="fallback" />,
+vi.mock("@/shared/components/FullScreenSpinner", () => ({
+  FullScreenSpinner: () => <div data-testid="fallback" />,
 }));
 
 function renderGate() {

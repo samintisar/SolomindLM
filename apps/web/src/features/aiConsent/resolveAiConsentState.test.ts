@@ -69,12 +69,27 @@ describe("resolveAiConsentState", () => {
 
   test.each([
     ["auth loading", { authLoading: true, record: undefined }],
-    ["auth reads signed out", { isAuthenticated: false, record: undefined }],
     ["query reads signed out", { record: { signedIn: false } as AiConsentRecord }],
     ["query pending", { record: undefined }],
   ])("holds the previous answer through a blip (%s)", (_label, blip) => {
     for (const previous of ["granted", "needsConsent", "declined"] as const) {
       expect(resolveAiConsentState(input({ ...blip, previous }))).toBe(previous);
     }
+  });
+
+  test("keeps a held consent or off screen up while auth reads signed out", () => {
+    for (const previous of ["needsConsent", "declined"] as const) {
+      expect(
+        resolveAiConsentState(input({ isAuthenticated: false, record: undefined, previous }))
+      ).toBe(previous);
+    }
+  });
+
+  test("drops a held grant when auth reads signed out, so the shell hides native upload", () => {
+    expect(
+      resolveAiConsentState(
+        input({ isAuthenticated: false, record: undefined, previous: "granted" })
+      )
+    ).toBe("notApplicable");
   });
 });

@@ -1,14 +1,19 @@
-import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
-import { AppShellFallback } from "@/shell/AppShellFallback";
+import { lazy, type ReactNode, Suspense, useState } from "react";
+import { FullScreenSpinner } from "@/shared/components/FullScreenSpinner";
+import { importOrReloadOnce } from "@/shared/utils/importOrReloadOnce";
 import { useAiConsentState } from "./useAiConsentState";
 import { useReportAiConsentToShell } from "./useReportAiConsentToShell";
 
 // Only the mobile shell ever shows these screens; keep them out of the web entry chunk.
 const AiConsentScreen = lazy(() =>
-  import("./AiConsentScreen").then((m) => ({ default: m.AiConsentScreen }))
+  importOrReloadOnce(() => import("./AiConsentScreen"), "ai-consent-screen-reloaded").then((m) => ({
+    default: m.AiConsentScreen,
+  }))
 );
 const AiFeaturesOffScreen = lazy(() =>
-  import("./AiFeaturesOffScreen").then((m) => ({ default: m.AiFeaturesOffScreen }))
+  importOrReloadOnce(() => import("./AiFeaturesOffScreen"), "ai-features-off-reloaded").then(
+    (m) => ({ default: m.AiFeaturesOffScreen })
+  )
 );
 
 /**
@@ -19,22 +24,20 @@ export function AiConsentGate({ children }: { children: ReactNode }) {
   const state = useAiConsentState();
   useReportAiConsentToShell(state);
   const [reviewing, setReviewing] = useState(false);
+  // Leaving "declined" ends review mode, so a later Turn off lands on the off screen.
+  if (reviewing && state !== "declined") setReviewing(false);
 
-  useEffect(() => {
-    if (state !== "declined") setReviewing(false);
-  }, [state]);
-
-  if (state === "loading") return <AppShellFallback />;
+  if (state === "loading") return <FullScreenSpinner />;
   if (state === "needsConsent") {
     return (
-      <Suspense fallback={<AppShellFallback />}>
+      <Suspense fallback={<FullScreenSpinner />}>
         <AiConsentScreen />
       </Suspense>
     );
   }
   if (state === "declined") {
     return (
-      <Suspense fallback={<AppShellFallback />}>
+      <Suspense fallback={<FullScreenSpinner />}>
         {reviewing ? (
           <AiConsentScreen onDeclined={() => setReviewing(false)} />
         ) : (
