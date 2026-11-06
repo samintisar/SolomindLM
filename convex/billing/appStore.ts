@@ -7,6 +7,8 @@ import { getAuthUserId } from "../auth";
 import { internalMutation, mutation } from "../functions";
 import {
   appStoreStatusValidator,
+  isAppStoreEntitled,
+  isOlderThan,
   mergeStatus,
   statusFromNotification,
   statusFromTransaction,
@@ -71,22 +73,35 @@ export const applyVerifiedTransaction = internalMutation({
   returns: v.object({ status: appStoreStatusValidator }),
   handler: async (ctx, { userId, transaction }) => {
     const now = Date.now();
-    if (transaction.appAccountToken) {
-      const owner = await findTokenOwner(ctx, transaction.appAccountToken);
-      if (owner && owner !== userId) throw linkedElsewhereError();
-    }
+    const tokenOwner = transaction.appAccountToken
+      ? await findTokenOwner(ctx, transaction.appAccountToken)
+      : null;
+    if (tokenOwner && tokenOwner !== userId) throw linkedElsewhereError();
     const existing = await findByOriginalTransaction(ctx, transaction.originalTransactionId);
-    if (existing && existing.userId !== userId) throw linkedElsewhereError();
+    // Apple keeps one originalTransactionId per Apple ID across resubscribes, so a lapsed row
+    // may move to the account that bought again (its token proves who bought).
+    const reassign = existing !== null && existing.userId !== userId;
+    if (reassign && !(tokenOwner === userId && !isAppStoreEntitled(existing, now))) {
+      throw linkedElsewhereError();
+    }
 
     const fromTransaction = statusFromTransaction(transaction, now);
 
     if (existing) {
-      // Restores can deliver an older transaction; never roll back to an earlier expiry.
-      if (transaction.revokedAt === undefined && transaction.expiresAt < existing.expiresAt) {
-        return { status: existing.status };
+      // Restores and replays can deliver an older period; never roll back.
+      if (isOlderThan(existing, transaction)) return { status: existing.status };
+      // Signed transactions never expire, so a replayed pre-refund one must not undo a refund;
+      // only a notification (REFUND_REVERSED) can.
+      if (
+        existing.status === "revoked" &&
+        transaction.revokedAt === undefined &&
+        transaction.expiresAt <= existing.expiresAt
+      ) {
+        return { status: "revoked" as const };
       }
       const status = mergeStatus(existing.status, fromTransaction);
       await ctx.db.patch(existing._id, {
+        ...(reassign ? { userId } : {}),
         latestTransactionId: transaction.transactionId,
         productId: transaction.productId,
         environment: transaction.environment,
@@ -195,9 +210,18 @@ export const applyNotification = internalMutation({
   handler: async (ctx, { notificationType, subtype, transaction, renewal }) => {
     const now = Date.now();
     const existing = await findByOriginalTransaction(ctx, transaction.originalTransactionId);
-    const userId =
-      existing?.userId ??
-      (transaction.appAccountToken ? await findTokenOwner(ctx, transaction.appAccountToken) : null);
+    // Stale data (older period) changes nothing, but counts as handled.
+    if (existing && isOlderThan(existing, transaction)) return { applied: true };
+    const tokenOwner = transaction.appAccountToken
+      ? await findTokenOwner(ctx, transaction.appAccountToken)
+      : null;
+    // A lapsed row on a shared Apple ID moves to whoever bought again; an entitled one keeps its owner.
+    const reassign =
+      existing !== null &&
+      tokenOwner !== null &&
+      tokenOwner !== existing.userId &&
+      !isAppStoreEntitled(existing, now);
+    const userId = reassign ? tokenOwner : (existing?.userId ?? tokenOwner);
     if (!userId) return { applied: false };
 
     const fromTransaction = statusFromTransaction(transaction, now);
@@ -205,6 +229,7 @@ export const applyNotification = internalMutation({
       statusFromNotification(notificationType, subtype) ??
       mergeStatus(existing?.status, fromTransaction);
     const fields = {
+      ...(reassign ? { userId } : {}),
       latestTransactionId: transaction.transactionId,
       productId: transaction.productId,
       environment: transaction.environment,

@@ -6,6 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { isProUser } from "../_lib/limits";
 import { preloadModules } from "../_testing/preloadModules.helpers";
 import schema from "../schema";
+import type { VerifiedTransaction } from "./appStoreModel";
 import { APP_STORE_PRODUCTS } from "./appStoreProducts";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -100,7 +101,7 @@ function asUser(t: T, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId as string}|session1` });
 }
 
-function transaction(overrides: Partial<Record<string, unknown>> = {}) {
+function transaction(overrides: Partial<VerifiedTransaction> = {}): VerifiedTransaction {
   return {
     environment: "Sandbox" as const,
     originalTransactionId: "1000000000000001",
@@ -187,6 +188,66 @@ describe("applyVerifiedTransaction", () => {
     });
     const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
     expect(row?.expiresAt).toBe(later);
+    expect(row?.status).toBe("active");
+    expect(row?.latestTransactionId).toBe("2000000000000001");
+  });
+
+  test("syncing a later transaction renews an expired row", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId, { status: "expired", expiresAt: Date.now() - DAY });
+    const result = await t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+      userId,
+      transaction: transaction({ transactionId: "2000000000000002" }),
+    });
+    expect(result).toEqual({ status: "active" });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.latestTransactionId).toBe("2000000000000002");
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(true);
+  });
+
+  test("a replayed pre-refund transaction does not undo a revoked row", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const expiresAt = Date.now() + 10 * DAY;
+    await seedAppStoreSubscription(t, userId, { status: "revoked", expiresAt });
+    const result = await t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+      userId,
+      transaction: transaction({ expiresAt }),
+    });
+    expect(result).toEqual({ status: "revoked" });
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(false);
+  });
+
+  test("a lapsed row on a shared Apple ID moves to the new token owner", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedUser(t);
+    const b = await seedUser(t);
+    await seedAppStoreSubscription(t, a, { status: "expired", expiresAt: Date.now() - 10 * DAY });
+    const token = await asUser(t, b).mutation(api.billing.appStore.getAccountToken, {});
+    const result = await t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+      userId: b,
+      transaction: transaction({ appAccountToken: token }),
+    });
+    expect(result).toEqual({ status: "active" });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.userId).toBe(b);
+    expect(await t.run((ctx) => isProUser(ctx, b))).toBe(true);
+    expect(await t.run((ctx) => isProUser(ctx, a))).toBe(false);
+  });
+
+  test("an entitled row is not taken over by another token owner", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedUser(t);
+    const b = await seedUser(t);
+    await seedAppStoreSubscription(t, a);
+    const token = await asUser(t, b).mutation(api.billing.appStore.getAccountToken, {});
+    await expect(
+      t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+        userId: b,
+        transaction: transaction({ appAccountToken: token }),
+      })
+    ).rejects.toThrow(/linked to another SolomindLM account/);
   });
 
   test("an expired transaction keeps a grace status from notifications", async () => {
@@ -239,11 +300,12 @@ describe("notifications", () => {
   test("DID_FAIL_TO_RENEW with GRACE_PERIOD keeps Pro until the grace deadline", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
-    await seedAppStoreSubscription(t, userId);
+    const expiresAt = Date.now() - DAY;
+    await seedAppStoreSubscription(t, userId, { expiresAt });
     const result = await t.mutation(internal.billing.appStore.applyNotification, {
       notificationType: "DID_FAIL_TO_RENEW",
       subtype: "GRACE_PERIOD",
-      transaction: transaction({ expiresAt: Date.now() - DAY }),
+      transaction: transaction({ expiresAt }),
       renewal: { autoRenews: true, gracePeriodExpiresAt: Date.now() + 5 * DAY },
     });
     expect(result).toEqual({ applied: true });
@@ -298,5 +360,77 @@ describe("notifications", () => {
       transaction: transaction(),
     });
     expect(result).toEqual({ applied: false });
+  });
+});
+
+describe("stale and reassigned notifications", () => {
+  test("a stale failure notification does not downgrade a newer period", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId, { expiresAt: Date.now() + 30 * DAY });
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "DID_FAIL_TO_RENEW",
+      transaction: transaction({ expiresAt: Date.now() - DAY }),
+    });
+    expect(result).toEqual({ applied: true });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.status).toBe("active");
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(true);
+  });
+
+  test("a refund of an older renewal does not revoke the current period", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId, { expiresAt: Date.now() + 60 * DAY });
+    await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "REFUND",
+      transaction: transaction({ expiresAt: Date.now() + DAY, revokedAt: Date.now() }),
+    });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.status).toBe("active");
+  });
+
+  test("REFUND_REVERSED restores a revoked row", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const expiresAt = Date.now() + 10 * DAY;
+    await seedAppStoreSubscription(t, userId, { status: "revoked", expiresAt });
+    await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "REFUND_REVERSED",
+      transaction: transaction({ expiresAt }),
+    });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.status).toBe("active");
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(true);
+  });
+
+  test("a lapsed row is reassigned to the token owner", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedUser(t);
+    const b = await seedUser(t);
+    await seedAppStoreSubscription(t, a, { status: "expired", expiresAt: Date.now() - 10 * DAY });
+    const token = await asUser(t, b).mutation(api.billing.appStore.getAccountToken, {});
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "SUBSCRIBED",
+      subtype: "RESUBSCRIBE",
+      transaction: transaction({ appAccountToken: token }),
+    });
+    expect(result).toEqual({ applied: true });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.userId).toBe(b);
+  });
+
+  test("an entitled row keeps its owner", async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedUser(t);
+    const b = await seedUser(t);
+    await seedAppStoreSubscription(t, a);
+    const token = await asUser(t, b).mutation(api.billing.appStore.getAccountToken, {});
+    await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "DID_RENEW",
+      transaction: transaction({ appAccountToken: token, expiresAt: Date.now() + 60 * DAY }),
+    });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.userId).toBe(a);
   });
 });

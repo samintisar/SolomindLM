@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   ENTITLEMENT_LEEWAY_MS,
   isAppStoreEntitled,
+  isOlderThan,
   mergeStatus,
   statusFromNotification,
   statusFromTransaction,
@@ -83,5 +84,13 @@ describe("isAppStoreEntitled", () => {
   });
   test.each(["billing_retry", "expired", "revoked"] as const)("%s is not Pro", (status) => {
     expect(isAppStoreEntitled({ status, expiresAt: NOW + DAY }, NOW)).toBe(false);
+  });
+});
+
+describe("isOlderThan", () => {
+  test("is true only for a strictly earlier expiry", () => {
+    expect(isOlderThan({ expiresAt: 100 }, { expiresAt: 99 })).toBe(true);
+    expect(isOlderThan({ expiresAt: 100 }, { expiresAt: 100 })).toBe(false);
+    expect(isOlderThan({ expiresAt: 100 }, { expiresAt: 101 })).toBe(false);
   });
 });

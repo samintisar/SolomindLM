@@ -96,3 +96,15 @@ export function isAppStoreEntitled(
   const accessUntil = Math.max(row.expiresAt, row.gracePeriodExpiresAt ?? 0);
   return accessUntil + ENTITLEMENT_LEEWAY_MS > now;
 }
+
+/**
+ * True when the incoming transaction describes an earlier period than the stored row. Notifications
+ * arrive out of order and signed data can be replayed, so such data must not change the row, even
+ * when it is a refund (a refund of the current period has an equal expiry and still applies).
+ */
+export function isOlderThan(
+  existing: { expiresAt: number },
+  transaction: { expiresAt: number }
+): boolean {
+  return transaction.expiresAt < existing.expiresAt;
+}
