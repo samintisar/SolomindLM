@@ -25,9 +25,7 @@ function input(overrides: Partial<ResolveAiConsentInput> = {}): ResolveAiConsent
 
 describe("resolveAiConsentState", () => {
   test("is not applicable on the web", () => {
-    expect(resolveAiConsentState(input({ inShell: false, record: answered(null) }))).toBe(
-      "notApplicable"
-    );
+    expect(resolveAiConsentState(input({ inShell: false }))).toBe("notApplicable");
   });
 
   test("asks when the user has never answered", () => {
@@ -58,6 +56,15 @@ describe("resolveAiConsentState", () => {
     expect(resolveAiConsentState(input({ isAuthenticated: false, record: undefined }))).toBe(
       "notApplicable"
     );
+  });
+
+  test.each([
+    ["granted", answered(null, true), "declined"],
+    ["granted", answered(1), "needsConsent"],
+    ["declined", answered(2), "granted"],
+    ["needsConsent", answered(null, true), "declined"],
+  ] as const)("a fresh answer replaces a held %s", (previous, record, expected) => {
+    expect(resolveAiConsentState(input({ previous, record }))).toBe(expected);
   });
 
   test.each([
