@@ -4,6 +4,7 @@ import {
   LogOut,
   MessageSquarePlus,
   Moon,
+  Sparkles,
   Sun,
   Trash2,
   User as UserIcon,
@@ -12,6 +13,7 @@ import {
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AiDataSharingDialog } from "@/features/aiConsent/AiDataSharingDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -24,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { isNativeShell } from "@/utils/platformDetection";
 import { useFeedback } from "../../feedback/FeedbackContext";
 import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
@@ -67,6 +70,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? "Signed in" : null);
   const initial = isAuthenticated ? userInitial(user) : null;
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [aiSharingOpen, setAiSharingOpen] = useState(false);
 
   return (
     <>
@@ -98,6 +102,12 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
               {theme === "light" ? "Dark mode" : "Light mode"}
             </DropdownMenuItem>
             <LanguageSelector isAuthenticated={isAuthenticated} />
+            {isAuthenticated && isNativeShell() ? (
+              <DropdownMenuItem onSelect={() => setAiSharingOpen(true)}>
+                <Sparkles />
+                AI data sharing
+              </DropdownMenuItem>
+            ) : null}
             {isAuthenticated && showChecklistDismissed && onShowChecklist ? (
               <DropdownMenuItem onSelect={onShowChecklist}>
                 <ListChecks />
@@ -140,6 +150,9 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Mounted only while open so the menu doesn't subscribe to billing status. */}
+      {isAuthenticated && aiSharingOpen ? (
+        <AiDataSharingDialog open onOpenChange={setAiSharingOpen} />
+      ) : null}
       {isAuthenticated && deleteAccountOpen ? (
         <DeleteAccountDialog open onOpenChange={setDeleteAccountOpen} />
       ) : null}
