@@ -182,7 +182,7 @@ Authenticated mutation: returns the caller's token, creating it on first call.
 - Shell, user has Stripe Pro: Billing page says "Your Pro plan is billed through the website." No
   purchase buttons, no link.
 - Web, user has App Store Pro: Billing page says "Billed by Apple. Manage it in your iPhone's
-  Settings." No Stripe checkout; `billing.actions.createCheckout` also refuses server-side.
+  Settings." No Stripe checkout; `billing.actions.createCheckoutSession` also refuses server-side.
 
 ### Account deletion
 
@@ -213,7 +213,7 @@ Billing page in an IAP-capable shell:
 
 - **Convex** (`convex-test`): notification → status mapping, `isProUser` across both tables
   including the `expiresAt` guard, token mismatch and re-link after deletion, duplicate
-  notifications, `createCheckout` refusal with App Store Pro, purge on deletion. Signature
+  notifications, `createCheckoutSession` refusal with App Store Pro, purge on deletion. Signature
   verification is tested with fixtures signed by a test certificate chain the verifier is configured
   to trust.
 - **Web** (vitest): bridge client (ids, timeouts, malformed replies), Billing page states (web, old
