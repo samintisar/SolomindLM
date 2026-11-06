@@ -569,6 +569,18 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(n)
   ),
+  direct("appStoreSubscriptions", (ctx, userId, n) =>
+    ctx.db
+      .query("appStoreSubscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(n)
+  ),
+  direct("appStoreAccountTokens", (ctx, userId, n) =>
+    ctx.db
+      .query("appStoreAccountTokens")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(n)
+  ),
   direct("rateLimits", (ctx, userId, n) =>
     ctx.db
       .query("rateLimits")
