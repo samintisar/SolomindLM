@@ -200,6 +200,8 @@ import type * as billing_actions from "../billing/actions.js";
 import type * as billing_appStore from "../billing/appStore.js";
 import type * as billing_appStoreModel from "../billing/appStoreModel.js";
 import type * as billing_appStoreProducts from "../billing/appStoreProducts.js";
+import type * as billing_appStoreVerifier from "../billing/appStoreVerifier.js";
+import type * as billing_appleRootCertificates from "../billing/appleRootCertificates.js";
 import type * as billing_index from "../billing/index.js";
 import type * as billing_webhook from "../billing/webhook.js";
 import type * as chat__researchExecuteImpl from "../chat/_researchExecuteImpl.js";
@@ -566,6 +568,8 @@ declare const fullApi: ApiFromModules<{
   "billing/appStore": typeof billing_appStore;
   "billing/appStoreModel": typeof billing_appStoreModel;
   "billing/appStoreProducts": typeof billing_appStoreProducts;
+  "billing/appStoreVerifier": typeof billing_appStoreVerifier;
+  "billing/appleRootCertificates": typeof billing_appleRootCertificates;
   "billing/index": typeof billing_index;
   "billing/webhook": typeof billing_webhook;
   "chat/_researchExecuteImpl": typeof chat__researchExecuteImpl;
