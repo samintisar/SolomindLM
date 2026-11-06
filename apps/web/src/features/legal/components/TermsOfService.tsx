@@ -69,11 +69,17 @@ export const TermsOfService: React.FC = () => {
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-foreground">Subscriptions and billing</h2>
         <p className="text-muted-foreground">
-          We may offer free and paid plans. Paid subscriptions are billed through Stripe on the
-          terms shown at checkout. Unless required by law, fees are generally non-refundable. You
-          can cancel according to in-product controls; cancellation typically takes effect at the
-          end of the current billing period. We may change prices with reasonable notice where
-          required.
+          We may offer free and paid plans. Paid subscriptions bought on the web are billed through
+          Stripe on the terms shown at checkout. Unless required by law, fees are generally
+          non-refundable. You can cancel according to in-product controls; cancellation typically
+          takes effect at the end of the current billing period. We may change prices with
+          reasonable notice where required.
+        </p>
+        <p className="text-muted-foreground">
+          Subscriptions bought in the iOS app are billed by Apple to your Apple ID, not by us. They
+          renew automatically until you cancel them in your Apple ID or App Store subscription
+          settings at least 24 hours before the current period ends. Apple handles refunds for these
+          subscriptions.
         </p>
       </section>
 

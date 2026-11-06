@@ -3309,7 +3309,7 @@ With `bun run dev:web` (via the preview tool, not Bash): on the web Billing page
 
 Record in the PR description:
 
-1. App Store Connect: subscription group "SolomindLM Pro" with `com.solomindlm.app.pro.monthly` and `com.solomindlm.app.pro.yearly`, prices, localizations, review screenshot; Small Business Program; Billing Grace Period on; App Store Server Notifications V2 URL for Production and Sandbox: `https://<prod deployment>.convex.site/appstore/notifications`; send a test notification and confirm `{"result":"ignored"}` in Convex logs.
+1. App Store Connect: subscription group "SolomindLM Pro" with `com.solomindlm.app.pro.monthly` and `com.solomindlm.app.pro.yearly`, prices, localizations, review screenshot; Billing Grace Period on; App Store Server Notifications V2 URL for Production and Sandbox: `https://<prod deployment>.convex.site/appstore/notifications`; send a test notification and confirm `{"result":"ignored"}` in Convex logs.
 2. A Sandbox tester account.
 3. New EAS build (`eas build -p ios --profile production`), TestFlight: buy monthly, cancel the sheet, restore on a second device, switch to yearly, let Sandbox renew, refund through Sandbox, check Convex rows after each.
 4. Resubmit: attach both subscriptions to the version, App Privacy (purchase history, linked to the user, app functionality), review notes explaining where to buy and restore, reply to App Review for 3.1.1.

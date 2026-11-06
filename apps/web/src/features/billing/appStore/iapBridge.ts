@@ -25,7 +25,7 @@ type IapResponse =
 const DEFAULT_TIMEOUT_MS = 15_000;
 /** Apple's sheet can stay up while the user signs in or confirms; Pro still shows via getPlan. */
 const PURCHASE_TIMEOUT_MS = 5 * 60_000;
-const RESTORE_TIMEOUT_MS = 60_000;
+const RESTORE_TIMEOUT_MS = 5 * 60_000;
 
 function isIapResponse(value: unknown): value is IapResponse {
   if (typeof value !== "object" || value === null) return false;

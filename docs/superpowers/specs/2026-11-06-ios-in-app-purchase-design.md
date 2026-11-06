@@ -97,9 +97,10 @@ A user is Pro if `isProUser` finds either:
   leeway covers a renewal notification that arrives late; the deadline check covers an `EXPIRED`
   notification that never arrives.
 
-`billing.getPlan` returns `{ tier: "free" | "pro", source: "stripe" | "app_store" | null,
-renewsAt, cancelAtPeriodEnd, productId?, gracePeriodExpiresAt? }`. The Billing page, the Header and the feedback
-`planTier` read it instead of reading `stripeSubscriptions` directly.
+`billing.getPlan` returns `{ tier: "free" | "pro", source: "stripe" | "app_store" | null, stripe,
+appStore: { productId, status, expiresAt, gracePeriodExpiresAt, autoRenews, environment } | null }`.
+The Billing page and the Header read it instead of reading `stripeSubscriptions` directly. The
+feedback `planTier` reads `isProUser` (`convex/_lib/limits`), not `getPlan`.
 
 ### Sandbox
 
@@ -127,7 +128,7 @@ shell keep today's behaviour (plan summary, no purchase UI).
 
 | `action` | Native action | Response |
 | --- | --- | --- |
-| `products` | `fetchProducts` for both IDs | `{ products: [{ id, displayPrice, period }] }` or `{ error }` |
+| `products` | `fetchProducts` for both IDs | `{ products: [{ id, displayPrice, price (number | null), period }] }` or `{ error }` |
 | `purchase` (+ `productId`) | Get account token from Convex, `requestPurchase` with `appAccountToken`, send the signed transaction to `syncTransaction`, then `finishTransaction` | `{ status: "purchased" \| "cancelled" \| "pending" \| "error", message? }` |
 | `restore` | Ask the App Store to sync, then `getAvailablePurchases`, sync each | `{ restored: number }` or `{ error }` |
 | `manage` | `deepLinkToSubscriptions` | none |
@@ -151,7 +152,7 @@ Rules:
 
 ## Server
 
-### `billing.appStore.syncTransaction({ signedTransaction })`
+### `billing.appStoreNode.syncTransaction({ signedTransaction })`
 
 Authenticated Node action.
 
@@ -160,10 +161,13 @@ Authenticated Node action.
    `enableOnlineChecks: true`, bundle ID and app Apple ID constants in
    `convex/billing/appStoreProducts.ts`), using the environment the payload claims.
 2. Reject product IDs other than the two above.
-3. Look up the caller's token. The transaction's `appAccountToken` must equal it.
-   - If it equals another existing user's token → reject with
+3. Look up the owner of the transaction's `appAccountToken`.
+   - No token on the transaction, or a token no account owns (that account was deleted) → accepted
+     for the caller.
+   - A token owned by another account → reject with
      "This Apple ID's subscription is linked to another SolomindLM account."
-   - If it belongs to no existing user (that account was deleted) → re-link to the caller.
+   - A subscription row already owned by another account is rejected too, unless the caller's token
+     is on the transaction and that row has lapsed (see the row rules below).
 4. Upsert `appStoreSubscriptions` by `originalTransactionId`; status from `expiresDate` and
    `revocationDate` (`revoked` if revoked, `expired` if past expiry, else `active`).
 
@@ -186,7 +190,7 @@ Authenticated mutation: returns the caller's token, creating it on first call.
 
 1. Reject bodies over 64 KiB (`413`) and anything that is not JWS-shaped (three base64url parts)
    before starting a Node action. Then `verifyAndDecodeNotification(signedPayload)`, using the
-   payload's environment claim. A signature or payload that fails verification → `400`, no retry. A
+   payload's environment claim. A signature or payload that fails verification → `400`; Apple does retry, which gives time to fix a config problem (wrong bundle or app ID, missing root certificate). A
    transient OCSP or network failure (`RETRYABLE_VERIFICATION_FAILURE`) throws
    `ExternalServiceError` → `500`, so Apple retries.
 2. Claim the event by `notificationUUID` (same pattern as `claimWebhookEvent`); already processed → `200`.
@@ -203,7 +207,7 @@ Authenticated mutation: returns the caller's token, creating it on first call.
 | `REFUND`, `REVOKE` | `revoked` |
 | `DID_CHANGE_RENEWAL_STATUS` | `autoRenews` |
 | `DID_CHANGE_RENEWAL_PREF` | `autoRenewProductId` |
-| anything else | ignored, marked processed |
+| anything else | Expiry and renewal info from the transaction still update the row; without a subscription transaction the notification is ignored and marked processed |
 
 5. Applying the state and marking the event processed happen in one mutation. Processing failure →
    mark failed, `500` so Apple retries.
@@ -263,7 +267,7 @@ Billing page in an IAP-capable shell:
 
 ## Rollout
 
-1. App Store Connect: subscription group and products with prices, Small Business Program, Billing
+1. App Store Connect: subscription group and products with prices, Billing
    Grace Period, Server Notifications V2 URL (Production and Sandbox) →
    `https://<prod deployment>.convex.site/appstore/notifications`.
 2. Merge web + Convex. No visible change until a build reports `iap: true`.
@@ -276,6 +280,9 @@ Billing page in an IAP-capable shell:
 Put both products at the same service level in the subscription group (or the yearly one higher).
 Otherwise an immediate upgrade to a shorter product would be ignored by the rule that a row never
 rolls back to an older period.
+
+The App Review demo account must be on Free (no Stripe or App Store subscription); otherwise the
+in-app Billing page shows "billed through the website" and no purchase buttons.
 
 ## Out of scope
 
