@@ -150,11 +150,11 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Mounted only while open so the menu doesn't subscribe to billing status. */}
-      {isAuthenticated && aiSharingOpen ? (
-        <AiDataSharingDialog open onOpenChange={setAiSharingOpen} />
-      ) : null}
       {isAuthenticated && deleteAccountOpen ? (
         <DeleteAccountDialog open onOpenChange={setDeleteAccountOpen} />
+      ) : null}
+      {isAuthenticated && aiSharingOpen ? (
+        <AiDataSharingDialog open onOpenChange={setAiSharingOpen} />
       ) : null}
     </>
   );
