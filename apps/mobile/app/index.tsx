@@ -20,6 +20,10 @@ export default function MobileShellScreen() {
   // Start light to match the web app's own default until the first report arrives.
   const [webTheme, setWebTheme] = useState<"light" | "dark">("light");
 
+  // The native upload button sits outside the web consent gate, so it stays hidden until the web app
+  // reports `granted` (`shell-web:ai-consent`).
+  const [aiConsentGranted, setAiConsentGranted] = useState(false);
+
   const webPathParam = Array.isArray(params.webPath) ? params.webPath[0] : params.webPath;
 
   // Keep the WebView entry path stable — auth routing is handled inside the web app.
@@ -41,8 +45,15 @@ export default function MobileShellScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: shellBackground }]} edges={["top"]}>
       <StatusBar style={webTheme === "dark" ? "light" : "dark"} />
-      <WebViewScreen path={path} onThemeChange={setWebTheme} theme={webTheme} />
-      {notebookIdForUpload ? <FileUploadButton notebookId={notebookIdForUpload} /> : null}
+      <WebViewScreen
+        path={path}
+        onThemeChange={setWebTheme}
+        onAiConsentChange={setAiConsentGranted}
+        theme={webTheme}
+      />
+      {notebookIdForUpload && aiConsentGranted ? (
+        <FileUploadButton notebookId={notebookIdForUpload} />
+      ) : null}
     </SafeAreaView>
   );
 }

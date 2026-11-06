@@ -6,6 +6,7 @@ import * as Linking from "expo-linking";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
+import { parseShellWebMessage } from "./parseShellWebMessage";
 import { getLoadErrorCopy, type WebViewLoadError } from "./webViewLoadError";
 import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
 
@@ -13,6 +14,8 @@ export type WebViewScreenProps = {
   path: string;
   /** Called when the web app reports its active theme (`shell-web:theme`). */
   onThemeChange?: (theme: "light" | "dark") => void;
+  /** Called when the web app reports whether AI data sharing is allowed (`shell-web:ai-consent`). */
+  onAiConsentChange?: (granted: boolean) => void;
   /** Active web theme, so native-only screens (load error) stay readable on the shell background. */
   theme?: "light" | "dark";
 };
@@ -23,7 +26,12 @@ function getWebBaseUrl(): string | null {
   return url.replace(/\/+$/, "");
 }
 
-export function WebViewScreen({ path, onThemeChange, theme = "light" }: WebViewScreenProps) {
+export function WebViewScreen({
+  path,
+  onThemeChange,
+  onAiConsentChange,
+  theme = "light",
+}: WebViewScreenProps) {
   const base = useMemo(() => getWebBaseUrl(), []);
   const {
     onWebViewMessage: onAuthBridgeMessage,
@@ -34,18 +42,18 @@ export function WebViewScreen({ path, onThemeChange, theme = "light" }: WebViewS
 
   const onWebViewMessage = useCallback(
     (raw: string) => {
-      try {
-        const msg = JSON.parse(raw) as { type?: string; theme?: unknown };
-        if (msg?.type === "shell-web:theme") {
-          if (msg.theme === "light" || msg.theme === "dark") onThemeChange?.(msg.theme);
-          return;
-        }
-      } catch {
-        /* not JSON — let the auth bridge decide */
+      const msg = parseShellWebMessage(raw);
+      if (msg?.kind === "theme") {
+        onThemeChange?.(msg.theme);
+        return;
+      }
+      if (msg?.kind === "aiConsent") {
+        onAiConsentChange?.(msg.granted);
+        return;
       }
       onAuthBridgeMessage(raw);
     },
-    [onAuthBridgeMessage, onThemeChange]
+    [onAuthBridgeMessage, onThemeChange, onAiConsentChange]
   );
   const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<WebViewLoadError | null>(null);

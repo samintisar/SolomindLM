@@ -3,6 +3,7 @@ import { AppShellFallback } from "@/shell/AppShellFallback";
 import { AiConsentScreen } from "./AiConsentScreen";
 import { AiFeaturesOffScreen } from "./AiFeaturesOffScreen";
 import { useAiConsentState } from "./useAiConsentState";
+import { useReportAiConsentToShell } from "./useReportAiConsentToShell";
 
 /**
  * In the mobile shell, nothing below this renders until the user has allowed AI data sharing,
@@ -10,6 +11,7 @@ import { useAiConsentState } from "./useAiConsentState";
  */
 export function AiConsentGate({ children }: { children: ReactNode }) {
   const state = useAiConsentState();
+  useReportAiConsentToShell(state);
   const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {

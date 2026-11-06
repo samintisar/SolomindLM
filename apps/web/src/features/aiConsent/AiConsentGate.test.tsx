@@ -6,6 +6,8 @@ import type { AiConsentState } from "./resolveAiConsentState";
 let state: AiConsentState = "granted";
 vi.mock("./useAiConsentState", () => ({ useAiConsentState: () => state }));
 
+vi.mock("./useReportAiConsentToShell", () => ({ useReportAiConsentToShell: () => {} }));
+
 vi.mock("./AiConsentScreen", () => ({
   AiConsentScreen: ({ onDeclined }: { onDeclined?: () => void }) => (
     <button type="button" data-testid="consent-screen" onClick={onDeclined}>
@@ -64,6 +66,29 @@ describe("AiConsentGate", () => {
     act(() => screen.getByTestId("off-screen").click());
     expect(screen.getByTestId("consent-screen")).toBeInTheDocument();
     act(() => screen.getByTestId("consent-screen").click());
+    expect(screen.getByTestId("off-screen")).toBeInTheDocument();
+  });
+
+  test("returns to the off screen after a review ends in granted and consent is later declined", () => {
+    state = "declined";
+    const { rerender } = renderGate();
+    act(() => screen.getByTestId("off-screen").click());
+    expect(screen.getByTestId("consent-screen")).toBeInTheDocument();
+
+    state = "granted";
+    rerender(
+      <AiConsentGate>
+        <div data-testid="app" />
+      </AiConsentGate>
+    );
+    expect(screen.getByTestId("app")).toBeInTheDocument();
+
+    state = "declined";
+    rerender(
+      <AiConsentGate>
+        <div data-testid="app" />
+      </AiConsentGate>
+    );
     expect(screen.getByTestId("off-screen")).toBeInTheDocument();
   });
 });
