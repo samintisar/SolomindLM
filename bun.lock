@@ -60,6 +60,7 @@
         "expo-dev-client": "~55.0.40",
         "expo-document-picker": "~55.0.17",
         "expo-font": "~55.0.8",
+        "expo-iap": "^6.4.3",
         "expo-image-picker": "~55.0.24",
         "expo-linking": "~55.0.17",
         "expo-notifications": "~55.0.27",
@@ -1698,6 +1699,8 @@
     "expo-font": ["expo-font@55.0.8", "", { "dependencies": { "fontfaceobserver": "^2.1.0" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-WyP75pnKqhLNktYwDn3xKAUNt5rLihRDv8XWGhhz6VEhVqypixpT86NA3uGtiDTlM3gGjhrYCY7o7ypXgCUOZg=="],
 
     "expo-glass-effect": ["expo-glass-effect@55.0.11", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-wqq7GUOqSkfoFJzreZvBG0jzjsq5c582m3glhWSjcmIuByxXXWp6j6GY6hyFuYKzpOXhbuvusVxGCQi0yWnp3g=="],
+
+    "expo-iap": ["expo-iap@6.4.3", "", { "peerDependencies": { "@amazon-devices/keplerscript-appstore-iap-lib": "~2.13.0", "@amazon-devices/package-manager-lib": "~1.0.1767254401", "expo": "*", "react": "*", "react-native": "*" }, "optionalPeers": ["@amazon-devices/keplerscript-appstore-iap-lib", "@amazon-devices/package-manager-lib"] }, "sha512-KNQ4BkptFBuzIU0Ap7WvfJ2mKF9GdFOmQJ4NDWLchWL8qYtD7FQIroX4t/kCLs6TNv08fi77sQbWEDjBtWFhEg=="],
 
     "expo-image": ["expo-image@55.0.11", "", { "dependencies": { "sf-symbols-typescript": "^2.2.0" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*", "react-native-web": "*" }, "optionalPeers": ["react-native-web"] }, "sha512-PVIBYQJW/h1f6Zb9xnoWlgfqyOPVm2yb6eo6ZogaKbvMrhb/Q/fiERbagi4oqmR6IPljWPEpkXXQyFBUh7TjpQ=="],
 

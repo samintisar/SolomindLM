@@ -1,6 +1,5 @@
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
-import { isConvexDeploymentConfigured } from "@mobile/services/convex/client";
-import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
+import { buildNativeShellInject } from "@mobile/utils/constants";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -80,10 +79,10 @@ export function WebViewScreen({
     return () => setWebViewRefRef.current(null);
   }, []);
 
-  const injectedJavaScriptBeforeContentLoaded = useMemo(() => {
-    if (!isConvexDeploymentConfigured) return NATIVE_SHELL_INJECT;
-    return NATIVE_SHELL_INJECT;
-  }, []);
+  const injectedJavaScriptBeforeContentLoaded = useMemo(
+    () => buildNativeShellInject({ iap: Platform.OS === "ios" }),
+    []
+  );
 
   if (!base) {
     return (
