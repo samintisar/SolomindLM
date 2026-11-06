@@ -30,6 +30,8 @@ export interface Source {
   status?: "pending" | "processing" | "completed" | "failed";
   /** Why processing failed, written for the user (set only when `status` is "failed"). */
   failureReason?: string;
+  /** A note about a processed source the user should know, e.g. OCR stopped at their page cap. */
+  processingNotice?: string;
   /** Original URL for WEB / YOUTUBE sources; used for embed + open in new tab */
   url?: string;
   /** Kebab Refresh: web page (`url` type, not YouTube) or Google Drive–backed file */

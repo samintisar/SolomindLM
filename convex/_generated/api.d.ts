@@ -122,6 +122,7 @@ import type * as _lib_googleDriveDownload from "../_lib/googleDriveDownload.js";
 import type * as _lib_limits from "../_lib/limits.js";
 import type * as _lib_logging_serviceLogger from "../_lib/logging/serviceLogger.js";
 import type * as _lib_notebookAccess from "../_lib/notebookAccess.js";
+import type * as _lib_ocrPageLimits from "../_lib/ocrPageLimits.js";
 import type * as _lib_queryCaps from "../_lib/queryCaps.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
 import type * as _lib_rerankConfig from "../_lib/rerankConfig.js";
@@ -221,6 +222,7 @@ import type * as documents_getExistingPapers from "../documents/getExistingPaper
 import type * as documents_index from "../documents/index.js";
 import type * as documents_internal from "../documents/internal.js";
 import type * as documents_listSummary from "../documents/listSummary.js";
+import type * as documents_ocrQuota from "../documents/ocrQuota.js";
 import type * as documents_paperFullText from "../documents/paperFullText.js";
 import type * as documents_paperIngest from "../documents/paperIngest.js";
 import type * as documents_paperRecord from "../documents/paperRecord.js";
@@ -483,6 +485,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/limits": typeof _lib_limits;
   "_lib/logging/serviceLogger": typeof _lib_logging_serviceLogger;
   "_lib/notebookAccess": typeof _lib_notebookAccess;
+  "_lib/ocrPageLimits": typeof _lib_ocrPageLimits;
   "_lib/queryCaps": typeof _lib_queryCaps;
   "_lib/rateLimits": typeof _lib_rateLimits;
   "_lib/rerankConfig": typeof _lib_rerankConfig;
@@ -582,6 +585,7 @@ declare const fullApi: ApiFromModules<{
   "documents/index": typeof documents_index;
   "documents/internal": typeof documents_internal;
   "documents/listSummary": typeof documents_listSummary;
+  "documents/ocrQuota": typeof documents_ocrQuota;
   "documents/paperFullText": typeof documents_paperFullText;
   "documents/paperIngest": typeof documents_paperIngest;
   "documents/paperRecord": typeof documents_paperRecord;

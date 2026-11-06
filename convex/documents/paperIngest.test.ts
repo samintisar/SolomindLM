@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ExternalServiceError } from "../_lib/errors";
+import { OCR_PAGE_LIMITS, OcrQuotaExceededError } from "../_lib/ocrPageLimits";
 import type { OaCandidate } from "../_services/extraction/openAccess/OpenAccessResolver";
 import {
   fulltextStatusAfterIngest,
@@ -68,6 +69,13 @@ describe("ingestPaper", () => {
     });
     expect(deps.ocrStoredPdf).toHaveBeenCalledWith("storage_1");
     expect(deps.resolveCandidates).not.toHaveBeenCalled();
+  });
+
+  it("fails with the quota message instead of saving abstract-only when OCR pages are used up", async () => {
+    const quota = new OcrQuotaExceededError(OCR_PAGE_LIMITS.free, false);
+    const deps = makeDeps({ ocrStoredPdf: vi.fn().mockRejectedValue(quota) });
+
+    await expect(ingestPaper(input({ storageId: "storage_1" }), deps, logger)).rejects.toBe(quota);
   });
 
   it("records a stored PDF with no recorded source as uploaded", async () => {

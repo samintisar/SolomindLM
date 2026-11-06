@@ -6,10 +6,12 @@ import {
   figureBlock,
   hasOcrContent,
   inlineOcrFigures,
+  isPageRangeRejection,
   MistralOCRService,
   MistralOcrTimeoutError,
   markdownFromMistralOcrResponse,
   NOTHING_READABLE_MESSAGE,
+  OcrNothingReadableError,
   ocrInputKindForFile,
   parseFigureAnnotation,
   shouldRetryWithoutAnnotations,
@@ -319,6 +321,32 @@ describe("buildOcrRequestBody", () => {
     const body = buildOcrRequestBody("https://x/storage/abc", "image", false);
     expect(body).not.toHaveProperty("bbox_annotation_format");
   });
+
+  it("asks a document for its first maxPages pages only", () => {
+    const body = buildOcrRequestBody("https://x/a.pdf", "document", true, 30);
+    expect(body.pages).toBe("0-29");
+  });
+
+  it("sends no page range without a cap, or for a single image", () => {
+    expect(buildOcrRequestBody("https://x/a.pdf", "document", true)).not.toHaveProperty("pages");
+    expect(buildOcrRequestBody("https://x/img", "image", true, 30)).not.toHaveProperty("pages");
+  });
+});
+
+describe("isPageRangeRejection", () => {
+  const http = (status: number, body: string) =>
+    new ExternalServiceError("mistral", `mistral HTTP ${status}: ${body}`, { statusCode: status });
+
+  it("is true for a 400 or 422 about the requested pages", () => {
+    expect(isPageRangeRejection(http(400, "Page index 12 out of range"))).toBe(true);
+    expect(isPageRangeRejection(http(422, '{"loc":["body","pages"]}'))).toBe(true);
+  });
+
+  it("is false for other rejections, billing errors and timeouts", () => {
+    expect(isPageRangeRejection(http(400, "Invalid document_url"))).toBe(false);
+    expect(isPageRangeRejection(http(402, "monthly spending limit"))).toBe(false);
+    expect(isPageRangeRejection(new MistralOcrTimeoutError())).toBe(false);
+  });
 });
 
 describe("shouldRetryWithoutAnnotations", () => {
@@ -377,6 +405,99 @@ describe("MistralOCRService.processDocument", () => {
 
     expect(md).toBe(`**Page 1**\n\n${figureBlock(CHART)}`);
     expect(sentBody(fetchMock, 0)).toHaveProperty("bbox_annotation_format");
+  });
+
+  it("sends the page cap and reports the pages Mistral read", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      ok({
+        pages: [{ markdown: "one" }, { markdown: "two" }],
+        usage_info: { pages_processed: 2 },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new MistralOCRService("key").readDocument("https://x/a.pdf", {
+      maxPages: 30,
+    });
+
+    expect(result.pagesRead).toBe(2);
+    expect(result.markdown).toContain("one");
+    expect(sentBody(fetchMock, 0).pages).toBe("0-29");
+  });
+
+  it("counts returned pages when usage_info is missing", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok({ pages: [{ markdown: "only" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new MistralOCRService("key").readDocument("https://x/a.pdf");
+
+    expect(result.pagesRead).toBe(1);
+  });
+
+  // A document shorter than the cap is the only one Mistral can reject the range for, so it is
+  // safe to read it whole.
+  it("resends without the page range when Mistral rejects the range", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("Page index 29 is out of range", { status: 400 }))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "short" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new MistralOCRService("key").readDocument("https://x/a.pdf", {
+      maxPages: 30,
+    });
+
+    expect(result.markdown).toContain("short");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("pages");
+    expect(sentBody(fetchMock, 1)).toHaveProperty("bbox_annotation_format");
+  });
+
+  it("keeps the page cap on the plain fallback request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(rejected(503))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/a.pdf", { maxPages: 30 });
+
+    const last = sentBody(fetchMock, fetchMock.mock.calls.length - 1);
+    expect(last).not.toHaveProperty("bbox_annotation_format");
+    expect(last.pages).toBe("0-29");
+  });
+
+  it("sends no page range when an image falls back to the plain document request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(rejected(400))
+      .mockResolvedValueOnce(ok({ pages: [{ markdown: "text" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new MistralOCRService("key").readDocument("https://x/storage/abc", {
+      kind: "image",
+      maxPages: 30,
+    });
+
+    expect(sentBody(fetchMock, 1).document.type).toBe("document_url");
+    expect(sentBody(fetchMock, 1)).not.toHaveProperty("pages");
+  });
+
+  it("reports the billed pages when OCR finds nothing readable", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        ok({ pages: [{ markdown: "" }, { markdown: " " }], usage_info: { pages_processed: 2 } })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const err = await new MistralOCRService("key")
+      .readDocument("https://x/a.pdf", { maxPages: 30 })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(OcrNothingReadableError);
+    expect((err as OcrNothingReadableError).pagesRead).toBe(2);
   });
 
   it("sends image uploads as image_url", async () => {

@@ -605,6 +605,13 @@ export const PURGE_STEPS: readonly PurgeStep[] = [
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(n)
   ),
+  // The index's month field is left open: one prefix covers every month's row.
+  direct("ocrUsage", (ctx, userId, n) =>
+    ctx.db
+      .query("ocrUsage")
+      .withIndex("by_user_and_month", (q) => q.eq("userId", userId))
+      .take(n)
+  ),
 ];
 
 export const PURGED_TABLES: ReadonlySet<TableNames> = new Set(

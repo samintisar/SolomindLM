@@ -462,6 +462,11 @@ export const getDocumentDetails = internalQuery({
       sourceGuide: doc.sourceGuide,
       fileSize: doc.fileSize,
       ocrTimedOut: doc.metadata?.ocrTimedOut === true,
+      /** Set by the eval pack seeder; kept when the job rewrites `metadata`. */
+      evalSourceSha256:
+        typeof doc.metadata?.evalSourceSha256 === "string"
+          ? (doc.metadata.evalSourceSha256 as string)
+          : undefined,
     };
   },
 });
