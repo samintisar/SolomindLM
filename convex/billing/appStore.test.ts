@@ -204,3 +204,99 @@ describe("applyVerifiedTransaction", () => {
     expect(result).toEqual({ status: "grace" });
   });
 });
+
+describe("notifications", () => {
+  test("claim → processed → duplicate", async () => {
+    const t = convexTest(schema, modules);
+    const args = { notificationUUID: "n-1", notificationType: "DID_RENEW" };
+    expect(await t.mutation(internal.billing.appStore.claimNotification, args)).toEqual({
+      status: "new",
+    });
+    expect(await t.mutation(internal.billing.appStore.claimNotification, args)).toEqual({
+      status: "in_flight",
+    });
+    await t.mutation(internal.billing.appStore.markNotificationProcessed, {
+      notificationUUID: "n-1",
+    });
+    expect(await t.mutation(internal.billing.appStore.claimNotification, args)).toEqual({
+      status: "processed",
+    });
+  });
+
+  test("a failed attempt can be claimed again right away", async () => {
+    const t = convexTest(schema, modules);
+    const args = { notificationUUID: "n-2", notificationType: "DID_RENEW" };
+    await t.mutation(internal.billing.appStore.claimNotification, args);
+    await t.mutation(internal.billing.appStore.markNotificationFailed, {
+      notificationUUID: "n-2",
+      errorMessage: "boom",
+    });
+    expect(await t.mutation(internal.billing.appStore.claimNotification, args)).toEqual({
+      status: "new",
+    });
+  });
+
+  test("DID_FAIL_TO_RENEW with GRACE_PERIOD keeps Pro until the grace deadline", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId);
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "DID_FAIL_TO_RENEW",
+      subtype: "GRACE_PERIOD",
+      transaction: transaction({ expiresAt: Date.now() - DAY }),
+      renewal: { autoRenews: true, gracePeriodExpiresAt: Date.now() + 5 * DAY },
+    });
+    expect(result).toEqual({ applied: true });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.status).toBe("grace");
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(true);
+  });
+
+  test("REFUND revokes Pro", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId);
+    await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "REFUND",
+      transaction: transaction({ revokedAt: Date.now() }),
+    });
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(false);
+  });
+
+  test("DID_CHANGE_RENEWAL_STATUS records auto-renew off without changing status", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedAppStoreSubscription(t, userId);
+    await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "DID_CHANGE_RENEWAL_STATUS",
+      subtype: "AUTO_RENEW_DISABLED",
+      transaction: transaction(),
+      renewal: { autoRenews: false },
+    });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row).toMatchObject({ status: "active", autoRenews: false });
+  });
+
+  test("an unknown subscription is linked through its account token", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const token = await asUser(t, userId).mutation(api.billing.appStore.getAccountToken, {});
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "SUBSCRIBED",
+      subtype: "INITIAL_BUY",
+      transaction: transaction({ appAccountToken: token }),
+      renewal: { autoRenews: true },
+    });
+    expect(result).toEqual({ applied: true });
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(true);
+  });
+
+  test("a subscription with no known owner is not applied", async () => {
+    const t = convexTest(schema, modules);
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationType: "DID_RENEW",
+      transaction: transaction(),
+    });
+    expect(result).toEqual({ applied: false });
+  });
+});
