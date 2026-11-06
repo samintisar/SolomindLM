@@ -182,7 +182,7 @@ describe("AI data sharing item", () => {
     renderMenu();
     await openMenu(user);
     await user.click(await screen.findByRole("menuitem", { name: /AI data sharing/ }));
-    expect(screen.getByTestId("ai-data-sharing-dialog")).toBeInTheDocument();
+    expect(await screen.findByTestId("ai-data-sharing-dialog")).toBeInTheDocument();
   });
 
   test("is hidden on the web", async () => {

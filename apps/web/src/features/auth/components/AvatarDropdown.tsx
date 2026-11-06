@@ -11,9 +11,8 @@ import {
   Wrench,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AiDataSharingDialog } from "@/features/aiConsent/AiDataSharingDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -32,6 +31,13 @@ import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import { LanguageSelector } from "./LanguageSelector";
+
+// Mobile-shell only; keep it out of the chunk every web page loads.
+const AiDataSharingDialog = lazy(() =>
+  import("@/features/aiConsent/AiDataSharingDialog").then((m) => ({
+    default: m.AiDataSharingDialog,
+  }))
+);
 
 interface AvatarDropdownProps {
   user: User | null;
@@ -154,7 +160,9 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
         <DeleteAccountDialog open onOpenChange={setDeleteAccountOpen} />
       ) : null}
       {isAuthenticated && aiSharingOpen ? (
-        <AiDataSharingDialog open onOpenChange={setAiSharingOpen} />
+        <Suspense fallback={null}>
+          <AiDataSharingDialog open onOpenChange={setAiSharingOpen} />
+        </Suspense>
       ) : null}
     </>
   );

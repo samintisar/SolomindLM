@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { AiConsentGate } from "./AiConsentGate";
 import type { AiConsentState } from "./resolveAiConsentState";
@@ -45,35 +45,43 @@ describe("AiConsentGate", () => {
     ["loading", "fallback"],
     ["needsConsent", "consent-screen"],
     ["declined", "off-screen"],
-  ] as const)("%s shows %s", (current, testId) => {
+  ] as const)("%s shows %s", async (current, testId) => {
     state = current;
     renderGate();
-    expect(screen.getByTestId(testId)).toBeInTheDocument();
+    expect(await screen.findByTestId(testId)).toBeInTheDocument();
   });
 
   test.each(["loading", "needsConsent", "declined"] as const)(
     "%s keeps the app unmounted",
-    (current) => {
+    async (current) => {
       state = current;
       renderGate();
+      expect(screen.queryByTestId("app")).not.toBeInTheDocument();
+      await screen.findByTestId(
+        current === "loading"
+          ? "fallback"
+          : current === "needsConsent"
+            ? "consent-screen"
+            : "off-screen"
+      );
       expect(screen.queryByTestId("app")).not.toBeInTheDocument();
     }
   );
 
-  test("Review and allow shows the consent screen; Not now returns to the off screen", () => {
+  test("Review and allow shows the consent screen; Not now returns to the off screen", async () => {
     state = "declined";
     renderGate();
     act(() => screen.getByTestId("off-screen").click());
-    expect(screen.getByTestId("consent-screen")).toBeInTheDocument();
+    expect(await screen.findByTestId("consent-screen")).toBeInTheDocument();
     act(() => screen.getByTestId("consent-screen").click());
-    expect(screen.getByTestId("off-screen")).toBeInTheDocument();
+    expect(await screen.findByTestId("off-screen")).toBeInTheDocument();
   });
 
-  test("returns to the off screen after a review ends in granted and consent is later declined", () => {
+  test("returns to the off screen after a review ends in granted and consent is later declined", async () => {
     state = "declined";
     const { rerender } = renderGate();
     act(() => screen.getByTestId("off-screen").click());
-    expect(screen.getByTestId("consent-screen")).toBeInTheDocument();
+    expect(await screen.findByTestId("consent-screen")).toBeInTheDocument();
 
     state = "granted";
     rerender(
@@ -81,7 +89,7 @@ describe("AiConsentGate", () => {
         <div data-testid="app" />
       </AiConsentGate>
     );
-    expect(screen.getByTestId("app")).toBeInTheDocument();
+    expect(await screen.findByTestId("app")).toBeInTheDocument();
 
     state = "declined";
     rerender(
@@ -89,6 +97,6 @@ describe("AiConsentGate", () => {
         <div data-testid="app" />
       </AiConsentGate>
     );
-    expect(screen.getByTestId("off-screen")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("off-screen")).toBeInTheDocument());
   });
 });

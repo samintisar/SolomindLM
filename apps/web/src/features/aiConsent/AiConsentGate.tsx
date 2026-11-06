@@ -1,9 +1,15 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { AppShellFallback } from "@/shell/AppShellFallback";
-import { AiConsentScreen } from "./AiConsentScreen";
-import { AiFeaturesOffScreen } from "./AiFeaturesOffScreen";
 import { useAiConsentState } from "./useAiConsentState";
 import { useReportAiConsentToShell } from "./useReportAiConsentToShell";
+
+// Only the mobile shell ever shows these screens; keep them out of the web entry chunk.
+const AiConsentScreen = lazy(() =>
+  import("./AiConsentScreen").then((m) => ({ default: m.AiConsentScreen }))
+);
+const AiFeaturesOffScreen = lazy(() =>
+  import("./AiFeaturesOffScreen").then((m) => ({ default: m.AiFeaturesOffScreen }))
+);
 
 /**
  * In the mobile shell, nothing below this renders until the user has allowed AI data sharing,
@@ -19,12 +25,22 @@ export function AiConsentGate({ children }: { children: ReactNode }) {
   }, [state]);
 
   if (state === "loading") return <AppShellFallback />;
-  if (state === "needsConsent") return <AiConsentScreen />;
+  if (state === "needsConsent") {
+    return (
+      <Suspense fallback={<AppShellFallback />}>
+        <AiConsentScreen />
+      </Suspense>
+    );
+  }
   if (state === "declined") {
-    return reviewing ? (
-      <AiConsentScreen onDeclined={() => setReviewing(false)} />
-    ) : (
-      <AiFeaturesOffScreen onReview={() => setReviewing(true)} />
+    return (
+      <Suspense fallback={<AppShellFallback />}>
+        {reviewing ? (
+          <AiConsentScreen onDeclined={() => setReviewing(false)} />
+        ) : (
+          <AiFeaturesOffScreen onReview={() => setReviewing(true)} />
+        )}
+      </Suspense>
     );
   }
   return <>{children}</>;
