@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { useQuery } from "convex/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { AI_CONSENT_VERSION } from "./aiConsentCopy";
 import { useAiConsentState } from "./useAiConsentState";
 
 vi.mock("convex/react", () => ({ useQuery: vi.fn() }));
@@ -36,7 +37,11 @@ describe("useAiConsentState", () => {
   });
 
   test("keeps showing the app through an auth blip after consent", () => {
-    mockedUseQuery.mockReturnValue({ signedIn: true, version: 1, declined: false });
+    mockedUseQuery.mockReturnValue({
+      signedIn: true,
+      version: AI_CONSENT_VERSION,
+      declined: false,
+    });
     const { result, rerender } = renderHook(() => useAiConsentState());
     expect(result.current).toBe("granted");
 
