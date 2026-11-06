@@ -45,10 +45,24 @@ describe("useReportAiConsentToShell", () => {
     });
     rerender({ state: "granted" });
     rerender({ state: "declined" });
+    // needsConsent, granted, then granted's cleanup (false) and the declined effect (false).
     expect(postMessage.mock.calls.map(([m]) => m)).toEqual([
       message(false),
       message(true),
       message(false),
+      message(false),
     ]);
+  });
+
+  test("unmounting after granted posts false", () => {
+    const { unmount } = renderHook(() => useReportAiConsentToShell("granted"));
+    unmount();
+    expect(postMessage.mock.calls.map(([m]) => m)).toEqual([message(true), message(false)]);
+  });
+
+  test("unmounting after needsConsent posts nothing extra", () => {
+    const { unmount } = renderHook(() => useReportAiConsentToShell("needsConsent"));
+    unmount();
+    expect(postMessage.mock.calls.map(([m]) => m)).toEqual([message(false)]);
   });
 });

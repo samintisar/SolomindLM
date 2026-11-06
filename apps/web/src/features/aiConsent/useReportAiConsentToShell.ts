@@ -13,8 +13,12 @@ export function useReportAiConsentToShell(state: AiConsentState) {
 
   useEffect(() => {
     if (granted === null) return;
-    getNativeWebViewBridge()?.postMessage(
-      JSON.stringify({ type: "shell-web:ai-consent", granted })
-    );
+    const post = (value: boolean) =>
+      getNativeWebViewBridge()?.postMessage(
+        JSON.stringify({ type: "shell-web:ai-consent", granted: value })
+      );
+    post(granted);
+    // Unmounting (sign-out, public routes) must hide the native button for the next user.
+    return granted ? () => post(false) : undefined;
   }, [granted]);
 }
