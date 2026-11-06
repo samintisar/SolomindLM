@@ -130,6 +130,72 @@ describe("grantOcrBonus", () => {
     expect(row?.bonusPages).toBe(60);
   });
 
+  test("a later grant lowers or removes the bonus", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedEmailUser(t, "a@example.com");
+    const grant = (pages: number) =>
+      t.mutation(internal.documents.ocrQuota.grantOcrBonus, {
+        emails: ["a@example.com"],
+        month: month(),
+        pages,
+      });
+
+    await grant(2000);
+    await grant(200);
+    const lowered = await t.run(async (ctx) =>
+      ctx.db
+        .query("ocrUsage")
+        .withIndex("by_user_and_month", (q) => q.eq("userId", userId).eq("month", month()))
+        .unique()
+    );
+    await grant(0);
+    const removed = await t.run(async (ctx) =>
+      ctx.db
+        .query("ocrUsage")
+        .withIndex("by_user_and_month", (q) => q.eq("userId", userId).eq("month", month()))
+        .unique()
+    );
+
+    expect(lowered?.bonusPages).toBe(200);
+    expect(removed?.bonusPages).toBe(0);
+  });
+
+  test("finds an account whatever the case of the email it was given", async () => {
+    const t = convexTest(schema, modules);
+    await seedEmailUser(t, "mixed@example.com");
+
+    const result = await t.mutation(internal.documents.ocrQuota.grantOcrBonus, {
+      emails: ["Mixed@Example.com"],
+      month: month(),
+      pages: 10,
+    });
+
+    expect(result).toEqual({ granted: 1, missing: [] });
+  });
+
+  test("rejects an impossible or past month", async () => {
+    const t = convexTest(schema, modules);
+    const grant = (m: string) =>
+      t.mutation(internal.documents.ocrQuota.grantOcrBonus, { emails: [], month: m, pages: 10 });
+
+    await expect(grant("2026-13")).rejects.toThrow();
+    await expect(grant("2000-01")).rejects.toThrow();
+  });
+
+  test("reports the month's allowance with the bonus included", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedEmailUser(t, "a@example.com");
+    await t.mutation(internal.documents.ocrQuota.grantOcrBonus, {
+      emails: ["a@example.com"],
+      month: month(),
+      pages: 60,
+    });
+
+    const r = await t.mutation(internal.documents.ocrQuota.reserveOcrPages, { userId });
+
+    expect(r.limits.perMonth).toBe(OCR_PAGE_LIMITS.free.perMonth + 60);
+  });
+
   test("handing back pages keeps the bonus", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedEmailUser(t, "a@example.com");

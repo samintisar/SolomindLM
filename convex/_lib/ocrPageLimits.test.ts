@@ -96,6 +96,16 @@ describe("ocrPageCapNotice", () => {
   });
 });
 
+describe("Pro suggestion with a bonus", () => {
+  it("drops the Pro suggestion once a bonus reaches Pro's monthly allowance", () => {
+    const bonused = { perFile: 30, perMonth: OCR_PAGE_LIMITS.pro.perMonth };
+    expect(ocrQuotaExhaustedMessage(bonused, false)).not.toContain("Upgrade");
+    expect(
+      ocrPageCapNotice({ pagesRead: 12, granted: 12, limits: bonused, isPro: false })
+    ).not.toContain("Upgrade");
+  });
+});
+
 describe("ocrQuotaExhaustedMessage", () => {
   it("states the monthly allowance and when it resets", () => {
     const message = ocrQuotaExhaustedMessage(OCR_PAGE_LIMITS.free, false);

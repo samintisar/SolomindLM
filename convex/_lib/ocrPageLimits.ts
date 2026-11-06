@@ -61,16 +61,24 @@ export function ocrPageCapNotice({
 }): string | undefined {
   if (granted <= 0 || pagesRead < granted) return undefined;
   if (granted < limits.perFile) {
-    return `Only the first ${granted} pages of this file were read: that was what was left of your ${limits.perMonth} pages this month.${isPro ? "" : " Upgrade to Pro for more."}`;
+    return `Only the first ${granted} pages of this file were read: that was what was left of your ${limits.perMonth} pages this month.${proGivesMoreMonthly(limits, isPro) ? " Upgrade to Pro for more." : ""}`;
   }
   return isPro
     ? `Only the first ${granted} pages of this file were read (the limit per file). Split longer files into chapters to add the rest.`
     : `Only the first ${granted} pages of this file were read (the Free plan limit per file). Split longer files into chapters, or upgrade to Pro to read up to ${OCR_PAGE_LIMITS.pro.perFile} pages per file.`;
 }
 
+/**
+ * Whether suggesting Pro for more monthly pages is true: `limits.perMonth` includes any bonus, which
+ * can put a Free user at or above Pro's allowance.
+ */
+function proGivesMoreMonthly(limits: OcrPageLimits, isPro: boolean): boolean {
+  return !isPro && limits.perMonth < OCR_PAGE_LIMITS.pro.perMonth;
+}
+
 /** Why a file that needs OCR could not be read once the month's pages are used up. */
 export function ocrQuotaExhaustedMessage(limits: OcrPageLimits, isPro: boolean): string {
-  return `You've used your ${limits.perMonth} pages of PDF, slide, and image reading for this month. It resets next month.${isPro ? "" : ` Upgrade to Pro for ${OCR_PAGE_LIMITS.pro.perMonth} pages a month.`}`;
+  return `You've used your ${limits.perMonth} pages of PDF, slide, and image reading for this month. It resets next month.${proGivesMoreMonthly(limits, isPro) ? ` Upgrade to Pro for ${OCR_PAGE_LIMITS.pro.perMonth} pages a month.` : ""}`;
 }
 
 /**
