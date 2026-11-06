@@ -1,10 +1,12 @@
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
+import { handleIapRequest } from "@mobile/services/iap/handleIapRequest";
 import { buildNativeShellInject } from "@mobile/utils/constants";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
+import { buildShellIapResponseScript } from "./buildShellIapResponseScript";
 import { parseShellWebMessage } from "./parseShellWebMessage";
 import { getLoadErrorCopy, type WebViewLoadError } from "./webViewLoadError";
 import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
@@ -39,6 +41,8 @@ export function WebViewScreen({
     onWebViewLoadEnd,
   } = useNativeConvexAuthBridge();
 
+  const webViewRef = useRef<WebView>(null);
+
   const onWebViewMessage = useCallback(
     (raw: string) => {
       const msg = parseShellWebMessage(raw);
@@ -50,11 +54,17 @@ export function WebViewScreen({
         onAiConsentChange?.(msg.granted);
         return;
       }
+      if (msg?.kind === "iap") {
+        if (Platform.OS !== "ios") return;
+        void handleIapRequest(msg).then((response) => {
+          webViewRef.current?.injectJavaScript(buildShellIapResponseScript(response));
+        });
+        return;
+      }
       onAuthBridgeMessage(raw);
     },
     [onAuthBridgeMessage, onThemeChange, onAiConsentChange]
   );
-  const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<WebViewLoadError | null>(null);
   // Bumped to remount the WebView after the OS kills its content/render process.
   const [webViewKey, setWebViewKey] = useState(0);

@@ -1,9 +1,11 @@
 import { FileUploadButton } from "@mobile/components/fileUpload/FileUploadButton";
 import { WebViewScreen } from "@mobile/components/web/WebViewScreen";
+import { startIapListeners, syncCurrentPurchases } from "@mobile/services/iap/iapService";
+import { useConvexAuth } from "convex/react";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
-import { StyleSheet } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Platform, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 /** Matches web's `--background` (apps/web/src/index.css) light/dark values so the status-bar inset doesn't flash the wrong color. */
@@ -23,6 +25,16 @@ export default function MobileShellScreen() {
   // The native upload button sits outside the web consent gate, so it stays hidden until the web app
   // reports `granted` (`shell-web:ai-consent`).
   const [aiConsentGranted, setAiConsentGranted] = useState(false);
+
+  const { isAuthenticated } = useConvexAuth();
+
+  // StoreKit redelivers unfinished transactions through these listeners at any time.
+  useEffect(() => (Platform.OS === "ios" ? startIapListeners() : undefined), []);
+
+  // Catch anything missed (renewal while offline, a crash before finishTransaction).
+  useEffect(() => {
+    if (Platform.OS === "ios" && isAuthenticated) void syncCurrentPurchases();
+  }, [isAuthenticated]);
 
   const webPathParam = Array.isArray(params.webPath) ? params.webPath[0] : params.webPath;
 
