@@ -86,38 +86,40 @@ allow (back to the consent screen), Sign out, Privacy policy, Delete account (ex
 Widen `userPreferences` (all optional, no migration):
 
 - `aiConsentVersion?: number`: the version the user allowed; absent means not allowed.
-- `aiConsentAt?: number`: time of the latest grant, decline or revoke.
+- `aiConsentAt?: number`: time of the latest grant or decline.
 - `aiConsentDeclinedAt?: number`: set by Not now, cleared by a grant.
 
 ## Backend (`convex/userPreferences/index.ts`)
 
-- `getMyPreferences`: also returns the three fields.
+- `getMyAiConsent()` (query): `{ signedIn: false }` when there is no user, else
+  `{ signedIn: true, version: number | null, declined: boolean }`. A separate query rather than
+  extending `getMyPreferences`, because that one returns `null` both for "signed out" and for "no row",
+  and the gate must tell an auth blip apart from a user who has never answered.
 - `grantAiConsent({ version: number })`: sets `aiConsentVersion` and `aiConsentAt`, clears
-  `aiConsentDeclinedAt`. Rejects versions below 1.
+  `aiConsentDeclinedAt`. Rejects versions that are not integers ≥ 1.
 - `declineAiConsent()`: sets `aiConsentDeclinedAt` and `aiConsentAt`, clears `aiConsentVersion`.
-- `revokeAiConsent()`: same as decline (Turn off leads to the "AI features are off" screen).
+  Used by both "Not now" and the avatar menu's Turn off.
 
-All three are public mutations that require `getAuthUserId`, create the user's row if missing, and
-only touch that row.
+Both mutations require `getAuthUserId`, create the user's row if missing, and only touch that row.
 
 ## Web (`apps/web/src/features/aiConsent/`)
 
 - `aiConsentCopy.ts`: `AI_CONSENT_VERSION = 1` and the provider table above. The screen renders from it.
 - `useAiConsentState()`: returns `notApplicable | loading | needsConsent | declined | granted` from
-  `isNativeShell()`, auth state and `getMyPreferences`, holding the last definite state through blips.
+  `isNativeShell()`, auth state and `getMyAiConsent`, holding the last definite state through blips.
 - `AiConsentGate`: renders the screen for the state, or its children.
 - `AiConsentScreen`, `AiFeaturesOffScreen`: the two screens, built from `shared/components/ui`
   primitives and semantic tokens (see `docs/design/principles.md`).
 - Avatar menu: an "AI data sharing" item in `AvatarDropdown.tsx`, rendered only when
   `isNativeShell()`, opening a dialog that states the current choice and offers Turn off
-  (`revokeAiConsent`).
+  (`declineAiConsent`).
 
-**Errors.** A failed grant, decline or revoke keeps the user on the current screen with a toast and
+**Errors.** A failed grant or decline keeps the user on the current screen with a toast and
 the button re-enabled. The gate never assumes consent.
 
 ## Testing
 
-- Convex (vitest + convex-test, `convex/userPreferences/index.test.ts`): grant, decline and revoke set
+- Convex (vitest + convex-test, `convex/userPreferences/index.test.ts`): grant and decline set
   the right fields; grant clears a decline; signed-out calls throw; each call touches only the
   caller's row.
 - Web (vitest): `useAiConsentState` for every combination of shell/web, loading, missing, old version,
