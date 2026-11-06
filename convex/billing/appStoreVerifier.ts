@@ -9,6 +9,7 @@ import {
   VerificationException,
   VerificationStatus,
 } from "@apple/app-store-server-library";
+import { ExternalServiceError } from "../_lib/errors";
 import { APPLE_ROOT_CA_G3_BASE64 } from "./appleRootCertificates";
 import type { VerifiedNotification, VerifiedRenewal, VerifiedTransaction } from "./appStoreModel";
 import { APP_STORE_APP_APPLE_ID, APP_STORE_BUNDLE_ID } from "./appStoreProducts";
@@ -40,35 +41,75 @@ function verifierFor(environment: StoreEnvironment): SignedDataVerifier {
   return verifier;
 }
 
-function rejected(error: VerificationException): AppStoreVerificationError {
-  return new AppStoreVerificationError(`App Store signature rejected (status ${error.status})`, {
-    cause: error,
-  });
-}
-
-/** Production first, then Sandbox: App Review and TestFlight buy in Sandbox against production. */
-async function inEitherEnvironment<T>(
-  verify: (verifier: SignedDataVerifier) => Promise<T>
-): Promise<{ environment: StoreEnvironment; value: T }> {
+/**
+ * Library failures become either a transient `ExternalServiceError` (OCSP / network; the
+ * caller may retry) or an `AppStoreVerificationError` (the data is not trustworthy).
+ */
+async function mapVerification<T>(promise: Promise<T>): Promise<T> {
   try {
-    return { environment: "Production", value: await verify(verifierFor("Production")) };
+    return await promise;
   } catch (error) {
     if (!(error instanceof VerificationException)) throw error;
-    if (error.status !== VerificationStatus.INVALID_ENVIRONMENT) throw rejected(error);
+    const name = VerificationStatus[error.status] ?? String(error.status);
+    if (error.status === VerificationStatus.RETRYABLE_VERIFICATION_FAILURE) {
+      const failure = new ExternalServiceError(
+        "app_store",
+        `App Store verification could not complete (${name})`,
+        { retryable: true }
+      );
+      failure.cause = error;
+      throw failure;
+    }
+    throw new AppStoreVerificationError(`App Store signature rejected (${name})`, {
+      cause: error,
+    });
   }
-  try {
-    return { environment: "Sandbox", value: await verify(verifierFor("Sandbox")) };
-  } catch (error) {
-    if (error instanceof VerificationException) throw rejected(error);
-    throw error;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function decodeJwsPayload(jws: string): Record<string, unknown> {
+  const segment = jws.split(".")[1];
+  if (segment) {
+    try {
+      const parsed = asRecord(JSON.parse(Buffer.from(segment, "base64url").toString("utf8")));
+      if (parsed) return parsed;
+    } catch {
+      // fall through to the rejection below
+    }
   }
+  throw new AppStoreVerificationError("Malformed signed data");
+}
+
+/**
+ * Read the environment the payload claims, to choose which verifier checks it. The claim is
+ * unverified, but the library re-checks the environment after verifying the signature, so a
+ * forged claim only makes verification fail.
+ */
+function claimedEnvironment(jws: string): StoreEnvironment {
+  const payload = decodeJwsPayload(jws);
+  const claim =
+    payload.environment ??
+    asRecord(payload.data)?.environment ??
+    asRecord(payload.summary)?.environment ??
+    asRecord(payload.appData)?.environment;
+  if (claim === "Production" || claim === "Sandbox") return claim;
+  throw new AppStoreVerificationError("Signed data names no known App Store environment");
+}
+
+function hasSubscriptionFields(tx: JWSTransactionDecodedPayload): boolean {
+  return Boolean(
+    tx.originalTransactionId && tx.transactionId && tx.productId && tx.expiresDate != null
+  );
 }
 
 function toTransaction(
   environment: StoreEnvironment,
   tx: JWSTransactionDecodedPayload
 ): VerifiedTransaction {
-  if (!tx.originalTransactionId || !tx.transactionId || !tx.productId || tx.expiresDate == null) {
+  if (!(tx.originalTransactionId && tx.transactionId && tx.productId) || tx.expiresDate == null) {
     throw new AppStoreVerificationError("Transaction is missing required subscription fields");
   }
   return {
@@ -92,45 +133,33 @@ function toRenewal(info: JWSRenewalInfoDecodedPayload): VerifiedRenewal {
   };
 }
 
-async function decodeWith<T>(
-  verifier: SignedDataVerifier,
-  run: (v: SignedDataVerifier) => Promise<T>
-) {
-  try {
-    return await run(verifier);
-  } catch (error) {
-    if (error instanceof VerificationException) throw rejected(error);
-    throw error;
-  }
-}
-
 /** Verify a transaction JWS the app received from StoreKit. */
 export async function verifyTransaction(signedTransaction: string): Promise<VerifiedTransaction> {
-  const { environment, value } = await inEitherEnvironment((verifier) =>
-    verifier.verifyAndDecodeTransaction(signedTransaction)
+  const environment = claimedEnvironment(signedTransaction);
+  const decoded = await mapVerification(
+    verifierFor(environment).verifyAndDecodeTransaction(signedTransaction)
   );
-  return toTransaction(environment, value);
+  return toTransaction(environment, decoded);
 }
 
 /** Verify an App Store Server Notification V2 `signedPayload` and its nested signed data. */
 export async function verifyNotification(signedPayload: string): Promise<VerifiedNotification> {
-  const { environment, value: payload } = await inEitherEnvironment((verifier) =>
-    verifier.verifyAndDecodeNotification(signedPayload)
-  );
-  if (!payload.notificationUUID || !payload.notificationType) {
+  const environment = claimedEnvironment(signedPayload);
+  const verifier = verifierFor(environment);
+  const payload = await mapVerification(verifier.verifyAndDecodeNotification(signedPayload));
+  if (!(payload.notificationUUID && payload.notificationType)) {
     throw new AppStoreVerificationError("Notification is missing its id or type");
   }
-  const verifier = verifierFor(environment);
   const signedTransaction = payload.data?.signedTransactionInfo;
   const signedRenewal = payload.data?.signedRenewalInfo;
-  const transaction = signedTransaction
-    ? toTransaction(
-        environment,
-        await decodeWith(verifier, (v) => v.verifyAndDecodeTransaction(signedTransaction))
-      )
-    : undefined;
+  let transaction: VerifiedTransaction | undefined;
+  if (signedTransaction) {
+    const decoded = await mapVerification(verifier.verifyAndDecodeTransaction(signedTransaction));
+    // Verified but not a subscription transaction: the handler reports it as ignored.
+    transaction = hasSubscriptionFields(decoded) ? toTransaction(environment, decoded) : undefined;
+  }
   const renewal = signedRenewal
-    ? toRenewal(await decodeWith(verifier, (v) => v.verifyAndDecodeRenewalInfo(signedRenewal)))
+    ? toRenewal(await mapVerification(verifier.verifyAndDecodeRenewalInfo(signedRenewal)))
     : undefined;
   return {
     notificationUUID: payload.notificationUUID,
