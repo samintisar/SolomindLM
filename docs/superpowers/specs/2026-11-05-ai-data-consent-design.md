@@ -1,7 +1,7 @@
 # AI data-sharing consent (mobile app)
 
 Date: 2026-11-05
-Status: approved in conversation, pending spec review
+Status: Approved; implemented on feature/ai-data-consent
 
 ## Goal
 

@@ -38,6 +38,10 @@
 | `apps/web/src/shell/RootRoutes.tsx` (modify) | Wrap `AppShell` in `AiConsentGate` |
 | `apps/web/src/shell/RootRoutes.test.tsx` (modify) | Mock the gate as a pass-through |
 | `apps/web/src/features/auth/components/AvatarDropdown.tsx` (+ test, modify) | "AI data sharing" item, shell only |
+| `apps/web/src/features/aiConsent/useReportAiConsentToShell.ts` (+ `.test.tsx`) | Task 6b: reports consent to the native shell over the WebView bridge |
+| `apps/mobile/src/components/web/parseShellWebMessage.ts` (+ `.test.ts`) | Task 6b: parses the `shell-web:ai-consent` message |
+| `apps/mobile/src/components/web/WebViewScreen.tsx` (modify) | Task 6b: forwards the consent report to its parent |
+| `apps/mobile/app/index.tsx` (modify) | Task 6b: shows the native upload button only after a `granted` report |
 
 ---
 
@@ -1067,6 +1071,10 @@ git commit -m "feat(consent): add the AI features are off screen"
 - Modify: `apps/web/src/shell/RootRoutes.tsx`
 - Modify: `apps/web/src/shell/RootRoutes.test.tsx`
 
+> Final review: the build keeps the gate logic static but loads `AiConsentScreen` and `AiFeaturesOffScreen` with
+> `React.lazy` inside `<Suspense fallback={<AppShellFallback />}>`, so web visitors don't download screens only the
+> mobile shell shows. Children still never render before consent. The avatar menu's `AiDataSharingDialog` is lazy too.
+
 - [ ] **Step 1: Move the fallback spinner into its own file**
 
 `apps/web/src/shell/AppShellFallback.tsx`:
@@ -1271,7 +1279,8 @@ web app reports its consent state over the existing bridge; the native shell sho
   `getNativeWebViewBridge()?.postMessage(JSON.stringify(...))` (same as `ThemeContext.tsx`). Only re-post when
   the boolean changes. Tests: mock `@/utils/platformDetection`'s `getNativeWebViewBridge` to return
   `{ postMessage: vi.fn() }`; assert payloads for each state, nothing for `loading`/`notApplicable`, and no
-  duplicate post on a rerender with the same state.
+  duplicate post on a rerender with the same state. As built, the hook also posts `granted:false` when the
+  gate unmounts after `granted`, so the native button hides again if the gate goes away.
 - [ ] **Step 2: Call it in `AiConsentGate`** (`useReportAiConsentToShell(state)` right after
   `useAiConsentState()`). In `AiConsentGate.test.tsx` mock the hook to a no-op, and add the test: render
   `declined` → click off-screen (reviewing) → rerender `granted` (app) → rerender `declined` → expect
@@ -1297,6 +1306,9 @@ web app reports its consent state over the existing bridge; the native shell sho
 - Test: `apps/web/src/features/aiConsent/AiDataSharingDialog.test.tsx`
 - Modify: `apps/web/src/features/auth/components/AvatarDropdown.tsx`
 - Modify: `apps/web/src/features/auth/components/AvatarDropdown.test.tsx`
+
+> As built: the dialog uses `AlertDialog` instead of `Dialog`, with closing guarded while a request is pending, and
+> `AvatarDropdown` loads it lazily (tests use `findBy�` for it).
 
 - [ ] **Step 1: Write the failing dialog test**
 
