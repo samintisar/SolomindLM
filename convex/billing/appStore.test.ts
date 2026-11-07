@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { isProUser } from "../_lib/limits";
@@ -20,8 +20,18 @@ const DAY = 24 * 60 * 60 * 1000;
 
 type T = ReturnType<typeof convexTest>;
 
-async function seedUser(t: T): Promise<Id<"users">> {
-  return t.run(async (ctx) => ctx.db.insert("users", { name: "Test" }));
+// Fixtures are Sandbox transactions; "sandbox access" below narrows this.
+beforeEach(() => {
+  vi.stubEnv("APP_STORE_SANDBOX_ACCESS", "all");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+async function seedUser(t: T, email?: string): Promise<Id<"users">> {
+  return t.run(async (ctx) =>
+    ctx.db.insert("users", { name: "Test", ...(email ? { email } : {}) })
+  );
 }
 
 async function seedAppStoreSubscription(
@@ -366,6 +376,111 @@ describe("notifications", () => {
       transaction: transaction(),
     });
     expect(result).toEqual({ applied: false });
+  });
+});
+
+describe("sandbox access", () => {
+  test("a Sandbox purchase is refused unless the account is allowed", async () => {
+    vi.stubEnv("APP_STORE_SANDBOX_ACCESS", "Reviewer@example.com, tester@example.com");
+    const t = convexTest(schema, modules);
+    const stranger = await seedUser(t, "someone@example.com");
+    await expect(
+      t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+        userId: stranger,
+        transaction: transaction(),
+      })
+    ).rejects.toThrow(/Test purchases/);
+    const reviewer = await seedUser(t, "reviewer@example.com");
+    await expect(
+      t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+        userId: reviewer,
+        transaction: transaction({ originalTransactionId: "1000000000000002" }),
+      })
+    ).resolves.toEqual({ status: "active" });
+  });
+
+  test("Production purchases ignore the allowlist; Sandbox notifications for others are unlinked", async () => {
+    vi.stubEnv("APP_STORE_SANDBOX_ACCESS", "");
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t, "someone@example.com");
+    await expect(
+      t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+        userId,
+        transaction: transaction({ environment: "Production" }),
+      })
+    ).resolves.toEqual({ status: "active" });
+    const token = await asUser(t, userId).mutation(api.billing.appStore.getAccountToken, {});
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-sandbox",
+      notificationType: "SUBSCRIBED",
+      transaction: transaction({
+        originalTransactionId: "1000000000000003",
+        appAccountToken: token,
+      }),
+    });
+    expect(result).toEqual({ applied: false });
+  });
+});
+
+describe("notification ordering", () => {
+  test("a retried DID_RENEW signed before an applied REFUND does not restore Pro", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const expiresAt = Date.now() + 30 * DAY;
+    await seedAppStoreSubscription(t, userId, { expiresAt });
+    const signed = Date.now();
+    await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-refund",
+      notificationType: "REFUND",
+      signedAt: signed,
+      transaction: transaction({ expiresAt, revokedAt: signed }),
+    });
+    const result = await t.mutation(internal.billing.appStore.applyNotification, {
+      notificationUUID: "n-renew",
+      notificationType: "DID_RENEW",
+      signedAt: signed - 60_000,
+      transaction: transaction({ expiresAt }),
+    });
+    expect(result).toEqual({ applied: true });
+    const row = await t.run((ctx) => ctx.db.query("appStoreSubscriptions").first());
+    expect(row?.status).toBe("revoked");
+    expect(await t.run((ctx) => isProUser(ctx, userId))).toBe(false);
+  });
+});
+
+describe("renewal state on client sync", () => {
+  test("a resubscribe resets auto-renew and grace left from the lapsed period", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const subscriptionId = await seedAppStoreSubscription(t, userId, {
+      status: "expired",
+      expiresAt: Date.now() - 10 * DAY,
+      gracePeriodExpiresAt: Date.now() - 5 * DAY,
+    });
+    await t.run((ctx) => ctx.db.patch(subscriptionId, { autoRenews: false }));
+    await t.mutation(internal.billing.appStore.applyVerifiedTransaction, {
+      userId,
+      transaction: transaction({ transactionId: "2000000000000009" }),
+    });
+    const row = await t.run((ctx) => ctx.db.get(subscriptionId));
+    expect(row?.autoRenews).toBe(true);
+    expect(row?.gracePeriodExpiresAt).toBeUndefined();
+    expect(row?.status).toBe("active");
+  });
+});
+
+describe("expireIfLapsed", () => {
+  test("marks a lapsed active row expired and leaves an entitled one alone", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const lapsed = await seedAppStoreSubscription(t, userId, { expiresAt: Date.now() - 2 * DAY });
+    const current = await seedAppStoreSubscription(t, userId, {
+      originalTransactionId: "1000000000000004",
+    });
+    await t.mutation(internal.billing.appStore.expireIfLapsed, { subscriptionId: lapsed });
+    await t.mutation(internal.billing.appStore.expireIfLapsed, { subscriptionId: current });
+    expect((await t.run((ctx) => ctx.db.get(lapsed)))?.status).toBe("expired");
+    expect((await t.run((ctx) => ctx.db.get(current)))?.status).toBe("active");
   });
 });
 

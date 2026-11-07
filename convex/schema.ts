@@ -574,6 +574,8 @@ export default defineSchema({
     gracePeriodExpiresAt: v.optional(v.number()),
     autoRenews: v.boolean(),
     autoRenewProductId: v.optional(v.string()),
+    /** `signedDate` of the newest notification applied; older (retried, late) ones change nothing. */
+    lastNotificationSignedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

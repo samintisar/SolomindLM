@@ -32,6 +32,11 @@ const modules = Object.fromEntries(
 preloadModules(rateLimiterTest.modules, ["./component/lib.ts"]);
 preloadModules(modules, ["./billing/appStoreNode.ts", "./billing/appStore.ts"]);
 
+// Fixtures are Sandbox transactions; the gate itself is covered in appStore.test.ts.
+beforeEach(() => {
+  vi.stubEnv("APP_STORE_SANDBOX_ACCESS", "all");
+});
+
 function makeT() {
   const t = convexTest(schema, modules);
   registerRateLimiter(t);

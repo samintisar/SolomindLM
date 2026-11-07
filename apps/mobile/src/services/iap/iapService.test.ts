@@ -32,6 +32,7 @@ function tx(id: string, extra: Record<string, unknown> = {}) {
     productId: MONTHLY,
     purchaseToken: `jws-${id}`,
     purchaseState: "purchased",
+    transactionDate: Date.now(),
     ...extra,
   };
 }
@@ -118,6 +119,28 @@ describe("purchase", () => {
     await flush();
     expect(action).toHaveBeenCalledTimes(1);
     expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't answer the page with an older redelivered transaction of the same product", async () => {
+    let listener: (p: unknown) => void = () => {};
+    mockedIap.purchaseUpdatedListener.mockImplementation((fn: (p: unknown) => void) => {
+      listener = fn;
+      return { remove: jest.fn() };
+    });
+    startIapListeners();
+    let release: (value: unknown) => void = () => {};
+    mockedIap.requestPurchase.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const outcome = purchase(MONTHLY);
+    await flush();
+    listener(tx("old", { transactionDate: Date.now() - 60 * 60 * 1000 }));
+    await flush();
+    // Synced quietly, but the page still waits for its own purchase.
+    expect(action).toHaveBeenCalledWith(expect.anything(), { signedTransaction: "jws-old" });
+    release(undefined); // StoreKit answered without a purchase: the listener must deliver it
+    const settled = await Promise.race([outcome, flush().then(() => "waiting")]);
+    expect(settled).toBe("waiting");
+    listener(tx("new"));
+    await expect(outcome).resolves.toEqual({ status: "purchased" });
   });
 
   it("clears the pending purchase after five minutes without an answer", async () => {

@@ -1,4 +1,13 @@
 import { type Infer, v } from "convex/values";
+import { InputValidationError } from "../_lib/errors";
+import { toConvexError } from "../_lib/serviceErrors";
+
+/** Structured, so the app shows a real message instead of production's opaque "Server Error". */
+export function signInAgainError() {
+  return toConvexError(
+    new InputValidationError("Sign in again to finish this purchase.", { field: "auth" })
+  );
+}
 
 export const appStoreStatusValidator = v.union(
   v.literal("active"),
@@ -35,6 +44,8 @@ export interface VerifiedNotification {
   notificationUUID: string;
   notificationType: string;
   subtype?: string;
+  /** Apple's `signedDate` (ms); retries keep the original, so it orders notifications. */
+  signedAt?: number;
   environment: VerifiedTransaction["environment"];
   transaction?: VerifiedTransaction;
   renewal?: VerifiedRenewal;

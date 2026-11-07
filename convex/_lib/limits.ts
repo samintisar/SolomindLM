@@ -26,16 +26,29 @@ import {
 
 /**
  * True when the user has an active Stripe subscription or an entitled App Store subscription.
- * Reads the wall clock: public queries should call `findEntitledAppStoreSubscription(ctx, userId, now)`
- * instead and accept that the result only refreshes when data changes (the 1-day leeway bounds the staleness).
+ * Reads the wall clock; in a cached query the result only recomputes when data changes
+ * (`billing.appStore.expireIfLapsed` writes the row when App Store access runs out).
  */
 export async function isProUser(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
-  const subscription = await ctx.db
+  const { stripe, appStore } = await findProSources(ctx, userId, Date.now());
+  return stripe !== null || appStore !== null;
+}
+
+/** Every billing source that currently grants the user Pro. The one place the Pro rule lives. */
+export async function findProSources(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  now: number
+): Promise<{
+  stripe: Doc<"stripeSubscriptions"> | null;
+  appStore: Doc<"appStoreSubscriptions"> | null;
+}> {
+  const stripe = await ctx.db
     .query("stripeSubscriptions")
     .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
     .first();
-  if (subscription) return true;
-  return (await findEntitledAppStoreSubscription(ctx, userId, Date.now())) !== null;
+  const appStore = await findEntitledAppStoreSubscription(ctx, userId, now);
+  return { stripe, appStore };
 }
 
 /** The user's App Store subscription that currently grants Pro, if any. */

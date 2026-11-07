@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { InputValidationError } from "../_lib/errors";
@@ -6,10 +7,13 @@ import { toConvexError } from "../_lib/serviceErrors";
 import { getAuthUserId } from "../auth";
 import { internalMutation, mutation } from "../functions";
 import {
+  type AppStoreStatus,
   appStoreStatusValidator,
+  ENTITLEMENT_LEEWAY_MS,
   isAppStoreEntitled,
   isOlderThan,
   mergeStatus,
+  signInAgainError,
   statusFromNotification,
   statusFromTransaction,
   type VerifiedRenewal,
@@ -18,13 +22,61 @@ import {
   verifiedTransactionValidator,
 } from "./appStoreModel";
 
+/**
+ * Sandbox purchases (TestFlight, App Review) cost nothing, so they only grant Pro to accounts the
+ * deployment allows: `APP_STORE_SANDBOX_ACCESS` is "all" or a comma-separated email allowlist
+ * (the App Review demo account, testers). Unset: nobody.
+ */
+async function sandboxAllowed(ctx: MutationCtx, userId: Id<"users">): Promise<boolean> {
+  const raw = (process.env.APP_STORE_SANDBOX_ACCESS ?? "").trim().toLowerCase();
+  if (raw === "all") return true;
+  const email = (await ctx.db.get(userId))?.email?.toLowerCase();
+  if (!email) return false;
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .includes(email);
+}
+
+/**
+ * Cached queries (`getPlan`) only recompute on writes, so touch the row when its access runs out
+ * even if Apple's EXPIRED notification never arrives.
+ */
+async function scheduleLapseCheck(
+  ctx: MutationCtx,
+  subscriptionId: Id<"appStoreSubscriptions">,
+  row: { status: AppStoreStatus; expiresAt: number; gracePeriodExpiresAt?: number }
+) {
+  if (row.status !== "active" && row.status !== "grace") return;
+  const accessUntil = Math.max(row.expiresAt, row.gracePeriodExpiresAt ?? 0);
+  await ctx.scheduler.runAt(
+    accessUntil + ENTITLEMENT_LEEWAY_MS + 1000,
+    internal.billing.appStore.expireIfLapsed,
+    { subscriptionId }
+  );
+}
+
+export const expireIfLapsed = internalMutation({
+  args: { subscriptionId: v.id("appStoreSubscriptions") },
+  returns: v.null(),
+  handler: async (ctx, { subscriptionId }) => {
+    const row = await ctx.db.get(subscriptionId);
+    const lapsed =
+      row &&
+      (row.status === "active" || row.status === "grace") &&
+      !isAppStoreEntitled(row, Date.now());
+    if (lapsed) await ctx.db.patch(row._id, { status: "expired", updatedAt: Date.now() });
+    return null;
+  },
+});
+
 /** The caller's appAccountToken, created on first use. */
 export const getAccountToken = mutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
+    if (!userId) throw signInAgainError();
     const existing = await ctx.db
       .query("appStoreAccountTokens")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -75,6 +127,13 @@ export const applyVerifiedTransaction = internalMutation({
   returns: v.object({ status: appStoreStatusValidator }),
   handler: async (ctx, { userId, transaction }) => {
     const now = Date.now();
+    if (transaction.environment === "Sandbox" && !(await sandboxAllowed(ctx, userId))) {
+      throw toConvexError(
+        new InputValidationError("Test purchases don't unlock Pro on this account.", {
+          field: "environment",
+        })
+      );
+    }
     const tokenOwner = transaction.appAccountToken
       ? await findTokenOwner(ctx, transaction.appAccountToken)
       : null;
@@ -102,19 +161,27 @@ export const applyVerifiedTransaction = internalMutation({
         return { status: "revoked" as const };
       }
       const status = mergeStatus(existing.status, fromTransaction);
-      await ctx.db.patch(existing._id, {
+      // A new period (renewal, resubscribe) or a new owner: the old renewal state no longer
+      // applies. A renewal means auto-renew was on; the next notification corrects it if not.
+      const freshRenewal = reassign || transaction.expiresAt > existing.expiresAt;
+      const fields = {
         ...(reassign ? { userId } : {}),
+        ...(freshRenewal
+          ? { autoRenews: true, autoRenewProductId: undefined, gracePeriodExpiresAt: undefined }
+          : {}),
         latestTransactionId: transaction.transactionId,
         productId: transaction.productId,
         environment: transaction.environment,
         expiresAt: transaction.expiresAt,
         status,
         updatedAt: now,
-      });
+      };
+      await ctx.db.patch(existing._id, fields);
+      await scheduleLapseCheck(ctx, existing._id, { ...existing, ...fields });
       return { status };
     }
 
-    await ctx.db.insert("appStoreSubscriptions", {
+    const insertedId = await ctx.db.insert("appStoreSubscriptions", {
       userId,
       originalTransactionId: transaction.originalTransactionId,
       latestTransactionId: transaction.transactionId,
@@ -125,6 +192,10 @@ export const applyVerifiedTransaction = internalMutation({
       autoRenews: true,
       createdAt: now,
       updatedAt: now,
+    });
+    await scheduleLapseCheck(ctx, insertedId, {
+      status: fromTransaction,
+      expiresAt: transaction.expiresAt,
     });
     return { status: fromTransaction };
   },
@@ -210,14 +281,19 @@ export const applyNotification = internalMutation({
     notificationUUID: v.string(),
     notificationType: v.string(),
     subtype: v.optional(v.string()),
+    signedAt: v.optional(v.number()),
     transaction: verifiedTransactionValidator,
     renewal: v.optional(verifiedRenewalValidator),
   },
   returns: v.object({ applied: v.boolean() }),
-  handler: async (ctx, { notificationUUID, notificationType, subtype, transaction, renewal }) => {
+  handler: async (
+    ctx,
+    { notificationUUID, notificationType, subtype, signedAt, transaction, renewal }
+  ) => {
     const result = await applyNotificationState(ctx, {
       notificationType,
       subtype,
+      signedAt,
       transaction,
       renewal,
     });
@@ -232,11 +308,13 @@ async function applyNotificationState(
   {
     notificationType,
     subtype,
+    signedAt,
     transaction,
     renewal,
   }: {
     notificationType: string;
     subtype?: string;
+    signedAt?: number;
     transaction: VerifiedTransaction;
     renewal?: VerifiedRenewal;
   }
@@ -245,6 +323,15 @@ async function applyNotificationState(
   const existing = await findByOriginalTransaction(ctx, transaction.originalTransactionId);
   // Stale data (older period) changes nothing, but counts as handled.
   if (existing && isOlderThan(existing, transaction)) return { applied: true };
+  // Same period but signed before the last applied notification (an Apple retry or a late
+  // delivery, e.g. DID_RENEW after REFUND): also stale.
+  if (
+    existing?.lastNotificationSignedAt !== undefined &&
+    signedAt !== undefined &&
+    signedAt < existing.lastNotificationSignedAt
+  ) {
+    return { applied: true };
+  }
   const tokenOwner = transaction.appAccountToken
     ? await findTokenOwner(ctx, transaction.appAccountToken)
     : null;
@@ -256,6 +343,9 @@ async function applyNotificationState(
     !isAppStoreEntitled(existing, now);
   const userId = reassign ? tokenOwner : (existing?.userId ?? tokenOwner);
   if (!userId) return { applied: false };
+  if (transaction.environment === "Sandbox" && !(await sandboxAllowed(ctx, userId))) {
+    return { applied: false };
+  }
 
   const fromTransaction = statusFromTransaction(transaction, now);
   const status =
@@ -263,6 +353,7 @@ async function applyNotificationState(
     mergeStatus(existing?.status, fromTransaction);
   const fields = {
     ...(reassign ? { userId } : {}),
+    ...(signedAt !== undefined ? { lastNotificationSignedAt: signedAt } : {}),
     latestTransactionId: transaction.transactionId,
     productId: transaction.productId,
     environment: transaction.environment,
@@ -280,14 +371,16 @@ async function applyNotificationState(
 
   if (existing) {
     await ctx.db.patch(existing._id, fields);
+    await scheduleLapseCheck(ctx, existing._id, { ...existing, ...fields });
   } else {
-    await ctx.db.insert("appStoreSubscriptions", {
+    const insertedId = await ctx.db.insert("appStoreSubscriptions", {
       userId,
       originalTransactionId: transaction.originalTransactionId,
       createdAt: now,
       ...fields,
       autoRenews: renewal?.autoRenews ?? true,
     });
+    await scheduleLapseCheck(ctx, insertedId, fields);
   }
   return { applied: true };
 }

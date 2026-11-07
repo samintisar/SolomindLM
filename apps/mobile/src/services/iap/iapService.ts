@@ -41,8 +41,21 @@ function ensureConnection(): Promise<unknown> {
 
 interface PendingPurchase {
   productId: string;
+  /** Device time the purchase started; older transactions are redeliveries, not this purchase. */
+  startedAt: number;
   resolve: (outcome: PurchaseOutcome) => void;
   timer: ReturnType<typeof setTimeout> | null;
+}
+
+/** Slack for the device clock against Apple's transaction timestamps. */
+const CLOCK_SKEW_MS = 60_000;
+
+/** Whether a listener event is the purchase `slot` is waiting on (not a renewal or redelivery). */
+function belongsTo(slot: PendingPurchase, purchase: Purchase): boolean {
+  if (slot.productId !== purchase.productId) return false;
+  // Ask to Buy's pending event comes straight from this request and has no settled date.
+  if (purchase.purchaseState === "pending") return true;
+  return purchase.transactionDate >= slot.startedAt - CLOCK_SKEW_MS;
 }
 
 /** The one purchase the web page is waiting on. Claimed before any await so taps can't overlap. */
@@ -101,7 +114,7 @@ export function startIapListeners(): () => void {
   });
   const updated = purchaseUpdatedListener((purchase) => {
     const slot = pending;
-    if (slot && slot.productId === purchase.productId) {
+    if (slot && belongsTo(slot, purchase)) {
       if (purchase.purchaseState === "pending") {
         settle(slot, { status: "pending" });
         return;
@@ -134,7 +147,12 @@ export function purchase(productId: string): Promise<PurchaseOutcome> {
   if (pending) {
     return Promise.resolve({ status: "error", message: "A purchase is already in progress." });
   }
-  const slot: PendingPurchase = { productId, resolve: () => undefined, timer: null };
+  const slot: PendingPurchase = {
+    productId,
+    startedAt: Date.now(),
+    resolve: () => undefined,
+    timer: null,
+  };
   const outcome = new Promise<PurchaseOutcome>((resolve) => {
     slot.resolve = resolve;
   });

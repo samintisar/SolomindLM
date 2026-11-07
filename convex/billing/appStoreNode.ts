@@ -11,6 +11,7 @@ import { getAuthUserId } from "../auth";
 import {
   type AppStoreStatus,
   appStoreStatusValidator,
+  signInAgainError,
   type VerifiedNotification,
   type VerifiedTransaction,
 } from "./appStoreModel";
@@ -30,7 +31,7 @@ export const syncTransaction = action({
   returns: v.object({ status: appStoreStatusValidator }),
   handler: async (ctx, { signedTransaction }): Promise<{ status: AppStoreStatus }> => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
+    if (!userId) throw signInAgainError();
     await rateLimiter.limit(ctx, "appStoreSync", { key: userId, throws: true });
     if (signedTransaction.length > MAX_SIGNED_TRANSACTION_LENGTH) {
       throw toConvexError(
@@ -98,7 +99,8 @@ export const handleNotification = internalAction({
       throw error;
     }
 
-    const { notificationUUID, notificationType, subtype, transaction, renewal } = notification;
+    const { notificationUUID, notificationType, subtype, signedAt, transaction, renewal } =
+      notification;
     const handled = (result: NotificationResult) => {
       log.info("appstore_notification_handled", {
         notificationUUID,
@@ -129,6 +131,7 @@ export const handleNotification = internalAction({
         notificationUUID,
         notificationType,
         ...(subtype ? { subtype } : {}),
+        ...(signedAt !== undefined ? { signedAt } : {}),
         transaction,
         ...(renewal ? { renewal } : {}),
       });

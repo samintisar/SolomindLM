@@ -58,6 +58,26 @@ describe("POST /appstore/notifications", () => {
     expect(res.status).toBe(413);
   });
 
+  test("413 for an oversized streamed body with no content-length", async () => {
+    const t = convexTest(schema, modules);
+    const chunk = new TextEncoder().encode("a".repeat(16 * 1024));
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        // Far more than the cap; the route must stop reading long before the end.
+        if (sent++ < 1000) controller.enqueue(chunk);
+        else controller.close();
+      },
+    });
+    const res = await t.fetch("/appstore/notifications", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit);
+    expect(res.status).toBe(413);
+    expect(sent).toBeLessThan(1000);
+  });
+
   test("400 for a payload that is not a three-part JWS", async () => {
     const t = convexTest(schema, modules);
     expect((await post(t, withPayload("not a jws"))).status).toBe(400);

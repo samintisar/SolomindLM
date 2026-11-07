@@ -284,6 +284,10 @@ rolls back to an older period.
 The App Review demo account must be on Free (no Stripe or App Store subscription); otherwise the
 in-app Billing page shows "billed through the website" and no purchase buttons.
 
+Sandbox purchases (TestFlight, App Review) only grant Pro to accounts in the Convex env var
+`APP_STORE_SANDBOX_ACCESS`: `all` on dev, and on production a comma-separated email allowlist with
+the App Review demo account and any testers. Unset, every Sandbox purchase is refused.
+
 ## Out of scope
 
 Google Play billing; App Store Server API calls (including a daily reconciliation job); offers and

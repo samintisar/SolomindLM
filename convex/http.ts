@@ -129,6 +129,31 @@ http.route({
 const MAX_APPSTORE_NOTIFICATION_BYTES = 64 * 1024;
 const JWS_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 
+/** The body as text, or null once it passes `maxBytes` (stops reading there). */
+async function readBodyCapped(request: Request, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
 http.route({
   path: "/appstore/notifications",
   method: "POST",
@@ -144,9 +169,9 @@ http.route({
     if (declaredBytes > MAX_APPSTORE_NOTIFICATION_BYTES) {
       return respond(413, { error: "Payload too large" });
     }
-    // content-length can be absent or wrong (chunked), so cap the actual body too.
-    const text = await request.text();
-    if (text.length > MAX_APPSTORE_NOTIFICATION_BYTES) {
+    // content-length can be absent or wrong (chunked), so cap the bytes actually read too.
+    const text = await readBodyCapped(request, MAX_APPSTORE_NOTIFICATION_BYTES);
+    if (text === null) {
       return respond(413, { error: "Payload too large" });
     }
 

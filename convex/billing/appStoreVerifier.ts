@@ -99,18 +99,13 @@ function claimedEnvironment(jws: string): StoreEnvironment {
   throw new AppStoreVerificationError("Signed data names no known App Store environment");
 }
 
-function hasSubscriptionFields(tx: JWSTransactionDecodedPayload): boolean {
-  return Boolean(
-    tx.originalTransactionId && tx.transactionId && tx.productId && tx.expiresDate != null
-  );
-}
-
+/** Our shape of a subscription transaction; undefined when a required field is missing. */
 function toTransaction(
   environment: StoreEnvironment,
   tx: JWSTransactionDecodedPayload
-): VerifiedTransaction {
+): VerifiedTransaction | undefined {
   if (!(tx.originalTransactionId && tx.transactionId && tx.productId) || tx.expiresDate == null) {
-    throw new AppStoreVerificationError("Transaction is missing required subscription fields");
+    return undefined;
   }
   return {
     environment,
@@ -139,7 +134,11 @@ export async function verifyTransaction(signedTransaction: string): Promise<Veri
   const decoded = await mapVerification(
     verifierFor(environment).verifyAndDecodeTransaction(signedTransaction)
   );
-  return toTransaction(environment, decoded);
+  const transaction = toTransaction(environment, decoded);
+  if (!transaction) {
+    throw new AppStoreVerificationError("Transaction is missing required subscription fields");
+  }
+  return transaction;
 }
 
 /** Verify an App Store Server Notification V2 `signedPayload` and its nested signed data. */
@@ -156,7 +155,7 @@ export async function verifyNotification(signedPayload: string): Promise<Verifie
   if (signedTransaction) {
     const decoded = await mapVerification(verifier.verifyAndDecodeTransaction(signedTransaction));
     // Verified but not a subscription transaction: the handler reports it as ignored.
-    transaction = hasSubscriptionFields(decoded) ? toTransaction(environment, decoded) : undefined;
+    transaction = toTransaction(environment, decoded);
   }
   const renewal = signedRenewal
     ? toRenewal(await mapVerification(verifier.verifyAndDecodeRenewalInfo(signedRenewal)))
@@ -165,6 +164,7 @@ export async function verifyNotification(signedPayload: string): Promise<Verifie
     notificationUUID: payload.notificationUUID,
     notificationType: String(payload.notificationType),
     ...(payload.subtype ? { subtype: String(payload.subtype) } : {}),
+    ...(typeof payload.signedDate === "number" ? { signedAt: payload.signedDate } : {}),
     environment,
     ...(transaction ? { transaction } : {}),
     ...(renewal ? { renewal } : {}),
