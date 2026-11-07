@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-11-06
 - **Deciders:** @samintisar
-- **PR:** #<!-- filled in when the PR is opened -->
+- **PR:** #620
 
 ## Context
 
