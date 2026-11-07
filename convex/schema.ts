@@ -1,6 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { appStoreEnvironmentValidator, appStoreStatusValidator } from "./billing/appStoreModel";
 import {
   fullTextSourceValidator,
   fulltextStatusValidator,
@@ -551,6 +552,44 @@ export default defineSchema({
     processedAt: v.optional(v.number()),
     createdAt: v.number(),
   }).index("stripe_event", ["stripeEventId"]),
+
+  // App Store (iOS in-app purchase)
+  appStoreAccountTokens: defineTable({
+    userId: v.id("users"),
+    /** Random UUID sent as StoreKit's appAccountToken; ties purchases to this account. */
+    token: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"]),
+
+  appStoreSubscriptions: defineTable({
+    userId: v.id("users"),
+    originalTransactionId: v.string(),
+    latestTransactionId: v.string(),
+    productId: v.string(),
+    environment: appStoreEnvironmentValidator,
+    status: appStoreStatusValidator,
+    expiresAt: v.number(),
+    gracePeriodExpiresAt: v.optional(v.number()),
+    autoRenews: v.boolean(),
+    autoRenewProductId: v.optional(v.string()),
+    /** `signedDate` of the newest notification applied; older (retried, late) ones change nothing. */
+    lastNotificationSignedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_original_transaction", ["originalTransactionId"]),
+
+  appStoreNotificationEvents: defineTable({
+    notificationUUID: v.string(),
+    notificationType: v.string(),
+    processed: v.boolean(),
+    errorMessage: v.optional(v.string()),
+    processedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_uuid", ["notificationUUID"]),
 
   // Rate limiting
   rateLimits: defineTable({
@@ -1140,7 +1179,7 @@ export default defineSchema({
     surface: v.union(v.literal("web"), v.literal("mobile")),
     appVersion: v.string(),
     lastRequestId: v.optional(v.string()),
-    /** Server-derived at submit time from the active Stripe subscription. */
+    /** Server-derived at submit time from `isProUser` (Stripe or App Store). */
     planTier: v.union(v.literal("free"), v.literal("pro")),
     status: v.union(
       v.literal("received"),

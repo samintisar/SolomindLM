@@ -85,6 +85,8 @@ export const RATE_LIMIT_CONFIG: Record<string, LimitConfig> = {
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
   /** In-app feedback submissions (per user, per hour) */
   feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
+  /** App Store purchase syncs (per user, per hour); each runs Apple signature + OCSP verification */
+  appStoreSync: { kind: "fixed window", rate: 60, period: HOUR },
   /** "Find full text" / "Upload PDF" on a paper source (per user, per hour); each re-runs OCR and lookups */
   paperFullText: { kind: "fixed window", rate: 20, period: HOUR },
   /** AI grading of written answers (per user, per hour); each grade is one LLM call */

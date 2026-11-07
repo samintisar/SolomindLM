@@ -90,6 +90,10 @@ export const PrivacyPolicy: React.FC = () => {
               full card numbers on our servers.
             </li>
             <li>
+              In the iOS app, subscriptions are processed by Apple. We receive transaction details
+              (product, dates, and status) but never your payment details.
+            </li>
+            <li>
               In the mobile app: a push notification token if you allow notifications, and crash,
               error, and performance reports (device model, operating system, app version, and
               diagnostic details; these reports are not tied to your name or email).
@@ -219,9 +223,11 @@ export const PrivacyPolicy: React.FC = () => {
           backups, legal compliance, and dispute resolution. You can delete many items inside the
           app (conversations, sources, notebooks, generated content) subject to product controls.
           You can delete your account at any time from the account menu in the app (Delete account).
-          This permanently deletes your account and the content in it, and cancels any active
-          subscription. Billing records our payment processor must retain are kept as required by
-          law. For other privacy requests, email us; we will respond within a reasonable time.
+          This permanently deletes your account and the content in it, and cancels any active web
+          (Stripe) subscription. Subscriptions bought through the App Store must be cancelled in
+          your Apple ID settings. Billing records our payment processor must retain are kept as
+          required by law. For other privacy requests, email us; we will respond within a reasonable
+          time.
         </p>
         <p className="text-muted-foreground">
           Where the product offers export or download for a given artifact (for example certain

@@ -123,6 +123,84 @@ http.route({
 });
 
 // ============================================================
+// App Store Server Notifications V2 (Forward to Node Action)
+// ============================================================
+
+const MAX_APPSTORE_NOTIFICATION_BYTES = 64 * 1024;
+const JWS_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$/;
+
+/** The body as text, or null once it passes `maxBytes` (stops reading there). */
+async function readBodyCapped(request: Request, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
+http.route({
+  path: "/appstore/notifications",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const respond = (status: number, body: Record<string, unknown>) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const log = createServiceLogger("appstore", "notifications-route");
+    const declaredBytes = Number(request.headers.get("content-length") ?? 0);
+    if (declaredBytes > MAX_APPSTORE_NOTIFICATION_BYTES) {
+      return respond(413, { error: "Payload too large" });
+    }
+    // content-length can be absent or wrong (chunked), so cap the bytes actually read too.
+    const text = await readBodyCapped(request, MAX_APPSTORE_NOTIFICATION_BYTES);
+    if (text === null) {
+      return respond(413, { error: "Payload too large" });
+    }
+
+    let signedPayload: unknown;
+    try {
+      signedPayload = (JSON.parse(text) as { signedPayload?: unknown } | null)?.signedPayload;
+    } catch {
+      return respond(400, { error: "Invalid JSON" });
+    }
+    // Cheap shape check in V8 so junk never starts a Node action: a JWS is three base64url parts.
+    if (typeof signedPayload !== "string" || !JWS_SHAPE.test(signedPayload)) {
+      return respond(400, { error: "Missing or malformed signedPayload" });
+    }
+
+    try {
+      const { result } = await ctx.runAction(internal.billing.appStoreNode.handleNotification, {
+        signedPayload,
+      });
+      // "invalid" deliberately answers 400: Apple retries, which gives time to fix a config
+      // problem (wrong bundle/app ID, missing root cert). Processing failures answer 500.
+      return respond(result === "invalid" ? 400 : 200, { result });
+    } catch (error) {
+      log.error("appstore_notification_failed", error);
+      return respond(500, { error: "Notification processing failed" });
+    }
+  }),
+});
+
+// ============================================================
 // Health Check Endpoint
 // ============================================================
 

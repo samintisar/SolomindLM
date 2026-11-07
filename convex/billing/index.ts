@@ -1,8 +1,11 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery, query } from "../_generated/server";
+import { findEntitledAppStoreSubscription, findProSources } from "../_lib/limits";
 import { getAuthUserId } from "../auth";
 import { internalMutation } from "../functions";
+import schema from "../schema";
+import { appStoreEnvironmentValidator, appStoreStatusValidator } from "./appStoreModel";
 
 // Re-export actions from subscriptions.actions.ts
 export {
@@ -30,6 +33,70 @@ export const getCurrent = query({
 
     return subscription;
   },
+});
+
+const planValidator = v.object({
+  tier: v.union(v.literal("pro"), v.literal("free")),
+  source: v.union(v.literal("stripe"), v.literal("app_store"), v.null()),
+  stripe: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("stripeSubscriptions"),
+      _creationTime: v.number(),
+      ...schema.tables.stripeSubscriptions.validator.fields,
+    })
+  ),
+  appStore: v.union(
+    v.null(),
+    v.object({
+      productId: v.string(),
+      status: appStoreStatusValidator,
+      expiresAt: v.number(),
+      gracePeriodExpiresAt: v.optional(v.number()),
+      autoRenews: v.boolean(),
+      environment: appStoreEnvironmentValidator,
+    })
+  ),
+});
+
+/**
+ * The caller's plan across billing sources. The Billing page, Header and limits read this instead
+ * of `stripeSubscriptions` so Pro bought in the iOS app counts everywhere.
+ *
+ * Reads `Date.now()` in a reactive query, whose cached result only recomputes when the rows it
+ * read change. `appStore.expireIfLapsed` writes the row when access runs out, so a lapse still
+ * reaches open clients when Apple's EXPIRED notification never arrives.
+ */
+export const getPlan = query({
+  args: {},
+  returns: v.union(v.null(), planValidator),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const { stripe, appStore } = await findProSources(ctx, userId, Date.now());
+    return {
+      tier: stripe || appStore ? ("pro" as const) : ("free" as const),
+      source: stripe ? ("stripe" as const) : appStore ? ("app_store" as const) : null,
+      stripe,
+      appStore: appStore
+        ? {
+            productId: appStore.productId,
+            status: appStore.status,
+            expiresAt: appStore.expiresAt,
+            gracePeriodExpiresAt: appStore.gracePeriodExpiresAt,
+            autoRenews: appStore.autoRenews,
+            environment: appStore.environment,
+          }
+        : null,
+    };
+  },
+});
+
+export const hasAppStoreProInternal = internalQuery({
+  args: { userId: v.id("users") },
+  returns: v.boolean(),
+  handler: async (ctx, { userId }) =>
+    (await findEntitledAppStoreSubscription(ctx, userId, Date.now())) !== null,
 });
 
 // ============ Internal Mutations/Queries ============

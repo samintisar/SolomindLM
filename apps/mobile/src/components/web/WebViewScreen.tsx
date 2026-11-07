@@ -1,11 +1,12 @@
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
-import { isConvexDeploymentConfigured } from "@mobile/services/convex/client";
-import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
+import { handleIapRequest } from "@mobile/services/iap/handleIapRequest";
+import { buildNativeShellInject } from "@mobile/utils/constants";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
+import { buildShellIapResponseScript } from "./buildShellIapResponseScript";
 import { parseShellWebMessage } from "./parseShellWebMessage";
 import { getLoadErrorCopy, type WebViewLoadError } from "./webViewLoadError";
 import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
@@ -40,8 +41,10 @@ export function WebViewScreen({
     onWebViewLoadEnd,
   } = useNativeConvexAuthBridge();
 
+  const webViewRef = useRef<WebView>(null);
+
   const onWebViewMessage = useCallback(
-    (raw: string) => {
+    (raw: string, sourceUrl?: string) => {
       const msg = parseShellWebMessage(raw);
       if (msg?.kind === "theme") {
         onThemeChange?.(msg.theme);
@@ -51,11 +54,19 @@ export function WebViewScreen({
         onAiConsentChange?.(msg.granted);
         return;
       }
+      if (msg?.kind === "iap") {
+        if (Platform.OS !== "ios") return;
+        // Defense in depth: only our own pages may start purchases.
+        if (!base || !sourceUrl || !shouldLoadUrlInWebView(sourceUrl, base)) return;
+        void handleIapRequest(msg).then((response) => {
+          webViewRef.current?.injectJavaScript(buildShellIapResponseScript(response));
+        });
+        return;
+      }
       onAuthBridgeMessage(raw);
     },
-    [onAuthBridgeMessage, onThemeChange, onAiConsentChange]
+    [onAuthBridgeMessage, onThemeChange, onAiConsentChange, base]
   );
-  const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<WebViewLoadError | null>(null);
   // Bumped to remount the WebView after the OS kills its content/render process.
   const [webViewKey, setWebViewKey] = useState(0);
@@ -80,10 +91,10 @@ export function WebViewScreen({
     return () => setWebViewRefRef.current(null);
   }, []);
 
-  const injectedJavaScriptBeforeContentLoaded = useMemo(() => {
-    if (!isConvexDeploymentConfigured) return NATIVE_SHELL_INJECT;
-    return NATIVE_SHELL_INJECT;
-  }, []);
+  const injectedJavaScriptBeforeContentLoaded = useMemo(
+    () => buildNativeShellInject({ iap: Platform.OS === "ios" }),
+    []
+  );
 
   if (!base) {
     return (
@@ -142,7 +153,7 @@ export function WebViewScreen({
       domStorageEnabled
       startInLoadingState
       injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
-      onMessage={(event) => onWebViewMessage(event.nativeEvent.data)}
+      onMessage={(event) => onWebViewMessage(event.nativeEvent.data, event.nativeEvent.url)}
       onLoadStart={() => onWebViewLoadStart()}
       onLoadEnd={() => onWebViewLoadEnd()}
       renderLoading={() => (

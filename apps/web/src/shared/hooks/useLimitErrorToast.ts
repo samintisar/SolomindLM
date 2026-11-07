@@ -3,9 +3,10 @@
  * Combines error parsing with toast notifications and Stripe checkout flow.
  */
 
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCreateCheckout } from "@/features/billing/services/subscriptionApi";
-import { canOfferPurchases } from "@/utils/platformDetection";
+import { canOfferPurchases, purchaseChannel } from "@/utils/platformDetection";
 import { useToast } from "../contexts/useToast";
 import {
   getLimitErrorMessage,
@@ -25,7 +26,7 @@ export interface HandleLimitErrorOptions {
   upgradeMessage?: string;
   /** Whether to show the upgrade button (default: true) */
   showUpgradeButton?: boolean;
-  /** Callback when upgrade button is clicked (default: opens Stripe checkout) */
+  /** Callback when upgrade button is clicked (default: Stripe checkout, or the Billing page in the iOS app) */
   onUpgrade?: () => void;
 }
 
@@ -45,6 +46,13 @@ export interface HandleLimitErrorResult {
 export function useLimitErrorToast() {
   const { error: showError } = useToast();
   const createCheckout = useCreateCheckout();
+  // Under <BrowserRouter> navigate is rebuilt on every pathname change. Read it through a ref so
+  // handleLimitError keeps a stable identity across navigations.
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  useLayoutEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   /**
    * Handle an error and show appropriate toast with upgrade CTA if it's a limit error
@@ -68,8 +76,13 @@ export function useLimitErrorToast() {
       const message = errorMessage || getLimitErrorMessage(parsedError);
       const upgradeText = purchasable ? upgradeMessage || getUpgradeMessage(parsedError) : "";
 
-      // Default upgrade handler: open Stripe checkout
+      // Default upgrade handler: Stripe checkout on the web. The iOS app sells through the App Store,
+      // so it opens the Billing page, where the in-app purchase plans live.
       const defaultOnUpgrade = async () => {
+        if (purchaseChannel() === "app_store") {
+          navigateRef.current("/billing");
+          return;
+        }
         try {
           const successUrl = `${window.location.origin}/billing?success=true`;
           const cancelUrl = `${window.location.origin}/billing?canceled=true`;

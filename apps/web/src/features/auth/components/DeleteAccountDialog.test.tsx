@@ -7,6 +7,8 @@ const mockSignOut = vi.fn();
 const mockShowError = vi.fn();
 const mockNavigate = vi.fn();
 let mockHasSubscription = false;
+let mockCancelAtPeriodEnd = false;
+let mockSource: "stripe" | "app_store" | null = null;
 
 vi.mock("convex/react", () => ({
   useAction: () => mockDeleteAccount,
@@ -21,7 +23,11 @@ vi.mock("../useAuth", () => ({
 }));
 
 vi.mock("@/features/billing/services/subscriptionApi", () => ({
-  useSubscriptionStatus: () => ({ hasSubscription: mockHasSubscription }),
+  useSubscriptionStatus: () => ({
+    hasSubscription: mockHasSubscription,
+    source: mockSource,
+    cancelAtPeriodEnd: mockCancelAtPeriodEnd,
+  }),
 }));
 
 vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
@@ -40,6 +46,8 @@ describe("DeleteAccountDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHasSubscription = false;
+    mockSource = null;
+    mockCancelAtPeriodEnd = false;
     mockDeleteAccount.mockResolvedValue(null);
     mockSignOut.mockResolvedValue(undefined);
   });
@@ -101,5 +109,28 @@ describe("DeleteAccountDialog", () => {
     renderDialog();
 
     expect(screen.getByText(/subscription will be cancelled immediately/i)).toBeInTheDocument();
+  });
+
+  test("warns App Store subscribers that Apple keeps billing them", () => {
+    mockHasSubscription = true;
+    mockSource = "app_store";
+    renderDialog();
+
+    expect(
+      screen.getByText(/Apple keeps billing your App Store subscription/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/cancelled immediately/i)).not.toBeInTheDocument();
+  });
+
+  test("uses a softer sentence when the App Store subscription is already set not to renew", () => {
+    mockHasSubscription = true;
+    mockSource = "app_store";
+    mockCancelAtPeriodEnd = true;
+    renderDialog();
+
+    expect(
+      screen.getByText(/won't renew; access ends at the end of the period/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/keeps billing/i)).not.toBeInTheDocument();
   });
 });
