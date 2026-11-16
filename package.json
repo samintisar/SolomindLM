@@ -107,7 +107,7 @@
     "@oslojs/crypto": "^1.0.1",
     "@standard-schema/spec": "^1.1.0",
     "@supadata/js": "^1.4.0",
-    "@tavily/core": "^0.7.13",
+    "@tavily/core": "^0.7.14",
     "convex-helpers": "0.1.124",
     "p-limit": "^7.3.3",
     "resend": "^4.8.0",
