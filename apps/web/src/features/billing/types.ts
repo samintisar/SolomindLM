@@ -13,6 +13,10 @@ export interface SubscriptionStatusResponse {
   cancelAtPeriodEnd?: boolean;
   interval?: SubscriptionInterval;
   amount?: number;
+  /** Where Pro is billed; null on Free. */
+  source?: "stripe" | "app_store" | null;
+  /** App Store product, when `source` is "app_store". */
+  appStoreProductId?: string;
 }
 
 export interface CheckoutSessionResponse {

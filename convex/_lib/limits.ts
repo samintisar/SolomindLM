@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { isAppStoreEntitled } from "../billing/appStoreModel";
 import { internalMutation } from "../functions";
 import {
   CONCURRENT_RUN_LIMITS,
@@ -23,13 +24,45 @@ import {
   rateLimiter,
 } from "./rateLimits";
 
-/** True when the user has an active Stripe subscription. */
+/**
+ * True when the user has an active Stripe subscription or an entitled App Store subscription.
+ * Reads the wall clock; in a cached query the result only recomputes when data changes
+ * (`billing.appStore.expireIfLapsed` writes the row when App Store access runs out).
+ */
 export async function isProUser(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
-  const subscription = await ctx.db
+  const { stripe, appStore } = await findProSources(ctx, userId, Date.now());
+  return stripe !== null || appStore !== null;
+}
+
+/** Every billing source that currently grants the user Pro. The one place the Pro rule lives. */
+export async function findProSources(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  now: number
+): Promise<{
+  stripe: Doc<"stripeSubscriptions"> | null;
+  appStore: Doc<"appStoreSubscriptions"> | null;
+}> {
+  const stripe = await ctx.db
     .query("stripeSubscriptions")
     .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
     .first();
-  return !!subscription;
+  const appStore = await findEntitledAppStoreSubscription(ctx, userId, now);
+  return { stripe, appStore };
+}
+
+/** The user's App Store subscription that currently grants Pro, if any. */
+export async function findEntitledAppStoreSubscription(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  now: number
+): Promise<Doc<"appStoreSubscriptions"> | null> {
+  const rows = await ctx.db
+    .query("appStoreSubscriptions")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(10);
+  return rows.find((row) => isAppStoreEntitled(row, now)) ?? null;
 }
 
 /**

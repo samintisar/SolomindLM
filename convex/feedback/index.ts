@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { type MutationCtx, query } from "../_generated/server";
 import { assertFeedbackAdmin, isFeedbackAdminEmail } from "../_lib/feedbackAdmin";
+import { isProUser } from "../_lib/limits";
 import { rateLimiter } from "../_lib/rateLimits";
 import { toAdminFeedbackRow } from "../_model/feedback";
 import { getAuthUserId } from "../auth";
@@ -27,11 +28,7 @@ const submitArgs = {
 };
 
 async function derivePlanTier(ctx: MutationCtx, userId: Id<"users">): Promise<"free" | "pro"> {
-  const sub = await ctx.db
-    .query("stripeSubscriptions")
-    .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
-    .first();
-  return sub ? "pro" : "free";
+  return (await isProUser(ctx, userId)) ? "pro" : "free";
 }
 
 export const submit = mutation({

@@ -52,6 +52,8 @@ const DIRECT_USER_TABLES = [
   "notes",
   "studioProgress",
   "stripeSubscriptions",
+  "appStoreSubscriptions",
+  "appStoreAccountTokens",
   "rateLimits",
   "mobilePushTokens",
   "searchAnalytics",
