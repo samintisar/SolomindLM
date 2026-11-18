@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { LiteratureReviewEvalResult } from "../runners/literatureReviewRunner";
 import type { EvalFixture, EvalRunArtifact } from "../types";
 import {
@@ -6,6 +6,7 @@ import {
   lrNumericGrounding,
   lrPrismaConsistency,
   lrRequiredSectionNames,
+  scoreLiteratureReviewLlmJudgeMetrics,
   scoreLiteratureReviewMetrics,
 } from "./literatureReview";
 
@@ -294,5 +295,51 @@ describe("literatureReview metrics with notebook papers", () => {
     const result = lrPrismaConsistency(fixture, stubArtifact(raw));
     expect(result.status).toBe("pass");
     expect(result.breakdown).toMatchObject({ included: 16, includedFromSearch: 12 });
+  });
+});
+
+describe("literatureReview Likert judges", () => {
+  const raw: LiteratureReviewEvalResult = {
+    sessionId: "s",
+    tableId: "t",
+    reportId: "r",
+    searchQueries: [],
+    confirmedColumns: [],
+    counts: { found: 1, deduplicated: 1, screened: 1, included: 1, extractedRows: 1 },
+    stagePapers: { search: [], deduped: [], ranked: [], screened: [] },
+    screeningDecisions: [],
+    extractionCoverage: [],
+    extractionSamples: [{ paperTitle: "P", columnName: "C", extractedValue: "v" }],
+    table: { title: "T", columns: [], papers: [] },
+    report: { title: "R", content: "A report body.", sections: [] },
+    latencyMs: 0,
+  };
+
+  it("use the injected invoker and model", async () => {
+    const invoke = vi.fn().mockResolvedValue('{"score": 0.9, "reasoning": "good"}');
+    const results = await scoreLiteratureReviewLlmJudgeMetrics(fixture, stubArtifact(raw), {
+      invoke,
+      model: "judge-x",
+    });
+    expect(invoke).toHaveBeenCalledTimes(3);
+    expect(results.map((r) => [r.metric, r.status, r.score])).toEqual([
+      ["lr_llm_judge_report_quality", "pass", 0.9],
+      ["lr_llm_judge_completeness", "pass", 0.9],
+      ["lr_llm_judge_extraction_quality", "pass", 0.9],
+    ]);
+    expect(results[0].breakdown).toMatchObject({ model: "judge-x" });
+  });
+
+  it("fail on an unparseable response instead of guessing a score", async () => {
+    const invoke = vi.fn().mockResolvedValue("Looks fine to me.");
+    const results = await scoreLiteratureReviewLlmJudgeMetrics(fixture, stubArtifact(raw), {
+      invoke,
+    });
+    expect(results.map((r) => [r.status, r.score])).toEqual([
+      ["fail", 0],
+      ["fail", 0],
+      ["fail", 0],
+    ]);
+    expect(results[0].detail).toMatch(/^LLM judge failed:/);
   });
 });

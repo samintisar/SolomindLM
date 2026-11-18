@@ -1,7 +1,5 @@
 import { FileUploadButton } from "@mobile/components/fileUpload/FileUploadButton";
 import { WebViewScreen } from "@mobile/components/web/WebViewScreen";
-import { useWebViewNavigation } from "@mobile/hooks/useWebViewNavigation";
-import { useConvexAuth } from "convex/react";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
@@ -18,8 +16,6 @@ function normalizePath(p: string) {
 
 export default function MobileShellScreen() {
   const params = useLocalSearchParams<{ webPath?: string | string[] }>();
-  const { isAuthenticated } = useConvexAuth();
-  const { onUrlChange: onSignInWebUrlChange } = useWebViewNavigation();
   // The web app owns its theme (in-app toggle, not the OS setting); it reports it via `shell-web:theme`.
   // Start light to match the web app's own default until the first report arrives.
   const [webTheme, setWebTheme] = useState<"light" | "dark">("light");
@@ -27,7 +23,7 @@ export default function MobileShellScreen() {
   const webPathParam = Array.isArray(params.webPath) ? params.webPath[0] : params.webPath;
 
   // Keep the WebView entry path stable — auth routing is handled inside the web app.
-  // Changing `path` when `isAuthenticated` flips reloads the WebView and drops the session mirror.
+  // Changing `path` on auth changes would reload the WebView and drop the session mirror.
   const path = useMemo(() => {
     if (typeof webPathParam === "string" && webPathParam.length > 0) {
       return normalizePath(webPathParam);
@@ -45,12 +41,7 @@ export default function MobileShellScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: shellBackground }]} edges={["top"]}>
       <StatusBar style={webTheme === "dark" ? "light" : "dark"} />
-      <WebViewScreen
-        path={path}
-        onUrlChange={!isAuthenticated ? onSignInWebUrlChange : undefined}
-        onThemeChange={setWebTheme}
-        theme={webTheme}
-      />
+      <WebViewScreen path={path} onThemeChange={setWebTheme} theme={webTheme} />
       {notebookIdForUpload ? <FileUploadButton notebookId={notebookIdForUpload} /> : null}
     </SafeAreaView>
   );

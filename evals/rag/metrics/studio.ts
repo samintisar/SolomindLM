@@ -13,6 +13,7 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
+import { metricResult } from "./metricResult";
 import {
   flashcardAnswerLeak,
   flashcardCardValidity,
@@ -21,33 +22,12 @@ import {
 } from "./studioInvariants";
 import { evaluateInfographicWithVision } from "./visionJudge";
 
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  status: MetricStatus,
-  score: number,
-  detail: string,
-  breakdown?: Record<string, unknown>
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status,
-    score,
-    detail,
-    ...(breakdown ? { breakdown } : {}),
-  };
-}
-
 function fromInvariant(
   check: InvariantCheck,
   fixture: EvalFixture,
   artifact: EvalRunArtifact
 ): MetricResult {
-  return baseMetric(
+  return metricResult(
     check.metric,
     fixture,
     artifact,
@@ -69,7 +49,7 @@ function countGate(
   label: string
 ): MetricResult {
   if (expected == null) {
-    return baseMetric(
+    return metricResult(
       metric,
       fixture,
       artifact,
@@ -80,7 +60,7 @@ function countGate(
     );
   }
   if (actual >= expected) {
-    return baseMetric(
+    return metricResult(
       metric,
       fixture,
       artifact,
@@ -92,7 +72,7 @@ function countGate(
   }
   const ratio = expected === 0 ? 1 : actual / expected;
   const status: MetricStatus = ratio >= 0.7 ? "warn" : "fail";
-  return baseMetric(
+  return metricResult(
     metric,
     fixture,
     artifact,
@@ -196,7 +176,7 @@ function infographicHasImage(fixture: EvalFixture, artifact: EvalRunArtifact): M
   const message = hasImage
     ? `Infographic generated with image URL: ${imageUrl.slice(0, 80)}...`
     : "Infographic did not generate an image URL.";
-  return baseMetric(
+  return metricResult(
     "infographic_image_generated",
     fixture,
     artifact,
@@ -231,7 +211,7 @@ function spreadsheetRowCount(fixture: EvalFixture, artifact: EvalRunArtifact): M
 function reportSectionPresence(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const required = fixture.expectedStructure?.requiredSections;
   if (!required || required.length === 0) {
-    return baseMetric(
+    return metricResult(
       "report_section_presence",
       fixture,
       artifact,
@@ -248,7 +228,7 @@ function reportSectionPresence(fixture: EvalFixture, artifact: EvalRunArtifact):
   if (score >= 0.9) status = "pass";
   else if (score >= 0.6) status = "warn";
   else status = "fail";
-  return baseMetric(
+  return metricResult(
     "report_section_presence",
     fixture,
     artifact,
@@ -285,7 +265,7 @@ function audioScriptLength(fixture: EvalFixture, artifact: EvalRunArtifact): Met
   else if (ratio >= 0.7) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "audio_script_length",
     fixture,
     artifact,

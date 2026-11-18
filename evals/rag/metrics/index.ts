@@ -11,6 +11,7 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
+import { metricResult } from "./metricResult";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -158,28 +159,6 @@ function recallScore(matched: number, total: number): number {
   return matched / total;
 }
 
-/** Build a base MetricResult with the common fields filled in. */
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  status: MetricStatus,
-  score: number,
-  detail: string,
-  breakdown?: Record<string, unknown>
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status,
-    score,
-    detail,
-    ...(breakdown ? { breakdown } : {}),
-  };
-}
-
 /** Check whether the answer text exhibits abstention language. */
 function answerAbstains(answer: string): boolean {
   const lower = answer.toLowerCase();
@@ -235,7 +214,7 @@ export function expectedItemRecall(
   _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
-    return baseMetric(
+    return metricResult(
       "expected_item_recall",
       fixture,
       artifact,
@@ -258,7 +237,7 @@ export function expectedItemRecall(
       ? `All ${matched.length} expected items found in answer.`
       : `Found ${matched.length}/${fixture.expectedItems.length} expected items. Missing: ${unmatched.join(", ")}`;
 
-  return baseMetric("expected_item_recall", fixture, artifact, status, score, detail, {
+  return metricResult("expected_item_recall", fixture, artifact, status, score, detail, {
     matched,
     unmatched,
   });
@@ -308,7 +287,7 @@ export function retrievalItemRecall(
         ? `All ${matched.length} expected items found at ${label} stage (${chunks.length} chunks).`
         : `Found ${matched.length}/${fixture.expectedItems.length} at ${label} stage. Missing: ${unmatched.join(", ")}`;
 
-    return baseMetric(metric, fixture, artifact, "info", score, detail, {
+    return metricResult(metric, fixture, artifact, "info", score, detail, {
       stage: label,
       matched,
       unmatched,
@@ -332,7 +311,7 @@ export function retrievalPrecisionAtK(
   _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
-    return baseMetric(
+    return metricResult(
       "retrieval_precision_at_k",
       fixture,
       artifact,
@@ -343,7 +322,7 @@ export function retrievalPrecisionAtK(
   }
   const total = artifact.selectedChunks.length;
   if (total === 0) {
-    return baseMetric(
+    return metricResult(
       "retrieval_precision_at_k",
       fixture,
       artifact,
@@ -369,7 +348,7 @@ export function retrievalPrecisionAtK(
   else if (score >= 0.3) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "retrieval_precision_at_k",
     fixture,
     artifact,
@@ -396,7 +375,7 @@ export function retrievalNdcgAtK(
   _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
-    return baseMetric(
+    return metricResult(
       "retrieval_ndcg_at_k",
       fixture,
       artifact,
@@ -409,7 +388,7 @@ export function retrievalNdcgAtK(
   const k = chunks.length;
 
   if (k === 0) {
-    return baseMetric(
+    return metricResult(
       "retrieval_ndcg_at_k",
       fixture,
       artifact,
@@ -447,7 +426,7 @@ export function retrievalNdcgAtK(
 
   const relevantCount = relevance.filter((r) => r === 1).length;
 
-  return baseMetric(
+  return metricResult(
     "retrieval_ndcg_at_k",
     fixture,
     artifact,
@@ -479,7 +458,7 @@ export function abstentionCorrectness(
   _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
-    return baseMetric(
+    return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
@@ -501,7 +480,7 @@ export function abstentionCorrectness(
 
   // Rule 1: Sufficient context was selected but answer still abstained.
   if (selectedRecall >= 0.7 && abstains) {
-    return baseMetric(
+    return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
@@ -521,7 +500,7 @@ export function abstentionCorrectness(
 
   // Rule 2: Pre-rerank or post-rerank had items, but context selection dropped them.
   if ((preRerankRecall >= 0.7 || postRerankRecall >= 0.7) && selectedRecall < 0.7) {
-    return baseMetric(
+    return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
@@ -541,7 +520,7 @@ export function abstentionCorrectness(
 
   // Rule 3: Retrieval never found the items.
   if (selectedRecall < 0.7 && preRerankRecall < 0.7 && postRerankRecall < 0.7) {
-    return baseMetric(
+    return metricResult(
       "abstention_correctness",
       fixture,
       artifact,
@@ -560,7 +539,7 @@ export function abstentionCorrectness(
   }
 
   // Rule 4: Answer provides items and recall is sufficient.
-  return baseMetric(
+  return metricResult(
     "abstention_correctness",
     fixture,
     artifact,
@@ -603,7 +582,7 @@ export function citationValidity(
   // No citations found in the answer.
   if (citations.length === 0) {
     if (expectsCitation) {
-      return baseMetric(
+      return metricResult(
         "citation_validity",
         fixture,
         artifact,
@@ -614,7 +593,7 @@ export function citationValidity(
       );
     }
     // No citations required, neutral pass.
-    return baseMetric(
+    return metricResult(
       "citation_validity",
       fixture,
       artifact,
@@ -641,7 +620,7 @@ export function citationValidity(
   else if (score >= 0.5) status = "warn";
   else status = "fail";
 
-  return baseMetric(
+  return metricResult(
     "citation_validity",
     fixture,
     artifact,
@@ -717,7 +696,7 @@ export function latencyCostBudget(
     else if (worstRatio <= 2.0) status = "warn";
     else status = "fail";
 
-    return baseMetric(
+    return metricResult(
       "latency_cost_budget",
       fixture,
       artifact,
@@ -753,7 +732,7 @@ export function latencyCostBudget(
         ? 0.5
         : 0;
 
-  return baseMetric(
+  return metricResult(
     "latency_cost_budget",
     fixture,
     artifact,

@@ -2,8 +2,15 @@
  * Binary pass/fail LLM judges per failure mode.
  * Default model: deepseek-ai/DeepSeek-V4.1-Flash via Together JSON mode.
  */
-import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
+import {
+  type EvalBaseline,
+  type EvalFixture,
+  type EvalRunArtifact,
+  isStudioRunner,
+  type MetricResult,
+} from "../types";
 import type { LlmJudgeOptions } from "./llmJudge";
+import { binaryMetricResult } from "./metricResult";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
 
 interface BinaryJudgeResult {
@@ -14,26 +21,6 @@ interface BinaryJudgeResult {
 export interface BinaryJudgeOptions extends LlmJudgeOptions {
   /** When false, skip network judges (unit tests). */
   enabled?: boolean;
-}
-
-function baseMetric(
-  metric: string,
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact,
-  pass: boolean,
-  reason: string,
-  breakdown?: Record<string, unknown>
-): MetricResult {
-  return {
-    metric,
-    caseId: fixture.id,
-    runner: artifact.runner,
-    configHash: artifact.configHash,
-    status: pass ? "pass" : "fail",
-    score: pass ? 1 : 0,
-    detail: reason,
-    breakdown,
-  };
 }
 
 /**
@@ -123,10 +110,10 @@ async function runBinaryJudge(
   try {
     const raw = await invoke(prompt);
     const { pass, reason } = parseBinaryResponse(raw);
-    return baseMetric(metric, fixture, artifact, pass, reason, { model, pass });
+    return binaryMetricResult(metric, fixture, artifact, pass, reason, { model, pass });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return baseMetric(metric, fixture, artifact, false, `Binary judge failed: ${message}`, {
+    return binaryMetricResult(metric, fixture, artifact, false, `Binary judge failed: ${message}`, {
       model,
       error: message,
     });
@@ -268,106 +255,37 @@ export async function scoreBinaryJudgeMetrics(
   }
 
   const model = options.model ?? DEFAULT_JUDGE_MODEL;
-  const results: MetricResult[] = [];
+  const judges: Array<[metric: string, prompt: string]> = [];
 
   if (artifact.runner === "chat") {
-    results.push(
-      await runBinaryJudge(
-        "binary_judge_chat_grounding",
-        fixture,
-        artifact,
-        chatGroundingPrompt(fixture, artifact),
-        invoke,
-        model
-      )
-    );
+    judges.push(["binary_judge_chat_grounding", chatGroundingPrompt(fixture, artifact)]);
     if (artifact.citations.length > 0) {
-      results.push(
-        await runBinaryJudge(
-          "binary_judge_citation_valid",
-          fixture,
-          artifact,
-          chatCitationPrompt(fixture, artifact),
-          invoke,
-          model
-        )
-      );
+      judges.push(["binary_judge_citation_valid", chatCitationPrompt(fixture, artifact)]);
     }
   }
 
   if (artifact.runner === "research") {
-    results.push(
-      await runBinaryJudge(
-        "binary_judge_research_grounding",
-        fixture,
-        artifact,
-        researchGroundingPrompt(fixture, artifact),
-        invoke,
-        model
-      )
-    );
+    judges.push(["binary_judge_research_grounding", researchGroundingPrompt(fixture, artifact)]);
     if (artifact.researchPlan?.subQuestions?.length) {
-      results.push(
-        await runBinaryJudge(
-          "binary_judge_research_plan",
-          fixture,
-          artifact,
-          researchPlanPrompt(fixture, artifact),
-          invoke,
-          model
-        )
-      );
+      judges.push(["binary_judge_research_plan", researchPlanPrompt(fixture, artifact)]);
     }
   }
 
   if (artifact.runner === "literatureReview") {
-    results.push(
-      await runBinaryJudge(
-        "binary_judge_lr_sections",
-        fixture,
-        artifact,
-        studioStructurePrompt(fixture, artifact),
-        invoke,
-        model
-      )
-    );
+    judges.push(["binary_judge_lr_sections", studioStructurePrompt(fixture, artifact)]);
   }
 
-  const studioRunners = new Set([
-    "report",
-    "flashcards",
-    "quiz",
-    "mindmap",
-    "infographic",
-    "spreadsheet",
-    "writtenQuestions",
-    "audioScript",
-    "audioScriptOnly",
-  ]);
-  if (studioRunners.has(artifact.runner)) {
-    results.push(
-      await runBinaryJudge(
-        "binary_judge_studio_structure",
-        fixture,
-        artifact,
-        studioStructurePrompt(fixture, artifact),
-        invoke,
-        model
-      )
-    );
-    results.push(
-      await runBinaryJudge(
-        "binary_judge_studio_grounding",
-        fixture,
-        artifact,
-        studioGroundingPrompt(fixture, artifact),
-        invoke,
-        model
-      )
-    );
+  if (isStudioRunner(artifact.runner)) {
+    judges.push(["binary_judge_studio_structure", studioStructurePrompt(fixture, artifact)]);
+    judges.push(["binary_judge_studio_grounding", studioGroundingPrompt(fixture, artifact)]);
   }
 
-  return results;
+  // Independent judges of one artifact run concurrently; results keep the order above.
+  return Promise.all(
+    judges.map(([metric, prompt]) =>
+      runBinaryJudge(metric, fixture, artifact, prompt, invoke, model)
+    )
+  );
 }
 
 export { parseBinaryResponse };

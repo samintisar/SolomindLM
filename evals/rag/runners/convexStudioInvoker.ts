@@ -11,24 +11,28 @@
  * Result-to-artifact conversion lives in [studioRunner.ts](./studioRunner.ts).
  */
 import { ConvexHttpClient } from "convex/browser";
+import type { FunctionArgs, FunctionReference, FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { AgentStageSpan, EvalFixture, StudioRunnerKind } from "../types";
 
-export interface ConvexStudioInvokerOptions {
+interface ConvexStudioInvokerOptions {
   evalSecret: string;
 }
 
-export interface StudioInvokeContext {
+interface StudioInvokeContext {
   notebookId: string;
   documentIds?: string[];
   studioParams?: EvalFixture["studioParams"];
 }
 
-export interface StudioInvokeResult {
+interface StudioInvokeResult {
   /** Structured payload — shape varies per kind */
   raw: unknown;
-  /** Server-measured latency in ms (excludes client/network) */
+  /**
+   * Client wall-clock ms from kickoff until the poll that saw a terminal status. Includes
+   * network round trips and up to one poll interval ({@link POLL_INTERVAL_MS}) of slack.
+   */
   latencyMs: number;
   /** Optional token usage if the action returned it */
   tokenUsage?: { prompt: number; completion: number; total: number };
@@ -36,11 +40,15 @@ export interface StudioInvokeResult {
   stageSpans?: AgentStageSpan[];
 }
 
-export function pickStudioInvokeTelemetry(status: {
+interface StudioJobTelemetry {
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: "provider" | "estimated";
   stageSpans?: AgentStageSpan[];
-}): Pick<StudioInvokeResult, "tokenUsage" | "tokenUsageSource" | "stageSpans"> {
+}
+
+export function pickStudioInvokeTelemetry(
+  status: StudioJobTelemetry
+): Pick<StudioInvokeResult, "tokenUsage" | "tokenUsageSource" | "stageSpans"> {
   return {
     ...(status.tokenUsage !== undefined ? { tokenUsage: status.tokenUsage } : {}),
     ...(status.tokenUsageSource !== undefined ? { tokenUsageSource: status.tokenUsageSource } : {}),
@@ -75,379 +83,182 @@ async function pollStatus<T extends { status: string }>(
   );
 }
 
-// ─── Reports ─────────────────────────────────────────────────
+// ─── Invoker definitions ─────────────────────────────────────
 
-export function createConvexReportInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "report",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { reportId } = await client.action(api.eval.studioEvalAction.startReportEval, {
-        evalSecret: options.evalSecret,
-        notebookId: context.notebookId as Id<"notebooks">,
-        documentIds: context.documentIds as Id<"documents">[] | undefined,
-        reportType: context.studioParams?.reportType,
-        customPrompt: context.studioParams?.customPrompt,
-        smartLlm: context.studioParams?.smartLlm,
-        documentTitleHint: context.studioParams?.documentTitleHint,
-      });
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getReportEvalStatus, {
-            evalSecret: options.evalSecret,
-            reportId: reportId as Id<"reports">,
-          }),
-        `Report ${reportId}`
-      );
-      return {
-        raw: { reportId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Flashcards ──────────────────────────────────────────────
-
-export function createConvexFlashcardsInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "flashcards",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { flashcardId } = await client.action(api.eval.studioEvalAction.startFlashcardsEval, {
-        evalSecret: options.evalSecret,
-        notebookId: context.notebookId as Id<"notebooks">,
-        documentIds: context.documentIds as Id<"documents">[] | undefined,
-        cardCount: context.studioParams?.cardCount,
-        difficulty: context.studioParams?.difficulty,
-        topic: context.studioParams?.topic,
-        smartLlm: context.studioParams?.smartLlm,
-      });
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getFlashcardsEvalStatus, {
-            evalSecret: options.evalSecret,
-            flashcardId: flashcardId as Id<"flashcards">,
-          }),
-        `Flashcards ${flashcardId}`
-      );
-      return {
-        raw: { flashcardId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Quiz ────────────────────────────────────────────────────
-
-export function createConvexQuizInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "quiz",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { quizId } = await client.action(api.eval.studioEvalAction.startQuizEval, {
-        evalSecret: options.evalSecret,
-        notebookId: context.notebookId as Id<"notebooks">,
-        documentIds: context.documentIds as Id<"documents">[] | undefined,
-        questionCount: context.studioParams?.questionCount,
-        difficulty: context.studioParams?.difficulty,
-        focus: context.studioParams?.topic,
-      });
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getQuizEvalStatus, {
-            evalSecret: options.evalSecret,
-            quizId: quizId as Id<"quizzes">,
-          }),
-        `Quiz ${quizId}`
-      );
-      return {
-        raw: { quizId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Mindmap ─────────────────────────────────────────────────
-
-export function createConvexMindmapInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "mindmap",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { mindmapId } = await client.action(api.eval.studioEvalAction.startMindmapEval, {
-        evalSecret: options.evalSecret,
-        notebookId: context.notebookId as Id<"notebooks">,
-        documentIds: context.documentIds as Id<"documents">[] | undefined,
-        customPrompt: context.studioParams?.customPrompt,
-      });
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getMindmapEvalStatus, {
-            evalSecret: options.evalSecret,
-            mindmapId: mindmapId as Id<"mindmaps">,
-          }),
-        `Mindmap ${mindmapId}`
-      );
-      return {
-        raw: { mindmapId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Infographic ─────────────────────────────────────────────
-
-export function createConvexInfographicInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "infographic",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { infographicId } = await client.action(
-        api.eval.studioEvalAction.startInfographicEval,
-        {
-          evalSecret: options.evalSecret,
-          notebookId: context.notebookId as Id<"notebooks">,
-          documentIds: context.documentIds as Id<"documents">[] | undefined,
-          customPrompt: context.studioParams?.customPrompt,
-        }
-      );
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getInfographicEvalStatus, {
-            evalSecret: options.evalSecret,
-            infographicId: infographicId as Id<"infographics">,
-          }),
-        `Infographic ${infographicId}`
-      );
-      return {
-        raw: { infographicId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Spreadsheet ─────────────────────────────────────────────
-
-export function createConvexSpreadsheetInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "spreadsheet",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { spreadsheetId } = await client.action(
-        api.eval.studioEvalAction.startSpreadsheetEval,
-        {
-          evalSecret: options.evalSecret,
-          notebookId: context.notebookId as Id<"notebooks">,
-          documentIds: context.documentIds as Id<"documents">[] | undefined,
-          customPrompt: context.studioParams?.customPrompt,
-        }
-      );
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getSpreadsheetEvalStatus, {
-            evalSecret: options.evalSecret,
-            spreadsheetId: spreadsheetId as Id<"spreadsheets">,
-          }),
-        `Spreadsheet ${spreadsheetId}`
-      );
-      return {
-        raw: { spreadsheetId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Written Questions ───────────────────────────────────────
-
-export function createConvexWrittenQuestionsInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "writtenQuestions",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { writtenQuestionId } = await client.action(
-        api.eval.studioEvalAction.startWrittenQuestionsEval,
-        {
-          evalSecret: options.evalSecret,
-          notebookId: context.notebookId as Id<"notebooks">,
-          documentIds: context.documentIds as Id<"documents">[] | undefined,
-          documentTitleHint: context.studioParams?.documentTitleHint,
-          questionCount: context.studioParams?.questionCount,
-          difficulty: context.studioParams?.difficulty,
-          focus: context.studioParams?.topic,
-        }
-      );
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getWrittenQuestionsEvalStatus, {
-            evalSecret: options.evalSecret,
-            writtenQuestionId: writtenQuestionId as Id<"writtenQuestions">,
-          }),
-        `WrittenQuestions ${writtenQuestionId}`
-      );
-      return {
-        raw: { writtenQuestionId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Audio Script ────────────────────────────────────────────
-
-export function createConvexAudioScriptInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "audioScript",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { audioOverviewId } = await client.action(
-        api.eval.studioEvalAction.startAudioScriptEval,
-        {
-          evalSecret: options.evalSecret,
-          notebookId: context.notebookId as Id<"notebooks">,
-          documentIds: context.documentIds as Id<"documents">[] | undefined,
-          focus: context.studioParams?.topic,
-          length: context.studioParams?.length,
-          audioType: context.studioParams?.audioType,
-        }
-      );
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getAudioScriptEvalStatus, {
-            evalSecret: options.evalSecret,
-            audioOverviewId: audioOverviewId as Id<"audioOverviews">,
-          }),
-        `AudioScript ${audioOverviewId}`
-      );
-      return {
-        raw: { audioOverviewId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Audio Script Only (no TTS) ──────────────────────────────
-
-export function createConvexAudioScriptOnlyInvoker(
-  convexUrl: string,
-  options: ConvexStudioInvokerOptions
-): StudioInvoker {
-  const client = new ConvexHttpClient(convexUrl);
-  return {
-    kind: "audioScriptOnly",
-    async invoke(context) {
-      const startTime = Date.now();
-      const { audioOverviewId } = await client.action(
-        api.eval.studioEvalAction.startAudioScriptOnlyEval,
-        {
-          evalSecret: options.evalSecret,
-          notebookId: context.notebookId as Id<"notebooks">,
-          documentIds: context.documentIds as Id<"documents">[] | undefined,
-          focus: context.studioParams?.topic,
-          length: context.studioParams?.length,
-          audioType: context.studioParams?.audioType,
-        }
-      );
-      const populated = await pollStatus(
-        () =>
-          client.action(api.eval.studioEvalAction.getAudioScriptOnlyEvalStatus, {
-            evalSecret: options.evalSecret,
-            audioOverviewId: audioOverviewId as Id<"audioOverviews">,
-          }),
-        `AudioScriptOnly ${audioOverviewId}`
-      );
-      return {
-        raw: { audioOverviewId, ...populated },
-        latencyMs: Date.now() - startTime,
-        ...pickStudioInvokeTelemetry(populated),
-      };
-    },
-  };
-}
-
-// ─── Invoker registry ────────────────────────────────────────
+type StudioAction = FunctionReference<"action">;
+type StudioParams = NonNullable<EvalFixture["studioParams"]>;
+/** Args every kickoff action takes; the invoker fills these in itself. */
+type CommonStartArgs = "evalSecret" | "notebookId" | "documentIds";
 
 /**
- * Map of studio runner kind → invoker factory. Add new kinds here as their
- * Convex eval actions land.
+ * One studio kind: a kickoff action returning `{ [idKey]: id }` and a status action taking
+ * `{ evalSecret, [idKey]: id }`. `buildArgs` maps fixture studio params onto the kickoff's
+ * kind-specific args.
  */
-export type StudioInvokerFactory = (
-  convexUrl: string,
+interface StudioInvokerSpec<
+  Start extends StudioAction,
+  Status extends StudioAction,
+  IdKey extends keyof FunctionReturnType<Start> & keyof FunctionArgs<Status> & string,
+> {
+  kind: StudioRunnerKind;
+  /** Label used in poll-timeout errors, e.g. "Report" */
+  label: string;
+  start: Start;
+  status: Status;
+  idKey: IdKey;
+  buildArgs: (params: StudioParams) => Omit<FunctionArgs<Start>, CommonStartArgs>;
+}
+
+type StudioInvokerFactory = (
+  client: ConvexHttpClient,
   options: ConvexStudioInvokerOptions
 ) => StudioInvoker;
 
+function defineStudioInvoker<
+  Start extends StudioAction,
+  Status extends StudioAction,
+  IdKey extends keyof FunctionReturnType<Start> & keyof FunctionArgs<Status> & string,
+>(spec: StudioInvokerSpec<Start, Status, IdKey>): StudioInvokerFactory {
+  return (client, options) => ({
+    kind: spec.kind,
+    async invoke(context) {
+      const startTime = Date.now();
+      const started = await client.action(spec.start, {
+        evalSecret: options.evalSecret,
+        notebookId: context.notebookId as Id<"notebooks">,
+        documentIds: context.documentIds as Id<"documents">[] | undefined,
+        ...spec.buildArgs(context.studioParams ?? {}),
+      } as FunctionArgs<Start>);
+      const id = (started as Record<IdKey, string>)[spec.idKey];
+      const populated = await pollStatus(
+        async () =>
+          (await client.action(spec.status, {
+            evalSecret: options.evalSecret,
+            [spec.idKey]: id,
+          } as FunctionArgs<Status>)) as StudioJobTelemetry & { status: string },
+        `${spec.label} ${id}`
+      );
+      return {
+        raw: { [spec.idKey]: id, ...populated },
+        latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
+      };
+    },
+  });
+}
+
+const studio = api.eval.studioEvalAction;
+
+/** Studio runner kind → invoker factory. Add new kinds here as their Convex eval actions land. */
 export const STUDIO_INVOKER_FACTORIES: Partial<Record<StudioRunnerKind, StudioInvokerFactory>> = {
-  report: createConvexReportInvoker,
-  flashcards: createConvexFlashcardsInvoker,
-  quiz: createConvexQuizInvoker,
-  mindmap: createConvexMindmapInvoker,
-  infographic: createConvexInfographicInvoker,
-  spreadsheet: createConvexSpreadsheetInvoker,
-  writtenQuestions: createConvexWrittenQuestionsInvoker,
-  audioScript: createConvexAudioScriptInvoker,
-  audioScriptOnly: createConvexAudioScriptOnlyInvoker,
+  report: defineStudioInvoker({
+    kind: "report",
+    label: "Report",
+    start: studio.startReportEval,
+    status: studio.getReportEvalStatus,
+    idKey: "reportId",
+    buildArgs: (p) => ({
+      reportType: p.reportType,
+      customPrompt: p.customPrompt,
+      smartLlm: p.smartLlm,
+      documentTitleHint: p.documentTitleHint,
+    }),
+  }),
+  flashcards: defineStudioInvoker({
+    kind: "flashcards",
+    label: "Flashcards",
+    start: studio.startFlashcardsEval,
+    status: studio.getFlashcardsEvalStatus,
+    idKey: "flashcardId",
+    buildArgs: (p) => ({
+      cardCount: p.cardCount,
+      difficulty: p.difficulty,
+      topic: p.topic,
+      smartLlm: p.smartLlm,
+    }),
+  }),
+  quiz: defineStudioInvoker({
+    kind: "quiz",
+    label: "Quiz",
+    start: studio.startQuizEval,
+    status: studio.getQuizEvalStatus,
+    idKey: "quizId",
+    buildArgs: (p) => ({
+      questionCount: p.questionCount,
+      difficulty: p.difficulty,
+      focus: p.topic,
+    }),
+  }),
+  mindmap: defineStudioInvoker({
+    kind: "mindmap",
+    label: "Mindmap",
+    start: studio.startMindmapEval,
+    status: studio.getMindmapEvalStatus,
+    idKey: "mindmapId",
+    buildArgs: (p) => ({ customPrompt: p.customPrompt }),
+  }),
+  infographic: defineStudioInvoker({
+    kind: "infographic",
+    label: "Infographic",
+    start: studio.startInfographicEval,
+    status: studio.getInfographicEvalStatus,
+    idKey: "infographicId",
+    buildArgs: (p) => ({ customPrompt: p.customPrompt }),
+  }),
+  spreadsheet: defineStudioInvoker({
+    kind: "spreadsheet",
+    label: "Spreadsheet",
+    start: studio.startSpreadsheetEval,
+    status: studio.getSpreadsheetEvalStatus,
+    idKey: "spreadsheetId",
+    buildArgs: (p) => ({ customPrompt: p.customPrompt }),
+  }),
+  writtenQuestions: defineStudioInvoker({
+    kind: "writtenQuestions",
+    label: "WrittenQuestions",
+    start: studio.startWrittenQuestionsEval,
+    status: studio.getWrittenQuestionsEvalStatus,
+    idKey: "writtenQuestionId",
+    buildArgs: (p) => ({
+      documentTitleHint: p.documentTitleHint,
+      questionCount: p.questionCount,
+      difficulty: p.difficulty,
+      focus: p.topic,
+    }),
+  }),
+  audioScript: defineStudioInvoker({
+    kind: "audioScript",
+    label: "AudioScript",
+    start: studio.startAudioScriptEval,
+    status: studio.getAudioScriptEvalStatus,
+    idKey: "audioOverviewId",
+    buildArgs: (p) => ({ focus: p.topic, length: p.length, audioType: p.audioType }),
+  }),
+  audioScriptOnly: defineStudioInvoker({
+    kind: "audioScriptOnly",
+    label: "AudioScriptOnly",
+    start: studio.startAudioScriptOnlyEval,
+    status: studio.getAudioScriptOnlyEvalStatus,
+    idKey: "audioOverviewId",
+    buildArgs: (p) => ({ focus: p.topic, length: p.length, audioType: p.audioType }),
+  }),
 };
 
 /**
- * Build a map of all available studio invokers for the given Convex URL/secret.
- * Kinds without a registered factory are omitted; the runner will surface a
- * clear error if a fixture references one of them.
+ * Build every registered studio invoker for the given Convex URL/secret, sharing one HTTP
+ * client (fixtures run one at a time). Kinds without a registered factory are omitted; the
+ * runner surfaces a clear error if a fixture references one of them.
  */
 export function createConvexStudioInvokers(
   convexUrl: string,
   options: ConvexStudioInvokerOptions
 ): Partial<Record<StudioRunnerKind, StudioInvoker>> {
+  const client = new ConvexHttpClient(convexUrl);
   const map: Partial<Record<StudioRunnerKind, StudioInvoker>> = {};
   for (const [kind, factory] of Object.entries(STUDIO_INVOKER_FACTORIES) as Array<
     [StudioRunnerKind, StudioInvokerFactory]
   >) {
-    map[kind] = factory(convexUrl, options);
+    map[kind] = factory(client, options);
   }
   return map;
 }

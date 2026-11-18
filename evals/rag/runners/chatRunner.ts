@@ -1,9 +1,9 @@
 import { passageTextForModel } from "../../../convex/_agents/chat/passageContext";
 import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
-import { computeConfigHash } from "../configHash";
 import { inferSourceChannel } from "../metrics/sourceAware";
-import type { ChunkSnapshot, EvalFixture, EvalRunArtifact, EvidenceChannel } from "../types";
+import type { ChunkSnapshot, EvalFixture, EvidenceChannel } from "../types";
+import { runWithHarness } from "./harness";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 // ─── Invoker interface ────────────────────────────────────────
@@ -64,128 +64,80 @@ function validateFixture(fixture: EvalFixture): string[] {
   return errors;
 }
 
-function stubArtifact(fixture: EvalFixture, configHash: string): EvalRunArtifact {
-  return {
-    caseId: fixture.id,
-    runner: "chat",
-    configHash,
-    answer: "",
-    citations: [],
-    preRerankChunks: [],
-    postRerankChunks: [],
-    selectedChunks: [],
-    subQueries: [],
-    latencyMs: 0,
-    timestamp: new Date().toISOString(),
-  };
-}
-
 // ─── Runner ───────────────────────────────────────────────────
 
 export async function runChatEval(
   options: EvalRunnerOptions,
   invoker?: ChatAgentInvoker
 ): Promise<EvalRunnerResult> {
-  const { fixture, config, dryRun } = options;
-  const configHash = computeConfigHash(config);
-
-  // Validate fixture structure
-  const validationErrors = validateFixture(fixture);
-  if (validationErrors.length > 0) {
-    return {
-      artifact: stubArtifact(fixture, configHash),
-      errors: validationErrors,
-    };
-  }
-
-  // Dry-run: return stub artifact without calling any agent
-  if (dryRun) {
-    return {
-      artifact: stubArtifact(fixture, configHash),
-      errors: [],
-    };
-  }
-
-  // Real run: invoker is required — fail fast rather than producing stub metrics
-  if (!invoker) {
-    throw new Error(
+  const { fixture } = options;
+  return runWithHarness(options, invoker, {
+    runner: "chat",
+    validate: validateFixture,
+    missingInvokerMessage:
       "No ChatAgentInvoker provided for real run. " +
-        "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
-    );
-  }
+      "Use --dry-run to validate fixtures, or provide an invoker to run against real agents.",
+    failurePrefix: "Chat agent invocation failed",
+    async invoke(chat, configHash) {
+      // userId is a sentinel placeholder. The Convex invoker
+      // (`evals/rag/runners/convexChatInvoker.ts`) does NOT forward it, and the
+      // Convex eval action derives identity from the notebook owner server-side.
+      // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
+      // future invoker starts using it, that invoker must derive a real userId
+      // rather than relying on this string.
+      const result = await chat.invoke({
+        userId: "__eval_unused__",
+        noteId: fixture.notebookId ?? "",
+        conversationHistory: [{ role: "user", content: fixture.question }],
+        documentIds: fixture.documentIds,
+        sourcePolicy: fixture.sourcePolicy,
+      });
 
-  // userId is a sentinel placeholder. The Convex invoker
-  // (`evals/rag/runners/convexChatInvoker.ts`) does NOT forward it, and the
-  // Convex eval action derives identity from the notebook owner server-side.
-  // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
-  // future invoker starts using it, that invoker must derive a real userId
-  // rather than relying on this string.
-  const agentContext: Parameters<ChatAgentInvoker["invoke"]>[0] = {
-    userId: "__eval_unused__",
-    noteId: fixture.notebookId ?? "",
-    conversationHistory: [{ role: "user", content: fixture.question }],
-    documentIds: fixture.documentIds,
-    sourcePolicy: fixture.sourcePolicy,
-  };
-
-  const errors: string[] = [];
-
-  try {
-    const result = await invoker.invoke(agentContext);
-
-    // Build source evidence summary from selected chunks
-    const sourceEvidenceMap = new Map<
-      EvidenceChannel,
-      { sourceCount: number; topDomains: string[] }
-    >();
-    for (const chunk of result.selectedChunks) {
-      const channel = inferSourceChannel(chunk.sourceUrl);
-      const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
-      existing.sourceCount++;
-      if (chunk.sourceUrl) {
-        try {
-          const domain = new URL(chunk.sourceUrl).hostname;
-          if (!existing.topDomains.includes(domain)) {
-            existing.topDomains.push(domain);
+      // Build source evidence summary from selected chunks
+      const sourceEvidenceMap = new Map<
+        EvidenceChannel,
+        { sourceCount: number; topDomains: string[] }
+      >();
+      for (const chunk of result.selectedChunks) {
+        const channel = inferSourceChannel(chunk.sourceUrl);
+        const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
+        existing.sourceCount++;
+        if (chunk.sourceUrl) {
+          try {
+            const domain = new URL(chunk.sourceUrl).hostname;
+            if (!existing.topDomains.includes(domain)) {
+              existing.topDomains.push(domain);
+            }
+          } catch {
+            // Invalid URL, skip
           }
-        } catch {
-          // Invalid URL, skip
         }
+        sourceEvidenceMap.set(channel, existing);
       }
-      sourceEvidenceMap.set(channel, existing);
-    }
-    const sourceEvidence = Array.from(sourceEvidenceMap.entries()).map(([channel, data]) => ({
-      channel,
-      sourceCount: data.sourceCount,
-      topDomains: data.topDomains.slice(0, 5),
-    }));
+      const sourceEvidence = Array.from(sourceEvidenceMap.entries()).map(([channel, data]) => ({
+        channel,
+        sourceCount: data.sourceCount,
+        topDomains: data.topDomains.slice(0, 5),
+      }));
 
-    const artifact: EvalRunArtifact = {
-      caseId: fixture.id,
-      runner: "chat",
-      configHash,
-      answer: result.answer,
-      citations: result.citations,
-      preRerankChunks: result.preRerankChunks.map(toChunkSnapshot),
-      postRerankChunks: result.postRerankChunks.map(toChunkSnapshot),
-      selectedChunks: result.selectedChunks.map(toChunkSnapshot),
-      subQueries: result.subQueries,
-      latencyMs: result.latencyMs,
-      tokenUsage: result.tokenUsage,
-      tokenUsageSource: result.tokenUsageSource ?? "estimated",
-      stageSpans: result.stageSpans,
-      sourcePolicy: result.sourcePolicy,
-      sourceEvidence,
-      timestamp: new Date().toISOString(),
-    };
-
-    return { artifact, errors };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    errors.push(`Chat agent invocation failed: ${message}`);
-    return {
-      artifact: stubArtifact(fixture, configHash),
-      errors,
-    };
-  }
+      return {
+        caseId: fixture.id,
+        runner: "chat",
+        configHash,
+        answer: result.answer,
+        citations: result.citations,
+        preRerankChunks: result.preRerankChunks.map(toChunkSnapshot),
+        postRerankChunks: result.postRerankChunks.map(toChunkSnapshot),
+        selectedChunks: result.selectedChunks.map(toChunkSnapshot),
+        subQueries: result.subQueries,
+        latencyMs: result.latencyMs,
+        tokenUsage: result.tokenUsage,
+        tokenUsageSource: result.tokenUsageSource ?? "estimated",
+        stageSpans: result.stageSpans,
+        sourcePolicy: result.sourcePolicy,
+        sourceEvidence,
+        timestamp: new Date().toISOString(),
+      };
+    },
+  });
 }
