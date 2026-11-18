@@ -73,20 +73,38 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|mcp__(plugin_serena_)?serena__(replace_symbol_body|insert_before_symbol|insert_after_symbol|replace_content|create_text_file)",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/on-edit.mjs format",
-            "statusMessage": "Formatting edited file...",
-            "timeout": 30
-          },
+            "command": "bun run typecheck:web",
+            "if": "Edit(apps/web/**)|Write(apps/web/**)",
+            "statusMessage": "Typechecking web...",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/on-edit.mjs typecheck",
-            "statusMessage": "Typechecking...",
-            "async": true,
-            "timeout": 300
+            "command": "bun run typecheck:convex",
+            "if": "Edit(convex/**)|Write(convex/**)",
+            "statusMessage": "Typechecking Convex...",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run lint:fix",
+            "if": "Edit(apps/web/**)|Write(apps/web/**)|Edit(convex/**)|Write(convex/**)",
+            "statusMessage": "Auto-linting...",
+            "async": true
           }
         ]
       }
