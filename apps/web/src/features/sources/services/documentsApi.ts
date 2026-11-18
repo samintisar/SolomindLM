@@ -33,13 +33,6 @@ export function useDocument(id: string | null) {
 }
 
 /**
- * Generate upload URL for file uploads
- */
-export function useGenerateUploadUrl() {
-  return useMutation(api.documents.index.generateUploadUrl);
-}
-
-/**
  * Raw upload mutation (for advanced use cases like manual paper entry)
  */
 export function useUpload() {

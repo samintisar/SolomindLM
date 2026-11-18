@@ -1,21 +1,19 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, describe, expect, test, vi } from "vitest";
-import { renderMessageWithReferences } from "./messageRendering";
-import type { RefHandlers } from "./messageRendering.utils";
+import type { RefHandlers } from "../utils/messageRendering.utils";
+import { MessageMarkdown } from "./MessageMarkdown";
 
 const handlers: RefHandlers = { onRefEnter: vi.fn(), onRefLeave: vi.fn(), onRefToggle: vi.fn() };
 
 function Message({ content, streaming }: { content: string; streaming: boolean }) {
   return (
     <div data-message-id="m1">
-      {renderMessageWithReferences("m1", content, undefined, handlers, {
-        isStreamingVisual: streaming,
-      })}
+      <MessageMarkdown messageId="m1" content={content} handlers={handlers} streaming={streaming} />
     </div>
   );
 }
 
-describe("renderMessageWithReferences", () => {
+describe("MessageMarkdown", () => {
   // The first render waits on the lazy Streamdown/Shiki/KaTeX chunk, which is slow under a
   // parallel run; load it up front so the assertions below aren't racing the import.
   beforeAll(async () => {

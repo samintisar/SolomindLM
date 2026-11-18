@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserLimits } from "@/features/billing/services/subscriptionApi";
 import { useToast } from "@/shared/contexts/useToast";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { canOfferPurchases } from "@/utils/platformDetection";
 import { useCreateDocument, useUploadDocument } from "../services/documentsApi";
 
@@ -70,7 +70,7 @@ export function useSourceUpload({
   const uploadDocument = useUploadDocument();
   const createDocument = useCreateDocument();
   const userLimits = useUserLimits();
-  const { handleLimitError } = useLimitErrorToast();
+  const { handleLimitError } = useErrorToast();
   const { error: showError, info: showInfo } = useToast();
 
   // Use provided limit or get from subscription

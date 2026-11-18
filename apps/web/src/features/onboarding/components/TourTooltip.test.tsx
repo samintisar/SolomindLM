@@ -6,8 +6,8 @@ import { OnboardingContext } from "../OnboardingContext";
 import { findStep } from "../steps";
 import { TourTooltip } from "./TourTooltip";
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError: vi.fn() }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: vi.fn() }),
 }));
 
 function withCtx(value: Partial<OnboardingContextValue>) {

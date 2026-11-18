@@ -1,26 +1,19 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { getNativeWebViewBridge } from "@/utils/platformDetection";
-import { ThemeContext } from "./useTheme";
+import { type Theme, ThemeContext } from "./useTheme";
 
-type Theme = "light" | "dark";
+const STORAGE_KEY = "solomind_theme";
+
+function readStoredTheme(): Theme {
+  const storedTheme = localStorage.getItem(STORAGE_KEY);
+  return storedTheme === "dark" || storedTheme === "light" ? storedTheme : "light";
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    const storedTheme = localStorage.getItem("solomind_theme") as Theme | null;
-    if (storedTheme && (storedTheme === "light" || storedTheme === "dark")) {
-      setTheme(storedTheme);
-    }
-    setIsInitialized(true);
-  }, []);
+  const [theme, setTheme] = useState<Theme>(readStoredTheme);
 
   // Apply theme to document element
   useEffect(() => {
-    if (!isInitialized) return;
-
     const root = document.documentElement;
     if (theme === "dark") {
       root.classList.add("dark");
@@ -34,12 +27,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [theme, isInitialized]);
+  }, [theme]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prevTheme) => {
       const newTheme = prevTheme === "light" ? "dark" : "light";
-      localStorage.setItem("solomind_theme", newTheme);
+      localStorage.setItem(STORAGE_KEY, newTheme);
       return newTheme;
     });
   }, []);

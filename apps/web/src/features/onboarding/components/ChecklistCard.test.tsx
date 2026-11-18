@@ -36,8 +36,8 @@ vi.mock("@convex/_generated/api", () => ({
   },
 }));
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError: vi.fn() }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: vi.fn() }),
 }));
 
 function renderAt(path: string) {

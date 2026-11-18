@@ -66,8 +66,8 @@ const mockMutations = {
   }),
 };
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError: vi.fn() }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError: vi.fn() }),
 }));
 
 vi.mock("convex/react", () => ({

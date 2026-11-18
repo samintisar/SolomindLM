@@ -13,8 +13,8 @@ vi.mock("../../services/spreadsheetsApi", () => ({
   useSaveSpreadsheetData: () => saveData,
 }));
 
-vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
-  useServiceErrorToast: () => ({ showError }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ showError }),
 }));
 
 const CSV = "Name,Score\nApple,3\nPear,5";

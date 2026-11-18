@@ -1,14 +1,16 @@
 import type { Doc } from "@convex/_generated/dataModel";
 import { createContext, useContext } from "react";
-import { Message, Note } from "@/shared/types/index";
+import type { Message, Note } from "@/shared/types/index";
 
 import type { ChatStreamSourcePolicy } from "./chatStreamTypes";
 
+/**
+ * Chat controls and flags. Stays referentially stable while tokens stream (the message list lives
+ * in {@link ChatMessagesContext}), so consumers that only send or check `isChatStreaming` don't
+ * re-render per token.
+ */
 export interface ChatStreamingContextType {
-  messages: Message[];
   isChatStreaming: boolean;
-  /** Assistant response in progress on the server (may be streaming in another tab/device). */
-  remoteChatGenerating: boolean;
   /** When true, block starting a new message (last DB row is not assistant while server refcount > 0). */
   remoteGenerationBlocksSend: boolean;
   onSendMessage: (
@@ -21,18 +23,9 @@ export interface ChatStreamingContextType {
   onStopChat: () => void;
   /** Attach UI to the HTTP body from POST /research/execute (same markers as chat stream). */
   consumeResearchExecuteStream: (response: Response) => Promise<void>;
-  onClearHistory: () => void;
   onSetFeedback: (messageId: string, feedback: "up" | "down" | null) => void;
   onRetry: (assistantMessageId: string) => void;
   onSaveChatOptimistic: (payload: { notebookId: string; note: Note } | null) => void;
-  externalSources: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    sourceType: string;
-    score?: number;
-  }>;
-  clearExternalSources: () => void;
   sourceCount: number;
   sourceSummary: string | null;
   suggestions: string[] | null;
@@ -47,9 +40,18 @@ export interface ChatStreamingContextType {
 
 export const ChatStreamingContext = createContext<ChatStreamingContextType | undefined>(undefined);
 
+/** Display rows for the active conversation, including the in-flight `__streaming__` row. Changes per token. */
+export const ChatMessagesContext = createContext<Message[] | undefined>(undefined);
+
 export function useChatStreamingContext() {
   const context = useContext(ChatStreamingContext);
   if (!context)
     throw new Error("useChatStreamingContext must be used within ChatStreamingProvider");
   return context;
+}
+
+export function useChatMessages() {
+  const messages = useContext(ChatMessagesContext);
+  if (!messages) throw new Error("useChatMessages must be used within ChatStreamingProvider");
+  return messages;
 }

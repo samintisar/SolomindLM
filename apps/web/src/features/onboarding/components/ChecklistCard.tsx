@@ -3,7 +3,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
-import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import {
   useChecklistProgress,
   useDismissChecklist,
@@ -38,7 +38,7 @@ export const ChecklistCard: React.FC = () => {
   const state = useOnboardingState();
   const progress = useChecklistProgress();
   const dismiss = useDismissChecklist();
-  const { showError } = useServiceErrorToast();
+  const { showError } = useErrorToast();
 
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;

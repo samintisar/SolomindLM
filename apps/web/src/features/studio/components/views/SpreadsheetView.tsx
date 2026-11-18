@@ -4,7 +4,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
-import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import type { SpreadsheetNote } from "@/shared/types/index";
 import { useSaveSpreadsheetData } from "../../services/spreadsheetsApi";
 import { SheetGrid } from "../spreadsheet/SheetGrid";
@@ -81,7 +81,7 @@ function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
   const syncedCsvRef = useRef(serverCsv);
 
   const saveData = useSaveSpreadsheetData();
-  const { showError } = useServiceErrorToast();
+  const { showError } = useErrorToast();
 
   const save = useCallback(
     async (data: string) => {

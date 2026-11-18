@@ -15,8 +15,8 @@ vi.mock("@/shared/contexts/useToast", () => ({
   useToast: () => ({ error: mockShowError, info: vi.fn() }),
 }));
 
-vi.mock("@/shared/hooks/useLimitErrorToast", () => ({
-  useLimitErrorToast: () => ({ handleLimitError: mockHandleLimitError }),
+vi.mock("@/shared/hooks/useErrorToast", () => ({
+  useErrorToast: () => ({ handleLimitError: mockHandleLimitError }),
 }));
 
 vi.mock("@/utils/platformDetection", () => ({

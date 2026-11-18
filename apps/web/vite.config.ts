@@ -28,6 +28,8 @@ function pdfjsWorker() {
   };
 }
 
+const REACT_VENDOR = /node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//;
+
 export default defineConfig(({ mode }) => {
   // Load env from monorepo root and app dir so VITE_CONVEX_* are available
   const rootDir = path.resolve(__dirname, "..", "..");
@@ -119,12 +121,15 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            // React ecosystem
-            if (
-              id.includes("node_modules/react") ||
-              id.includes("node_modules/react-dom") ||
-              id.includes("node_modules/react-router")
-            ) {
+            // React core + router. Exact package names: a bare "node_modules/react" prefix also
+            // matched react-pdf / react-virtuoso / react-resizable-panels, so their own rules
+            // never fired and the entry preloaded pdfjs on every page.
+            if (REACT_VENDOR.test(id)) {
+              return "react-vendor";
+            }
+            // clsx is shared by `cn` and react-pdf. Left unassigned, Rollup pulls it into the pdfjs
+            // chunk with react-pdf, and the entry then preloads pdfjs just to get clsx.
+            if (id.includes("node_modules/clsx/")) {
               return "react-vendor";
             }
 

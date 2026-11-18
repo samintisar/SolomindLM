@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Favicon } from "@/shared/components/Favicon";
 import { Button } from "@/shared/components/ui/button";
-import type { ExternalSource } from "../ExternalSourcesModal";
+import type { ExternalSource } from "@/shared/types/index";
 
 const MAX_FAVICONS = 3;
 

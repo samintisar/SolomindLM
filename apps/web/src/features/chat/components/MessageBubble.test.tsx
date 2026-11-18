@@ -2,11 +2,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { Message } from "@/shared/types/index";
-import type { ExternalSource } from "./ExternalSourcesModal";
+import type { ExternalSource, Message } from "@/shared/types/index";
 import { MessageBubble } from "./MessageBubble";
 import { areMessageBubblePropsEqual } from "./message/bubbleProps";
-import { ThinkingIndicator } from "./message/ThinkingIndicator";
 
 vi.mock("@/shared/components/MarkdownRenderer", () => ({
   default: ({ children }: { children: string }) => (
@@ -174,9 +172,7 @@ describe("MessageBubble", () => {
       { title: "B", url: "https://b.example.com/y", snippet: "", sourceType: "web" },
     ];
     renderBubble({
-      message: msg({ id: "a1", role: "assistant", content: "Body" }),
-      externalSources: sources,
-      showSourcesButton: true,
+      message: msg({ id: "a1", role: "assistant", content: "Body", externalSources: sources }),
       onOpenExternalSources,
     });
     const pill = screen.getByRole("button", { name: "View 2 sources" });
@@ -224,20 +220,6 @@ describe("MessageBubble", () => {
         animates
       );
     });
-  });
-});
-
-describe("ThinkingIndicator", () => {
-  test("is a live status whose visible text is the thinking label", () => {
-    render(<ThinkingIndicator />);
-    const status = screen.getByRole("status");
-    expect(status.getAttribute("aria-label")).toBeNull();
-    expect(status.textContent).toBe("Thinking…");
-  });
-
-  test("uses the phase label when a status is given", () => {
-    render(<ThinkingIndicator status="searching" />);
-    expect(screen.getByRole("status").textContent).toBe("Searching sources…");
   });
 });
 
@@ -305,13 +287,12 @@ describe("areMessageBubblePropsEqual", () => {
     test("the same objects pass on identity without serialising", () => {
       const t = trace();
       const src = sources();
-      const prev = { ...base, message: { ...base.message, agentTrace: t }, externalSources: src };
+      const prev = { ...base, message: { ...base.message, agentTrace: t, externalSources: src } };
       const spy = vi.spyOn(JSON, "stringify");
       expect(
         areMessageBubblePropsEqual(prev, {
           ...prev,
-          message: { ...prev.message, agentTrace: t },
-          externalSources: src,
+          message: { ...prev.message, agentTrace: t, externalSources: src },
         })
       ).toBe(true);
       expect(spy).not.toHaveBeenCalled();
@@ -320,21 +301,19 @@ describe("areMessageBubblePropsEqual", () => {
     test("value-equal copies are equal; different values are not", () => {
       const prev = {
         ...base,
-        message: { ...base.message, agentTrace: trace() },
-        externalSources: sources(),
+        message: { ...base.message, agentTrace: trace(), externalSources: sources() },
       };
       const spy = vi.spyOn(JSON, "stringify");
       const copy = {
         ...prev,
-        message: { ...prev.message, agentTrace: trace() },
-        externalSources: sources(),
+        message: { ...prev.message, agentTrace: trace(), externalSources: sources() },
       };
       expect(areMessageBubblePropsEqual(prev, copy)).toBe(true);
       expect(spy).toHaveBeenCalled();
       expect(
         areMessageBubblePropsEqual(prev, {
           ...copy,
-          externalSources: [{ ...sources()[0], title: "B" }],
+          message: { ...copy.message, externalSources: [{ ...sources()[0], title: "B" }] },
         })
       ).toBe(false);
       expect(

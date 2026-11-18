@@ -16,7 +16,7 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { useErrorToast } from "@/shared/hooks/useErrorToast";
 import { useAuth } from "../useAuth";
 
 const CONFIRMATION = "DELETE";
@@ -31,7 +31,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
   const deleteAccount = useAction(api.account.actions.deleteAccount);
   const { signOut } = useAuth();
   const { hasSubscription } = useSubscriptionStatus();
-  const { showError } = useServiceErrorToast();
+  const { showError } = useErrorToast();
   const navigate = useNavigate();
   const [confirmation, setConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);

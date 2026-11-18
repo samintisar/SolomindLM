@@ -50,7 +50,6 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./item
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Progress } from "./progress";
 import { RadioGroup, RadioGroupItem } from "./radio-group";
-import { ScrollArea } from "./scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { Separator } from "./separator";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet";
@@ -179,7 +178,6 @@ const cases: Array<[name: string, element: ReactElement, text: string]> = [
     </Popover>,
     "Popover body",
   ],
-  ["ScrollArea", <ScrollArea key="scroll-area">Scrollable</ScrollArea>, "Scrollable"],
   [
     "Select",
     <Select open value="a" key="select">

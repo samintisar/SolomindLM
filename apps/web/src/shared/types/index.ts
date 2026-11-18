@@ -137,13 +137,16 @@ export interface Message {
     error?: string;
   };
   /** External sources discovered during chat (web, academic, news, finance) */
-  externalSources?: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    sourceType: string;
-    score?: number;
-  }>;
+  externalSources?: ExternalSource[];
+}
+
+/** A web/academic/news/finance result surfaced by chat search, addable to the notebook. */
+export interface ExternalSource {
+  title: string;
+  url: string;
+  snippet: string;
+  sourceType: string;
+  score?: number;
 }
 
 export interface StudioTool {
