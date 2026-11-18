@@ -1,19 +1,11 @@
 import type React from "react";
-import type { StudioDialogTheme } from "./customize/dialogContext";
 import { type PromptFormat, PromptFormatPicker } from "./customize/PromptFormatPicker";
-import { StudioCustomizeDialog } from "./customize/StudioCustomizeDialog";
+import {
+  StudioCustomizeDialog,
+  type StudioCustomizeModalProps,
+} from "./customize/StudioCustomizeDialog";
 
-interface CustomizeSpreadsheetsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onGenerate: (config: SpreadsheetConfig) => void;
-  /** When true, opens inside a positioned parent (the marketing hero preview) instead of the viewport. */
-  embedded?: boolean;
-  /** Pins light-theme tokens on always-light pages (the auth page). */
-  theme?: StudioDialogTheme;
-  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
-  preview?: boolean;
-}
+type CustomizeSpreadsheetsModalProps = StudioCustomizeModalProps<SpreadsheetConfig>;
 
 export interface SpreadsheetConfig {
   spreadsheetType:
@@ -123,20 +115,10 @@ FINANCIAL NOTES:`),
 
 export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProps> = ({
   isOpen,
-  onClose,
   onGenerate,
-  embedded = false,
-  theme,
-  preview = false,
+  ...dialogProps
 }) => (
-  <StudioCustomizeDialog
-    open={isOpen}
-    onClose={onClose}
-    embedded={embedded}
-    theme={theme}
-    preview={preview}
-    wide
-  >
+  <StudioCustomizeDialog open={isOpen} {...dialogProps} wide>
     <PromptFormatPicker
       kind="spreadsheet"
       title="Create spreadsheet"

@@ -10,14 +10,15 @@ const noop = vi.fn().mockResolvedValue(undefined);
 const updateCard = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/features/studio/services/flashcardsApi", () => ({
-  useFlashcard: () => null,
   useDueCards: () => due,
   useAddCard: () => noop,
   useUpdateCard: () => updateCard,
   useDeleteCard: () => noop,
   useCardReview: () => noop,
   useUpdateFlashcardPreferences: () => noop,
-  useUpdateFlashcardProgress: () => undefined,
+}));
+vi.mock("@/features/studio/services/studioProgressApi", () => ({
+  usePersistLastViewedIndex: () => undefined,
 }));
 
 vi.mock("@/shared/contexts/useToast", () => ({

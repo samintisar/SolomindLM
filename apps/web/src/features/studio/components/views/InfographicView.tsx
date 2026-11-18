@@ -19,7 +19,6 @@ export type InfographicViewControls = {
 
 export interface InfographicViewProps {
   note: InfographicNote;
-  onNoteUpdate?: (note: InfographicNote) => void;
   /** Register Download / Fullscreen actions for StudioPanelHeader (desktop + mobile). */
   registerControls?: (controls: InfographicViewControls | null) => void;
   onFullscreenChange?: (isFullscreen: boolean) => void;
@@ -27,7 +26,6 @@ export interface InfographicViewProps {
 
 export const InfographicView: React.FC<InfographicViewProps> = ({
   note,
-  onNoteUpdate: _onNoteUpdate,
   registerControls,
   onFullscreenChange,
 }) => {

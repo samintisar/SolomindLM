@@ -326,11 +326,4 @@ describe("SpreadsheetView", () => {
       Object.assign(URL, original);
     }
   });
-
-  it("calls onBack from the mobile back button", () => {
-    const onBack = vi.fn();
-    render(<SpreadsheetView note={makeNote()} onBack={onBack} />);
-    fireEvent.click(screen.getByRole("button", { name: "Back to Studio" }));
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
 });

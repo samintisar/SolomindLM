@@ -1,16 +1,14 @@
-import { ArrowLeft, Eye, Info, Lightbulb, RotateCcw } from "lucide-react";
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import {
-  useQuiz,
-  useResetQuizAnswers,
-  useSubmitQuizAnswer,
-  useUpdateQuizProgress,
-} from "@/features/studio/services/quizzesApi";
+import { Eye, Info, Lightbulb, RotateCcw } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useResetQuizAnswers, useSubmitQuizAnswer } from "@/features/studio/services/quizzesApi";
+import { usePersistLastViewedIndex } from "@/features/studio/services/studioProgressApi";
+import { LazyMarkdown } from "@/shared/components/LazyMarkdown";
 import type { MarkdownRendererProps } from "@/shared/components/MarkdownRenderer.utils";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Button } from "@/shared/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Spinner } from "@/shared/components/ui/spinner";
+import { useToast } from "@/shared/contexts/useToast";
 import { QuizNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
@@ -26,17 +24,8 @@ import { ResultsSummary } from "../practice/ResultsSummary";
 import { StreakChip } from "../practice/StreakChip";
 import type { QuestionState } from "../practice/types";
 
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
-
 // Generated content may carry tables; links, media and embeds are dropped.
 const contentComponents: MarkdownRendererProps["components"] = {
-  img: () => null,
-  a: ({ children }) => <span>{children}</span>,
-  video: () => null,
-  audio: () => null,
-  iframe: () => null,
   table: ({ children }) => (
     <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
       {children}
@@ -63,15 +52,12 @@ const optionComponents: MarkdownRendererProps["components"] = {
 
 export interface QuizViewProps {
   note: QuizNote;
-  onNoteUpdate?: (note: QuizNote) => void;
-  onBack?: () => void;
 }
 
-export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }) => {
-  // Initialize currentIndex from note.metadata.lastViewedIndex if available
-  const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
-  const [currentIndex, setCurrentIndex] = useState(
-    Math.min(initialIndex, Math.max(0, note.questions.length - 1))
+export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
+  // Resume where the learner left off (the note carries the saved index)
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    Math.min(note.metadata.lastViewedIndex ?? 0, Math.max(0, note.questions.length - 1))
   );
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>(note.userAnswers || {});
   const [showResults, setShowResults] = useState(false);
@@ -81,34 +67,17 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
   const submitAnswer = useSubmitQuizAnswer();
   const resetAnswers = useResetQuizAnswers();
-  const latestNote = useQuiz(note.id);
+  const toast = useToast();
 
-  // Track if we've initialized the index from saved progress
-  const hasInitializedIndex = useRef(false);
+  usePersistLastViewedIndex("quiz", note.id, currentIndex);
 
-  // Restore saved index on mount (from latestNote which has the latest data from server)
+  // Adopt the server's answers when they change (not on every echo of the note, e.g. a
+  // saved index, which would drop an answer whose submit is still in flight).
+  const serverUserAnswersKey = JSON.stringify(note.userAnswers ?? {});
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the answers' content, see above
   useEffect(() => {
-    if (!hasInitializedIndex.current && latestNote) {
-      const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
-      const boundedIndex = Math.min(savedIndex, Math.max(0, note.questions.length - 1));
-      if (savedIndex > 0) {
-        setCurrentIndex(boundedIndex);
-      }
-      hasInitializedIndex.current = true;
-    }
-  }, [latestNote, note.questions.length]);
-
-  // Persist progress - track last viewed index
-  // Use useMemo to prevent re-initializing when other state changes
-  const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-  useUpdateQuizProgress(note.id, stableCurrentIndex);
-
-  // Sync userAnswers with note.userAnswers
-  // Using a serialized key prevents the effect from running on every render
-  const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
-  useEffect(() => {
-    if (latestNote?.userAnswers) {
-      setUserAnswers(latestNote.userAnswers);
+    if (note.userAnswers) {
+      setUserAnswers(note.userAnswers);
     }
   }, [serverUserAnswersKey]);
 
@@ -173,10 +142,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     // Submit to server in the background
     try {
       await submitAnswer(note.id, currentIndex, index);
-      // Notify parent of the update (syncs with notes list)
-      if (latestNote && onNoteUpdate) {
-        onNoteUpdate(latestNote);
-      }
     } catch (error) {
       console.error("Failed to submit answer:", error);
       // Revert the local state on error
@@ -226,13 +191,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
       setCelebrated(null);
       setAnnouncement("");
       resetStreak();
-      // Notify parent of the update
-      if (latestNote && onNoteUpdate) {
-        onNoteUpdate(latestNote);
-      }
     } catch (error) {
       console.error("Failed to reset answers:", error);
-      alert(error instanceof Error ? error.message : "Failed to reset answers");
+      toast.error(error instanceof Error ? error.message : "Failed to reset answers");
     } finally {
       setIsResetting(false);
     }
@@ -294,14 +255,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
   return (
     <div className="relative flex h-full flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300">
-      {onBack && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-          <span className="truncate text-sm font-semibold text-foreground">{note.title}</span>
-        </div>
-      )}
       <div className="min-h-0 flex-1 overflow-y-auto bg-card">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-6 md:p-12">
           {reviewMode && (
@@ -325,13 +278,13 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
             className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-300"
           >
             <div className="prose max-w-none font-serif text-lg leading-relaxed text-foreground md:text-2xl">
-              <Suspense
+              <LazyMarkdown
+                generated
+                components={contentComponents}
                 fallback={<div className="h-6 w-full animate-pulse rounded bg-secondary/30" />}
               >
-                <MarkdownRenderer components={contentComponents}>
-                  {sanitizeMarkdown(currentQuestion.question)}
-                </MarkdownRenderer>
-              </Suspense>
+                {sanitizeMarkdown(currentQuestion.question)}
+              </LazyMarkdown>
             </div>
 
             <div className="space-y-3">
@@ -345,15 +298,15 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                   onSelect={() => handleSelect(idx)}
                 >
                   <span className="prose block max-w-none font-serif text-base md:text-lg">
-                    <Suspense
+                    <LazyMarkdown
+                      generated
+                      components={optionComponents}
                       fallback={
                         <span className="block h-5 w-full animate-pulse rounded bg-secondary/30" />
                       }
                     >
-                      <MarkdownRenderer components={optionComponents}>
-                        {sanitizeMarkdown(stripQuizOptionLabel(option))}
-                      </MarkdownRenderer>
-                    </Suspense>
+                      {sanitizeMarkdown(stripQuizOptionLabel(option))}
+                    </LazyMarkdown>
                   </span>
                 </QuizOption>
               ))}
@@ -365,15 +318,15 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                 <div className="min-w-0 flex-1">
                   <p className="font-sans text-xs font-bold uppercase tracking-wide">Explanation</p>
                   <div className="prose mt-2 max-w-none wrap-break-word text-base leading-relaxed">
-                    <Suspense
+                    <LazyMarkdown
+                      generated
+                      components={contentComponents}
                       fallback={
                         <div className="h-4 w-full animate-pulse rounded bg-secondary/30" />
                       }
                     >
-                      <MarkdownRenderer components={contentComponents}>
-                        {sanitizeMarkdown(currentQuestion.explanation)}
-                      </MarkdownRenderer>
-                    </Suspense>
+                      {sanitizeMarkdown(currentQuestion.explanation)}
+                    </LazyMarkdown>
                   </div>
                 </div>
               </div>

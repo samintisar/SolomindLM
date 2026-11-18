@@ -100,13 +100,6 @@ describe("MindMapView", () => {
     expect(onAskInChat).toHaveBeenCalledWith(askPrompt("Child 1", "Mind Map"), ["d1", "d2"]);
   });
 
-  it("names the mobile back button 'Back to Studio'", async () => {
-    const onBack = vi.fn();
-    render(<MindMapView note={mindMapNote()} onBack={onBack} />);
-    await userEvent.click(screen.getByRole("button", { name: "Back to Studio" }));
-    expect(onBack).toHaveBeenCalled();
-  });
-
   it("has no back button when there is nowhere to go back to", () => {
     render(<MindMapView note={mindMapNote()} />);
     expect(screen.queryByRole("button", { name: "Back to Studio" })).not.toBeInTheDocument();

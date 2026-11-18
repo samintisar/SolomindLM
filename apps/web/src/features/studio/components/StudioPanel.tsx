@@ -1,14 +1,8 @@
 import { Loader2 } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { MiniAudioPlayer } from "@/features/audio/components/MiniAudioPlayer";
 import { useAudioPlayerContext } from "@/features/audio/useAudioPlayer";
-import {
-  isAudioNote,
-  isAudioOverviewNote,
-  isInfographicNote,
-  Note,
-  StudioTool,
-} from "@/shared/types/index";
+import { isAudioOverviewNote, isInfographicNote, Note, StudioTool } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { useNoteActions } from "../hooks/useNoteActions";
 import { useStudioHandlers } from "../hooks/useStudioHandlers";
@@ -28,13 +22,7 @@ import { StudioPanelHeader } from "./StudioPanelHeader";
 import type { InfographicViewControls } from "./views/InfographicView";
 
 function isShowingExpandedAudioPlayer(note: Note): boolean {
-  if (isAudioOverviewNote(note) && note.status === "completed") {
-    return Boolean(note.audioUrl?.trim());
-  }
-  if (isAudioNote(note) && note.status === "completed") {
-    return Boolean(note.metadata.audioUrl);
-  }
-  return false;
+  return isAudioOverviewNote(note) && note.status === "completed" && Boolean(note.audioUrl?.trim());
 }
 
 interface StudioPanelProps {
@@ -66,7 +54,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   // State
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
   const [isEditingReportContent, setIsEditingReportContent] = useState(false);
   const [isInfographicFullscreen, setIsInfographicFullscreen] = useState(false);
   const infographicControlsRef = useRef<InfographicViewControls | null>(null);
@@ -123,32 +110,21 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     }
   }, [activeNote]);
 
-  // Mobile detection
+  // Other parts of the app open a note here with a `setActiveNote` window event.
+  const onSetActiveNoteEvent = useEffectEvent((event: Event) => {
+    const noteId = (event as CustomEvent).detail?.noteId;
+    if (!noteId) return;
+    const note = notes.find((n) => n.id === noteId);
+    // Allow selecting notes not yet in the list (e.g. right after first save)
+    if (!note || note.status !== "generating") {
+      setActiveNoteId(noteId);
+    }
+  });
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  // Custom event handler for setting active note from external sources
-  useEffect(() => {
-    const handleSetActiveNote = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const noteId = customEvent.detail?.noteId;
-      if (noteId) {
-        const note = notes.find((n) => n.id === noteId);
-        // Allow selecting notes not yet in the list (e.g. right after first save)
-        if (!note || note.status !== "generating") {
-          setActiveNoteId(noteId);
-        }
-      }
-    };
+    const handleSetActiveNote = (event: Event) => onSetActiveNoteEvent(event);
     window.addEventListener("setActiveNote", handleSetActiveNote);
     return () => window.removeEventListener("setActiveNote", handleSetActiveNote);
-  }, [notes]);
+  }, []);
 
   // Confirm dialog
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
@@ -156,78 +132,29 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   // Note actions hook (edit, copy, download, delete, export)
   const noteActions = useNoteActions({
     activeNote,
-    notes,
     onUpdateNote,
     onDeleteNote,
     confirm,
   });
 
   // Studio handlers hook (modals, creation flows)
-  const {
-    isReportModalOpen,
-    isFlashcardModalOpen,
-    isQuizModalOpen,
-    isAudioModalOpen,
-    isWrittenQuestionsModalOpen,
-    isInfographicModalOpen,
-    isSpreadsheetsModalOpen,
-    isMindMapModalOpen,
-    setIsReportModalOpen,
-    setIsFlashcardModalOpen,
-    setIsQuizModalOpen,
-    setIsAudioModalOpen,
-    setIsWrittenQuestionsModalOpen,
-    setIsInfographicModalOpen,
-    setIsSpreadsheetsModalOpen,
-    setIsMindMapModalOpen,
-    handleToolClick,
-    handleCreateReport,
-    handleCreateFlashcards,
-    handleCreateQuiz,
-    handleCreateAudio,
-    handleCreateWrittenQuestions,
-    handleCreateInfographic,
-    handleCreateSpreadsheet,
-    handleCreateMindMap,
-  } = useStudioHandlers({
-    notes,
+  const { openTool, closeTool, handleToolClick, create } = useStudioHandlers({
     sources,
     notebookId,
     onAddNote,
-    onUpdateNote,
     onUpdateNoteFull,
     onDeleteNote,
-    onSetActiveNoteId: setActiveNoteId,
     confirm,
   });
 
-  // Handle note click (for viewing)
+  // Open a saved note (generating rows aren't openable yet)
   const handleNoteClick = (note: Note) => {
-    // Prevent clicking on generating notes
-    if (note.status === "generating") {
-      return;
-    }
-    if (
-      note.type === "quiz" ||
-      note.type === "flashcard" ||
-      note.type === "report" ||
-      note.type === "mindmap" ||
-      note.type === "audio" ||
-      note.type === "audioOverview" ||
-      note.type === "writtenQuestions" ||
-      note.type === "infographic" ||
-      note.type === "spreadsheet" ||
-      note.type === "note"
-    ) {
-      setActiveNoteId(note.id);
-    }
+    if (note.status !== "generating") setActiveNoteId(note.id);
   };
 
   // Handle play audio from note item
   const handlePlayAudioFromNote = (note: Note) => {
-    if (note.type === "audio" && note.metadata.audioUrl) {
-      onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
-    } else if (isAudioOverviewNote(note) && note.audioUrl) {
+    if (isAudioOverviewNote(note) && note.audioUrl) {
       onPlayAudio?.(note.audioUrl, note.title, note.transcript, note.id, note.id);
     }
   };
@@ -308,9 +235,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           isInfographicFullscreen={isInfographicFullscreen}
           canCopyOrDownload={noteActions.canCopyOrDownloadReport}
           canCopyOrDownloadUserNote={noteActions.canCopyOrDownloadUserNote}
-          canExportFlashcards={noteActions.canExportFlashcards}
           isExporting={noteActions.isExporting}
-          isMobile={isMobile}
         />
 
         {/* Main Content */}
@@ -326,8 +251,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             ) : (
               <ActiveNoteView
                 activeNote={activeNote}
-                onUpdateNoteFull={onUpdateNoteFull}
-                isMobile={isMobile}
                 onBack={handleBack}
                 isEditingReportContent={isEditingReportContent}
                 onSaveReportContent={handleSaveReportContent}
@@ -341,7 +264,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             <NoteListView
               tools={tools}
               notes={notes}
-              activeNoteId={activeNoteId}
               onToolClick={handleToolClick}
               onNoteClick={handleNoteClick}
               onDeleteNote={noteActions.handleDeleteNote}
@@ -372,51 +294,44 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
       {/* Modals */}
       <CustomizeReportModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        onSelectFormat={handleCreateReport}
+        isOpen={openTool === "reports"}
+        onClose={closeTool}
+        onSelectFormat={create.reports}
       />
-
       <CustomizeFlashcardsModal
-        isOpen={isFlashcardModalOpen}
-        onClose={() => setIsFlashcardModalOpen(false)}
-        onGenerate={handleCreateFlashcards}
+        isOpen={openTool === "flashcards"}
+        onClose={closeTool}
+        onGenerate={create.flashcards}
       />
-
       <CustomizeQuizModal
-        isOpen={isQuizModalOpen}
-        onClose={() => setIsQuizModalOpen(false)}
-        onGenerate={handleCreateQuiz}
+        isOpen={openTool === "quiz"}
+        onClose={closeTool}
+        onGenerate={create.quiz}
       />
-
       <CustomizeAudioModal
-        isOpen={isAudioModalOpen}
-        onClose={() => setIsAudioModalOpen(false)}
-        onGenerate={handleCreateAudio}
+        isOpen={openTool === "audio"}
+        onClose={closeTool}
+        onGenerate={create.audio}
       />
-
       <CustomizeWrittenQuestionsModal
-        isOpen={isWrittenQuestionsModalOpen}
-        onClose={() => setIsWrittenQuestionsModalOpen(false)}
-        onGenerate={handleCreateWrittenQuestions}
+        isOpen={openTool === "writtenQuestions"}
+        onClose={closeTool}
+        onGenerate={create.writtenQuestions}
       />
-
       <CustomizeInfographicModal
-        isOpen={isInfographicModalOpen}
-        onClose={() => setIsInfographicModalOpen(false)}
-        onGenerate={handleCreateInfographic}
+        isOpen={openTool === "infographic"}
+        onClose={closeTool}
+        onGenerate={create.infographic}
       />
-
       <CustomizeSpreadsheetsModal
-        isOpen={isSpreadsheetsModalOpen}
-        onClose={() => setIsSpreadsheetsModalOpen(false)}
-        onGenerate={handleCreateSpreadsheet}
+        isOpen={openTool === "spreadsheets"}
+        onClose={closeTool}
+        onGenerate={create.spreadsheets}
       />
-
       <CustomizeMindMapModal
-        isOpen={isMindMapModalOpen}
-        onClose={() => setIsMindMapModalOpen(false)}
-        onGenerate={handleCreateMindMap}
+        isOpen={openTool === "mindmap"}
+        onClose={closeTool}
+        onGenerate={create.mindmap}
       />
 
       <ConfirmDialogComponent />

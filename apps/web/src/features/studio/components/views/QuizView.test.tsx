@@ -7,13 +7,16 @@ import { QuizView } from "./QuizView";
 
 const submitAnswer = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn().mockResolvedValue(undefined);
-let latestNote: QuizNote | null = null;
 
 vi.mock("@/features/studio/services/quizzesApi", () => ({
   useSubmitQuizAnswer: () => submitAnswer,
   useResetQuizAnswers: () => resetAnswers,
-  useUpdateQuizProgress: () => undefined,
-  useQuiz: () => latestNote,
+}));
+vi.mock("@/features/studio/services/studioProgressApi", () => ({
+  usePersistLastViewedIndex: () => undefined,
+}));
+vi.mock("@/shared/contexts/useToast", () => ({
+  useToast: () => ({ error: vi.fn() }),
 }));
 
 vi.mock("@/shared/components/MarkdownRenderer", () => ({
@@ -61,7 +64,6 @@ async function finishQuiz(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  latestNote = null;
 });
 
 describe("QuizView", () => {

@@ -278,7 +278,7 @@ export interface QuizNote extends BaseNote {
 }
 
 // Audio note - audio overview with transcript
-export interface AudioNote extends BaseNote {
+interface AudioNote extends BaseNote {
   type: "audio";
   content: string; // transcript
   metadata: {
@@ -402,10 +402,6 @@ export function isFlashcardNote(note: Note): note is FlashcardNote {
 
 export function isQuizNote(note: Note): note is QuizNote {
   return note.type === "quiz";
-}
-
-export function isAudioNote(note: Note): note is AudioNote {
-  return note.type === "audio";
 }
 
 export function isAudioOverviewNote(note: Note): note is AudioOverviewNote {

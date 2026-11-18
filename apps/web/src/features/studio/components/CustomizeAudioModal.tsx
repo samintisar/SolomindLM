@@ -2,7 +2,6 @@ import type React from "react";
 import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { FieldLegend, FieldSet } from "@/shared/components/ui/field";
-import type { StudioDialogTheme } from "./customize/dialogContext";
 import { OptionCard } from "./customize/OptionCard";
 import { OptionToggleGroup } from "./customize/OptionToggleGroup";
 import type { ToggleOption } from "./customize/options";
@@ -12,6 +11,7 @@ import {
   StudioCustomizeDialog,
   StudioCustomizeFooter,
   StudioCustomizeHeader,
+  type StudioCustomizeModalProps,
 } from "./customize/StudioCustomizeDialog";
 
 interface AudioFormat {
@@ -59,17 +59,7 @@ const FOCUS_PLACEHOLDER = [
   '• Target a specific audience ("explain to someone new to biology")',
 ].join("\n");
 
-interface CustomizeAudioModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onGenerate: (config: AudioConfig) => void;
-  /** When true, opens inside a positioned parent (a preview mock-up) instead of the viewport. */
-  embedded?: boolean;
-  /** Pins light-theme tokens on always-light pages (the auth page). */
-  theme?: StudioDialogTheme;
-  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
-  preview?: boolean;
-}
+type CustomizeAudioModalProps = StudioCustomizeModalProps<AudioConfig>;
 
 export interface AudioConfig {
   formatId: string;
@@ -79,20 +69,10 @@ export interface AudioConfig {
 
 export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
   isOpen,
-  onClose,
   onGenerate,
-  embedded = false,
-  theme,
-  preview = false,
+  ...dialogProps
 }) => (
-  <StudioCustomizeDialog
-    open={isOpen}
-    onClose={onClose}
-    embedded={embedded}
-    theme={theme}
-    preview={preview}
-    wide
-  >
+  <StudioCustomizeDialog open={isOpen} {...dialogProps} wide>
     <AudioForm onGenerate={onGenerate} />
   </StudioCustomizeDialog>
 );

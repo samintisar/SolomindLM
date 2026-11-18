@@ -1,14 +1,10 @@
 import { ArrowLeft, FileText } from "lucide-react";
-import React, { lazy, Suspense } from "react";
+import type React from "react";
+import { LazyMarkdown } from "@/shared/components/LazyMarkdown";
 import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
-import { Skeleton } from "@/shared/components/ui/skeleton";
 import { UserNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
 
 export interface UserNoteViewProps {
   note: UserNote;
@@ -30,19 +26,9 @@ export const UserNoteView: React.FC<UserNoteViewProps> = ({ note, onBack }) => {
       <div className="flex-1 overflow-y-auto">
         {note.content ? (
           <div className="px-6 py-6 animate-in fade-in duration-300 ease-out">
-            <Suspense
-              fallback={
-                <div className="mx-auto max-w-prose space-y-3">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              }
-            >
-              <MarkdownRenderer className="prose mx-auto font-serif select-text">
-                {sanitizeMarkdown(note.content)}
-              </MarkdownRenderer>
-            </Suspense>
+            <LazyMarkdown className="prose mx-auto font-serif select-text">
+              {sanitizeMarkdown(note.content)}
+            </LazyMarkdown>
           </div>
         ) : (
           <Empty className="h-full">

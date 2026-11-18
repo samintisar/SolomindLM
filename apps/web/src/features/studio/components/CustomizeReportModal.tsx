@@ -1,7 +1,9 @@
 import type React from "react";
-import type { StudioDialogTheme } from "./customize/dialogContext";
 import { type PromptFormat, PromptFormatPicker } from "./customize/PromptFormatPicker";
-import { StudioCustomizeDialog } from "./customize/StudioCustomizeDialog";
+import {
+  StudioCustomizeDialog,
+  type StudioCustomizeModalProps,
+} from "./customize/StudioCustomizeDialog";
 
 const CUSTOM_FORMAT: PromptFormat<string> = {
   id: "custom",
@@ -164,20 +166,10 @@ const ALL_FORMATS = [...FORMATS, ...SUGGESTED_FORMATS];
 
 export const CustomizeReportModal: React.FC<CustomizeReportModalProps> = ({
   isOpen,
-  onClose,
   onSelectFormat,
-  embedded = false,
-  theme,
-  preview = false,
+  ...dialogProps
 }) => (
-  <StudioCustomizeDialog
-    open={isOpen}
-    onClose={onClose}
-    embedded={embedded}
-    theme={theme}
-    preview={preview}
-    wide
-  >
+  <StudioCustomizeDialog open={isOpen} {...dialogProps} wide>
     <PromptFormatPicker
       kind="report"
       title="Create report"
@@ -195,14 +187,6 @@ export const CustomizeReportModal: React.FC<CustomizeReportModalProps> = ({
   </StudioCustomizeDialog>
 );
 
-interface CustomizeReportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+type CustomizeReportModalProps = Omit<StudioCustomizeModalProps<never>, "onGenerate"> & {
   onSelectFormat: (formatId: string, customPrompt?: string) => void;
-  /** When true, opens inside a positioned parent (the marketing hero preview) instead of the viewport. */
-  embedded?: boolean;
-  /** Pins light-theme tokens on always-light pages (the auth page). */
-  theme?: StudioDialogTheme;
-  /** A marketing mock-up (landing, sign-in): hides Discover Prompts and Save as reusable prompt. */
-  preview?: boolean;
-}
+};

@@ -1,40 +1,26 @@
-import { ArrowLeft, Network, XCircle } from "lucide-react";
+import { Network, XCircle } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
-import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
 import type { MindMapNote } from "@/shared/types/index";
+import { studioErrorMessage } from "../../utils/studioErrorMessage";
 import { MindMapOutline } from "../mindmap/MindMapOutline";
 import { sanitizeNodeTree } from "../mindmap/outline";
 
 export interface MindMapViewProps {
   note: MindMapNote;
-  onBack?: () => void;
   onAskInChat?: (prompt: string, documentIds?: string[]) => void;
 }
 
-/** The stored error as text. Metadata isn't validated, so only a non-empty string is shown. */
-function errorMessage(error: unknown): string {
-  if (typeof error === "string" && error) return error;
-  if (typeof error === "object" && error !== null) {
-    const { message } = error as { message?: unknown };
-    if (typeof message === "string" && message) return message;
-  }
-  return "An unknown error occurred";
-}
-
 /** A mind map note as a collapsible outline; clicking a topic asks the notebook chat about it. */
-export const MindMapView: React.FC<MindMapViewProps> = ({ note, onBack, onAskInChat }) => {
+export const MindMapView: React.FC<MindMapViewProps> = ({ note, onAskInChat }) => {
   const { isChatStreaming, remoteGenerationBlocksSend } = useChatStreamingContext();
   const title = note.title?.trim() || "Mind Map";
-  // `content` is the stored map serialised, so it only changes when the map does. The note is
-  // mapped afresh on every render, which makes `mindMapData` a new object each time.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on `content`, see above
   const root = useMemo(
     () => sanitizeNodeTree(note.mindMapData?.nodeData, title, true),
-    [note.content, title]
+    [note.mindMapData, title]
   );
 
   if (note.status === "failed") {
@@ -43,7 +29,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, onBack, onAskInC
         <Alert variant="destructive">
           <XCircle />
           <AlertTitle>Mind map generation failed</AlertTitle>
-          <AlertDescription>{errorMessage(note.metadata?.error)}</AlertDescription>
+          <AlertDescription>{studioErrorMessage(note.metadata?.error)}</AlertDescription>
         </Alert>
         <Empty>
           <EmptyHeader>
@@ -89,13 +75,6 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, onBack, onAskInC
 
   return (
     <div className="flex h-full flex-col bg-card duration-300 ease-out animate-in fade-in slide-in-from-right-4">
-      {onBack && (
-        <div className="flex shrink-0 items-center px-2 py-2 md:hidden">
-          <Button variant="ghost" size="icon-sm" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-        </div>
-      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <MindMapOutline
           key={note.id}

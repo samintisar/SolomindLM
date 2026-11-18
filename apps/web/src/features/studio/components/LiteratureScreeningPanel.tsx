@@ -24,6 +24,7 @@ import {
 } from "@/shared/components/ui/empty";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { cn } from "@/shared/utils/cn";
+import { downloadFile } from "@/shared/utils/download";
 import {
   useLiteratureReviewScreeningDecisions,
   useLiteratureReviewSession,
@@ -513,15 +514,11 @@ function exportScreeningDecisions(decisions: LiteratureScreeningDecision[], titl
     decision.reason,
   ]);
   const csv = [headers, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${title.replace(/\s+/g, "_")}_screening_decisions.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadFile(
+    csv,
+    `${title.replace(/\s+/g, "_")}_screening_decisions.csv`,
+    "text/csv;charset=utf-8;"
+  );
 }
 
 function escapeCsvValue(value: string) {

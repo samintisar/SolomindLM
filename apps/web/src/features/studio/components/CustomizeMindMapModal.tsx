@@ -6,17 +6,17 @@ import {
   StudioCustomizeDialog,
   StudioCustomizeFooter,
   StudioCustomizeHeader,
+  type StudioCustomizeModalProps,
 } from "./customize/StudioCustomizeDialog";
 
 export interface MindMapConfig {
   customPrompt: string;
 }
 
-interface CustomizeMindMapModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onGenerate: (config: MindMapConfig) => void;
-}
+type CustomizeMindMapModalProps = Pick<
+  StudioCustomizeModalProps<MindMapConfig>,
+  "isOpen" | "onClose" | "onGenerate"
+>;
 
 export function CustomizeMindMapModal({ isOpen, onClose, onGenerate }: CustomizeMindMapModalProps) {
   return (

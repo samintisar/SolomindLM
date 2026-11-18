@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, Table2, XCircle } from "lucide-react";
+import { Download, Table2, XCircle } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -6,7 +6,9 @@ import { Button } from "@/shared/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/components/ui/empty";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import type { SpreadsheetNote } from "@/shared/types/index";
+import { downloadFile, safeFileName } from "@/shared/utils/download";
 import { useSaveSpreadsheetData } from "../../services/spreadsheetsApi";
+import { studioErrorMessage } from "../../utils/studioErrorMessage";
 import { SheetGrid } from "../spreadsheet/SheetGrid";
 import { SheetSaveStatus } from "../spreadsheet/SheetSaveStatus";
 import { type Grid, toCsv, toExportCsv, toGrid } from "../spreadsheet/sheetModel";
@@ -14,12 +16,6 @@ import { useSheetAutosave } from "../spreadsheet/useSheetAutosave";
 
 export interface SpreadsheetViewProps {
   note: SpreadsheetNote;
-  onBack?: () => void;
-}
-
-/** A download name without the characters file systems reject. */
-function safeFileName(title: string): string {
-  return title.replace(/[\\/:*?"<>|]/g, "-").trim() || "spreadsheet";
 }
 
 /**
@@ -27,20 +23,11 @@ function safeFileName(title: string): string {
  * app would run as formulas are written as text (see `toExportCsv`).
  */
 function downloadCsv(grid: Grid, title: string) {
-  const blob = new Blob([`﻿${toExportCsv(grid)}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${safeFileName(title)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function errorMessage(error: unknown): string {
-  if (typeof error === "object" && error !== null) {
-    return (error as { message?: string }).message || "An unknown error occurred";
-  }
-  return typeof error === "string" && error ? error : "An unknown error occurred";
+  downloadFile(
+    `﻿${toExportCsv(grid)}`,
+    `${safeFileName(title, "spreadsheet", "-")}.csv`,
+    "text/csv;charset=utf-8"
+  );
 }
 
 /**
@@ -60,11 +47,11 @@ function hasTableContent(content: unknown): boolean {
  *
  * Keyed by note id, so a different spreadsheet never inherits this one's grid or pending save.
  */
-export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ note, onBack }) => (
-  <SpreadsheetSheet key={note.id} note={note} onBack={onBack} />
+export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ note }) => (
+  <SpreadsheetSheet key={note.id} note={note} />
 );
 
-function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
+function SpreadsheetSheet({ note }: SpreadsheetViewProps) {
   const readOnly = note.status !== "completed";
   const isFailed = note.status === "failed";
 
@@ -125,25 +112,8 @@ function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background animate-in fade-in slide-in-from-right-4 duration-300 ease-out">
-      {onBack && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 bg-background px-2 py-2 md:hidden">
-          <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to Studio">
-            <ArrowLeft />
-          </Button>
-          <span className="truncate text-sm font-semibold">{note.title}</span>
-        </div>
-      )}
-
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-        <h2
-          className={
-            onBack
-              ? "hidden flex-1 truncate font-display text-base font-semibold md:block"
-              : "flex-1 truncate font-display text-base font-semibold"
-          }
-        >
-          {note.title}
-        </h2>
+        <h2 className="flex-1 truncate font-display text-base font-semibold">{note.title}</h2>
         <SheetSaveStatus state={state} editedAt={note.metadata?.editedAt} onRetry={retry} />
         <Button
           variant="ghost"
@@ -161,7 +131,7 @@ function SpreadsheetSheet({ note, onBack }: SpreadsheetViewProps) {
           <Alert variant="destructive">
             <XCircle />
             <AlertTitle>Spreadsheet generation failed</AlertTitle>
-            <AlertDescription>{errorMessage(note.metadata?.error)}</AlertDescription>
+            <AlertDescription>{studioErrorMessage(note.metadata?.error)}</AlertDescription>
           </Alert>
         </div>
       )}
