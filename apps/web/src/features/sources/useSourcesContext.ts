@@ -5,7 +5,8 @@ export interface SourcesContextType {
   sources: Source[];
   onToggleSource: (id: string) => void;
   onToggleAll: (visibleIds: string[]) => void;
-  onAddSource: (source: Source) => void;
+  /** @deprecated Unused: the reactive document list shows new sources. Remove with App.tsx's wiring. */
+  onAddSource?: (source: Source) => void;
   onDeleteSource: (id: string) => void;
   onDeleteSelectedSources: (ids: string[]) => Promise<void>;
   onRenameSource: (id: string, newTitle: string) => void;

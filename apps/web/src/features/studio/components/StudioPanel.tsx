@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MiniAudioPlayer } from "@/features/audio/components/MiniAudioPlayer";
-import { useAudioPlayerContext } from "@/features/audio/useAudioPlayer";
+import { useAudioPlayerContext } from "@/features/audio/useAudioPlayerContext";
 import {
   isAudioNote,
   isAudioOverviewNote,

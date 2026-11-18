@@ -1,5 +1,4 @@
 import { isNativeShell } from "@/utils/platformDetection";
-import { getLastRequestId } from "./lastRequestId";
 
 export type FeedbackType = "bug" | "feature";
 
@@ -9,7 +8,6 @@ export interface FeedbackContextCapture {
   route: string;
   surface: "web" | "mobile";
   appVersion: string;
-  lastRequestId?: string;
 }
 
 export function captureFeedbackContext(
@@ -19,7 +17,6 @@ export function captureFeedbackContext(
     route: `${loc.pathname}${loc.search ?? ""}`,
     surface: isNativeShell() ? "mobile" : "web",
     appVersion: (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "unknown",
-    lastRequestId: getLastRequestId(),
   };
 }
 

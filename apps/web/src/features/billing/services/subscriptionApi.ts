@@ -7,6 +7,9 @@ import type {
   SubscriptionStatusResponse,
 } from "../types";
 
+const FREE_LIMITS = { notebookLimit: 5, sourceLimit: 20 };
+const PRO_LIMITS = { notebookLimit: 200, sourceLimit: 200 };
+
 /** Backstop for canOfferPurchases: no Stripe checkout or portal from the native app. */
 function assertPurchasesAllowed() {
   if (!canOfferPurchases()) {
@@ -25,8 +28,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
       hasSubscription: false,
       isLoading: subscription === undefined,
       plan: "free",
-      notebookLimit: 5,
-      sourceLimit: 20,
+      ...FREE_LIMITS,
       currentPeriodEnd: undefined,
       cancelAtPeriodEnd: false,
     };
@@ -66,12 +68,12 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
     }
   }
 
+  const active = subscription.status === "active";
   return {
-    hasSubscription: subscription.status === "active",
+    hasSubscription: active,
     status: subscription.status as any,
-    plan: subscription.status === "active" ? "premium" : "free",
-    notebookLimit: subscription.status === "active" ? 200 : 5,
-    sourceLimit: subscription.status === "active" ? 200 : 20,
+    plan: active ? "premium" : "free",
+    ...(active ? PRO_LIMITS : FREE_LIMITS),
     currentPeriodEnd: currentPeriodEndIso ?? undefined,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     interval: subscription.interval as SubscriptionInterval,
@@ -132,25 +134,13 @@ export function useCreatePortalSession() {
  * Get limits for current user (convenience hook)
  */
 export function useUserLimits() {
-  const subscription = useQuery(api.billing.index.getCurrent);
-  // `useQuery` is `undefined` until the subscription query resolves. Callers
-  // must not treat the free cap as authoritative during this window (it would
-  // flash "limit reached" at a Pro user); they gate on `isLoading` instead.
-  const isLoading = subscription === undefined;
-
-  if (subscription?.status === "active") {
-    return {
-      notebookLimit: 200,
-      sourceLimit: 200,
-      isPremium: true,
-      isLoading: false,
-    };
-  }
-
+  const status = useSubscriptionStatus();
+  const isPremium = status.plan === "premium";
   return {
-    notebookLimit: 5,
-    sourceLimit: 20,
-    isPremium: false,
-    isLoading,
+    ...(isPremium ? PRO_LIMITS : FREE_LIMITS),
+    isPremium,
+    // True until the subscription query resolves. Callers must not treat the free cap as
+    // authoritative during this window (it would flash "limit reached" at a Pro user).
+    isLoading: status.isLoading === true,
   };
 }

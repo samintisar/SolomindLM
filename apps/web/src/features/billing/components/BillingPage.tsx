@@ -2,9 +2,11 @@ import { Check } from "lucide-react";
 import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent } from "@/shared/components/ui/card";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { canOfferPurchases } from "@/utils/platformDetection";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "../planFeatures";
+import { PRO_PRICES } from "../planPrices";
 import {
   useCancelSubscription,
   useCreateCheckout,
@@ -24,6 +26,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
   const createPortalSession = useCreatePortalSession();
   const cancelSubscription = useCancelSubscription();
   const purchasable = canOfferPurchases();
+  const { showError } = useServiceErrorToast();
 
   const handleUpgrade = async (interval: "month" | "year") => {
     try {
@@ -35,7 +38,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
       window.location.href = session.url;
     } catch (error) {
       console.error("Failed to create checkout:", error);
-      alert(error instanceof Error ? error.message : "Failed to start checkout");
+      showError(error);
     }
   };
 
@@ -48,7 +51,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
       window.location.href = url;
     } catch (error) {
       console.error("Failed to open billing portal:", error);
-      alert(error instanceof Error ? error.message : "Failed to open billing portal");
+      showError(error);
     }
   };
 
@@ -64,7 +67,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
       await cancelSubscription();
     } catch (error) {
       console.error("Failed to cancel subscription:", error);
-      alert(error instanceof Error ? error.message : "Failed to cancel subscription");
+      showError(error);
     }
   };
 
@@ -197,8 +200,8 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <PlanCard
                   title="Yearly"
                   subtitle="Best value – billed once per year"
-                  price="$7.50"
-                  priceNote="($90/year)"
+                  price={PRO_PRICES.annualPerMonth}
+                  priceNote={`(${PRO_PRICES.annualTotal}/year)`}
                   badge="Save 50%"
                   highlighted
                   featuresLabel="Everything included:"
@@ -224,7 +227,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <PlanCard
                   title="Monthly"
                   subtitle="Billed every month"
-                  price="$15"
+                  price={PRO_PRICES.monthly}
                   proChecks
                   featuresLabel="Everything included:"
                   features={PRO_PLAN_FEATURES}

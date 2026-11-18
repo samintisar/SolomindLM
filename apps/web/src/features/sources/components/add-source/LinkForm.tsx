@@ -5,6 +5,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/shared/compon
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { useToast } from "@/shared/contexts/useToast";
+import { parseUrls } from "../../utils/parseUrls";
 import { type StepFormProps, useReportBusy } from "./types";
 
 const COPY = {
@@ -40,10 +41,7 @@ export function LinkForm({ kind, onUpload, isUploading, onDone, onBusyChange }: 
 
   const submit = async () => {
     if (!value.trim() || pending) return;
-    const urls = value
-      .split(/\s+/)
-      .map((url) => url.trim())
-      .filter((url) => url.startsWith("http://") || url.startsWith("https://"));
+    const urls = parseUrls(value);
     if (urls.length === 0) {
       showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;

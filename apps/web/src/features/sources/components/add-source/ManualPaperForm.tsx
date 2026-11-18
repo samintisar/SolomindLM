@@ -7,7 +7,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/shared/compon
 import { Input } from "@/shared/components/ui/input";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { useUpload } from "../../services/documentsApi";
+import { useCreateDocument } from "../../services/documentsApi";
 import { type StepFormProps, useReportBusy } from "./types";
 
 interface ManualPaperFormProps extends StepFormProps {
@@ -26,7 +26,7 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
   const [error, setError] = useState<string | null>(null);
   const baseId = useId();
 
-  const upload = useUpload();
+  const createDocument = useCreateDocument();
   useReportBusy(isUploading, onBusyChange);
 
   const isValid = Boolean(title.trim() && authors.trim());
@@ -44,7 +44,7 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
       // Only a whole 4-digit year counts: parseInt would read "20x" as year 20.
       const publicationYear = /^\d{4}$/.test(year.trim()) ? Number(year.trim()) : undefined;
 
-      await upload({
+      await createDocument({
         notebookId,
         type: "paper_record",
         fileName: title.trim(),
@@ -65,7 +65,19 @@ export function ManualPaperForm({ notebookId, onDone, onBusyChange }: ManualPape
     } finally {
       setIsUploading(false);
     }
-  }, [isValid, title, authors, abstract, doi, venue, year, pdfUrl, notebookId, upload, onDone]);
+  }, [
+    isValid,
+    title,
+    authors,
+    abstract,
+    doi,
+    venue,
+    year,
+    pdfUrl,
+    notebookId,
+    createDocument,
+    onDone,
+  ]);
 
   return (
     <form

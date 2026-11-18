@@ -7,7 +7,7 @@ import { ManualPaperForm } from "./ManualPaperForm";
 const upload = vi.fn();
 vi.mock("../../services/documentsApi", () => ({
   useResolveDoi: () => vi.fn(),
-  useUpload: () => upload,
+  useCreateDocument: () => upload,
 }));
 
 const notebookId = "nb1" as Id<"notebooks">;

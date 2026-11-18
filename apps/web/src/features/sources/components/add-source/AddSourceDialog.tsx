@@ -1,7 +1,6 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { ArrowLeft, File, X } from "lucide-react";
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useUserLimits } from "@/features/billing/services/subscriptionApi";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@/shared/components/ui/dialog";
 import { Progress } from "@/shared/components/ui/progress";
 import { cn } from "@/shared/utils/cn";
+import type { SourceUpload } from "../../hooks/useSourceUpload";
 import { AddSourceMenu } from "./AddSourceMenu";
 import { BibtexImportForm } from "./BibtexImportForm";
 import { DoiForm } from "./DoiForm";
@@ -28,17 +28,7 @@ export interface AddSourceDialogProps {
   sourcesCount: number;
   userId?: string | null;
   noteId?: string | null;
-  isUploading: boolean;
-  isDragging: boolean;
-  onDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  fileInputRef?: React.RefObject<HTMLInputElement | null>;
-  onFileSelect?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onUrlUpload: (urls: string[]) => Promise<void>;
-  onVideoUpload: (urls: string[]) => Promise<void>;
-  onTextUpload: (text: string, title?: string) => Promise<void>;
+  upload: SourceUpload;
   onDiscoverClick: () => void;
   onGoogleDriveClick: () => void;
 }
@@ -69,17 +59,7 @@ export function AddSourceDialog({
   sourcesCount,
   userId,
   noteId,
-  isUploading,
-  isDragging,
-  onDragEnter,
-  onDragLeave,
-  onDragOver,
-  onDrop,
-  fileInputRef,
-  onFileSelect,
-  onUrlUpload,
-  onVideoUpload,
-  onTextUpload,
+  upload,
   onDiscoverClick,
   onGoogleDriveClick,
 }: AddSourceDialogProps) {
@@ -103,25 +83,6 @@ export function AddSourceDialog({
       setBusy(false);
     }
   }
-
-  // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
-  // onDragLeave is recreated each render, so [open, onDragLeave] would retrigger after setState).
-  const onDragLeaveRef = useRef(onDragLeave);
-  onDragLeaveRef.current = onDragLeave;
-
-  // Reset dragging state when the dialog closes (run only when open changes, not when callback
-  // identity changes).
-  useEffect(() => {
-    if (!open) {
-      const syntheticEvent = {
-        preventDefault: () => undefined,
-        stopPropagation: () => undefined,
-        currentTarget: document.createElement("div"),
-        relatedTarget: null,
-      } as unknown as React.DragEvent<HTMLDivElement>;
-      onDragLeaveRef.current(syntheticEvent);
-    }
-  }, [open]);
 
   // While the subscription is still loading the cap is not known — don't gate on
   // it (the server enforces the real limit); a Pro user would otherwise briefly
@@ -151,13 +112,7 @@ export function AddSourceDialog({
             showAuthWarning={showAuthWarning}
             limitReached={limitReached}
             maxSources={maxSources}
-            isDragging={isDragging}
-            onDragEnter={onDragEnter}
-            onDragLeave={onDragLeave}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-            fileInputRef={fileInputRef}
-            onFileSelect={onFileSelect}
+            onFiles={upload.processFiles}
             focusKey={originKey}
             onSelect={selectStep}
             onDiscover={() => {
@@ -178,8 +133,8 @@ export function AddSourceDialog({
           <LinkForm
             key={step}
             kind={step}
-            onUpload={step === "website" ? onUrlUpload : onVideoUpload}
-            isUploading={isUploading}
+            onUpload={step === "website" ? upload.handleUrlUpload : upload.handleSocialMediaUpload}
+            isUploading={upload.isUploading}
             onDone={done}
             onBusyChange={onBusyChange}
           />
@@ -187,8 +142,8 @@ export function AddSourceDialog({
       case "text":
         return (
           <TextForm
-            onUpload={onTextUpload}
-            isUploading={isUploading}
+            onUpload={upload.handleTextUpload}
+            isUploading={upload.isUploading}
             onDone={done}
             onBusyChange={onBusyChange}
           />

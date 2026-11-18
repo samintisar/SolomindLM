@@ -1,14 +1,9 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { ConvexClient } from "convex/browser";
 import { useAction, useMutation, useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
 import { useCallback } from "react";
-import type {
-  Document,
-  PaperRecordInput,
-  UnifiedDiscoveryResult,
-  UploadResponse,
-} from "@/shared/types/index";
+import type { UnifiedDiscoveryResult } from "@/shared/types/index";
 
 // ============================================================
 // Hooks (for use in React components)
@@ -40,13 +35,6 @@ export function useGenerateUploadUrl() {
 }
 
 /**
- * Raw upload mutation (for advanced use cases like manual paper entry)
- */
-export function useUpload() {
-  return useMutation(api.documents.index.upload);
-}
-
-/**
  * Parse bibliography from BibTeX or RIS content
  */
 export function useParseBibliography() {
@@ -60,48 +48,20 @@ export function useResolveDoi() {
   return useAction(api.documents.index.resolveDoi);
 }
 
+type CreateDocumentArgs = Omit<FunctionArgs<typeof api.documents.index.upload>, "notebookId"> & {
+  notebookId: string;
+};
+
 /**
- * Create (upload) a new document
+ * Create a document: a link, pasted text, a paper record, or an already-stored file.
  */
 export function useCreateDocument() {
   const upload = useMutation(api.documents.index.upload);
-
-  return async (
-    data:
-      | {
-          notebookId: string;
-          type: "file" | "url" | "youtube" | "text";
-          source?: string;
-          fileName: string;
-          fileSize?: number;
-          storageId?: string;
-          contentType?: string;
-        }
-      | {
-          notebookId: string;
-          type: "paper_record";
-          fileName: string;
-          paperRecord: PaperRecordInput;
-        }
-  ) => {
-    if (data.type === "paper_record") {
-      return await upload({
-        notebookId: data.notebookId as Id<"notebooks">,
-        type: "paper_record",
-        fileName: data.fileName,
-        paperRecord: data.paperRecord,
-      });
-    }
-    return await upload({
-      notebookId: data.notebookId as Id<"notebooks">,
-      type: data.type,
-      source: data.source,
-      storageId: data.storageId,
-      fileName: data.fileName,
-      fileSize: data.fileSize,
-      contentType: data.contentType,
-    });
-  };
+  return useCallback(
+    (args: CreateDocumentArgs) =>
+      upload({ ...args, notebookId: args.notebookId as Id<"notebooks"> }),
+    [upload]
+  );
 }
 
 /**
@@ -318,35 +278,6 @@ export function useIngestFromGoogleDrive() {
 }
 
 /**
- * Poll document status until it's completed or failed
- * Note: With Convex, you can also use useQuery with real-time updates
- * This polling function is kept for compatibility
- */
-export async function pollDocumentStatus(
-  getDocument: () => Document | null | undefined,
-  onUpdate?: (status: Document["status"]) => void,
-  maxAttempts = 60,
-  interval = 2000
-): Promise<Document> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const doc = getDocument();
-
-    if (!doc) {
-      throw new Error("Document not found");
-    }
-
-    if (doc.status === "completed" || doc.status === "failed") {
-      return doc;
-    }
-
-    onUpdate?.(doc.status);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error("Document processing timed out");
-}
-
-/**
  * Upload a file to Convex storage and create a document record
  * This is a React hook that should be used in components
  */
@@ -399,63 +330,4 @@ export function useGetExistingPapers(notebookId: string) {
  */
 export function useBulkUpload() {
   return useMutation(api.documents.bulkUpload.bulkUpload);
-}
-
-// ============================================================
-// Imperative API (for use in event handlers, outside React)
-// ============================================================
-
-// Get or create a singleton Convex client
-let convexClient: ConvexClient | null = null;
-function getConvexClient(): ConvexClient {
-  if (!convexClient) {
-    const convexUrl = import.meta.env.VITE_CONVEX_URL;
-    if (!convexUrl) {
-      throw new Error("VITE_CONVEX_URL environment variable is not set");
-    }
-    convexClient = new ConvexClient(convexUrl);
-  }
-  return convexClient;
-}
-
-/**
- * Upload URL as a document
- * This is an imperative function that can be called outside of React
- */
-export async function uploadUrl(
-  notebookId: string,
-  url: string,
-  type: "url" | "youtube"
-): Promise<UploadResponse> {
-  const client = getConvexClient();
-  const result = await client.mutation(api.documents.index.upload, {
-    notebookId: notebookId as Id<"notebooks">,
-    type,
-    source: url,
-    fileName: type === "youtube" ? "YouTube Video" : url,
-  });
-  return {
-    documentId: result.documentId,
-    message: "Uploaded successfully",
-    status: "success",
-  };
-}
-
-/**
- * Upload pasted text as a document
- * This is an imperative function that can be called outside of React
- */
-export async function uploadText(notebookId: string, text: string): Promise<UploadResponse> {
-  const client = getConvexClient();
-  const result = await client.mutation(api.documents.index.upload, {
-    notebookId: notebookId as Id<"notebooks">,
-    type: "text",
-    source: text,
-    fileName: "Pasted text",
-  });
-  return {
-    documentId: result.documentId,
-    message: "Uploaded successfully",
-    status: "success",
-  };
 }

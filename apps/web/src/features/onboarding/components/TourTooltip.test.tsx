@@ -15,6 +15,8 @@ function withCtx(value: Partial<OnboardingContextValue>) {
     tourStatus: "active",
     currentStepId: "createNotebook",
     initFailed: false,
+    checklist: undefined,
+    checklistDismissed: false,
     skip: vi.fn(async () => {}),
     ...value,
   };

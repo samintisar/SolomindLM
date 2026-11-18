@@ -467,41 +467,6 @@ export interface FolderItem {
   updated_at: string | number;
 }
 
-export interface Document {
-  id: string;
-  user_id: string;
-  note_id: string;
-  title?: string;
-  file_name: string;
-  file_type: "file" | "url" | "youtube";
-  file_url?: string;
-  status: "pending" | "processing" | "completed" | "failed";
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface UploadResponse {
-  message: string;
-  documentId: string;
-  status: string;
-}
-
-/** Payload for `documents.upload` with `type: "paper_record"` */
-export interface PaperRecordInput {
-  abstract: string;
-  authors: string[];
-  doi?: string;
-  venue?: string;
-  publicationYear?: number;
-  openAlexId?: string;
-  semanticScholarId?: string;
-  isOa: boolean;
-  pdfUrl?: string;
-  landingPageUrl?: string;
-  license?: string;
-}
-
 /**
  * Unified discovery result from multi-source search
  */

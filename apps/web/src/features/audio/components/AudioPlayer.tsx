@@ -2,9 +2,8 @@ import { ArrowLeft, Download } from "lucide-react";
 import React, { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
-import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { usePauseAlignedLines } from "../hooks/usePauseAlignedLines";
-import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
+import { useResolvedAudioPlayer } from "../hooks/useResolvedAudioPlayer";
 import { currentLineIndex, resolveReaderLines } from "../transcript/transcriptLines";
 import { PlayButton } from "./controls/PlayButton";
 import { SkipButton } from "./controls/SkipButton";
@@ -60,24 +59,23 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   metadata,
   onBack,
 }) => {
-  const resolvedPlayback = useResolvedAudioPlaybackUrl(audioUrl, audioOverviewId);
-  const audioSource = typeof resolvedPlayback === "string" ? resolvedPlayback : null;
   const {
     audioRef,
+    audioSource,
+    canPlay,
     canSeek,
     currentTime,
     cyclePlaybackRate,
     duration,
     error,
     isPlaying,
+    isResolving,
+    isUnavailable,
     playbackRate,
     seekTo,
     skipBy,
     togglePlay,
-  } = useAudioPlayer(audioSource);
-  const isResolving = resolvedPlayback === undefined;
-  const isUnavailable = resolvedPlayback === null;
-  const canPlay = !!audioSource && !error;
+  } = useResolvedAudioPlayer(audioUrl, audioOverviewId);
 
   // The estimate depends on the duration, which is 0 until the audio loads. currentLineIndex is
   // -1 until then, so the reader does not open on the last line.

@@ -4,11 +4,8 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
-import {
-  useChecklistProgress,
-  useDismissChecklist,
-  useOnboardingState,
-} from "../services/onboardingApi";
+import { useOnboarding } from "../OnboardingContext";
+import { useDismissChecklist } from "../services/onboardingApi";
 import { ChecklistItem } from "./ChecklistItem";
 
 const COLLAPSED_KEY = "onboardingChecklistCollapsed";
@@ -35,8 +32,7 @@ function logOnboardingError(action: string, error: unknown) {
 
 export const ChecklistCard: React.FC = () => {
   const location = useLocation();
-  const state = useOnboardingState();
-  const progress = useChecklistProgress();
+  const { tourStatus, checklist: progress, checklistDismissed } = useOnboarding();
   const dismiss = useDismissChecklist();
   const { showError } = useServiceErrorToast();
 
@@ -58,9 +54,8 @@ export const ChecklistCard: React.FC = () => {
     }
   }, [collapsed]);
 
-  if (!state || !progress) return null;
-  if ("tourStatus" in state && state.tourStatus === "completed") return null;
-  if ("checklistDismissed" in state && state.checklistDismissed) return null;
+  // tourStatus reads "completed" until the onboarding state loads.
+  if (!progress || tourStatus === "completed" || checklistDismissed) return null;
 
   const isHome = location.pathname === "/home";
   const isNotebook = location.pathname.startsWith("/notebook/");

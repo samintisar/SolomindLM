@@ -23,6 +23,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/features/billing/planFeatures";
+import { PRO_PRICES } from "@/features/billing/planPrices";
 import type { CoverTone, Tone } from "./tone";
 
 /** Nav anchors. `target` is a section id on the home page. */
@@ -279,7 +280,7 @@ export const PLANS: Plan[] = [
     id: "pro",
     name: "Pro",
     description: "For a full course load, or a thesis.",
-    price: { annual: "$7.50", monthly: "$15" },
+    price: { annual: PRO_PRICES.annualPerMonth, monthly: PRO_PRICES.monthly },
     period: { annual: "/ month, billed yearly", monthly: "/ month" },
     features: PRO_PLAN_FEATURES,
     cta: "Get Pro",

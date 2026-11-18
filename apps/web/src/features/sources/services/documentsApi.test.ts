@@ -13,19 +13,6 @@ vi.mock("convex/react", () => ({
   useAction: mockUseAction,
 }));
 
-// Mock convex/browser for imperative API
-const mockClientMutation = vi.fn();
-const mockClientQuery = vi.fn();
-
-vi.mock("convex/browser", () => ({
-  ConvexClient: vi.fn().mockImplementation(function () {
-    return {
-      mutation: mockClientMutation,
-      query: mockClientQuery,
-    };
-  }),
-}));
-
 // Mock the Convex API
 function deepProxy(): any {
   return new Proxy(
@@ -54,9 +41,6 @@ const {
   useDeleteDocument,
   useRemoveManyDocuments,
   useUploadDocument,
-  pollDocumentStatus,
-  uploadUrl,
-  uploadText,
 } = await import("./documentsApi");
 
 describe("documentsApi hooks", () => {
@@ -281,129 +265,6 @@ describe("documentsApi hooks", () => {
       );
 
       vi.unstubAllGlobals();
-    });
-  });
-});
-
-describe("documentsApi imperative functions", () => {
-  beforeEach(() => {
-    mockClientMutation.mockReset();
-    mockClientQuery.mockReset();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  describe("pollDocumentStatus", () => {
-    it("resolves when document status is completed", async () => {
-      const getDocument = vi
-        .fn()
-        .mockReturnValueOnce({ status: "pending" })
-        .mockReturnValueOnce({ status: "processing" })
-        .mockReturnValueOnce({ status: "completed", _id: "doc-1" });
-
-      const doc = await pollDocumentStatus(getDocument, undefined, 10, 10);
-
-      expect(doc.status).toBe("completed");
-      expect(getDocument).toHaveBeenCalledTimes(3);
-    });
-
-    it("resolves when document status is failed", async () => {
-      const getDocument = vi
-        .fn()
-        .mockReturnValueOnce({ status: "processing" })
-        .mockReturnValueOnce({ status: "failed", _id: "doc-1" });
-
-      const doc = await pollDocumentStatus(getDocument, undefined, 10, 10);
-
-      expect(doc.status).toBe("failed");
-    });
-
-    it("calls onUpdate callback with status changes", async () => {
-      const getDocument = vi
-        .fn()
-        .mockReturnValueOnce({ status: "pending" })
-        .mockReturnValueOnce({ status: "completed", _id: "doc-1" });
-      const onUpdate = vi.fn();
-
-      await pollDocumentStatus(getDocument, onUpdate, 10, 10);
-
-      expect(onUpdate).toHaveBeenCalledWith("pending");
-    });
-
-    it("throws when document is null", async () => {
-      const getDocument = vi.fn().mockReturnValue(null);
-
-      await expect(pollDocumentStatus(getDocument, undefined, 10, 10)).rejects.toThrow(
-        "Document not found"
-      );
-    });
-
-    it("throws when max attempts exceeded", async () => {
-      const getDocument = vi.fn().mockReturnValue({ status: "pending" });
-
-      await expect(pollDocumentStatus(getDocument, undefined, 3, 10)).rejects.toThrow(
-        "Document processing timed out"
-      );
-      expect(getDocument).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  describe("uploadUrl", () => {
-    it("calls client mutation with correct args for url type", async () => {
-      mockClientMutation.mockResolvedValue({ documentId: "doc-1" });
-
-      const result = await uploadUrl("nb-1", "https://example.com", "url");
-
-      expect(mockClientMutation).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          notebookId: "nb-1",
-          type: "url",
-          source: "https://example.com",
-          fileName: "https://example.com",
-        })
-      );
-      expect(result.documentId).toBe("doc-1");
-      expect(result.status).toBe("success");
-    });
-
-    it("calls client mutation with correct args for youtube type", async () => {
-      mockClientMutation.mockResolvedValue({ documentId: "doc-2" });
-
-      const result = await uploadUrl("nb-1", "https://youtube.com/watch?v=abc", "youtube");
-
-      expect(mockClientMutation).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          notebookId: "nb-1",
-          type: "youtube",
-          source: "https://youtube.com/watch?v=abc",
-          fileName: "YouTube Video",
-        })
-      );
-      expect(result.documentId).toBe("doc-2");
-    });
-  });
-
-  describe("uploadText", () => {
-    it("calls client mutation with correct args", async () => {
-      mockClientMutation.mockResolvedValue({ documentId: "doc-1" });
-
-      const result = await uploadText("nb-1", "Some pasted text content");
-
-      expect(mockClientMutation).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          notebookId: "nb-1",
-          type: "text",
-          source: "Some pasted text content",
-          fileName: "Pasted text",
-        })
-      );
-      expect(result.documentId).toBe("doc-1");
-      expect(result.status).toBe("success");
     });
   });
 });

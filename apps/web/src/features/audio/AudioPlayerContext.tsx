@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { AudioPlayerContext, AudioPlayerContextType } from "./useAudioPlayer";
+import { AudioPlayerContext, AudioPlayerContextType } from "./useAudioPlayerContext";
 
 interface AudioPlayerProviderProps {
   children: ReactNode;
