@@ -113,6 +113,18 @@ export function sourceRecallByChannel(
 
   return channels.map((channel) => {
     const channelChunks = chunksBySource[channel] ?? [];
+    if (channelChunks.length === 0) {
+      return baseMetric(
+        `source_recall_${channel}`,
+        fixture,
+        artifact,
+        "info",
+        1,
+        `No ${channel} chunks retrieved — recall not scored for this channel.`,
+        { channel, matched: [], chunkCount: 0, skipped: true }
+      );
+    }
+
     const combinedText = channelChunks.map((c) => c.content).join("\n");
 
     const matched: string[] = [];
@@ -142,9 +154,32 @@ export function sourceRecallByChannel(
 export function inferSourceChannel(sourceUrl?: string): string {
   if (!sourceUrl) return "notebook";
   const url = sourceUrl.toLowerCase();
-  if (url.includes("arxiv.org")) return "academic";
-  if (url.includes("semanticscholar.org")) return "academic";
-  if (url.includes("ncbi.nlm.nih.gov")) return "academic";
+  const academicMarkers = [
+    "arxiv.org",
+    "semanticscholar.org",
+    "ncbi.nlm.nih.gov",
+    "doi.org",
+    "pubmed.gov",
+    "pmc.ncbi",
+    "nber.org",
+    "ssrn.com",
+    "sciencedirect.com",
+    "springer.com",
+    "wiley.com",
+    "nature.com",
+    "science.org",
+    "ieee.org",
+    "acm.org",
+    "jstor.org",
+    "tandfonline.com",
+    "oxfordacademic",
+    "pnas.org",
+    "biorxiv.org",
+    "medrxiv.org",
+    "frontiersin.org",
+    "plos.org",
+  ];
+  if (academicMarkers.some((marker) => url.includes(marker))) return "academic";
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
   if (url.includes("tiktok.com")) return "social";
   if (url.includes("news") || url.includes("bbc") || url.includes("reuters")) return "news";

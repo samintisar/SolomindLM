@@ -14,6 +14,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { EvalFixture, StudioRunnerKind } from "../types";
+import { visionJudgeEnabled } from "../metrics/visionJudge";
 
 export interface ConvexStudioInvokerOptions {
   evalSecret: string;
@@ -423,6 +424,9 @@ export function createConvexStudioInvokers(
   for (const [kind, factory] of Object.entries(STUDIO_INVOKER_FACTORIES) as Array<
     [StudioRunnerKind, StudioInvokerFactory]
   >) {
+    if (kind === "infographic" && !visionJudgeEnabled()) {
+      continue;
+    }
     map[kind] = factory(convexUrl, options);
   }
   return map;

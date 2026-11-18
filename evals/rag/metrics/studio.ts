@@ -13,7 +13,11 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
-import { evaluateInfographicWithVision } from "./visionJudge";
+import {
+  evaluateInfographicWithVision,
+  SKIPPED_INFOGRAPHIC_IMAGE_REASON,
+  visionJudgeEnabled,
+} from "./visionJudge";
 
 function baseMetric(
   metric: string,
@@ -167,6 +171,16 @@ function mindmapNodeCount(fixture: EvalFixture, artifact: EvalRunArtifact): Metr
 }
 
 function infographicHasImage(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
+  if (!visionJudgeEnabled()) {
+    return baseMetric(
+      "infographic_image_generated",
+      fixture,
+      artifact,
+      "info",
+      1,
+      SKIPPED_INFOGRAPHIC_IMAGE_REASON
+    );
+  }
   const data = (artifact.studioOutput?.raw as InfographicPayload | undefined)?.data;
   const imageUrl = data?.imageUrl ?? "";
   const hasImage = imageUrl.length > 0 && imageUrl.startsWith("http");

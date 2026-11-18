@@ -86,15 +86,56 @@ function baseMetric(
   };
 }
 
+/** True when evals may generate and vision-score infographic images. */
+export function visionJudgeEnabled(): boolean {
+  const raw = process.env.EVAL_VISION_JUDGE?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+export const SKIPPED_INFOGRAPHIC_IMAGE_REASON =
+  "Infographic image generation skipped — set EVAL_VISION_JUDGE=true to enable Together image gen and the vision judge.";
+
+export function isInfographicImageGenerationSkipped(raw: unknown): boolean {
+  return (
+    typeof raw === "object" &&
+    raw !== null &&
+    (raw as { skippedImageGeneration?: boolean }).skippedImageGeneration === true
+  );
+}
+
+function isVisionModelUnavailable(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("model_not_available") ||
+    lower.includes("model not found") ||
+    lower.includes("does not exist") ||
+    (lower.includes("404") && lower.includes("model"))
+  );
+}
+
 /**
  * Evaluate an infographic using a vision-capable LLM.
  * The image URL is extracted from the artifact's studio output.
+ * Skipped unless EVAL_VISION_JUDGE is set.
  */
 export async function evaluateInfographicWithVision(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   config: VisionJudgeConfig = {}
 ): Promise<MetricResult[]> {
+  if (!visionJudgeEnabled()) {
+    return [
+      baseMetric(
+        "vision_judge",
+        fixture,
+        artifact,
+        "info",
+        1,
+        "Vision judge skipped — set EVAL_VISION_JUDGE=true after a vision model is configured."
+      ),
+    ];
+  }
+
   const client = createVisionClient(config);
   const model = config.model ?? VISION_JUDGE_MODEL;
 
@@ -223,6 +264,18 @@ export async function evaluateInfographicWithVision(
     return metrics;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (isVisionModelUnavailable(message)) {
+      return [
+        baseMetric(
+          "vision_judge",
+          fixture,
+          artifact,
+          "info",
+          1,
+          `Vision judge skipped — model unavailable: ${message}`
+        ),
+      ];
+    }
     return [
       baseMetric("vision_judge", fixture, artifact, "fail", 0, `Vision judge failed: ${message}`),
     ];

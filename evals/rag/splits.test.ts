@@ -7,6 +7,8 @@ describe("eval splits", () => {
     const ids = listFixtureIdsForSplit("smoke");
     const runners = new Set(ids.map((id) => getFixture(id).runner));
     expect(ids).toContain("agentic-patterns-20");
+    expect(ids).toContain("ml-factoid-decision-stump");
+    expect(ids.filter((id) => getFixture(id).runner === "chat")).toHaveLength(2);
     expect(ids.some((id) => id.startsWith("research-"))).toBe(true);
     expect(ids.some((id) => id.startsWith("literature-review-"))).toBe(true);
     expect(ids.some((id) => id.startsWith("studio-"))).toBe(true);

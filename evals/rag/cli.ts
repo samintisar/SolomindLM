@@ -216,6 +216,8 @@ Options:
   --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
   --help, -h               Show this help
 
+Infographic image generation (Together gpt-image-1.5) is skipped unless EVAL_VISION_JUDGE=true.
+
 Real runs (non --dry-run) require env:
   RAG_EVAL_CONVEX_URL       Dev Convex https://….convex.cloud (avoid prod)
   RAG_EVAL_SECRET           Matches Convex dashboard env RAG_EVAL_SECRET (min 16 chars)
@@ -479,6 +481,15 @@ async function main(): Promise<void> {
         console.log(
           `  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`
         );
+      }
+
+      const skippedImage =
+        artifact.studioOutput &&
+        typeof artifact.studioOutput.raw === "object" &&
+        artifact.studioOutput.raw !== null &&
+        "skippedImageGeneration" in artifact.studioOutput.raw;
+      if (skippedImage) {
+        console.log("  skipped infographic image generation (set EVAL_VISION_JUDGE=true to enable)");
       }
 
       const metrics = await scoreAllMetrics(fixture, artifact, baseline, {

@@ -8,6 +8,7 @@
  */
 
 import { computeConfigHash } from "../configHash";
+import { SKIPPED_INFOGRAPHIC_IMAGE_REASON, visionJudgeEnabled } from "../metrics/visionJudge";
 import type { EvalFixture, EvalRunArtifact, StudioOutput, StudioRunnerKind } from "../types";
 import type { StudioInvoker } from "./convexStudioInvoker";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
@@ -253,6 +254,15 @@ export async function runStudioEval(
 
   if (dryRun) {
     return { artifact: stubArtifact(fixture, kind, configHash), errors: [] };
+  }
+
+  if (kind === "infographic" && !visionJudgeEnabled()) {
+    const artifact = stubArtifact(fixture, kind, configHash);
+    artifact.studioOutput = {
+      kind,
+      raw: { skippedImageGeneration: true, reason: SKIPPED_INFOGRAPHIC_IMAGE_REASON },
+    };
+    return { artifact, errors: [] };
   }
 
   if (!invoker) {

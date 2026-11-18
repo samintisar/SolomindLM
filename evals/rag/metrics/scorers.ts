@@ -26,6 +26,10 @@ import {
 } from "./sourceAware";
 import { scoreStudioMetrics } from "./studio";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
+import {
+  isInfographicImageGenerationSkipped,
+  SKIPPED_INFOGRAPHIC_IMAGE_REASON,
+} from "./visionJudge";
 
 export interface ScoreAllMetricsOptions {
   /** Run legacy Likert 0–1 LLM judges (default false). */
@@ -72,6 +76,19 @@ export async function scoreAllMetrics(
   options: ScoreAllMetricsOptions = {}
 ): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
+
+  if (isInfographicImageGenerationSkipped(artifact.studioOutput?.raw)) {
+    results.push({
+      metric: "infographic_image_generated",
+      caseId: fixture.id,
+      runner: artifact.runner,
+      configHash: artifact.configHash,
+      status: "info",
+      score: 1,
+      detail: SKIPPED_INFOGRAPHIC_IMAGE_REASON,
+    });
+    return results;
+  }
 
   results.push(expectedItemRecall(fixture, artifact, baseline));
   results.push(latencyCostBudget(fixture, artifact, baseline));

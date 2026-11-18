@@ -23,20 +23,40 @@ export function getMinimumDialogueLines(targetLines: number): number {
   return Math.min(12, Math.max(8, Math.ceil(targetLines * 0.25)));
 }
 
+function extractDialogueJsonArray(responseText: string): string | null {
+  const fenced = responseText.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/i);
+  if (fenced?.[1]) {
+    return fenced[1];
+  }
+
+  const speakerStart = responseText.search(/\[\s*\{\s*"speaker"\s*:/);
+  if (speakerStart !== -1) {
+    const end = responseText.lastIndexOf("]");
+    if (end > speakerStart) {
+      return responseText.slice(speakerStart, end + 1);
+    }
+  }
+
+  const jsonStart = responseText.indexOf("[");
+  const jsonEnd = responseText.lastIndexOf("]");
+  if (jsonStart !== -1 && jsonEnd > jsonStart) {
+    return responseText.substring(jsonStart, jsonEnd + 1);
+  }
+  return null;
+}
+
 export function parseDialogueScriptResponse(
   responseText: string,
   minimumLines: number
 ): DialogueScriptParseResult {
-  const jsonStart = responseText.indexOf("[");
-  const jsonEnd = responseText.lastIndexOf("]");
-
-  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) {
+  const jsonArray = extractDialogueJsonArray(responseText);
+  if (!jsonArray) {
     return { ok: false, reason: "missing_json_array" };
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1));
+    parsed = JSON.parse(jsonArray);
   } catch (error) {
     return {
       ok: false,
@@ -133,4 +153,24 @@ export function describeDialogueScriptParseFailure(
     case "too_short":
       return `The script response was too short (${result.actualLines} lines; minimum ${result.minimumLines}).`;
   }
+}
+
+export function resolveDialogueScript(
+  responseText: string,
+  beatsText: string,
+  targetLines: number
+): DialogueLine[] {
+  const parsed = parseDialogueScriptResponse(responseText, 2);
+  if (parsed.ok) {
+    return parsed.script;
+  }
+
+  const fromBeats = buildFallbackDialogueScriptFromBeats(beatsText, targetLines);
+  if (fromBeats && fromBeats.length > 0) {
+    return fromBeats;
+  }
+
+  throw new Error(
+    `Dialogue script generation failed: ${describeDialogueScriptParseFailure(parsed)}`
+  );
 }
