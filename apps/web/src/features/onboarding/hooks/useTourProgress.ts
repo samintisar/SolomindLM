@@ -6,7 +6,6 @@ export type TourProgress = {
   createNotebook: boolean;
   addSource: boolean;
   askQuestion: boolean;
-  openStudio: boolean;
   generateArtifact: boolean;
   tourNotebookId?: Id<"notebooks">;
 };
@@ -15,7 +14,6 @@ const EMPTY: TourProgress = {
   createNotebook: false,
   addSource: false,
   askQuestion: false,
-  openStudio: false,
   generateArtifact: false,
 };
 

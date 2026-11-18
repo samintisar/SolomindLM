@@ -9,7 +9,6 @@ function withCtx(value: Partial<OnboardingContextValue>) {
   const full: OnboardingContextValue = {
     tourStatus: "active",
     currentStepId: "createNotebook",
-    notifyStudioOpen: () => {},
     skip: vi.fn(async () => {}),
     ...value,
   };
@@ -68,9 +67,9 @@ describe("TourTooltip", () => {
     expect(skip).toHaveBeenCalledTimes(1);
   });
 
-  test("renders step counter '3 of 5'", () => {
+  test("renders step counter '3 of 4'", () => {
     makeMeasuredTarget("chat-input");
     render(withCtx({ tourStatus: "active", currentStepId: "askQuestion" }));
-    expect(screen.getByText(/3 of 5/)).toBeInTheDocument();
+    expect(screen.getByText(/3 of 4/)).toBeInTheDocument();
   });
 });

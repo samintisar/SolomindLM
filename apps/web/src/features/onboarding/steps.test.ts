@@ -7,7 +7,6 @@ describe("step definitions", () => {
       "createNotebook",
       "addSource",
       "askQuestion",
-      "openStudio",
       "generateArtifact",
     ]);
   });

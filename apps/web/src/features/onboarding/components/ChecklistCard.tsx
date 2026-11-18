@@ -11,7 +11,6 @@ const ITEM_LABELS: Record<string, string> = {
   createNotebook: "Create your first notebook",
   addSource: "Add a source",
   askQuestion: "Ask a question in chat",
-  openStudio: "Open Studio",
   generateArtifact: "Generate your first artifact",
 };
 
@@ -19,7 +18,6 @@ const ORDER = [
   "createNotebook",
   "addSource",
   "askQuestion",
-  "openStudio",
   "generateArtifact",
 ] as const;
 
@@ -59,7 +57,7 @@ export const ChecklistCard: React.FC = () => {
   if (completed === ORDER.length) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
+    <div className="fixed bottom-4 right-4 z-45 w-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
       <div className="flex items-center justify-between p-3 border-b border-border">
         <span className="text-sm font-semibold">
           Get started — {completed} of {ORDER.length}

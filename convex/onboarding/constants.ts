@@ -16,7 +16,6 @@ export const STEP_IDS = [
   "createNotebook",
   "addSource",
   "askQuestion",
-  "openStudio",
   "generateArtifact",
 ] as const;
 

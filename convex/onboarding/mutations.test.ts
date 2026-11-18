@@ -28,7 +28,6 @@ type OnboardingPatch = {
     | "createNotebook"
     | "addSource"
     | "askQuestion"
-    | "openStudio"
     | "generateArtifact";
   tourNotebookId?: Id<"notebooks">;
   checklistDismissed?: boolean;
@@ -160,11 +159,6 @@ describe("advanceTourStep", () => {
     await auth.mutation(api.onboarding.mutations.advanceTourStep, {
       expectedCurrentStepId: "askQuestion",
     });
-    expect((await readRow(t, userId))?.currentStepId).toBe("openStudio");
-
-    await auth.mutation(api.onboarding.mutations.advanceTourStep, {
-      expectedCurrentStepId: "openStudio",
-    });
     expect((await readRow(t, userId))?.currentStepId).toBe("generateArtifact");
 
     await auth.mutation(api.onboarding.mutations.advanceTourStep, {
@@ -244,7 +238,7 @@ describe("completeTour", () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, {
       tourStatus: "active",
-      currentStepId: "openStudio",
+      currentStepId: "generateArtifact",
     });
     await withAuth(t, userId).mutation(
       api.onboarding.mutations.completeTour,
@@ -259,7 +253,7 @@ describe("completeTour", () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, {
       tourStatus: "active",
-      currentStepId: "openStudio",
+      currentStepId: "generateArtifact",
     });
     await withAuth(t, userId).mutation(
       api.onboarding.mutations.completeTour,

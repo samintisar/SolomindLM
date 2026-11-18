@@ -24,11 +24,14 @@ function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
 async function makeUserAndOnboarding(t: ReturnType<typeof convexTest>) {
   return await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { name: "U" });
+    /** Mirrors production startTour/restartTour — checklist uses tour-scoped progress while active. */
+    const startedAt = Date.now() - 60_000;
     await ctx.db.insert("userOnboarding", {
       userId,
       tourStatus: "active",
       currentStepId: "createNotebook",
       checklistDismissed: false,
+      startedAt,
     });
     return userId;
   });
@@ -94,7 +97,6 @@ describe("getChecklistProgress", () => {
       createNotebook: false,
       addSource: false,
       askQuestion: false,
-      openStudio: false,
       generateArtifact: false,
     });
   });
@@ -142,6 +144,52 @@ describe("getChecklistProgress", () => {
     );
     await insertNotebook(t, userB, "B's");
     const result = await withAuth(t, userA).query(
+      api.onboarding.progress.getChecklistProgress,
+      {},
+    );
+    expect(result.createNotebook).toBe(false);
+  });
+
+  test("uses global progress when tour is not active", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await t.run(async (ctx) => {
+      const uid = await ctx.db.insert("users", { name: "U" });
+      await ctx.db.insert("userOnboarding", {
+        userId: uid,
+        tourStatus: "completed",
+        checklistDismissed: false,
+        completedAt: Date.now(),
+      });
+      return uid;
+    });
+    await insertNotebook(t, userId);
+    const result = await withAuth(t, userId).query(
+      api.onboarding.progress.getChecklistProgress,
+      {},
+    );
+    expect(result.createNotebook).toBe(true);
+  });
+
+  test("while tour active, ignores notebooks created before current startedAt (restart)", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await t.run(async (ctx) => {
+      const uid = await ctx.db.insert("users", { name: "U" });
+      await ctx.db.insert("notebooks", {
+        userId: uid,
+        title: "Before restart",
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("userOnboarding", {
+        userId: uid,
+        tourStatus: "active",
+        currentStepId: "createNotebook",
+        checklistDismissed: false,
+        startedAt: Date.now(),
+      });
+      return uid;
+    });
+    const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
       {},
     );
@@ -234,23 +282,4 @@ describe("getTourProgress", () => {
     expect(result.askQuestion).toBe(true);
   });
 
-  test("openStudio is always false from server (provider overlays its own state)", async () => {
-    const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
-    await t.run(async (ctx) =>
-      ctx.db.insert("userOnboarding", {
-        userId,
-        tourStatus: "active",
-        currentStepId: "openStudio",
-        checklistDismissed: false,
-      }),
-    );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
-    expect(result.openStudio).toBe(false);
-  });
 });

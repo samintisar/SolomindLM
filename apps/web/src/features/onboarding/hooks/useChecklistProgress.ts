@@ -5,7 +5,6 @@ export type ChecklistProgress = {
   createNotebook: boolean;
   addSource: boolean;
   askQuestion: boolean;
-  openStudio: boolean;
   generateArtifact: boolean;
 };
 
@@ -13,7 +12,6 @@ const EMPTY: ChecklistProgress = {
   createNotebook: false,
   addSource: false,
   askQuestion: false,
-  openStudio: false,
   generateArtifact: false,
 };
 

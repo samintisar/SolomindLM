@@ -9,7 +9,6 @@ const mockProgress = {
   createNotebook: false,
   addSource: false,
   askQuestion: false,
-  openStudio: false,
   generateArtifact: false,
 };
 const mockState: { tourStatus: string; checklistDismissed: boolean } = {
@@ -66,10 +65,10 @@ describe("ChecklistCard", () => {
     expect(screen.queryByText(/Get started/i)).toBeNull();
   });
 
-  test("renders five items on /home", () => {
+  test("renders four items on /home", () => {
     mockState.tourStatus = "active";
     renderAt("/home");
-    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
   });
 
   test("dismiss button calls dismissChecklist", async () => {
@@ -78,5 +77,15 @@ describe("ChecklistCard", () => {
     renderAt("/home");
     await userEvent.click(screen.getByRole("button", { name: /dismiss/i }));
     expect(mockDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  test("renders on /notebook routes", () => {
+    mockState.tourStatus = "active";
+    render(
+      <MemoryRouter initialEntries={["/notebook/abc"]}>
+        <ChecklistCard />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Get started/i)).toBeInTheDocument();
   });
 });
