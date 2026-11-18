@@ -2,7 +2,7 @@
 /**
  * Prompt templates and schemas for single infographic generation.
  *
- * Generates a single, comprehensive infographic image using OpenAI's gpt-image-1.5 model.
+ * Generates a single, comprehensive infographic image using OpenAI's gpt-image-2 model.
  * The infographic combines key insights from source documents into one visual summary.
  */
 
@@ -21,7 +21,7 @@ export const InfographicSchema = z.object({
   prompt: z
     .string()
     .describe(
-      "Comprehensive prompt for gpt-image-1.5 model that includes: (1) EXACT text to render in quotation marks (title, key points, labels), (2) typography specifications (fonts, sizes, weights, crisp/sharp keywords), (3) layout composition (text placement, visual elements, spacing), (4) visual style (theme colors, graphics, icons), (5) quality requirements. The prompt must be detailed enough for gpt-image-1.5 to generate a complete, professional infographic with all text baked in."
+      "Comprehensive prompt for gpt-image-2 model that includes: (1) EXACT text to render in quotation marks (title, key points, labels), (2) typography specifications (fonts, sizes, weights, crisp/sharp keywords), (3) layout composition (text placement, visual elements, spacing), (4) visual style (theme colors, graphics, icons), (5) quality requirements. The prompt must be detailed enough for gpt-image-2 to generate a complete, professional infographic with all text baked in."
     ),
   keyPoints: z
     .array(z.string())
@@ -57,7 +57,7 @@ Your infographics are:
 - Clean: Uncluttered layouts with generous whitespace and logical grouping
 - Professionally designed with consistent color palettes and typography
 - Structured with clear visual hierarchy
-- Optimized for the gpt-image-1.5 model's text rendering capabilities
+- Optimized for the gpt-image-2 model's text rendering capabilities
 
 CRITICAL RULES:
 1. COUNT FIRST: Before designing, count the exact number of items/concepts in the source. Your infographic MUST display every single one — no clustering, no grouping multiple items into one card, no omitting items.
@@ -82,7 +82,7 @@ export const getInfographicPrompt = (params: {
 }): string => {
   const { content, customPrompt } = params;
 
-  return `You are creating a prompt for OpenAI's gpt-image-1.5 model to generate a single, comprehensive infographic that summarizes the following content.
+  return `You are creating a prompt for OpenAI's gpt-image-2 model to generate a single, comprehensive infographic that summarizes the following content.
 
 ${customPrompt ? `**Custom Focus:** ${customPrompt}\n\n` : ""}
 **SOURCE CONTENT:**
@@ -100,7 +100,7 @@ Design a single infographic that captures ALL important items from this content.
 
 1. **Title**: Create a compelling, descriptive title (3-8 words) that captures the essence of the infographic.
 
-2. **Image Generation Prompt**: Write a detailed prompt for gpt-image-1.5 that specifies:
+2. **Image Generation Prompt**: Write a detailed prompt for gpt-image-2 that specifies:
    - EXACT text to render in quotation marks (title, key points, labels, data values)
    - Typography specifications (font styles, sizes in points, weights)
    - Layout composition (sections, grid structure, text placement)
@@ -109,7 +109,7 @@ Design a single infographic that captures ALL important items from this content.
    - Style keywords (professional, 8k, crisp text, sharp rendering)
    - Aspect ratio: 1024x1536px (portrait, ideal for infographics)
 
-   The prompt must explicitly include all text content in quotation marks so gpt-image-1.5 renders it perfectly.
+   The prompt must explicitly include all text content in quotation marks so gpt-image-2 renders it perfectly.
 
 3. **Key Points**: List ALL items that appear in the infographic. The count must match the source content exactly.
 
@@ -126,8 +126,8 @@ Design a single infographic that captures ALL important items from this content.
 - Layout must accommodate ALL items: For 20 items, use a dense grid (e.g., 5 columns × 4 rows) with minimal padding. Each cell should be compact.
 - NEVER omit items. If space is tight, make cells smaller but ensure every item is visible and labeled.
 
-**CRITICAL INSTRUCTION FOR gpt-image-1.5:**
-The gpt-image-1.5 model excels at crisp, sharp text rendering. Your prompt must explicitly specify the exact text to be rendered in quotation marks, the font styles, sizes, colors, and precise positions. Use typography keywords like "crisp", "sharp", "legible", "clear", "bold", "readable" to reinforce text quality. DO NOT include pie charts, bar charts, or legends — they clutter the infographic and make text harder to read.
+**CRITICAL INSTRUCTION FOR gpt-image-2:**
+The gpt-image-2 model excels at crisp, sharp text rendering. Your prompt must explicitly specify the exact text to be rendered in quotation marks, the font styles, sizes, colors, and precise positions. Use typography keywords like "crisp", "sharp", "legible", "clear", "bold", "readable" to reinforce text quality. DO NOT include pie charts, bar charts, or legends — they clutter the infographic and make text harder to read.
 
 Return your response as a structured object with title, prompt, and keyPoints.`;
 };
