@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
-    "test:coverage": "vitest run --coverage --config vitest.config.ts"
+    "test:coverage": "vitest run --coverage --config vitest.config.ts",
+    "lint:design": "bun run scripts/design-lint-baseline.ts",
+    "lint:design:update": "bun run scripts/design-lint-baseline.ts --update"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
