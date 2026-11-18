@@ -26,6 +26,14 @@ import { ToastContainer } from "./shared/components/ToastContainer";
 import { ProtectedRoute } from "./shared/components/ProtectedRoute";
 import { PrivacyPolicy } from "./features/legal/components/PrivacyPolicy";
 import { TermsOfService } from "./features/legal/components/TermsOfService";
+import { NotebookLMComparison } from "./features/seo/pages/NotebookLMComparison";
+import { AnkiComparison } from "./features/seo/pages/AnkiComparison";
+import { QuizletComparison } from "./features/seo/pages/QuizletComparison";
+import { AIFlashcardGenerator } from "./features/seo/pages/AIFlashcardGenerator";
+import { AIQuizGenerator } from "./features/seo/pages/AIQuizGenerator";
+import { AIStudyGuideCreator } from "./features/seo/pages/AIStudyGuideCreator";
+import { PDFToStudyMaterials } from "./features/seo/pages/PDFToStudyMaterials";
+import { AIMindMapGenerator } from "./features/seo/pages/AIMindMapGenerator";
 import { NotebookItem } from "@/shared/types/index";
 import { useNotebooks } from "./features/notebooks/services/notebooksApi";
 import { useFolders } from "./features/notebooks/services/foldersApi";
@@ -148,7 +156,9 @@ const AppContent: React.FC = () => {
     location.pathname === "/" ||
     location.pathname === "/privacy" ||
     location.pathname === "/terms" ||
-    location.pathname === "/sign-in";
+    location.pathname === "/sign-in" ||
+    location.pathname.startsWith("/vs/") ||
+    location.pathname.startsWith("/tools/");
   const isHomePage =
     location.pathname === "/home" ||
     location.pathname === "/billing" ||
@@ -375,6 +385,18 @@ const AppContent: React.FC = () => {
             <Route path="/sign-in" element={<AuthPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+
+            {/* SEO Comparison Pages */}
+            <Route path="/vs/notebooklm" element={<NotebookLMComparison />} />
+            <Route path="/vs/anki" element={<AnkiComparison />} />
+            <Route path="/vs/quizlet" element={<QuizletComparison />} />
+
+            {/* SEO Tool Landing Pages */}
+            <Route path="/tools/ai-flashcard-generator" element={<AIFlashcardGenerator />} />
+            <Route path="/tools/ai-quiz-generator" element={<AIQuizGenerator />} />
+            <Route path="/tools/ai-study-guide-creator" element={<AIStudyGuideCreator />} />
+            <Route path="/tools/pdf-to-study-materials" element={<PDFToStudyMaterials />} />
+            <Route path="/tools/ai-mind-map-generator" element={<AIMindMapGenerator />} />
 
             <Route path="/home" element={<HomePage />} />
 

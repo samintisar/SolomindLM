@@ -10,6 +10,7 @@ import {
   Brain,
   Table2,
   Presentation,
+  Microscope,
 } from "lucide-react";
 import { LANDING_CONTENT } from "../constants";
 
@@ -32,6 +33,8 @@ export const FeaturesGrid: React.FC = () => {
         return MessageSquareText;
       case "rag":
         return Brain;
+      case "deepResearch":
+        return Microscope;
       case "spreadsheets":
         return Table2;
       default:
@@ -57,6 +60,8 @@ export const FeaturesGrid: React.FC = () => {
         return "text-green-700";
       case "rag":
         return "text-violet-600";
+      case "deepResearch":
+        return "text-indigo-600";
       case "spreadsheets":
         return "text-cyan-600";
       default:

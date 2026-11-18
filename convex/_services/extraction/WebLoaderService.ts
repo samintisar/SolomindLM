@@ -262,7 +262,7 @@ export class WebLoaderService {
    */
   private async fetchTitleFromMetadata(url: string): Promise<string> {
     try {
-      const metadata = await (this.supadata as any).metadata({ url });
+      const metadata = await this.supadata.metadata({ url });
       return metadata?.title ?? "";
     } catch {
       return "";

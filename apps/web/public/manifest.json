@@ -1,7 +1,7 @@
 {
   "name": "SolomindLM - AI-Powered Study Materials",
   "short_name": "SolomindLM",
-  "description": "Transform PDFs, videos, and articles into flashcards, quizzes, mind maps, and audio overviews. Grounded AI ensures accurate, hallucination-free study materials.",
+  "description": "Intelligent knowledge management for researchers and learners. Transform documents into structured insights, flashcards, quizzes, and research summaries with grounded AI.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

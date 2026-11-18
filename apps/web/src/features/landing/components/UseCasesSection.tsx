@@ -54,8 +54,8 @@ const useCases: UseCase[] = [
   {
     icon: Users,
     title: "Study Groups",
-    description: "Collaborate on shared study materials and track progress together.",
-    example: "Share flashcard deck → Practice together with real-time sync",
+    description: "Share notebooks with collaborate links for editing or fork links for copying.",
+    example: "Share a collaborate link → Team members can edit and contribute materials",
     color: "text-indigo-600",
     borderColor: "border-l-indigo-500",
   },

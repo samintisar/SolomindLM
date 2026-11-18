@@ -8,6 +8,7 @@ interface CustomizeSpreadsheetsModalProps {
   onClose: () => void;
   onGenerate: (config: SpreadsheetConfig) => void;
   embedded?: boolean;
+  showDiscoverPrompts?: boolean;
 }
 
 export interface SpreadsheetConfig {
@@ -132,6 +133,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
   onClose,
   onGenerate,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [configuringFormat, setConfiguringFormat] = useState<SpreadsheetFormat | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -195,7 +197,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
             <h2 className="text-xl font-bold font-sans">Create spreadsheet</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="spreadsheet" onApplyPrompt={setCustomPrompt} />
+            <StudioModalDiscoverPromptsButton studioTool="spreadsheet" onApplyPrompt={setCustomPrompt} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}

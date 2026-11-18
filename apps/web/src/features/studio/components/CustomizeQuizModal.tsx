@@ -9,6 +9,8 @@ interface CustomizeQuizModalProps {
   onGenerate: (config: QuizConfig) => void;
   /** When true, positions the overlay inside a relative parent instead of the viewport. */
   embedded?: boolean;
+  /** Hide the Discover Prompts button (useful for landing page demos). */
+  showDiscoverPrompts?: boolean;
 }
 
 export interface QuizConfig {
@@ -22,6 +24,7 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
   onClose,
   onGenerate,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [count, setCount] = useState<QuizConfig["count"]>("standard");
   const [difficulty, setDifficulty] = useState<QuizConfig["difficulty"]>("medium");
@@ -48,7 +51,7 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Quiz</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="quiz" onApplyPrompt={setFocus} />
+            <StudioModalDiscoverPromptsButton studioTool="quiz" onApplyPrompt={setFocus} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}

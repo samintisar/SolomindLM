@@ -21,12 +21,149 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="border-t border-border bg-background">
-      <div className="max-w-[1500px] w-full mx-auto px-6 py-12">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-[1500px] w-full mx-auto px-6 py-16 md:py-20">
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-8 md:gap-6 lg:gap-8 mb-16">
           {/* Brand */}
-          <div className="text-sm text-muted-foreground">&copy; {currentYear} SolomindLM</div>
+          <div className="col-span-2 md:col-span-5 lg:col-span-5">
+            <div className="text-foreground font-bold text-xl mb-4">SolomindLM</div>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6 max-w-sm">
+              Intelligent knowledge management for researchers and learners.
+            </p>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://discord.gg/solomindlm"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Discord"
+                className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+              >
+                <DiscordIcon className="w-4 h-4" />
+              </a>
+              <a
+                href="https://x.com/SolomindLM"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Twitter"
+                className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+              >
+                <Twitter className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
 
-          {/* Links */}
+          {/* Company */}
+          <div className="md:col-span-2 lg:col-span-2 md:col-start-7">
+            <h4 className="font-semibold text-foreground text-sm uppercase tracking-wider mb-4">Company</h4>
+            <ul className="space-y-3">
+              <li>
+                <Link
+                  to="/"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/privacy"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Privacy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/terms"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Terms
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* AI Tools */}
+          <div className="md:col-span-3 lg:col-span-3">
+            <h4 className="font-semibold text-foreground text-sm uppercase tracking-wider mb-4">AI Tools</h4>
+            <ul className="space-y-3">
+              <li>
+                <Link
+                  to="/tools/ai-flashcard-generator"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  AI Flashcard Generator
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tools/ai-quiz-generator"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  AI Quiz Generator
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tools/ai-study-guide-creator"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  AI Study Guide Creator
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tools/pdf-to-study-materials"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  PDF to Study Materials
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/tools/ai-mind-map-generator"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  AI Mind Map Generator
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Comparisons */}
+          <div className="md:col-span-2 lg:col-span-2">
+            <h4 className="font-semibold text-foreground text-sm uppercase tracking-wider mb-4">Comparisons</h4>
+            <ul className="space-y-3">
+              <li>
+                <Link
+                  to="/vs/notebooklm"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  SolomindLM vs NotebookLM
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/vs/anki"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  SolomindLM vs Anki
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/vs/quizlet"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  SolomindLM vs Quizlet
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-muted-foreground">&copy; {currentYear} SolomindLM</div>
           <nav className="flex items-center gap-6">
             <Link
               to="/privacy"
@@ -41,28 +178,6 @@ export const Footer: React.FC = () => {
               Terms
             </Link>
           </nav>
-
-          {/* Social Links */}
-          <div className="flex items-center gap-4">
-            <a
-              href="https://discord.gg/solomindlm"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Discord"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <DiscordIcon className="w-5 h-5" />
-            </a>
-            <a
-              href="https://twitter.com/solomindlm"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Twitter"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Twitter className="w-5 h-5" />
-            </a>
-          </div>
         </div>
       </div>
     </footer>

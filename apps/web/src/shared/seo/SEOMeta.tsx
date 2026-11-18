@@ -16,7 +16,7 @@ interface SEOMetaProps {
 const BASE_URL = "https://solomindlm.com";
 const DEFAULT_TITLE = "SolomindLM - AI Research Tool & Learning Partner";
 const DEFAULT_DESCRIPTION =
-  "Transform PDFs, videos, and articles into flashcards, quizzes, mind maps, and audio overviews. Grounded AI ensures accurate, hallucination-free study materials.";
+  "Intelligent knowledge management for researchers and learners. Transform documents into structured insights, flashcards, quizzes, and research summaries with grounded AI.";
 
 export const SEOMeta: React.FC<SEOMetaProps> = ({
   title = DEFAULT_TITLE,

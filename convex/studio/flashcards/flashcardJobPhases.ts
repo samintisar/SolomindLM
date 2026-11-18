@@ -12,7 +12,6 @@ import {
   recursiveCollapse,
   refineFlashcardSelection,
 } from "../../_agents/flashcard/collapseReduceLlm";
-import { FLASHCARD_CONFIG } from "../../_agents/flashcard/config";
 import {
   groupFlashcardsByTopic,
   heuristicDedupeFlashcards,

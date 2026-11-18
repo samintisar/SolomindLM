@@ -8,6 +8,7 @@ interface CustomizeFlashcardsModalProps {
   onClose: () => void;
   onGenerate: (config: FlashcardConfig) => void;
   embedded?: boolean;
+  showDiscoverPrompts?: boolean;
 }
 
 export interface FlashcardConfig {
@@ -21,6 +22,7 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
   onClose,
   onGenerate,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [count, setCount] = useState<FlashcardConfig["count"]>("standard");
   const [difficulty, setDifficulty] = useState<FlashcardConfig["difficulty"]>("medium");
@@ -47,7 +49,7 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Flashcards</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="flashcards" onApplyPrompt={setTopic} />
+            <StudioModalDiscoverPromptsButton studioTool="flashcards" onApplyPrompt={setTopic} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}

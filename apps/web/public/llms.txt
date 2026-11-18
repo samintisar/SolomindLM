@@ -1,0 +1,78 @@
+# SolomindLM
+
+SolomindLM is an intelligent knowledge management platform for researchers and learners. Transform PDFs, videos, articles, and documents into structured insights, flashcards, quizzes, mind maps, research summaries, and interactive study materials.
+
+## Key Features
+
+- **AI Flashcard Generator**: Automatically creates flashcards from any uploaded content
+- **AI Quiz Generator**: Generates multiple-choice quizzes with explanations from study materials
+- **AI Study Guide Creator**: Transforms documents into comprehensive study guides
+- **AI Mind Map Generator**: Creates visual mind maps to organize complex topics
+- **RAG Chat**: Chat with your documents using retrieval-augmented generation for accurate answers
+- **Audio Overviews**: Converts study materials into podcast-style audio summaries
+- **Deep Research**: AI-powered research assistant for in-depth topic exploration
+- **PDF to Study Materials**: Upload PDFs and automatically generate flashcards, quizzes, and more
+- **Video to Notes**: Convert YouTube videos and other video content into structured notes
+
+## Supported Content Types
+
+- PDF documents
+- Images (including handwritten notes)
+- Audio files
+- Websites and web articles
+- YouTube videos
+- Social media content (TikTok, Instagram, X)
+- Google Drive files
+- Plain text
+
+## Use Cases
+
+- **Students**: Create study materials from lecture notes, textbooks, and research papers
+- **Researchers**: Organize literature reviews and extract key findings
+- **Language Learners**: Generate vocabulary flashcards and practice quizzes
+- **Educators**: Create teaching materials and assessments
+- **Professionals**: Prepare for certifications and continuing education
+
+## Pricing
+
+- **Free Plan**: Core features with generous limits
+- **Pro Plan**: $7.50/month (billed yearly) or $15/month - Unlimited AI generation, priority processing, advanced features
+
+## Comparison with Alternatives
+
+### SolomindLM vs NotebookLM
+- SolomindLM offers more study material types (flashcards, quizzes, mind maps, infographics)
+- SolomindLM has a more modern, student-focused interface
+- SolomindLM supports more content formats including social media
+- NotebookLM is Google-integrated; SolomindLM is platform-agnostic
+
+### SolomindLM vs Anki
+- SolomindLM automatically generates flashcards from content; Anki requires manual creation
+- SolomindLM includes quizzes, mind maps, and audio; Anki is flashcard-only
+- Anki uses spaced repetition; SolomindLM focuses on content transformation
+- SolomindLM has built-in AI chat for questions
+
+### SolomindLM vs Quizlet
+- SolomindLM generates materials from your own content; Quizlet relies on pre-made sets
+- SolomindLM creates multiple study formats from one upload
+- SolomindLM uses RAG for accurate, grounded answers
+- Quizlet has a larger pre-made library; SolomindLM is more personalized
+
+## Technical Details
+
+- **Platform**: Web application with responsive design
+- **Mobile**: Available as progressive web app (PWA) and native mobile app
+- **AI Models**: Uses GPT-OSS for smart tasks and fast inference
+- **Embeddings**: 1536-dimensional vector embeddings for semantic search
+- **Security**: User data is private and not used to train AI models
+
+## Contact
+
+- Website: https://solomindlm.com
+- Support: support@solomindlm.com
+- X: https://x.com/SolomindLM
+- Discord: https://discord.gg/solomindlm
+
+## Last Updated
+
+2025-05-09

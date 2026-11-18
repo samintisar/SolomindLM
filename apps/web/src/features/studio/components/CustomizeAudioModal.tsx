@@ -40,6 +40,7 @@ interface CustomizeAudioModalProps {
   onClose: () => void;
   onGenerate: (config: AudioConfig) => void;
   embedded?: boolean;
+  showDiscoverPrompts?: boolean;
 }
 
 export interface AudioConfig {
@@ -53,6 +54,7 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
   onClose,
   onGenerate,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [selectedFormat, setSelectedFormat] = useState("deep_dive");
   const [length, setLength] = useState<AudioConfig["length"]>("default");
@@ -79,7 +81,7 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Audio Overview</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="audio" onApplyPrompt={setFocus} />
+            <StudioModalDiscoverPromptsButton studioTool="audio" onApplyPrompt={setFocus} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}

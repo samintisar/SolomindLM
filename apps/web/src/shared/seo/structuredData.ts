@@ -1,6 +1,6 @@
 const BASE_URL = "https://solomindlm.com";
 const DEFAULT_DESCRIPTION =
-  "Transform PDFs, videos, and articles into flashcards, quizzes, mind maps, and audio overviews. Grounded AI ensures accurate, hallucination-free study materials.";
+  "Intelligent knowledge management for researchers and learners. Transform documents into structured insights, flashcards, quizzes, and research summaries with grounded AI.";
 
 export const generateFAQStructuredData = (faqs: Array<{ question: string; answer: string }>) => ({
   "@context": "https://schema.org",
@@ -22,7 +22,7 @@ export const generateOrganizationStructuredData = () => ({
   url: BASE_URL,
   logo: `${BASE_URL}/SolomindLM_logo.png`,
   description: DEFAULT_DESCRIPTION,
-  sameAs: ["https://github.com/solomindlm", "https://twitter.com/solomindlm"],
+  sameAs: ["https://github.com/solomindlm", "https://x.com/SolomindLM"],
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer support",

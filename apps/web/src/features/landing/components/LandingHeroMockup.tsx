@@ -3,13 +3,16 @@ import {
   Check,
   ChevronDown,
   FileStack,
+  FileText,
   Globe,
+  HardDrive,
   Layers,
   MessageCircle,
   PanelLeftOpen,
   PanelRightOpen,
   Search,
   Send,
+  Video,
 } from "lucide-react";
 import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
@@ -51,9 +54,12 @@ export function LandingHeroMockup({
 
   const sources = useMemo(
     () => [
-      { id: "s1", title: "CPSC 304 — notes.pdf", kind: "PDF" },
-      { id: "s2", title: "Normal forms explained", kind: "YouTube" },
-      { id: "s3", title: "ACM survey (2019)", kind: "Article" },
+      { id: "s1", title: "Mixtral 8x7B — Technical Report.pdf", kind: "PDF", icon: FileText, color: "text-orange-500" },
+      { id: "s2", title: "DeepSeek-V2: Efficient MoE LLM", kind: "Article", icon: Globe, color: "text-blue-500" },
+      { id: "s3", title: "Switch Transformers (Google)", kind: "PDF", icon: FileText, color: "text-red-500" },
+      { id: "s4", title: "Mixture of Experts Explained", kind: "YouTube", icon: Video, color: "text-red-600" },
+      { id: "s5", title: "Efficient LLMs: A Survey (2024)", kind: "Article", icon: Globe, color: "text-emerald-500" },
+      { id: "s6", title: "Google Drive: MoE Research", kind: "Google Drive", icon: HardDrive, color: "text-cyan-500" },
     ],
     []
   );
@@ -80,21 +86,21 @@ export function LandingHeroMockup({
     () =>
       ({
         1: {
-          sourceTitle: "CPSC 304 — notes.pdf",
+          sourceTitle: "Mixtral 8x7B — Technical Report.pdf",
           excerpt:
-            "A relation is in BCNF when every determinant of a non-trivial FD is a superkey. Decomposition to BCNF can require splitting relations and may lose the ability to enforce certain dependencies without joins.",
+            "Mixtral 8x7B uses a sparse mixture-of-experts architecture with 8 expert networks, each 7B parameters. For every token, only 2 experts are activated (12B active parameters out of 46B total), enabling faster inference than a 70B dense model while matching its quality on most benchmarks.",
         },
         2: {
-          sourceTitle: "ACM survey (2019)",
+          sourceTitle: "DeepSeek-V2: Efficient MoE LLM",
           excerpt:
-            "Third normal form relaxes BCNF slightly: transitive dependencies through prime attributes may remain. Teams often accept 3NF when BCNF decomposition would fragment the schema too much for query patterns.",
+            "DeepSeek-V2 achieves training cost reduction of 5× compared to dense models through multi-head latent attention (MLA) and a fine-grained MoE architecture with shared experts. The model activates only 21B parameters per token out of 236B total (8.9% sparsity).",
         },
       }) as const,
     []
   );
 
   const citeBtnBase =
-    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-xl bg-primary text-xs font-bold text-primary-foreground align-middle transition-colors hover:bg-primary/90 active:bg-primary/80 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground align-middle transition-colors hover:bg-primary/90 active:bg-primary/80";
 
   return (
     <div
@@ -159,53 +165,59 @@ export function LandingHeroMockup({
         hidden={mode !== "chat"}
         className="relative z-10 flex min-h-0 flex-1 flex-col gap-2 pt-18 sm:gap-3 sm:pt-21 md:pt-23"
       >
-        <div className="flex min-h-0 flex-1 gap-2 px-3 pb-3 pt-0.5 sm:gap-3 sm:px-4 sm:pb-4 md:gap-4 md:px-5">
-          <aside className="flex w-[min(38%,12rem)] shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-background/70 shadow-md backdrop-blur-sm sm:w-[min(38%,13.5rem)] sm:rounded-2xl">
-            <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border bg-background/80 px-3 backdrop-blur-sm sm:h-14 sm:gap-2 sm:px-4">
-              <FileStack className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-              <span className="font-display text-xs font-bold uppercase tracking-wide sm:text-sm">
+        <div className="flex min-h-0 flex-1 gap-3 px-4 pb-4 pt-0.5 sm:gap-4 sm:px-5 sm:pb-5 md:gap-5 md:px-6">
+          <aside className="flex w-[min(42%,14rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm backdrop-blur-sm sm:w-[min(42%,15rem)]">
+            <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/40 bg-background/60 px-4 backdrop-blur-sm sm:h-14 sm:px-5">
+              <FileStack className="h-4 w-4 shrink-0 text-muted-foreground sm:h-5 sm:w-5" aria-hidden />
+              <span className="font-display text-xs font-bold uppercase tracking-wide text-muted-foreground sm:text-sm">
                 Sources
               </span>
             </div>
-            <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-3 sm:gap-2 sm:p-4">
+            <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3 sm:gap-3 sm:p-4">
               {sources.map((s) => {
                 const active = sourceId === s.id;
+                const Icon = s.icon;
                 return (
                   <button
                     key={s.id}
                     type="button"
                     onClick={() => setSourceId(s.id)}
-                    className={`rounded-lg border px-2 py-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-2.5 sm:py-2 ${
+                    className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-3.5 sm:py-3 ${
                       active
-                        ? "border-primary/50 bg-primary/8 shadow-sm"
-                        : "border-border/80 bg-background/60 hover:border-border hover:bg-accent/40"
+                        ? "border-primary/30 bg-primary/[0.06] shadow-sm"
+                        : "border-transparent bg-background/40 hover:border-border/60 hover:bg-accent/30"
                     }`}
                   >
-                    <p className="truncate font-sans text-[11px] font-medium text-foreground sm:text-xs">
-                      {s.title}
-                    </p>
-                    <p className="mt-0.5 font-sans text-[10px] text-muted-foreground sm:text-[11px]">
-                      {s.kind}
-                    </p>
+                    <div className={`mt-0.5 shrink-0 rounded-lg bg-background p-1.5 shadow-sm sm:p-2`}>
+                      <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${s.color}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-sans text-[11px] font-semibold text-foreground leading-snug sm:text-xs">
+                        {s.title}
+                      </p>
+                      <p className="mt-0.5 font-sans text-[10px] text-muted-foreground/70 sm:text-[11px]">
+                        {s.kind}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
             </div>
           </aside>
 
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background/70 shadow-md backdrop-blur-sm sm:rounded-2xl">
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur-sm sm:h-14 sm:px-4">
-              <div className="flex items-center gap-1.5 text-foreground sm:gap-2">
-                <MessageCircle className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-                <span className="font-display text-xs font-bold uppercase tracking-wide sm:text-sm">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm backdrop-blur-sm">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/40 bg-background/60 px-4 backdrop-blur-sm sm:h-14 sm:px-5">
+              <div className="flex items-center gap-2 text-foreground sm:gap-2.5">
+                <MessageCircle className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" aria-hidden />
+                <span className="font-display text-xs font-bold uppercase tracking-wide text-muted-foreground sm:text-sm">
                   Chat
                 </span>
               </div>
               <div className="flex items-center gap-1.5" aria-hidden>
-                <span className="rounded-md border border-border bg-card p-1.5 text-muted-foreground shadow-sm sm:rounded-lg sm:p-2">
+                <span className="rounded-lg border border-border/60 bg-card p-1.5 text-muted-foreground/60 shadow-sm sm:p-2">
                   <PanelLeftOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
-                <span className="rounded-md border border-border bg-card p-1.5 text-muted-foreground shadow-sm sm:rounded-lg sm:p-2">
+                <span className="rounded-lg border border-border/60 bg-card p-1.5 text-muted-foreground/60 shadow-sm sm:p-2">
                   <PanelRightOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
               </div>
@@ -215,21 +227,21 @@ export function LandingHeroMockup({
               className="chat-panel-graph-grid relative min-h-0 flex-1 overflow-y-auto"
               style={{ backgroundColor: "var(--background)" }}
             >
-              <div className="relative space-y-3 p-3 text-left sm:space-y-5 sm:p-4 md:p-5">
+              <div className="relative space-y-4 p-4 text-left sm:space-y-6 sm:p-5 md:p-6">
                 <div className="flex flex-col items-end gap-1">
-                  <div className="max-w-[95%] rounded-lg bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))] p-3 text-left font-serif text-sm leading-relaxed text-foreground shadow-sm sm:rounded-xl sm:p-4 sm:text-base md:text-lg">
-                    What are the tradeoffs between 3NF and BCNF for our schema sketch?
+                  <div className="max-w-[90%] rounded-2xl bg-[color-mix(in_oklch,var(--primary)_8%,var(--background))] p-3.5 text-left font-serif text-sm leading-relaxed text-foreground shadow-sm sm:rounded-2xl sm:p-4 sm:text-base">
+                    What are the tradeoffs between mixture-of-experts and dense architectures for LLMs?
                   </div>
                 </div>
 
-                <div className="space-y-1.5 sm:space-y-2">
+                <div className="space-y-2 sm:space-y-2.5">
                   <button
                     type="button"
                     onClick={() => setActivityOpen((o) => !o)}
-                    className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/90 px-2.5 py-2 text-left text-xs text-muted-foreground shadow-sm transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 sm:py-2.5 sm:text-sm"
+                    className="flex w-full items-center gap-2.5 rounded-xl border border-border/50 bg-card/70 px-3 py-2 text-left text-xs text-muted-foreground shadow-sm transition hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3.5 sm:py-2.5 sm:text-sm"
                   >
                     <Search
-                      className="h-3.5 w-3.5 shrink-0 text-primary/80 sm:h-4 sm:w-4"
+                      className="h-3.5 w-3.5 shrink-0 text-primary/70 sm:h-4 sm:w-4"
                       aria-hidden
                     />
                     <span className="font-sans">Searching your sources</span>
@@ -239,72 +251,73 @@ export function LandingHeroMockup({
                     />
                   </button>
                   {activityOpen ? (
-                    <ul className="space-y-1 border-l-2 border-primary/20 py-1 pl-2.5 font-sans text-[10px] text-muted-foreground sm:space-y-1.5 sm:pl-3 sm:text-xs">
-                      <li className="flex items-center gap-1.5 sm:gap-2">
+                    <ul className="space-y-1.5 border-l-2 border-primary/15 py-1.5 pl-3 font-sans text-[11px] text-muted-foreground/80 sm:space-y-2 sm:pl-4 sm:text-xs">
+                      <li className="flex items-center gap-2 sm:gap-2.5">
                         <Check
-                          className="h-3 w-3 shrink-0 text-vintage-green-600 sm:h-3.5 sm:w-3.5"
+                          className="h-3.5 w-3.5 shrink-0 text-emerald-600/80 sm:h-4 sm:w-4"
                           aria-hidden
                         />
                         HyDE + embeddings
                       </li>
-                      <li className="flex items-center gap-1.5 sm:gap-2">
+                      <li className="flex items-center gap-2 sm:gap-2.5">
                         <Check
-                          className="h-3 w-3 shrink-0 text-vintage-green-600 sm:h-3.5 sm:w-3.5"
+                          className="h-3.5 w-3.5 shrink-0 text-emerald-600/80 sm:h-4 sm:w-4"
                           aria-hidden
                         />
                         Ranked relevant passages
                       </li>
-                      <li className="flex items-start gap-1.5 pt-0.5 sm:gap-2">
+                      <li className="flex items-start gap-2 pt-0.5 sm:gap-2.5">
                         <Globe
-                          className="mt-0.5 h-3 w-3 shrink-0 opacity-70 sm:h-3.5 sm:w-3.5"
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60 sm:h-4 sm:w-4"
                           aria-hidden
                         />
-                        <span>Reading: CPSC 304 — notes.pdf</span>
+                        <span>Reading: Mixtral 8x7B — Technical Report.pdf</span>
                       </li>
                     </ul>
                   ) : null}
                 </div>
 
-                {/* Assistant message — mirrors MessageBubble + inline citation pills (messageRendering) */}
                 <div className="flex w-full flex-col items-start gap-1 text-left">
-                  <div className="w-full max-w-4xl font-serif text-base leading-relaxed text-foreground sm:text-lg">
-                    <div className="prose max-w-none space-y-2 font-serif text-base leading-relaxed text-foreground">
-                      <p className="text-left text-base leading-relaxed">
-                        BCNF removes every dependency where the determinant isn&apos;t a superkey
+                  <div className="w-full max-w-3xl font-serif text-sm leading-relaxed text-foreground sm:text-base">
+                    <div className="prose max-w-none space-y-3 font-serif text-sm leading-relaxed text-foreground sm:space-y-4 sm:text-base">
+                      <p className="text-left">
+                        MoE architectures activate only a subset of parameters per token, achieving
+                        better inference efficiency
                         <button
                           type="button"
                           aria-pressed={refKey === 1}
                           title="Reference 1"
                           onClick={() => setRefKey((k) => (k === 1 ? null : 1))}
-                          className={`${citeBtnBase} mx-1 ${refKey === 1 ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}
+                          className={`${citeBtnBase} mx-1 ${refKey === 1 ? "ring-2 ring-primary/40 ring-offset-2 ring-offset-background" : ""}`}
                           style={{ verticalAlign: "middle" }}
                         >
                           1
                         </button>
-                        . Third normal form still allows some dependencies when the right-hand side
-                        is a prime attribute
+                        . Dense models use all parameters for every token, which simplifies
+                        deployment but increases compute costs significantly at scale
                         <button
                           type="button"
                           aria-pressed={refKey === 2}
                           title="Reference 2"
                           onClick={() => setRefKey((k) => (k === 2 ? null : 2))}
-                          className={`${citeBtnBase} mx-1 ${refKey === 2 ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}
+                          className={`${citeBtnBase} mx-1 ${refKey === 2 ? "ring-2 ring-primary/40 ring-offset-2 ring-offset-background" : ""}`}
                           style={{ verticalAlign: "middle" }}
                         >
                           2
                         </button>
-                        . In practice, pushing all the way to BCNF can mean more joins, so teams
-                        weigh anomaly risk against query ergonomics.
+                        . For production, MoE excels when batch sizes are large and latency
+                        requirements are moderate, while dense models remain preferable for
+                        low-latency applications.
                       </p>
                     </div>
 
                     {refKey !== null ? (
                       <div
-                        className="mt-3 max-h-48 w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-popover p-4 text-left shadow-xl animate-in fade-in zoom-in-95 duration-200 sm:mt-4 sm:max-h-52 sm:p-5"
+                        className="mt-4 max-h-44 w-full max-w-lg overflow-y-auto rounded-2xl border border-border/60 bg-popover p-4 text-left shadow-lg animate-in fade-in zoom-in-95 duration-200 sm:mt-5 sm:max-h-48 sm:p-5"
                         role="note"
                         aria-label={`Reference ${refKey}`}
                       >
-                        <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground sm:text-xs">
+                        <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 sm:text-xs">
                           Reference {refKey} • {refDetails[refKey].sourceTitle}
                         </p>
                         <p className="wrap-break-word font-serif text-sm leading-relaxed text-popover-foreground">
@@ -317,17 +330,17 @@ export function LandingHeroMockup({
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-border bg-background/90 p-2 backdrop-blur-sm sm:p-3">
+            <div className="shrink-0 border-t border-border/40 bg-background/80 p-2.5 backdrop-blur-sm sm:p-3">
               <div
-                className={`flex items-center gap-2 rounded-lg border border-input bg-card px-2.5 py-1.5 shadow-sm transition sm:rounded-xl sm:px-3 sm:py-2 ${
-                  inputFlash ? "ring-2 ring-primary/35" : ""
+                className={`flex items-center gap-2.5 rounded-xl border border-input/60 bg-card/80 px-3 py-2 shadow-sm transition sm:px-3.5 sm:py-2.5 ${
+                  inputFlash ? "ring-2 ring-primary/25" : ""
                 }`}
               >
-                <div className="h-2 min-w-0 flex-1 rounded-full bg-muted/80" />
+                <div className="h-2.5 min-w-0 flex-1 rounded-full bg-muted/60" />
                 <button
                   type="button"
                   onClick={flashInput}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9 sm:w-9 sm:rounded-lg"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9 sm:w-9"
                   aria-label="Send (demo)"
                 >
                   <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
@@ -345,16 +358,16 @@ export function LandingHeroMockup({
         hidden={mode !== "studio"}
         className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden pt-18 sm:pt-21 md:pt-23"
       >
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-sm sm:h-14 sm:gap-2 sm:px-5">
-          <Layers className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" aria-hidden />
-          <span className="font-display text-xs font-bold uppercase tracking-wide text-foreground sm:text-sm">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/40 bg-background/60 px-4 backdrop-blur-sm sm:h-14 sm:gap-2.5 sm:px-6">
+          <Layers className="h-4 w-4 text-muted-foreground/60 sm:h-5 sm:w-5" aria-hidden />
+          <span className="font-display text-xs font-bold uppercase tracking-wide text-muted-foreground sm:text-sm">
             Studio
           </span>
-          <span className="hidden font-sans text-[10px] text-muted-foreground sm:ml-2 sm:inline sm:text-xs">
+          <span className="hidden font-sans text-[10px] text-muted-foreground/50 sm:ml-2 sm:inline sm:text-xs">
             Create study artifacts from your sources
           </span>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5 sm:py-5 md:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 md:px-8">
           <ToolGrid
             tools={STUDIO_TOOLS}
             onToolClick={handleStudioToolClick}
@@ -366,6 +379,7 @@ export function LandingHeroMockup({
 
       <CreateReportModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}
         onSelectFormat={() => {}}
@@ -373,6 +387,7 @@ export function LandingHeroMockup({
 
       <CustomizeFlashcardsModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "flashcards"}
         onClose={closeStudioModal}
         onGenerate={() => {}}
@@ -380,6 +395,7 @@ export function LandingHeroMockup({
 
       <CustomizeQuizModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "quiz"}
         onClose={closeStudioModal}
         onGenerate={() => {}}
@@ -387,6 +403,7 @@ export function LandingHeroMockup({
 
       <CustomizeAudioModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "audio"}
         onClose={closeStudioModal}
         onGenerate={() => {}}
@@ -394,6 +411,7 @@ export function LandingHeroMockup({
 
       <CustomizeWrittenQuestionsModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "writtenQuestions"}
         onClose={closeStudioModal}
         onGenerate={() => {}}
@@ -401,6 +419,7 @@ export function LandingHeroMockup({
 
       <CustomizeInfographicModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "infographic"}
         onClose={closeStudioModal}
         onGenerate={() => {}}
@@ -408,6 +427,7 @@ export function LandingHeroMockup({
 
       <CustomizeSpreadsheetsModal
         embedded
+        showDiscoverPrompts={false}
         isOpen={studioModal === "spreadsheets"}
         onClose={closeStudioModal}
         onGenerate={() => {}}

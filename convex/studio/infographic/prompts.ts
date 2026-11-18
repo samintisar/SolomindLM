@@ -7,8 +7,6 @@
  */
 
 import { z } from "zod";
-import { env } from "../../_lib/env";
-
 // ============================================================
 // SCHEMAS
 // ============================================================
@@ -38,11 +36,6 @@ export type Infographic = z.infer<typeof InfographicSchema>;
 // ============================================================
 // CONFIGURATION
 // ============================================================
-
-const safeParseInt = (val: string | undefined, fallback: number): number => {
-  const parsed = parseInt(val || "", 10);
-  return isNaN(parsed) ? fallback : parsed;
-};
 
 export const INFOGRAPHIC_CONFIG = {
   MAX_TOKENS: 8_000,

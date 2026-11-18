@@ -5,13 +5,17 @@ import type { StudioTool } from "../services/promptsApi";
 interface StudioModalDiscoverPromptsButtonProps {
   studioTool: StudioTool;
   onApplyPrompt: (promptText: string) => void;
+  hidden?: boolean;
 }
 
 export function StudioModalDiscoverPromptsButton({
   studioTool,
   onApplyPrompt,
+  hidden = false,
 }: StudioModalDiscoverPromptsButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  if (hidden) return null;
 
   return (
     <>

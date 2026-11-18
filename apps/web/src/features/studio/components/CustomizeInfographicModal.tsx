@@ -28,6 +28,7 @@ interface CustomizeInfographicModalProps {
   onClose: () => void;
   onGenerate: (config: InfographicConfig) => void;
   embedded?: boolean;
+  showDiscoverPrompts?: boolean;
 }
 
 export interface InfographicConfig {
@@ -42,6 +43,7 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
   onClose,
   onGenerate,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [orientation, setOrientation] = useState<InfographicConfig["orientation"]>("landscape");
   const [visualStyle, setVisualStyle] = useState("auto");
@@ -80,7 +82,7 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Infographic</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="infographic" onApplyPrompt={setCustomPrompt} />
+            <StudioModalDiscoverPromptsButton studioTool="infographic" onApplyPrompt={setCustomPrompt} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}

@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Youtube, Globe, AudioLines, File, FileCode } from "lucide-react";
+import { FileText, Youtube, Globe, AudioLines, File, Image, HardDrive, Share2 } from "lucide-react";
 import { LANDING_CONTENT } from "../constants";
 
 export const ContentShowcase: React.FC = () => {
@@ -15,8 +15,12 @@ export const ContentShowcase: React.FC = () => {
         return AudioLines;
       case "File":
         return File;
-      case "FileCode":
-        return FileCode;
+      case "Image":
+        return Image;
+      case "HardDrive":
+        return HardDrive;
+      case "Share2":
+        return Share2;
       default:
         return File;
     }

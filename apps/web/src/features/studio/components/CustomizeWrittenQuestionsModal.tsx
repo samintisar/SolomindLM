@@ -8,6 +8,7 @@ interface CustomizeWrittenQuestionsModalProps {
   onClose: () => void;
   onGenerate: (config: WrittenQuestionsConfig) => void;
   embedded?: boolean;
+  showDiscoverPrompts?: boolean;
 }
 
 export interface WrittenQuestionsConfig {
@@ -22,6 +23,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
   onClose,
   onGenerate,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [count, setCount] = useState<WrittenQuestionsConfig["count"]>("standard");
   const [difficulty, setDifficulty] = useState<WrittenQuestionsConfig["difficulty"]>("medium");
@@ -51,7 +53,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="writtenQuestions" onApplyPrompt={setFocus} />
+            <StudioModalDiscoverPromptsButton studioTool="writtenQuestions" onApplyPrompt={setFocus} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}

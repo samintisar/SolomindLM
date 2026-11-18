@@ -180,6 +180,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
   onClose,
   onSelectFormat,
   embedded = false,
+  showDiscoverPrompts = true,
 }) => {
   const [configuringFormat, setConfiguringFormat] = useState<ReportFormat | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -243,7 +244,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
             <h2 className="text-xl font-bold font-sans">Create report</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="report" onApplyPrompt={setCustomPrompt} />
+            <StudioModalDiscoverPromptsButton studioTool="report" onApplyPrompt={setCustomPrompt} hidden={!showDiscoverPrompts} />
             <button
               type="button"
               onClick={onClose}
@@ -357,4 +358,5 @@ interface CreateReportModalProps {
   onSelectFormat: (formatId: string, customPrompt?: string) => void;
   /** When true, positions the overlay inside a relative parent (e.g. marketing hero preview) instead of the viewport. */
   embedded?: boolean;
+  showDiscoverPrompts?: boolean;
 }
