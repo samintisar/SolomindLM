@@ -3,6 +3,7 @@ import type { Doc } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
 import { MAX_DOCS_TO_COUNT } from "../_lib/queryCaps";
 import * as Folders from "../_model/folders";
+import { DEFAULT_NOTEBOOK_ICON } from "../_model/notebooks";
 import { getAuthUserId } from "../auth";
 
 /** Shape folder + notebook count for API response */
@@ -99,7 +100,7 @@ export const getNotebooks = query({
           }),
           sourceCount,
           coverColor: notebook.coverColor ?? "bg-vintage-brown-300",
-          icon: notebook.icon ?? "Folder",
+          icon: notebook.icon ?? DEFAULT_NOTEBOOK_ICON,
           isFeatured: notebook.isFeatured ?? false,
           folderId: notebook.folderId,
           created_at: notebook.createdAt,

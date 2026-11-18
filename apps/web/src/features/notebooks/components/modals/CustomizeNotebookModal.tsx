@@ -1,48 +1,12 @@
-import {
-  BarChart3,
-  Book,
-  Brain,
-  FileText,
-  Folder,
-  Globe,
-  GraduationCap,
-  Lightbulb,
-  Monitor,
-  Palette,
-  Search,
-  Settings2,
-  Type,
-  X,
-} from "lucide-react";
+import { Palette, Settings2, Type, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { COVER_COLORS, COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
+import {
+  getNotebookLucideIcon,
+  NOTEBOOK_ICON_OPTIONS,
+  normalizeNotebookIcon,
+} from "@/shared/notebook/notebookLucideIcon";
 import { NotebookItem } from "@/shared/types/index";
-
-const IconMap: Record<string, React.FC<any>> = {
-  Folder,
-  Book,
-  BarChart: BarChart3,
-  Monitor,
-  Search,
-  Brain,
-  Globe,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-};
-
-const AVAILABLE_ICONS = [
-  "Folder",
-  "Book",
-  "BarChart",
-  "Monitor",
-  "Search",
-  "Brain",
-  "Globe",
-  "FileText",
-  "GraduationCap",
-  "Lightbulb",
-];
 
 interface CustomizeNotebookModalProps {
   notebook?: NotebookItem;
@@ -58,18 +22,18 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
   const isCreateMode = !notebook;
   const [title, setTitle] = useState(notebook?.title || "");
   const [selectedColor, setSelectedColor] = useState(coverFillClass(notebook?.coverColor));
-  const [selectedIcon, setSelectedIcon] = useState(notebook?.icon || "Folder");
+  const [selectedIcon, setSelectedIcon] = useState(normalizeNotebookIcon(notebook?.icon));
 
   // Update state when notebook prop changes (when data is updated in parent)
   useEffect(() => {
     if (notebook) {
       setTitle(notebook.title);
       setSelectedColor(coverFillClass(notebook.coverColor));
-      setSelectedIcon(notebook.icon || "Folder");
+      setSelectedIcon(normalizeNotebookIcon(notebook.icon));
     }
   }, [notebook?.id]); // Only update when notebook ID changes (different notebook selected)
 
-  const CurrentIcon = IconMap[selectedIcon] || Folder;
+  const CurrentIcon = getNotebookLucideIcon(selectedIcon);
 
   const handleSave = () => {
     onSave({ title: title.trim(), coverColor: selectedColor, icon: selectedIcon });
@@ -142,8 +106,8 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
               <Settings2 className="w-3.5 h-3.5 shrink-0" /> Icon
             </label>
             <div className="grid grid-cols-5 gap-3">
-              {AVAILABLE_ICONS.map((iconName) => {
-                const Icon = IconMap[iconName] || Folder;
+              {NOTEBOOK_ICON_OPTIONS.map((iconName) => {
+                const Icon = getNotebookLucideIcon(iconName);
                 const isSelected = selectedIcon === iconName;
                 return (
                   <button

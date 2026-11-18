@@ -35,6 +35,9 @@ export async function getDocumentCountByNotebook(
   return documents.length;
 }
 
+/** Icon shown for notebooks with no stored icon. "Folder" is reserved for folders. */
+export const DEFAULT_NOTEBOOK_ICON = "Book";
+
 export type NotebookCreate = {
   userId: Id<"users">;
   title: string;

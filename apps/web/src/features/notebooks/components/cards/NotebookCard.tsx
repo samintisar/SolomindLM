@@ -1,37 +1,9 @@
-import {
-  BarChart3,
-  Book,
-  Brain,
-  FileText,
-  Folder,
-  FolderOpen,
-  Globe,
-  GraduationCap,
-  Lightbulb,
-  Monitor,
-  MoreVertical,
-  Search,
-  Settings2,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { FileText, FolderOpen, Globe, MoreVertical, Settings2, Trash2, Users } from "lucide-react";
 import React from "react";
 import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
+import { getNotebookLucideIcon } from "@/shared/notebook/notebookLucideIcon";
 import { NotebookItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-
-const IconMap: Record<string, React.FC<{ className?: string }>> = {
-  Folder,
-  Book,
-  BarChart: BarChart3,
-  Monitor,
-  Search,
-  Brain,
-  Globe,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-};
 
 /** Shared props for all notebook card variants */
 interface SharedNotebookCardProps {
@@ -146,7 +118,7 @@ export function NotebookCardGrid(props: SharedNotebookCardProps) {
     ConfirmDialogComponent,
   } = useNotebookCardActions(props);
 
-  const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
+  const Icon = getNotebookLucideIcon(notebook.icon);
 
   return (
     <>
@@ -218,7 +190,7 @@ export function NotebookCardListInFolder(props: SharedNotebookCardProps) {
     ConfirmDialogComponent,
   } = useNotebookCardActions(props);
 
-  const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
+  const Icon = getNotebookLucideIcon(notebook.icon);
 
   return (
     <>
@@ -296,7 +268,7 @@ export function NotebookCardList({ showAuthor = false, ...props }: NotebookCardL
     ConfirmDialogComponent,
   } = useNotebookCardActions(props);
 
-  const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
+  const Icon = getNotebookLucideIcon(notebook.icon);
 
   return (
     <>

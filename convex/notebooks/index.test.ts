@@ -37,6 +37,18 @@ describe("notebooks.index", () => {
     expect(created.id).toBeDefined();
   });
 
+  test("create falls back to the book icon, not the folder icon", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const asUser = withAuth(t, userId);
+
+    const created = await asUser.mutation(api.notebooks.index.create, { title: "No Icon" });
+    expect(created.icon).toBe("Book");
+
+    const listed = await asUser.query(api.notebooks.index.list, {});
+    expect(listed.find((n) => n.id === created.id)?.icon).toBe("Book");
+  });
+
   test("list returns notebooks for owner only", async () => {
     const t = convexTest(schema, modules);
     const ownerId = await seedUser(t);
