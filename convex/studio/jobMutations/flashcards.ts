@@ -4,19 +4,6 @@ import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
 import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
-export const updateFlashcardTitle = internalMutation({
-  args: {
-    flashcardId: v.id("flashcards"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.flashcardId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
 export const saveFlashcardResults = internalMutation({
   args: {
     flashcardId: v.id("flashcards"),

@@ -49,16 +49,6 @@ export interface LLMConfig {
   };
 }
 
-/**
- * Result from createLLMs factory function.
- */
-export interface LLMInstances {
-  /** Fast LLM for map phase (parallel processing) */
-  fastLlm: ChatTogetherAI;
-  /** Smart LLM for reduce phase (quality synthesis) */
-  smartLlm: ChatTogetherAI;
-}
-
 // ============================================================
 // Together model kwargs
 // ============================================================
@@ -104,61 +94,6 @@ export function mergeModelKwargs(
 // ============================================================
 
 /**
- * Creates LLM instances for map and reduce phases with consistent configuration.
- *
- * If reduceModel is not provided, fastLlm will be used for both phases.
- *
- * @param config - LLM configuration
- * @returns Object containing fastLlm and smartLlm instances
- *
- * @example
- * ```typescript
- * // With separate map and reduce models
- * const llms = createLLMs({
- *   apiKey: env.TOGETHER_AI_API_KEY,
- *   mapModel: 'Qwen/Qwen3.5-9B',
- *   reduceModel: 'deepseek-ai/DeepSeek-V4.1-Flash',
- *   temperatures: {
- *     map: 0.3,
- *     reduce: 0.6,
- *   },
- * });
- *
- * // With single model for both phases
- * const llms = createLLMs({
- *   apiKey: env.TOGETHER_AI_API_KEY,
- *   mapModel: 'Qwen/Qwen3.5-9B',
- * });
- * ```
- */
-export function createLLMs(config: LLMConfig): LLMInstances {
-  const fastModelKwargs = mergeModelKwargs(config.mapModel, "fast");
-  const reduceModelKwargs = config.reduceModel ? mergeModelKwargs(config.reduceModel, "smart") : {};
-
-  // Fast model for map phase (parallel processing, lower temp for consistency)
-  const fastLlm = new ChatTogetherAI({
-    apiKey: config.apiKey,
-    model: config.mapModel,
-    temperature: config.temperatures?.map ?? 0.3,
-    maxTokens: config.maxTokens?.map,
-    modelKwargs: fastModelKwargs,
-  });
-
-  // Smart model for reduce phase (quality synthesis, higher temp for creativity)
-  const smartLlm = config.reduceModel
-    ? new ChatTogetherAI({
-        apiKey: config.apiKey,
-        model: config.reduceModel,
-        temperature: config.temperatures?.reduce ?? 0.6,
-        maxTokens: config.maxTokens?.reduce,
-        modelKwargs: reduceModelKwargs,
-      })
-    : fastLlm;
-
-  return { fastLlm, smartLlm };
-}
-
-/**
  * Creates a single LLM instance with specified configuration.
  *
  * Use this for agents that don't need separate map/reduce models.
@@ -191,49 +126,5 @@ export function createLLM(
     temperature: config.temperatures ?? 0.3,
     maxTokens: config.maxTokens,
     modelKwargs,
-  });
-}
-
-/**
- * Creates LLM instances from environment variables.
- *
- * This is a convenience function that reads from standard env variable names.
- *
- * @param env - Environment variables object
- * @returns Object containing fastLlm and smartLlm instances
- *
- * @example
- * ```typescript
- * import { env } from '../../_lib/env';
- *
- * const llms = createLLMsFromEnv(env, {
- *   mapModel: env.FAST_LLM,
- *   reduceModel: env.SMART_LLM,
- * });
- * ```
- */
-export function createLLMsFromEnv(
-  env: Record<string, string | undefined>,
-  options: {
-    mapModel?: string;
-    reduceModel?: string;
-    mapTemperature?: number;
-    reduceTemperature?: number;
-  } = {}
-): LLMInstances {
-  const apiKey = options.mapModel && env.TOGETHER_AI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("TOGETHER_AI_API_KEY is required");
-  }
-
-  return createLLMs({
-    apiKey,
-    mapModel: options.mapModel || env.FAST_LLM || "Qwen/Qwen3.5-9B",
-    reduceModel: options.reduceModel || env.SMART_LLM,
-    temperatures: {
-      map: options.mapTemperature,
-      reduce: options.reduceTemperature,
-    },
   });
 }

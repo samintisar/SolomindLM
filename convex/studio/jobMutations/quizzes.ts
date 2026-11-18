@@ -44,19 +44,6 @@ export const saveQuizResults = internalMutation({
   },
 });
 
-export const updateQuizTitle = internalMutation({
-  args: {
-    quizId: v.id("quizzes"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.quizId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
 export const updateQuizStatus = internalMutation({
   args: {
     quizId: v.id("quizzes"),

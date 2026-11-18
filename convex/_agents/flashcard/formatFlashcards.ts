@@ -1,6 +1,6 @@
 "use node";
 
-import type { Flashcard } from "./state.js";
+import type { Flashcard } from "./prompts.js";
 
 export function formatFlashcardsAsText(flashcards: Flashcard[]): string {
   return flashcards

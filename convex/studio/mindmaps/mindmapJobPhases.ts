@@ -19,7 +19,6 @@ import {
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
 import {
   MAP_PROMPT,
   MAP_SYSTEM_PROMPT,
@@ -35,7 +34,10 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { conceptsFromSource, createSmartFallback } from "./mindmapFallback";
+
+const { packChunks, validateChunks } = createStudioChunkHelpers("MindMapGraph");
 
 // ============================================================
 // CONFIGURATION
@@ -144,8 +146,6 @@ export async function runMindmapGenerationPhase(
   ctx: ActionCtx,
   args: MindmapGenerationPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { mindmapId, userId, notebookId, documentIds, customPrompt } = args;
 
   // Initialize structured logger
@@ -308,8 +308,6 @@ export async function runProcessMindMapMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessMindMapMapChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { mindmapId, userId, notebookId, chunkIndex, totalChunks, chunk, customPrompt } = args;
 
   const logger = createJobLogger({
@@ -499,8 +497,6 @@ export async function runFinalizeMindMapPhase(
   ctx: ActionCtx,
   args: FinalizeMindMapPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { mindmapId, userId, notebookId, customPrompt } = args;
 
   const logger = createJobLogger({

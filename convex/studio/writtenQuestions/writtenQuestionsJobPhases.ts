@@ -18,7 +18,6 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
   appendUniqueWrittenQuestions,
   applySelectedQuestionIds,
@@ -43,6 +42,9 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { createStudioChunkHelpers } from "../_job/studioChunks";
+
+const { packChunks, validateChunks } = createStudioChunkHelpers("WrittenQuestionsGraph");
 
 // ============================================================
 // SCHEMAS
@@ -128,8 +130,6 @@ export async function runWrittenQuestionsGenerationPhase(
   ctx: ActionCtx,
   args: WrittenQuestionsGenerationPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const {
     writtenQuestionId,
     userId,
@@ -311,8 +311,6 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessWrittenQuestionsMapChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const {
     writtenQuestionId,
     userId,
@@ -595,8 +593,6 @@ export async function runFinalizeWrittenQuestionsPhase(
   ctx: ActionCtx,
   args: FinalizeWrittenQuestionsPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { writtenQuestionId, userId, notebookId, questionCount, difficulty, questionType, focus } =
     args;
 

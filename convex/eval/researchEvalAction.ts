@@ -90,7 +90,7 @@ export const runResearchEval = action({
       );
       if (chunkIds.length === 0) return [];
 
-      const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
+      const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
       const chunkMap = new Map(
         (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map((c) => [
           c._id,
@@ -132,7 +132,7 @@ export const runResearchEval = action({
     };
 
     const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
-      return ctx.runQuery(internal.documents.index.keywordSearch, {
+      return ctx.runQuery(internal.documents.internal.keywordSearch, {
         notebookId: notebookIdTyped,
         userId: keywordSearchChunkUserId,
         query,

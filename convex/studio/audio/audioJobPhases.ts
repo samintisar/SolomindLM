@@ -57,7 +57,6 @@ import {
   synthesizeSpeechToBuffer,
 } from "../../_services/ai/togetherTts.js";
 import { concatenateWavBuffers, getPcmWavDurationSeconds } from "../../_services/ai/wav.js";
-import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 import type { AudioSynthesisInput, AudioSynthesisState } from "../jobMutations/audio";
 import { buildTranscriptLines, planSynthesisChunks } from "./synthesisChunks";
@@ -68,7 +67,6 @@ import { buildTranscriptLines, planSynthesisChunks } from "./synthesisChunks";
 
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 20_000,
-  REDUCE_CHUNK_SIZE_TOKENS: 40_000,
   PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk
   REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
   REDUCE_MAX_OUTPUT_TOKENS: 16_384,
@@ -139,8 +137,6 @@ export async function runAudioOverviewGenerationPhase(
   ctx: ActionCtx,
   args: AudioOverviewGenerationPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { audioOverviewId, userId, notebookId, documentIds } = args;
 
   // Initialize structured logger
@@ -289,8 +285,6 @@ export async function runProcessAudioMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessAudioMapChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { audioOverviewId, userId, notebookId, chunkIndex, totalChunks, chunk } = args;
 
   const logger = createJobLogger({
@@ -482,8 +476,6 @@ export async function runFinalizeAudioOverviewPhase(
   ctx: ActionCtx,
   args: FinalizeAudioOverviewPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { audioOverviewId, userId, notebookId } = args;
 
   const logger = createJobLogger({
@@ -562,16 +554,9 @@ export async function runFinalizeAudioOverviewPhase(
       },
     });
 
-    // Collapse outputs
-    const collapsedOutputs = collapseStringOutputsByTokens(
-      allBeats,
-      CONFIG.REDUCE_CHUNK_SIZE_TOKENS / 2
-    );
-    const combined = collapsedOutputs.join("\n\n---\n\n");
+    const combined = allBeats.join("\n\n---\n\n");
 
-    console.log(
-      `[AudioJob] Collapsed ${allBeats.length} outputs to ${collapsedOutputs.length} chunks`
-    );
+    console.log(`[AudioJob] Combined ${allBeats.length} beat extractions`);
 
     // Update status for script writing
     await ctx.runMutation(internal.studio.jobMutations.audio.updateAudioOverviewStatus, {
@@ -841,8 +826,6 @@ export async function runSynthesizeAudioOverviewPhase(
   ctx: ActionCtx,
   args: SynthesizeAudioOverviewPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { audioOverviewId, userId, notebookId } = args;
   const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
 
@@ -981,8 +964,6 @@ export async function runSynthesizeAudioOverviewChunkPhase(
   ctx: ActionCtx,
   args: SynthesizeAudioOverviewChunkPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { audioOverviewId, userId, notebookId, chunkIndex, attempt } = args;
   const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
   // Stored but not yet recorded: nothing else would delete it if this action fails.
@@ -1073,8 +1054,6 @@ export async function runAssembleAudioOverviewPhase(
   ctx: ActionCtx,
   args: SynthesizeAudioOverviewPhaseArgs
 ): Promise<void> {
-  "use node";
-
   const { audioOverviewId, userId, notebookId } = args;
   const logger = createJobLogger({ jobType: "audio", jobId: audioOverviewId, notebookId, userId });
 

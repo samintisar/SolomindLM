@@ -36,19 +36,6 @@ export const saveSpreadsheetResults = internalMutation({
   },
 });
 
-export const updateSpreadsheetTitle = internalMutation({
-  args: {
-    spreadsheetId: v.id("spreadsheets"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.spreadsheetId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
 export const updateSpreadsheetStatus = internalMutation({
   args: {
     spreadsheetId: v.id("spreadsheets"),

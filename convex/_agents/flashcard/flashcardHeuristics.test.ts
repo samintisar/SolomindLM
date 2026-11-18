@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUsableFlashcard } from "./flashcardHeuristics";
-import type { Flashcard } from "./state";
+import type { Flashcard } from "./prompts";
 
 function card(front: string, back: string): Flashcard {
   return { type: "fill-blank", front, back };

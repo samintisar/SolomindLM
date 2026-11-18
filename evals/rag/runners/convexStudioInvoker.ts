@@ -396,7 +396,7 @@ export function createConvexAudioScriptOnlyInvoker(
       );
       const populated = await pollStatus(
         () =>
-          client.action(api.eval.studioEvalAction.getAudioScriptOnlyEvalStatus, {
+          client.action(api.eval.studioEvalAction.getAudioScriptEvalStatus, {
             evalSecret: options.evalSecret,
             audioOverviewId: audioOverviewId as Id<"audioOverviews">,
           }),

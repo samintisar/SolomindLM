@@ -43,19 +43,6 @@ export const saveMindMapResults = internalMutation({
   },
 });
 
-export const updateMindMapTitle = internalMutation({
-  args: {
-    mindmapId: v.id("mindmaps"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.mindmapId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
 export const updateMindMapStatus = internalMutation({
   args: {
     mindmapId: v.id("mindmaps"),

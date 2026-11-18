@@ -16,7 +16,6 @@ import {
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
 import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
-import { packChunks, validateChunks } from "../../_agents/ReportGraph";
 import {
   MAP_PROMPTS,
   MAP_STRUCTURED_SYSTEM_PROMPT,
@@ -29,7 +28,10 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { createStudioChunkHelpers } from "../_job/studioChunks";
 import { isFailedMapResult } from "./mapResultUtils.js";
+
+const { packChunks, validateChunks } = createStudioChunkHelpers("ReportGraph");
 
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,

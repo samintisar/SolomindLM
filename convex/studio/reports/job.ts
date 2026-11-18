@@ -24,7 +24,6 @@ export const reportGeneration = internalAction({
     smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runReportGenerationPhase(ctx, args);
   },
 });
@@ -42,7 +41,6 @@ export const processReportMapChunk = internalAction({
     smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runProcessReportMapChunkPhase(ctx, args);
   },
 });
@@ -57,7 +55,6 @@ export const finalizeReportPhase = internalAction({
     smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    "use node";
     await runFinalizeReportPhase(ctx, args);
   },
 });

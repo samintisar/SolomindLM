@@ -6,57 +6,6 @@ import * as Conversations from "../_model/conversations";
 import { getAuthUserId } from "../auth";
 
 /**
- * Get a conversation by ID
- */
-export const get = query({
-  args: {
-    conversationId: v.id("conversations"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-
-    return await assertCanReadConversation(ctx, args.conversationId, userId);
-  },
-});
-
-/**
- * Get or create conversation for a notebook
- */
-export const getOrCreate = query({
-  args: {
-    notebookId: v.id("notebooks"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
-
-    const existing = await Conversations.getPrimaryConversationForNotebook(ctx, args.notebookId);
-
-    if (existing) {
-      return existing;
-    }
-
-    return null;
-  },
-});
-
-/**
- * Get all conversations for a user
- */
-export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    return await Conversations.getUserConversations(ctx, userId);
-  },
-});
-
-/**
  * List all conversations for a specific notebook, ordered by most recently updated
  */
 export const listForNotebook = query({

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { ExternalServiceError } from "../../_lib/errors";
 import { EmptyLlmResponseError } from "./llmErrors";
 import {
-  createRetryWrapper,
   invokeWithHttpRetry,
   invokeWithRetry,
   isHttpAwareRetryableError,
@@ -128,17 +127,6 @@ describe("invokeWithRetry", () => {
       "500"
     );
     expect(fn).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("createRetryWrapper", () => {
-  it("creates a reusable retry function with fixed config", async () => {
-    const withRetry = createRetryWrapper({ maxAttempts: 2, baseDelayMs: 10 });
-    const fn = vi.fn().mockRejectedValueOnce(new Error("rate limit")).mockResolvedValue("wrapped");
-
-    const result = await withRetry(fn, "phase");
-    expect(result).toBe("wrapped");
-    expect(fn).toHaveBeenCalledTimes(2);
   });
 });
 
