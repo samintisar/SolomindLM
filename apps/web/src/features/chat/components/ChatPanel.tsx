@@ -56,7 +56,10 @@ import { ResearchPlanMessage } from "./ResearchPlanMessage";
  * tracks the composer's rendered height via `useComposerClearance` (fallback until measured).
  */
 const MessageListFooter = () => (
-  <div className="h-[var(--chat-composer-clearance,14rem)] shrink-0" aria-hidden />
+  <div
+    className="h-[var(--chat-composer-clearance,18rem)] shrink-0 md:h-[var(--chat-composer-clearance,14rem)]"
+    aria-hidden
+  />
 );
 const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
 
@@ -293,6 +296,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const messageScrollerRef = useRef<HTMLElement | null>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   useComposerClearance(messagesContainerRef, composerRef, messageScrollerRef);
+  const setMessageScroller = useCallback((el: unknown) => {
+    messageScrollerRef.current = el instanceof HTMLElement ? el : null;
+  }, []);
 
   // --- Chat action handlers ---
 
@@ -922,9 +928,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     )}
                   </div>
                 )}
-                scrollerRef={(el) => {
-                  messageScrollerRef.current = el instanceof HTMLElement ? el : null;
-                }}
+                scrollerRef={setMessageScroller}
                 components={MESSAGE_LIST_COMPONENTS}
                 defaultItemHeight={150}
                 increaseViewportBy={{ top: 200, bottom: 400 }}
